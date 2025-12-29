@@ -1,155 +1,27 @@
 import * as Sentry from '@sentry/nextjs';
-import { and, eq, gt, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import {
-  creatorProfiles,
-  dashboardIdempotencyKeys,
-  socialLinks,
-  users,
-} from '@/lib/db/schema';
+import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
-import {
-  enqueueBeaconsIngestionJob,
-  enqueueLayloIngestionJob,
-  enqueueLinktreeIngestionJob,
-  enqueueYouTubeIngestionJob,
-} from '@/lib/ingestion/jobs';
 import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
-  isBeaconsUrl,
-  validateBeaconsUrl,
-} from '@/lib/ingestion/strategies/beacons';
-import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
-import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
-import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
-import {
-  createRateLimitHeaders,
-  dashboardLinksRateLimit,
-} from '@/lib/rate-limit';
+  checkIdempotencyKey,
+  checkRateLimit,
+  scheduleIngestionJobs,
+  storeIdempotencyKey,
+  updateLinkStateSchema,
+  updateSocialLinksSchema,
+} from '@/lib/services/social-links';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
-import { isValidSocialPlatform } from '@/types';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-/**
- * Idempotency key expiration time (24 hours).
- * This duration balances between:
- * - Long enough to catch retries from network failures and user refreshes
- * - Short enough to not consume excessive storage
- *
- * NOTE: Expired keys should be cleaned up periodically via a background job
- * or Postgres TTL extension (pg_cron). See dashboard_idempotency_keys table.
- */
-const IDEMPOTENCY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Check and apply rate limiting for dashboard link operations.
- *
- * Rate limiting is applied per-user (via clerkUserId) rather than per-profile.
- * This means a user with multiple profiles shares the same rate limit bucket
- * across all their profiles (30 requests per minute total).
- *
- * Rationale: Per-user limiting is simpler and prevents abuse where a malicious
- * user creates many profiles to bypass per-profile limits.
- */
-async function checkRateLimit(
-  userId: string
-): Promise<{ allowed: boolean; headers: HeadersInit }> {
-  if (!dashboardLinksRateLimit) {
-    // Rate limiting not configured, allow request
-    return { allowed: true, headers: {} };
-  }
-
-  const result = await dashboardLinksRateLimit.limit(userId);
-  const headers = createRateLimitHeaders({
-    success: result.success,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: new Date(result.reset),
-  });
-
-  return { allowed: result.success, headers };
-}
-
-/**
- * Check for existing idempotency key and return cached response if found
- */
-async function checkIdempotencyKey(
-  key: string,
-  userId: string,
-  endpoint: string
-): Promise<{ cached: boolean; response?: NextResponse }> {
-  if (!key) {
-    return { cached: false };
-  }
-
-  const [existing] = await db
-    .select({
-      responseStatus: dashboardIdempotencyKeys.responseStatus,
-      responseBody: dashboardIdempotencyKeys.responseBody,
-      expiresAt: dashboardIdempotencyKeys.expiresAt,
-    })
-    .from(dashboardIdempotencyKeys)
-    .where(
-      and(
-        eq(dashboardIdempotencyKeys.key, key),
-        eq(dashboardIdempotencyKeys.userId, userId),
-        eq(dashboardIdempotencyKeys.endpoint, endpoint),
-        gt(dashboardIdempotencyKeys.expiresAt, new Date())
-      )
-    )
-    .limit(1);
-
-  if (existing) {
-    return {
-      cached: true,
-      response: NextResponse.json(existing.responseBody ?? { ok: true }, {
-        status: existing.responseStatus,
-        headers: NO_STORE_HEADERS,
-      }),
-    };
-  }
-
-  return { cached: false };
-}
-
-/**
- * Store idempotency key with response for future deduplication
- */
-async function storeIdempotencyKey(
-  key: string,
-  userId: string,
-  endpoint: string,
-  responseStatus: number,
-  responseBody: Record<string, unknown>
-): Promise<void> {
-  if (!key) return;
-
-  try {
-    await db
-      .insert(dashboardIdempotencyKeys)
-      .values({
-        key,
-        userId,
-        endpoint,
-        responseStatus,
-        responseBody,
-        expiresAt: new Date(Date.now() + IDEMPOTENCY_KEY_TTL_MS),
-      })
-      .onConflictDoNothing();
-  } catch {
-    // Non-critical: idempotency key storage failure shouldn't fail the request
-    console.error('Failed to store idempotency key');
-  }
-}
 
 export async function GET(req: Request) {
   try {
@@ -268,45 +140,6 @@ export async function GET(req: Request) {
     );
   }
 }
-
-const updateSocialLinksSchema = z.object({
-  profileId: z.string().min(1),
-  idempotencyKey: z.string().max(128).optional(),
-  expectedVersion: z.number().int().min(1).optional(),
-  links: z
-    .array(
-      z.object({
-        platform: z
-          .string()
-          .min(1)
-          .refine(isValidSocialPlatform, { message: 'Invalid platform' }),
-        platformType: z.string().min(1).optional(),
-        url: z.string().min(1).max(2048),
-        sortOrder: z.number().int().min(0).optional(),
-        isActive: z.boolean().optional(),
-        displayText: z.string().max(256).optional(),
-        state: z.enum(['active', 'suggested', 'rejected']).optional(),
-        confidence: z.number().min(0).max(1).optional(),
-        sourcePlatform: z.string().max(128).optional(),
-        sourceType: z.enum(['manual', 'admin', 'ingested']).optional(),
-        evidence: z
-          .object({
-            sources: z.array(z.string()).optional(),
-            signals: z.array(z.string()).optional(),
-          })
-          .optional(),
-      })
-    )
-    .max(100)
-    .optional(),
-});
-
-const updateLinkStateSchema = z.object({
-  profileId: z.string().min(1),
-  linkId: z.string().min(1),
-  action: z.enum(['accept', 'dismiss']),
-  expectedVersion: z.number().int().min(1).optional(),
-});
 
 export async function PUT(req: Request) {
   try {
@@ -580,89 +413,7 @@ export async function PUT(req: Request) {
       })();
 
       // Schedule ingestion jobs (non-blocking)
-      const ingestionPromise = (async () => {
-        const linktreeTargets = links.filter(
-          link => link.platform === 'linktree' || isLinktreeUrl(link.url)
-        );
-        const beaconsTargets = links
-          .map(link => {
-            const validated = validateBeaconsUrl(link.url);
-            if (!validated) return null;
-            return link.platform === 'beacons' || isBeaconsUrl(validated)
-              ? { ...link, url: validated }
-              : null;
-          })
-          .filter((link): link is NonNullable<typeof link> => Boolean(link));
-        const layloTargets = links.filter(
-          link => link.platform === 'laylo' || isLayloUrl(link.url)
-        );
-        const youtubeTargets = links
-          .map(link => {
-            const validated = validateYouTubeChannelUrl(link.url);
-            return validated ? { ...link, url: validated } : null;
-          })
-          .filter((link): link is NonNullable<typeof link> => Boolean(link));
-
-        const jobs: Promise<unknown>[] = [];
-
-        if (beaconsTargets.length > 0) {
-          jobs.push(
-            ...beaconsTargets.map(link =>
-              enqueueBeaconsIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue beacons ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        if (linktreeTargets.length > 0) {
-          jobs.push(
-            ...linktreeTargets.map(link =>
-              enqueueLinktreeIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue linktree ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        if (layloTargets.length > 0) {
-          jobs.push(
-            ...layloTargets.map(link =>
-              enqueueLayloIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue laylo ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        if (youtubeTargets.length > 0) {
-          jobs.push(
-            ...youtubeTargets.map(link =>
-              enqueueYouTubeIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue youtube ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        await Promise.all(jobs);
-      })();
+      const ingestionPromise = scheduleIngestionJobs(profileId, links);
 
       // Wait for background tasks but don't let failures affect the response.
       // Failures are logged for follow-up but shouldn't block the user.

@@ -1,0 +1,80 @@
+import { eq } from 'drizzle-orm';
+import { creatorProfiles, type DbType } from '@/lib/db';
+import { enqueueFollowupIngestionJobs } from '../followup';
+import { normalizeAndMergeExtraction } from '../merge';
+import type {
+  BaseJobPayload,
+  JobExecutionResult,
+  JobExecutorConfig,
+} from './types';
+
+/**
+ * Generic job executor that handles the common workflow for all ingestion jobs.
+ * This reduces duplication across processLinktreeJob, processLayloJob, etc.
+ */
+export async function executeIngestionJob<TPayload extends BaseJobPayload>(
+  tx: DbType,
+  jobPayload: unknown,
+  config: JobExecutorConfig<TPayload>
+): Promise<JobExecutionResult> {
+  const parsed = config.payloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const extraction = await config.fetchAndExtract(parsed, profile);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : `${config.platformName} ingestion failed`;
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
