@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { z } from 'zod';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  type TipIntentPayload,
+  tipIntentSchema,
+} from '@/lib/validation/schemas';
 import { validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const TipIntentSchema = z.object({
-  amount: z.number().int().min(1).max(500),
-  handle: z.string(),
-});
-
-type TipIntentInput = z.infer<typeof TipIntentSchema>;
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
     const json = parsedBody.data;
 
-    const parsed = TipIntentSchema.safeParse(json);
+    const parsed = tipIntentSchema.safeParse(json);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -42,7 +38,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { amount, handle }: TipIntentInput = parsed.data;
+    const { amount, handle }: TipIntentPayload = parsed.data;
 
     const usernameValidation = validateUsername(handle);
     if (!usernameValidation.isValid) {

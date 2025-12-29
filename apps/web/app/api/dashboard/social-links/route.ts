@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, gt, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
@@ -13,26 +12,17 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
-import {
-  enqueueBeaconsIngestionJob,
-  enqueueLayloIngestionJob,
-  enqueueLinktreeIngestionJob,
-  enqueueYouTubeIngestionJob,
-} from '@/lib/ingestion/jobs';
 import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
-import {
-  isBeaconsUrl,
-  validateBeaconsUrl,
-} from '@/lib/ingestion/strategies/beacons';
-import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
-import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
-import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
 import {
   createRateLimitHeaders,
   dashboardLinksRateLimit,
 } from '@/lib/rate-limit';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
+import {
+  updateSocialLinksSchema as baseUpdateSocialLinksSchema,
+  updateLinkStateSchema,
+} from '@/lib/validation/schemas';
 import { isValidSocialPlatform } from '@/types';
 
 export const runtime = 'nodejs';
@@ -269,44 +259,27 @@ export async function GET(req: Request) {
   }
 }
 
-const updateSocialLinksSchema = z.object({
-  profileId: z.string().min(1),
-  idempotencyKey: z.string().max(128).optional(),
-  expectedVersion: z.number().int().min(1).optional(),
-  links: z
-    .array(
-      z.object({
-        platform: z
-          .string()
-          .min(1)
-          .refine(isValidSocialPlatform, { message: 'Invalid platform' }),
-        platformType: z.string().min(1).optional(),
-        url: z.string().min(1).max(2048),
-        sortOrder: z.number().int().min(0).optional(),
-        isActive: z.boolean().optional(),
-        displayText: z.string().max(256).optional(),
-        state: z.enum(['active', 'suggested', 'rejected']).optional(),
-        confidence: z.number().min(0).max(1).optional(),
-        sourcePlatform: z.string().max(128).optional(),
-        sourceType: z.enum(['manual', 'admin', 'ingested']).optional(),
-        evidence: z
-          .object({
-            sources: z.array(z.string()).optional(),
-            signals: z.array(z.string()).optional(),
-          })
-          .optional(),
-      })
-    )
-    .max(100)
-    .optional(),
-});
-
-const updateLinkStateSchema = z.object({
-  profileId: z.string().min(1),
-  linkId: z.string().min(1),
-  action: z.enum(['accept', 'dismiss']),
-  expectedVersion: z.number().int().min(1).optional(),
-});
+/**
+ * Extended update social links schema with platform validation.
+ *
+ * Uses the centralized baseUpdateSocialLinksSchema and adds route-specific
+ * platform validation via superRefine to check against isValidSocialPlatform.
+ */
+const updateSocialLinksSchema = baseUpdateSocialLinksSchema.superRefine(
+  (data, ctx) => {
+    if (data.links) {
+      data.links.forEach((link, index) => {
+        if (!isValidSocialPlatform(link.platform)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Invalid platform',
+            path: ['links', index, 'platform'],
+          });
+        }
+      });
+    }
+  }
+);
 
 export async function PUT(req: Request) {
   try {
@@ -579,95 +552,10 @@ export async function PUT(req: Request) {
         }
       })();
 
-      // Schedule ingestion jobs (non-blocking)
-      const ingestionPromise = (async () => {
-        const linktreeTargets = links.filter(
-          link => link.platform === 'linktree' || isLinktreeUrl(link.url)
-        );
-        const beaconsTargets = links
-          .map(link => {
-            const validated = validateBeaconsUrl(link.url);
-            if (!validated) return null;
-            return link.platform === 'beacons' || isBeaconsUrl(validated)
-              ? { ...link, url: validated }
-              : null;
-          })
-          .filter((link): link is NonNullable<typeof link> => Boolean(link));
-        const layloTargets = links.filter(
-          link => link.platform === 'laylo' || isLayloUrl(link.url)
-        );
-        const youtubeTargets = links
-          .map(link => {
-            const validated = validateYouTubeChannelUrl(link.url);
-            return validated ? { ...link, url: validated } : null;
-          })
-          .filter((link): link is NonNullable<typeof link> => Boolean(link));
-
-        const jobs: Promise<unknown>[] = [];
-
-        if (beaconsTargets.length > 0) {
-          jobs.push(
-            ...beaconsTargets.map(link =>
-              enqueueBeaconsIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue beacons ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        if (linktreeTargets.length > 0) {
-          jobs.push(
-            ...linktreeTargets.map(link =>
-              enqueueLinktreeIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue linktree ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        if (layloTargets.length > 0) {
-          jobs.push(
-            ...layloTargets.map(link =>
-              enqueueLayloIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue laylo ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        if (youtubeTargets.length > 0) {
-          jobs.push(
-            ...youtubeTargets.map(link =>
-              enqueueYouTubeIngestionJob({
-                creatorProfileId: profileId,
-                sourceUrl: link.url,
-              }).catch(err => {
-                console.error('Failed to enqueue youtube ingestion job', err);
-                return null;
-              })
-            )
-          );
-        }
-
-        await Promise.all(jobs);
-      })();
-
       // Wait for background tasks but don't let failures affect the response.
       // Failures are logged for follow-up but shouldn't block the user.
-      Promise.all([enrichmentPromise, ingestionPromise]).catch(error =>
-        captureError('Social links enrichment or ingestion failed', error, {
+      enrichmentPromise.catch(error =>
+        captureError('Social links enrichment failed', error, {
           route: '/api/dashboard/social-links',
           profileId,
           action: 'background_processing',
@@ -694,7 +582,7 @@ export async function PUT(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export async function DELETE(req: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       // Apply rate limiting
@@ -708,7 +596,7 @@ export async function PATCH(req: Request) {
       }
 
       const parsedBody = await parseJsonBody<unknown>(req, {
-        route: 'PATCH /api/dashboard/social-links',
+        route: 'DELETE /api/dashboard/social-links',
         headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
       });
       if (!parsedBody.ok) {
@@ -732,10 +620,21 @@ export async function PATCH(req: Request) {
 
       const { profileId, linkId, action, expectedVersion } = parsed.data;
 
+      if (!profileId || !linkId || !action) {
+        return NextResponse.json(
+          { error: 'Profile ID, Link ID, and action are required' },
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Verify the profile belongs to the authenticated user
       const [profile] = await tx
         .select({
           id: creatorProfiles.id,
           usernameNormalized: creatorProfiles.usernameNormalized,
+          avatarUrl: creatorProfiles.avatarUrl,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          userId: creatorProfiles.userId,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -751,28 +650,18 @@ export async function PATCH(req: Request) {
         );
       }
 
+      // Get the link to verify it exists and belongs to this profile
       const [link] = await tx
         .select({
           id: socialLinks.id,
           creatorProfileId: socialLinks.creatorProfileId,
-          platform: socialLinks.platform,
-          platformType: socialLinks.platformType,
-          url: socialLinks.url,
-          sortOrder: socialLinks.sortOrder,
-          isActive: socialLinks.isActive,
-          displayText: socialLinks.displayText,
-          state: socialLinks.state,
-          confidence: socialLinks.confidence,
-          sourcePlatform: socialLinks.sourcePlatform,
-          sourceType: socialLinks.sourceType,
-          evidence: socialLinks.evidence,
           version: socialLinks.version,
         })
         .from(socialLinks)
         .where(
           and(
             eq(socialLinks.id, linkId),
-            eq(socialLinks.creatorProfileId, profile.id)
+            eq(socialLinks.creatorProfileId, profileId)
           )
         )
         .limit(1);
@@ -784,119 +673,54 @@ export async function PATCH(req: Request) {
         );
       }
 
-      // PATCH state validation: only allow transitions from 'suggested' state
-      const currentState = link.state as 'active' | 'suggested' | 'rejected';
-      if (currentState !== 'suggested') {
-        return NextResponse.json(
-          {
-            error: `Cannot ${action} link: only suggested links can be accepted or dismissed`,
-            code: 'INVALID_STATE_TRANSITION',
-            currentState,
-          },
-          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
-      }
-
-      // Check optimistic locking
-      const currentVersion = link.version ?? 1;
-      if (expectedVersion !== undefined && currentVersion !== expectedVersion) {
-        return NextResponse.json(
-          {
+      // Check optimistic locking if expectedVersion is provided
+      if (expectedVersion !== undefined) {
+        const currentVersion = link.version ?? 1;
+        if (currentVersion !== expectedVersion) {
+          const response = {
             error: 'Conflict: Link has been modified by another request',
             code: 'VERSION_CONFLICT',
             currentVersion,
             expectedVersion,
-          },
-          { status: 409, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
+          };
+          return NextResponse.json(response, {
+            status: 409,
+            headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          });
+        }
       }
 
-      const evidenceRaw =
-        (link.evidence as { sources?: string[]; signals?: string[] }) || {};
-      const nextEvidence = {
-        sources: Array.from(
-          new Set([...(evidenceRaw.sources ?? []), 'dashboard'])
-        ),
-        signals: Array.from(
-          new Set(
-            [
-              ...(evidenceRaw.signals ?? []),
-              action === 'accept' ? 'kept_after_claim' : undefined,
-            ].filter(Boolean) as string[]
-          )
-        ),
-      };
-
-      const existingConfidence =
-        typeof link.confidence === 'number'
-          ? link.confidence
-          : Number.parseFloat(String(link.confidence ?? '0'));
-
-      const scored = computeLinkConfidence({
-        sourceType: link.sourceType ?? 'manual',
-        signals: nextEvidence.signals,
-        sources: nextEvidence.sources,
-        usernameNormalized: profile.usernameNormalized ?? null,
-        url: link.url,
-        existingConfidence,
-      });
-
-      const nextState = action === 'accept' ? 'active' : 'rejected';
-      const nextConfidence =
-        action === 'accept' ? Math.max(scored.confidence, 0.7) : 0;
-      const nextVersion = currentVersion + 1;
-
-      const [updated] = await tx
-        .update(socialLinks)
-        .set({
-          state: nextState,
-          isActive: action === 'accept',
-          confidence: nextConfidence.toFixed(2),
-          evidence: nextEvidence,
-          version: nextVersion,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(socialLinks.id, link.id),
-            // Double-check version in WHERE for extra safety
-            eq(socialLinks.version, currentVersion)
-          )
-        )
-        .returning({
-          id: socialLinks.id,
-          platform: socialLinks.platform,
-          platformType: socialLinks.platformType,
-          url: socialLinks.url,
-          sortOrder: socialLinks.sortOrder,
-          isActive: socialLinks.isActive,
-          displayText: socialLinks.displayText,
-          state: socialLinks.state,
-          confidence: socialLinks.confidence,
-          sourcePlatform: socialLinks.sourcePlatform,
-          sourceType: socialLinks.sourceType,
-          evidence: socialLinks.evidence,
-          version: socialLinks.version,
-        });
-
-      // If no rows updated, version changed between SELECT and UPDATE
-      if (!updated) {
-        return NextResponse.json(
-          {
-            error: 'Conflict: Link was modified during the update',
-            code: 'VERSION_CONFLICT',
-          },
-          { status: 409, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
+      if (action === 'accept') {
+        // Activate the link
+        await tx
+          .update(socialLinks)
+          .set({
+            state: 'active',
+            isActive: true,
+            version: (link.version ?? 1) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
+      } else if (action === 'dismiss') {
+        // Reject the link
+        await tx
+          .update(socialLinks)
+          .set({
+            state: 'rejected',
+            isActive: false,
+            version: (link.version ?? 1) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
       }
 
       return NextResponse.json(
-        { ok: true, link: updated },
+        { ok: true, version: (link.version ?? 1) + 1 },
         { status: 200, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
       );
     });
   } catch (error) {
-    console.error('Error updating social link state:', error);
+    console.error('Error updating link state:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

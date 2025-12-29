@@ -11,6 +11,11 @@ import { ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { TableEmptyState } from '@/components/admin/table';
+import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
+import {
+  WAITLIST_CSV_FILENAME_PREFIX,
+  waitlistCSVColumns,
+} from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { WaitlistMobileCard } from './WaitlistMobileCard';
 
@@ -331,6 +336,15 @@ export function WaitlistTable({
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
           {total.toLocaleString()}
           <span className='hidden sm:inline'> entries</span>
+        </div>
+        <div className='ml-auto'>
+          <ExportCSVButton<WaitlistEntryRow>
+            getData={() => rows}
+            columns={waitlistCSVColumns}
+            filename={WAITLIST_CSV_FILENAME_PREFIX}
+            disabled={rows.length === 0}
+            ariaLabel='Export waitlist entries to CSV file'
+          />
         </div>
       </div>
 

@@ -1,6 +1,5 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import {
   checkVisitRateLimit,
   getRateLimitHeaders,
@@ -18,6 +17,7 @@ import {
   checkPublicRateLimit,
   getPublicRateLimitStatus,
 } from '@/lib/utils/rate-limit';
+import { visitSchema } from '@/lib/validation/schemas';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -27,18 +27,6 @@ import {
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const visitSchema = z.object({
-  profileId: z.string().uuid(),
-  ipAddress: z.string().optional(),
-  userAgent: z.string().optional(),
-  referrer: z.string().optional(),
-  geoCity: z.string().optional(),
-  geoCountry: z.string().optional(),
-  deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
-  // HMAC-SHA256 signed tracking token for request authentication
-  trackingToken: z.string().optional(),
-});
 
 function inferDeviceType(
   userAgent: string | null

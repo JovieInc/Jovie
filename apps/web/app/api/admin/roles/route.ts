@@ -1,21 +1,13 @@
 import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
+import { syncAdminRoleChange } from '@/lib/auth/clerk-sync';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { captureCriticalError } from '@/lib/error-tracking';
-
-const GrantRoleSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-  role: z.literal('admin'), // Currently only support admin role
-});
-
-const RevokeRoleSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-  role: z.literal('admin'),
-});
+import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
 
 /**
  * POST /api/admin/roles
@@ -31,7 +23,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const validation = GrantRoleSchema.safeParse(body);
+    const validation = grantRoleSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -61,6 +53,28 @@ export async function POST(request: Request) {
 
     // Get current admin user ID for logging
     const { userId: currentAdminId } = await auth();
+
+    // Sync role change to Clerk metadata (best-effort)
+    const headersList = await headers();
+    const ipAddress =
+      headersList.get('x-forwarded-for')?.split(',')[0] ?? undefined;
+    const userAgent = headersList.get('user-agent') ?? undefined;
+
+    try {
+      await syncAdminRoleChange(
+        targetUserId,
+        true,
+        currentAdminId ?? undefined,
+        ipAddress,
+        userAgent
+      );
+    } catch (syncError) {
+      console.warn(
+        '[admin/roles] Failed to sync admin role to Clerk:',
+        syncError
+      );
+      // Continue - Clerk sync is best-effort
+    }
 
     console.log(
       `[admin/roles] Admin role granted to user ${targetUserId} by ${currentAdminId}`
@@ -102,7 +116,7 @@ export async function DELETE(request: Request) {
 
   try {
     const body = await request.json();
-    const validation = RevokeRoleSchema.safeParse(body);
+    const validation = revokeRoleSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -138,6 +152,28 @@ export async function DELETE(request: Request) {
 
     // Invalidate cache for the target user
     invalidateAdminCache(targetUserId);
+
+    // Sync role change to Clerk metadata (best-effort)
+    const headersList = await headers();
+    const ipAddress =
+      headersList.get('x-forwarded-for')?.split(',')[0] ?? undefined;
+    const userAgent = headersList.get('user-agent') ?? undefined;
+
+    try {
+      await syncAdminRoleChange(
+        targetUserId,
+        false,
+        currentAdminId ?? undefined,
+        ipAddress,
+        userAgent
+      );
+    } catch (syncError) {
+      console.warn(
+        '[admin/roles] Failed to sync admin role revocation to Clerk:',
+        syncError
+      );
+      // Continue - Clerk sync is best-effort
+    }
 
     console.log(
       `[admin/roles] Admin role revoked from user ${targetUserId} by ${currentAdminId}`

@@ -1,130 +1,28 @@
 'use client';
 
 import { useAuth, useClerk } from '@clerk/nextjs';
-import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { AuthBackButton, AuthLayout } from '@/components/auth';
+import {
+  ALLOWED_PLANS,
+  BUTTON_CLASSES,
+  clearWaitlistStorage,
+  type FormErrors,
+  isValidUrl,
+  normalizeUrl,
+  PRIMARY_GOAL_OPTIONS,
+  type PrimaryGoal,
+  resolvePrimarySocialUrl,
+  SOCIAL_PLATFORM_OPTIONS,
+  type SocialPlatform,
+  WAITLIST_STORAGE_KEYS,
+} from '@/components/waitlist/types';
+import { WaitlistAdditionalInfoStep } from '@/components/waitlist/WaitlistAdditionalInfoStep';
+import { WaitlistPrimaryGoalStep } from '@/components/waitlist/WaitlistPrimaryGoalStep';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
-
-interface FormErrors {
-  primaryGoal?: string[];
-  primarySocialUrl?: string[];
-  spotifyUrl?: string[];
-  heardAbout?: string[];
-}
-
-type PrimaryGoal = 'streams' | 'merch' | 'tickets';
-
-type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
-
-const BUTTON_CLASSES =
-  'w-full h-12 rounded-xl border border-subtle bg-surface-1 px-4 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
-
-const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
-
-// Session storage keys for waitlist form persistence
-const WAITLIST_STORAGE_KEYS = {
-  step: 'waitlist_step',
-  primaryGoal: 'waitlist_primary_goal',
-  socialPlatform: 'waitlist_social_platform',
-  primarySocialUrl: 'waitlist_primary_social_url',
-  spotifyUrl: 'waitlist_spotify_url',
-  heardAbout: 'waitlist_heard_about',
-} as const;
-
-/**
- * Clear all waitlist form data from session storage
- */
-function clearWaitlistStorage(): void {
-  try {
-    Object.values(WAITLIST_STORAGE_KEYS).forEach(key => {
-      window.sessionStorage.removeItem(key);
-    });
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-const SOCIAL_PLATFORM_OPTIONS: Array<{ value: SocialPlatform; label: string }> =
-  [
-    { value: 'instagram', label: 'Instagram' },
-    { value: 'tiktok', label: 'TikTok' },
-    { value: 'youtube', label: 'YouTube' },
-    { value: 'other', label: 'Other' },
-  ];
-
-const PRIMARY_GOAL_OPTIONS: Array<{ value: PrimaryGoal; label: string }> = [
-  { value: 'streams', label: 'More streams' },
-  { value: 'merch', label: 'More merch sales' },
-  { value: 'tickets', label: 'More ticket sales' },
-];
-
-function getSocialPlatformPrefix(platform: SocialPlatform): {
-  display: string;
-  buildUrl: (value: string) => string;
-} {
-  if (platform === 'instagram') {
-    return {
-      display: 'instagram.com/',
-      buildUrl: value => `https://instagram.com/${value}`,
-    };
-  }
-
-  if (platform === 'tiktok') {
-    return {
-      display: 'tiktok.com/@',
-      buildUrl: value => `https://tiktok.com/@${value}`,
-    };
-  }
-
-  if (platform === 'youtube') {
-    return {
-      display: 'youtube.com/@',
-      buildUrl: value => `https://youtube.com/@${value}`,
-    };
-  }
-
-  return {
-    display: '',
-    buildUrl: value => value,
-  };
-}
-
-function normalizeUrl(url: string): string {
-  if (!url.trim()) return '';
-  const trimmed = url.trim();
-  if (!/^https?:\/\//i.test(trimmed)) {
-    return `https://${trimmed}`;
-  }
-  return trimmed;
-}
-
-function resolvePrimarySocialUrl(
-  value: string,
-  platform: SocialPlatform
-): string {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) {
-    return normalizeUrl(trimmed);
-  }
-
-  const { buildUrl } = getSocialPlatformPrefix(platform);
-  return normalizeUrl(buildUrl(trimmed));
-}
-
-function isValidUrl(url: string): boolean {
-  if (!url.trim()) return false;
-  const normalized = normalizeUrl(url);
-  try {
-    const parsed = new URL(normalized);
-    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
-  } catch {
-    return false;
-  }
-}
+import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
+import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
 
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -190,7 +88,6 @@ export default function WaitlistPage() {
   // Load all persisted form state on mount
   useEffect(() => {
     try {
-      // Load step
       const storedStep = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.step
       );
@@ -198,7 +95,6 @@ export default function WaitlistPage() {
         setStep(Number.parseInt(storedStep, 10) as 0 | 1 | 2);
       }
 
-      // Load primary goal
       const storedGoal = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.primaryGoal
       );
@@ -210,7 +106,6 @@ export default function WaitlistPage() {
         setPrimaryGoal(storedGoal);
       }
 
-      // Load social platform
       const storedPlatform = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.socialPlatform
       );
@@ -223,7 +118,6 @@ export default function WaitlistPage() {
         setSocialPlatform(storedPlatform);
       }
 
-      // Load primary social URL
       const storedSocialUrl = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.primarySocialUrl
       );
@@ -231,7 +125,6 @@ export default function WaitlistPage() {
         setPrimarySocialUrl(storedSocialUrl);
       }
 
-      // Load spotify URL
       const storedSpotifyUrl = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.spotifyUrl
       );
@@ -239,7 +132,6 @@ export default function WaitlistPage() {
         setSpotifyUrl(storedSpotifyUrl);
       }
 
-      // Load heard about
       const storedHeardAbout = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.heardAbout
       );
@@ -339,34 +231,6 @@ export default function WaitlistPage() {
   }, [heardAbout]);
 
   useEffect(() => {
-    if (isHydrating) return;
-
-    if (step === 0) {
-      const button =
-        primaryGoalButtonRefs.current[selectedPrimaryGoalIndex] ??
-        primaryGoalButtonRefs.current[0];
-      button?.focus();
-    }
-
-    if (step === 1) {
-      const button =
-        socialPlatformButtonRefs.current[selectedSocialPlatformIndex] ??
-        socialPlatformButtonRefs.current[0];
-      button?.focus();
-    }
-
-    if (step === 2) {
-      spotifyUrlInputRef.current?.focus();
-    }
-  }, [
-    isHydrating,
-    selectedPrimaryGoalIndex,
-    selectedSocialPlatformIndex,
-    step,
-    socialPlatform,
-  ]);
-
-  useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     void (async () => {
       try {
@@ -394,7 +258,6 @@ export default function WaitlistPage() {
             router.replace('/app/dashboard');
             return;
           }
-          // User already submitted waitlist - clear any stale form data
           clearWaitlistStorage();
           setIsSubmitted(true);
         }
@@ -409,7 +272,6 @@ export default function WaitlistPage() {
 
     if (targetStep === 0) {
       if (!primaryGoal) {
-        // Keep messaging minimal; just block progression
         errors.primaryGoal = ['Primary goal is required'];
       }
     }
@@ -557,7 +419,7 @@ export default function WaitlistPage() {
           primarySocialUrl: resolvedPrimarySocialUrl,
           spotifyUrl: normalizedSpotifyUrl,
           heardAbout: sanitizedHeardAbout,
-          selectedPlan, // Quietly track pricing tier interest
+          selectedPlan,
         }),
       });
 
@@ -572,7 +434,6 @@ export default function WaitlistPage() {
         return;
       }
 
-      // Clear persisted form data on successful submission
       clearWaitlistStorage();
       setIsSubmitted(true);
     } catch (err) {
@@ -597,27 +458,10 @@ export default function WaitlistPage() {
 
   if (isSubmitted) {
     return (
-      <AuthLayout
-        formTitle="You're on the waitlist!"
-        showLogo={false}
-        showFooterPrompt={false}
-        formTitleClassName='text-lg font-medium text-primary-token mb-4 text-center'
-      >
-        <p className='text-sm text-secondary-token text-center'>
-          Early access is rolling out in stages.
-        </p>
-
-        <div className='flex items-center justify-center pt-6'>
-          <button
-            type='button'
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className='text-sm text-secondary-token hover:text-primary-token transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed rounded-md px-2 py-1'
-          >
-            {isSigningOut ? 'Signing out…' : 'Sign out'}
-          </button>
-        </div>
-      </AuthLayout>
+      <WaitlistSuccessView
+        isSigningOut={isSigningOut}
+        onSignOut={handleSignOut}
+      />
     );
   }
 
@@ -641,233 +485,57 @@ export default function WaitlistPage() {
       showFooterPrompt={false}
       showLogo={false}
     >
-      {/* Form */}
       <div className='w-full'>
         <form onSubmit={handleSubmit} className='space-y-4'>
-          {step === 0 ? (
-            <>
-              <div className='space-y-1'>
-                <h1 className='text-lg font-medium text-primary-token text-center'>
-                  Primary goal
-                </h1>
-                <p
-                  id='waitlist-primary-goal-hint'
-                  className='text-sm text-secondary-token text-center'
-                >
-                  You can change this later.
-                </p>
-              </div>
+          {step === 0 && (
+            <WaitlistPrimaryGoalStep
+              primaryGoal={primaryGoal}
+              primaryGoalFocusIndex={primaryGoalFocusIndex}
+              fieldErrors={fieldErrors}
+              isSubmitting={isSubmitting}
+              isHydrating={isHydrating}
+              onSelect={handlePrimaryGoalSelect}
+              onKeyDown={handlePrimaryGoalKeyDown}
+              setButtonRef={(index, el) => {
+                primaryGoalButtonRefs.current[index] = el;
+              }}
+            />
+          )}
 
-              <div
-                className='grid grid-cols-1 gap-2'
-                role='radiogroup'
-                aria-label='Primary goal'
-                aria-describedby={
-                  fieldErrors.primaryGoal
-                    ? 'waitlist-primary-goal-hint waitlist-primary-goal-error'
-                    : 'waitlist-primary-goal-hint'
-                }
-                onKeyDown={handlePrimaryGoalKeyDown}
-              >
-                {PRIMARY_GOAL_OPTIONS.map((option, index) => {
-                  const isSelected = primaryGoal === option.value;
-                  const isTabStop = primaryGoal ? isSelected : index === 0;
+          {step === 1 && (
+            <WaitlistSocialStep
+              socialPlatform={socialPlatform}
+              primarySocialUrl={primarySocialUrl}
+              fieldErrors={fieldErrors}
+              isSubmitting={isSubmitting}
+              isHydrating={isHydrating}
+              onPlatformSelect={handleSocialPlatformSelect}
+              onPlatformKeyDown={handleSocialPlatformKeyDown}
+              onUrlChange={setPrimarySocialUrl}
+              onNext={handleNext}
+              setPlatformButtonRef={(index, el) => {
+                socialPlatformButtonRefs.current[index] = el;
+              }}
+              setUrlInputRef={el => {
+                primarySocialUrlInputRef.current = el;
+              }}
+            />
+          )}
 
-                  return (
-                    <Button
-                      key={option.value}
-                      ref={el => {
-                        primaryGoalButtonRefs.current[index] = el;
-                      }}
-                      type='button'
-                      role='radio'
-                      aria-checked={isSelected}
-                      tabIndex={isTabStop ? 0 : -1}
-                      onClick={() => handlePrimaryGoalSelect(option.value)}
-                      variant={isSelected ? 'primary' : 'secondary'}
-                      className='w-full h-12 justify-center rounded-xl text-[15px] leading-5'
-                      disabled={isSubmitting}
-                    >
-                      {option.label}
-                    </Button>
-                  );
-                })}
-              </div>
-
-              {fieldErrors.primaryGoal && (
-                <p
-                  id='waitlist-primary-goal-error'
-                  role='alert'
-                  className='text-sm text-red-400'
-                >
-                  {fieldErrors.primaryGoal?.[0]}
-                </p>
-              )}
-            </>
-          ) : null}
-
-          {step === 1 ? (
-            <>
-              <div className='space-y-1'>
-                <h1 className='text-lg font-medium text-primary-token text-center'>
-                  Where do fans find you?
-                </h1>
-              </div>
-
-              <div
-                className='flex items-center justify-center gap-2'
-                role='radiogroup'
-                aria-label='Social platform'
-                onKeyDown={handleSocialPlatformKeyDown}
-              >
-                {SOCIAL_PLATFORM_OPTIONS.map(option => (
-                  // biome-ignore lint/a11y/useSemanticElements: button element used with ARIA radio pattern for custom radio group
-                  <button
-                    key={option.value}
-                    ref={el => {
-                      const index = SOCIAL_PLATFORM_OPTIONS.findIndex(
-                        item => item.value === option.value
-                      );
-                      if (index >= 0) {
-                        socialPlatformButtonRefs.current[index] = el;
-                      }
-                    }}
-                    type='button'
-                    role='radio'
-                    aria-checked={socialPlatform === option.value}
-                    tabIndex={socialPlatform === option.value ? 0 : -1}
-                    onClick={() => {
-                      handleSocialPlatformSelect(option.value);
-                    }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
-                      socialPlatform === option.value
-                        ? 'bg-surface-2 text-primary-token border-border'
-                        : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1'
-                    }`}
-                    disabled={isSubmitting}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              {socialPlatform === 'other' ? (
-                <>
-                  <label htmlFor='primarySocialUrl' className='sr-only'>
-                    Social profile link
-                  </label>
-                  <Input
-                    ref={primarySocialUrlInputRef}
-                    type='url'
-                    id='primarySocialUrl'
-                    value={primarySocialUrl}
-                    onChange={e => setPrimarySocialUrl(e.target.value)}
-                    maxLength={2048}
-                    required
-                    aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
-                    aria-describedby={
-                      fieldErrors.primarySocialUrl
-                        ? 'waitlist-primary-social-url-error'
-                        : undefined
-                    }
-                    placeholder='Paste a link'
-                    disabled={isSubmitting}
-                    onKeyDown={e => {
-                      if (e.key !== 'Enter') return;
-                      e.preventDefault();
-                      handleNext();
-                    }}
-                  />
-                </>
-              ) : (
-                <div className='w-full flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
-                  <span className='text-sm text-secondary-token whitespace-nowrap'>
-                    {getSocialPlatformPrefix(socialPlatform).display}
-                  </span>
-                  <input
-                    ref={primarySocialUrlInputRef}
-                    type='text'
-                    id='primarySocialUrl'
-                    value={primarySocialUrl}
-                    onChange={e => setPrimarySocialUrl(e.target.value)}
-                    maxLength={2048}
-                    required
-                    aria-label='Social profile username'
-                    aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
-                    aria-describedby={
-                      fieldErrors.primarySocialUrl
-                        ? 'waitlist-primary-social-url-error'
-                        : undefined
-                    }
-                    className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
-                    placeholder='yourusername'
-                    disabled={isSubmitting}
-                    onKeyDown={e => {
-                      if (e.key !== 'Enter') return;
-                      e.preventDefault();
-                      handleNext();
-                    }}
-                  />
-                </div>
-              )}
-
-              {fieldErrors.primarySocialUrl && (
-                <p
-                  id='waitlist-primary-social-url-error'
-                  role='alert'
-                  className='text-sm text-red-400'
-                >
-                  {fieldErrors.primarySocialUrl[0]}
-                </p>
-              )}
-            </>
-          ) : null}
-
-          {step === 2 ? (
-            <>
-              <label htmlFor='spotifyUrl' className='sr-only'>
-                Spotify link
-              </label>
-              <Input
-                type='url'
-                id='spotifyUrl'
-                value={spotifyUrl}
-                onChange={e => setSpotifyUrl(e.target.value)}
-                ref={spotifyUrlInputRef}
-                maxLength={2048}
-                aria-invalid={Boolean(fieldErrors.spotifyUrl)}
-                aria-describedby={
-                  fieldErrors.spotifyUrl
-                    ? 'waitlist-spotify-url-error'
-                    : undefined
-                }
-                placeholder='open.spotify.com/artist/... (optional)'
-                disabled={isSubmitting}
-              />
-              {fieldErrors.spotifyUrl && (
-                <p
-                  id='waitlist-spotify-url-error'
-                  role='alert'
-                  className='text-sm text-red-400'
-                >
-                  {fieldErrors.spotifyUrl[0]}
-                </p>
-              )}
-
-              <label htmlFor='heardAbout' className='sr-only'>
-                How did you hear about us?
-              </label>
-              <Input
-                type='text'
-                id='heardAbout'
-                value={heardAbout}
-                onChange={e => setHeardAbout(e.target.value)}
-                maxLength={280}
-                placeholder='How did you hear about us? (optional)'
-                disabled={isSubmitting}
-              />
-            </>
-          ) : null}
+          {step === 2 && (
+            <WaitlistAdditionalInfoStep
+              spotifyUrl={spotifyUrl}
+              heardAbout={heardAbout}
+              fieldErrors={fieldErrors}
+              isSubmitting={isSubmitting}
+              isHydrating={isHydrating}
+              onSpotifyUrlChange={setSpotifyUrl}
+              onHeardAboutChange={setHeardAbout}
+              setSpotifyUrlInputRef={el => {
+                spotifyUrlInputRef.current = el;
+              }}
+            />
+          )}
 
           {error && (
             <div role='alert' className='text-red-400 text-sm text-center'>
@@ -875,7 +543,7 @@ export default function WaitlistPage() {
             </div>
           )}
 
-          {step === 2 ? (
+          {step === 2 && (
             <button
               type='submit'
               disabled={isSubmitting || !isReadyToSubmit}
@@ -883,9 +551,9 @@ export default function WaitlistPage() {
             >
               {isSubmitting ? 'Submitting…' : 'Join the waitlist'}
             </button>
-          ) : null}
+          )}
 
-          {step === 1 ? (
+          {step === 1 && (
             <button
               type='button'
               onClick={handleNext}
@@ -894,7 +562,7 @@ export default function WaitlistPage() {
             >
               Continue
             </button>
-          ) : null}
+          )}
 
           <div className='flex items-center justify-center pt-2'>
             <AuthBackButton

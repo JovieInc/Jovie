@@ -1,11 +1,16 @@
 import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
-import { z } from 'zod';
 import { db, ingestionJobs } from '@/lib/db';
 import {
   canonicalIdentity,
   detectPlatform,
   normalizeUrl,
 } from '@/lib/utils/platform-detection';
+import {
+  beaconsJobPayloadSchema,
+  layloJobPayloadSchema,
+  linktreeJobPayloadSchema,
+  youtubeJobPayloadSchema,
+} from '@/lib/validation/schemas';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
 import { isLayloUrl } from './strategies/laylo';
 import { isLinktreeUrl } from './strategies/linktree';
@@ -14,12 +19,7 @@ import {
   validateYouTubeChannelUrl,
 } from './strategies/youtube';
 
-const linktreeJobPayloadSchema = z.object({
-  creatorProfileId: z.string().uuid(),
-  sourceUrl: z.string().url(),
-  dedupKey: z.string(),
-  depth: z.number().int().min(0).max(3).default(0),
-});
+// Ingestion job payload schemas are now centralized in @/lib/validation/schemas/ingestion.ts
 
 export async function enqueueLinktreeIngestionJob(params: {
   creatorProfileId: string;
@@ -87,13 +87,6 @@ export async function enqueueLinktreeIngestionJob(params: {
   return inserted?.id ?? null;
 }
 
-const beaconsJobPayloadSchema = z.object({
-  creatorProfileId: z.string().uuid(),
-  sourceUrl: z.string().url(),
-  dedupKey: z.string(),
-  depth: z.number().int().min(0).max(3).default(0),
-});
-
 export async function enqueueBeaconsIngestionJob(params: {
   creatorProfileId: string;
   sourceUrl: string;
@@ -156,13 +149,6 @@ export async function enqueueBeaconsIngestionJob(params: {
   return inserted?.id ?? null;
 }
 
-const youtubeJobPayloadSchema = z.object({
-  creatorProfileId: z.string().uuid(),
-  sourceUrl: z.string().url(),
-  dedupKey: z.string(),
-  depth: z.number().int().min(0).max(1).default(0),
-});
-
 export async function enqueueYouTubeIngestionJob(params: {
   creatorProfileId: string;
   sourceUrl: string;
@@ -224,13 +210,6 @@ export async function enqueueYouTubeIngestionJob(params: {
 
   return inserted?.id ?? null;
 }
-
-const layloJobPayloadSchema = z.object({
-  creatorProfileId: z.string().uuid(),
-  sourceUrl: z.string().url(),
-  dedupKey: z.string(),
-  depth: z.number().int().min(0).max(3).default(0),
-});
 
 export async function enqueueLayloIngestionJob(params: {
   creatorProfileId: string;

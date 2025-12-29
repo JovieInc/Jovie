@@ -2,7 +2,6 @@ import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -37,15 +36,10 @@ import {
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { logger } from '@/lib/utils/logger';
+import { creatorIngestSchema } from '@/lib/validation/schemas';
 
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
-
-const ingestSchema = z.object({
-  url: z.string().url(),
-  // Optional idempotency key to prevent duplicate ingestion on double-click
-  idempotencyKey: z.string().uuid().optional(),
-});
 
 async function findAvailableHandle(
   tx: DbType,
@@ -235,7 +229,7 @@ export async function POST(request: Request) {
       return parsedBody.response;
     }
     const body = parsedBody.data;
-    const parsed = ingestSchema.safeParse(body);
+    const parsed = creatorIngestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.flatten() },

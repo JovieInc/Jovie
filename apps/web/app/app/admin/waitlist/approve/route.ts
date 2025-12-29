@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { type DbType, db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -12,15 +11,12 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { waitlistApproveSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const approveSchema = z.object({
-  entryId: z.string().uuid(),
-});
 
 function safeRandomHandle(): string {
   const token = randomUUID().replace(/-/g, '').slice(0, 12);
@@ -116,7 +112,7 @@ export async function POST(request: Request) {
       return parsedBody.response;
     }
     const body = parsedBody.data;
-    const parsed = approveSchema.safeParse(body);
+    const parsed = waitlistApproveSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, error: 'Invalid request body' },

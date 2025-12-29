@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { onboardingSchema } from '@/lib/validation/onboarding';
+import { onboardingSchema } from '@/lib/validation/schemas';
 
 describe('onboardingSchema', () => {
   describe('handle validation', () => {

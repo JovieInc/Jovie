@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { AuthBackButton, AuthButton, OtpInput } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
@@ -70,6 +70,7 @@ export function VerificationStep({
   mode,
 }: VerificationStepProps) {
   const [resendSuccess, setResendSuccess] = useState(false);
+  const errorId = useId();
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -143,11 +144,12 @@ export function VerificationStep({
             onComplete={handleComplete}
             disabled={isLoading}
             error={!!error}
+            errorId={error ? errorId : undefined}
             aria-label='Enter 6-digit verification code'
           />
 
           {error && (
-            <p className={FIELD_ERROR_CLASSES} role='alert'>
+            <p id={errorId} className={FIELD_ERROR_CLASSES} role='alert'>
               {error}
             </p>
           )}

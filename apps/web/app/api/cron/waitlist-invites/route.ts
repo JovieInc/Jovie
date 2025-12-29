@@ -1,10 +1,10 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
+import { waitlistInviteSendWindowSchema } from '@/lib/validation/schemas';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
 export const runtime = 'nodejs';
@@ -21,12 +21,6 @@ function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   return authHeader === `Bearer ${CRON_SECRET}`;
 }
-
-const sendWindowSchema = z.object({
-  sendWindowEnabled: z.boolean().default(true),
-  maxPerRun: z.number().int().min(1).max(100).default(10),
-  maxPerHour: z.number().int().min(1).max(1000).default(50),
-});
 
 function isWithinPacificSendWindow(now: Date): boolean {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -68,7 +62,7 @@ export async function POST(request: NextRequest) {
     return parsedBody.response;
   }
   const body = parsedBody.data;
-  const parsed = sendWindowSchema.safeParse(body);
+  const parsed = waitlistInviteSendWindowSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid request body' },
