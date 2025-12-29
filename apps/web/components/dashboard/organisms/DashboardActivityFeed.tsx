@@ -6,6 +6,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
+import { formatTimeAgo } from '@/lib/utils/date-formatting';
 
 type Activity = {
   id: string;
@@ -13,20 +14,6 @@ type Activity = {
   icon: string;
   timestamp: string;
 };
-
-function formatTimeAgo(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '—';
-  const diff = Date.now() - parsed.getTime();
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 export function DashboardActivityFeed({
   profileId,
