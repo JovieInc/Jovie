@@ -1,4 +1,8 @@
 export {
+  ExportCSVButton,
+  type ExportCSVButtonProps,
+} from './ExportCSVButton';
+export {
   type BulkAction,
   TableBulkActionsToolbar,
   type TableBulkActionsToolbarProps,

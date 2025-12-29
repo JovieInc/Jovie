@@ -24,6 +24,7 @@ import {
 } from '@/components/admin/creator-sort-config';
 import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
@@ -33,11 +34,14 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { useToast } from '@/components/molecules/ToastContainer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-
 import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
 } from '@/lib/admin/creator-profiles';
+import {
+  CREATORS_CSV_FILENAME_PREFIX,
+  creatorsCSVColumns,
+} from '@/lib/admin/csv-configs/creators';
 import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode } from '@/types';
 
@@ -464,6 +468,13 @@ export function AdminCreatorProfilesWithSidebar({
                 <div
                   className='hidden h-6 w-px bg-border sm:block'
                   aria-hidden='true'
+                />
+                <ExportCSVButton<AdminCreatorProfileRow>
+                  getData={() => profilesWithActions}
+                  columns={creatorsCSVColumns}
+                  filename={CREATORS_CSV_FILENAME_PREFIX}
+                  disabled={profilesWithActions.length === 0}
+                  ariaLabel='Export creator profiles to CSV file'
                 />
                 <IngestProfileDropdown />
               </div>

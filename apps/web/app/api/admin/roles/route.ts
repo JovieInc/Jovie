@@ -2,22 +2,12 @@ import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
 import { syncAdminRoleChange } from '@/lib/auth/clerk-sync';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { captureCriticalError } from '@/lib/error-tracking';
-
-const GrantRoleSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-  role: z.literal('admin'), // Currently only support admin role
-});
-
-const RevokeRoleSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-  role: z.literal('admin'),
-});
+import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
 
 /**
  * POST /api/admin/roles
@@ -33,7 +23,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const validation = GrantRoleSchema.safeParse(body);
+    const validation = grantRoleSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -126,7 +116,7 @@ export async function DELETE(request: Request) {
 
   try {
     const body = await request.json();
-    const validation = RevokeRoleSchema.safeParse(body);
+    const validation = revokeRoleSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(

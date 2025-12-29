@@ -7,12 +7,17 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { type Column, Table } from '@/components/admin/table';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
+import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { UserActionsMenu } from '@/components/admin/UserActionsMenu';
 import {
   getNextUserSort,
   type UserSortableColumnKey,
 } from '@/components/admin/users-sort-config';
+import {
+  USERS_CSV_FILENAME_PREFIX,
+  usersCSVColumns,
+} from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
@@ -251,6 +256,13 @@ export function AdminUsersTable({
               </Button>
             ) : null}
           </form>
+          <ExportCSVButton<AdminUserRow>
+            getData={() => users}
+            columns={usersCSVColumns}
+            filename={USERS_CSV_FILENAME_PREFIX}
+            disabled={users.length === 0}
+            ariaLabel='Export users to CSV file'
+          />
         </div>
       </div>
 

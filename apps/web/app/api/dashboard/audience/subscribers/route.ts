@@ -1,12 +1,12 @@
 import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   creatorProfiles,
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+import { subscribersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
@@ -19,22 +19,11 @@ const SORTABLE_COLUMNS = {
   createdAt: notificationSubscriptions.createdAt,
 } as const;
 
-const querySchema = z.object({
-  profileId: z.string().uuid(),
-  sort: z.enum(['email', 'phone', 'country', 'createdAt']).default('createdAt'),
-  direction: z.enum(['asc', 'desc']).default('desc'),
-  page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
-  pageSize: z.preprocess(
-    val => Number(val ?? 10),
-    z.number().int().min(1).max(100)
-  ),
-});
-
 export async function GET(request: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const { searchParams } = new URL(request.url);
-      const parsed = querySchema.safeParse({
+      const parsed = subscribersQuerySchema.safeParse({
         profileId: searchParams.get('profileId'),
         sort: searchParams.get('sort') ?? undefined,
         direction: searchParams.get('direction') ?? undefined,

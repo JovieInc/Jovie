@@ -1,19 +1,15 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { accountEmailSyncSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const syncSchema = z.object({
-  email: z.string().email(),
-});
 
 export async function POST(request: Request) {
   try {
@@ -25,7 +21,7 @@ export async function POST(request: Request) {
       return parsedBody.response;
     }
     const payload = parsedBody.data;
-    const result = syncSchema.safeParse(payload);
+    const result = accountEmailSyncSchema.safeParse(payload);
 
     if (!result.success) {
       return NextResponse.json(

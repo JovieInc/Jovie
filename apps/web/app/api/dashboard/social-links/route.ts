@@ -1,27 +1,145 @@
 import * as Sentry from '@sentry/nextjs';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import {
+  creatorProfiles,
+  dashboardIdempotencyKeys,
+  socialLinks,
+  users,
+} from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
-  checkIdempotencyKey,
-  checkRateLimit,
-  scheduleIngestionJobs,
-  storeIdempotencyKey,
-  updateLinkStateSchema,
-  updateSocialLinksSchema,
-} from '@/lib/services/social-links';
+  createRateLimitHeaders,
+  dashboardLinksRateLimit,
+} from '@/lib/rate-limit';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
+import {
+  updateSocialLinksSchema as baseUpdateSocialLinksSchema,
+  updateLinkStateSchema,
+} from '@/lib/validation/schemas';
+import { isValidSocialPlatform } from '@/types';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+/**
+ * Idempotency key expiration time (24 hours).
+ * This duration balances between:
+ * - Long enough to catch retries from network failures and user refreshes
+ * - Short enough to not consume excessive storage
+ *
+ * NOTE: Expired keys should be cleaned up periodically via a background job
+ * or Postgres TTL extension (pg_cron). See dashboard_idempotency_keys table.
+ */
+const IDEMPOTENCY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Check and apply rate limiting for dashboard link operations.
+ *
+ * Rate limiting is applied per-user (via clerkUserId) rather than per-profile.
+ * This means a user with multiple profiles shares the same rate limit bucket
+ * across all their profiles (30 requests per minute total).
+ *
+ * Rationale: Per-user limiting is simpler and prevents abuse where a malicious
+ * user creates many profiles to bypass per-profile limits.
+ */
+async function checkRateLimit(
+  userId: string
+): Promise<{ allowed: boolean; headers: HeadersInit }> {
+  if (!dashboardLinksRateLimit) {
+    // Rate limiting not configured, allow request
+    return { allowed: true, headers: {} };
+  }
+
+  const result = await dashboardLinksRateLimit.limit(userId);
+  const headers = createRateLimitHeaders({
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: new Date(result.reset),
+  });
+
+  return { allowed: result.success, headers };
+}
+
+/**
+ * Check for existing idempotency key and return cached response if found
+ */
+async function checkIdempotencyKey(
+  key: string,
+  userId: string,
+  endpoint: string
+): Promise<{ cached: boolean; response?: NextResponse }> {
+  if (!key) {
+    return { cached: false };
+  }
+
+  const [existing] = await db
+    .select({
+      responseStatus: dashboardIdempotencyKeys.responseStatus,
+      responseBody: dashboardIdempotencyKeys.responseBody,
+      expiresAt: dashboardIdempotencyKeys.expiresAt,
+    })
+    .from(dashboardIdempotencyKeys)
+    .where(
+      and(
+        eq(dashboardIdempotencyKeys.key, key),
+        eq(dashboardIdempotencyKeys.userId, userId),
+        eq(dashboardIdempotencyKeys.endpoint, endpoint),
+        gt(dashboardIdempotencyKeys.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    return {
+      cached: true,
+      response: NextResponse.json(existing.responseBody ?? { ok: true }, {
+        status: existing.responseStatus,
+        headers: NO_STORE_HEADERS,
+      }),
+    };
+  }
+
+  return { cached: false };
+}
+
+/**
+ * Store idempotency key with response for future deduplication
+ */
+async function storeIdempotencyKey(
+  key: string,
+  userId: string,
+  endpoint: string,
+  responseStatus: number,
+  responseBody: Record<string, unknown>
+): Promise<void> {
+  if (!key) return;
+
+  try {
+    await db
+      .insert(dashboardIdempotencyKeys)
+      .values({
+        key,
+        userId,
+        endpoint,
+        responseStatus,
+        responseBody,
+        expiresAt: new Date(Date.now() + IDEMPOTENCY_KEY_TTL_MS),
+      })
+      .onConflictDoNothing();
+  } catch {
+    // Non-critical: idempotency key storage failure shouldn't fail the request
+    console.error('Failed to store idempotency key');
+  }
+}
 
 export async function GET(req: Request) {
   try {
@@ -140,6 +258,28 @@ export async function GET(req: Request) {
     );
   }
 }
+
+/**
+ * Extended update social links schema with platform validation.
+ *
+ * Uses the centralized baseUpdateSocialLinksSchema and adds route-specific
+ * platform validation via superRefine to check against isValidSocialPlatform.
+ */
+const updateSocialLinksSchema = baseUpdateSocialLinksSchema.superRefine(
+  (data, ctx) => {
+    if (data.links) {
+      data.links.forEach((link, index) => {
+        if (!isValidSocialPlatform(link.platform)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Invalid platform',
+            path: ['links', index, 'platform'],
+          });
+        }
+      });
+    }
+  }
+);
 
 export async function PUT(req: Request) {
   try {
@@ -412,13 +552,10 @@ export async function PUT(req: Request) {
         }
       })();
 
-      // Schedule ingestion jobs (non-blocking)
-      const ingestionPromise = scheduleIngestionJobs(profileId, links);
-
       // Wait for background tasks but don't let failures affect the response.
       // Failures are logged for follow-up but shouldn't block the user.
-      Promise.all([enrichmentPromise, ingestionPromise]).catch(error =>
-        captureError('Social links enrichment or ingestion failed', error, {
+      enrichmentPromise.catch(error =>
+        captureError('Social links enrichment failed', error, {
           route: '/api/dashboard/social-links',
           profileId,
           action: 'background_processing',
@@ -445,7 +582,7 @@ export async function PUT(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export async function DELETE(req: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       // Apply rate limiting
@@ -459,7 +596,7 @@ export async function PATCH(req: Request) {
       }
 
       const parsedBody = await parseJsonBody<unknown>(req, {
-        route: 'PATCH /api/dashboard/social-links',
+        route: 'DELETE /api/dashboard/social-links',
         headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
       });
       if (!parsedBody.ok) {
@@ -483,10 +620,21 @@ export async function PATCH(req: Request) {
 
       const { profileId, linkId, action, expectedVersion } = parsed.data;
 
+      if (!profileId || !linkId || !action) {
+        return NextResponse.json(
+          { error: 'Profile ID, Link ID, and action are required' },
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Verify the profile belongs to the authenticated user
       const [profile] = await tx
         .select({
           id: creatorProfiles.id,
           usernameNormalized: creatorProfiles.usernameNormalized,
+          avatarUrl: creatorProfiles.avatarUrl,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          userId: creatorProfiles.userId,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -502,28 +650,18 @@ export async function PATCH(req: Request) {
         );
       }
 
+      // Get the link to verify it exists and belongs to this profile
       const [link] = await tx
         .select({
           id: socialLinks.id,
           creatorProfileId: socialLinks.creatorProfileId,
-          platform: socialLinks.platform,
-          platformType: socialLinks.platformType,
-          url: socialLinks.url,
-          sortOrder: socialLinks.sortOrder,
-          isActive: socialLinks.isActive,
-          displayText: socialLinks.displayText,
-          state: socialLinks.state,
-          confidence: socialLinks.confidence,
-          sourcePlatform: socialLinks.sourcePlatform,
-          sourceType: socialLinks.sourceType,
-          evidence: socialLinks.evidence,
           version: socialLinks.version,
         })
         .from(socialLinks)
         .where(
           and(
             eq(socialLinks.id, linkId),
-            eq(socialLinks.creatorProfileId, profile.id)
+            eq(socialLinks.creatorProfileId, profileId)
           )
         )
         .limit(1);
@@ -535,119 +673,54 @@ export async function PATCH(req: Request) {
         );
       }
 
-      // PATCH state validation: only allow transitions from 'suggested' state
-      const currentState = link.state as 'active' | 'suggested' | 'rejected';
-      if (currentState !== 'suggested') {
-        return NextResponse.json(
-          {
-            error: `Cannot ${action} link: only suggested links can be accepted or dismissed`,
-            code: 'INVALID_STATE_TRANSITION',
-            currentState,
-          },
-          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
-      }
-
-      // Check optimistic locking
-      const currentVersion = link.version ?? 1;
-      if (expectedVersion !== undefined && currentVersion !== expectedVersion) {
-        return NextResponse.json(
-          {
+      // Check optimistic locking if expectedVersion is provided
+      if (expectedVersion !== undefined) {
+        const currentVersion = link.version ?? 1;
+        if (currentVersion !== expectedVersion) {
+          const response = {
             error: 'Conflict: Link has been modified by another request',
             code: 'VERSION_CONFLICT',
             currentVersion,
             expectedVersion,
-          },
-          { status: 409, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
+          };
+          return NextResponse.json(response, {
+            status: 409,
+            headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          });
+        }
       }
 
-      const evidenceRaw =
-        (link.evidence as { sources?: string[]; signals?: string[] }) || {};
-      const nextEvidence = {
-        sources: Array.from(
-          new Set([...(evidenceRaw.sources ?? []), 'dashboard'])
-        ),
-        signals: Array.from(
-          new Set(
-            [
-              ...(evidenceRaw.signals ?? []),
-              action === 'accept' ? 'kept_after_claim' : undefined,
-            ].filter(Boolean) as string[]
-          )
-        ),
-      };
-
-      const existingConfidence =
-        typeof link.confidence === 'number'
-          ? link.confidence
-          : Number.parseFloat(String(link.confidence ?? '0'));
-
-      const scored = computeLinkConfidence({
-        sourceType: link.sourceType ?? 'manual',
-        signals: nextEvidence.signals,
-        sources: nextEvidence.sources,
-        usernameNormalized: profile.usernameNormalized ?? null,
-        url: link.url,
-        existingConfidence,
-      });
-
-      const nextState = action === 'accept' ? 'active' : 'rejected';
-      const nextConfidence =
-        action === 'accept' ? Math.max(scored.confidence, 0.7) : 0;
-      const nextVersion = currentVersion + 1;
-
-      const [updated] = await tx
-        .update(socialLinks)
-        .set({
-          state: nextState,
-          isActive: action === 'accept',
-          confidence: nextConfidence.toFixed(2),
-          evidence: nextEvidence,
-          version: nextVersion,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(socialLinks.id, link.id),
-            // Double-check version in WHERE for extra safety
-            eq(socialLinks.version, currentVersion)
-          )
-        )
-        .returning({
-          id: socialLinks.id,
-          platform: socialLinks.platform,
-          platformType: socialLinks.platformType,
-          url: socialLinks.url,
-          sortOrder: socialLinks.sortOrder,
-          isActive: socialLinks.isActive,
-          displayText: socialLinks.displayText,
-          state: socialLinks.state,
-          confidence: socialLinks.confidence,
-          sourcePlatform: socialLinks.sourcePlatform,
-          sourceType: socialLinks.sourceType,
-          evidence: socialLinks.evidence,
-          version: socialLinks.version,
-        });
-
-      // If no rows updated, version changed between SELECT and UPDATE
-      if (!updated) {
-        return NextResponse.json(
-          {
-            error: 'Conflict: Link was modified during the update',
-            code: 'VERSION_CONFLICT',
-          },
-          { status: 409, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
+      if (action === 'accept') {
+        // Activate the link
+        await tx
+          .update(socialLinks)
+          .set({
+            state: 'active',
+            isActive: true,
+            version: (link.version ?? 1) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
+      } else if (action === 'dismiss') {
+        // Reject the link
+        await tx
+          .update(socialLinks)
+          .set({
+            state: 'rejected',
+            isActive: false,
+            version: (link.version ?? 1) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
       }
 
       return NextResponse.json(
-        { ok: true, link: updated },
+        { ok: true, version: (link.version ?? 1) + 1 },
         { status: 200, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
       );
     });
   } catch (error) {
-    console.error('Error updating social link state:', error);
+    console.error('Error updating link state:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

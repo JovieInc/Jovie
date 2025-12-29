@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -8,10 +7,7 @@ import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
-
-const rerunSchema = z.object({
-  profileId: z.string().uuid(),
-});
+import { ingestionRerunSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
@@ -42,7 +38,7 @@ export async function POST(request: Request) {
       return parsedBody.response;
     }
     const body = parsedBody.data;
-    const parsed = rerunSchema.safeParse(body);
+    const parsed = ingestionRerunSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
