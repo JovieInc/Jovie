@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { and, eq, gt, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
+import { invalidateSocialLinksCache } from '@/lib/cache';
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -527,6 +528,10 @@ export async function PUT(req: Request) {
         successResponse
       );
 
+      // Invalidate caches for the profile's social links
+      // This ensures public profile and dashboard show updated links
+      await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
+
       // Magic profile enrichment (non-blocking, outside transaction for safety)
       // Note: We schedule this but don't await it inside the transaction
       const enrichmentPromise = (async () => {
@@ -713,6 +718,10 @@ export async function DELETE(req: Request) {
           })
           .where(eq(socialLinks.id, linkId));
       }
+
+      // Invalidate caches for the profile's social links
+      // This ensures public profile and dashboard show updated link state
+      await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
 
       return NextResponse.json(
         { ok: true, version: (link.version ?? 1) + 1 },
