@@ -13,7 +13,6 @@ on:
 permissions:
   contents: read
   actions: read
-  pull-requests: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -641,12 +640,6 @@ jobs:
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
-      # Test performance metrics for PR comparison
-      test_duration_ms: ${{ steps.test-metrics.outputs.duration_ms }}
-      total_tests: ${{ steps.test-metrics.outputs.total_tests }}
-      passed_tests: ${{ steps.test-metrics.outputs.passed_tests }}
-      failed_tests: ${{ steps.test-metrics.outputs.failed_tests }}
-      pass_rate: ${{ steps.test-metrics.outputs.pass_rate }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -699,81 +692,11 @@ jobs:
           fi
 
       - name: Run unit tests
-        id: run-tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          set -euo pipefail
-          START_TIME=$(date +%s%N)
-
-          # Run tests and capture output
-          if pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }} 2>&1 | tee test-output.txt; then
-            echo "test_result=success" >> $GITHUB_OUTPUT
-          else
-            echo "test_result=failure" >> $GITHUB_OUTPUT
-          fi
-
-          END_TIME=$(date +%s%N)
-          DURATION_MS=$(( (END_TIME - START_TIME) / 1000000 ))
-          echo "duration_ms=$DURATION_MS" >> $GITHUB_OUTPUT
+        run: pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-        continue-on-error: true
-
-      - name: Parse test metrics
-        id: test-metrics
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          set -euo pipefail
-
-          DURATION="${{ steps.run-tests.outputs.duration_ms }}"
-          RESULT="${{ steps.run-tests.outputs.test_result }}"
-
-          # Parse test counts from Vitest output
-          if [ -f test-output.txt ]; then
-            # Extract test counts from Vitest output
-            TOTAL=$(grep -oP '\d+(?=\s+tests?)' test-output.txt | tail -1 || echo "0")
-            PASSED=$(grep -oP '\d+(?=\s+passed)' test-output.txt | tail -1 || echo "0")
-            FAILED=$(grep -oP '\d+(?=\s+failed)' test-output.txt | tail -1 || echo "0")
-
-            # Fallback patterns if above didn't work
-            if [ "$TOTAL" == "0" ] || [ -z "$TOTAL" ]; then
-              TOTAL=$(grep -c 'PASS\|FAIL' test-output.txt || echo "0")
-              PASSED=$(grep -c 'PASS' test-output.txt || echo "0")
-              FAILED=$(grep -c 'FAIL' test-output.txt || echo "0")
-            fi
-          else
-            TOTAL=0
-            PASSED=0
-            FAILED=0
-          fi
-
-          # Ensure numeric values
-          TOTAL=${TOTAL:-0}
-          PASSED=${PASSED:-0}
-          FAILED=${FAILED:-0}
-
-          # Calculate pass rate
-          if [ "$TOTAL" -gt 0 ]; then
-            PASS_RATE=$(awk "BEGIN {printf \"%.2f\", ($PASSED / $TOTAL) * 100}")
-          else
-            PASS_RATE="0.00"
-          fi
-
-          echo "duration_ms=$DURATION" >> $GITHUB_OUTPUT
-          echo "total_tests=$TOTAL" >> $GITHUB_OUTPUT
-          echo "passed_tests=$PASSED" >> $GITHUB_OUTPUT
-          echo "failed_tests=$FAILED" >> $GITHUB_OUTPUT
-          echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
-
-          echo "📊 Test Results: $PASSED/$TOTAL passed ($PASS_RATE%)"
-          echo "⏱️ Duration: ${DURATION}ms"
-
-      - name: Fail if tests failed
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.run-tests.outputs.test_result == 'failure'
-        run: |
-          echo "❌ Unit tests failed"
-          exit 1
 
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
@@ -1228,167 +1151,50 @@ jobs:
                 body: summaryBody
               });
             }
-
-  # Test Performance Comparison - Posts before/after metrics on PRs
-  ci-test-performance-comment:
-    name: Test Performance Comment
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [ci-unit-tests]
+  # CRITICAL: Homepage smoke test runs BEFORE production deploy
+  # This prevents broken homepages from reaching production
+  ci-homepage-smoke:
+    name: Homepage Smoke (Pre-Deploy)
+    needs: [ci-fast, ci-build]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with: { fetch-depth: 1 }
-
-      - name: Get baseline from repository
-        id: baseline
-        run: |
-          set -euo pipefail
-
-          # Try to read baseline from repo (committed baseline file)
-          BASELINE_FILE="test-performance-baseline.json"
-
-          if [ -f "$BASELINE_FILE" ]; then
-            BASELINE_DURATION=$(jq -r '.metrics.totalDuration // 0' "$BASELINE_FILE")
-            BASELINE_P95=$(jq -r '.metrics.performanceStats.p95 // 0' "$BASELINE_FILE")
-            BASELINE_SETUP=$(jq -r '.metrics.setupTime // 0' "$BASELINE_FILE")
-            echo "baseline_duration=$BASELINE_DURATION" >> $GITHUB_OUTPUT
-            echo "baseline_p95=$BASELINE_P95" >> $GITHUB_OUTPUT
-            echo "baseline_setup=$BASELINE_SETUP" >> $GITHUB_OUTPUT
-            echo "has_baseline=true" >> $GITHUB_OUTPUT
-            echo "📊 Baseline found: ${BASELINE_DURATION}ms total, P95=${BASELINE_P95}ms"
-          else
-            echo "baseline_duration=0" >> $GITHUB_OUTPUT
-            echo "baseline_p95=0" >> $GITHUB_OUTPUT
-            echo "baseline_setup=0" >> $GITHUB_OUTPUT
-            echo "has_baseline=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No baseline file found"
-          fi
-
-      - name: Post Test Performance Comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        env:
-          TEST_DURATION: ${{ needs.ci-unit-tests.outputs.test_duration_ms }}
-          TOTAL_TESTS: ${{ needs.ci-unit-tests.outputs.total_tests }}
-          PASSED_TESTS: ${{ needs.ci-unit-tests.outputs.passed_tests }}
-          FAILED_TESTS: ${{ needs.ci-unit-tests.outputs.failed_tests }}
-          PASS_RATE: ${{ needs.ci-unit-tests.outputs.pass_rate }}
-          BASELINE_DURATION: ${{ steps.baseline.outputs.baseline_duration }}
-          BASELINE_P95: ${{ steps.baseline.outputs.baseline_p95 }}
-          HAS_BASELINE: ${{ steps.baseline.outputs.has_baseline }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          script: |
-            const testDuration = parseInt(process.env.TEST_DURATION || '0');
-            const totalTests = parseInt(process.env.TOTAL_TESTS || '0');
-            const passedTests = parseInt(process.env.PASSED_TESTS || '0');
-            const failedTests = parseInt(process.env.FAILED_TESTS || '0');
-            const passRate = parseFloat(process.env.PASS_RATE || '0');
-            const baselineDuration = parseInt(process.env.BASELINE_DURATION || '0');
-            const baselineP95 = parseInt(process.env.BASELINE_P95 || '0');
-            const hasBaseline = process.env.HAS_BASELINE === 'true';
+          fetch-depth: 1
 
-            // Skip if no test data available
-            if (testDuration === 0 && totalTests === 0) {
-              console.log('No test metrics available - skipping performance comment');
-              return;
-            }
+      - uses: ./.github/actions/setup-node-pnpm
 
-            const testIcon = failedTests === 0 ? '✅' : '❌';
-            const rateIcon = passRate >= 99 ? '✅' : (passRate >= 95 ? '⚠️' : '❌');
+      - name: Cache Playwright Browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
 
-            const durationSec = (testDuration / 1000).toFixed(1);
-            const baselineSec = (baselineDuration / 1000).toFixed(1);
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-            // Calculate performance delta
-            let perfDelta = '';
-            let perfIcon = '';
-            if (hasBaseline && baselineDuration > 0) {
-              const diffMs = testDuration - baselineDuration;
-              const diffPercent = ((diffMs / baselineDuration) * 100).toFixed(1);
-              if (diffMs < -1000) {
-                perfIcon = '🚀';
-                perfDelta = `${diffPercent}% faster`;
-              } else if (diffMs > 1000) {
-                perfIcon = '🐢';
-                perfDelta = `+${diffPercent}% slower`;
-              } else {
-                perfIcon = '➡️';
-                perfDelta = 'No significant change';
-              }
-            }
+      - name: Run Homepage Smoke Test against production
+        run: |
+          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/homepage-smoke.spec.ts --project=chromium --reporter=line
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
-            let comment = `## 📊 Test Performance Report
-
-            | Metric | Value | Status |
-            |--------|-------|--------|
-            | Tests | ${passedTests}/${totalTests} passed | ${testIcon} |
-            | Pass Rate | ${passRate}% | ${rateIcon} |
-            | Duration | ${durationSec}s | ⏱️ |
-            `;
-
-            if (hasBaseline && baselineDuration > 0) {
-              comment += `
-            ### Performance Comparison
-
-            | Metric | Baseline | Current | Delta |
-            |--------|----------|---------|-------|
-            | Total Duration | ${baselineSec}s | ${durationSec}s | ${perfIcon} ${perfDelta} |
-            | P95 Latency | ${baselineP95}ms | — | — |
-            `;
-            }
-
-            if (failedTests > 0) {
-              comment += `
-            ⚠️ **${failedTests} test(s) failed** - please review the test output.
-            `;
-            }
-
-            comment += `
-            <details>
-            <summary>📈 Performance Thresholds</summary>
-
-            | Threshold | Target | Status |
-            |-----------|--------|--------|
-            | Test duration | <60s | ${testDuration < 60000 ? '✅' : '❌'} |
-            | Pass rate | ≥99% | ${passRate >= 99 ? '✅' : '❌'} |
-            | P95 latency | <200ms | ${baselineP95 < 200 ? '✅' : (hasBaseline ? '❌' : '—')} |
-
-            </details>
-
-            Run \`pnpm test:profile\` locally for detailed performance analysis.
-            `;
-
-            // Find existing comment to update
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(c =>
-              c.user?.type === 'Bot' &&
-              c.body?.includes('## 📊 Test Performance Report')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: comment,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: comment,
-              });
-            }
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: homepage-smoke-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
 
   deploy:
-    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before production deploy
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-homepage-smoke] # Homepage smoke must pass before deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
