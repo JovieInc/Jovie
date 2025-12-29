@@ -1,0 +1,182 @@
+import { pgEnum } from 'drizzle-orm/pg-core';
+
+// Creator & Profile Enums
+export const creatorTypeEnum = pgEnum('creator_type', [
+  'artist',
+  'podcaster',
+  'influencer',
+  'creator',
+]);
+
+export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
+
+export const photoStatusEnum = pgEnum('photo_status', [
+  'uploading',
+  'processing',
+  'ready',
+  'failed',
+]);
+
+export const userStatusEnum = pgEnum('user_status', [
+  'active',
+  'pending',
+  'banned',
+]);
+
+// Link & Social Enums
+export const linkTypeEnum = pgEnum('link_type', [
+  'listen',
+  'social',
+  'tip',
+  'other',
+]);
+
+export const socialLinkStateEnum = pgEnum('social_link_state', [
+  'active',
+  'suggested',
+  'rejected',
+]);
+
+export const socialAccountStatusEnum = pgEnum('social_account_status', [
+  'suspected',
+  'confirmed',
+  'rejected',
+]);
+
+// Provider & Content Enums
+export const providerKindEnum = pgEnum('provider_kind', [
+  'music_streaming',
+  'video',
+  'social',
+  'retail',
+  'other',
+]);
+
+export const discogReleaseTypeEnum = pgEnum('discog_release_type', [
+  'single',
+  'ep',
+  'album',
+  'compilation',
+  'live',
+  'mixtape',
+  'other',
+]);
+
+export const providerLinkOwnerEnum = pgEnum('provider_link_owner_type', [
+  'release',
+  'track',
+]);
+
+// Billing & Subscription Enums
+export const subscriptionPlanEnum = pgEnum('subscription_plan', [
+  'free',
+  'basic',
+  'premium',
+  'pro',
+]);
+
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'active',
+  'inactive',
+  'cancelled',
+  'past_due',
+  'trialing',
+  'incomplete',
+  'incomplete_expired',
+  'unpaid',
+]);
+
+export const currencyCodeEnum = pgEnum('currency_code', [
+  'USD',
+  'EUR',
+  'GBP',
+  'CAD',
+  'AUD',
+  'JPY',
+  'CHF',
+  'SEK',
+  'NOK',
+  'DKK',
+]);
+
+// Ingestion Enums
+export const ingestionStatusEnum = pgEnum('ingestion_status', [
+  'idle',
+  'pending',
+  'processing',
+  'failed',
+]);
+
+export const ingestionSourceTypeEnum = pgEnum('ingestion_source_type', [
+  'manual',
+  'admin',
+  'ingested',
+]);
+
+export const ingestionJobStatusEnum = pgEnum('ingestion_job_status', [
+  'pending',
+  'processing',
+  'succeeded',
+  'failed',
+]);
+
+export const scraperStrategyEnum = pgEnum('scraper_strategy', [
+  'http',
+  'browser',
+  'api',
+]);
+
+// Contact Enums
+export const contactRoleEnum = pgEnum('contact_role', [
+  'bookings',
+  'management',
+  'press_pr',
+  'brand_partnerships',
+  'fan_general',
+  'other',
+]);
+
+export const contactChannelEnum = pgEnum('contact_channel', ['email', 'phone']);
+
+// Waitlist Enums
+export const waitlistStatusEnum = pgEnum('waitlist_status', [
+  'new',
+  'invited',
+  'claimed',
+  'rejected',
+]);
+
+export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
+  'pending',
+  'sending',
+  'sent',
+  'failed',
+]);
+
+// Audience & Analytics Enums
+export const notificationChannelEnum = pgEnum('notification_channel', [
+  'email',
+  'sms',
+  'push',
+]);
+
+export const audienceMemberTypeEnum = pgEnum('audience_member_type', [
+  'anonymous',
+  'email',
+  'sms',
+  'spotify',
+  'customer',
+]);
+
+export const audienceDeviceTypeEnum = pgEnum('audience_device_type', [
+  'mobile',
+  'desktop',
+  'tablet',
+  'unknown',
+]);
+
+export const audienceIntentLevelEnum = pgEnum('audience_intent_level', [
+  'high',
+  'medium',
+  'low',
+]);
