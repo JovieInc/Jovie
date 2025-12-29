@@ -128,7 +128,7 @@
     "drizzle-orm": "^0.45.0",
     "flags": "^4.0.1",
     "framer-motion": "^12.23.26",
-    "import-in-the-middle": "^2.0.0",
+    "import-in-the-middle": "^2.0.1",
     "isomorphic-dompurify": "2.34.0",
     "lucide-react": "^0.556.0",
     "mdast-util-to-string": "^4.0.0",
