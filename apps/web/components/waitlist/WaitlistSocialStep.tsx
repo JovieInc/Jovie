@@ -1,11 +1,11 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Input } from '@/components/atoms/Input';
 import {
-  SOCIAL_PLATFORM_OPTIONS,
-  getSocialPlatformPrefix,
   type FormErrors,
+  getSocialPlatformPrefix,
+  SOCIAL_PLATFORM_OPTIONS,
   type SocialPlatform,
 } from './types';
 

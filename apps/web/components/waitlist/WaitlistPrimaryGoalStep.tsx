@@ -1,8 +1,12 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useRef, useEffect } from 'react';
-import { PRIMARY_GOAL_OPTIONS, type FormErrors, type PrimaryGoal } from './types';
+import { useEffect, useRef } from 'react';
+import {
+  type FormErrors,
+  PRIMARY_GOAL_OPTIONS,
+  type PrimaryGoal,
+} from './types';
 
 interface WaitlistPrimaryGoalStepProps {
   primaryGoal: PrimaryGoal | null;

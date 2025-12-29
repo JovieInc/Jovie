@@ -4,25 +4,25 @@ import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton, AuthLayout } from '@/components/auth';
+import {
+  ALLOWED_PLANS,
+  BUTTON_CLASSES,
+  clearWaitlistStorage,
+  type FormErrors,
+  isValidUrl,
+  normalizeUrl,
+  PRIMARY_GOAL_OPTIONS,
+  type PrimaryGoal,
+  resolvePrimarySocialUrl,
+  SOCIAL_PLATFORM_OPTIONS,
+  type SocialPlatform,
+  WAITLIST_STORAGE_KEYS,
+} from '@/components/waitlist/types';
 import { WaitlistAdditionalInfoStep } from '@/components/waitlist/WaitlistAdditionalInfoStep';
 import { WaitlistPrimaryGoalStep } from '@/components/waitlist/WaitlistPrimaryGoalStep';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
-import {
-  ALLOWED_PLANS,
-  BUTTON_CLASSES,
-  PRIMARY_GOAL_OPTIONS,
-  SOCIAL_PLATFORM_OPTIONS,
-  WAITLIST_STORAGE_KEYS,
-  clearWaitlistStorage,
-  isValidUrl,
-  normalizeUrl,
-  resolvePrimarySocialUrl,
-  type FormErrors,
-  type PrimaryGoal,
-  type SocialPlatform,
-} from '@/components/waitlist/types';
 
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn } = useAuth();

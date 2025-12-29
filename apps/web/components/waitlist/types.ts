@@ -33,12 +33,14 @@ export const SOCIAL_PLATFORM_OPTIONS: Array<{
   { value: 'other', label: 'Other' },
 ];
 
-export const PRIMARY_GOAL_OPTIONS: Array<{ value: PrimaryGoal; label: string }> =
-  [
-    { value: 'streams', label: 'More streams' },
-    { value: 'merch', label: 'More merch sales' },
-    { value: 'tickets', label: 'More ticket sales' },
-  ];
+export const PRIMARY_GOAL_OPTIONS: Array<{
+  value: PrimaryGoal;
+  label: string;
+}> = [
+  { value: 'streams', label: 'More streams' },
+  { value: 'merch', label: 'More merch sales' },
+  { value: 'tickets', label: 'More ticket sales' },
+];
 
 export function clearWaitlistStorage(): void {
   try {
