@@ -18,6 +18,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -30,38 +31,6 @@ interface ReleaseProviderMatrixProps {
 }
 
 type DraftState = Partial<Record<ProviderKey, string>>;
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  const fallbackCopy = (value: string) => {
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = value;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-999999px';
-      textarea.style.top = '-999999px';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      return successful;
-    } catch (error) {
-      console.error('Fallback copy failed', error);
-      return false;
-    }
-  };
-
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return fallbackCopy(text);
-    }
-  }
-
-  return fallbackCopy(text);
-}
 
 function ProviderStatusDot({
   status,
