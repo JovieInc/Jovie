@@ -70,13 +70,18 @@ export function ArtistSEO({ artist, socialLinks }: ArtistSEOProps) {
 
   return (
     <>
+      {/*
+        Structured data scripts use 'afterInteractive' strategy.
+        JSON-LD is non-blocking and doesn't affect page rendering,
+        so there's no need to delay page interactivity for these scripts.
+      */}
       {/* Music Group Structured Data */}
-      <Script type='application/ld+json' strategy='beforeInteractive'>
+      <Script type='application/ld+json' strategy='afterInteractive'>
         {JSON.stringify(musicStructuredData)}
       </Script>
 
       {/* Breadcrumb Structured Data */}
-      <Script type='application/ld+json' strategy='beforeInteractive'>
+      <Script type='application/ld+json' strategy='afterInteractive'>
         {JSON.stringify(breadcrumbStructuredData)}
       </Script>
 
