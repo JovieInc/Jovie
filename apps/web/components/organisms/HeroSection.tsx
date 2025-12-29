@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
+import React, { type ReactNode, useMemo } from 'react';
 import { GradientText } from '@/components/atoms/GradientText';
 import { Container } from '@/components/site/Container';
 
@@ -32,7 +32,13 @@ export interface HeroSectionProps {
   showBackgroundEffects?: boolean;
 }
 
-export function HeroSection({
+/**
+ * HeroSection - Reusable hero component for marketing pages.
+ *
+ * Wrapped in React.memo to prevent unnecessary re-renders when parent
+ * components update but hero props remain unchanged.
+ */
+export const HeroSection = React.memo(function HeroSection({
   headline,
   highlightText,
   gradientVariant = 'primary',
@@ -132,4 +138,4 @@ export function HeroSection({
       </Container>
     </header>
   );
-}
+});

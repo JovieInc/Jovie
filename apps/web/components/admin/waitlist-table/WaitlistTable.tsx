@@ -1,7 +1,8 @@
 'use client';
 
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ClipboardList } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TableEmptyState } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { WaitlistMobileCard } from '../WaitlistMobileCard';
@@ -46,6 +47,28 @@ export function WaitlistTable({
     onApprove: approveEntry,
   });
 
+  // Ref for the scrollable container (desktop table)
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Virtual scrolling configuration for table rows.
+   *
+   * Virtualization improves performance for large datasets by only rendering
+   * visible rows plus a small buffer, reducing DOM node count from O(n)
+   * to O(viewport_height / row_height + overscan).
+   *
+   * Configuration:
+   * - estimateSize: 48px - Based on typical row height with padding
+   * - overscan: 5 - Renders 5 extra rows above/below for smoother scrolling
+   */
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 48,
+    overscan: 5,
+  });
+
   return (
     <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
       {/* Custom toolbar - sticky at top */}
@@ -58,8 +81,11 @@ export function WaitlistTable({
         </div>
       </div>
 
-      {/* Desktop Table - hidden on mobile */}
-      <div className='hidden md:block overflow-x-auto'>
+      {/* Desktop Table - hidden on mobile, with virtualization */}
+      <div
+        ref={tableContainerRef}
+        className='hidden md:block overflow-auto max-h-[600px]'
+      >
         <table className='w-full min-w-[960px] table-fixed border-separate border-spacing-0 text-[13px]'>
           <caption className='sr-only'>Waitlist entries table</caption>
           <thead>
@@ -67,7 +93,7 @@ export function WaitlistTable({
               {columns.map(column => (
                 <th
                   key={column.id}
-                  className={`sticky top-12 sm:top-14 z-20 px-4 py-3 border-b border-subtle text-[13px] bg-surface-1/80 backdrop-blur text-left ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
+                  className={`sticky top-0 z-20 px-4 py-3 border-b border-subtle text-[13px] bg-surface-1/80 backdrop-blur text-left ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
                 >
                   <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                     {column.header}
@@ -76,7 +102,12 @@ export function WaitlistTable({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody
+            style={{
+              position: 'relative',
+              height: `${rowVirtualizer.getTotalSize()}px`,
+            }}
+          >
             {rows.length === 0 ? (
               <TableEmptyState
                 colSpan={columns.length}
@@ -85,21 +116,33 @@ export function WaitlistTable({
                 description='New waitlist signups will appear here.'
               />
             ) : (
-              rows.map((row, index) => (
-                <tr
-                  key={row.id}
-                  className='border-b border-subtle last:border-b-0 hover:bg-surface-2/50 transition-colors'
-                >
-                  {columns.map(column => (
-                    <td
-                      key={column.id}
-                      className={`px-4 py-3 ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
-                    >
-                      {column.cell(row, index)}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const row = rows[virtualRow.index];
+                return (
+                  <tr
+                    key={row.id}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2/50 transition-colors'
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    {columns.map(column => (
+                      <td
+                        key={column.id}
+                        className={`px-4 py-3 ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
+                      >
+                        {column.cell(row, virtualRow.index)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

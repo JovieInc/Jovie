@@ -184,11 +184,25 @@ export const LinkCategoryGrid = React.memo(function LinkCategoryGrid<
     return sorted;
   }, [groups]);
 
-  // Map of link IDs to their indices for efficient lookup
+  // Map of link IDs to their indices for efficient lookup (used in drag-and-drop)
   const mapIdToIndex = useMemo(() => {
     const m = new Map<string, number>();
     links.forEach((l, idx) => {
       m.set(idFor(l), idx);
+    });
+    return m;
+  }, [links]);
+
+  // Map of normalizedUrl to index for O(1) lookup in render loop
+  // This eliminates O(n) findIndex calls for each link, reducing complexity
+  // from O(n²) to O(n) for rendering n links
+  const mapNormalizedUrlToIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    links.forEach((l, idx) => {
+      const key = l.normalizedUrl || l.originalUrl || '';
+      if (key) {
+        m.set(key, idx);
+      }
     });
     return m;
   }, [links]);
@@ -330,9 +344,9 @@ export const LinkCategoryGrid = React.memo(function LinkCategoryGrid<
               <SortableContext items={items.map(idFor)}>
                 {items.map(link => {
                   const linkId = idFor(link);
-                  const linkIndex = links.findIndex(
-                    l => l.normalizedUrl === link.normalizedUrl
-                  );
+                  // Use memoized map for O(1) lookup instead of O(n) findIndex
+                  const linkKey = link.normalizedUrl || link.originalUrl || '';
+                  const linkIndex = mapNormalizedUrlToIndex.get(linkKey) ?? -1;
 
                   return (
                     <SortableLinkItem

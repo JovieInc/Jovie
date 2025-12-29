@@ -2,12 +2,22 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { HeroSection } from '@/components/organisms/HeroSection';
 import { FEATURE_FLAGS, useFeatureFlagWithLoading } from '@/lib/analytics';
 import { ClaimHandleForm } from './ClaimHandleForm';
 
-export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
+/**
+ * HomeHero - The main hero component for the homepage.
+ *
+ * Wrapped in React.memo to prevent unnecessary re-renders from parent updates.
+ * Note: Internal re-renders still occur when feature flag loading state changes.
+ */
+export const HomeHero = React.memo(function HomeHero({
+  subtitle,
+}: {
+  subtitle?: ReactNode;
+}) {
   const { enabled: showClaimHandle, loading } = useFeatureFlagWithLoading(
     FEATURE_FLAGS.CLAIM_HANDLE,
     false
@@ -51,4 +61,4 @@ export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
       {content}
     </HeroSection>
   );
-}
+});
