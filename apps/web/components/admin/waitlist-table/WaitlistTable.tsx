@@ -2,7 +2,6 @@
 
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ClipboardList } from 'lucide-react';
-import * as React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TableEmptyState } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';

@@ -213,12 +213,12 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
           console.log(`\n- ${violation.id}: ${violation.description}`);
           console.log(`  Impact: ${violation.impact}`);
           console.log(`  Help: ${violation.helpUrl}`);
-          console.log(
-            `  Affected: ${violation.nodes.length} element(s)`
-          );
+          console.log(`  Affected: ${violation.nodes.length} element(s)`);
           // Show first affected element for debugging
           if (violation.nodes[0]) {
-            console.log(`  Example: ${violation.nodes[0].html.substring(0, 100)}...`);
+            console.log(
+              `  Example: ${violation.nodes[0].html.substring(0, 100)}...`
+            );
           }
         });
       }
