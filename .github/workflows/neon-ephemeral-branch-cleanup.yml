@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 5
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
 
     steps:
       - name: Validate Neon configuration
