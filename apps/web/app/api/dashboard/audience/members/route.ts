@@ -1,8 +1,8 @@
 import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { audienceMembers, creatorProfiles, users } from '@/lib/db/schema';
+import { membersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
@@ -17,24 +17,11 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
-const querySchema = z.object({
-  profileId: z.string().uuid(),
-  sort: z
-    .enum(['lastSeen', 'visits', 'intent', 'type', 'engagement', 'createdAt'])
-    .default('lastSeen'),
-  direction: z.enum(['asc', 'desc']).default('desc'),
-  page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
-  pageSize: z.preprocess(
-    val => Number(val ?? 10),
-    z.number().int().min(1).max(100)
-  ),
-});
-
 export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const { searchParams } = new URL(request.url);
-      const parsed = querySchema.safeParse({
+      const parsed = membersQuerySchema.safeParse({
         profileId: searchParams.get('profileId'),
         sort: searchParams.get('sort') ?? undefined,
         direction: searchParams.get('direction') ?? undefined,

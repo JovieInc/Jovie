@@ -1,6 +1,5 @@
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
@@ -10,14 +9,9 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+import { recentActivityQuerySchema } from '@/lib/validation/schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const querySchema = z.object({
-  profileId: z.string().uuid(),
-  limit: z.preprocess(val => Number(val ?? 5), z.number().int().min(1).max(20)),
-  range: z.enum(['7d', '30d', '90d']).optional().default('7d'),
-});
 
 const ACTION_ICONS: Record<string, string> = {
   listen: '🎧',
@@ -106,7 +100,7 @@ export async function GET(request: NextRequest) {
   try {
     return await withDbSession(async clerkUserId => {
       const { searchParams } = new URL(request.url);
-      const parsed = querySchema.safeParse({
+      const parsed = recentActivityQuerySchema.safeParse({
         profileId: searchParams.get('profileId'),
         limit: searchParams.get('limit') ?? undefined,
         range: searchParams.get('range') ?? undefined,

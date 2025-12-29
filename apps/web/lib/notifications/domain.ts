@@ -38,16 +38,16 @@ import {
   type NotificationDomainResponse,
   type NotificationSubscribeDomainResponse,
 } from '@/lib/notifications/response';
-import {
-  statusSchema,
-  subscribeSchema,
-  unsubscribeSchema,
-} from '@/lib/notifications/schemas';
 import { sendNotification } from '@/lib/notifications/service';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import {
+  statusSchema,
+  subscribeSchema,
+  unsubscribeSchema,
+} from '@/lib/validation/schemas';
 import type {
   NotificationChannel,
   NotificationContactValues,

@@ -2,7 +2,6 @@ import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
-import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { profilePhotos, users } from '@/lib/db';
 import {
@@ -14,6 +13,7 @@ import {
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
+import { imageUploadSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
@@ -112,11 +112,6 @@ async function getSharp(): Promise<SharpConstructor> {
   }
   return sharpModule as unknown as SharpConstructor;
 }
-
-const uploadSchema = z.object({
-  filename: z.string().min(1),
-  contentType: z.enum(SUPPORTED_IMAGE_MIME_TYPES),
-});
 
 async function fileToBuffer(file: File): Promise<Buffer> {
   const arrayBuffer =
@@ -349,7 +344,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate file
-      const validation = uploadSchema.safeParse({
+      const validation = imageUploadSchema.safeParse({
         filename: file.name,
         contentType: normalizedType,
       });

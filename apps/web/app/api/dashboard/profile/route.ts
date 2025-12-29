@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { clerkClient } from '@clerk/nextjs/server';
-import { Buffer } from 'buffer';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
@@ -13,6 +12,7 @@ import {
   syncCanonicalUsernameFromApp,
   UsernameValidationError,
 } from '@/lib/username/sync';
+import { profileUpdateSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 // Use Node.js runtime for compatibility with PostHog Node client and DB libs
@@ -20,116 +20,31 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const allowedUrlProtocols = new Set(['http:', 'https:']);
-
-const hasSafeHttpProtocol = (value: string) => {
-  try {
-    const url = new URL(value);
-    return allowedUrlProtocols.has(url.protocol);
-  } catch {
-    return false;
-  }
-};
-
-const httpUrlSchema = z
-  .string()
-  .trim()
-  .max(2048)
-  .refine(hasSafeHttpProtocol, 'URL must start with http or https');
-
-const settingsSchema = z
-  .object({
-    hide_branding: z.boolean().optional(),
-    marketing_emails: z.boolean().optional(),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    const size = Buffer.byteLength(JSON.stringify(value), 'utf8');
-    if (size > 1024) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Settings payload is too large',
-      });
+/**
+ * Extended profile update schema with username validation.
+ *
+ * Extends the centralized profileUpdateSchema with route-specific
+ * username validation using validateUsername and normalizeUsername.
+ */
+const ProfileUpdateSchema = profileUpdateSchema
+  .superRefine((data, ctx) => {
+    if (data.username !== undefined) {
+      const validation = validateUsername(data.username);
+      if (!validation.isValid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['username'],
+          message: validation.error ?? 'Username is invalid or reserved',
+        });
+      }
     }
-  });
-
-const themeSchema = z
-  .union([
-    z
-      .object({
-        preference: z.enum(['light', 'dark', 'system']),
-      })
-      .strict(),
-    z
-      .object({
-        mode: z.enum(['light', 'dark', 'system']),
-      })
-      .strict(),
-  ])
-  .transform(value => {
-    const preference = 'preference' in value ? value.preference : value.mode;
-    return { preference, mode: preference };
-  });
-
-const venmoHandleSchema = z.preprocess(
-  value => {
-    if (typeof value !== 'string') return value;
-    const trimmed = value.trim();
-    const withoutAt = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
-    return withoutAt;
-  },
-  z
-    .string()
-    .min(1)
-    .max(30)
-    // Venmo allows letters, numbers, underscores, and hyphens
-    .regex(/^[A-Za-z0-9_-]{1,30}$/)
-    .transform(handle => `@${handle}`)
-);
-
-const ProfileUpdateSchema = z
-  .object({
-    username: z
-      .string()
-      .trim()
-      .min(3)
-      .max(30)
-      .superRefine((value, ctx) => {
-        const validation = validateUsername(value);
-        if (!validation.isValid) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: validation.error ?? 'Username is invalid or reserved',
-          });
-        }
-      })
-      .transform(value => normalizeUsername(value))
-      .optional(),
-    displayName: z
-      .string()
-      .trim()
-      .min(1, 'Display name cannot be empty')
-      .max(60, 'Display name must be 60 characters or fewer')
-      .optional(),
-    bio: z
-      .string()
-      .trim()
-      .max(512, 'Bio must be 512 characters or fewer')
-      .optional(),
-    creatorType: z
-      .enum(['artist', 'podcaster', 'influencer', 'creator'])
-      .optional(),
-    avatarUrl: httpUrlSchema.optional(),
-    spotifyUrl: httpUrlSchema.optional(),
-    appleMusicUrl: httpUrlSchema.optional(),
-    youtubeUrl: httpUrlSchema.optional(),
-    isPublic: z.boolean().optional(),
-    marketingOptOut: z.boolean().optional(),
-    settings: settingsSchema.optional(),
-    theme: themeSchema.optional(),
-    venmo_handle: venmoHandleSchema.optional(),
   })
-  .strict();
+  .transform(data => {
+    if (data.username !== undefined) {
+      return { ...data, username: normalizeUsername(data.username) };
+    }
+    return data;
+  });
 
 type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 

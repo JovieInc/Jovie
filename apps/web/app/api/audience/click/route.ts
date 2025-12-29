@@ -1,6 +1,5 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import {
   checkClickRateLimit,
   getRateLimitHeaders,
@@ -19,6 +18,7 @@ import {
   checkPublicRateLimit,
   getPublicRateLimitStatus,
 } from '@/lib/utils/rate-limit';
+import { clickSchema } from '@/lib/validation/schemas';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -29,26 +29,6 @@ import {
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const clickSchema = z.object({
-  profileId: z.string().uuid(),
-  linkId: z.string().uuid().optional(),
-  linkType: z.enum(['listen', 'social', 'tip', 'other']).default('other'),
-  actionLabel: z.string().optional(),
-  platform: z.string().optional(),
-  ipAddress: z.string().optional(),
-  userAgent: z.string().optional(),
-  referrer: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
-  deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
-  os: z.string().optional(),
-  browser: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  audienceMemberId: z.string().uuid().optional(),
-  // HMAC-SHA256 signed tracking token for request authentication
-  trackingToken: z.string().optional(),
-});
 
 const ACTION_ICONS: Record<string, string> = {
   listen: '🎧',

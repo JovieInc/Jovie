@@ -1,0 +1,93 @@
+/**
+ * CSV column configuration for AdminCreatorProfileRow data type.
+ * Used by the CSV export utility to format creator profile data for download.
+ */
+
+import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { CSVColumn } from '@/lib/utils/csv';
+
+/**
+ * CSV column configuration for exporting admin creator profile data.
+ * Includes all relevant fields with human-readable headers.
+ */
+export const creatorsCSVColumns: CSVColumn<AdminCreatorProfileRow>[] = [
+  {
+    header: 'ID',
+    accessor: 'id',
+  },
+  {
+    header: 'Username',
+    accessor: 'username',
+  },
+  {
+    header: 'Username Normalized',
+    accessor: 'usernameNormalized',
+  },
+  {
+    header: 'Display Name',
+    accessor: 'displayName',
+    formatter: value => (value ? String(value) : ''),
+  },
+  {
+    header: 'Avatar URL',
+    accessor: 'avatarUrl',
+    formatter: value => (value ? String(value) : ''),
+  },
+  {
+    header: 'Is Verified',
+    accessor: 'isVerified',
+    formatter: value => (value ? 'Yes' : 'No'),
+  },
+  {
+    header: 'Is Featured',
+    accessor: 'isFeatured',
+    formatter: value => (value ? 'Yes' : 'No'),
+  },
+  {
+    header: 'Is Claimed',
+    accessor: 'isClaimed',
+    formatter: value => (value ? 'Yes' : 'No'),
+  },
+  {
+    header: 'Marketing Opt Out',
+    accessor: 'marketingOptOut',
+    formatter: value => (value ? 'Yes' : 'No'),
+  },
+  {
+    header: 'User ID',
+    accessor: 'userId',
+    formatter: value => (value ? String(value) : ''),
+  },
+  {
+    header: 'Confidence',
+    accessor: 'confidence',
+    formatter: value =>
+      value !== null && value !== undefined
+        ? (Number(value) * 100).toFixed(1) + '%'
+        : '',
+  },
+  {
+    header: 'Ingestion Status',
+    accessor: 'ingestionStatus',
+    formatter: value => {
+      // Capitalize first letter for better readability
+      const str = String(value);
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    },
+  },
+  {
+    header: 'Last Ingestion Error',
+    accessor: 'lastIngestionError',
+    formatter: value => (value ? String(value) : ''),
+  },
+  {
+    header: 'Created At',
+    accessor: 'createdAt',
+    // Date formatting is handled by the CSV utility
+  },
+];
+
+/**
+ * Default filename prefix for creators CSV exports.
+ */
+export const CREATORS_CSV_FILENAME_PREFIX = 'creators';

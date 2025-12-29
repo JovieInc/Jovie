@@ -9,4 +9,10 @@ export * from './atoms';
 export * from './molecules';
 export * from './organisms';
 export { SortableHeaderButton } from './SortableHeaderButton';
+// CSV Export utilities
+export {
+  type UseCSVExportOptions,
+  type UseCSVExportResult,
+  useCSVExport,
+} from './useCSVExport';
 export { useRowSelection } from './useRowSelection';

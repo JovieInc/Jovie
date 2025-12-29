@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PATCH, PUT } from '@/app/api/dashboard/social-links/route';
+import { PUT } from '@/app/api/dashboard/social-links/route';
 import { captureError } from '@/lib/error-tracking';
 import { validateBeaconsUrl } from '@/lib/ingestion/strategies/beacons';
 
@@ -669,11 +669,11 @@ describe('PUT /api/dashboard/social-links', () => {
   });
 });
 
-describe('PATCH /api/dashboard/social-links', () => {
+describe('PUT /api/dashboard/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Configure select to return suggested link for PATCH tests
+    // Configure select to return suggested link for PUT tests
     hoisted.select.mockImplementation(() => {
       const where = vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue(hoisted.suggestedLinkResult),
@@ -697,7 +697,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -705,7 +705,7 @@ describe('PATCH /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PATCH(request as unknown as Request);
+    const response = await PUT(request as unknown as Request);
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
@@ -716,7 +716,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -728,7 +728,7 @@ describe('PATCH /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PATCH(request as unknown as Request);
+    const response = await PUT(request as unknown as Request);
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
@@ -739,7 +739,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -752,7 +752,7 @@ describe('PATCH /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PATCH(request as unknown as Request);
+    const response = await PUT(request as unknown as Request);
 
     expect(response.status).toBe(200);
     const data = (await response.json()) as { ok?: boolean };
@@ -763,7 +763,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -775,7 +775,7 @@ describe('PATCH /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PATCH(request as unknown as Request);
+    const response = await PUT(request as unknown as Request);
 
     expect(response.headers.get('X-RateLimit-Limit')).toBeDefined();
   });
@@ -803,7 +803,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -815,7 +815,7 @@ describe('PATCH /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PATCH(request as unknown as Request);
+    const response = await PUT(request as unknown as Request);
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as {
@@ -828,7 +828,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     expect(data.error).toContain('only suggested links');
   });
 
-  it('returns 409 when expectedVersion does not match for PATCH', async () => {
+  it('returns 409 when expectedVersion does not match for PUT', async () => {
     // Configure select to return suggested link with different version
     hoisted.select.mockImplementation(() => {
       const where = vi.fn().mockReturnValue({
@@ -855,7 +855,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -868,7 +868,7 @@ describe('PATCH /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PATCH(request as unknown as Request);
+    const response = await PUT(request as unknown as Request);
 
     expect(response.status).toBe(409);
     const data = (await response.json()) as {
