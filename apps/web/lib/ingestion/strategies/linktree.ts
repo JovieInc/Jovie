@@ -19,7 +19,9 @@ import {
   extractScriptJson,
   type FetchOptions,
   fetchDocument,
+  isPlatformUrl,
   type StrategyConfig,
+  validatePlatformUrl,
 } from './base';
 
 // ============================================================================
@@ -67,40 +69,16 @@ type StructuredLink = { url?: string | null; title?: string | null };
 
 /**
  * Validates that a URL is a valid Linktree profile URL.
+ * Uses shared validation logic from base module.
  */
 export function isLinktreeUrl(url: string): boolean {
-  try {
-    const candidate = url.trim();
-
-    // Reject dangerous or unsupported schemes early
-    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
-      return false;
-    }
-
-    // Reject protocol-relative URLs
-    if (candidate.startsWith('//')) {
-      return false;
-    }
-
-    // Check original URL protocol before normalization (normalizeUrl converts http to https)
-    const originalParsed = new URL(
-      candidate.startsWith('http') ? candidate : `https://${candidate}`
-    );
-    if (originalParsed.protocol !== 'https:') {
-      return false;
-    }
-
-    const parsed = new URL(normalizeUrl(candidate));
-
-    if (!LINKTREE_CONFIG.validHosts.has(parsed.hostname.toLowerCase())) {
-      return false;
-    }
-
-    const handle = extractLinktreeHandle(url);
-    return handle !== null && handle.length > 0;
-  } catch {
+  if (!isPlatformUrl(url, LINKTREE_CONFIG)) {
     return false;
   }
+
+  // Additional Linktree-specific validation: check handle format
+  const handle = extractLinktreeHandle(url);
+  return handle !== null && handle.length > 0;
 }
 
 /**
@@ -108,44 +86,19 @@ export function isLinktreeUrl(url: string): boolean {
  * Returns null if invalid.
  */
 export function validateLinktreeUrl(url: string): string | null {
-  try {
-    const candidate = url.trim();
+  const result = validatePlatformUrl(url, LINKTREE_CONFIG);
 
-    // Reject dangerous or unsupported schemes early
-    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
-      return null;
-    }
-
-    // Reject protocol-relative URLs
-    if (candidate.startsWith('//')) {
-      return null;
-    }
-
-    // Check original URL protocol before normalization
-    const originalParsed = new URL(
-      candidate.startsWith('http') ? candidate : `https://${candidate}`
-    );
-    if (originalParsed.protocol !== 'https:') {
-      return null;
-    }
-
-    const normalized = normalizeUrl(candidate);
-    const parsed = new URL(normalized);
-
-    if (!LINKTREE_CONFIG.validHosts.has(parsed.hostname.toLowerCase())) {
-      return null;
-    }
-
-    const handle = extractLinktreeHandle(url);
-    if (!handle || !isValidHandle(handle)) {
-      return null;
-    }
-
-    // Return canonical URL format
-    return `https://${LINKTREE_CONFIG.canonicalHost}/${handle}`;
-  } catch {
+  if (!result.valid || !result.handle) {
     return null;
   }
+
+  // Additional Linktree-specific validation
+  if (!isValidHandle(result.handle)) {
+    return null;
+  }
+
+  // Return canonical URL format
+  return `https://${LINKTREE_CONFIG.canonicalHost}/${result.handle}`;
 }
 
 /**

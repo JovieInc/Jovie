@@ -1,26 +1,21 @@
 'use client';
 
-// Import from legacy to use the traditional hook API
-// The new Clerk v7 uses signal-based hooks which have a different interface
+/**
+ * Sign-up authentication flow hook using Clerk Core API.
+ * Uses shared base logic from useAuthFlowBase.
+ */
+
 import { useSignUp } from '@clerk/nextjs/legacy';
-import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import {
-  isCodeExpired,
-  isRateLimited,
-  isSignInSuggested,
-  parseClerkError,
-} from '@/lib/auth/clerk-errors';
-import type { AuthMethod, LoadingState } from '@/lib/auth/types';
+import { isSignInSuggested, parseClerkError } from '@/lib/auth/clerk-errors';
+import type { LoadingState } from '@/lib/auth/types';
+import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
 // Re-export types for backwards compatibility
 export type { AuthMethod, LoadingState } from '@/lib/auth/types';
+// Workaround for eslint - use AuthMethod via re-export
 
-// Storage keys (matching existing implementation)
-const LAST_AUTH_METHOD_STORAGE_KEY = 'jovie.last_auth_method';
-const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
-
-export type SignUpStep = 'method' | 'email' | 'verification';
+export type SignUpStep = AuthFlowStep;
 
 export interface UseSignUpFlowReturn {
   // Clerk loaded state
@@ -58,64 +53,20 @@ export interface UseSignUpFlowReturn {
  */
 export function useSignUpFlow(): UseSignUpFlowReturn {
   const { signUp, setActive, isLoaded } = useSignUp();
-  const router = useRouter();
 
-  // Step management
-  const [step, setStep] = useState<SignUpStep>('method');
-
-  // Form state
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-
-  // Loading & error state
-  const [loadingState, setLoadingState] = useState<LoadingState>({
-    type: 'idle',
+  // Use shared auth flow base - sign-up always goes to onboarding
+  const base = useAuthFlowBase({
+    defaultRedirectUrl: '/onboarding',
+    useStoredRedirectUrl: false,
   });
-  const [error, setError] = useState<string | null>(null);
+
+  // Sign-up specific state
   const [shouldSuggestSignIn, setShouldSuggestSignIn] = useState(false);
 
   const clearError = useCallback(() => {
-    setError(null);
+    base.clearError();
     setShouldSuggestSignIn(false);
-  }, []);
-
-  /**
-   * Get the redirect URL - for sign-up, always go to onboarding first
-   */
-  const getRedirectUrl = useCallback((): string => {
-    // New users always go through onboarding
-    return '/onboarding';
-  }, []);
-
-  /**
-   * Store the redirect URL from query params (for post-onboarding)
-   */
-  const storeRedirectUrl = useCallback(() => {
-    try {
-      const redirectUrl = new URL(window.location.href).searchParams.get(
-        'redirect_url'
-      );
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
-        window.sessionStorage.setItem(
-          AUTH_REDIRECT_URL_STORAGE_KEY,
-          redirectUrl
-        );
-      }
-    } catch {
-      // Ignore errors
-    }
-  }, []);
-
-  /**
-   * Persist the last used auth method for UX personalization
-   */
-  const persistAuthMethod = useCallback((method: AuthMethod) => {
-    try {
-      window.localStorage.setItem(LAST_AUTH_METHOD_STORAGE_KEY, method);
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
+  }, [base]);
 
   /**
    * Start the email OTP flow - sends a verification code
@@ -125,9 +76,9 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       if (!signUp || !isLoaded) return false;
 
       clearError();
-      setLoadingState({ type: 'submitting' });
-      setEmail(emailAddress);
-      persistAuthMethod('email');
+      base.setLoadingState({ type: 'submitting' });
+      base.setEmail(emailAddress);
+      base.persistAuthMethod('email');
 
       try {
         // Create sign-up with email
@@ -140,18 +91,18 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           strategy: 'email_code',
         });
 
-        setStep('verification');
-        setLoadingState({ type: 'idle' });
+        base.setStep('verification');
+        base.setLoadingState({ type: 'idle' });
         return true;
       } catch (err) {
         const message = parseClerkError(err);
-        setError(message);
+        base.setError(message);
         setShouldSuggestSignIn(isSignInSuggested(err));
-        setLoadingState({ type: 'idle' });
+        base.setLoadingState({ type: 'idle' });
         return false;
       }
     },
-    [signUp, isLoaded, clearError, persistAuthMethod]
+    [signUp, isLoaded, clearError, base]
   );
 
   /**
@@ -162,8 +113,8 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       if (!signUp || !isLoaded) return false;
 
       clearError();
-      setLoadingState({ type: 'verifying' });
-      setCode(verificationCode);
+      base.setLoadingState({ type: 'verifying' });
+      base.setCode(verificationCode);
 
       try {
         const result = await signUp.attemptEmailAddressVerification({
@@ -175,8 +126,8 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           await setActive({ session: result.createdSessionId });
 
           // Navigate to onboarding
-          const redirectUrl = getRedirectUrl();
-          router.push(redirectUrl);
+          const redirectUrl = base.getRedirectUrl();
+          base.router.push(redirectUrl);
 
           return true;
         }
@@ -184,30 +135,24 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         // Handle other statuses
         if (result.status === 'missing_requirements') {
           // There may be additional verification needed
-          setError('Additional verification required. Please try again.');
+          base.setError('Additional verification required. Please try again.');
         } else {
-          setError('Sign-up incomplete. Please try again.');
+          base.setError('Sign-up incomplete. Please try again.');
         }
-        setLoadingState({ type: 'idle' });
+        base.setLoadingState({ type: 'idle' });
         return false;
       } catch (err) {
         const message = parseClerkError(err);
-        setError(message);
-
-        // If code expired, user can resend
-        if (isCodeExpired(err)) {
-          setError(
-            'Your code has expired. Click "Resend code" to get a new one.'
-          );
-        }
+        base.setError(message);
+        base.handleCodeExpiredError(err);
 
         // Clear the code on error so user can re-enter
-        setCode('');
-        setLoadingState({ type: 'idle' });
+        base.setCode('');
+        base.setLoadingState({ type: 'idle' });
         return false;
       }
     },
-    [signUp, setActive, isLoaded, router, clearError, getRedirectUrl]
+    [signUp, setActive, isLoaded, clearError, base]
   );
 
   /**
@@ -217,30 +162,24 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
     if (!signUp || !isLoaded) return false;
 
     clearError();
-    setLoadingState({ type: 'resending' });
-    setCode('');
+    base.setLoadingState({ type: 'resending' });
+    base.setCode('');
 
     try {
       await signUp.prepareEmailAddressVerification({
         strategy: 'email_code',
       });
 
-      setLoadingState({ type: 'idle' });
+      base.setLoadingState({ type: 'idle' });
       return true;
     } catch (err) {
       const message = parseClerkError(err);
-      setError(message);
-
-      if (isRateLimited(err)) {
-        setError(
-          'Too many attempts. Please wait before requesting a new code.'
-        );
-      }
-
-      setLoadingState({ type: 'idle' });
+      base.setError(message);
+      base.handleRateLimitedError(err);
+      base.setLoadingState({ type: 'idle' });
       return false;
     }
-  }, [signUp, isLoaded, clearError]);
+  }, [signUp, isLoaded, clearError, base]);
 
   /**
    * Start OAuth flow (Google/Spotify)
@@ -250,30 +189,23 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       if (!signUp || !isLoaded) return;
 
       clearError();
-      setLoadingState({ type: 'oauth', provider });
-      persistAuthMethod(provider);
-      storeRedirectUrl();
+      base.setLoadingState({ type: 'oauth', provider });
+      base.persistAuthMethod(provider);
+      base.storeRedirectUrl();
 
       try {
         await signUp.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
           redirectUrl: '/signup/sso-callback',
-          redirectUrlComplete: getRedirectUrl(),
+          redirectUrlComplete: base.getRedirectUrl(),
         });
       } catch (err) {
         const message = parseClerkError(err);
-        setError(message);
-        setLoadingState({ type: 'idle' });
+        base.setError(message);
+        base.setLoadingState({ type: 'idle' });
       }
     },
-    [
-      signUp,
-      isLoaded,
-      clearError,
-      persistAuthMethod,
-      storeRedirectUrl,
-      getRedirectUrl,
-    ]
+    [signUp, isLoaded, clearError, base]
   );
 
   /**
@@ -281,24 +213,19 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
    */
   const goBack = useCallback(() => {
     clearError();
-    setCode('');
-    if (step === 'verification') {
-      setStep('email');
-    } else if (step === 'email') {
-      setStep('method');
-    }
-  }, [step, clearError]);
+    base.goBack();
+  }, [clearError, base]);
 
   return {
     isLoaded,
-    step,
-    setStep,
-    email,
-    setEmail,
-    code,
-    setCode,
-    loadingState,
-    error,
+    step: base.step,
+    setStep: base.setStep,
+    email: base.email,
+    setEmail: base.setEmail,
+    code: base.code,
+    setCode: base.setCode,
+    loadingState: base.loadingState,
+    error: base.error,
     clearError,
     shouldSuggestSignIn,
     startEmailFlow,

@@ -21,6 +21,7 @@ import {
   extractScriptJson,
   type FetchOptions,
   fetchDocument,
+  isPlatformUrl,
   type StrategyConfig,
   validatePlatformUrl,
 } from './base';
@@ -71,40 +72,16 @@ type StructuredLink = { url?: string | null; title?: string | null };
 
 /**
  * Validates that a URL is a valid Beacons.ai profile URL.
+ * Uses shared validation logic from base module.
  */
 export function isBeaconsUrl(url: string): boolean {
-  try {
-    const candidate = url.trim();
-
-    // Reject dangerous or unsupported schemes early
-    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
-      return false;
-    }
-
-    // Reject protocol-relative URLs
-    if (candidate.startsWith('//')) {
-      return false;
-    }
-
-    // Check original URL protocol before normalization (normalizeUrl converts http to https)
-    const originalParsed = new URL(
-      candidate.startsWith('http') ? candidate : `https://${candidate}`
-    );
-    if (originalParsed.protocol !== 'https:') {
-      return false;
-    }
-
-    const parsed = new URL(normalizeUrl(candidate));
-
-    if (!BEACONS_CONFIG.validHosts.has(parsed.hostname.toLowerCase())) {
-      return false;
-    }
-
-    const handle = extractBeaconsHandle(url);
-    return handle !== null && handle.length > 0;
-  } catch {
+  if (!isPlatformUrl(url, BEACONS_CONFIG)) {
     return false;
   }
+
+  // Additional Beacons-specific validation: check handle format
+  const handle = extractBeaconsHandle(url);
+  return handle !== null && handle.length > 0;
 }
 
 /**

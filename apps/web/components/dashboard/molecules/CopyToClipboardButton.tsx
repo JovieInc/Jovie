@@ -1,11 +1,9 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { useClipboard } from '@/hooks/useClipboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-
-type CopyStatus = 'idle' | 'success' | 'error';
 
 export interface CopyToClipboardButtonProps {
   relativePath: string; // e.g. '/artist-handle'
@@ -21,120 +19,49 @@ export interface CopyToClipboardButtonProps {
 export function CopyToClipboardButton({
   relativePath,
   idleLabel = 'Copy URL',
-  successLabel = '✓ Copied!',
+  successLabel = 'Copied!',
   errorLabel = 'Failed to copy',
   className,
   iconName,
   onCopySuccess,
   onCopyError,
 }: CopyToClipboardButtonProps) {
-  const [status, setStatus] = useState<CopyStatus>('idle');
+  const { copy, status, isSuccess, isError } = useClipboard({
+    onSuccess: onCopySuccess,
+    onError: onCopyError ? () => onCopyError() : undefined,
+  });
 
-  const fallbackCopy = (text: string): boolean => {
-    try {
-      // Create a temporary textarea element
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-999999px';
-      textarea.style.top = '-999999px';
-      document.body.appendChild(textarea);
-
-      // Select and copy the text
-      textarea.focus();
-      textarea.select();
-      const successful = document.execCommand('copy');
-
-      // Clean up
-      document.body.removeChild(textarea);
-
-      return successful;
-    } catch (error) {
-      console.error('Fallback copy failed:', error);
-      return false;
-    }
-  };
-
-  const onCopy = async () => {
+  const handleCopy = () => {
     const url = `${getBaseUrl()}${relativePath}`;
-    let copySuccess = false;
-
-    try {
-      // Try modern clipboard API first
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(url);
-        copySuccess = true;
-      } else {
-        // Fall back to textarea selection method
-        copySuccess = fallbackCopy(url);
-      }
-
-      if (copySuccess) {
-        setStatus('success');
-        onCopySuccess?.();
-      } else {
-        setStatus('error');
-        onCopyError?.();
-      }
-    } catch (error) {
-      console.error('Failed to copy URL:', error);
-
-      // Try fallback method if modern API failed
-      try {
-        copySuccess = fallbackCopy(url);
-
-        if (copySuccess) {
-          setStatus('success');
-          onCopySuccess?.();
-        } else {
-          setStatus('error');
-          onCopyError?.();
-        }
-      } catch (fallbackError) {
-        console.error('Both copy methods failed:', fallbackError);
-        setStatus('error');
-        onCopyError?.();
-      }
-    } finally {
-      setTimeout(() => setStatus('idle'), 2000);
-    }
+    copy(url);
   };
+
+  const currentLabel = isSuccess
+    ? successLabel
+    : isError
+      ? errorLabel
+      : idleLabel;
+  const currentIcon = isSuccess ? 'Check' : isError ? 'X' : iconName;
 
   return (
     <div className='relative'>
       <Button
         variant='secondary'
         size='sm'
-        onClick={onCopy}
+        onClick={handleCopy}
         className={className}
       >
         {iconName ? (
           <>
             <Icon
-              name={
-                status === 'success'
-                  ? 'Check'
-                  : status === 'error'
-                    ? 'X'
-                    : iconName
-              }
+              name={currentIcon ?? iconName}
               className='h-4 w-4'
               aria-hidden='true'
             />
-            <span className='sr-only'>
-              {status === 'success'
-                ? successLabel
-                : status === 'error'
-                  ? errorLabel
-                  : idleLabel}
-            </span>
+            <span className='sr-only'>{currentLabel}</span>
           </>
-        ) : status === 'success' ? (
-          successLabel
-        ) : status === 'error' ? (
-          errorLabel
         ) : (
-          idleLabel
+          currentLabel
         )}
       </Button>
       {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for screen reader announcement */}
