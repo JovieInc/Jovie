@@ -156,4 +156,30 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Canary passed: Deployment healthy"
+          echo "✅ Health endpoint passed"
+
+          # CRITICAL: Verify homepage renders (not just API health)
+          echo "Checking homepage renders..."
+          homepage_url="${deployment_url%/}/"
+          homepage_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$homepage_url" || echo "\n000")
+          homepage_code="${homepage_response##*$'\n'}"
+          homepage_body="${homepage_response%$'\n'*}"
+
+          if [ "$homepage_code" != "200" ]; then
+            echo "❌ Canary failed: Homepage returned HTTP $homepage_code"
+            exit 1
+          fi
+
+          # Check homepage has actual content (not blank or error page)
+          if [ ${#homepage_body} -lt 1000 ]; then
+            echo "❌ Canary failed: Homepage body too short (${#homepage_body} chars) - likely broken"
+            exit 1
+          fi
+
+          # Check for common error indicators
+          if echo "$homepage_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred"; then
+            echo "❌ Canary failed: Homepage contains error message"
+            exit 1
+          fi
+
+          echo "✅ Canary passed: Deployment healthy and homepage renders"

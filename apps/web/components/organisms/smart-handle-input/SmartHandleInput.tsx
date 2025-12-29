@@ -1,0 +1,152 @@
+'use client';
+
+import { useCallback, useEffect, useId, useMemo } from 'react';
+import { Input } from '@/components/atoms/Input';
+import {
+  generateUsernameSuggestions,
+  validateUsernameFormat,
+} from '@/lib/validation/client-username';
+import { FormatHints } from './FormatHints';
+import { getStatusMessage } from './getStatusMessage';
+import { HandleSuggestions } from './HandleSuggestions';
+import type { SmartHandleInputProps } from './types';
+import { useHandleApiValidation } from './useHandleApiValidation';
+import { ValidationStatusIcon } from './ValidationStatusIcon';
+
+export function SmartHandleInput({
+  value,
+  onChange,
+  onValidationChange,
+  placeholder = 'yourname',
+  prefix = 'jovie.link/',
+  showAvailability = true,
+  formatHints = true,
+  disabled = false,
+  artistName,
+  className = '',
+}: SmartHandleInputProps) {
+  const inputId = useId();
+  const statusId = useId();
+  const previewId = useId();
+
+  // Instant client-side validation
+  const validateClientSide = useCallback(
+    (handleValue: string) => validateUsernameFormat(handleValue),
+    []
+  );
+
+  const clientValidation = useMemo(
+    () => validateClientSide(value),
+    [value, validateClientSide]
+  );
+
+  // Memoized username suggestions
+  const usernameSuggestions = useMemo(() => {
+    if (clientValidation.valid || !value) return [];
+    return generateUsernameSuggestions(value, artistName);
+  }, [value, artistName, clientValidation.valid]);
+
+  // API validation with debouncing
+  const handleValidation = useHandleApiValidation({
+    value,
+    clientValidation,
+    usernameSuggestions,
+    showAvailability,
+  });
+
+  // Notify parent of validation changes
+  useEffect(() => {
+    onValidationChange?.(handleValidation);
+  }, [handleValidation, onValidationChange]);
+
+  const statusMessage = getStatusMessage({
+    handleValidation,
+    clientValidation,
+    value,
+  });
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {/* Input with prefix and validation icon */}
+      <div className='relative'>
+        <div className='absolute left-3 top-1/2 -translate-y-1/2 z-10 text-sm font-sans text-secondary-token'>
+          {prefix}
+        </div>
+        <Input
+          type='text'
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className='font-sans pl-20'
+          inputClassName='font-sans'
+          id={inputId}
+          validationState={
+            !value
+              ? null
+              : handleValidation.error || clientValidation.error
+                ? 'invalid'
+                : handleValidation.available && clientValidation.valid
+                  ? 'valid'
+                  : handleValidation.checking
+                    ? 'pending'
+                    : null
+          }
+          statusIcon={
+            <ValidationStatusIcon
+              showAvailability={showAvailability}
+              checking={handleValidation.checking}
+              available={handleValidation.available}
+              clientValid={clientValidation.valid}
+              hasError={!!handleValidation.error}
+            />
+          }
+          aria-describedby={`${statusId} ${previewId}`}
+          aria-label='Enter your desired handle'
+          autoCapitalize='none'
+          autoCorrect='off'
+          autoComplete='off'
+          inputMode='text'
+        />
+      </div>
+
+      {/* Live preview */}
+      <div className='text-xs text-secondary-token' id={previewId}>
+        Your profile will be live at{' '}
+        <span className='font-sans text-primary-token'>
+          {prefix}
+          {value || placeholder}
+        </span>
+      </div>
+
+      {/* Status message */}
+      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
+      <div
+        className={`text-xs min-h-5 transition-all duration-300 ${
+          statusMessage
+            ? handleValidation.available && clientValidation.valid
+              ? 'text-(--accent-speed) opacity-100'
+              : 'text-destructive opacity-100'
+            : 'opacity-0'
+        }`}
+        id={statusId}
+        role='status'
+        aria-live='polite'
+      >
+        {statusMessage || '\u00A0'}
+      </div>
+
+      {/* Username suggestions */}
+      {formatHints && (
+        <HandleSuggestions
+          suggestions={handleValidation.suggestions}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      )}
+
+      {/* Format hints */}
+      {formatHints && !value && <FormatHints />}
+    </div>
+  );
+}
