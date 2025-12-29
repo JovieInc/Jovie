@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import { useSidebar } from '@/components/organisms/Sidebar';
+import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 
 interface SidebarCollapseButtonProps {
@@ -50,7 +51,7 @@ export function SidebarCollapseButton({
         <TooltipContent side='right' className='font-medium'>
           <div className='flex items-center gap-2'>
             <span>{isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
-            <Kbd>⌘ ⇧ S</Kbd>
+            <Kbd>⌘/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}</Kbd>
           </div>
         </TooltipContent>
       </Tooltip>
