@@ -4,10 +4,11 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { useDedupedFetchAll } from '@/lib/fetch';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 interface BillingInfo {
@@ -16,58 +17,43 @@ interface BillingInfo {
   stripeSubscriptionId: string | null;
 }
 
+interface PricingOptions {
+  pricingOptions?: Array<{ priceId: string }>;
+  options?: Array<{ priceId: string }>;
+}
+
+// Cache billing data for 30 seconds to reduce API calls
+const BILLING_CACHE_TTL_MS = 30_000;
+
 export function BillingDashboard() {
-  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
-  const [defaultPriceId, setDefaultPriceId] = useState<string | undefined>(
-    undefined
-  );
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { error: notifyError } = useNotifications();
 
-  const fetchBillingInfo = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      // Fetch billing status and pricing options in parallel
-      const [billingResponse, pricingResponse] = await Promise.all([
-        fetch('/api/billing/status'),
-        fetch('/api/stripe/pricing-options'),
-      ]);
-
-      if (!billingResponse.ok) {
-        throw new Error('Failed to fetch billing status');
-      }
-
-      const billingData = await billingResponse.json();
-      setBillingInfo(billingData);
-
-      // Get default price ID from pricing options
-      if (pricingResponse.ok) {
-        const pricingData = await pricingResponse.json();
-        const firstPriceId =
-          pricingData.pricingOptions?.[0]?.priceId ||
-          pricingData.options?.[0]?.priceId;
-        if (firstPriceId) {
-          setDefaultPriceId(firstPriceId);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching billing info:', err);
-      setBillingInfo(null);
-      setErrorMessage(
-        'We could not load your billing details. Please retry or visit the portal once the connection is restored.'
-      );
+  // Fetch billing status and pricing options with deduplication
+  // Multiple components/renders will share the same request
+  const { data, loading, errors, refresh } = useDedupedFetchAll<
+    [BillingInfo, PricingOptions]
+  >(['/api/billing/status', '/api/stripe/pricing-options'], {
+    ttlMs: BILLING_CACHE_TTL_MS,
+    onError: useCallback(() => {
       notifyError('Billing is temporarily unavailable.');
-    } finally {
-      setLoading(false);
-    }
-  }, [notifyError]);
+    }, [notifyError]),
+  });
 
-  useEffect(() => {
-    fetchBillingInfo();
-  }, [fetchBillingInfo]);
+  const [billingInfo, pricingData] = data;
+  const [billingError] = errors;
+
+  // Extract default price ID from pricing options
+  const defaultPriceId = useMemo(() => {
+    if (!pricingData) return undefined;
+    return (
+      pricingData.pricingOptions?.[0]?.priceId ||
+      pricingData.options?.[0]?.priceId
+    );
+  }, [pricingData]);
+
+  const errorMessage = billingError
+    ? 'We could not load your billing details. Please retry or visit the portal once the connection is restored.'
+    : null;
 
   if (loading) {
     return (
@@ -85,7 +71,7 @@ export function BillingDashboard() {
         title='Billing is temporarily unavailable'
         description={errorMessage}
         actions={[
-          { label: 'Retry', onClick: fetchBillingInfo },
+          { label: 'Retry', onClick: refresh },
           { label: 'Contact support', href: '/support' },
         ]}
         testId='billing-error-state'
