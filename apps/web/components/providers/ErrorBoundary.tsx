@@ -2,6 +2,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 import {
   createErrorToast,
   getUserFriendlyErrorMessage,
@@ -35,21 +36,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
 
     // Capture error in Sentry with component stack context
-    Sentry.captureException(error, {
-      extra: {
-        componentStack: errorInfo.componentStack,
-      },
-      tags: {
-        errorBoundary: 'true',
-      },
-    });
+    // Works with both lite and full SDK variants
+    this.captureErrorInSentry(error, errorInfo);
 
     // Show toast notification if enabled and error is user-facing
     if (this.props.showToast !== false && isUserFacingError(error)) {
@@ -73,6 +65,51 @@ export class ErrorBoundary extends Component<Props, State> {
         description: error.message,
         fatal: false,
       });
+    }
+  }
+
+  /**
+   * Captures an error in Sentry with SDK variant awareness.
+   *
+   * This method gracefully handles both lite and full SDK modes:
+   * - Checks if Sentry is initialized before attempting capture
+   * - Includes SDK mode information in tags for debugging
+   * - Provides fallback logging if Sentry is not available
+   *
+   * @param error - The error to capture
+   * @param errorInfo - React error info with component stack
+   */
+  private captureErrorInSentry(error: Error, errorInfo: ErrorInfo): void {
+    const sentryMode = getSentryMode();
+    const isInitialized = isSentryInitialized();
+
+    // Capture error in Sentry if SDK is initialized (works with both lite and full modes)
+    if (isInitialized) {
+      try {
+        Sentry.captureException(error, {
+          extra: {
+            componentStack: errorInfo.componentStack,
+            sentryMode, // Include SDK mode for debugging
+          },
+          tags: {
+            errorBoundary: 'true',
+            sentryMode, // Tag to filter by SDK variant in Sentry dashboard
+          },
+        });
+      } catch (sentryError) {
+        // Fallback: Sentry capture failed, log to console
+        // This should never happen but provides resilience
+        console.error('[ErrorBoundary] Sentry capture failed:', sentryError);
+        console.error('[ErrorBoundary] Original error:', error, errorInfo);
+      }
+    } else {
+      // Fallback: Sentry not initialized, log to console
+      // This can happen during initial load before SDK is ready
+      console.error(
+        '[ErrorBoundary] Sentry not initialized, logging error:',
+        error,
+        errorInfo
+      );
     }
   }
 
@@ -141,23 +178,57 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 /**
- * Hook-based error boundary for functional components
- * Use this when you need to handle errors in a specific component tree
+ * Hook-based error handler for functional components.
+ *
+ * Works with both lite and full Sentry SDK modes:
+ * - Checks if Sentry is initialized before capturing
+ * - Includes SDK mode information in error context
+ * - Provides fallback logging if Sentry is unavailable
+ *
+ * @example
+ * const { handleError, sentryMode, isSentryReady } = useErrorHandler();
+ *
+ * try {
+ *   await riskyOperation();
+ * } catch (error) {
+ *   handleError(error as Error);
+ * }
  */
 export const useErrorHandler = () => {
   const handleError = React.useCallback(
     (error: Error, errorInfo?: ErrorInfo) => {
-      console.error('Error caught by useErrorHandler:', error, errorInfo);
+      const sentryMode = getSentryMode();
+      const isInitialized = isSentryInitialized();
 
-      // Capture error in Sentry
-      Sentry.captureException(error, {
-        extra: {
-          componentStack: errorInfo?.componentStack,
-        },
-        tags: {
-          errorHandler: 'useErrorHandler',
-        },
-      });
+      // Capture error in Sentry if SDK is initialized (works with both lite and full modes)
+      if (isInitialized) {
+        try {
+          Sentry.captureException(error, {
+            extra: {
+              componentStack: errorInfo?.componentStack,
+              sentryMode,
+            },
+            tags: {
+              errorHandler: 'useErrorHandler',
+              sentryMode,
+            },
+          });
+        } catch (sentryError) {
+          // Fallback: Sentry capture failed
+          console.error(
+            '[useErrorHandler] Sentry capture failed:',
+            sentryError
+          );
+          console.error('[useErrorHandler] Original error:', error, errorInfo);
+        }
+      } else {
+        // Fallback: Sentry not initialized
+        console.error(
+          '[useErrorHandler] Sentry not initialized, logging error:',
+          error,
+          errorInfo
+        );
+      }
 
       // Show toast for user-facing errors
       if (isUserFacingError(error)) {
@@ -170,7 +241,11 @@ export const useErrorHandler = () => {
     []
   );
 
-  return { handleError };
+  // Provide additional state for consumers that need to check SDK status
+  const sentryMode = React.useMemo(() => getSentryMode(), []);
+  const isSentryReady = React.useMemo(() => isSentryInitialized(), []);
+
+  return { handleError, sentryMode, isSentryReady };
 };
 
 /**
