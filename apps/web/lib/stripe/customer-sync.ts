@@ -97,6 +97,7 @@ export async function ensureStripeCustomer(): Promise<{
             userData.stripeCustomerId
           );
 
+          // Type guard: Check if customer is deleted (Stripe.DeletedCustomer has deleted: true)
           if (
             existing &&
             typeof existing === 'object' &&
@@ -106,12 +107,12 @@ export async function ensureStripeCustomer(): Promise<{
             throw new Error('Stripe customer is deleted');
           }
 
-          const customer = existing as unknown as {
-            id: string;
-            metadata?: Record<string, string> | null;
-          };
+          // After the deleted check, existing is a live Stripe.Customer
+          // Access properties directly - Stripe.Customer has id and metadata
+          const customerId = existing.id;
+          const customerMetadata = existing.metadata;
+          const existingClerkUserId = customerMetadata?.clerk_user_id;
 
-          const existingClerkUserId = customer.metadata?.clerk_user_id;
           if (
             typeof existingClerkUserId === 'string' &&
             existingClerkUserId.length > 0 &&
@@ -122,9 +123,9 @@ export async function ensureStripeCustomer(): Promise<{
 
           // Update metadata if needed
           if (existingClerkUserId !== clerkUserId) {
-            await stripe.customers.update(customer.id, {
+            await stripe.customers.update(customerId, {
               metadata: {
-                ...(customer.metadata ?? {}),
+                ...(customerMetadata ?? {}),
                 clerk_user_id: clerkUserId,
                 created_via: 'jovie_app',
               },

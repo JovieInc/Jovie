@@ -18,10 +18,13 @@ export {
   detectPlatform,
   // Environment
   getBaseUrl,
+  // Link utilities
+  getLinkVisibility,
   getPlatform,
   getPlatformsByCategory,
   // Validator
   getValidationError,
+  hasManagedMetadata,
   isDevelopment,
   isDSPPlatform,
   isPreview,
@@ -29,6 +32,7 @@ export {
   isSocialPlatform,
   // Normalizer
   isUnsafeUrl,
+  type ManagedLink,
   normalizeUrl,
   PLATFORM_ERROR_EXAMPLES,
   PLATFORMS,

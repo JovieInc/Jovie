@@ -296,6 +296,15 @@ export function validateEnvironment(
 }
 
 /**
+ * Node.js process properties that may not be available in Edge runtime.
+ * Using a dedicated interface instead of 'any' for type safety.
+ */
+interface NodeProcessExtras {
+  platform?: string;
+  version?: string;
+}
+
+/**
  * Get environment information for debugging
  * Note: Some properties (platform, nodeVersion) are only available in Node.js runtime
  */
@@ -306,16 +315,15 @@ export function getEnvironmentInfo() {
   const isTest = nodeEnv === 'test';
 
   // These are Node.js-only APIs, not available in Edge runtime
-  // We cast to any to avoid static analysis errors during build
   let platform = 'edge';
   let nodeVersion = 'edge-runtime';
 
   if (typeof process !== 'undefined' && !process.env.NEXT_RUNTIME) {
     // Only access these if we are likely in a Node environment (NEXT_RUNTIME is undefined or 'nodejs')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p = process as any;
-    if (p.platform) platform = p.platform;
-    if (p.version) nodeVersion = p.version;
+    // Use intersection type with NodeProcessExtras instead of 'any'
+    const nodeProcess = process as typeof process & NodeProcessExtras;
+    if (nodeProcess.platform) platform = nodeProcess.platform;
+    if (nodeProcess.version) nodeVersion = nodeProcess.version;
   }
 
   return {

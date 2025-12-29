@@ -10,6 +10,8 @@ import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
 import {
   canonicalIdentity,
   type DetectedLink,
+  getLinkVisibility,
+  type ManagedLink,
 } from '@/lib/utils/platform-detection';
 import { sectionOf } from '../utils';
 
@@ -133,10 +135,9 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
     return m;
   }, [idFor, links]);
 
-  // Check if a link is visible
+  // Check if a link is visible using type-safe helper
   const linkIsVisible = useCallback(
-    (l: T): boolean =>
-      ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false,
+    (l: T): boolean => getLinkVisibility(l),
     []
   );
 
@@ -196,27 +197,28 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
    */
   const handleAdd = useCallback(
     async (link: DetectedLink) => {
-      const enriched = {
-        isVisible: true,
+      // Create a managed link with visibility tracking
+      const enriched: ManagedLink = {
         ...link,
-      } as unknown as T;
+        isVisible: true,
+      };
 
       // Special handling for Venmo - force earnings category
-      if ((enriched as DetectedLink).platform.id === 'venmo') {
-        (enriched as DetectedLink).platform = {
-          ...(enriched as DetectedLink).platform,
-          category: 'earnings' as unknown as 'social',
-        } as DetectedLink['platform'];
+      if (enriched.platform.id === 'venmo') {
+        enriched.platform = {
+          ...enriched.platform,
+          category: 'earnings',
+        };
       }
 
-      const section = sectionOf(enriched as T);
+      const section = sectionOf(enriched);
 
       // Enforce MAX_SOCIAL_LINKS visibility
       const socialVisibleCount = links.filter(
-        l => sectionOf(l as T) === 'social' && linkIsVisible(l as T)
+        l => sectionOf(l) === 'social' && linkIsVisible(l)
       ).length;
       if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
-        (enriched as unknown as { isVisible?: boolean }).isVisible = false;
+        enriched.isVisible = false;
       }
 
       // Check for existing links in same/other sections
@@ -233,20 +235,20 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
           )
         : false;
 
-      // Duplicate detection
+      // Duplicate detection - ManagedLink extends DetectedLink, so canonicalIdentity works directly
       const canonicalId = canonicalIdentity({
-        platform: (enriched as DetectedLink).platform,
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+        platform: enriched.platform,
+        normalizedUrl: enriched.normalizedUrl,
       });
       const dupAt = links.findIndex(
         l =>
           canonicalIdentity({
-            platform: (l as DetectedLink).platform,
-            normalizedUrl: (l as DetectedLink).normalizedUrl,
+            platform: l.platform,
+            normalizedUrl: l.normalizedUrl,
           }) === canonicalId
       );
       const duplicate = dupAt !== -1 ? links[dupAt] : null;
-      const duplicateSection = duplicate ? sectionOf(duplicate as T) : null;
+      const duplicateSection = duplicate ? sectionOf(duplicate) : null;
       const hasCrossSectionDuplicate =
         enriched.platform.id === 'youtube' &&
         duplicateSection !== null &&
@@ -269,27 +271,33 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
         dupAt !== -1 &&
         duplicateSection === section
       ) {
-        const merged = {
-          ...links[dupAt],
-          normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-          suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-        } as T;
-        const next = links.map((l, i) => (i === dupAt ? merged : l));
-        setLinks(next);
-        onLinkAdded?.([merged]);
+        const existingLink = links[dupAt];
+        if (existingLink) {
+          const merged: T = {
+            ...existingLink,
+            normalizedUrl: enriched.normalizedUrl,
+            suggestedTitle: enriched.suggestedTitle,
+          };
+          const next = links.map((l, i) => (i === dupAt ? merged : l));
+          setLinks(next);
+          onLinkAdded?.([merged]);
+        }
         return;
       }
 
       // Non-YouTube duplicate - merge
       if (dupAt !== -1 && !hasCrossSectionDuplicate) {
-        const merged = {
-          ...links[dupAt],
-          normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-          suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-        } as T;
-        const next = links.map((l, i) => (i === dupAt ? merged : l));
-        setLinks(next);
-        onLinkAdded?.([merged]);
+        const existingLink = links[dupAt];
+        if (existingLink) {
+          const merged: T = {
+            ...existingLink,
+            normalizedUrl: enriched.normalizedUrl,
+            suggestedTitle: enriched.suggestedTitle,
+          };
+          const next = links.map((l, i) => (i === dupAt ? merged : l));
+          setLinks(next);
+          onLinkAdded?.([merged]);
+        }
         return;
       }
 
@@ -302,22 +310,22 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
         return;
       }
 
-      // Show loading placeholder
-      setAddingLink(enriched);
+      // Show loading placeholder - cast to T since ManagedLink is compatible
+      setAddingLink(enriched as T & ManagedLink);
       await new Promise(resolve => setTimeout(resolve, 600));
 
       const prev = linksRef.current;
-      const currentSection = sectionOf(enriched as T);
+      const currentSection = sectionOf(enriched);
       const canonicalIdAfterDelay = canonicalIdentity({
-        platform: (enriched as DetectedLink).platform,
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+        platform: enriched.platform,
+        normalizedUrl: enriched.normalizedUrl,
       });
 
       const dupAtAfterDelay = prev.findIndex(
         existing =>
           canonicalIdentity({
-            platform: (existing as DetectedLink).platform,
-            normalizedUrl: (existing as DetectedLink).normalizedUrl,
+            platform: existing.platform,
+            normalizedUrl: existing.normalizedUrl,
           }) === canonicalIdAfterDelay
       );
 
@@ -327,27 +335,27 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       let emittedLink: T | null = null;
 
       if (dupAtAfterDelay !== -1) {
-        const duplicate = prev[dupAtAfterDelay];
-        if (duplicate) {
-          const duplicateSection = sectionOf(duplicate);
+        const existingDuplicate = prev[dupAtAfterDelay];
+        if (existingDuplicate) {
+          const existingDupSection = sectionOf(existingDuplicate);
 
           if (
-            (enriched as DetectedLink).platform.id !== 'youtube' &&
-            duplicateSection !== currentSection
+            enriched.platform.id !== 'youtube' &&
+            existingDupSection !== currentSection
           ) {
             // Cross-section duplicates are not allowed (except YouTube)
             emittedLink = null;
           } else if (
-            (enriched as DetectedLink).platform.id === 'youtube' &&
-            duplicateSection !== currentSection
+            enriched.platform.id === 'youtube' &&
+            existingDupSection !== currentSection
           ) {
             // Allow YouTube to exist in both social + dsp: treat as add
           } else {
-            const merged = {
-              ...duplicate,
-              normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-              suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-            } as T;
+            const merged: T = {
+              ...existingDuplicate,
+              normalizedUrl: enriched.normalizedUrl,
+              suggestedTitle: enriched.suggestedTitle,
+            };
             next = prev.map((l, i) => (i === dupAtAfterDelay ? merged : l));
             emittedLink = merged;
             didMerge = true;
@@ -361,16 +369,17 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
             sectionOf(existing) === 'social' && linkIsVisible(existing)
         ).length;
 
-        const adjusted = { ...enriched } as unknown as T;
+        // Create adjusted link with proper visibility
+        const adjusted: ManagedLink = { ...enriched };
         if (
           currentSection === 'social' &&
           socialVisibleCount >= MAX_SOCIAL_LINKS
         ) {
-          (adjusted as unknown as { isVisible?: boolean }).isVisible = false;
+          adjusted.isVisible = false;
         }
 
-        next = [...prev, adjusted];
-        emittedLink = adjusted;
+        next = [...prev, adjusted as T & ManagedLink];
+        emittedLink = adjusted as T & ManagedLink;
         didAdd = true;
       }
 
@@ -385,7 +394,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
 
       // Non-blocking: enable tipping if Venmo was added
       try {
-        if ((enriched as DetectedLink).platform.id === 'venmo') {
+        if (enriched.platform.id === 'venmo') {
           void fetch('/api/dashboard/tipping/enable', { method: 'POST' });
         }
       } catch {
@@ -401,11 +410,12 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
   const handleToggle = useCallback((idx: number) => {
     setLinks(prev => {
       const next = [...prev];
-      const curr = next[idx] as unknown as { isVisible?: boolean };
-      next[idx] = {
-        ...next[idx],
-        isVisible: !(curr?.isVisible ?? true),
-      } as unknown as T;
+      const current = next[idx];
+      if (!current) return prev;
+      // T extends DetectedLink, and we're adding isVisible which makes it compatible with ManagedLink
+      const currentVisibility = getLinkVisibility(current);
+      next[idx] = { ...current, isVisible: !currentVisibility } as T &
+        ManagedLink;
       return next;
     });
   }, []);
@@ -435,17 +445,18 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
    */
   const confirmYtPrompt = useCallback(() => {
     if (!ytPrompt) return;
-    const adjusted = {
+    // Create adjusted link with new category - ManagedLink is compatible with T
+    const adjusted: ManagedLink = {
       ...ytPrompt.candidate,
       platform: {
         ...ytPrompt.candidate.platform,
         category: ytPrompt.target,
       },
-    } as unknown as T;
-    const next = [...links, adjusted];
+    };
+    const next = [...links, adjusted as T & ManagedLink];
     setLinks(next);
     setYtPrompt(null);
-    onLinkAdded?.([adjusted]);
+    onLinkAdded?.([adjusted as T & ManagedLink]);
   }, [ytPrompt, links, onLinkAdded]);
 
   /**

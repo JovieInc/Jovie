@@ -33,6 +33,27 @@ export interface DetectedLink {
 }
 
 /**
+ * Extended DetectedLink with optional visibility and metadata fields.
+ * Used by link management components that track visibility state.
+ */
+export interface ManagedLink extends DetectedLink {
+  /** Whether the link is visible on the profile. Defaults to true if not set. */
+  isVisible?: boolean;
+  /** Database ID when persisted */
+  id?: string;
+  /** Link state for admin/ingestion workflows */
+  state?: 'active' | 'suggested' | 'rejected';
+  /** Confidence score from detection/ingestion */
+  confidence?: number | null;
+  /** Source platform for ingested links */
+  sourcePlatform?: string | null;
+  /** How the link was created */
+  sourceType?: 'manual' | 'admin' | 'ingested' | null;
+  /** Evidence from ingestion */
+  evidence?: { sources?: string[]; signals?: string[] } | null;
+}
+
+/**
  * Domain pattern configuration for platform detection
  */
 export interface DomainPattern {

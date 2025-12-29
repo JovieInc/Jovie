@@ -14,7 +14,8 @@ export {
   isPreview,
   isProduction,
 } from './environment';
-
+// Link utilities
+export { getLinkVisibility, hasManagedMetadata } from './link-utils';
 // Normalizer - URL normalization
 export { isUnsafeUrl, normalizeUrl } from './normalizer';
 // Registry - Platform configurations and helpers
@@ -28,7 +29,12 @@ export {
   PLATFORMS,
 } from './registry';
 // Types
-export type { DetectedLink, DetectionCategory, PlatformInfo } from './types';
+export type {
+  DetectedLink,
+  DetectionCategory,
+  ManagedLink,
+  PlatformInfo,
+} from './types';
 // Validator - URL validation
 export {
   getValidationError,

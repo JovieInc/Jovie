@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -51,13 +50,10 @@ type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
       const [row] = await db
         .select({ profile: creatorProfiles })
         .from(creatorProfiles)
-        // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
@@ -329,12 +325,10 @@ export async function PUT(req: Request) {
         // Don't fail the entire request - avatar is still stored in our DB
       }
 
-      // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
       const updateResult = await db
         .update(creatorProfiles)
         .set({ ...dbProfileUpdates, updatedAt: new Date() })
         .from(users)
-        // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
         .where(
           and(
             eq(creatorProfiles.userId, users.id),
@@ -345,11 +339,9 @@ export async function PUT(req: Request) {
       const [updatedProfile] = updateResult;
 
       if (displayNameForUserUpdate) {
-        // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
         await db
           .update(users)
           .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-          // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
           .where(eq(users.clerkId, clerkUserId));
       }
 
