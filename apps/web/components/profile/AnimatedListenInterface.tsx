@@ -6,8 +6,9 @@ import {
   motion,
   type Variants,
 } from 'framer-motion';
+import DOMPurify from 'isomorphic-dompurify';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   LISTEN_COOKIE,
@@ -34,6 +35,17 @@ export function AnimatedListenInterface({
   const prefersReducedMotion = useReducedMotion();
 
   const availableDSPs = dsps;
+
+  // Sanitize SVG logos to prevent XSS
+  const sanitizedLogos = useMemo(() => {
+    const logos: Record<string, string> = {};
+    for (const dsp of availableDSPs) {
+      logos[dsp.key] = DOMPurify.sanitize(dsp.config.logoSvg, {
+        USE_PROFILES: { svg: true },
+      });
+    }
+    return logos;
+  }, [availableDSPs]);
 
   // Handle backspace key to go back
   useEffect(() => {
@@ -240,8 +252,10 @@ export function AnimatedListenInterface({
                 >
                   <motion.span
                     className='flex items-center'
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
-                    dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG sanitized with DOMPurify
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizedLogos[dsp.key],
+                    }}
                     animate={
                       prefersReducedMotion
                         ? undefined

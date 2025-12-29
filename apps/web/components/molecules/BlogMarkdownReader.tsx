@@ -1,3 +1,7 @@
+'use client';
+
+import DOMPurify from 'isomorphic-dompurify';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface BlogMarkdownReaderProps {
@@ -9,6 +13,9 @@ export function BlogMarkdownReader({
   html,
   className,
 }: BlogMarkdownReaderProps) {
+  // Sanitize HTML to prevent XSS from markdown content
+  const sanitizedHtml = useMemo(() => DOMPurify.sanitize(html), [html]);
+
   return (
     <article className={cn('relative', className)}>
       <div
@@ -74,8 +81,8 @@ export function BlogMarkdownReader({
           '[&_th]:pb-3 [&_th]:text-sm [&_th]:font-semibold [&_th]:text-tertiary-token [&_th]:border-b [&_th]:border-border-default',
           '[&_td]:py-3 [&_td]:text-secondary-token [&_td]:border-b [&_td]:border-border-subtle'
         )}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for markdown content rendering
-        dangerouslySetInnerHTML={{ __html: html }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with DOMPurify
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     </article>
   );
