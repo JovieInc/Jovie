@@ -1,10 +1,22 @@
-// This file configures the initialization of Sentry on the client.
-// The added config here will be used whenever a users loads a page in their browser.
-// https://docs.sentry.io/platforms/javascript/guides/nextjs/
-
-import * as Sentry from '@sentry/nextjs';
-
 /**
+ * Sentry Client Instrumentation - Route-Based SDK Loading
+ *
+ * This file configures the initialization of Sentry on the client with intelligent
+ * SDK variant selection based on the current route:
+ *
+ * - Public pages (/, /artists, /[username], etc.): Lite SDK for faster LCP
+ *   - Core error tracking only (~20-30KB gzipped)
+ *   - No Replay, no Profiling
+ *
+ * - Dashboard pages (/app, /account, /billing, etc.): Full SDK with all features
+ *   - Session Replay (~40-50KB gzipped)
+ *   - Complete debugging capabilities
+ *
+ * Dynamic imports are used to enable webpack code splitting, ensuring only the
+ * necessary SDK variant is loaded for each page.
+ *
+ * @see https://docs.sentry.io/platforms/javascript/guides/nextjs/
+ *
  * PII Collection Notice:
  * When sendDefaultPii is enabled, Sentry may collect:
  * - User IP addresses (anonymized via beforeSend)
@@ -14,44 +26,64 @@ import * as Sentry from '@sentry/nextjs';
  * Users can request data deletion via privacy@jov.ie.
  */
 
-const isProduction = process.env.NODE_ENV === 'production';
+import { captureRouterTransitionStart } from '@sentry/nextjs';
+import { getSdkMode, isApiRoute } from './lib/sentry/route-detector';
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+/**
+ * Export the router transition capture for Next.js App Router.
+ * This is used by Next.js to track client-side navigation.
+ */
+export const onRouterTransitionStart = captureRouterTransitionStart;
 
-  // Add optional integrations for additional features
-  integrations: [Sentry.replayIntegration()],
+/**
+ * Initialize Sentry with the appropriate SDK variant based on the current route.
+ *
+ * This uses dynamic imports to enable code splitting:
+ * - Public routes load client-lite.ts (~20-30KB)
+ * - Dashboard routes load client-full.ts with Replay (~60-80KB total)
+ *
+ * The initialization is wrapped in an IIFE to allow async/await while keeping
+ * the module synchronously exportable.
+ */
+(async function initializeSentryClient(): Promise<void> {
+  // Skip initialization if not in a browser environment
+  if (typeof window === 'undefined') {
+    return;
+  }
 
-  // Sample 10% of transactions in production, 100% in development
-  tracesSampleRate: isProduction ? 0.1 : 1.0,
+  // Get the current pathname to determine SDK mode
+  const pathname = window.location.pathname;
 
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
+  // Skip initialization for API routes (handled server-side)
+  if (isApiRoute(pathname)) {
+    return;
+  }
 
-  // Define how likely Replay events are sampled.
-  // 10% in production, 100% in development
-  replaysSessionSampleRate: isProduction ? 0.1 : 1.0,
+  // Determine which SDK mode to use based on the route
+  const sdkMode = getSdkMode(pathname);
 
-  // Define how likely Replay events are sampled when an error occurs.
-  replaysOnErrorSampleRate: 1.0,
+  if (sdkMode === 'none') {
+    // This shouldn't happen for client routes, but handle gracefully
+    return;
+  }
 
-  // Disable PII collection on client - user context set server-side only
-  sendDefaultPii: false,
-
-  // Scrub sensitive data before sending to Sentry
-  beforeSend(event) {
-    // Anonymize IP addresses if present
-    if (event.user?.ip_address) {
-      event.user.ip_address = '{{auto}}';
+  try {
+    if (sdkMode === 'full') {
+      // Dashboard routes: Load full SDK with Replay
+      // Dynamic import enables webpack to create a separate chunk
+      const { initFullSentryAsync } = await import('./lib/sentry/client-full');
+      await initFullSentryAsync();
+    } else {
+      // Public routes: Load lite SDK for better LCP
+      // Dynamic import enables webpack to create a separate chunk
+      const { initLiteSentry } = await import('./lib/sentry/client-lite');
+      initLiteSentry();
     }
-
-    // Remove email addresses if present
-    if (event.user?.email) {
-      delete event.user.email;
+  } catch (error) {
+    // Silently fail Sentry initialization to avoid breaking the app
+    // In production, this would be caught by the global error handler
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Sentry] Failed to initialize SDK:', error);
     }
-
-    return event;
-  },
-});
-
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+  }
+})();
