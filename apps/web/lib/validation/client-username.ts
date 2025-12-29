@@ -1,7 +1,23 @@
 /**
- * Client-side username validation for instant feedback
- * Reduces validation response time from 500ms+ to <50ms
+ * Client-side username validation for instant feedback.
+ * Reduces validation response time from 500ms+ to <50ms.
+ *
+ * Uses shared validation core for consistency with server-side validation.
  */
+
+import {
+  type DetailedValidationResult,
+  generateUsernameSuggestions as generateSuggestions,
+  validateUsernameCore,
+} from './username-core';
+
+// Re-export core constants for backwards compatibility
+export {
+  RESERVED_USERNAMES,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from './username-core';
 
 export interface ClientValidationResult {
   valid: boolean;
@@ -9,145 +25,43 @@ export interface ClientValidationResult {
   suggestion?: string;
 }
 
-// Username validation rules (must match server-side validation)
-const USERNAME_MIN_LENGTH = 3;
-const USERNAME_MAX_LENGTH = 30;
-const USERNAME_PATTERN = /^[a-zA-Z0-9-]+$/;
-
 /**
- * Instant client-side username validation
- * Provides immediate feedback without API calls
+ * Instant client-side username validation.
+ * Provides immediate feedback without API calls.
+ *
+ * @param username - The username to validate
+ * @returns Validation result with error message and optional suggestion
  */
 export function validateUsernameFormat(
   username: string
 ): ClientValidationResult {
+  // Empty username returns valid: false with no error (user hasn't typed yet)
   if (!username) {
     return { valid: false, error: null };
   }
 
-  if (username.length < USERNAME_MIN_LENGTH) {
-    return {
-      valid: false,
-      error: `Handle must be at least ${USERNAME_MIN_LENGTH} characters`,
-    };
+  const result: DetailedValidationResult = validateUsernameCore(username);
+
+  if (result.isValid) {
+    return { valid: true, error: null };
   }
 
-  if (username.length > USERNAME_MAX_LENGTH) {
-    return {
-      valid: false,
-      error: `Handle must be no more than ${USERNAME_MAX_LENGTH} characters`,
-    };
-  }
-
-  if (!USERNAME_PATTERN.test(username)) {
-    return {
-      valid: false,
-      error: 'Handle can only contain letters, numbers, and hyphens',
-    };
-  }
-
-  // Additional validation rules
-  if (/^[0-9-]/.test(username)) {
-    return {
-      valid: false,
-      error: 'Handle must start with a letter',
-    };
-  }
-
-  if (username.endsWith('-')) {
-    return {
-      valid: false,
-      error: 'Handle cannot end with a hyphen',
-    };
-  }
-
-  if (username.includes('--')) {
-    return {
-      valid: false,
-      error: 'Handle cannot contain consecutive hyphens',
-    };
-  }
-
-  // Reserved usernames
-  const reservedUsernames = [
-    'admin',
-    'api',
-    'app',
-    'auth',
-    'blog',
-    'dashboard',
-    'help',
-    'mail',
-    'root',
-    'support',
-    'www',
-    'ftp',
-    'email',
-    'test',
-    'demo',
-    'stage',
-    'staging',
-    'dev',
-    'development',
-    'prod',
-    'production',
-    'beta',
-    'alpha',
-    'preview',
-    'cdn',
-    'assets',
-  ];
-
-  if (reservedUsernames.includes(username.toLowerCase())) {
-    return {
-      valid: false,
-      error: 'This handle is reserved and cannot be used',
-      suggestion: `${username}-artist`,
-    };
-  }
-
-  return { valid: true, error: null };
+  return {
+    valid: false,
+    error: result.error ?? 'Invalid username',
+    suggestion: result.suggestion,
+  };
 }
 
 /**
- * Generate username suggestions based on input
+ * Generate username suggestions based on input.
+ * Re-exported from core for client-side use.
  */
-export function generateUsernameSuggestions(
-  baseUsername: string,
-  artistName?: string
-): string[] {
-  const suggestions: string[] = [];
-  const base = baseUsername.toLowerCase().replace(/[^a-z0-9-]/g, '');
-
-  if (artistName) {
-    const artistSlug = artistName
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-');
-    suggestions.push(artistSlug);
-    suggestions.push(`${artistSlug}-music`);
-    suggestions.push(`${artistSlug}-official`);
-  }
-
-  if (base) {
-    suggestions.push(`${base}-music`);
-    suggestions.push(`${base}-official`);
-    suggestions.push(`${base}-artist`);
-
-    // Add numbered variations
-    for (let i = 1; i <= 3; i++) {
-      suggestions.push(`${base}${i}`);
-    }
-  }
-
-  // Remove duplicates and filter out invalid suggestions
-  return [...new Set(suggestions)]
-    .filter(suggestion => validateUsernameFormat(suggestion).valid)
-    .slice(0, 5); // Limit to 5 suggestions
-}
+export const generateUsernameSuggestions = generateSuggestions;
 
 /**
- * Debounce utility for API calls
+ * Debounce utility for API calls.
+ * Use this to debounce availability checks against the server.
  */
 export function debounce<T extends (...args: never[]) => unknown>(
   func: T,

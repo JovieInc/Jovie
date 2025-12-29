@@ -10,6 +10,7 @@ import {
   users,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS, TTL } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
@@ -27,18 +28,14 @@ import { isValidSocialPlatform } from '@/types';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
 /**
- * Idempotency key expiration time (24 hours).
- * This duration balances between:
- * - Long enough to catch retries from network failures and user refreshes
- * - Short enough to not consume excessive storage
+ * Idempotency key expiration time.
+ * Uses centralized TTL constant for consistency across API routes.
  *
  * NOTE: Expired keys should be cleaned up periodically via a background job
  * or Postgres TTL extension (pg_cron). See dashboard_idempotency_keys table.
  */
-const IDEMPOTENCY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
+const IDEMPOTENCY_KEY_TTL_MS = TTL.IDEMPOTENCY_KEY_MS;
 
 /**
  * Check and apply rate limiting for dashboard link operations.
