@@ -2,7 +2,21 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
+import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 
+/**
+ * Global error page for Next.js App Router.
+ *
+ * This component handles uncaught errors at the root level of the application.
+ * It integrates with Sentry for error tracking, supporting both lite and full
+ * SDK variants.
+ *
+ * SDK Variant Awareness:
+ * - Checks SDK initialization state before capturing errors
+ * - Includes SDK mode (lite/full) in error tags for dashboard filtering
+ * - Provides fallback console logging when SDK is not initialized
+ * - Wrapped in try/catch for resilience in case Sentry capture fails
+ */
 export default function GlobalError({
   error,
   reset,
@@ -11,7 +25,39 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    // Capture error in Sentry with SDK variant awareness
+    const sentryMode = getSentryMode();
+    const isInitialized = isSentryInitialized();
+
+    if (isInitialized) {
+      try {
+        Sentry.captureException(error, {
+          extra: {
+            digest: error.digest,
+            sentryMode, // Include SDK mode for debugging
+          },
+          tags: {
+            globalError: 'true',
+            sentryMode, // Tag to filter by SDK variant in Sentry dashboard
+          },
+        });
+      } catch (sentryError) {
+        // Fallback: Sentry capture failed - this should be rare but provides resilience
+        console.error('[GlobalError] Sentry capture failed:', sentryError);
+        console.error('[GlobalError] Original error:', error);
+      }
+    } else {
+      // Fallback: Sentry not initialized - log to console
+      // This can happen during initial load before SDK is ready
+      console.error(
+        '[GlobalError] Sentry not initialized, logging error:',
+        error,
+        {
+          digest: error.digest,
+          sentryMode,
+        }
+      );
+    }
   }, [error]);
 
   return (

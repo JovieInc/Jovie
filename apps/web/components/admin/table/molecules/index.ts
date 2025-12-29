@@ -1,7 +1,5 @@
 export {
   ExportCSVButton,
-  ExportCSVButton,
-  type ExportCSVButtonProps,
   type ExportCSVButtonProps,
 } from './ExportCSVButton';
 export {
