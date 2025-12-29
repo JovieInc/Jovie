@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Test performance thresholds for YC-style fast feedback loops",
+  "thresholds": {
+    "totalDuration": 60000,
+    "p95": 200,
+    "setupTime": 15000,
+    "individualTest": 200,
+    "slowTestCount": 3
+  },
+  "targets": {
+    "totalDuration": 30000,
+    "p95": 100,
+    "setupTime": 5000
+  },
+  "notes": {
+    "totalDuration": "Maximum total test suite duration in ms (60s limit, 30s target)",
+    "p95": "Maximum p95 test duration in ms (200ms limit, 100ms target)",
+    "setupTime": "Maximum setup time in ms (15s limit, 5s target)",
+    "individualTest": "Maximum individual test duration in ms",
+    "slowTestCount": "Maximum number of tests exceeding individualTest threshold"
+  }
+}

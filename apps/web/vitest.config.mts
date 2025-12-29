@@ -17,15 +17,16 @@ export default defineConfig({
       'node_modules/**',
       '.next/**',
     ],
-    // Use forks pool to prevent JS heap OOM in worker threads
-    pool: 'forks',
+    // Use threads pool for better performance (forks only if OOM issues occur)
+    pool: 'threads',
     poolOptions: {
-      forks: {
-        minForks: 1,
-        maxForks: 1,
+      threads: {
+        minThreads: 1,
+        maxThreads: 4,
+        useAtomics: true,
       },
     },
-    // Isolate tests to prevent cross-contamination but allow within-file parallelism
+    // Isolate tests to prevent cross-contamination
     isolate: true,
     // Coverage optimization
     coverage: {
@@ -41,12 +42,17 @@ export default defineConfig({
         'dist/**',
       ],
     },
-    // Test timeout - reduced from 30s to 10s (most tests should be <200ms)
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    // Test timeout - aggressive to catch slow tests early (most tests should be <200ms)
+    testTimeout: 5000,
+    hookTimeout: 5000,
     globals: true,
-    // Reduce overhead by limiting concurrent tests per worker
-    maxConcurrency: 1,
+    // Optimize dependency handling
+    server: {
+      deps: {
+        // Inline common dependencies for faster loading
+        inline: ['@testing-library/react', '@testing-library/jest-dom'],
+      },
+    },
   },
   resolve: {
     alias: [

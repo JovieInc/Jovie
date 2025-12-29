@@ -442,6 +442,52 @@ jobs:
         run: |
           echo "ci-fast passed: Typecheck and Lint succeeded"
 
+  ci-test-perf-guard:
+    name: Test Performance Guard
+    # Run on PRs to enforce fast test suite performance
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [ci-fast]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - name: Check for test-related changes
+        id: check_changes
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD || echo "")
+
+          # Check if any test or source code files changed
+          if echo "$CHANGED_FILES" | grep -E '^(apps/web/tests/|apps/web/lib/|apps/web/components/|apps/web/app/)' > /dev/null 2>&1; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.has_changes != 'true'
+        run: |
+          echo "No test or source code changes detected. Skipping test performance guard."
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.has_changes == 'true'
+
+      - name: Run test performance guard
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: pnpm --filter=@jovie/web run test:guard
+        continue-on-error: true
+
+      - name: Report performance status
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "Test performance guard completed. Check the output above for any violations."
+          echo "Note: Performance violations are reported but don't block merging."
+          echo "Run 'pnpm --filter=@jovie/web run test:profile' locally for detailed analysis."
+
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
