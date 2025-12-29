@@ -28,7 +28,10 @@ test.describe('Marketing Homepage Visual Regression @visual', () => {
     // Define expected sections based on homepage structure
     // These selectors match the actual component hierarchy
     const sections = [
-      { name: 'Hero Section', selector: 'header, [class*="hero"], section:first-child' },
+      {
+        name: 'Hero Section',
+        selector: 'header, [class*="hero"], section:first-child',
+      },
       { name: 'Main Content', selector: 'main#main-content' },
     ];
 
@@ -84,7 +87,9 @@ test.describe('Marketing Homepage Visual Regression @visual', () => {
     ).toBe(true);
 
     // Check for multiple content sections (at least hero + one other section)
-    const sections = page.locator('main#main-content > section, main#main-content > div > section');
+    const sections = page.locator(
+      'main#main-content > section, main#main-content > div > section'
+    );
     const sectionCount = await sections.count();
 
     // Even if no explicit sections, verify content is distributed
@@ -215,7 +220,9 @@ test.describe('Marketing Homepage Accessibility @a11y', () => {
 
     // Find all interactive elements
     const interactiveCount = await page
-      .locator('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      .locator(
+        'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
       .count();
 
     expect(
@@ -298,9 +305,7 @@ test.describe('Marketing Homepage Responsive Design @visual', () => {
 
       // Check text is readable (not too small)
       const bodyFontSize = await page.evaluate(() => {
-        return parseFloat(
-          window.getComputedStyle(document.body).fontSize
-        );
+        return parseFloat(window.getComputedStyle(document.body).fontSize);
       });
 
       expect(
