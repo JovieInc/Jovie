@@ -66,12 +66,20 @@
         "noConstAssign": "error",
         "noUndeclaredVariables": "error",
         "noUnreachable": "error",
-        "noInvalidConstructorSuper": "error"
+        "noInvalidConstructorSuper": "error",
+        "noInvalidUseBeforeDeclaration": "error",
+        "useExhaustiveDependencies": "warn"
       },
       "suspicious": {
         "noDuplicateObjectKeys": "error",
         "noDebugger": "error",
-        "noFallthroughSwitchClause": "error"
+        "noFallthroughSwitchClause": "error",
+        "noDoubleEquals": "error",
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "warn"
+      },
+      "complexity": {
+        "noUselessFragments": "warn"
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"
