@@ -275,6 +275,45 @@ See `.coderabbit.yaml` for full auto-labeling configuration and label-specific i
 
 ## 5. Neon & Migrations
 
+### 🚨 CRITICAL RULE: NEVER Manually Edit Migration Files
+
+**Migration files (`.sql` files in `drizzle/migrations/`) are SACRED and must NEVER be manually created, edited, or modified.**
+
+**✅ ONLY WAY to create/modify migrations:**
+```bash
+# 1. Modify your schema in lib/db/schema/
+# 2. Generate migration via Drizzle Kit
+pnpm drizzle:generate
+```
+
+**❌ FORBIDDEN ACTIONS:**
+- Creating `.sql` files manually in `drizzle/migrations/`
+- Editing existing `.sql` migration files
+- Copying/pasting SQL into migration files
+- Modifying `drizzle/migrations/meta/_journal.json` manually
+- Using any tool other than `drizzle-kit generate` to create migrations
+
+**Why this rule exists:**
+1. **Hash verification:** Drizzle validates migration hashes - manual edits break the chain
+2. **Journal sync:** `_journal.json` must match migration content exactly
+3. **Schema drift:** Manual SQL can diverge from TypeScript schema definitions
+4. **CI failures:** Pre-commit hooks and CI will block manually created/edited migrations
+5. **Production safety:** Only Drizzle-generated migrations are guaranteed to be idempotent and safe
+
+**Exception for EMERGENCY fixes (use ONLY when absolutely necessary):**
+If you must manually fix a migration (e.g., production is broken):
+1. Get explicit approval from team lead
+2. Document the change in PR description
+3. Regenerate the entire migration via `pnpm drizzle:generate` after fixing schema
+4. Expect pre-commit hooks to catch and block manual changes
+
+**AI Agents - EXCLUDE migration files from refactoring:**
+- Migration files in `drizzle/migrations/*.sql` must be excluded from all refactoring tasks
+- If you need to change database schema, modify `lib/db/schema/` and regenerate migrations
+- NEVER suggest "let me fix this migration file" - always use Drizzle Kit
+
+---
+
 - **Do not** run Drizzle migrations manually in ad-hoc ways.
 - **Do not** make direct DDL changes to the database - use Drizzle migrations only.
 - **Long-lived branch:** Only `main` (trunk-based development).
@@ -581,21 +620,30 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_name ON table_name (column_name);
 
 ### 5.3 PostgreSQL Syntax Requirements (CRITICAL)
 
-When writing raw SQL migrations, you **MUST** use correct PostgreSQL syntax. Common mistakes to avoid:
+**⚠️ IMPORTANT: These patterns are CRITICAL for migration idempotency. Non-idempotent migrations WILL cause production failures.**
 
-#### ❌ WRONG: `CREATE TYPE IF NOT EXISTS`
+When Drizzle generates migrations, it sometimes produces non-idempotent SQL. You **MUST** manually fix these patterns before committing:
 
-PostgreSQL does **NOT** support `IF NOT EXISTS` for `CREATE TYPE`:
+#### 5.3.1 CREATE TYPE Idempotency (MOST COMMON ISSUE)
+
+**❌ WRONG: `CREATE TYPE` without idempotency guard**
+
+PostgreSQL does **NOT** support `CREATE TYPE IF NOT EXISTS`:
 
 ```sql
--- ❌ INVALID SYNTAX - will fail
+-- ❌ INVALID SYNTAX - PostgreSQL doesn't support IF NOT EXISTS for types
 CREATE TYPE IF NOT EXISTS my_enum AS ENUM ('a', 'b', 'c');
+
+-- ❌ WRONG - Not idempotent, will fail on re-run
+CREATE TYPE my_enum AS ENUM ('a', 'b', 'c');
 ```
 
-#### ✅ RIGHT: Use DO block with pg_type check
+**What happens:** Migration fails with `type "my_enum" already exists` when run against database where type was created previously (CI tests, production recovery, etc.)
+
+**✅ CORRECT: Use DO block with pg_type catalog check**
 
 ```sql
--- ✅ CORRECT - check pg_type catalog first
+-- ✅ CORRECT - Idempotent pattern for CREATE TYPE
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'my_enum') THEN
@@ -604,7 +652,76 @@ BEGIN
 END $$;
 ```
 
-#### ❌ WRONG: Multiple statements in Neon MCP
+**Why DO blocks are required:**
+- PostgreSQL's `CREATE TYPE` statement doesn't support `IF NOT EXISTS` clause
+- Must use procedural code (DO block) to check `pg_type` system catalog first
+- This is the ONLY way to make type creation idempotent in PostgreSQL
+
+**When to apply this pattern:**
+- EVERY CREATE TYPE statement in EVERY migration
+- Drizzle Kit does NOT generate this automatically - you must add it manually
+- Pre-commit hooks will block migrations without this pattern (starting 2025-01-02)
+
+#### 5.3.2 CREATE INDEX Idempotency
+
+**❌ WRONG: CREATE INDEX without IF NOT EXISTS**
+
+```sql
+-- ❌ WRONG - Not idempotent
+CREATE INDEX idx_users_email ON users(email);
+CREATE UNIQUE INDEX uniq_users_clerk_id ON users(clerk_id);
+```
+
+**✅ CORRECT: Always use IF NOT EXISTS**
+
+```sql
+-- ✅ CORRECT - Idempotent index creation
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_clerk_id ON users(clerk_id);
+```
+
+**Why this matters:**
+- Indexes can fail to create if they already exist
+- Tests may run migrations multiple times
+- Production recovery scenarios need idempotency
+
+#### 5.3.3 ALTER TYPE ADD VALUE Idempotency
+
+**❌ WRONG: ALTER TYPE without IF NOT EXISTS**
+
+```sql
+-- ❌ WRONG - Fails if value already exists
+ALTER TYPE user_status ADD VALUE 'suspended';
+```
+
+**✅ CORRECT: Use IF NOT EXISTS clause**
+
+```sql
+-- ✅ CORRECT - Idempotent enum value addition
+ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'suspended';
+```
+
+**Note:** PostgreSQL 9.3+ supports IF NOT EXISTS for ALTER TYPE ADD VALUE.
+
+#### 5.3.4 Migration Idempotency Checklist
+
+Before committing ANY migration, verify:
+
+- [ ] All `CREATE TYPE` statements wrapped in DO blocks with `pg_type` check
+- [ ] All `CREATE INDEX` statements include `IF NOT EXISTS`
+- [ ] All `ALTER TYPE ADD VALUE` statements include `IF NOT EXISTS`
+- [ ] All `DROP` statements include `IF EXISTS`
+- [ ] Migration can be run successfully twice without errors
+- [ ] `pnpm run drizzle:check` passes locally
+
+**Testing idempotency:**
+```bash
+# Run migration twice - both should succeed
+pnpm run drizzle:migrate:preview
+pnpm run drizzle:migrate:preview  # Should not fail
+```
+
+#### 5.3.5 Multiple statements in Neon MCP (Deprecated - use Drizzle)
 
 The Neon MCP `run_sql` tool cannot execute multiple statements:
 

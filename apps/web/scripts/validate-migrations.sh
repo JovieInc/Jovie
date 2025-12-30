@@ -71,6 +71,48 @@ for sql_file in "${SQL_FILES[@]}"; do
   fi
 done
 
+# Check for non-idempotent CREATE TYPE statements
+NON_IDEMPOTENT_TYPE_FILES=()
+for sql_file in "${SQL_FILES[@]}"; do
+  filename=$(basename "$sql_file")
+  # Look for CREATE TYPE statements
+  if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" >/dev/null 2>&1; then
+    # Check if CREATE TYPE is wrapped in a DO block with pg_type check
+    # We look for the idempotent pattern: DO $$ ... IF NOT EXISTS (SELECT ... FROM pg_type ...) ... CREATE TYPE
+    if ! grep -Pzo "(?s)DO[[:space:]]*\$\$.*?pg_type.*?CREATE[[:space:]]+TYPE.*?END[[:space:]]*\$\$" "$sql_file" >/dev/null 2>&1; then
+      # Fallback to simpler check if perl regex not available
+      # Check for DO $$ and pg_type in proximity to CREATE TYPE
+      if ! (grep -B 10 -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" "$sql_file" | grep -i "DO[[:space:]]*\$\$" >/dev/null 2>&1 && \
+            grep -B 10 -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" "$sql_file" | grep -i "pg_type" >/dev/null 2>&1); then
+        NON_IDEMPOTENT_TYPE_FILES+=("$filename")
+        EXIT_CODE=1
+      fi
+    fi
+  fi
+done
+
+# Check for CREATE INDEX without IF NOT EXISTS
+NON_IDEMPOTENT_INDEX_FILES=()
+for sql_file in "${SQL_FILES[@]}"; do
+  filename=$(basename "$sql_file")
+  # Look for CREATE INDEX or CREATE UNIQUE INDEX without IF NOT EXISTS (ignoring comments)
+  if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "CREATE[[:space:]]\+\(UNIQUE[[:space:]]\+\)\?INDEX" | grep -v -i "IF[[:space:]]\+NOT[[:space:]]\+EXISTS" >/dev/null 2>&1; then
+    NON_IDEMPOTENT_INDEX_FILES+=("$filename")
+    EXIT_CODE=1
+  fi
+done
+
+# Check for ALTER TYPE ADD VALUE without IF NOT EXISTS
+NON_IDEMPOTENT_ALTER_TYPE_FILES=()
+for sql_file in "${SQL_FILES[@]}"; do
+  filename=$(basename "$sql_file")
+  # Look for ALTER TYPE ... ADD VALUE without IF NOT EXISTS (ignoring comments)
+  if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "ALTER[[:space:]]\+TYPE.*ADD[[:space:]]\+VALUE" | grep -v -i "IF[[:space:]]\+NOT[[:space:]]\+EXISTS" >/dev/null 2>&1; then
+    NON_IDEMPOTENT_ALTER_TYPE_FILES+=("$filename")
+    EXIT_CODE=1
+  fi
+done
+
 # Check for orphaned journal entries (entries without SQL files)
 ORPHANED_ENTRIES=()
 for tag in "${JOURNAL_TAGS[@]}"; do
@@ -138,6 +180,79 @@ if [ ${#CONCURRENT_FILES[@]} -gt 0 ]; then
   echo ""
   echo "📖 Read: docs/MIGRATION_CONCURRENTLY_RULE.md for detailed explanation"
   echo "🔗 PostgreSQL docs: https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY"
+fi
+
+if [ ${#NON_IDEMPOTENT_TYPE_FILES[@]} -gt 0 ]; then
+  echo -e "\n${RED}❌ Non-Idempotent CREATE TYPE Detected${NC}"
+  echo -e "${RED}Found ${#NON_IDEMPOTENT_TYPE_FILES[@]} migration file(s) with CREATE TYPE outside DO blocks:${NC}"
+  for file in "${NON_IDEMPOTENT_TYPE_FILES[@]}"; do
+    echo -e "  ${RED}- ${file}${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}⚠️  PostgreSQL does NOT support 'CREATE TYPE IF NOT EXISTS'!${NC}"
+  echo "CREATE TYPE must be wrapped in a DO block with a pg_type catalog check."
+  echo ""
+  echo "This will cause:"
+  echo "  - Migration failures when re-running against existing databases"
+  echo "  - CI test failures (ephemeral database setup)"
+  echo "  - Production deployment failures (type already exists)"
+  echo ""
+  echo "To fix:"
+  echo "  ❌ WRONG:"
+  echo "    CREATE TYPE user_status AS ENUM ('active', 'pending');"
+  echo ""
+  echo "  ✅ CORRECT:"
+  echo "    DO \$\$"
+  echo "    BEGIN"
+  echo "      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN"
+  echo "        CREATE TYPE user_status AS ENUM ('active', 'pending');"
+  echo "      END IF;"
+  echo "    END \$\$;"
+  echo ""
+  echo "Why: Migrations must be idempotent (safe to run multiple times)."
+  echo "     PostgreSQL requires explicit existence check via DO blocks for types."
+fi
+
+if [ ${#NON_IDEMPOTENT_INDEX_FILES[@]} -gt 0 ]; then
+  echo -e "\n${RED}❌ Non-Idempotent CREATE INDEX Detected${NC}"
+  echo -e "${RED}Found ${#NON_IDEMPOTENT_INDEX_FILES[@]} migration file(s) with CREATE INDEX missing IF NOT EXISTS:${NC}"
+  for file in "${NON_IDEMPOTENT_INDEX_FILES[@]}"; do
+    echo -e "  ${RED}- ${file}${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}⚠️  All CREATE INDEX statements MUST include IF NOT EXISTS!${NC}"
+  echo ""
+  echo "This will cause:"
+  echo "  - Migration failures when re-running against existing databases"
+  echo "  - CI test failures (index already exists)"
+  echo "  - Production deployment failures"
+  echo ""
+  echo "To fix:"
+  echo "  ❌ WRONG: CREATE INDEX idx_name ON table_name (column);"
+  echo "  ✅ RIGHT: CREATE INDEX IF NOT EXISTS idx_name ON table_name (column);"
+  echo ""
+  echo "Why: Migrations must be idempotent (safe to run multiple times)."
+fi
+
+if [ ${#NON_IDEMPOTENT_ALTER_TYPE_FILES[@]} -gt 0 ]; then
+  echo -e "\n${RED}❌ Non-Idempotent ALTER TYPE Detected${NC}"
+  echo -e "${RED}Found ${#NON_IDEMPOTENT_ALTER_TYPE_FILES[@]} migration file(s) with ALTER TYPE ADD VALUE missing IF NOT EXISTS:${NC}"
+  for file in "${NON_IDEMPOTENT_ALTER_TYPE_FILES[@]}"; do
+    echo -e "  ${RED}- ${file}${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}⚠️  ALTER TYPE ADD VALUE MUST include IF NOT EXISTS!${NC}"
+  echo ""
+  echo "This will cause:"
+  echo "  - Migration failures when re-running (enum value already exists)"
+  echo "  - CI test failures"
+  echo "  - Production deployment failures"
+  echo ""
+  echo "To fix:"
+  echo "  ❌ WRONG: ALTER TYPE user_status ADD VALUE 'suspended';"
+  echo "  ✅ RIGHT: ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'suspended';"
+  echo ""
+  echo "Why: Migrations must be idempotent (safe to run multiple times)."
 fi
 
 exit $EXIT_CODE
