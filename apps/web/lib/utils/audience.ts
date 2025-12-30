@@ -23,33 +23,11 @@ export function flagFromCountry(code: string | null): string {
   return String.fromCodePoint(0x1f1e6 + (first - 65), 0x1f1e6 + (second - 65));
 }
 
-export function formatTimeAgo(value: string | null): string {
-  if (!value) return '—';
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return '—';
-
-  const diff = Date.now() - timestamp.getTime();
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (seconds < 60) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
-}
-
-export function formatLongDate(value: string | null): string {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '—';
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(parsed);
-}
+// Re-export date formatting from centralized utility for backwards compatibility
+export {
+  formatShortDate as formatLongDate,
+  formatTimeAgo,
+} from '@/lib/utils/date-formatting';
 
 export function getDeviceIndicator(
   deviceType: string | null

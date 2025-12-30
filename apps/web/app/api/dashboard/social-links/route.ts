@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { and, eq, gt, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
+import { invalidateSocialLinksCache } from '@/lib/cache';
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -10,6 +11,7 @@ import {
   users,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS, TTL } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
@@ -27,18 +29,14 @@ import { isValidSocialPlatform } from '@/types';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
 /**
- * Idempotency key expiration time (24 hours).
- * This duration balances between:
- * - Long enough to catch retries from network failures and user refreshes
- * - Short enough to not consume excessive storage
+ * Idempotency key expiration time.
+ * Uses centralized TTL constant for consistency across API routes.
  *
  * NOTE: Expired keys should be cleaned up periodically via a background job
  * or Postgres TTL extension (pg_cron). See dashboard_idempotency_keys table.
  */
-const IDEMPOTENCY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
+const IDEMPOTENCY_KEY_TTL_MS = TTL.IDEMPOTENCY_KEY_MS;
 
 /**
  * Check and apply rate limiting for dashboard link operations.
@@ -527,6 +525,10 @@ export async function PUT(req: Request) {
         successResponse
       );
 
+      // Invalidate caches for the profile's social links
+      // This ensures public profile and dashboard show updated links
+      await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
+
       // Magic profile enrichment (non-blocking, outside transaction for safety)
       // Note: We schedule this but don't await it inside the transaction
       const enrichmentPromise = (async () => {
@@ -713,6 +715,10 @@ export async function DELETE(req: Request) {
           })
           .where(eq(socialLinks.id, linkId));
       }
+
+      // Invalidate caches for the profile's social links
+      // This ensures public profile and dashboard show updated link state
+      await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
 
       return NextResponse.json(
         { ok: true, version: (link.version ?? 1) + 1 },

@@ -557,6 +557,66 @@ export function normalizeHandle(handle: string): string {
 // ============================================================================
 
 /**
+ * Validates URL safety before processing.
+ * Rejects dangerous schemes and protocol-relative URLs.
+ *
+ * @param url - The URL to validate
+ * @returns True if URL is safe to process
+ */
+export function isUrlSafe(url: string): boolean {
+  const candidate = url.trim();
+
+  // Reject dangerous or unsupported schemes early
+  if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
+    return false;
+  }
+
+  // Reject protocol-relative URLs to avoid inheriting caller context
+  if (candidate.startsWith('//')) {
+    return false;
+  }
+
+  // Check original URL protocol - require HTTPS
+  try {
+    const parsed = new URL(
+      candidate.startsWith('http') ? candidate : `https://${candidate}`
+    );
+    return parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a URL belongs to a specific platform.
+ * Common validation logic used by all ingestion strategies.
+ *
+ * @param url - The URL to check
+ * @param config - Strategy configuration with valid hosts
+ * @returns True if URL belongs to the platform
+ */
+export function isPlatformUrl(url: string, config: StrategyConfig): boolean {
+  if (!isUrlSafe(url)) {
+    return false;
+  }
+
+  try {
+    const normalized = normalizeUrl(url);
+    const parsed = new URL(normalized);
+
+    if (!config.validHosts.has(parsed.hostname.toLowerCase())) {
+      return false;
+    }
+
+    // Must have a path (handle)
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    return parts.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates that a URL belongs to a specific platform.
  */
 export function validatePlatformUrl(

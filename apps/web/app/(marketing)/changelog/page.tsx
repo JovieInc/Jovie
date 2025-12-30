@@ -1,4 +1,5 @@
 import fs from 'fs';
+import DOMPurify from 'isomorphic-dompurify';
 import type { Metadata } from 'next';
 import path from 'path';
 import { remark } from 'remark';
@@ -11,7 +12,8 @@ const CHANGELOG_PATH = path.join(process.cwd(), 'CHANGELOG.md');
 async function getChangelogHtml(): Promise<string> {
   const fileContents = fs.readFileSync(CHANGELOG_PATH, 'utf8');
   const processedContent = await remark().use(html).process(fileContents);
-  return processedContent.toString();
+  // Sanitize HTML to prevent XSS from markdown content
+  return DOMPurify.sanitize(processedContent.toString());
 }
 
 export const metadata: Metadata = {
@@ -36,7 +38,7 @@ export default async function ChangelogPage() {
         </header>
         <article
           className='prose prose-neutral dark:prose-invert max-w-none text-sm md:text-base'
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for markdown content rendering
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with DOMPurify
           dangerouslySetInnerHTML={{ __html: contentHtml }}
         />
       </Container>

@@ -1,0 +1,238 @@
+/**
+ * Centralized date formatting utilities.
+ * Consolidates duplicated date formatting patterns across the codebase.
+ */
+
+// ============================================================================
+// Pre-configured formatters for common patterns
+// ============================================================================
+
+/** Short date: "Dec 29, 2024" */
+const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+/** Long date: "December 29, 2024" */
+const longDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+/** Short date without year: "Dec 29" */
+const shortDateNoYearFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+});
+
+/** Date with time: "Dec 29, 2024, 14:30" */
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** Time only: "14:30" */
+const timeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+// ============================================================================
+// Core formatting functions
+// ============================================================================
+
+/**
+ * Parse a date value safely.
+ * @returns Date object or null if invalid
+ */
+export function parseDate(
+  value: string | Date | null | undefined
+): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Format date as short format: "Dec 29, 2024"
+ * Used in: blog posts, release dates, admin tables
+ */
+export function formatShortDate(
+  value: string | Date | null | undefined
+): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+  return shortDateFormatter.format(date);
+}
+
+/**
+ * Format date as long format: "December 29, 2024"
+ * Used in: blog post pages, detailed views
+ */
+export function formatLongDate(
+  value: string | Date | null | undefined
+): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+  return longDateFormatter.format(date);
+}
+
+/**
+ * Format date without year: "Dec 29"
+ * Used in: compact displays, charts
+ */
+export function formatShortDateNoYear(
+  value: string | Date | null | undefined
+): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+  return shortDateNoYearFormatter.format(date);
+}
+
+/**
+ * Format date with time: "Dec 29, 2024, 14:30"
+ * Used in: activity logs, waitlist tables, timestamps
+ */
+export function formatDateTime(
+  value: string | Date | null | undefined
+): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+  return dateTimeFormatter.format(date);
+}
+
+/**
+ * Format time only: "14:30"
+ */
+export function formatTime(value: string | Date | null | undefined): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+  return timeFormatter.format(date);
+}
+
+/**
+ * Format as ISO date string: "2024-12-29"
+ * Used in: CSV exports, data attributes
+ */
+export function formatISODate(value: string | Date | null | undefined): string {
+  const date = parseDate(value);
+  if (!date) return '';
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Format as ISO datetime string: "2024-12-29T14:30:00.000Z"
+ * Used in: API payloads, analytics tracking
+ */
+export function formatISODateTime(
+  value: string | Date | null | undefined
+): string {
+  const date = parseDate(value);
+  if (!date) return '';
+  return date.toISOString();
+}
+
+// ============================================================================
+// Relative time formatting
+// ============================================================================
+
+/**
+ * Format as relative time: "just now", "5m ago", "2h ago", "3d ago"
+ * Used in: activity feeds, last seen indicators
+ */
+export function formatTimeAgo(value: string | Date | null | undefined): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+
+  const diff = Date.now() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
+}
+
+/**
+ * Format time remaining: "30 seconds", "5 minutes", "2 hours"
+ * Used in: rate limit messages, countdown timers
+ */
+export function formatTimeRemaining(resetTime: Date | number): string {
+  const resetMs =
+    typeof resetTime === 'number' ? resetTime : resetTime.getTime();
+  const remaining = Math.max(0, resetMs - Date.now());
+
+  const seconds = Math.ceil(remaining / 1000);
+  const minutes = Math.ceil(seconds / 60);
+  const hours = Math.ceil(minutes / 60);
+
+  if (seconds < 60) {
+    return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+  }
+  if (minutes < 60) {
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+}
+
+// ============================================================================
+// Specialized formatters
+// ============================================================================
+
+/**
+ * Format for admin overview: "2024-12-29 14:30 UTC"
+ */
+export function formatTimestampUTC(
+  value: string | Date | null | undefined
+): string {
+  const date = parseDate(value);
+  if (!date) return '—';
+  return `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
+
+/**
+ * Format for CSV export with configurable format.
+ */
+export function formatDateForCSV(
+  value: string | Date | null | undefined,
+  format: 'iso' | 'locale' = 'iso'
+): string {
+  const date = parseDate(value);
+  if (!date) return '';
+  return format === 'iso' ? date.toISOString() : date.toLocaleString();
+}
+
+/**
+ * Check if a date is today.
+ */
+export function isToday(value: string | Date | null | undefined): boolean {
+  const date = parseDate(value);
+  if (!date) return false;
+  const today = new Date();
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
+}
+
+/**
+ * Check if a date is within the last N days.
+ */
+export function isWithinDays(
+  value: string | Date | null | undefined,
+  days: number
+): boolean {
+  const date = parseDate(value);
+  if (!date) return false;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return date.getTime() >= cutoff;
+}

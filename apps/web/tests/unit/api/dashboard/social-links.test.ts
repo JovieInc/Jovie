@@ -225,6 +225,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/cache', () => ({
+  invalidateSocialLinksCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe('PUT /api/dashboard/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks();

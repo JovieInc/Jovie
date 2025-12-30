@@ -1,0 +1,158 @@
+import { eq } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+import { db } from '@/lib/db';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
+
+export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+const createInviteSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  email: z.string().email(),
+});
+
+/**
+ * Admin endpoint to create a claim invite for a creator profile.
+ *
+ * This creates a pending invite record that can be processed by
+ * a background worker to send the actual email.
+ */
+export async function POST(request: Request) {
+  try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: 'POST /api/admin/creator-invite',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+
+    const parsed = createInviteSchema.safeParse(parsedBody.data);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { creatorProfileId, email } = parsed.data;
+
+    // Verify the creator profile exists and is not claimed
+    const [profile] = await db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        isClaimed: creatorProfiles.isClaimed,
+        claimToken: creatorProfiles.claimToken,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, creatorProfileId))
+      .limit(1);
+
+    if (!profile) {
+      return NextResponse.json(
+        { error: 'Creator profile not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (profile.isClaimed) {
+      return NextResponse.json(
+        { error: 'Profile is already claimed' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!profile.claimToken) {
+      return NextResponse.json(
+        { error: 'Profile does not have a claim token' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Create the invite record
+    const [invite] = await db
+      .insert(creatorClaimInvites)
+      .values({
+        creatorProfileId,
+        email: email.toLowerCase().trim(),
+        status: 'pending',
+        meta: { source: 'admin_click' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({
+        id: creatorClaimInvites.id,
+        email: creatorClaimInvites.email,
+        status: creatorClaimInvites.status,
+        createdAt: creatorClaimInvites.createdAt,
+      });
+
+    if (!invite) {
+      return NextResponse.json(
+        { error: 'Failed to create invite' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    logger.info('Creator claim invite created', {
+      inviteId: invite.id,
+      profileId: creatorProfileId,
+      profileUsername: profile.username,
+      email: invite.email,
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        invite: {
+          id: invite.id,
+          email: invite.email,
+          status: invite.status,
+          createdAt: invite.createdAt,
+        },
+        profile: {
+          id: profile.id,
+          username: profile.username,
+          displayName: profile.displayName,
+        },
+      },
+      { status: 201, headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    logger.error('Failed to create claim invite', {
+      error: errorMessage,
+      raw: error,
+    });
+
+    return NextResponse.json(
+      { error: 'Failed to create invite', details: errorMessage },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}

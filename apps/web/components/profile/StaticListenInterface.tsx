@@ -1,7 +1,8 @@
 'use client';
 
+import DOMPurify from 'isomorphic-dompurify';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 // Lazy import deep links to avoid loading heavy code upfront
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
@@ -32,6 +33,17 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   const router = useRouter();
 
   const availableDSPs = dsps;
+
+  // Sanitize SVG logos to prevent XSS
+  const sanitizedLogos = useMemo(() => {
+    const logos: Record<string, string> = {};
+    for (const dsp of availableDSPs) {
+      logos[dsp.key] = DOMPurify.sanitize(dsp.config.logoSvg, {
+        USE_PROFILES: { svg: true },
+      });
+    }
+    return logos;
+  }, [availableDSPs]);
 
   // Handle backspace key to go back
   useEffect(() => {
@@ -157,8 +169,8 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             >
               <div
                 className='shrink-0'
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
-                dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG sanitized with DOMPurify
+                dangerouslySetInnerHTML={{ __html: sanitizedLogos[dsp.key] }}
               />
               <span>
                 {selectedDSP === dsp.key ? 'Opening...' : `Open in ${dsp.name}`}

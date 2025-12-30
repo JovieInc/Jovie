@@ -140,14 +140,14 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: |
             .cache/tsbuildinfo
@@ -189,14 +189,14 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache Next build cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: |
             apps/web/.next/cache
@@ -527,7 +527,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
@@ -599,7 +599,7 @@ jobs:
 
       - name: Cache Next build cache
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: .next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
@@ -797,7 +797,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'playwright.config*.ts') }}
@@ -896,7 +896,7 @@ jobs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 20
           package-manager-cache: false
@@ -1154,7 +1154,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
@@ -1187,11 +1187,13 @@ jobs:
     timeout-minutes: 30
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
+      migration_status: ${{ steps.migrate.outcome }}
+      preflight_status: ${{ steps.preflight.outcome }}
     env:
       # Trunk-based: main deploys directly to production
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     environment:
-      name: Production - jovie
+      name: Production – jovie
       url: https://jov.ie
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -1199,12 +1201,14 @@ jobs:
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
       - name: DB safety check (production - preflight)
+        id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
       - name: DB migrate (production - Drizzle)
+        id: migrate
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -1303,8 +1307,123 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Slack notify (production deploy failed)
-        if: ${{ (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') && env.SLACK_WEBHOOK_URL != '' }}
+      - name: Classify failure type
+        id: classify-failure
+        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') }}
+        run: |
+          # Determine failure type for accurate Slack notification
+          MIGRATION_STATUS="${{ needs.deploy.outputs.migration_status }}"
+          PREFLIGHT_STATUS="${{ needs.deploy.outputs.preflight_status }}"
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
+          CANARY_RESULT="${{ needs.canary-health-gate.result }}"
+
+          if [ "$PREFLIGHT_STATUS" = "failure" ]; then
+            echo "failure_type=migration_preflight" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🚨" >> "$GITHUB_OUTPUT"
+            echo "failure_title=DATABASE MIGRATION PREFLIGHT FAILED" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Migration preflight check failed - deployment was BLOCKED before any changes were made" >> "$GITHUB_OUTPUT"
+          elif [ "$MIGRATION_STATUS" = "failure" ]; then
+            echo "failure_type=migration" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🚨" >> "$GITHUB_OUTPUT"
+            echo "failure_title=DATABASE MIGRATION FAILED" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Migration failed on production database - deployment was BLOCKED (no code deployed)" >> "$GITHUB_OUTPUT"
+          elif [ "$DEPLOY_RESULT" != "success" ]; then
+            echo "failure_type=deploy" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🔥" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production deploy failed" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Vercel deployment failed" >> "$GITHUB_OUTPUT"
+          elif [ "$CANARY_RESULT" != "success" ]; then
+            echo "failure_type=canary" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=⚠️" >> "$GITHUB_OUTPUT"
+            echo "failure_title=CANARY HEALTH CHECK FAILED" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Deployment is LIVE but health check failed - investigate immediately" >> "$GITHUB_OUTPUT"
+          else
+            echo "failure_type=unknown" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=❓" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production deploy failed" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Unknown failure - check workflow logs" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Slack notify (migration failure - CRITICAL)
+        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'migration' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "🚨 DATABASE MIGRATION FAILED - Production deploy BLOCKED: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Status", "value": "🛑 DEPLOYMENT BLOCKED - No code was deployed", "short": false },
+                    { "title": "Failure", "value": "Database migration failed", "short": true },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Action Required", "value": "Fix migration and re-run pipeline", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (migration preflight failure - CRITICAL)
+        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'migration_preflight' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "🚨 MIGRATION PREFLIGHT FAILED - Production deploy BLOCKED: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Status", "value": "🛑 DEPLOYMENT BLOCKED - Preflight safety check failed", "short": false },
+                    { "title": "Failure", "value": "Migration preflight validation failed", "short": true },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Action Required", "value": "Check migration journal integrity and database state", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (canary failure - URGENT)
+        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'canary' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "⚠️ CANARY HEALTH CHECK FAILED - Deployment may be broken: jov.ie",
+              "attachments": [
+                {
+                  "color": "warning",
+                  "fields": [
+                    { "title": "Status", "value": "⚠️ DEPLOYMENT IS LIVE but health check failed", "short": false },
+                    { "title": "Failure", "value": "Canary health gate failed", "short": true },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Action Required", "value": "Check https://jov.ie immediately - may need rollback", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (general deploy failure)
+        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom

@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   MoreVertical,
   RefreshCw,
+  Send,
   Star,
   Trash2,
   X,
@@ -44,6 +45,7 @@ interface CreatorActionsMenuProps {
   onToggleFeatured: () => Promise<void>;
   onToggleMarketing: () => Promise<void>;
   onRefreshIngest?: () => Promise<void>;
+  onSendInvite?: () => void;
   onDelete: () => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -70,6 +72,7 @@ export function CreatorActionsMenu({
   onToggleFeatured,
   onToggleMarketing,
   onRefreshIngest,
+  onSendInvite,
   onDelete,
   open,
   onOpenChange,
@@ -200,13 +203,24 @@ export function CreatorActionsMenu({
             </DropdownMenuItem>
 
             {!profile.isClaimed && profile.claimToken && (
-              <DropdownMenuItem
-                onClick={handleCopyClaimLink}
-                className={geistTableMenuItemClass}
-              >
-                <Copy className='h-4 w-4' />
-                {copySuccess ? 'Copied!' : 'Copy claim link'}
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem
+                  onClick={handleCopyClaimLink}
+                  className={geistTableMenuItemClass}
+                >
+                  <Copy className='h-4 w-4' />
+                  {copySuccess ? 'Copied!' : 'Copy claim link'}
+                </DropdownMenuItem>
+                {onSendInvite && (
+                  <DropdownMenuItem
+                    onClick={onSendInvite}
+                    className={geistTableMenuItemClass}
+                  >
+                    <Send className='h-4 w-4' />
+                    Send invite
+                  </DropdownMenuItem>
+                )}
+              </>
             )}
 
             <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
@@ -330,6 +344,15 @@ export function CreatorActionsMenu({
               <Copy className='h-4 w-4' />
               {copySuccess ? 'Copied!' : 'Copy claim link'}
             </DropdownMenuItem>
+            {onSendInvite && (
+              <DropdownMenuItem
+                onClick={onSendInvite}
+                className={geistTableMenuItemClass}
+              >
+                <Send className='h-4 w-4' />
+                Send invite
+              </DropdownMenuItem>
+            )}
           </>
         )}
 

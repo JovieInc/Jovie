@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { profilePhotos, users } from '@/lib/db';
+import { invalidateAvatarCache } from '@/lib/cache';
+import { creatorProfiles, profilePhotos, users } from '@/lib/db';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -474,6 +475,20 @@ export async function POST(request: NextRequest) {
           })
           // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
+
+        // Get the user's profile username for cache invalidation
+        const [profile] = await tx
+          .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+          .from(creatorProfiles)
+          // @ts-ignore drizzle version mismatch in tests/runtime
+          .where(eq(creatorProfiles.userId, dbUser.id))
+          .limit(1);
+
+        // Invalidate avatar caches so profile shows updated image
+        await invalidateAvatarCache(
+          dbUser.id,
+          profile?.usernameNormalized ?? null
+        );
 
         return NextResponse.json(
           {

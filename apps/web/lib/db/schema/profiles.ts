@@ -14,6 +14,7 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { users } from './auth';
 import {
+  claimInviteStatusEnum,
   contactChannelEnum,
   contactRoleEnum,
   creatorTypeEnum,
@@ -144,6 +145,41 @@ export const profilePhotos = pgTable('profile_photos', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Creator claim invites table for tracking email invitations to claim profiles
+export const creatorClaimInvites = pgTable(
+  'creator_claim_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    creatorContactId: uuid('creator_contact_id').references(
+      () => creatorContacts.id,
+      { onDelete: 'set null' }
+    ),
+    email: text('email').notNull(),
+    status: claimInviteStatusEnum('status').default('pending').notNull(),
+    sendAt: timestamp('send_at'),
+    sentAt: timestamp('sent_at'),
+    error: text('error'),
+    subject: text('subject'),
+    body: text('body'),
+    aiVariantId: text('ai_variant_id'),
+    meta: jsonb('meta')
+      .$type<{ source?: 'admin_click' | 'bulk' | 'auto' }>()
+      .default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileIdIdx: index(
+      'idx_creator_claim_invites_creator_profile_id'
+    ).on(table.creatorProfileId),
+    statusIdx: index('idx_creator_claim_invites_status').on(table.status),
+    sendAtIdx: index('idx_creator_claim_invites_send_at').on(table.sendAt),
+  })
+);
+
 // Schema validations
 export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
 export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
@@ -154,6 +190,11 @@ export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
+export const insertCreatorClaimInviteSchema =
+  createInsertSchema(creatorClaimInvites);
+export const selectCreatorClaimInviteSchema =
+  createSelectSchema(creatorClaimInvites);
+
 // Types
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;
 export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
@@ -163,3 +204,6 @@ export type NewCreatorContact = typeof creatorContacts.$inferInsert;
 
 export type ProfilePhoto = typeof profilePhotos.$inferSelect;
 export type NewProfilePhoto = typeof profilePhotos.$inferInsert;
+
+export type CreatorClaimInvite = typeof creatorClaimInvites.$inferSelect;
+export type NewCreatorClaimInvite = typeof creatorClaimInvites.$inferInsert;
