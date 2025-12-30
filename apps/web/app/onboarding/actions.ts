@@ -360,6 +360,18 @@ export async function completeOnboarding({
         }
 
         if (existingProfile) {
+          // Ensure unclaimed-but-publishable profiles are marked as claimed
+          if (!existingProfile.isClaimed) {
+            await tx
+              .update(creatorProfiles)
+              .set({
+                isClaimed: true,
+                claimedAt: existingProfile.claimedAt ?? new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(creatorProfiles.id, existingProfile.id));
+          }
+
           const completed: CompletionResult = {
             username: existingProfile.usernameNormalized,
             status: 'complete',
