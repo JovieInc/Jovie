@@ -24,7 +24,16 @@ export default defineConfig({
       forks: {
         minForks: 1,
         // Use 50% of available CPUs in CI (typically 2-4), single fork locally for stability
-        maxForks: process.env.CI ? Math.max(2, Math.floor((process.env.VITEST_MAX_FORKS ? parseInt(process.env.VITEST_MAX_FORKS) : 4))) : 1,
+        maxForks: process.env.CI
+          ? Math.max(
+              2,
+              Math.floor(
+                process.env.VITEST_MAX_FORKS
+                  ? parseInt(process.env.VITEST_MAX_FORKS)
+                  : 4
+              )
+            )
+          : 1,
       },
     },
     // Isolate tests to prevent cross-contamination but allow within-file parallelism
