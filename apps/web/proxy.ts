@@ -319,13 +319,15 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname.startsWith('/account') ||
         pathname.startsWith('/billing')
       ) {
-        // Redirect unauthenticated users to sign-in
-        const signInUrl = new URL('/signin', req.url);
-        signInUrl.searchParams.set(
+        // Redirect to signup for waitlist (new users creating accounts)
+        // Redirect to signin for everything else (existing users)
+        const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
+        const authUrl = new URL(authPage, req.url);
+        authUrl.searchParams.set(
           'redirect_url',
           normalizeRedirectPath(req.nextUrl.pathname)
         );
-        res = NextResponse.redirect(signInUrl);
+        res = NextResponse.redirect(authUrl);
       } else {
         res = NextResponse.next({ request: { headers: requestHeaders } });
       }
