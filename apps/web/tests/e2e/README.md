@@ -152,6 +152,50 @@ When writing new E2E tests:
    await setupClerkTestingToken({ page });
    ```
 
+### Visual Regression Tests
+
+Visual regression tests capture screenshots of key pages to detect unintended visual changes.
+
+#### Running Visual Tests
+
+```bash
+# Run visual regression tests
+pnpm test:e2e --grep "Visual Regression"
+
+# Update baseline snapshots after intentional changes
+pnpm test:e2e --grep "Visual Regression" --update-snapshots
+```
+
+#### Snapshot Storage
+
+- Snapshots are stored in `*.spec.ts-snapshots/` directories next to test files
+- **Snapshots must be committed to git** for baseline comparison
+- Each browser/platform has separate snapshots (e.g., `chromium-darwin/`, `chromium-linux/`)
+
+#### Test Coverage
+
+Visual tests cover:
+- **Public pages**: Homepage, pricing, signin, signup
+- **Public profiles**: Light/dark modes, mobile viewport
+- **Dashboard**: Home, links, analytics, tipping, settings (requires auth)
+- **Admin pages**: Creators, overview, activity (requires admin auth)
+- **Responsive viewports**: Mobile (375px), tablet (768px), desktop (1440px)
+
+#### Configuration
+
+- `E2E_TEST_PROFILE_HANDLE`: Handle for public profile tests (default: `demo`)
+- Threshold: 5% pixel difference allowed (`maxDiffPixelRatio: 0.05`)
+- Dynamic content (timestamps, counters) is masked automatically
+
+#### Updating Snapshots
+
+When making intentional UI changes:
+
+1. Run tests to see failures: `pnpm test:e2e --grep "Visual Regression"`
+2. Review the diff in `test-results/` directory
+3. Update snapshots: `pnpm test:e2e --grep "Visual Regression" --update-snapshots`
+4. Commit the updated snapshots
+
 ### CI/CD Integration
 
 E2E tests run automatically in CI:
