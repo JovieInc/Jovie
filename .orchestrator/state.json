@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "lastUpdated": "2024-12-30T07:55:00Z",
+  "agents": {
+    "CODEX": { "active": 0, "maxConcurrency": 3, "tasks": [] },
+    "CLOD": { "active": 0, "maxConcurrency": 3, "tasks": [] },
+    "CURSOR": { "active": 0, "maxConcurrency": 3, "tasks": [] }
+  },
+  "activePRs": [
+    {
+      "number": 1558,
+      "branch": "claude/fix-pr-1508-CW046",
+      "status": "ready_to_merge",
+      "ciStatus": "success"
+    },
+    {
+      "number": 1549,
+      "branch": "dependabot/npm_and_yarn/statsig/react-bindings-3.31.0",
+      "status": "failing",
+      "ciStatus": "typecheck_failure"
+    },
+    {
+      "number": 1508,
+      "branch": "claude/review-biome-ci-wGaZi",
+      "status": "ready_to_merge",
+      "ciStatus": "success"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F001",
+      "dedupeKey": "biome:auth-screens-ux-audit:unused-vars",
+      "files": ["apps/web/tests/audit/auth-screens-ux-audit.spec.ts"],
+      "category": "lint",
+      "severity": "P2",
+      "confidence": "high",
+      "effort": "XS",
+      "title": "Unused functions and variables in auth UX audit test",
+      "evidence": "biome check: checkElementOverlap (line 61), checkTouchTargetSize (line 124), errorText (line 408) unused; expect import unused",
+      "status": "fixed_local"
+    },
+    {
+      "id": "F002",
+      "dedupeKey": "typecheck:quick-auth-audit:implicit-any",
+      "files": ["apps/web/scripts/quick-auth-audit.ts"],
+      "category": "typecheck",
+      "severity": "P1",
+      "confidence": "high",
+      "effort": "XS",
+      "title": "Implicit any type in quick-auth-audit script",
+      "evidence": "tsc error TS7006: Parameter 'el' implicitly has an 'any' type at line 179",
+      "status": "fixed_local"
+    }
+  ],
+  "linearIssues": [],
+  "discoveryRuns": [
+    {
+      "timestamp": "2024-12-30T07:50:00Z",
+      "biomeErrors": 1,
+      "biomeWarnings": 3,
+      "typecheckErrors": 1
+    }
+  ]
+}
