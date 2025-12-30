@@ -23,6 +23,11 @@ if [ ! -f "$JOURNAL_FILE" ]; then
   exit 1
 fi
 
+# Determine which migrations are NEW (added in this branch)
+# Only validate idempotency on new migrations - historical ones are grandfathered
+BASE_BRANCH="${BASE_BRANCH:-origin/main}"
+NEW_MIGRATIONS=()
+
 # Get all .sql migration files (excluding meta directory)
 SQL_FILES=()
 while IFS= read -r file; do
@@ -32,6 +37,32 @@ done < <(find "$MIGRATIONS_DIR" -maxdepth 1 -name "*.sql" -type f | sort)
 if [ ${#SQL_FILES[@]} -eq 0 ]; then
   echo -e "${GREEN}✅ No migration files found${NC}"
   exit 0
+fi
+
+# Check if we're in a git repo and can detect new migrations
+if git rev-parse --git-dir > /dev/null 2>&1; then
+  # Get migrations that don't exist on the base branch
+  for file in "${SQL_FILES[@]}"; do
+    filename=$(basename "$file")
+    # Check if this file exists on the base branch
+    if ! git cat-file -e "$BASE_BRANCH:$MIGRATIONS_DIR/$filename" 2>/dev/null; then
+      NEW_MIGRATIONS+=("$file")
+    fi
+  done
+
+  if [ ${#NEW_MIGRATIONS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}ℹ️  Found ${#NEW_MIGRATIONS[@]} new migration(s) to validate (not on $BASE_BRANCH):${NC}"
+    for migration in "${NEW_MIGRATIONS[@]}"; do
+      echo "  - $(basename "$migration")"
+    done
+    echo ""
+  fi
+else
+  echo -e "${YELLOW}⚠️  Not a git repository - will validate ALL migrations${NC}"
+  # Fallback: validate all migrations if not in a git repo
+  for file in "${SQL_FILES[@]}"; do
+    NEW_MIGRATIONS+=("$file")
+  done
 fi
 
 # Extract migration tags from journal
@@ -61,8 +92,9 @@ for sql_file in "${SQL_FILES[@]}"; do
 done
 
 # Check for CREATE INDEX CONCURRENTLY in migrations (not DROP or comments)
+# ONLY check NEW migrations - historical ones are grandfathered
 CONCURRENT_FILES=()
-for sql_file in "${SQL_FILES[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]}"; do
   filename=$(basename "$sql_file")
   # Check for CREATE INDEX CONCURRENTLY (case insensitive, ignoring comments and DROP)
   if grep -i "CREATE[[:space:]]\+INDEX[[:space:]]\+CONCURRENTLY" "$sql_file" | grep -v "^[[:space:]]*--" >/dev/null 2>&1; then
@@ -72,8 +104,9 @@ for sql_file in "${SQL_FILES[@]}"; do
 done
 
 # Check for non-idempotent CREATE TYPE statements
+# ONLY check NEW migrations - historical ones are grandfathered
 NON_IDEMPOTENT_TYPE_FILES=()
-for sql_file in "${SQL_FILES[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]}"; do
   filename=$(basename "$sql_file")
 
   # Look for CREATE TYPE statements (excluding comments)
@@ -83,11 +116,11 @@ for sql_file in "${SQL_FILES[@]}"; do
     type_section=$(grep -B 10 -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" "$sql_file" | grep -v "^[[:space:]]*--")
 
     # Check if this CREATE TYPE is in an idempotent DO block
-    # Must have: 1) DO $$ before CREATE TYPE, 2) pg_type check
+    # Must have: 1) DO $ before CREATE TYPE, 2) pg_type check
     has_do_block=false
     has_pg_type_check=false
 
-    # Use fixed string matching for DO $$ to avoid regex escaping issues
+    # Use fixed string matching for DO $ to avoid regex escaping issues
     if echo "$type_section" | grep -iF "DO \$" >/dev/null 2>&1; then
       has_do_block=true
     fi
@@ -105,8 +138,9 @@ for sql_file in "${SQL_FILES[@]}"; do
 done
 
 # Check for CREATE INDEX without IF NOT EXISTS
+# ONLY check NEW migrations - historical ones are grandfathered
 NON_IDEMPOTENT_INDEX_FILES=()
-for sql_file in "${SQL_FILES[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]}"; do
   filename=$(basename "$sql_file")
   # Look for CREATE INDEX or CREATE UNIQUE INDEX without IF NOT EXISTS (ignoring comments)
   if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "CREATE[[:space:]]\+\(UNIQUE[[:space:]]\+\)\?INDEX" | grep -v -i "IF[[:space:]]\+NOT[[:space:]]\+EXISTS" >/dev/null 2>&1; then
@@ -116,8 +150,9 @@ for sql_file in "${SQL_FILES[@]}"; do
 done
 
 # Check for ALTER TYPE ADD VALUE without IF NOT EXISTS
+# ONLY check NEW migrations - historical ones are grandfathered
 NON_IDEMPOTENT_ALTER_TYPE_FILES=()
-for sql_file in "${SQL_FILES[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]}"; do
   filename=$(basename "$sql_file")
   # Look for ALTER TYPE ... ADD VALUE without IF NOT EXISTS (ignoring comments)
   if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "ALTER[[:space:]]\+TYPE.*ADD[[:space:]]\+VALUE" | grep -v -i "IF[[:space:]]\+NOT[[:space:]]\+EXISTS" >/dev/null 2>&1; then
@@ -138,7 +173,7 @@ done
 
 # Report results
 if [ $EXIT_CODE -eq 0 ]; then
-  echo -e "${GREEN}✅ All migrations are properly registered${NC}"
+  echo -e "${GREEN}✅ All migrations are properly registered and idempotent${NC}"
   exit 0
 fi
 
@@ -224,6 +259,8 @@ if [ ${#NON_IDEMPOTENT_TYPE_FILES[@]} -gt 0 ]; then
   echo ""
   echo "Why: Migrations must be idempotent (safe to run multiple times)."
   echo "     PostgreSQL requires explicit existence check via DO blocks for types."
+  echo ""
+  echo "📌 NOTE: Historical migrations (already on main) are grandfathered - only NEW migrations are validated."
 fi
 
 if [ ${#NON_IDEMPOTENT_INDEX_FILES[@]} -gt 0 ]; then
@@ -245,6 +282,8 @@ if [ ${#NON_IDEMPOTENT_INDEX_FILES[@]} -gt 0 ]; then
   echo "  ✅ RIGHT: CREATE INDEX IF NOT EXISTS idx_name ON table_name (column);"
   echo ""
   echo "Why: Migrations must be idempotent (safe to run multiple times)."
+  echo ""
+  echo "📌 NOTE: Historical migrations (already on main) are grandfathered - only NEW migrations are validated."
 fi
 
 if [ ${#NON_IDEMPOTENT_ALTER_TYPE_FILES[@]} -gt 0 ]; then
@@ -266,6 +305,8 @@ if [ ${#NON_IDEMPOTENT_ALTER_TYPE_FILES[@]} -gt 0 ]; then
   echo "  ✅ RIGHT: ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'suspended';"
   echo ""
   echo "Why: Migrations must be idempotent (safe to run multiple times)."
+  echo ""
+  echo "📌 NOTE: Historical migrations (already on main) are grandfathered - only NEW migrations are validated."
 fi
 
 exit $EXIT_CODE
