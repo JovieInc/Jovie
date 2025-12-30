@@ -212,6 +212,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache Next build cache
+        id: next-cache
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: |
@@ -222,7 +223,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}-
             ${{ runner.os }}-next-
-          save-always: true
+          # Removed save-always: true - only cache on successful builds to avoid persisting corrupted caches
       - name: Warm Next build cache
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
         run: pnpm turbo build --filter=@jovie/web
