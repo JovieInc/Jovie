@@ -40,7 +40,7 @@
     "test:profile": "pnpm --filter=@jovie/web run test:profile",
     "test:flaky": "pnpm --filter=@jovie/web run test:flaky",
     "format": "biome format --write .",
-    "format:check": "biome format --check .",
+    "format:check": "biome check --formatter-enabled=true --linter-enabled=false .",
     "biome:ci": "biome ci .",
     "biome:check": "biome check .",
     "commit": "cz",
@@ -51,7 +51,7 @@
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.2",
+    "@biomejs/biome": "^2.3.10",
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "commitizen": "^4.3.1",
