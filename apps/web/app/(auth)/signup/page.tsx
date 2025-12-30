@@ -10,9 +10,7 @@ export default function SignUpPage() {
   return (
     <AuthLayout
       formTitle='Create your account'
-      footerPrompt='Already have an account?'
-      footerLinkText='Log in'
-      footerLinkHref='/signin'
+      showFooterPrompt={false}
       showLegalLinks
     >
       <SignUpForm />
