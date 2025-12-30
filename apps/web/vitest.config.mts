@@ -18,11 +18,13 @@ export default defineConfig({
       '.next/**',
     ],
     // Use forks pool to prevent JS heap OOM in worker threads
+    // CI runners have 7GB RAM - safe to use more workers for parallelization
     pool: 'forks',
     poolOptions: {
       forks: {
         minForks: 1,
-        maxForks: 1,
+        // Use 50% of available CPUs in CI (typically 2-4), single fork locally for stability
+        maxForks: process.env.CI ? Math.max(2, Math.floor((process.env.VITEST_MAX_FORKS ? parseInt(process.env.VITEST_MAX_FORKS) : 4))) : 1,
       },
     },
     // Isolate tests to prevent cross-contamination but allow within-file parallelism
@@ -45,8 +47,9 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     globals: true,
-    // Reduce overhead by limiting concurrent tests per worker
-    maxConcurrency: 1,
+    // Allow concurrent tests within each worker for better throughput
+    // CI can handle more concurrency; local stays conservative
+    maxConcurrency: process.env.CI ? 5 : 1,
   },
   resolve: {
     alias: [
