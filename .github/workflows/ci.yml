@@ -109,7 +109,21 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Biome CI (lint + format)
-        run: pnpm biome ci --reporter=github .
+        run: |
+          # For PRs: only lint changed files (faster, pre-commit already ran on local)
+          # For pushes to main: full lint to catch any issues
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' | tr '\n' ' ')
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "Linting changed files only: $CHANGED_FILES"
+              pnpm biome ci --reporter=github $CHANGED_FILES
+            else
+              echo "No lintable files changed"
+            fi
+          else
+            pnpm biome ci --reporter=github .
+          fi
 
   ci-typecheck:
     name: Typecheck
@@ -143,7 +157,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          # Use content hash for better cache hit rates (not commit SHA which changes every commit)
+          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
@@ -192,7 +207,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          # Use content hash for better cache hit rates (not commit SHA which changes every commit)
+          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache Next build cache
@@ -201,7 +217,8 @@ jobs:
           path: |
             apps/web/.next/cache
             .turbo
-          key: ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}-${{ github.sha }}
+          # Use content hash only - no commit SHA for better cache reuse across commits
+          key: ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json', 'apps/web/**/*.ts', 'apps/web/**/*.tsx') }}
           restore-keys: |
             ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}-
             ${{ runner.os }}-next-
@@ -561,7 +578,8 @@ jobs:
 
   ci-build:
     name: Build
-    needs: [ci-fast]
+    # Optimized: only wait for typecheck and lint, not full ci-fast (guardrails can run in parallel)
+    needs: [ci-typecheck, ci-biome]
     # Build runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -620,7 +638,8 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests
-    needs: [ci-fast]
+    # Optimized: only wait for typecheck and lint, not full ci-fast (guardrails can run in parallel)
+    needs: [ci-typecheck, ci-biome]
     # Unit tests run on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -806,7 +825,13 @@ jobs:
 
       - name: Install Playwright
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        run: pnpm --filter=@jovie/web exec playwright install chromium firefox --with-deps
+        run: |
+          # PRs: Chrome-only for faster feedback; main branch: full browser matrix
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+          else
+            pnpm --filter=@jovie/web exec playwright install chromium firefox --with-deps
+          fi
 
       - name: Load quarantined E2E specs
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -853,7 +878,8 @@ jobs:
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
+          # Chrome-only for PRs - faster feedback, Firefox runs on main only
+          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Full (Main Branch)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
