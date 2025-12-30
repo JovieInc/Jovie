@@ -75,18 +75,31 @@ done
 NON_IDEMPOTENT_TYPE_FILES=()
 for sql_file in "${SQL_FILES[@]}"; do
   filename=$(basename "$sql_file")
-  # Look for CREATE TYPE statements
+
+  # Look for CREATE TYPE statements (excluding comments)
   if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" >/dev/null 2>&1; then
-    # Check if CREATE TYPE is wrapped in a DO block with pg_type check
-    # We look for the idempotent pattern: DO $$ ... IF NOT EXISTS (SELECT ... FROM pg_type ...) ... CREATE TYPE
-    if ! grep -Pzo "(?s)DO[[:space:]]*\$\$.*?pg_type.*?CREATE[[:space:]]+TYPE.*?END[[:space:]]*\$\$" "$sql_file" >/dev/null 2>&1; then
-      # Fallback to simpler check if perl regex not available
-      # Check for DO $$ and pg_type in proximity to CREATE TYPE
-      if ! (grep -B 10 -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" "$sql_file" | grep -i "DO[[:space:]]*\$\$" >/dev/null 2>&1 && \
-            grep -B 10 -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" "$sql_file" | grep -i "pg_type" >/dev/null 2>&1); then
-        NON_IDEMPOTENT_TYPE_FILES+=("$filename")
-        EXIT_CODE=1
-      fi
+    # Extract the section containing CREATE TYPE for analysis
+    # Get 10 lines before CREATE TYPE to check for DO block and pg_type
+    type_section=$(grep -B 10 -i "CREATE[[:space:]]\+TYPE.*AS[[:space:]]\+ENUM" "$sql_file" | grep -v "^[[:space:]]*--")
+
+    # Check if this CREATE TYPE is in an idempotent DO block
+    # Must have: 1) DO $$ before CREATE TYPE, 2) pg_type check
+    has_do_block=false
+    has_pg_type_check=false
+
+    # Use fixed string matching for DO $$ to avoid regex escaping issues
+    if echo "$type_section" | grep -iF "DO \$" >/dev/null 2>&1; then
+      has_do_block=true
+    fi
+
+    if echo "$type_section" | grep -i "pg_type" >/dev/null 2>&1; then
+      has_pg_type_check=true
+    fi
+
+    # Flag as non-idempotent if missing either DO block OR pg_type check
+    if [ "$has_do_block" = false ] || [ "$has_pg_type_check" = false ]; then
+      NON_IDEMPOTENT_TYPE_FILES+=("$filename")
+      EXIT_CODE=1
     fi
   fi
 done
