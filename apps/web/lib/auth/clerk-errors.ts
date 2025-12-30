@@ -23,6 +23,16 @@ const CLERK_ERROR_MESSAGES: Record<string, string> = {
   too_many_requests: 'Too many attempts. Please wait a moment and try again.',
   rate_limit_exceeded: 'Too many requests. Please wait before trying again.',
 
+  // Bot protection / CAPTCHA errors
+  captcha_invalid: 'Verification failed. Please try again.',
+  captcha_not_enabled: 'Please try again.',
+  captcha_missing:
+    'Please disable ad blockers or try a different browser, then refresh the page.',
+  captcha_unavailable:
+    'Verification is temporarily unavailable. Please try again or use a different sign-in method.',
+  bot_traffic_detected:
+    'Unable to verify your request. Please try again or use a different browser.',
+
   // OAuth errors
   external_account_not_found:
     'No account found with this provider. Please sign up first.',
