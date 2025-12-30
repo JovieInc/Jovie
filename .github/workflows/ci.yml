@@ -82,8 +82,8 @@ jobs:
         run: pnpm --filter=@jovie/web run next:proxy-guard
 
   ci-biome:
-    name: Biome (lint + format)
-    # Single consolidated job for all Biome checks - replaces separate lint and format jobs
+    name: Lint
+    # Single consolidated job for all Biome checks (lint + format)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
