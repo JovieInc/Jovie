@@ -343,6 +343,8 @@ export async function completeOnboarding({
               onboardingCompletedAt:
                 existingProfile.onboardingCompletedAt ?? new Date(),
               isPublic: true,
+              isClaimed: true,
+              claimedAt: existingProfile.claimedAt ?? new Date(),
               updatedAt: new Date(),
             })
             .where(eq(creatorProfiles.id, existingProfile.id))
