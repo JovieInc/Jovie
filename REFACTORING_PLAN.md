@@ -658,6 +658,7 @@ Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
+| 2025-12-31 | - | Cascade | _pending_ | Split ContactSidebar.tsx (591→23 lines) into 4 modules |
 | 2025-12-31 | P2.2 | Cascade | _pending_ | Split Sidebar.tsx (786→47 lines) into 7 modules |
 | 2025-12-31 | P2.4 | Cascade | _pending_ | Split customer-sync.ts (1203→68 lines) into 7 modules |
 | 2025-12-31 | P2.1 | Cascade | #1593 | Extract onboarding steps (785→569 lines) |
