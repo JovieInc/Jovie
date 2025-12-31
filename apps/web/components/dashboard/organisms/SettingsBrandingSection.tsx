@@ -1,7 +1,7 @@
 'use client';
 
 import { SparklesIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useOptimisticMutation } from '@/lib/hooks/useOptimisticMutation';
@@ -19,6 +19,9 @@ export function SettingsBrandingSection({
   const [hideBranding, setHideBranding] = useState(
     artist.settings?.hide_branding ?? false
   );
+
+  // Capture original value before optimistic update for accurate rollback
+  const originalValueRef = useRef(hideBranding);
 
   const { mutate: updateBrandingPreference, isLoading } =
     useOptimisticMutation({
@@ -45,6 +48,9 @@ export function SettingsBrandingSection({
         return response.json();
       },
       onOptimisticUpdate: enabled => {
+        // Capture the current value before updating
+        originalValueRef.current = hideBranding;
+
         setHideBranding(enabled);
 
         if (onArtistUpdate) {
@@ -58,14 +64,16 @@ export function SettingsBrandingSection({
         }
       },
       onRollback: () => {
-        setHideBranding(prev => !prev);
+        // Restore the captured original value
+        const original = originalValueRef.current;
+        setHideBranding(original);
 
         if (onArtistUpdate) {
           onArtistUpdate({
             ...artist,
             settings: {
               ...artist.settings,
-              hide_branding: !hideBranding,
+              hide_branding: original,
             },
           });
         }

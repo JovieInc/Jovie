@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   calculateBackoffDelay,
@@ -344,6 +344,23 @@ export function useOptimisticMutation<TData, TVariables>(
       }, ms);
     });
 
+  // Cleanup on unmount: abort in-flight requests and clear pending timeouts
+  useEffect(() => {
+    return () => {
+      // Clear pending retry timeout
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+
+      // Abort in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
   const cancel = useCallback(() => {
     // Clear any pending retry timeout
     if (retryTimeoutRef.current) {
@@ -483,7 +500,8 @@ export function useOptimisticMutation<TData, TVariables>(
             });
 
             if (showToasts) {
-              toast.error(errorMessage);
+              // Show the actual error message (errorMsg) for consistency with state
+              toast.error(errorMsg);
             }
 
             throw error;

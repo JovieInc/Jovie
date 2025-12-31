@@ -52,7 +52,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
     }
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors; // Return errors object for immediate use
   };
 
   // Optimistic mutation for profile updates
@@ -135,9 +135,12 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
     setFormSubmitted(true);
 
     // Client-side validation BEFORE optimistic update
-    if (!validateForm()) {
-      // Focus the first field with an error
-      if (validationErrors.name && nameInputRef.current) {
+    const errors = validateForm();
+    const isValid = Object.keys(errors).length === 0;
+
+    if (!isValid) {
+      // Focus the first field with an error using the returned errors object
+      if (errors.name && nameInputRef.current) {
         nameInputRef.current.focus();
       }
       return;

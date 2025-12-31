@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useOptimisticMutation } from '@/lib/hooks/useOptimisticMutation';
 
 export function SettingsNotificationsSection() {
   const [marketingEmails, setMarketingEmails] = useState(true);
+
+  // Capture original value before optimistic update for accurate rollback
+  const originalValueRef = useRef(marketingEmails);
 
   const { mutate: updateMarketingPreference, isLoading } =
     useOptimisticMutation({
@@ -33,10 +36,13 @@ export function SettingsNotificationsSection() {
         return response.json();
       },
       onOptimisticUpdate: enabled => {
+        // Capture the current value before updating
+        originalValueRef.current = marketingEmails;
         setMarketingEmails(enabled);
       },
       onRollback: () => {
-        setMarketingEmails(prev => !prev);
+        // Restore the captured original value
+        setMarketingEmails(originalValueRef.current);
       },
       successMessage: 'Marketing preferences updated',
       errorMessage: 'Failed to update preferences. Please try again.',
