@@ -329,8 +329,12 @@ export async function completeOnboarding({
         }
 
         const needsPublish = !profileIsPublishable(existingProfile);
+        // CRITICAL: Also update if isClaimed is not set - this is required by gate.ts
+        // which filters profiles by isClaimed=true. Without this, users with
+        // "publishable" profiles but isClaimed=false get stuck in an onboarding loop.
+        const needsClaim = existingProfile && !existingProfile.isClaimed;
 
-        if (existingProfile && (needsPublish || handleChanged)) {
+        if (existingProfile && (needsPublish || handleChanged || needsClaim)) {
           const nextDisplayName =
             trimmedDisplayName || existingProfile.displayName || username;
 
