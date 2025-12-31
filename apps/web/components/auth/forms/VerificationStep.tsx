@@ -108,6 +108,15 @@ export function VerificationStep({
 
   return (
     <div className={STEP_TRANSITION_CLASSES}>
+      {/* Back button - positioned inline at top, not fixed */}
+      <div className='flex justify-start mb-6'>
+        <AuthBackButton
+          onClick={onBack}
+          ariaLabel='Use a different email'
+          inline
+        />
+      </div>
+
       <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         Check your email
       </h1>
@@ -189,8 +198,6 @@ export function VerificationStep({
             {isResending ? 'Sending...' : 'Resend code'}
           </button>
         </div>
-
-        <AuthBackButton onClick={onBack} ariaLabel='Use a different email' />
       </form>
     </div>
   );

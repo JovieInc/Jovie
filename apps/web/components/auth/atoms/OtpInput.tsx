@@ -334,8 +334,8 @@ export function OtpInput({
                 'bg-surface-0 text-primary-token',
                 // Status-based styling
                 isFocused
-                  ? 'border-default ring-2 ring-[rgb(var(--focus-ring))]/30 scale-105'
-                  : 'border-subtle',
+                  ? 'border-strong ring-2 ring-[rgb(var(--focus-ring))]/30 scale-105'
+                  : 'border-default',
                 // Error state
                 error && 'border-destructive',
                 // Success state animation

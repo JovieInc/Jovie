@@ -10,6 +10,11 @@ interface AuthBackButtonProps {
   href?: string;
   className?: string;
   ariaLabel?: string;
+  /**
+   * When true, renders inline instead of fixed positioning.
+   * Use this when the button is part of a form flow to prevent overlap.
+   */
+  inline?: boolean;
 }
 
 export function AuthBackButton({
@@ -17,23 +22,28 @@ export function AuthBackButton({
   href,
   className,
   ariaLabel = 'Go back',
+  inline = false,
 }: AuthBackButtonProps) {
   const haptic = useHapticFeedback();
 
   const baseClasses = cn(
-    // Fixed positioning with safe area insets for notched devices
-    'fixed z-50',
-    'top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))]',
-    'md:top-6 md:left-6',
+    // Positioning - fixed by default, inline when specified
+    inline
+      ? 'relative'
+      : [
+          'fixed z-50',
+          'top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))]',
+          'md:top-6 md:left-6',
+        ],
     // Larger touch target on mobile (min 44x44)
     'inline-flex items-center justify-center rounded-full',
     'h-11 w-11 sm:h-10 sm:w-10',
     // Visual styling
     'text-primary-token bg-surface-0/80 backdrop-blur-sm',
-    'border border-subtle/50',
+    'border border-default',
     'shadow-sm',
     // Hover and active states
-    'hover:bg-surface-1 hover:border-subtle',
+    'hover:bg-surface-1 hover:border-default',
     'active:scale-95 active:bg-surface-2',
     // Transitions
     'transition-all duration-150 ease-out',
