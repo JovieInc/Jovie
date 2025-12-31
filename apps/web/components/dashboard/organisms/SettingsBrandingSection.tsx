@@ -1,9 +1,10 @@
 'use client';
 
 import { SparklesIcon } from '@heroicons/react/24/outline';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { useOptimisticMutation } from '@/lib/hooks/useOptimisticMutation';
 import type { Artist } from '@/types/db';
 
 export interface SettingsBrandingSectionProps {
@@ -18,12 +19,10 @@ export function SettingsBrandingSection({
   const [hideBranding, setHideBranding] = useState(
     artist.settings?.hide_branding ?? false
   );
-  const [isSavingBranding, setIsSavingBranding] = useState(false);
 
-  const handleBrandingToggle = useCallback(
-    async (enabled: boolean) => {
-      setIsSavingBranding(true);
-      try {
+  const { mutate: updateBrandingPreference, isLoading } =
+    useOptimisticMutation({
+      mutationFn: async (enabled: boolean, signal) => {
         const response = await fetch('/api/dashboard/profile', {
           method: 'PUT',
           headers: {
@@ -36,12 +35,16 @@ export function SettingsBrandingSection({
               },
             },
           }),
+          signal,
         });
 
         if (!response.ok) {
           throw new Error('Failed to update branding settings');
         }
 
+        return response.json();
+      },
+      onOptimisticUpdate: enabled => {
         setHideBranding(enabled);
 
         if (onArtistUpdate) {
@@ -53,15 +56,23 @@ export function SettingsBrandingSection({
             },
           });
         }
-      } catch (error) {
-        console.error('Failed to update branding settings:', error);
-        setHideBranding(!enabled);
-      } finally {
-        setIsSavingBranding(false);
-      }
-    },
-    [artist, onArtistUpdate]
-  );
+      },
+      onRollback: () => {
+        setHideBranding(prev => !prev);
+
+        if (onArtistUpdate) {
+          onArtistUpdate({
+            ...artist,
+            settings: {
+              ...artist.settings,
+              hide_branding: !hideBranding,
+            },
+          });
+        }
+      },
+      successMessage: 'Branding settings updated',
+      errorMessage: 'Failed to update branding. Please try again.',
+    });
 
   return (
     <DashboardCard variant='settings'>
@@ -70,9 +81,9 @@ export function SettingsBrandingSection({
         description='When enabled, Jovie branding will be removed from your profile page, giving your fans a fully custom experience.'
         checked={hideBranding}
         onCheckedChange={enabled => {
-          void handleBrandingToggle(enabled);
+          void updateBrandingPreference(enabled);
         }}
-        disabled={isSavingBranding}
+        disabled={isLoading}
         ariaLabel='Hide Jovie branding'
       />
 

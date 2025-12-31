@@ -186,7 +186,7 @@ export function useSuggestionSync({
     }
   }, [pollIntervalMs, profileId, suggestionsEnabled, updateTask]);
 
-  // Handle accepting a suggestion
+  // Handle accepting a suggestion with optimistic update
   const handleAcceptSuggestion = useCallback(
     async (
       suggestion: DetectedLink & { suggestionId?: string }
@@ -196,12 +196,30 @@ export function useSuggestionSync({
         return null;
       }
 
-      try {
-        const suggestionId = suggestion.suggestionId;
-        if (!suggestionId) {
-          return null;
-        }
+      const suggestionId = suggestion.suggestionId;
+      if (!suggestionId) {
+        return null;
+      }
 
+      // Create optimistic link item
+      const optimisticLink: LinkItem = {
+        id: suggestionId,
+        platform: suggestion.platform,
+        normalizedUrl: suggestion.normalizedUrl,
+        identity: suggestion.identity,
+        url: suggestion.url,
+        state: 'ready' as const,
+        position: 0, // Will be updated by server
+        version: linksVersion,
+      };
+
+      // Optimistic update: remove from suggestions, add to links immediately
+      setSuggestedLinks(prev =>
+        prev.filter(s => s.suggestionId !== suggestionId)
+      );
+      setLinks(prev => [...prev, optimisticLink]);
+
+      try {
         const response = await fetch('/api/dashboard/social-links', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -224,28 +242,50 @@ export function useSuggestionSync({
         };
 
         if (data.link) {
-          const [detected] = convertDbLinksToLinkItems([data.link]);
-          setSuggestedLinks(prev =>
-            prev.filter(s => s.suggestionId !== suggestionId)
-          );
-          if (detected) {
-            setLinks(prev => [...prev, detected]);
+          // Replace optimistic link with server data
+          const [serverLink] = convertDbLinksToLinkItems([data.link]);
+          if (serverLink) {
+            setLinks(prev =>
+              prev.map(link =>
+                link.id === suggestionId ? serverLink : link
+              )
+            );
+            toast.success('Link added to your list');
+            return serverLink;
           }
-          toast.success('Link added to your list');
-          return detected ?? null;
         }
+
+        return optimisticLink;
       } catch (error) {
         console.error(error);
+
+        // Rollback: remove optimistic link, restore suggestion
+        setLinks(prev => prev.filter(link => link.id !== suggestionId));
+        setSuggestedLinks(prev => {
+          const suggestionStillExists = prev.some(
+            s => s.suggestionId === suggestionId
+          );
+          if (suggestionStillExists) return prev;
+
+          // Re-create suggestion from the original data
+          const restoredSuggestion: SuggestedLink = {
+            ...suggestion,
+            suggestionId,
+            state: 'suggested' as const,
+          };
+          return [...prev, restoredSuggestion];
+        });
+
         toast.error(
           error instanceof Error ? error.message : 'Failed to accept link'
         );
+        return null;
       }
-      return null;
     },
-    [profileId, setLinks, setSuggestedLinks]
+    [profileId, linksVersion, setLinks, setSuggestedLinks]
   );
 
-  // Handle dismissing a suggestion
+  // Handle dismissing a suggestion with optimistic update
   const handleDismissSuggestion = useCallback(
     async (
       suggestion: DetectedLink & { suggestionId?: string }
@@ -255,9 +295,15 @@ export function useSuggestionSync({
         return;
       }
 
-      if (!suggestion.suggestionId) {
+      const suggestionId = suggestion.suggestionId;
+      if (!suggestionId) {
         return;
       }
+
+      // Optimistic update: remove from suggestions immediately
+      setSuggestedLinks(prev =>
+        prev.filter(s => s.suggestionId !== suggestionId)
+      );
 
       try {
         const response = await fetch('/api/dashboard/social-links', {
@@ -265,7 +311,7 @@ export function useSuggestionSync({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             profileId,
-            linkId: suggestion.suggestionId,
+            linkId: suggestionId,
             action: 'dismiss',
           }),
         });
@@ -277,12 +323,26 @@ export function useSuggestionSync({
           throw new Error(data?.error || 'Failed to dismiss link');
         }
 
-        setSuggestedLinks(prev =>
-          prev.filter(s => s.suggestionId !== suggestion.suggestionId)
-        );
         toast.success('Suggestion dismissed');
       } catch (error) {
         console.error(error);
+
+        // Rollback: restore the suggestion
+        setSuggestedLinks(prev => {
+          const suggestionStillExists = prev.some(
+            s => s.suggestionId === suggestionId
+          );
+          if (suggestionStillExists) return prev;
+
+          // Re-create suggestion from the original data
+          const restoredSuggestion: SuggestedLink = {
+            ...suggestion,
+            suggestionId,
+            state: 'suggested' as const,
+          };
+          return [...prev, restoredSuggestion];
+        });
+
         toast.error(
           error instanceof Error ? error.message : 'Failed to dismiss link'
         );

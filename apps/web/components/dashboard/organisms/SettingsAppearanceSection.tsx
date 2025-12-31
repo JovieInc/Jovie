@@ -8,8 +8,10 @@ export function SettingsAppearanceSection() {
   const { theme, setTheme } = useTheme();
 
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    // Update theme immediately (next-themes handles this optimistically)
     setTheme(newTheme);
 
+    // Save to server in background (fire-and-forget with silent error handling)
     try {
       const response = await fetch('/api/dashboard/profile', {
         method: 'PUT',
@@ -25,9 +27,12 @@ export function SettingsAppearanceSection() {
 
       if (!response.ok) {
         console.error('Failed to save theme preference');
+        // Theme is already changed locally via setTheme, so we don't rollback
+        // User experience is not affected
       }
     } catch (error) {
       console.error('Error saving theme preference:', error);
+      // Same as above - local theme is already updated
     }
   };
 

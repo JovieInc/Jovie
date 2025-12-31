@@ -977,7 +977,326 @@ CodeRabbit is already installed in the terminal. Run it as a way to review your 
   - `pnpm typecheck`, `pnpm lint`, `pnpm test` must be green before merge.
   - Smoke E2E tests run on PRs touching critical flows.
 
-## 13. CI/CD, Critical Modules & Landmines
+## 13. Optimistic UI Updates (Best Practices)
+
+Optimistic updates provide instant user feedback by updating the UI immediately before waiting for server confirmation. This section defines when and how to use the `useOptimisticMutation` hook.
+
+### 13.1 When to Use Optimistic Updates
+
+**✅ USE optimistic updates for:**
+
+- **User-initiated actions**: Settings toggles, profile edits, adding/removing items from lists
+- **Reversible operations**: Actions that can be rolled back without data loss (accept/dismiss suggestions, toggle visibility)
+- **High-frequency interactions**: Operations users perform repeatedly (liking, favoriting, sorting)
+- **Non-critical mutations**: Updates where temporary inconsistency is acceptable (UI preferences, non-monetary data)
+
+**Examples:**
+- Toggle marketing emails preference
+- Accept/dismiss link suggestions
+- Reorder dashboard items
+- Update display name or bio
+- Toggle hide branding setting
+
+**❌ DO NOT use optimistic updates for:**
+
+- **Payment/financial operations**: Stripe charges, refunds, subscription changes, billing updates
+  - Reason: Financial operations must confirm server success before showing confirmation to avoid user confusion about payment state
+  - Exception: None - always wait for server confirmation
+
+- **Irreversible deletions**: Account deletion, permanent content removal, data purges
+  - Reason: Users need explicit server confirmation before seeing "deleted" state
+  - Safe alternative: Use confirmation dialog + wait for server response
+
+- **Security-critical operations**: Password changes, 2FA setup/removal, permission changes, API key generation
+  - Reason: Security state must be server-authoritative to prevent false sense of security
+  - Exception: None - always wait for server confirmation
+
+- **Operations with complex side effects**: Actions that trigger emails, webhooks, external API calls with no rollback mechanism
+  - Reason: Side effects may succeed even if the main operation fails, creating inconsistent state
+  - Safe alternative: Show "processing" state, then update after server confirms all side effects completed
+
+**Examples of prohibited operations:**
+```typescript
+// ❌ WRONG - Never optimistically update payment state
+const { mutate } = useOptimisticMutation({
+  mutationFn: createStripeCharge,
+  onOptimisticUpdate: () => setPaymentComplete(true), // DANGEROUS!
+});
+
+// ❌ WRONG - Never optimistically delete account
+const { mutate } = useOptimisticMutation({
+  mutationFn: deleteAccount,
+  onOptimisticUpdate: () => router.push('/goodbye'), // DANGEROUS!
+});
+
+// ✅ CORRECT - Wait for server confirmation
+async function handlePayment() {
+  setLoading(true);
+  const result = await createStripeCharge();
+  if (result.success) {
+    setPaymentComplete(true); // Only after server confirms
+  }
+  setLoading(false);
+}
+```
+
+### 13.2 Implementation Pattern
+
+**Import and use the hook:**
+
+```typescript
+import { useOptimisticMutation } from '@/lib/hooks/useOptimisticMutation';
+
+const { mutate, isLoading, error, canRetry, retry } = useOptimisticMutation({
+  mutationFn: async (enabled: boolean, signal) => {
+    const res = await fetch('/api/endpoint', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+      signal, // REQUIRED: pass signal for cancellation support
+    });
+    if (!res.ok) throw new Error('Failed');
+    return res.json();
+  },
+  onOptimisticUpdate: (enabled) => {
+    // Update local state IMMEDIATELY
+    setEnabled(enabled);
+  },
+  onRollback: () => {
+    // Revert to previous state on error
+    setEnabled(prev => !prev);
+  },
+  successMessage: 'Settings saved!', // Optional
+  errorMessage: 'Failed to save. Please try again.', // Optional
+});
+```
+
+**Key requirements:**
+1. **Always pass `signal` parameter** to `mutationFn` for proper cancellation
+2. **Keep `onOptimisticUpdate` pure** - only update local state, no side effects
+3. **Implement `onRollback`** - must undo ALL changes from `onOptimisticUpdate`
+4. **Use functional setState** when rolling back: `setState(prev => !prev)` (ensures correctness even if state changed)
+
+### 13.3 Error Handling Requirements
+
+**Auto-retry configuration:**
+- Default: 3 automatic retries with exponential backoff (1s, 2s, 4s)
+- Customize via `retryConfig`: `{ maxRetries: 3, baseDelay: 1000, maxDelay: 30000 }`
+- Transient errors (network issues) auto-retry silently
+- Persistent errors show toast notification after final retry
+
+**Rollback requirements:**
+- MUST undo all state changes from `onOptimisticUpdate`
+- MUST preserve user's ability to manually retry via `canRetry` flag
+- MUST show error toast on final failure (unless `showToasts: false`)
+- MUST maintain data consistency (no partial rollbacks)
+
+**Version conflict handling (409 responses):**
+
+When your API returns 409 (VERSION_CONFLICT), handle it in `mutationFn`:
+
+```typescript
+mutationFn: async (newData, signal) => {
+  const res = await fetch('/api/endpoint', {
+    method: 'PUT',
+    body: JSON.stringify({
+      ...newData,
+      expectedVersion: currentVersion, // Include version for optimistic locking
+    }),
+    signal,
+  });
+
+  if (res.status === 409) {
+    // Auto-retry: fetch latest version and retry
+    const latest = await fetch('/api/endpoint').then(r => r.json());
+    setCurrentVersion(latest.version); // Update local version
+
+    // Retry with latest version (will use auto-retry mechanism)
+    throw new Error('VERSION_CONFLICT'); // Hook will auto-retry
+  }
+
+  if (!res.ok) throw new Error('Failed to update');
+  return res.json();
+},
+```
+
+**Toast notification strategy:**
+- Success: Silent by default (or show `successMessage` if provided)
+- Error after retries: Always show error toast (unless `showToasts: false`)
+- Conflicts (409): Auto-retry silently, only show toast if all retries fail
+
+### 13.4 Testing Requirements
+
+**Unit tests (REQUIRED for all optimistic updates):**
+
+1. **Basic flow**: Optimistic update → successful mutation → success state
+2. **Rollback**: Optimistic update → error → rollback to previous state
+3. **Auto-retry**: Optimistic update → transient error → auto-retry → success
+4. **Version conflict**: Optimistic update → 409 response → fetch latest → retry → success
+5. **Manual retry**: Optimistic update → persistent error → user clicks retry → success
+
+**Example test structure:**
+
+```typescript
+describe('useOptimisticMutation', () => {
+  it('should optimistically update and rollback on error', async () => {
+    const onOptimisticUpdate = vi.fn();
+    const onRollback = vi.fn();
+    const mutationFn = vi.fn().mockRejectedValue(new Error('Failed'));
+
+    const { result } = renderHook(() =>
+      useOptimisticMutation({
+        mutationFn,
+        onOptimisticUpdate,
+        onRollback,
+        retryConfig: { maxRetries: 0 }, // No retries for this test
+      })
+    );
+
+    await act(async () => {
+      try {
+        await result.current.mutate({ value: 'test' });
+      } catch {
+        // Expected to throw
+      }
+    });
+
+    expect(onOptimisticUpdate).toHaveBeenCalledWith({ value: 'test' });
+    expect(onRollback).toHaveBeenCalled();
+    expect(result.current.error).toBe('Failed');
+  });
+});
+```
+
+**Integration tests:**
+- Test with real API routes (using test database)
+- Verify rollback happens on network failures
+- Confirm version conflicts are handled gracefully
+
+**E2E tests:**
+- Verify UI updates immediately on user action
+- Simulate network failure and verify rollback is visible
+- Test concurrent edits from two browser tabs (version conflicts)
+
+### 13.5 Common Patterns
+
+**Settings toggle:**
+```typescript
+const [enabled, setEnabled] = useState(initialValue);
+
+const { mutate } = useOptimisticMutation({
+  mutationFn: async (newValue: boolean, signal) => {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: newValue }),
+      signal,
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    return res.json();
+  },
+  onOptimisticUpdate: (newValue) => setEnabled(newValue),
+  onRollback: () => setEnabled(prev => !prev),
+  successMessage: 'Setting updated',
+});
+```
+
+**List item removal:**
+```typescript
+const [items, setItems] = useState(initialItems);
+
+const { mutate: removeItem } = useOptimisticMutation({
+  mutationFn: async (itemId: string, signal) => {
+    const res = await fetch(`/api/items/${itemId}`, {
+      method: 'DELETE',
+      signal,
+    });
+    if (!res.ok) throw new Error('Failed to delete');
+    return res.json();
+  },
+  onOptimisticUpdate: (itemId) => {
+    setItems(prev => prev.filter(item => item.id !== itemId));
+  },
+  onRollback: () => {
+    // Re-fetch items from server to restore
+    fetchItems().then(setItems);
+  },
+  successMessage: 'Item removed',
+});
+```
+
+**Accept/dismiss suggestions:**
+```typescript
+const [suggestions, setSuggestions] = useState(initial);
+const [links, setLinks] = useState(initialLinks);
+
+const { mutate: acceptSuggestion } = useOptimisticMutation({
+  mutationFn: async (suggestion: Suggestion, signal) => {
+    const res = await fetch('/api/suggestions', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: suggestion.id, action: 'accept' }),
+      signal,
+    });
+    if (!res.ok) throw new Error('Failed to accept');
+    return res.json();
+  },
+  onOptimisticUpdate: (suggestion) => {
+    // Remove from suggestions, add to links
+    setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+    setLinks(prev => [...prev, convertToLink(suggestion)]);
+  },
+  onRollback: () => {
+    // Restore suggestion, remove from links
+    setSuggestions(prev => [...prev, suggestion]);
+    setLinks(prev => prev.filter(l => l.id !== suggestion.id));
+  },
+});
+```
+
+### 13.6 Performance Considerations
+
+**Debouncing vs. Optimistic Updates:**
+- Use **optimistic updates** for discrete user actions (clicks, toggles)
+- Use **debouncing** for rapid input (text fields, sliders)
+- Combine both: Optimistic UI + debounced API calls for text inputs
+
+**Example: Debounced save with optimistic preview:**
+```typescript
+const [text, setText] = useState(initialText);
+const debouncedSave = useDebouncedCallback(
+  (value: string) => {
+    void mutate(value);
+  },
+  500 // 500ms debounce
+);
+
+const handleChange = (newText: string) => {
+  setText(newText); // Optimistic UI update
+  debouncedSave(newText); // Debounced API call
+};
+```
+
+**Monitoring:**
+- Track optimistic update failure rate (target: <5%)
+- Log 409 conflict frequency (indicates concurrent edit issues)
+- Alert on rollback spikes (>5% of mutations indicates systemic problem)
+
+### 13.7 Quick Reference
+
+| Operation Type | Use Optimistic? | Pattern | Notes |
+|----------------|-----------------|---------|-------|
+| Settings toggle | ✅ Yes | `useOptimisticMutation` | Instant feedback, auto-rollback |
+| Text input | ⚠️ Debounce | Optimistic UI + debounced save | Prevent API spam |
+| Delete item | ✅ Yes | `useOptimisticMutation` | Remove immediately, rollback if fails |
+| Payments | ❌ Never | Wait for server | Financial operations are critical |
+| Password change | ❌ Never | Wait for server | Security-critical |
+| Accept suggestion | ✅ Yes | `useOptimisticMutation` | High-frequency interaction |
+| Profile update | ✅ Yes | `useOptimisticMutation` | Show preview immediately |
+| Account deletion | ❌ Never | Wait for server | Irreversible operation |
+
+**Hook location:** `apps/web/lib/hooks/useOptimisticMutation.ts`
+**Tests:** `apps/web/lib/hooks/__tests__/useOptimisticMutation.test.ts`
+**Examples:** See Phase 2 & 3 implementations in settings and social links
+
+## 14. CI/CD, Critical Modules & Landmines
 
 - **CI/CD:**
   - Fast checks always run: `pnpm typecheck`, `pnpm lint`, `pnpm test`.

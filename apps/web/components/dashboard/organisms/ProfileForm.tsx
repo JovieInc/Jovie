@@ -6,6 +6,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
+import { useOptimisticMutation } from '@/lib/hooks/useOptimisticMutation';
 // flags import removed - pre-launch
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -19,8 +20,6 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
   const [success, setSuccess] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<
@@ -56,26 +55,11 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormSubmitted(true);
-
-    // Validate form
-    if (!validateForm()) {
-      // Focus the first field with an error
-      if (validationErrors.name && nameInputRef.current) {
-        nameInputRef.current.focus();
-      }
-      return;
-    }
-
-    setLoading(true);
-    setError(undefined);
-    setSuccess(false);
-
-    try {
+  // Optimistic mutation for profile updates
+  const { mutate: updateProfile, isLoading, error } = useOptimisticMutation({
+    mutationFn: async (updates: typeof formData, signal) => {
       const settingsUpdates = hasRemoveBrandingFeature
-        ? { hide_branding: formData.hide_branding }
+        ? { hide_branding: updates.hide_branding }
         : undefined;
 
       const res = await fetch('/api/dashboard/profile', {
@@ -83,24 +67,53 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           updates: {
-            displayName: formData.name,
-            bio: formData.tagline,
-            avatarUrl: formData.image_url || null,
+            displayName: updates.name,
+            bio: updates.tagline,
+            avatarUrl: updates.image_url || null,
             ...(settingsUpdates ? { settings: settingsUpdates } : {}),
           },
         }),
+        signal,
       });
+
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as {
           error?: string;
         };
         throw new Error(err?.error ?? 'Failed to update profile');
       }
-      const json: { profile: unknown } = await res.json();
+
+      return res.json();
+    },
+    onOptimisticUpdate: updates => {
+      // Update parent immediately with optimistic artist object
+      const optimisticArtist: Artist = {
+        ...artist,
+        name: updates.name,
+        tagline: updates.tagline,
+        image_url: updates.image_url,
+        settings: {
+          ...artist.settings,
+          hide_branding: updates.hide_branding,
+        },
+      };
+      onUpdate(optimisticArtist);
+    },
+    onRollback: () => {
+      // Revert parent to original artist state
+      onUpdate(artist);
+      // Revert form data to match server state
+      setFormData({
+        name: artist.name || '',
+        tagline: artist.tagline || '',
+        image_url: artist.image_url || '',
+        hide_branding: artist.settings?.hide_branding ?? false,
+      });
+    },
+    onSuccess: (data: { profile: unknown }) => {
+      // Update parent with server-confirmed artist
       const updatedArtist = convertDrizzleCreatorProfileToArtist(
-        json.profile as Parameters<
-          typeof convertDrizzleCreatorProfileToArtist
-        >[0]
+        data.profile as Parameters<typeof convertDrizzleCreatorProfileToArtist>[0]
       );
       onUpdate(updatedArtist);
       setSuccess(true);
@@ -112,12 +125,26 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       }
 
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to update profile');
-    } finally {
-      setLoading(false);
+    },
+    successMessage: 'Profile updated successfully!',
+    errorMessage: 'Failed to update profile',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormSubmitted(true);
+
+    // Client-side validation BEFORE optimistic update
+    if (!validateForm()) {
+      // Focus the first field with an error
+      if (validationErrors.name && nameInputRef.current) {
+        nameInputRef.current.focus();
+      }
+      return;
     }
+
+    // Trigger optimistic mutation
+    await updateProfile(formData);
   };
 
   // Collect all form errors for the error summary
@@ -255,12 +282,12 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
 
       <Button
         type='submit'
-        disabled={loading}
+        disabled={isLoading}
         variant='primary'
         className='w-full'
-        aria-busy={loading}
+        aria-busy={isLoading}
       >
-        {loading ? (
+        {isLoading ? (
           <div className='flex items-center justify-center space-x-2'>
             <span
               className='animate-spin motion-reduce:animate-none h-4 w-4 border-2 border-white border-t-transparent rounded-full'
