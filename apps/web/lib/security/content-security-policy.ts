@@ -28,6 +28,7 @@ export const buildContentSecurityPolicy = ({
       'https://*.clerk.accounts.dev',
       'https://cdn.statsig.com',
       'https://*.statsigcdn.com',
+      'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
     ]
       .filter(Boolean)
       .join(' '),
@@ -62,9 +63,10 @@ export const buildContentSecurityPolicy = ({
       'https://*.ingest.sentry.io',
       'wss://*.clerk.com', // Clerk WebSocket connections
       'https://jov.ie', // Monitoring endpoint
+      'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
     ].join(' '),
     "font-src 'self' data:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];
