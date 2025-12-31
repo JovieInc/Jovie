@@ -20,5 +20,9 @@
     "editor.defaultFormatter": "denoland.vscode-deno"
   },
   "doppler.autocomplete.enable": true,
-  "doppler.hover.enable": true
+  "doppler.hover.enable": true,
+  "sonarlint.connectedMode.project": {
+    "connectionId": "jovieinc",
+    "projectKey": "JovieInc_Jovie"
+  }
 }
