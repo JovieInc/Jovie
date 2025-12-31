@@ -48,6 +48,12 @@ body {
 @layer base {
   :root {
     --font-inter: "Inter";
+
+    /* Safe area inset custom properties for iOS device support */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
 }
 
@@ -82,6 +88,75 @@ body {
   /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
   --color-btn-primary: var(--color-btn-primary-bg);
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
+}
+
+/* Safe area inset utilities for iOS device support */
+/* Padding utilities that add safe area insets */
+@utility pt-safe {
+  padding-top: var(--safe-area-inset-top);
+}
+
+@utility pr-safe {
+  padding-right: var(--safe-area-inset-right);
+}
+
+@utility pb-safe {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+@utility pl-safe {
+  padding-left: var(--safe-area-inset-left);
+}
+
+/* Position utilities that add safe area insets to positioning */
+@utility top-safe {
+  top: var(--safe-area-inset-top);
+}
+
+@utility right-safe {
+  right: var(--safe-area-inset-right);
+}
+
+@utility bottom-safe {
+  bottom: var(--safe-area-inset-bottom);
+}
+
+@utility left-safe {
+  left: var(--safe-area-inset-left);
+}
+
+/* Combined safe area utilities with minimum spacing (base spacing + safe area inset) */
+/* These ensure minimum spacing on devices without safe areas while adding safe area insets on iOS */
+@utility pb-4-safe {
+  padding-bottom: calc(1rem + var(--safe-area-inset-bottom));
+}
+
+@utility pr-4-safe {
+  padding-right: calc(1rem + var(--safe-area-inset-right));
+}
+
+@utility pt-4-safe {
+  padding-top: calc(1rem + var(--safe-area-inset-top));
+}
+
+@utility pl-4-safe {
+  padding-left: calc(1rem + var(--safe-area-inset-left));
+}
+
+@utility bottom-4-safe {
+  bottom: calc(1rem + var(--safe-area-inset-bottom));
+}
+
+@utility right-4-safe {
+  right: calc(1rem + var(--safe-area-inset-right));
+}
+
+@utility top-4-safe {
+  top: calc(1rem + var(--safe-area-inset-top));
+}
+
+@utility left-4-safe {
+  left: calc(1rem + var(--safe-area-inset-left));
 }
 
 @utility grid-bg {
