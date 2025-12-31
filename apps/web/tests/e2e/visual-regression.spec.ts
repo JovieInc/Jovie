@@ -7,8 +7,15 @@ import { expect, test } from './setup';
  * Captures screenshots for key pages in light/dark modes to detect visual regressions.
  * Uses Playwright's built-in screenshot comparison with configurable thresholds.
  *
- * Run with: pnpm test:e2e --grep "Visual Regression"
- * Update snapshots: pnpm test:e2e --grep "Visual Regression" --update-snapshots
+ * Run with: pnpm e2e:visual
+ * Update snapshots: pnpm e2e:visual:update
+ *
+ * Snapshots are stored in: tests/e2e/__snapshots__/
+ *
+ * This catches issues like:
+ * - Wrong design tokens (e.g., white border on dark background)
+ * - Theme-specific styling bugs
+ * - Layout regressions across viewports
  *
  * @visual-regression
  */
