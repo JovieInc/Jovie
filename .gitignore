@@ -14,6 +14,9 @@ apps/web/node_modules
 
 # test runner artifacts
 /test-results/
+/artifacts/
+apps/web/test-results/
+apps/web/artifacts/
 
 # next.js
 /.next/

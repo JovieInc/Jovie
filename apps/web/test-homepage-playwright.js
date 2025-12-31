@@ -1,3 +1,5 @@
+const { mkdirSync } = require('node:fs');
+const { join } = require('node:path');
 const { chromium } = require('@playwright/test');
 
 async function testHomepage() {
@@ -110,8 +112,17 @@ async function testHomepage() {
     console.log(`   - Total sections: ${sections.hasSections}`);
 
     // Take screenshot
-    const screenshotPath =
-      '/Users/timwhite/Documents/GitHub/TBF/Jovie/homepage-test-screenshot.png';
+    // Use environment variable or default to ./test-results directory
+    const screenshotDir =
+      process.env.SCREENSHOT_DIR || join(process.cwd(), 'test-results');
+    mkdirSync(screenshotDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const screenshotPath = join(
+      screenshotDir,
+      `homepage-test-${timestamp}.png`
+    );
+
     await page.screenshot({
       path: screenshotPath,
       fullPage: true,
