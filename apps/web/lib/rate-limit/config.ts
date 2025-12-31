@@ -178,6 +178,46 @@ export const RATE_LIMITERS = {
     prefix: 'general',
     analytics: false,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Spotify Ingest Operations
+  // ---------------------------------------------------------------------------
+
+  /** Artist search: 30 requests per minute per user */
+  spotifySearch: {
+    name: 'Spotify Search',
+    limit: 30,
+    window: '1 m',
+    prefix: 'spotify:search',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Profile claim: 5 attempts per hour per user - CRITICAL for security */
+  spotifyClaim: {
+    name: 'Spotify Claim',
+    limit: 5,
+    window: '1 h',
+    prefix: 'spotify:claim',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Data refresh: 10 per hour per artist */
+  spotifyRefresh: {
+    name: 'Spotify Refresh',
+    limit: 10,
+    window: '1 h',
+    prefix: 'spotify:refresh',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Unauthenticated search (homepage): 10 per minute per IP */
+  spotifyPublicSearch: {
+    name: 'Spotify Public Search',
+    limit: 10,
+    window: '1 m',
+    prefix: 'spotify:public-search',
+    analytics: false,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;
