@@ -1,10 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 async function testHomepage() {
   console.log('🚀 Starting homepage test...\n');
@@ -99,17 +94,8 @@ async function testHomepage() {
     console.log(`   - Total sections: ${sections.hasSections}`);
 
     // Take screenshot
-    // Use environment variable or default to ./artifacts directory
-    const screenshotDir =
-      process.env.SCREENSHOT_DIR || join(__dirname, 'artifacts');
-    mkdirSync(screenshotDir, { recursive: true });
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const screenshotPath = join(
-      screenshotDir,
-      `homepage-test-${timestamp}.png`
-    );
-
+    const screenshotPath =
+      '/Users/timwhite/Documents/GitHub/TBF/Jovie/homepage-test-screenshot.png';
     await page.screenshot({
       path: screenshotPath,
       fullPage: true,

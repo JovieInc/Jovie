@@ -24,19 +24,5 @@
   "sonarlint.connectedMode.project": {
     "connectionId": "jovieinc",
     "projectKey": "JovieInc_Jovie"
-  },
-  "cascade.hooks": {
-    "afterToolCall": [
-      {
-        "toolName": "Edit",
-        "command": "node_modules/.bin/biome check --write ${filePath}",
-        "description": "Format and lint with Biome after editing"
-      },
-      {
-        "toolName": "Write",
-        "command": "node_modules/.bin/biome check --write ${filePath}",
-        "description": "Format and lint with Biome after writing"
-      }
-    ]
   }
 }
