@@ -612,6 +612,153 @@ _To be filled by completing agent_
 
 ---
 
+## Priority 3.5: API/DB Query Unification
+
+### P3.5.1 - Unify Profile Data Access Layer
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Consolidate 53+ direct `creatorProfiles` queries into unified service
+- **Effort:** Large
+- **Dependencies:** None
+
+**Problem:**
+Profile data is queried directly from 40+ files with inconsistent patterns:
+- `lib/db/queries.ts` - `getCreatorProfileByUsername()`, `getCreatorProfileWithLinks()`
+- `app/api/dashboard/profile/route.ts` - direct queries with joins
+- `app/app/dashboard/actions/creator-profile.ts` - `updateCreatorProfile()`
+- `app/app/dashboard/actions/dashboard-data.ts` - profile fetching
+- Plus 36+ other files with direct `from(creatorProfiles)` queries
+
+**Solution:**
+Create unified profile service at `lib/services/profile/`:
+```
+lib/services/profile/
+├── index.ts           # Re-exports
+├── types.ts           # ProfileData, ProfileWithLinks, etc.
+├── queries.ts         # getProfileById, getProfileByUsername, getProfileWithLinks
+├── mutations.ts       # updateProfile, publishProfile
+└── cache.ts           # Profile caching utilities
+```
+
+**Acceptance Criteria:**
+- [ ] All profile queries go through unified service
+- [ ] Consistent caching strategy
+- [ ] Type-safe return types
+- [ ] Backwards compatible exports
+
+---
+
+### P3.5.2 - Unify User Lookup Pattern
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Consolidate "clerkId → dbUser → profile" lookup pattern
+- **Effort:** Medium
+- **Dependencies:** P3.5.1
+
+**Problem:**
+62+ occurrences of the pattern:
+```typescript
+// Step 1: Get user by clerkId
+const [user] = await db.select().from(users).where(eq(users.clerkId, clerkUserId));
+// Step 2: Get profile by userId
+const [profile] = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
+```
+
+This pattern appears in:
+- `app/api/dashboard/*` routes (10+ files)
+- `app/app/dashboard/actions/*` (6+ files)
+- `lib/auth/gate.ts`, `lib/auth/clerk-sync.ts`
+- `lib/stripe/customer-sync/*`
+- And 40+ other locations
+
+**Solution:**
+Extend `withDbSession` to optionally return user/profile context:
+```typescript
+// New: withDbSessionContext returns user + profile
+const { user, profile } = await withDbSessionContext();
+
+// Or use new helper
+const profile = await getCurrentUserProfile(); // Single call
+```
+
+**Acceptance Criteria:**
+- [ ] New `withDbSessionContext()` helper
+- [ ] New `getCurrentUserProfile()` helper
+- [ ] Migrate high-traffic routes first
+- [ ] Document migration path for remaining code
+
+---
+
+### P3.5.3 - Consolidate Social Links API Patterns
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Unify 487 social links references across 88 files
+- **Effort:** Large
+- **Dependencies:** P3.5.1
+
+**Problem:**
+Social links are accessed via multiple patterns:
+1. `app/api/dashboard/social-links/route.ts` - REST API (52 refs)
+2. `app/app/dashboard/actions/social-links.ts` - Server actions (17 refs)
+3. `lib/db/queries.ts` - Direct queries (26 refs)
+4. `components/dashboard/organisms/SocialsForm.tsx` - Client fetch (18 refs)
+5. Plus 84 other files
+
+**Solution:**
+Consolidate into `lib/services/social-links/`:
+```
+lib/services/social-links/
+├── index.ts           # Re-exports
+├── types.ts           # SocialLink, LinkState, etc.
+├── queries.ts         # getLinks, getLinksByProfile
+├── mutations.ts       # saveLinks, deleteLink, reorderLinks
+└── validation.ts      # Platform validation, URL normalization
+```
+
+**Acceptance Criteria:**
+- [ ] Single source of truth for link operations
+- [ ] Consistent validation across all entry points
+- [ ] Type-safe link state management
+
+---
+
+### P3.5.4 - Unify Dashboard Data Fetching
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Consolidate `getDashboardData` patterns (49 refs across 21 files)
+- **Effort:** Medium
+- **Dependencies:** P3.5.1, P3.5.3
+
+**Problem:**
+Dashboard data is fetched via:
+- `getDashboardData()` - Main server action
+- `getDashboardDataCached()` - Cached variant
+- Direct API calls from client components
+- Inconsistent data shapes between routes
+
+**Solution:**
+Create unified dashboard data layer with consistent caching:
+```typescript
+// Single entry point with options
+const data = await getDashboardData({
+  includeLinks: true,
+  includeAnalytics: false,
+  cacheStrategy: 'stale-while-revalidate'
+});
+```
+
+**Acceptance Criteria:**
+- [ ] Single `getDashboardData()` with options
+- [ ] Consistent caching strategy
+- [ ] Type-safe return shapes
+- [ ] Prefetch support for layouts
+
+---
+
 ## Priority 4: Low Priority / Future
 
 ### P4.1 - Review Dashboard Organisms Count
@@ -658,6 +805,7 @@ Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
+| 2025-12-31 | - | Cascade | _pending_ | Consolidate auth/onboarding/waitlist into unified gate system (~150 lines removed) |
 | 2025-12-31 | - | Cascade | _pending_ | Split validation/schemas/dashboard.ts (484→58 lines) into 5 modules |
 | 2025-12-31 | - | Cascade | _pending_ | Split ingestion/strategies/base.ts (735→43 lines) into 8 modules |
 | 2025-12-31 | - | Cascade | _pending_ | Split ContactSidebar.tsx (591→23 lines) into 4 modules |
