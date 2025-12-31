@@ -5,30 +5,31 @@
  * providing a clean single import path for dashboard functionality.
  */
 
-// Creator profile management server actions
-export { publishProfileBasics, updateCreatorProfile } from './creator-profile';
-// Core dashboard data fetching
-export {
-  type DashboardData,
-  getDashboardData,
-  getDashboardDataCached,
-  getDashboardDataFresh,
-  prefetchDashboardData,
-} from './dashboard-data';
+// Tipping statistics types and helpers
+export { type TippingStats, createEmptyTippingStats } from './tipping-stats';
+
 // Profile selection logic
+export { profileIsPublishable, selectDashboardProfile } from './profile-selection';
+
+// Social links types, constants, and server actions
 export {
-  profileIsPublishable,
-  selectDashboardProfile,
-} from './profile-selection';
+  type ProfileSocialLink,
+  type DspPlatform,
+  DSP_PLATFORMS,
+  getProfileSocialLinks,
+} from './social-links';
 
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
-// Social links types, constants, and server actions
+
+// Creator profile management server actions
+export { updateCreatorProfile, publishProfileBasics } from './creator-profile';
+
+// Core dashboard data fetching
 export {
-  DSP_PLATFORMS,
-  type DspPlatform,
-  getProfileSocialLinks,
-  type ProfileSocialLink,
-} from './social-links';
-// Tipping statistics types and helpers
-export { createEmptyTippingStats, type TippingStats } from './tipping-stats';
+  type DashboardData,
+  prefetchDashboardData,
+  getDashboardData,
+  getDashboardDataFresh,
+  getDashboardDataCached,
+} from './dashboard-data';
