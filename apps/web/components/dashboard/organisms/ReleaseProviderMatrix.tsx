@@ -1,7 +1,6 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
-import Image from 'next/image';
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -12,12 +11,9 @@ import {
 } from '@/app/app/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/organisms/Dialog';
+  ReleaseEditDialog,
+  ReleaseTableRow,
+} from '@/components/dashboard/organisms/releases';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -31,36 +27,6 @@ interface ReleaseProviderMatrixProps {
 }
 
 type DraftState = Partial<Record<ProviderKey, string>>;
-
-function ProviderStatusDot({
-  status,
-  accent,
-}: {
-  status: 'available' | 'manual' | 'missing';
-  accent: string;
-}) {
-  if (status === 'missing') {
-    return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
-        <span className='h-1 w-1 rounded-full bg-tertiary-token' />
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={cn(
-        'relative flex h-2.5 w-2.5 items-center justify-center rounded-full',
-        status === 'manual' && 'ring-2 ring-amber-400/30'
-      )}
-      style={{ backgroundColor: accent }}
-    >
-      {status === 'manual' && (
-        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500' />
-      )}
-    </span>
-  );
-}
 
 export function ReleaseProviderMatrix({
   releases,
@@ -374,179 +340,18 @@ export function ReleaseProviderMatrix({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((release, index) => {
-                    const manualOverrideCount = release.providers.filter(
-                      provider => provider.source === 'manual'
-                    ).length;
-
-                    return (
-                      <tr
-                        key={release.slug}
-                        className={cn(
-                          'group transition-colors duration-200 hover:bg-surface-2/50',
-                          index !== rows.length - 1 && 'border-b border-subtle'
-                        )}
-                      >
-                        {/* Release info cell */}
-                        <td className='px-4 py-4 align-middle sm:px-6'>
-                          <div className='flex items-center gap-3'>
-                            {/* Artwork thumbnail */}
-                            <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-                              {release.artworkUrl ? (
-                                <Image
-                                  src={release.artworkUrl}
-                                  alt={`${release.title} artwork`}
-                                  fill
-                                  className='object-cover'
-                                  sizes='48px'
-                                />
-                              ) : (
-                                <div className='flex h-full w-full items-center justify-center'>
-                                  <Icon
-                                    name='Disc3'
-                                    className='h-6 w-6 text-tertiary-token'
-                                    aria-hidden='true'
-                                  />
-                                </div>
-                              )}
-                            </div>
-                            {/* Title and metadata */}
-                            <div className='min-w-0 flex-1'>
-                              <div className='flex items-center gap-2'>
-                                <span className='truncate text-sm font-semibold text-primary-token'>
-                                  {release.title}
-                                </span>
-                                {manualOverrideCount > 0 && (
-                                  <Badge
-                                    variant='secondary'
-                                    className='shrink-0 border border-amber-200 bg-amber-50 text-[10px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'
-                                  >
-                                    {manualOverrideCount} edited
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className='mt-0.5 text-xs text-secondary-token'>
-                                {release.releaseDate
-                                  ? new Date(
-                                      release.releaseDate
-                                    ).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      year: 'numeric',
-                                    })
-                                  : 'Release date TBD'}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Smart link cell */}
-                        <td className='px-4 py-4 align-middle sm:px-6'>
-                          <Button
-                            variant='secondary'
-                            size='sm'
-                            data-testid={`smart-link-copy-${release.id}`}
-                            data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-                            onClick={() =>
-                              void handleCopy(
-                                release.smartLinkPath,
-                                `${release.title} smart link`,
-                                `smart-link-copy-${release.id}`
-                              )
-                            }
-                            className='inline-flex items-center gap-2 text-xs'
-                          >
-                            <Icon
-                              name='Link'
-                              className='h-3.5 w-3.5'
-                              aria-hidden='true'
-                            />
-                            Copy link
-                          </Button>
-                        </td>
-
-                        {/* Provider cells */}
-                        {primaryProviders.map(providerKey => {
-                          const provider = release.providers.find(
-                            item => item.key === providerKey
-                          );
-                          const available = Boolean(provider?.url);
-                          const isManual = provider?.source === 'manual';
-                          const testId = `provider-copy-${release.id}-${providerKey}`;
-                          const status = isManual
-                            ? 'manual'
-                            : available
-                              ? 'available'
-                              : 'missing';
-
-                          return (
-                            <td
-                              key={providerKey}
-                              className='px-4 py-4 align-middle sm:px-6'
-                            >
-                              <div className='flex items-center gap-3'>
-                                <ProviderStatusDot
-                                  status={status}
-                                  accent={providerConfig[providerKey].accent}
-                                />
-                                {available ? (
-                                  <button
-                                    type='button'
-                                    data-testid={testId}
-                                    data-url={
-                                      provider?.path
-                                        ? `${getBaseUrl()}${provider.path}`
-                                        : undefined
-                                    }
-                                    onClick={() => {
-                                      if (!provider?.path) return;
-                                      void handleCopy(
-                                        provider.path,
-                                        `${release.title} – ${providerConfig[providerKey].label}`,
-                                        testId
-                                      );
-                                    }}
-                                    className='group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-                                  >
-                                    <Icon
-                                      name='Copy'
-                                      className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/btn:opacity-100'
-                                      aria-hidden='true'
-                                    />
-                                    <span>
-                                      {isManual ? 'Custom' : 'Detected'}
-                                    </span>
-                                  </button>
-                                ) : (
-                                  <span className='text-xs text-tertiary-token'>
-                                    Not found
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-
-                        {/* Actions cell */}
-                        <td className='px-4 py-4 align-middle text-right sm:px-6'>
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            className='inline-flex items-center gap-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100'
-                            data-testid={`edit-links-${release.id}`}
-                            onClick={() => openEditor(release)}
-                          >
-                            <Icon
-                              name='PencilLine'
-                              className='h-3.5 w-3.5'
-                              aria-hidden='true'
-                            />
-                            Edit
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {rows.map((release, index) => (
+                    <ReleaseTableRow
+                      key={release.slug}
+                      release={release}
+                      index={index}
+                      totalRows={rows.length}
+                      primaryProviders={primaryProviders}
+                      providerConfig={providerConfig}
+                      onCopy={handleCopy}
+                      onEdit={openEditor}
+                    />
+                  ))}
                 </tbody>
               </table>
             )}
@@ -575,153 +380,18 @@ export function ReleaseProviderMatrix({
         </div>
       </div>
 
-      {/* Edit dialog */}
-      <Dialog open={Boolean(editingRelease)} onClose={closeEditor} size='3xl'>
-        <DialogTitle className='flex items-center gap-3 text-xl font-semibold text-primary-token'>
-          <Icon
-            name='Link'
-            className='h-5 w-5 text-secondary-token'
-            aria-hidden='true'
-          />
-          Edit release links
-        </DialogTitle>
-        <DialogDescription className='text-sm text-secondary-token'>
-          Swap in a preferred DSP link or revert back to our detected URL. All
-          changes are live for your smart link immediately.
-        </DialogDescription>
-        <DialogBody className='space-y-4'>
-          {editingRelease ? (
-            <div className='space-y-4'>
-              {/* Release info header */}
-              <div className='flex items-center gap-4 rounded-xl border border-subtle bg-surface-2/60 p-4'>
-                {/* Artwork */}
-                <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-                  {editingRelease.artworkUrl ? (
-                    <Image
-                      src={editingRelease.artworkUrl}
-                      alt={`${editingRelease.title} artwork`}
-                      fill
-                      className='object-cover'
-                      sizes='64px'
-                    />
-                  ) : (
-                    <div className='flex h-full w-full items-center justify-center'>
-                      <Icon
-                        name='Disc3'
-                        className='h-8 w-8 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className='min-w-0 flex-1'>
-                  <p className='text-base font-semibold text-primary-token'>
-                    {editingRelease.title}
-                  </p>
-                  <p className='mt-0.5 text-xs text-secondary-token'>
-                    Smart link: {editingRelease.smartLinkPath}
-                  </p>
-                  <Badge
-                    variant='secondary'
-                    className='mt-2 border border-subtle bg-transparent text-xs text-secondary-token'
-                  >
-                    {editingRelease.releaseDate
-                      ? new Date(
-                          editingRelease.releaseDate
-                        ).toLocaleDateString()
-                      : 'Date TBD'}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Provider inputs grid */}
-              <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-                {providerList.map(provider => {
-                  const value = drafts[provider.key] ?? '';
-                  const existing = editingRelease.providers.find(
-                    entry => entry.key === provider.key
-                  );
-                  const helperText =
-                    existing?.source === 'manual'
-                      ? 'Manual override active'
-                      : existing?.url
-                        ? 'Detected automatically'
-                        : 'No link yet';
-
-                  return (
-                    <div
-                      key={`${editingRelease.id}-${provider.key}`}
-                      className='rounded-lg border border-subtle bg-surface-1 p-3 shadow-sm'
-                    >
-                      <div className='flex items-center justify-between gap-2'>
-                        <div className='flex items-center gap-2'>
-                          <span
-                            className='block h-2.5 w-2.5 rounded-full'
-                            style={{ backgroundColor: provider.accent }}
-                            aria-hidden='true'
-                          />
-                          <p className='text-sm font-semibold text-primary-token'>
-                            {provider.label}
-                          </p>
-                        </div>
-                        {existing?.source === 'manual' ? (
-                          <Badge
-                            variant='secondary'
-                            className='border border-amber-200 bg-amber-50 text-[10px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'
-                          >
-                            Manual
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className='mt-1 text-xs text-secondary-token'>
-                        {helperText}
-                      </p>
-                      <div className='mt-2 space-y-2'>
-                        <Input
-                          value={value}
-                          onChange={event =>
-                            setDrafts(prev => ({
-                              ...prev,
-                              [provider.key]: event.target.value,
-                            }))
-                          }
-                          placeholder={`${provider.label} URL`}
-                          data-testid={`provider-input-${editingRelease.id}-${provider.key}`}
-                        />
-                        <div className='flex items-center justify-between gap-2'>
-                          <Button
-                            variant='primary'
-                            size='sm'
-                            disabled={isSaving || !value.trim()}
-                            data-testid={`save-provider-${editingRelease.id}-${provider.key}`}
-                            onClick={() => handleSave(provider.key)}
-                          >
-                            Save
-                          </Button>
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            disabled={isSaving}
-                            data-testid={`reset-provider-${editingRelease.id}-${provider.key}`}
-                            onClick={() => handleReset(provider.key)}
-                          >
-                            Reset
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </DialogBody>
-        <DialogActions className='justify-end'>
-          <Button variant='secondary' size='sm' onClick={closeEditor}>
-            Done
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ReleaseEditDialog
+        release={editingRelease}
+        providerList={providerList}
+        drafts={drafts}
+        isSaving={isSaving}
+        onDraftChange={(provider, value) =>
+          setDrafts(prev => ({ ...prev, [provider]: value }))
+        }
+        onSave={handleSave}
+        onReset={handleReset}
+        onClose={closeEditor}
+      />
     </div>
   );
 }

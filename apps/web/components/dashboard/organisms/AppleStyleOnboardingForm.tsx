@@ -4,13 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
+import { AuthBackButton } from '@/components/auth';
 import {
-  AuthBackButton,
-  AuthButton,
-  AuthLinkPreviewCard,
-  AuthTextInput,
-} from '@/components/auth';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+  OnboardingCompleteStep,
+  OnboardingHandleStep,
+  OnboardingNameStep,
+} from '@/components/dashboard/organisms/onboarding';
 import { PROFILE_HOSTNAME, PROFILE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { identify, track } from '@/lib/analytics';
@@ -482,265 +481,50 @@ export function AppleStyleOnboardingForm({
     switch (currentStepIndex) {
       case 0:
         return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
-            <div className='text-center space-y-3 max-w-2xl px-4'>
-              <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
-                {ONBOARDING_STEPS[0].title}
-              </h1>
-              {ONBOARDING_STEPS[0].prompt && (
-                <p className='text-(--muted) text-sm sm:text-base'>
-                  {ONBOARDING_STEPS[0].prompt}
-                </p>
-              )}
-            </div>
-
-            <div className='w-full max-w-md space-y-6'>
-              <form
-                className='space-y-4'
-                onSubmit={e => {
-                  e.preventDefault();
-                  if (
-                    isDisplayNameValid &&
-                    !isTransitioning &&
-                    !state.isSubmitting
-                  ) {
-                    goToNextStep();
-                  }
-                }}
-              >
-                <AuthTextInput
-                  id='display-name'
-                  ref={nameInputRef}
-                  name='name'
-                  type='text'
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  placeholder={namePlaceholder}
-                  aria-label='Your full name'
-                  maxLength={50}
-                  autoComplete='name'
-                />
-
-                <AuthButton
-                  type='submit'
-                  disabled={
-                    !isDisplayNameValid || isTransitioning || state.isSubmitting
-                  }
-                >
-                  Continue
-                </AuthButton>
-              </form>
-            </div>
-          </div>
+          <OnboardingNameStep
+            title={ONBOARDING_STEPS[0].title}
+            prompt={ONBOARDING_STEPS[0].prompt}
+            fullName={fullName}
+            namePlaceholder={namePlaceholder}
+            isValid={isDisplayNameValid}
+            isTransitioning={isTransitioning}
+            isSubmitting={state.isSubmitting}
+            inputRef={nameInputRef}
+            onNameChange={setFullName}
+            onSubmit={goToNextStep}
+          />
         );
 
       case 1:
         return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
-            <div className='text-center space-y-3 max-w-xl px-4'>
-              <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
-                {ONBOARDING_STEPS[1].title}
-              </h1>
-              {ONBOARDING_STEPS[1].prompt ? (
-                <p className='text-(--muted) text-sm sm:text-base'>
-                  {ONBOARDING_STEPS[1].prompt}
-                </p>
-              ) : null}
-            </div>
-
-            <div className='w-full max-w-md space-y-6'>
-              <form className='space-y-4' onSubmit={handleSubmit}>
-                <label
-                  className='text-sm font-medium text-(--muted)'
-                  htmlFor='handle-input'
-                >
-                  @handle
-                </label>
-                <div className='relative'>
-                  <div className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#6b6f76]'>
-                    @
-                  </div>
-                  <AuthTextInput
-                    id='handle-input'
-                    ref={handleInputRef}
-                    name='username'
-                    aria-label='Enter your desired handle'
-                    type='text'
-                    value={handleInput}
-                    onChange={e =>
-                      setHandleInput(
-                        e.target.value
-                          .toLowerCase()
-                          .replace(/\s+/g, '')
-                          .replace(/^@+/, '')
-                      )
-                    }
-                    placeholder='yourhandle'
-                    autoComplete='username'
-                    autoCapitalize='none'
-                    autoCorrect='off'
-                    spellCheck={false}
-                    aria-invalid={handleValidation.error ? 'true' : undefined}
-                    className={[
-                      'pl-10 pr-10',
-                      state.error || handleValidation.error
-                        ? 'border-red-500'
-                        : !state.error && handleValidation.available
-                          ? 'border-green-500'
-                          : undefined,
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  />
-                  <div className='absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center'>
-                    {handleValidation.checking ? (
-                      <LoadingSpinner
-                        size='sm'
-                        className='text-secondary-token'
-                      />
-                    ) : state.error || handleValidation.error ? (
-                      <svg
-                        viewBox='0 0 20 20'
-                        fill='none'
-                        aria-hidden='true'
-                        className='h-5 w-5'
-                      >
-                        <circle
-                          cx='10'
-                          cy='10'
-                          r='9'
-                          stroke='currentColor'
-                          className='text-red-500'
-                          strokeWidth='2'
-                        />
-                        <path
-                          d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
-                          stroke='currentColor'
-                          className='text-red-500'
-                          strokeWidth='2'
-                          strokeLinecap='round'
-                        />
-                      </svg>
-                    ) : handleInput &&
-                      handleValidation.clientValid &&
-                      handleValidation.available ? (
-                      <svg
-                        viewBox='0 0 20 20'
-                        fill='none'
-                        aria-hidden='true'
-                        className='h-5 w-5'
-                      >
-                        <circle
-                          cx='10'
-                          cy='10'
-                          r='9'
-                          stroke='currentColor'
-                          className='text-green-600'
-                          strokeWidth='2'
-                        />
-                        <path
-                          d='M6 10.2l2.6 2.6L14 7.4'
-                          stroke='currentColor'
-                          className='text-green-600'
-                          strokeWidth='2'
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                        />
-                      </svg>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
-                <div
-                  className='min-h-[24px] flex flex-col items-center justify-center px-1'
-                  role='status'
-                  aria-live='polite'
-                >
-                  {handleInput && !state.error ? (
-                    handleValidation.checking ? (
-                      <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                        Checking…
-                      </div>
-                    ) : handleValidation.clientValid &&
-                      handleValidation.available ? (
-                      <div className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                        Available
-                      </div>
-                    ) : handleValidation.error ? (
-                      <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
-                        Not available
-                      </div>
-                    ) : null
-                  ) : null}
-                </div>
-
-                <AuthButton
-                  type='submit'
-                  disabled={
-                    Boolean(handleStepCtaDisabledReason) || isTransitioning
-                  }
-                  variant='primary'
-                >
-                  {state.isSubmitting ? (
-                    <div className='flex items-center justify-center space-x-2'>
-                      <LoadingSpinner size='sm' className='text-current' />
-                      <span>Saving…</span>
-                    </div>
-                  ) : (
-                    'Continue'
-                  )}
-                </AuthButton>
-
-                {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for error message */}
-                <div
-                  className='min-h-[40px] flex items-center justify-center text-center text-xs text-[#6b6f76]'
-                  role='status'
-                  aria-live='polite'
-                >
-                  {state.error ?? null}
-                </div>
-              </form>
-            </div>
-          </div>
+          <OnboardingHandleStep
+            title={ONBOARDING_STEPS[1].title}
+            prompt={ONBOARDING_STEPS[1].prompt}
+            handleInput={handleInput}
+            handleValidation={handleValidation}
+            stateError={state.error}
+            isSubmitting={state.isSubmitting}
+            isTransitioning={isTransitioning}
+            ctaDisabledReason={handleStepCtaDisabledReason}
+            inputRef={handleInputRef}
+            onHandleChange={setHandleInput}
+            onSubmit={handleSubmit}
+          />
         );
 
       case 2:
         return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
-            <div className='text-center space-y-3 max-w-xl px-4'>
-              <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
-                {ONBOARDING_STEPS[2].title}
-              </h1>
-              {ONBOARDING_STEPS[2].prompt ? (
-                <p className='text-(--muted) text-sm sm:text-base'>
-                  {ONBOARDING_STEPS[2].prompt}
-                </p>
-              ) : null}
-            </div>
-
-            <div className='w-full max-w-md space-y-6'>
-              <AuthLinkPreviewCard
-                label='Your link'
-                hrefText={`${displayDomain}/${profileReadyHandle || handle}`}
-              />
-
-              <div className='space-y-4'>
-                <AuthButton onClick={goToDashboard}>Go to Dashboard</AuthButton>
-
-                <AuthButton onClick={copyProfileLink} variant='secondary'>
-                  Copy Link
-                </AuthButton>
-              </div>
-
-              {copied && (
-                <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
-                  Link copied to clipboard!
-                </div>
-              )}
-            </div>
-          </div>
+          <OnboardingCompleteStep
+            title={ONBOARDING_STEPS[2].title}
+            prompt={ONBOARDING_STEPS[2].prompt}
+            displayDomain={displayDomain}
+            handle={profileReadyHandle || handle}
+            copied={copied}
+            onGoToDashboard={goToDashboard}
+            onCopyLink={copyProfileLink}
+          />
         );
+
       default:
         return null;
     }

@@ -1,31 +1,18 @@
 'use client';
 
-import {
-  Button,
-  Checkbox,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-} from '@jovie/ui';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
-import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
-  getSortDirection,
-  SORTABLE_COLUMNS,
   SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
-import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
+import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
+import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
+import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
-import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
@@ -38,11 +25,6 @@ import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
 } from '@/lib/admin/creator-profiles';
-import {
-  CREATORS_CSV_FILENAME_PREFIX,
-  creatorsCSVColumns,
-} from '@/lib/admin/csv-configs/creators';
-import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode } from '@/types';
 
 const DeleteCreatorDialog = dynamic(
@@ -161,7 +143,6 @@ export function AdminCreatorProfilesWithSidebar({
     Record<string, 'idle' | 'loading' | 'success' | 'error'>
   >({});
   const tableMetaCtx = useOptionalTableMeta();
-  const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
     () => tableMetaCtx?.setTableMeta ?? (() => {}),
     [tableMetaCtx]
@@ -194,21 +175,14 @@ export function AdminCreatorProfilesWithSidebar({
     total,
   });
 
-  const createSortHref = (column: SortableColumnKey) =>
-    buildHref({ page: 1, sort: getNextSort(sort, column) });
+  const handleSortChange = useCallback(
+    (column: SortableColumnKey) => {
+      router.push(buildHref({ page: 1, sort: getNextSort(sort, column) }));
+    },
+    [buildHref, router, sort]
+  );
 
-  const filteredProfiles = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return profilesWithActions;
-    return profilesWithActions.filter(profile => {
-      const username = profile.username.toLowerCase();
-      const displayName =
-        'displayName' in profile
-          ? (profile.displayName ?? '').toLowerCase()
-          : '';
-      return username.includes(term) || displayName.includes(term);
-    });
-  }, [profilesWithActions, searchTerm]);
+  const filteredProfiles = profilesWithActions;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -446,81 +420,31 @@ export function AdminCreatorProfilesWithSidebar({
             onKeyDown: handleKeyDown,
           }}
           toolbar={
-            <div className='flex h-14 w-full items-center gap-3 px-4'>
-              <div className='hidden sm:block text-xs text-secondary-token'>
-                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()} profiles
-              </div>
-              <div className='ml-auto flex items-center gap-3'>
-                <form
-                  action={basePath}
-                  method='get'
-                  className='relative isolate flex items-center gap-2'
-                >
-                  <input type='hidden' name='sort' value={sort} />
-                  <input type='hidden' name='pageSize' value={pageSize} />
-                  <Input
-                    name='q'
-                    placeholder='Search by handle'
-                    value={searchTerm}
-                    onChange={event => setSearchTerm(event.target.value)}
-                    className='w-[240px]'
-                  />
-                  <input type='hidden' name='page' value='1' />
-                  <Button type='submit' size='sm' variant='secondary'>
-                    Search
-                  </Button>
-                  {search && search.length > 0 && (
-                    <Button asChild size='sm' variant='ghost'>
-                      <Link href={clearHref}>Clear</Link>
-                    </Button>
-                  )}
-                </form>
-                <div
-                  className='hidden h-6 w-px bg-border sm:block'
-                  aria-hidden='true'
-                />
-                <ExportCSVButton<AdminCreatorProfileRow>
-                  getData={() => profilesWithActions}
-                  columns={creatorsCSVColumns}
-                  filename={CREATORS_CSV_FILENAME_PREFIX}
-                  disabled={profilesWithActions.length === 0}
-                  ariaLabel='Export creator profiles to CSV file'
-                />
-                <IngestProfileDropdown />
-              </div>
-            </div>
+            <AdminCreatorsToolbar
+              basePath={basePath}
+              search={search}
+              sort={sort}
+              pageSize={pageSize}
+              from={from}
+              to={to}
+              total={total}
+              clearHref={clearHref}
+              profiles={profilesWithActions}
+            />
           }
           footer={
-            <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
-              <div className='flex items-center gap-2'>
-                <span>
-                  Page {page} of {totalPages}
-                </span>
-                <span className='text-tertiary-token'>
-                  {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                  {total.toLocaleString()}
-                </span>
-              </div>
-              <div className='flex items-center gap-3'>
-                <div className='flex items-center gap-2'>
-                  <span>Rows per page</span>
-                  <AdminCreatorFilters initialPageSize={pageSize} />
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                    <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                      Previous
-                    </Link>
-                  </Button>
-                  <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                    <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                      Next
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <AdminCreatorsFooter
+              page={page}
+              totalPages={totalPages}
+              from={from}
+              to={to}
+              total={total}
+              pageSize={pageSize}
+              canPrev={canPrev}
+              canNext={canNext}
+              prevHref={prevHref}
+              nextHref={nextHref}
+            />
           }
         >
           {({ headerElevated, stickyTopPx }) => (
@@ -533,122 +457,15 @@ export function AdminCreatorProfilesWithSidebar({
                 <col className='w-[160px]' />
                 <col className='w-[140px]' />
               </colgroup>
-              <thead className='text-left text-secondary-token'>
-                <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                  <th
-                    className={cn(
-                      'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <Checkbox
-                      aria-label='Select all creators'
-                      checked={headerCheckboxState}
-                      onCheckedChange={toggleSelectAll}
-                      className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <span className='sr-only'>Creator</span>
-                    <div
-                      className={cn(
-                        'inline-flex items-center transition-all duration-150',
-                        selectedCount > 0
-                          ? 'opacity-100 translate-y-0'
-                          : 'pointer-events-none opacity-0 -translate-y-0.5'
-                      )}
-                    >
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant='secondary'
-                            size='sm'
-                            className='normal-case'
-                          >
-                            Bulk actions
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align='start'>
-                          <DropdownMenuItem disabled>
-                            Feature selected (coming soon)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled>
-                            Unverify selected (coming soon)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled
-                            className='text-destructive'
-                          >
-                            Delete selected (coming soon)
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <SortableHeaderButton
-                      label={SORTABLE_COLUMNS.created.label}
-                      direction={getSortDirection(sort, 'created')}
-                      onClick={() => router.push(createSortHref('created'))}
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <SortableHeaderButton
-                      label={SORTABLE_COLUMNS.claimed.label}
-                      direction={getSortDirection(sort, 'claimed')}
-                      onClick={() => router.push(createSortHref('claimed'))}
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <SortableHeaderButton
-                      label={SORTABLE_COLUMNS.verified.label}
-                      direction={getSortDirection(sort, 'verified')}
-                      onClick={() => router.push(createSortHref('verified'))}
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <span className='sr-only'>Action</span>
-                    <div className='flex items-center justify-end' />
-                  </th>
-                </tr>
-              </thead>
+              <AdminCreatorsTableHeader
+                sort={sort}
+                headerCheckboxState={headerCheckboxState}
+                selectedCount={selectedCount}
+                headerElevated={headerElevated}
+                stickyTopPx={stickyTopPx}
+                onToggleSelectAll={toggleSelectAll}
+                onSortChange={handleSortChange}
+              />
               <tbody>
                 {profilesWithActions.length === 0 ? (
                   <tr>
