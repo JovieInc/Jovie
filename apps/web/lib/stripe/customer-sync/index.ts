@@ -1,9 +1,7 @@
 /**
- * Customer Sync Functionality
- * Ensures Stripe customers exist for authenticated users and keeps data synchronized
+ * Customer Sync Module
  *
- * @deprecated This file is maintained for backwards compatibility.
- * Import from '@/lib/stripe/customer-sync/index' for new code.
+ * Ensures Stripe customers exist for authenticated users and keeps data synchronized.
  *
  * ## Architecture
  *
@@ -35,34 +33,39 @@
  * - Migration fallback for backwards compatibility during schema rollout
  */
 
-// Re-export everything from the modular structure for backwards compatibility
+// Audit log
+export { getBillingAuditLog } from './audit-log';
+// Billing info functions
 export {
-  // Types and constants
+  getUserBillingInfo,
+  getUserBillingInfoByClerkId,
+  userHasProFeatures,
+} from './billing-info';
+
+// Customer operations
+export { ensureStripeCustomer } from './customer';
+// Query functions
+export {
+  fetchUserBillingData,
+  fetchUserBillingDataWithAuth,
+} from './queries';
+// Types and constants
+export {
   BILLING_FIELDS_CUSTOMER,
   BILLING_FIELDS_FULL,
   BILLING_FIELDS_STATUS,
   type BillingAuditEventType,
   type BillingFieldsResult,
-  // Customer operations
-  ensureStripeCustomer,
   type FetchUserBillingDataOptions,
   type FetchUserBillingDataResult,
   type FetchUserBillingDataWithAuthOptions,
   type FetchUserBillingDataWithAuthResult,
-  // Query functions
-  fetchUserBillingData,
-  fetchUserBillingDataWithAuth,
-  // Billing info functions
-  getBillingAuditLog,
-  getUserBillingInfo,
-  getUserBillingInfoByClerkId,
   LEGACY_FIELDS,
   type UpdateBillingStatusOptions,
   type UpdateBillingStatusResult,
   type UserBillingFieldKey,
   type UserBillingFields,
   type UserBillingFieldsSelection,
-  // Update operations
-  updateUserBillingStatus,
-  userHasProFeatures,
-} from './customer-sync/index';
+} from './types';
+// Update operations
+export { updateUserBillingStatus } from './update-status';
