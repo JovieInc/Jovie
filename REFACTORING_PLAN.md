@@ -334,8 +334,8 @@ Original Sidebar.tsx now just re-exports (47 lines) for backwards compatibility.
 
 ### P2.3 - Create BaseSidebar Component
 
-- **Status:** [✅]
-- **Assigned:** Cascade
+- **Status:** [ ]
+- **Assigned:** _unassigned_
 - **Files:** 7 sidebar components with duplicate patterns
   - `components/organisms/Sidebar.tsx`
   - `components/organisms/ContactSidebar.tsx` (590 lines)
@@ -355,36 +355,30 @@ Create composable base sidebar:
 ```
 components/molecules/
 └── BaseSidebar/
-    ├── index.ts              # Public exports with usage example
-    ├── BaseSidebar.tsx       # Main component + Header/Content/Footer
-    ├── useSidebarState.ts    # Shared keyboard handling hook
-    └── types.ts              # Type definitions
+    ├── index.tsx             # Main composable component
+    ├── BaseSidebarOverlay.tsx
+    ├── BaseSidebarPanel.tsx
+    ├── BaseSidebarHeader.tsx
+    ├── useSidebarState.ts    # Shared state hook
+    └── types.ts
 
 # Usage example:
-<BaseSidebar isOpen={isOpen} onClose={onClose} position="right">
-  <BaseSidebarHeader onClose={onClose}>Title</BaseSidebarHeader>
-  <BaseSidebarContent>...</BaseSidebarContent>
+<BaseSidebar open={open} onClose={onClose} position="right">
+  <BaseSidebar.Header>Title</BaseSidebar.Header>
+  <BaseSidebar.Content>...</BaseSidebar.Content>
 </BaseSidebar>
 ```
 
 **Acceptance Criteria:**
-- [x] BaseSidebar component created
-- [x] Supports left/right positioning
-- [x] Handles keyboard (Escape to close, respects form focus)
-- [x] Mobile responsive (overlay on mobile)
-- [ ] At least 2 existing sidebars migrated to use it (deferred - component ready for adoption)
-- [x] Documented with examples in index.ts
+- [ ] BaseSidebar component created
+- [ ] Supports left/right positioning
+- [ ] Handles keyboard (Escape to close)
+- [ ] Mobile responsive
+- [ ] At least 2 existing sidebars migrated to use it
+- [ ] Documented with examples
 
 **Completion Notes:**
-Created composable BaseSidebar at components/molecules/BaseSidebar/:
-- types.ts (57 lines) - Props for sidebar, header, content, footer
-- useSidebarState.ts (54 lines) - Escape key handling with form element detection
-- BaseSidebar.tsx (143 lines) - Main component with overlay, positioning, animations
-- index.ts (38 lines) - Public exports with JSDoc usage example
-
-Features: left/right positioning, Escape to close (respects form focus), mobile overlay,
-forwardRef support, accessible (aria-label, aria-hidden). Migration of existing sidebars
-deferred as the component is ready for incremental adoption.
+_To be filled by completing agent_
 
 ---
 
@@ -618,153 +612,6 @@ _To be filled by completing agent_
 
 ---
 
-## Priority 3.5: API/DB Query Unification
-
-### P3.5.1 - Unify Profile Data Access Layer
-
-- **Status:** [ ]
-- **Assigned:** _unassigned_
-- **Scope:** Consolidate 53+ direct `creatorProfiles` queries into unified service
-- **Effort:** Large
-- **Dependencies:** None
-
-**Problem:**
-Profile data is queried directly from 40+ files with inconsistent patterns:
-- `lib/db/queries.ts` - `getCreatorProfileByUsername()`, `getCreatorProfileWithLinks()`
-- `app/api/dashboard/profile/route.ts` - direct queries with joins
-- `app/app/dashboard/actions/creator-profile.ts` - `updateCreatorProfile()`
-- `app/app/dashboard/actions/dashboard-data.ts` - profile fetching
-- Plus 36+ other files with direct `from(creatorProfiles)` queries
-
-**Solution:**
-Create unified profile service at `lib/services/profile/`:
-```
-lib/services/profile/
-├── index.ts           # Re-exports
-├── types.ts           # ProfileData, ProfileWithLinks, etc.
-├── queries.ts         # getProfileById, getProfileByUsername, getProfileWithLinks
-├── mutations.ts       # updateProfile, publishProfile
-└── cache.ts           # Profile caching utilities
-```
-
-**Acceptance Criteria:**
-- [ ] All profile queries go through unified service
-- [ ] Consistent caching strategy
-- [ ] Type-safe return types
-- [ ] Backwards compatible exports
-
----
-
-### P3.5.2 - Unify User Lookup Pattern
-
-- **Status:** [ ]
-- **Assigned:** _unassigned_
-- **Scope:** Consolidate "clerkId → dbUser → profile" lookup pattern
-- **Effort:** Medium
-- **Dependencies:** P3.5.1
-
-**Problem:**
-62+ occurrences of the pattern:
-```typescript
-// Step 1: Get user by clerkId
-const [user] = await db.select().from(users).where(eq(users.clerkId, clerkUserId));
-// Step 2: Get profile by userId
-const [profile] = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
-```
-
-This pattern appears in:
-- `app/api/dashboard/*` routes (10+ files)
-- `app/app/dashboard/actions/*` (6+ files)
-- `lib/auth/gate.ts`, `lib/auth/clerk-sync.ts`
-- `lib/stripe/customer-sync/*`
-- And 40+ other locations
-
-**Solution:**
-Extend `withDbSession` to optionally return user/profile context:
-```typescript
-// New: withDbSessionContext returns user + profile
-const { user, profile } = await withDbSessionContext();
-
-// Or use new helper
-const profile = await getCurrentUserProfile(); // Single call
-```
-
-**Acceptance Criteria:**
-- [ ] New `withDbSessionContext()` helper
-- [ ] New `getCurrentUserProfile()` helper
-- [ ] Migrate high-traffic routes first
-- [ ] Document migration path for remaining code
-
----
-
-### P3.5.3 - Consolidate Social Links API Patterns
-
-- **Status:** [ ]
-- **Assigned:** _unassigned_
-- **Scope:** Unify 487 social links references across 88 files
-- **Effort:** Large
-- **Dependencies:** P3.5.1
-
-**Problem:**
-Social links are accessed via multiple patterns:
-1. `app/api/dashboard/social-links/route.ts` - REST API (52 refs)
-2. `app/app/dashboard/actions/social-links.ts` - Server actions (17 refs)
-3. `lib/db/queries.ts` - Direct queries (26 refs)
-4. `components/dashboard/organisms/SocialsForm.tsx` - Client fetch (18 refs)
-5. Plus 84 other files
-
-**Solution:**
-Consolidate into `lib/services/social-links/`:
-```
-lib/services/social-links/
-├── index.ts           # Re-exports
-├── types.ts           # SocialLink, LinkState, etc.
-├── queries.ts         # getLinks, getLinksByProfile
-├── mutations.ts       # saveLinks, deleteLink, reorderLinks
-└── validation.ts      # Platform validation, URL normalization
-```
-
-**Acceptance Criteria:**
-- [ ] Single source of truth for link operations
-- [ ] Consistent validation across all entry points
-- [ ] Type-safe link state management
-
----
-
-### P3.5.4 - Unify Dashboard Data Fetching
-
-- **Status:** [ ]
-- **Assigned:** _unassigned_
-- **Scope:** Consolidate `getDashboardData` patterns (49 refs across 21 files)
-- **Effort:** Medium
-- **Dependencies:** P3.5.1, P3.5.3
-
-**Problem:**
-Dashboard data is fetched via:
-- `getDashboardData()` - Main server action
-- `getDashboardDataCached()` - Cached variant
-- Direct API calls from client components
-- Inconsistent data shapes between routes
-
-**Solution:**
-Create unified dashboard data layer with consistent caching:
-```typescript
-// Single entry point with options
-const data = await getDashboardData({
-  includeLinks: true,
-  includeAnalytics: false,
-  cacheStrategy: 'stale-while-revalidate'
-});
-```
-
-**Acceptance Criteria:**
-- [ ] Single `getDashboardData()` with options
-- [ ] Consistent caching strategy
-- [ ] Type-safe return shapes
-- [ ] Prefetch support for layouts
-
----
-
 ## Priority 4: Low Priority / Future
 
 ### P4.1 - Review Dashboard Organisms Count
@@ -811,22 +658,8 @@ Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
-<<<<<<< HEAD
-<<<<<<< HEAD
-| 2025-01-01 | P2.3 | Cascade | _pending_ | Create BaseSidebar composable component (4 files, 292 lines) |
-| 2025-01-01 | P3.5.3 | Cascade | _pending_ | Extend social-links service with queries/mutations (3 files, 448 lines) |
-| 2025-01-01 | P3.5.1 | Cascade | _pending_ | Create unified profile service (4 files, 696 lines) |
-| 2025-01-01 | P3.5.2 | Cascade | _pending_ | Add user/profile context helpers to lib/auth/session.ts |
-| 2025-12-31 | - | Cascade | _pending_ | Consolidate auth/onboarding/waitlist into unified gate system (~150 lines removed) |
-| 2025-12-31 | - | Cascade | _pending_ | Split validation/schemas/dashboard.ts (484→58 lines) into 5 modules |
-| 2025-12-31 | - | Cascade | _pending_ | Split ingestion/strategies/base.ts (735→43 lines) into 8 modules |
 | 2025-12-31 | - | Cascade | _pending_ | Split ContactSidebar.tsx (591→23 lines) into 4 modules |
 | 2025-12-31 | P2.2 | Cascade | _pending_ | Split Sidebar.tsx (786→47 lines) into 7 modules |
-=======
->>>>>>> d057896b (chore: refactor customer-sync.ts into modular structure (P2.4))
-=======
-| 2025-12-31 | P2.2 | Cascade | _pending_ | Split Sidebar.tsx (786→47 lines) into 7 modules |
->>>>>>> ef27bf03 (chore: refactor Sidebar.tsx into modular structure (P2.2))
 | 2025-12-31 | P2.4 | Cascade | _pending_ | Split customer-sync.ts (1203→68 lines) into 7 modules |
 | 2025-12-31 | P2.1 | Cascade | #1593 | Extract onboarding steps (785→569 lines) |
 | 2025-12-31 | P1.4 | Cascade | #1593 | Extract admin table components (791→608 lines) |
