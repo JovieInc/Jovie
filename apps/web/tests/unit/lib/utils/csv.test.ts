@@ -13,6 +13,31 @@ import {
   UTF8_BOM,
 } from '@/lib/utils/csv';
 
+// Polyfill for Blob methods which are not available in the test environment
+if (typeof Blob !== 'undefined') {
+  if (!Blob.prototype.text) {
+    Blob.prototype.text = async function () {
+      const reader = new FileReader();
+      return new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(this);
+      });
+    };
+  }
+
+  if (!Blob.prototype.arrayBuffer) {
+    Blob.prototype.arrayBuffer = async function () {
+      const reader = new FileReader();
+      return new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(this);
+      });
+    };
+  }
+}
+
 describe('CSV Utility', () => {
   describe('escapeCSVValue', () => {
     describe('null and undefined handling', () => {
@@ -501,9 +526,14 @@ describe('CSV Utility', () => {
       const data = [{ name: 'Test' }];
 
       const blob = toCSVBlob(data);
-      const text = await blob.text();
+      // Read as arrayBuffer to preserve BOM bytes
+      const buffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
 
-      expect(text.charCodeAt(0)).toBe(0xfeff); // BOM character
+      // BOM is EF BB BF in UTF-8
+      expect(bytes[0]).toBe(0xef);
+      expect(bytes[1]).toBe(0xbb);
+      expect(bytes[2]).toBe(0xbf);
     });
 
     it('should respect custom column options', async () => {
