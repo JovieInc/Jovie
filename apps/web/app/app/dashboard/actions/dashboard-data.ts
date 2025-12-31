@@ -37,7 +37,7 @@ import {
   selectDashboardProfile,
 } from './profile-selection';
 import { DSP_PLATFORMS } from './social-links';
-import { createEmptyTippingStats, type TippingStats } from './tipping-stats';
+import { type TippingStats, createEmptyTippingStats } from './tipping-stats';
 
 /**
  * Complete dashboard data structure containing all information
