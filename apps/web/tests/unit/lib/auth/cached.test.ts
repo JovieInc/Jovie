@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockAuth, mockCurrentUser } = vi.hoisted(() => ({
+const { mockAuth, mockCurrentUser, mockCache } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockCurrentUser: vi.fn(),
+  mockCache: vi.fn(fn => fn), // React's cache() passes through the function in tests
 }));
 
 // Mock Clerk's auth functions
@@ -11,6 +12,15 @@ vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
   currentUser: mockCurrentUser,
 }));
+
+// Mock React's cache function
+vi.mock('react', async importOriginal => {
+  const actual = await importOriginal<typeof import('react')>();
+  return {
+    ...actual,
+    cache: mockCache,
+  };
+});
 
 // Import after mocks are set up
 // Note: We need to use dynamic import or resetModules to test cache() deduplication

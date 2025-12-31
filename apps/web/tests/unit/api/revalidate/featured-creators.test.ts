@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
+const mockRevalidateTag = vi.hoisted(() => vi.fn());
+const mockUpdateTag = vi.hoisted(() => vi.fn());
 
 vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
+  revalidateTag: mockRevalidateTag,
+  updateTag: mockUpdateTag,
 }));
 
 describe('POST /api/revalidate/featured-creators', () => {
