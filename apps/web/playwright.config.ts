@@ -25,7 +25,21 @@ export default defineConfig({
   timeout: isSmokeOnly ? 30_000 : 60_000, // 30s for smoke, 60s for full
   expect: {
     timeout: isSmokeOnly ? 10_000 : 15_000, // 10s for smoke, 15s for full
+    // Visual regression snapshot settings
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
+      threshold: 0.2, // Per-pixel color threshold
+      animations: 'disabled',
+    },
+    toMatchSnapshot: {
+      maxDiffPixelRatio: 0.05,
+      threshold: 0.2,
+    },
   },
+
+  // Snapshot directory configuration
+  snapshotDir: './tests/e2e/__snapshots__',
+  snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{arg}{ext}',
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3100',

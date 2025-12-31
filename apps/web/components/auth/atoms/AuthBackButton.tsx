@@ -30,10 +30,10 @@ export function AuthBackButton({
     'h-11 w-11 sm:h-10 sm:w-10',
     // Visual styling
     'text-primary-token bg-surface-0/80 backdrop-blur-sm',
-    'border border-subtle/50',
+    'border border-default',
     'shadow-sm',
     // Hover and active states
-    'hover:bg-surface-1 hover:border-subtle',
+    'hover:bg-surface-1 hover:border-default',
     'active:scale-95 active:bg-surface-2',
     // Transitions
     'transition-all duration-150 ease-out',

@@ -33,6 +33,8 @@
     "e2e:smoke": "playwright test -g @smoke",
     "e2e:smoke:noauth": "playwright test -g @smoke --config=playwright.config.noauth.ts",
     "e2e:full": "playwright test",
+    "e2e:visual": "playwright test tests/e2e/visual-regression.spec.ts",
+    "e2e:visual:update": "playwright test tests/e2e/visual-regression.spec.ts --update-snapshots",
     "e2e:full:noauth": "playwright test --config=playwright.config.noauth.ts",
     "a11y:ci": "playwright test -g @a11y",
     "a11y:axe": "playwright test tests/e2e/axe-audit.spec.ts",
