@@ -1,10 +1,7 @@
 'use client';
 
 /**
- * Sidebar Component
- *
- * @deprecated This file is maintained for backwards compatibility.
- * Import from '@/components/organisms/sidebar' for new code.
+ * Sidebar Component Module
  *
  * A comprehensive sidebar component system with support for:
  * - Responsive behavior (mobile sheet, desktop collapsible)
@@ -14,20 +11,30 @@
  * - Menu system with tooltips, badges, and actions
  */
 
-// Re-export everything from the modular structure for backwards compatibility
+export type { SidebarContextValue } from './context';
+// Context and Provider
+export { SidebarContext, SidebarProvider, useSidebar } from './context';
+// Controls
+export { SidebarRail, SidebarShortcutHint, SidebarTrigger } from './controls';
+// Group Components
 export {
-  Sidebar,
-  SidebarContent,
-  SidebarContext,
-  type SidebarContextValue,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
+} from './group';
+
+// Layout Components
+export {
+  SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarInput,
   SidebarInset,
+  SidebarSeparator,
+} from './layout';
+// Menu Components
+export {
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuActions,
@@ -38,10 +45,6 @@ export {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarProvider,
-  SidebarRail,
-  SidebarSeparator,
-  SidebarShortcutHint,
-  SidebarTrigger,
-  useSidebar,
-} from './sidebar/index';
+} from './menu';
+// Main Sidebar
+export { Sidebar } from './sidebar';
