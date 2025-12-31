@@ -246,7 +246,7 @@ export async function resolveUserState(options?: {
   // 3. Check waitlist access for existing users without waitlist linkage
   // This handles users who existed before the waitlist system
   if (!dbUser?.waitlistEntryId && email) {
-    const waitlistResult = await getWaitlistAccess(email);
+    const waitlistResult = await checkWaitlistAccessInternal(email);
 
     // If user has no waitlist entry and hasn't been approved, check their access
     if (waitlistResult.status === 'new') {
@@ -420,7 +420,9 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
  * Get waitlist invite details by claim token.
  * Returns the waitlist entry ID and email if the token is valid.
  */
-export async function getWaitlistInviteByToken(token: string): Promise<{
+export async function getWaitlistInviteByToken(
+  token: string
+): Promise<{
   waitlistEntryId: string;
   email: string;
   claimToken: string;
