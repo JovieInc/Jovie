@@ -811,6 +811,7 @@ Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
+<<<<<<< HEAD
 | 2025-01-01 | P2.3 | Cascade | _pending_ | Create BaseSidebar composable component (4 files, 292 lines) |
 | 2025-01-01 | P3.5.3 | Cascade | _pending_ | Extend social-links service with queries/mutations (3 files, 448 lines) |
 | 2025-01-01 | P3.5.1 | Cascade | _pending_ | Create unified profile service (4 files, 696 lines) |
@@ -820,6 +821,8 @@ Track all refactoring completions here. Add newest entries at the top.
 | 2025-12-31 | - | Cascade | _pending_ | Split ingestion/strategies/base.ts (735→43 lines) into 8 modules |
 | 2025-12-31 | - | Cascade | _pending_ | Split ContactSidebar.tsx (591→23 lines) into 4 modules |
 | 2025-12-31 | P2.2 | Cascade | _pending_ | Split Sidebar.tsx (786→47 lines) into 7 modules |
+=======
+>>>>>>> d057896b (chore: refactor customer-sync.ts into modular structure (P2.4))
 | 2025-12-31 | P2.4 | Cascade | _pending_ | Split customer-sync.ts (1203→68 lines) into 7 modules |
 | 2025-12-31 | P2.1 | Cascade | #1593 | Extract onboarding steps (785→569 lines) |
 | 2025-12-31 | P1.4 | Cascade | #1593 | Extract admin table components (791→608 lines) |
