@@ -658,6 +658,7 @@ Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
+| 2025-12-31 | - | Cascade | _pending_ | Split validation/schemas/dashboard.ts (484→58 lines) into 5 modules |
 | 2025-12-31 | - | Cascade | _pending_ | Split ingestion/strategies/base.ts (735→43 lines) into 8 modules |
 | 2025-12-31 | - | Cascade | _pending_ | Split ContactSidebar.tsx (591→23 lines) into 4 modules |
 | 2025-12-31 | P2.2 | Cascade | _pending_ | Split Sidebar.tsx (786→47 lines) into 7 modules |
