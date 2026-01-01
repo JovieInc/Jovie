@@ -2,8 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { canAccessApp, resolveUserState, UserState } from '@/lib/auth/gate';
+import { canAccessApp, resolveUserState } from '@/lib/auth/gate';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
@@ -16,55 +15,25 @@ import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 /**
  * Centralized auth gate for the app shell.
  * Uses resolveUserState() to determine user access and redirect appropriately.
+ *
+ * Returns the clerkUserId for downstream use (e.g., Statsig).
  */
-async function ensureAppAccess(): Promise<void> {
+async function ensureAppAccess(): Promise<string> {
   return Sentry.startSpan({ op: 'auth', name: 'app.authGate' }, async () => {
-    try {
-      const authResult = await resolveUserState();
+    const authResult = await resolveUserState();
 
-      // Handle each state with appropriate redirect
-      if (!canAccessApp(authResult.state)) {
-        // Use redirectTo if available, otherwise apply fallback logic
-        if (authResult.redirectTo) {
-          redirect(authResult.redirectTo);
-        }
-
-        // Fallback redirects for edge cases where redirectTo might be null
-        if (authResult.state === UserState.UNAUTHENTICATED) {
-          redirect('/signin?redirect_url=/app/dashboard');
-        }
-        if (
-          authResult.state === UserState.NEEDS_WAITLIST_SUBMISSION ||
-          authResult.state === UserState.WAITLIST_PENDING
-        ) {
-          redirect('/waitlist');
-        }
-        if (authResult.state === UserState.WAITLIST_INVITED) {
-          redirect(
-            authResult.context.claimToken
-              ? `/claim/${encodeURIComponent(authResult.context.claimToken)}`
-              : '/waitlist'
-          );
-        }
-        if (
-          authResult.state === UserState.NEEDS_ONBOARDING ||
-          authResult.state === UserState.NEEDS_DB_USER
-        ) {
-          redirect('/onboarding');
-        }
-        if (authResult.state === UserState.BANNED) {
-          redirect('/banned');
-        }
+    // Handle each state with appropriate redirect
+    if (!canAccessApp(authResult.state)) {
+      // resolveUserState always provides redirectTo for non-ACTIVE states
+      if (authResult.redirectTo) {
+        redirect(authResult.redirectTo);
       }
-    } catch (error) {
-      if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-        throw error;
-      }
-
-      Sentry.captureException(error, {
-        tags: { context: 'auth_gate' },
-      });
+      // Fallback (should never reach here)
+      redirect('/signin?redirect_url=/app/dashboard');
     }
+
+    // Return clerkUserId for downstream use
+    return authResult.clerkUserId!;
   });
 }
 
@@ -73,22 +42,23 @@ export default async function AppShellLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect('/signin?redirect_url=/app/dashboard');
-  }
-
-  // Use centralized auth gate - handles all auth state checks
+  // Use centralized auth gate - handles all auth state checks including:
+  // - UNAUTHENTICATED → /signin
+  // - NEEDS_WAITLIST_SUBMISSION/WAITLIST_PENDING → /waitlist
+  // - WAITLIST_INVITED → /claim/[token]
+  // - NEEDS_ONBOARDING/NEEDS_DB_USER → /onboarding
+  // - BANNED → /banned
   const authPromise = ensureAppAccess();
   prefetchDashboardData();
 
   try {
-    const [dashboardData] = await Promise.all([
+    const [dashboardData, userId] = await Promise.all([
       getDashboardDataCached(),
       authPromise,
     ]);
 
+    // Double-check onboarding status from dashboard data
+    // This catches edge cases where profile was created but onboarding not completed
     if (dashboardData.needsOnboarding) {
       redirect('/onboarding');
     }

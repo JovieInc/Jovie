@@ -21,7 +21,7 @@ export default async function OnboardingPage({
   // Use centralized auth gate for access control
   const authResult = await resolveUserState();
 
-  // Handle unauthenticated users
+  // Handle unauthenticated users - preserve handle param in redirect
   if (authResult.state === UserState.UNAUTHENTICATED) {
     const handleParam = resolvedSearchParams?.handle
       ? `?handle=${encodeURIComponent(resolvedSearchParams.handle)}`
@@ -30,28 +30,13 @@ export default async function OnboardingPage({
     redirect(`/signin?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
-  // Handle states that can't access onboarding
+  // Handle states that can't access onboarding - use centralized redirectTo
   if (!canAccessOnboarding(authResult.state)) {
-    // For waitlist states, redirect appropriately
-    if (
-      authResult.state === UserState.NEEDS_WAITLIST_SUBMISSION ||
-      authResult.state === UserState.WAITLIST_PENDING
-    ) {
-      redirect('/waitlist');
-    }
-    if (
-      authResult.state === UserState.WAITLIST_INVITED &&
-      authResult.redirectTo
-    ) {
-      redirect(authResult.redirectTo);
-    }
-    if (authResult.state === UserState.BANNED) {
-      redirect('/banned');
-    }
-    // Fallback
     if (authResult.redirectTo) {
       redirect(authResult.redirectTo);
     }
+    // Fallback (should never reach here)
+    redirect('/app/dashboard/overview');
   }
 
   const user = await currentUser();

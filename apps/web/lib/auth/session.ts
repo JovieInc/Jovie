@@ -1,8 +1,9 @@
 'server only';
 
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbType, db } from '@/lib/db';
+import { creatorProfiles, users } from '@/lib/db/schema';
 
 /**
  * Validates that a userId is a safe Clerk ID format
@@ -136,4 +137,199 @@ export async function requireAuth() {
     throw new Error('Authentication required');
   }
   return userId;
+}
+
+// =============================================================================
+// User/Profile Context Helpers
+// =============================================================================
+
+/**
+ * Minimal user data returned by context helpers.
+ * Contains only the fields commonly needed for auth checks.
+ */
+export interface DbUserContext {
+  id: string;
+  clerkId: string;
+  email: string | null;
+  isAdmin: boolean;
+  isPro: boolean | null;
+  status: 'active' | 'pending' | 'banned';
+}
+
+/**
+ * Minimal profile data returned by context helpers.
+ * Contains only the fields commonly needed for dashboard operations.
+ */
+export interface ProfileContext {
+  id: string;
+  userId: string | null;
+  username: string | null;
+  usernameNormalized: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isPublic: boolean | null;
+  isClaimed: boolean | null;
+  onboardingCompletedAt: Date | null;
+}
+
+/**
+ * Combined user and profile context.
+ */
+export interface SessionContext {
+  clerkUserId: string;
+  user: DbUserContext;
+  profile: ProfileContext | null;
+}
+
+/**
+ * Get the current user's database record by Clerk ID.
+ * This is the single source of truth for user lookups.
+ *
+ * @param clerkUserId - Clerk user ID (uses auth() if not provided)
+ * @returns User record or null if not found
+ */
+export async function getDbUser(
+  clerkUserId?: string
+): Promise<DbUserContext | null> {
+  const userId = await resolveClerkUserId(clerkUserId);
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      clerkId: users.clerkId,
+      email: users.email,
+      isAdmin: users.isAdmin,
+      isPro: users.isPro,
+      status: users.status,
+    })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
+
+  return user ?? null;
+}
+
+/**
+ * Get the current user's claimed profile.
+ * Returns the profile associated with the user's database record.
+ *
+ * @param dbUserId - Database user ID
+ * @returns Profile record or null if not found
+ */
+export async function getProfileByDbUserId(
+  dbUserId: string
+): Promise<ProfileContext | null> {
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
+      username: creatorProfiles.username,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      displayName: creatorProfiles.displayName,
+      avatarUrl: creatorProfiles.avatarUrl,
+      isPublic: creatorProfiles.isPublic,
+      isClaimed: creatorProfiles.isClaimed,
+      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+    })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.userId, dbUserId),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
+    .limit(1);
+
+  return profile ?? null;
+}
+
+/**
+ * Get the full session context: clerkUserId, user, and profile.
+ * This is the recommended way to get user/profile data in server actions and API routes.
+ *
+ * Replaces the common pattern:
+ * ```typescript
+ * const { userId } = await getCachedAuth();
+ * const [user] = await db.select().from(users).where(eq(users.clerkId, userId));
+ * const [profile] = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
+ * ```
+ *
+ * With:
+ * ```typescript
+ * const { user, profile } = await getSessionContext();
+ * ```
+ *
+ * @param options.clerkUserId - Optional explicit Clerk user ID
+ * @param options.requireUser - If true, throws if user not found (default: true)
+ * @param options.requireProfile - If true, throws if profile not found (default: false)
+ * @returns Session context with user and profile
+ */
+export async function getSessionContext(options?: {
+  clerkUserId?: string;
+  requireUser?: boolean;
+  requireProfile?: boolean;
+}): Promise<SessionContext> {
+  const { requireUser = true, requireProfile = false } = options ?? {};
+
+  const clerkUserId = await resolveClerkUserId(options?.clerkUserId);
+  const user = await getDbUser(clerkUserId);
+
+  if (!user && requireUser) {
+    throw new Error('User not found');
+  }
+
+  const profile = user ? await getProfileByDbUserId(user.id) : null;
+
+  if (!profile && requireProfile) {
+    throw new Error('Profile not found');
+  }
+
+  return {
+    clerkUserId,
+    user: user!,
+    profile,
+  };
+}
+
+/**
+ * Get the current user's profile directly.
+ * Convenience wrapper around getSessionContext for when you only need the profile.
+ *
+ * @param options.clerkUserId - Optional explicit Clerk user ID
+ * @returns Profile or null if not found
+ * @throws Error if user is not authenticated or user record not found
+ */
+export async function getCurrentUserProfile(options?: {
+  clerkUserId?: string;
+}): Promise<ProfileContext | null> {
+  const { profile } = await getSessionContext({
+    clerkUserId: options?.clerkUserId,
+    requireUser: true,
+    requireProfile: false,
+  });
+  return profile;
+}
+
+/**
+ * Wrapper that provides session context to the operation.
+ * Combines withDbSession with automatic user/profile lookup.
+ *
+ * @param operation - Function receiving session context
+ * @param options.clerkUserId - Optional explicit Clerk user ID
+ * @param options.requireProfile - If true, throws if profile not found
+ */
+export async function withSessionContext<T>(
+  operation: (context: SessionContext) => Promise<T>,
+  options?: { clerkUserId?: string; requireProfile?: boolean }
+): Promise<T> {
+  const context = await getSessionContext({
+    clerkUserId: options?.clerkUserId,
+    requireUser: true,
+    requireProfile: options?.requireProfile,
+  });
+
+  // Set up RLS session
+  await setupDbSession(context.clerkUserId);
+
+  return await operation(context);
 }

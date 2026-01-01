@@ -1,17 +1,15 @@
-import { auth } from '@clerk/nextjs/server';
 import { and, eq, gte, isNull, or } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import {
+  getWaitlistInviteByToken,
+  resolveUserState,
+  UserState,
+} from '@/lib/auth/gate';
 import { db } from '@/lib/db';
 import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
 import { checkRateLimit } from '@/lib/utils/rate-limit';
-import { getWaitlistInviteByToken } from '@/lib/waitlist/access';
-
-// Note: The claim page intentionally does NOT use the full resolveUserState()
-// from lib/auth/gate.ts because it has specialized claim flow logic that needs
-// to handle users who don't have DB rows yet. The auth gate's user creation
-// side effects would interfere with the atomic claim process.
 
 interface ClaimPageProps {
   params: {
@@ -68,20 +66,31 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     redirect('/');
   }
 
-  const { userId } = await auth();
+  // Use centralized auth gate for user state resolution
+  // Note: createDbUserIfMissing=true ensures user row exists for claim
+  const authResult = await resolveUserState({ createDbUserIfMissing: true });
 
-  if (!userId) {
+  // Handle unauthenticated users
+  if (authResult.state === UserState.UNAUTHENTICATED) {
     const redirectTarget = `/claim/${encodeURIComponent(token)}`;
     const invite = await getWaitlistInviteByToken(token);
     const authPath = invite ? '/signin' : '/signup';
     redirect(`${authPath}?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
-  const claimUserKey = `claim:user:${userId}`;
+  // Handle banned users
+  if (authResult.state === UserState.BANNED) {
+    logger.warn('Claim attempt by banned user', {
+      clerkId: authResult.clerkUserId,
+    });
+    redirect('/banned');
+  }
+
+  const claimUserKey = `claim:user:${authResult.clerkUserId}`;
   if (checkRateLimit(claimUserKey)) {
     logger.warn('Claim attempt rate limited by user', {
       token: token.slice(0, 8),
-      clerkId: userId,
+      clerkId: authResult.clerkUserId,
     });
     redirect('/');
   }
@@ -115,40 +124,17 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     redirect('/app/dashboard/overview');
   }
 
-  // Ensure a corresponding users row exists for this Clerk user
-  let dbUserId: string | null = null;
+  // Get or create DB user ID from auth result
+  // resolveUserState with createDbUserIfMissing=true ensures dbUserId exists
+  let dbUserId = authResult.dbUserId;
 
-  const [existingUser] = await db
-    .select({ id: users.id, deletedAt: users.deletedAt, status: users.status })
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
-
-  if (existingUser) {
-    // Check if user is soft-deleted
-    if (existingUser.deletedAt) {
-      logger.warn('Claim attempt by soft-deleted user', {
-        clerkId: userId,
-        deletedAt: existingUser.deletedAt,
-      });
-      redirect('/app/dashboard/overview');
-    }
-    // Check if user is banned (auth hardening)
-    if (existingUser.status === 'banned') {
-      logger.warn('Claim attempt by banned user', {
-        clerkId: userId,
-        status: existingUser.status,
-      });
-      redirect('/banned');
-    }
-    dbUserId = existingUser.id;
-  } else {
-    // Create new user with active status
+  if (!dbUserId) {
+    // Fallback: create user if somehow missing (shouldn't happen with createDbUserIfMissing=true)
     const [createdUser] = await db
       .insert(users)
       .values({
-        clerkId: userId,
-        email: null,
+        clerkId: authResult.clerkUserId!,
+        email: authResult.context.email,
         status: 'active',
       })
       .returning({ id: users.id });

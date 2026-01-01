@@ -175,7 +175,7 @@ export async function resolveUserState(options?: {
   if (!dbUserId) {
     if (createDbUserIfMissing && email) {
       // Check waitlist status before creating user
-      const waitlistResult = await checkWaitlistAccess(email);
+      const waitlistResult = await checkWaitlistAccessInternal(email);
 
       if (
         waitlistResult.status === 'new' ||
@@ -246,7 +246,7 @@ export async function resolveUserState(options?: {
   // 3. Check waitlist access for existing users without waitlist linkage
   // This handles users who existed before the waitlist system
   if (!dbUser?.waitlistEntryId && email) {
-    const waitlistResult = await checkWaitlistAccess(email);
+    const waitlistResult = await getWaitlistAccess(email);
 
     // If user has no waitlist entry and hasn't been approved, check their access
     if (waitlistResult.status === 'new') {
@@ -346,11 +346,35 @@ export async function resolveUserState(options?: {
   };
 }
 
+// =============================================================================
+// Waitlist Access Helpers (exported for reuse)
+// =============================================================================
+
+export type WaitlistStatus = 'new' | 'invited' | 'claimed' | 'rejected';
+
+export interface WaitlistAccessResult {
+  entryId: string | null;
+  status: WaitlistStatus | null;
+  claimToken: string | null;
+}
+
 /**
- * Helper to check waitlist access by email.
+ * Check waitlist access by email.
  * Returns the waitlist entry status and claim token if available.
+ *
+ * This is the single source of truth for waitlist status checks.
+ * Use this instead of querying waitlist tables directly.
  */
-async function checkWaitlistAccess(email: string): Promise<{
+export async function getWaitlistAccess(
+  email: string
+): Promise<WaitlistAccessResult> {
+  return checkWaitlistAccessInternal(email);
+}
+
+/**
+ * Internal helper to check waitlist access by email.
+ */
+async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
   status: 'new' | 'invited' | 'claimed' | 'rejected' | null;
   claimToken: string | null;
@@ -391,6 +415,32 @@ async function checkWaitlistAccess(email: string): Promise<{
     claimToken: null,
   };
 }
+
+/**
+ * Get waitlist invite details by claim token.
+ * Returns the waitlist entry ID and email if the token is valid.
+ */
+export async function getWaitlistInviteByToken(token: string): Promise<{
+  waitlistEntryId: string;
+  email: string;
+  claimToken: string;
+} | null> {
+  const [invite] = await db
+    .select({
+      waitlistEntryId: waitlistInvites.waitlistEntryId,
+      email: waitlistInvites.email,
+      claimToken: waitlistInvites.claimToken,
+    })
+    .from(waitlistInvites)
+    .where(eq(waitlistInvites.claimToken, token))
+    .limit(1);
+
+  return invite ?? null;
+}
+
+// =============================================================================
+// State Utilities
+// =============================================================================
 
 /**
  * Returns redirect paths for each user state.
