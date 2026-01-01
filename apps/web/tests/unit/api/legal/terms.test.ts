@@ -11,6 +11,12 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   }),
 }));
 
+vi.mock('fs', () => ({
+  default: {
+    readFileSync: vi.fn().mockReturnValue('# Terms of Service\n\nTest content'),
+  },
+}));
+
 describe('GET /api/legal/terms', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -20,10 +26,12 @@ describe('GET /api/legal/terms', () => {
   it('returns terms of service content', async () => {
     const { GET } = await import('@/app/api/legal/terms/route');
     const response = await GET();
-    const data = await response.json();
+    const contentType = response.headers.get('Content-Type');
 
     expect(response.status).toBe(200);
-    expect(data).toHaveProperty('content');
-    expect(data).toHaveProperty('lastUpdated');
+    expect(contentType).toBe('text/html');
+
+    const html = await response.text();
+    expect(html).toContain('Terms of Service');
   });
 });

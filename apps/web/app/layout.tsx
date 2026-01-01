@@ -1,5 +1,5 @@
 import { VercelToolbar } from '@vercel/toolbar/next';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import React from 'react';
 import { ClientProviders } from '@/components/providers/ClientProviders';
@@ -132,6 +132,13 @@ export const metadata: Metadata = {
     ],
   },
   manifest: '/site.webmanifest',
+};
+
+// Viewport configuration with viewport-fit=cover for iOS safe area insets
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default async function RootLayout({

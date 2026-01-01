@@ -105,7 +105,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     <ToastContext.Provider value={{ showToast, hideToast, clearToasts }}>
       {children}
       <div
-        className='fixed bottom-4 right-4 flex flex-col gap-2 z-50'
+        className='fixed bottom-4-safe right-4-safe flex flex-col gap-2 z-50'
         data-testid='toast-stack'
       >
         {toasts.map(toast => (

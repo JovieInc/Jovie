@@ -1,46 +1,27 @@
-import { desc, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { waitlistEntries, waitlistInvites } from '@/lib/db/schema';
+/**
+ * Waitlist Access Utilities
+ *
+ * @deprecated This file is maintained for backwards compatibility.
+ * Import from '@/lib/auth/gate' for new code.
+ *
+ * The waitlist access functions have been consolidated into the
+ * centralized auth gate module for consistency.
+ */
 
-export type WaitlistStatus = 'new' | 'invited' | 'claimed' | 'rejected';
+import {
+  getWaitlistAccess,
+  getWaitlistInviteByToken as getWaitlistInviteByTokenFromGate,
+  type WaitlistAccessResult,
+  type WaitlistStatus,
+} from '@/lib/auth/gate';
+
+// Re-export types for backwards compatibility
+export type { WaitlistStatus };
 
 export interface WaitlistAccessLookup {
   entryId: string | null;
   status: WaitlistStatus | null;
   inviteToken: string | null;
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-export async function getWaitlistAccessByEmail(
-  emailRaw: string
-): Promise<WaitlistAccessLookup> {
-  const email = normalizeEmail(emailRaw);
-
-  // Email is already normalized at write time, so use direct equality for index efficiency
-  const [entry] = await db
-    .select({ id: waitlistEntries.id, status: waitlistEntries.status })
-    .from(waitlistEntries)
-    .where(eq(waitlistEntries.email, email))
-    .limit(1);
-
-  const entryId = entry?.id ?? null;
-  const status = (entry?.status ?? null) as WaitlistStatus | null;
-
-  if (!entryId || status !== 'invited') {
-    return { entryId, status, inviteToken: null };
-  }
-
-  const [invite] = await db
-    .select({ claimToken: waitlistInvites.claimToken })
-    .from(waitlistInvites)
-    .where(eq(waitlistInvites.waitlistEntryId, entryId))
-    .orderBy(desc(waitlistInvites.createdAt))
-    .limit(1);
-
-  return { entryId, status, inviteToken: invite?.claimToken ?? null };
 }
 
 export interface WaitlistInviteLookup {
@@ -49,18 +30,25 @@ export interface WaitlistInviteLookup {
   claimToken: string;
 }
 
+/**
+ * @deprecated Use `getWaitlistAccess` from '@/lib/auth/gate' instead.
+ */
+export async function getWaitlistAccessByEmail(
+  emailRaw: string
+): Promise<WaitlistAccessLookup> {
+  const result: WaitlistAccessResult = await getWaitlistAccess(emailRaw);
+  return {
+    entryId: result.entryId,
+    status: result.status,
+    inviteToken: result.claimToken,
+  };
+}
+
+/**
+ * @deprecated Use `getWaitlistInviteByToken` from '@/lib/auth/gate' instead.
+ */
 export async function getWaitlistInviteByToken(
   token: string
 ): Promise<WaitlistInviteLookup | null> {
-  const [invite] = await db
-    .select({
-      waitlistEntryId: waitlistInvites.waitlistEntryId,
-      email: waitlistInvites.email,
-      claimToken: waitlistInvites.claimToken,
-    })
-    .from(waitlistInvites)
-    .where(eq(waitlistInvites.claimToken, token))
-    .limit(1);
-
-  return invite ?? null;
+  return getWaitlistInviteByTokenFromGate(token);
 }
