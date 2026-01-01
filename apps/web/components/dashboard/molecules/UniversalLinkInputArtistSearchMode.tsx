@@ -318,15 +318,18 @@ export function UniversalLinkInputArtistSearchMode({
             <ul
               ref={resultsListRef}
               id='artist-search-results'
+              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: listbox role on ul is correct for ARIA combobox pattern
+              role='listbox'
               className='max-h-64 overflow-y-auto'
             >
               {results.map((artist, index) => (
-                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: List item with click handler for artist selection
-                // biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA props needed for accessibility
-                // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent component
+                // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys
                 <li
                   key={artist.id}
                   id={`artist-result-${index}`}
+                  // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: option role on li is correct for ARIA listbox pattern
+                  role='option'
+                  tabIndex={-1}
                   aria-selected={index === activeResultIndex}
                   aria-label={`${artist.name}${artist.followers ? `, ${formatFollowers(artist.followers)}` : ''}`}
                   className={cn(
