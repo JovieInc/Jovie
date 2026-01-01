@@ -52,13 +52,19 @@ export function registerDevCleanup(key: string, fn: DevCleanupFn): void {
       void (async () => {
         try {
           await runDevCleanups('SIGINT');
-          process.exit(0);
+          // Only exit in Node.js runtime, not Edge Runtime
+          if (typeof process.exit === 'function') {
+            process.exit(0);
+          }
         } catch (error) {
           console.error('[DEV_CLEANUP_FATAL]', {
             reason: 'SIGINT',
             error: error instanceof Error ? error.message : String(error),
           });
-          process.exit(1);
+          // Only exit in Node.js runtime, not Edge Runtime
+          if (typeof process.exit === 'function') {
+            process.exit(1);
+          }
         }
       })();
     });
@@ -66,13 +72,19 @@ export function registerDevCleanup(key: string, fn: DevCleanupFn): void {
       void (async () => {
         try {
           await runDevCleanups('SIGTERM');
-          process.exit(0);
+          // Only exit in Node.js runtime, not Edge Runtime
+          if (typeof process.exit === 'function') {
+            process.exit(0);
+          }
         } catch (error) {
           console.error('[DEV_CLEANUP_FATAL]', {
             reason: 'SIGTERM',
             error: error instanceof Error ? error.message : String(error),
           });
-          process.exit(1);
+          // Only exit in Node.js runtime, not Edge Runtime
+          if (typeof process.exit === 'function') {
+            process.exit(1);
+          }
         }
       })();
     });
