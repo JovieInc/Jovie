@@ -1,25 +1,18 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
 import * as React from 'react';
 
+import {
+  centeredContentStyles,
+  descriptionStyles,
+  footerStyles,
+  headerStyles,
+  overlayClassName,
+  titleStyles,
+} from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
-
-const baseOverlayClasses =
-  'fixed inset-0 z-50 bg-black/80 ' +
-  'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
-  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0';
-
-const baseContentClasses =
-  'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-subtle bg-surface-1 p-6 text-primary-token shadow-lg ' +
-  'duration-200 ' +
-  'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
-  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
-  'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ' +
-  'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] ' +
-  'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] ' +
-  'sm:rounded-2xl';
+import { CloseButtonIcon, closeButtonClassName } from './close-button';
 
 const Dialog = DialogPrimitive.Root;
 
@@ -39,7 +32,8 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn(baseOverlayClasses, className)}
+    className={cn(overlayClassName, className)}
+    data-testid='dialog-overlay'
     {...props}
   />
 ));
@@ -51,6 +45,11 @@ interface DialogContentProps
   overlayProps?: DialogOverlayProps;
   disablePortal?: boolean;
   hideClose?: boolean;
+  /**
+   * Test ID for the dialog content.
+   * @default "dialog-content"
+   */
+  testId?: string;
 }
 
 const DialogContent = React.forwardRef<
@@ -65,21 +64,35 @@ const DialogContent = React.forwardRef<
       overlayProps,
       disablePortal = false,
       hideClose = false,
+      testId = 'dialog-content',
       ...props
     },
     ref
   ) => {
+    const contentClassName = cn(
+      centeredContentStyles.position,
+      centeredContentStyles.layout,
+      centeredContentStyles.surface,
+      centeredContentStyles.animation,
+      centeredContentStyles.rounded,
+      centeredContentStyles.reducedMotion,
+      className
+    );
+
     const content = (
       <DialogPrimitive.Content
         ref={ref}
-        className={cn(baseContentClasses, className)}
+        className={contentClassName}
+        data-testid={testId}
         {...props}
       >
         {children}
         {!hideClose && (
-          <DialogPrimitive.Close className='absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground'>
-            <X className='h-4 w-4' />
-            <span className='sr-only'>Close</span>
+          <DialogPrimitive.Close
+            className={closeButtonClassName}
+            data-testid='dialog-close-button'
+          >
+            <CloseButtonIcon />
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -104,29 +117,43 @@ const DialogContent = React.forwardRef<
 );
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+interface DialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * Test ID for the dialog header.
+   * @default "dialog-header"
+   */
+  testId?: string;
+}
+
 const DialogHeader = ({
   className,
+  testId = 'dialog-header',
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
+}: DialogHeaderProps) => (
   <div
-    className={cn(
-      'flex flex-col space-y-1.5 text-center sm:text-left',
-      className
-    )}
+    className={cn(headerStyles.base, className)}
+    data-testid={testId}
     {...props}
   />
 );
 DialogHeader.displayName = 'DialogHeader';
 
+interface DialogFooterProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * Test ID for the dialog footer.
+   * @default "dialog-footer"
+   */
+  testId?: string;
+}
+
 const DialogFooter = ({
   className,
+  testId = 'dialog-footer',
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
+}: DialogFooterProps) => (
   <div
-    className={cn(
-      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
-      className
-    )}
+    className={cn(footerStyles.base, className)}
+    data-testid={testId}
     {...props}
   />
 );
@@ -138,10 +165,8 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      'text-lg font-semibold leading-none tracking-tight',
-      className
-    )}
+    className={cn(titleStyles.base, className)}
+    data-testid='dialog-title'
     {...props}
   />
 ));
@@ -153,7 +178,8 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-muted-foreground', className)}
+    className={cn(descriptionStyles.base, className)}
+    data-testid='dialog-description'
     {...props}
   />
 ));

@@ -51,6 +51,11 @@ interface TooltipContentProps
    * Whether to show the arrow pointer. Defaults to true.
    */
   showArrow?: boolean;
+  /**
+   * Test ID for the tooltip content.
+   * @default "tooltip-content"
+   */
+  testId?: string;
 }
 
 /**
@@ -62,13 +67,21 @@ const TooltipContent = React.forwardRef<
   TooltipContentProps
 >(
   (
-    { className, sideOffset = 8, showArrow = true, children, ...props },
+    {
+      className,
+      sideOffset = 8,
+      showArrow = true,
+      children,
+      testId = 'tooltip-content',
+      ...props
+    },
     ref
   ) => (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}
+        data-testid={testId}
         className={cn(
           // Base layout + spacing
           'z-50 inline-flex select-none items-center gap-2 rounded-[8px] px-3 py-2 text-[13px] font-medium leading-tight',
@@ -104,6 +117,7 @@ const TooltipContent = React.forwardRef<
               'fill-black/80 dark:fill-black/70',
               'drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)] opacity-90'
             )}
+            data-testid='tooltip-arrow'
           />
         )}
       </TooltipPrimitive.Content>
