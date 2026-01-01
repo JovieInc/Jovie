@@ -17,10 +17,10 @@ import {
   incrementProfileViews,
   isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
-import { getTopProfilesForStaticGeneration } from '@/lib/services/profile';
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
+import { getTopProfilesForStaticGeneration } from '@/lib/services/profile';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -222,8 +222,8 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   const dynamicOverrideEnabled = creatorClerkId
     ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
-      userID: creatorClerkId,
-    })
+        userID: creatorClerkId,
+      })
     : false;
 
   const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
@@ -329,13 +329,13 @@ export async function generateMetadata({ params }: Props) {
       description,
       images: profile.avatar_url
         ? [
-          {
-            url: profile.avatar_url,
-            width: 400,
-            height: 400,
-            alt: `${profile.display_name || profile.username} profile picture`,
-          },
-        ]
+            {
+              url: profile.avatar_url,
+              width: 400,
+              height: 400,
+              alt: `${profile.display_name || profile.username} profile picture`,
+            },
+          ]
         : undefined,
     },
     twitter: {
