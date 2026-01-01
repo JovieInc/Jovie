@@ -99,6 +99,7 @@ export { Label, labelVariants } from './atoms/label';
 // Popover
 export {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';
@@ -124,6 +125,7 @@ export {
 export { Separator } from './atoms/separator';
 
 // Sheet
+export type { SheetContentProps } from './atoms/sheet';
 export {
   Sheet,
   SheetClose,
