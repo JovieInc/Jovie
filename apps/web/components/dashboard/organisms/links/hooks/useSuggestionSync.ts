@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { LinkItem, SuggestedLink } from '../types';

@@ -333,3 +333,38 @@ export async function isClaimTokenValid(
 
   return Boolean(row);
 }
+
+/**
+ * Get top public profiles for static generation.
+ * Returns featured profiles first, then by profile views.
+ *
+ * @param limit - Maximum number of profiles to return (default: 100)
+ * @returns Array of usernames for static generation
+ */
+export async function getTopProfilesForStaticGeneration(
+  limit = 100
+): Promise<{ username: string }[]> {
+  const { desc, or } = await import('drizzle-orm');
+
+  const profiles = await db
+    .select({
+      username: creatorProfiles.username,
+    })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.isPublic, true),
+        or(
+          eq(creatorProfiles.isFeatured, true),
+          eq(creatorProfiles.isClaimed, true)
+        )
+      )
+    )
+    .orderBy(
+      desc(creatorProfiles.isFeatured),
+      desc(creatorProfiles.profileViews)
+    )
+    .limit(limit);
+
+  return profiles;
+}

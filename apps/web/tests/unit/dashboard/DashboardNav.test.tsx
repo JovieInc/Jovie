@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/app/dashboard/actions';
+import type { DashboardData } from '@/app/app/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
