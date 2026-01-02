@@ -1,6 +1,6 @@
 'use client';
 
-import { ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -160,7 +160,7 @@ export function DashboardAnalyticsCards({
         ) : showEmpty ? (
           <div className='min-h-[196px]'>
             <EmptyState
-              icon={<ChartBarIcon className='h-6 w-6' aria-hidden='true' />}
+              icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
               heading='No profile views yet'
               description='Share your profile link to start tracking clicks and engagement from your fans.'
               action={
@@ -189,7 +189,7 @@ export function DashboardAnalyticsCards({
                 title='Profile views'
                 value={profileViewsLabel}
                 metadata={rangeLabel}
-                icon={ChartBarIcon}
+                icon={BarChart3}
                 iconClassName='text-sky-600 dark:text-sky-400'
                 iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
               />
@@ -198,7 +198,7 @@ export function DashboardAnalyticsCards({
                 title='Audience'
                 value={uniqueUsersLabel}
                 metadata={rangeLabel}
-                icon={UserGroupIcon}
+                icon={Users}
                 iconClassName='text-emerald-600 dark:text-emerald-400'
                 iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
               >

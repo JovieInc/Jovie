@@ -1,5 +1,5 @@
-import { XMarkIcon } from '@heroicons/react/20/solid';
 import { Input } from '@jovie/ui';
+import { X } from 'lucide-react';
 import React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -130,7 +130,7 @@ export function UniversalLinkInputUrlMode({
               className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
               aria-label='Clear input'
             >
-              <XMarkIcon className='w-4 h-4' />
+              <X className='w-4 h-4' />
             </button>
           </div>
         )}

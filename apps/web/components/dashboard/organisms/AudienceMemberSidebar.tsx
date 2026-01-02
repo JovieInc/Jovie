@@ -1,6 +1,6 @@
 'use client';
 
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { AudienceDetailRow } from '@/components/dashboard/atoms/AudienceDetailRow';
@@ -102,7 +102,7 @@ export function AudienceMemberSidebar({
         <DashboardHeaderActionButton
           ariaLabel='Close contact sidebar'
           onClick={onClose}
-          icon={<XMarkIcon className='h-4 w-4' aria-hidden='true' />}
+          icon={<X className='h-4 w-4' aria-hidden='true' />}
         />
       </div>
 

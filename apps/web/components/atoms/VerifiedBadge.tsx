@@ -1,4 +1,4 @@
-import { CheckBadgeIcon } from '@heroicons/react/24/solid';
+import { BadgeCheck } from 'lucide-react';
 
 interface VerifiedBadgeProps {
   size?: 'sm' | 'md' | 'lg';
@@ -22,7 +22,7 @@ export function VerifiedBadge({
       title='Verified artist'
       aria-label='Verified artist'
     >
-      <CheckBadgeIcon
+      <BadgeCheck
         className={`${sizeClasses[size]} translate-y-[1px]`}
         aria-hidden='true'
       />

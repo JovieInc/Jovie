@@ -1,8 +1,8 @@
 'use client';
 
-import { BellAlertIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { BellRing, Users } from 'lucide-react';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
@@ -257,9 +257,9 @@ export function DashboardAudienceTable({
       : 'Invite fans to tap the bell on your profile to receive notifications.';
   const emptyStateIcon =
     mode === 'members' ? (
-      <UserGroupIcon className='h-6 w-6' aria-hidden='true' />
+      <Users className='h-6 w-6' aria-hidden='true' />
     ) : (
-      <BellAlertIcon className='h-6 w-6' aria-hidden='true' />
+      <BellRing className='h-6 w-6' aria-hidden='true' />
     );
   const emptyStatePrimaryAction = profileUrl
     ? {

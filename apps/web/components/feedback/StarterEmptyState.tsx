@@ -1,4 +1,4 @@
-import { RocketLaunchIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { Rocket, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -104,7 +104,7 @@ export function StarterEmptyState({
     >
       <div className='flex items-start gap-4'>
         <div className='flex h-12 w-12 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-sm ring-1 ring-subtle dark:bg-zinc-900 dark:text-white'>
-          {icon ?? <SparklesIcon className='h-6 w-6' aria-hidden='true' />}
+          {icon ?? <Sparkles className='h-6 w-6' aria-hidden='true' />}
         </div>
         <div className='flex-1 space-y-2'>
           <div>
@@ -122,7 +122,7 @@ export function StarterEmptyState({
           )}
         </div>
 
-        <RocketLaunchIcon className='hidden h-10 w-10 text-accent-token sm:block' />
+        <Rocket className='hidden h-10 w-10 text-accent-token sm:block' />
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
-import { LinkIcon } from '@heroicons/react/24/outline';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Link as LinkIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,

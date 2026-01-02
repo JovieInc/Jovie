@@ -1,5 +1,5 @@
-import { LinkIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Link as LinkIcon, Music } from 'lucide-react';
 import { StarterEmptyState } from './StarterEmptyState';
 
 const meta: Meta<typeof StarterEmptyState> = {
@@ -45,7 +45,7 @@ export const CustomIcon: Story = {
   args: {
     title: 'Add your music',
     description: 'Connect your Spotify, Apple Music, or SoundCloud.',
-    icon: <MusicalNoteIcon className='h-6 w-6' />,
+    icon: <Music className='h-6 w-6' />,
     primaryAction: {
       label: 'Add Music Link',
       onClick: () => console.log('Add music'),

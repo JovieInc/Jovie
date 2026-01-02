@@ -1,7 +1,7 @@
 'use client';
 
-import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { Button, type ButtonProps } from '@jovie/ui';
+import { CreditCard } from 'lucide-react';
 import { useState } from 'react';
 import { track } from '@/lib/analytics';
 
@@ -85,7 +85,7 @@ export function BillingPortalLink({
         size={mappedSize}
         className='inline-flex items-center gap-2'
       >
-        <CreditCardIcon className='h-4 w-4' />
+        <CreditCard className='h-4 w-4' />
         {loading ? 'Loading...' : children}
       </Button>
       {error && (

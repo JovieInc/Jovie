@@ -7,12 +7,8 @@
  * Allows adding, verifying, and removing email addresses.
  */
 
-import {
-  CheckCircleIcon,
-  EnvelopeIcon,
-  ShieldExclamationIcon,
-} from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { CheckCircle, Mail, ShieldAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Input } from '@/components/atoms/Input';
@@ -164,7 +160,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
       <div className='flex items-start justify-between gap-6'>
         <div className='flex-1'>
           <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-            <EnvelopeIcon className='h-5 w-5 text-accent' />
+            <Mail className='h-5 w-5 text-accent' />
             Email addresses
           </h3>
           <p className='mt-1 text-sm text-secondary max-w-lg'>
@@ -197,12 +193,12 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   <p className='text-xs text-secondary flex items-center gap-2 mt-1'>
                     {isVerified ? (
                       <span className='inline-flex items-center gap-1 text-emerald-600'>
-                        <CheckCircleIcon className='h-4 w-4' />
+                        <CheckCircle className='h-4 w-4' />
                         Verified
                       </span>
                     ) : (
                       <span className='inline-flex items-center gap-1 text-amber-600'>
-                        <ShieldExclamationIcon className='h-4 w-4' />
+                        <ShieldAlert className='h-4 w-4' />
                         Verification required
                       </span>
                     )}

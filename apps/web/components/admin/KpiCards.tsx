@@ -1,12 +1,12 @@
 import {
-  ArrowTrendingDownIcon,
-  BanknotesIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  ExclamationTriangleIcon,
-  UserGroupIcon,
-} from '@heroicons/react/24/outline';
+  AlertTriangle,
+  Banknote,
+  CircleDollarSign,
+  ClipboardList,
+  Clock,
+  TrendingDown,
+  Users,
+} from 'lucide-react';
 import { AnalyticsCard } from '@/components/dashboard/atoms/AnalyticsCard';
 
 interface DataAvailability {
@@ -34,7 +34,7 @@ function UnavailableBadge({ message }: { message?: string }) {
       className='inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400'
       title={message ?? 'Data source unavailable'}
     >
-      <ExclamationTriangleIcon className='size-3' aria-hidden='true' />
+      <AlertTriangle className='size-3' aria-hidden='true' />
       <span className='hidden sm:inline'>Unavailable</span>
       <span className='sm:hidden'>N/A</span>
     </span>
@@ -147,7 +147,7 @@ export function KpiCards({
         title='MRR'
         value={mrrLabel}
         metadata={renderStripeMetadata('Monthly recurring revenue')}
-        icon={CurrencyDollarIcon}
+        icon={CircleDollarSign}
         iconClassName='text-sky-600 dark:text-sky-400'
         iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
       />
@@ -156,7 +156,7 @@ export function KpiCards({
         title='Balance'
         value={balanceLabel}
         metadata={renderMercuryMetadata('Mercury checking')}
-        icon={BanknotesIcon}
+        icon={Banknote}
         iconClassName='text-emerald-600 dark:text-emerald-400'
         iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
       />
@@ -165,7 +165,7 @@ export function KpiCards({
         title='Burn rate'
         value={burnRateLabel}
         metadata={renderMercuryMetadata('Spend in the last 30 days')}
-        icon={ArrowTrendingDownIcon}
+        icon={TrendingDown}
         iconClassName='text-rose-500 dark:text-rose-300'
         iconChipClassName='bg-rose-500/10 dark:bg-rose-500/15'
       />
@@ -174,7 +174,7 @@ export function KpiCards({
         title='Runway'
         value={runwayLabel}
         metadata={renderRunwayMetadata()}
-        icon={ClockIcon}
+        icon={Clock}
         iconClassName='text-amber-500 dark:text-amber-300'
         iconChipClassName='bg-amber-500/10 dark:bg-amber-500/15'
       />
@@ -183,7 +183,7 @@ export function KpiCards({
         title='Waitlist'
         value={waitlistLabel}
         metadata='Future customers on deck'
-        icon={ClipboardDocumentListIcon}
+        icon={ClipboardList}
         iconClassName='text-indigo-500 dark:text-indigo-300'
         iconChipClassName='bg-indigo-500/10 dark:bg-indigo-500/15'
       />
@@ -192,7 +192,7 @@ export function KpiCards({
         title='Active subs'
         value={subscribersLabel}
         metadata={renderStripeMetadata('Paying customers this month')}
-        icon={UserGroupIcon}
+        icon={Users}
         iconClassName='text-purple-500 dark:text-purple-300'
         iconChipClassName='bg-purple-500/10 dark:bg-purple-500/15'
       />
