@@ -44,11 +44,10 @@ export default async function OnboardingPage({
     authResult.context.email ?? user?.emailAddresses?.[0]?.emailAddress ?? null;
   const userId = authResult.clerkUserId!;
 
+  // Get dashboard data for form initialization
+  // No need to check needsOnboarding here - auth gate already validated access
+  // Removing this check prevents redirect loops caused by race conditions
   const dashboardData = await getDashboardData();
-  if (!dashboardData.needsOnboarding) {
-    redirect('/app/dashboard/overview');
-  }
-
   const existingProfile = dashboardData.selectedProfile;
 
   const displayNameSource = existingProfile?.displayName
