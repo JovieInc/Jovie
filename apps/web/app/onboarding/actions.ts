@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
@@ -469,6 +470,9 @@ export async function completeOnboarding({
     }
 
     if (redirectToDashboard) {
+      // Invalidate dashboard data cache to prevent stale data causing redirect loops
+      // This ensures the app layout gets fresh data showing onboarding is complete
+      revalidatePath('/app', 'layout');
       redirect('/app/dashboard/overview');
     }
 
