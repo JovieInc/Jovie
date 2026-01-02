@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import { debounce } from '@/lib/utils';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
