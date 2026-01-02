@@ -211,6 +211,116 @@ export async function checkOnboardingRateLimit(
   return userResult;
 }
 
+// ============================================================================
+// Spotify Ingest Operations
+// ============================================================================
+
+/**
+ * Rate limiter for Spotify artist search
+ * Limit: 30 requests per minute per user
+ */
+export const spotifySearchLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifySearch
+);
+
+/**
+ * Rate limiter for profile claim attempts
+ * CRITICAL: 5 attempts per hour per user - prevents claim abuse
+ */
+export const spotifyClaimLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifyClaim
+);
+
+/**
+ * Rate limiter for artist data refresh
+ * Limit: 10 per hour per artist
+ */
+export const spotifyRefreshLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifyRefresh
+);
+
+/**
+ * Rate limiter for unauthenticated search (homepage)
+ * Limit: 10 per minute per IP (in-memory for high throughput)
+ */
+export const spotifyPublicSearchLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifyPublicSearch,
+  { preferRedis: false }
+);
+
+// ============================================================================
+// Convenience Functions
+// ============================================================================
+
+/**
+ * Check Spotify search rate limits (authenticated user)
+ * Returns the first failure or success if all pass
+ */
+export async function checkSpotifySearchRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  const result = await spotifySearchLimiter.limit(userId);
+  if (!result.success) {
+    return {
+      ...result,
+      reason: 'Search rate limit exceeded. Please wait before searching again.',
+    };
+  }
+  return result;
+}
+
+/**
+ * Check Spotify public search rate limits (by IP)
+ * Returns the first failure or success if all pass
+ */
+export async function checkSpotifyPublicSearchRateLimit(
+  ipAddress: string
+): Promise<RateLimitResult> {
+  const result = await spotifyPublicSearchLimiter.limit(ipAddress);
+  if (!result.success) {
+    return {
+      ...result,
+      reason: 'Too many search requests. Please wait before trying again.',
+    };
+  }
+  return result;
+}
+
+/**
+ * Check profile claim rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkSpotifyClaimRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  const result = await spotifyClaimLimiter.limit(userId);
+  if (!result.success) {
+    return {
+      ...result,
+      reason: 'Too many claim attempts. Please try again later.',
+    };
+  }
+  return result;
+}
+
+/**
+ * Check artist data refresh rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkSpotifyRefreshRateLimit(
+  artistId: string
+): Promise<RateLimitResult> {
+  const result = await spotifyRefreshLimiter.limit(artistId);
+  if (!result.success) {
+    return {
+      ...result,
+      reason:
+        'Artist data was recently refreshed. Please wait before refreshing again.',
+    };
+  }
+  return result;
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -230,5 +340,9 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicVisit: publicVisitLimiter,
     health: healthLimiter,
     general: generalLimiter,
+    spotifySearch: spotifySearchLimiter,
+    spotifyClaim: spotifyClaimLimiter,
+    spotifyRefresh: spotifyRefreshLimiter,
+    spotifyPublicSearch: spotifyPublicSearchLimiter,
   };
 }

@@ -14,27 +14,25 @@
  * - ./actions/dashboard-data - Core dashboard data fetching
  */
 
+// Types and constants (imported directly from source to avoid "use server" conflicts)
+export type { DashboardData } from './actions/dashboard-data';
+// Server actions (from barrel)
 export {
   createEmptyTippingStats,
-  // Core dashboard data fetching
-  type DashboardData,
-  DSP_PLATFORMS,
-  type DspPlatform,
   getDashboardData,
   getDashboardDataCached,
   getDashboardDataFresh,
   getProfileSocialLinks,
-  // Social links types, constants, and server actions
-  type ProfileSocialLink,
   prefetchDashboardData,
-  // Profile selection logic
   profileIsPublishable,
   publishProfileBasics,
   selectDashboardProfile,
-  // User dashboard settings server actions
   setSidebarCollapsed,
-  // Tipping statistics types and helpers
-  type TippingStats,
-  // Creator profile management server actions
   updateCreatorProfile,
 } from './actions/index';
+export type {
+  DspPlatform,
+  ProfileSocialLink,
+} from './actions/social-links';
+export { DSP_PLATFORMS } from './actions/social-links';
+export type { TippingStats } from './actions/tipping-stats';

@@ -1,0 +1,137 @@
+'use client';
+
+import { useClerk, useUser } from '@clerk/nextjs';
+import { useEffect, useRef, useState } from 'react';
+import { useToast } from '@/components/molecules/ToastContainer';
+import { useBillingStatus } from '@/hooks/useBillingStatus';
+import type { Artist } from '@/types/db';
+import { useUserMenuActions } from '../useUserMenuActions';
+import type { UserDisplayInfo } from './types';
+
+export interface UseUserButtonProps {
+  artist?: Artist | null;
+  profileHref?: string;
+  settingsHref?: string;
+}
+
+export interface UseUserButtonReturn {
+  isLoaded: boolean;
+  user: ReturnType<typeof useUser>['user'];
+  isMenuOpen: boolean;
+  setIsMenuOpen: (open: boolean) => void;
+  isFeedbackOpen: boolean;
+  setIsFeedbackOpen: (open: boolean) => void;
+  billingStatus: ReturnType<typeof useBillingStatus>;
+  userInfo: UserDisplayInfo;
+  menuActions: ReturnType<typeof useUserMenuActions>;
+}
+
+export function useUserButton({
+  artist,
+  profileHref,
+  settingsHref,
+}: UseUserButtonProps): UseUserButtonReturn {
+  const { isLoaded, user } = useUser();
+  const { signOut } = useClerk();
+  const { showToast } = useToast();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const billingStatus = useBillingStatus();
+  const billingErrorNotifiedRef = useRef(false);
+
+  const redirectToUrl = (url: string) => {
+    if (typeof window === 'undefined') return;
+    if (typeof window.location.assign === 'function') {
+      window.location.assign(url);
+      return;
+    }
+    window.location.href = url;
+  };
+
+  useEffect(() => {
+    if (billingStatus.error && !billingErrorNotifiedRef.current) {
+      showToast({
+        type: 'error',
+        message:
+          "We couldn't confirm your current plan just now. Billing actions may be temporarily unavailable.",
+        duration: 6000,
+      });
+      billingErrorNotifiedRef.current = true;
+    }
+
+    if (!billingStatus.error) {
+      billingErrorNotifiedRef.current = false;
+    }
+  }, [billingStatus.error, showToast]);
+
+  // User display info
+  const userImageUrl = user?.imageUrl;
+  const contactEmail =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress;
+
+  const emailDerivedName = contactEmail?.split('@')[0]?.replace(/[._-]+/g, ' ');
+
+  const displayName =
+    artist?.name ||
+    user?.fullName ||
+    (user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.firstName) ||
+    user?.username ||
+    artist?.handle ||
+    emailDerivedName ||
+    'Artist';
+
+  const userInitials = displayName
+    ? displayName
+        .split(' ')
+        .map((n: string) => n[0] ?? '')
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : 'A';
+
+  const profileUrl =
+    profileHref ??
+    (user?.username
+      ? `/${user.username}`
+      : artist?.handle
+        ? `/${artist.handle}`
+        : '/app/settings');
+  const settingsUrl = settingsHref ?? '/app/settings';
+
+  const jovieUsername =
+    user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
+  const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
+
+  const menuActions = useUserMenuActions({
+    billingStatus,
+    profileUrl,
+    redirectToUrl,
+    settingsUrl,
+    signOut,
+  });
+
+  const userInfo: UserDisplayInfo = {
+    userImageUrl,
+    displayName,
+    userInitials,
+    contactEmail,
+    formattedUsername,
+    profileUrl,
+    settingsUrl,
+  };
+
+  return {
+    isLoaded,
+    user,
+    isMenuOpen,
+    setIsMenuOpen,
+    isFeedbackOpen,
+    setIsFeedbackOpen,
+    billingStatus,
+    userInfo,
+    menuActions,
+  };
+}

@@ -1,20 +1,21 @@
 /**
  * Dashboard actions barrel export.
  *
- * This module re-exports all public APIs from domain-specific action modules,
- * providing a clean single import path for dashboard functionality.
+ * This module re-exports server actions only. Types and constants should be
+ * imported directly from their source modules to avoid "use server" conflicts.
  */
 
 // Creator profile management server actions
 export { publishProfileBasics, updateCreatorProfile } from './creator-profile';
+
 // Core dashboard data fetching
 export {
-  type DashboardData,
   getDashboardData,
   getDashboardDataCached,
   getDashboardDataFresh,
   prefetchDashboardData,
 } from './dashboard-data';
+
 // Profile selection logic
 export {
   profileIsPublishable,
@@ -23,12 +24,15 @@ export {
 
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
-// Social links types, constants, and server actions
-export {
-  DSP_PLATFORMS,
-  type DspPlatform,
-  getProfileSocialLinks,
-  type ProfileSocialLink,
-} from './social-links';
-// Tipping statistics types and helpers
-export { createEmptyTippingStats, type TippingStats } from './tipping-stats';
+
+// Social links server actions
+export { getProfileSocialLinks } from './social-links';
+
+// Tipping statistics helpers
+export { createEmptyTippingStats } from './tipping-stats';
+
+// Types and constants should be imported directly from source modules:
+// - import type { DashboardData } from './dashboard-data';
+// - import type { DspPlatform, ProfileSocialLink } from './social-links';
+// - import { DSP_PLATFORMS } from './social-links';
+// - import type { TippingStats } from './tipping-stats';

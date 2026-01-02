@@ -246,7 +246,7 @@ export async function resolveUserState(options?: {
   // 3. Check waitlist access for existing users without waitlist linkage
   // This handles users who existed before the waitlist system
   if (!dbUser?.waitlistEntryId && email) {
-    const waitlistResult = await getWaitlistAccess(email);
+    const waitlistResult = await checkWaitlistAccessInternal(email);
 
     // If user has no waitlist entry and hasn't been approved, check their access
     if (waitlistResult.status === 'new') {
