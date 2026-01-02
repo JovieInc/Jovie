@@ -19,7 +19,7 @@ interface UniversalLinkInputUrlModeProps {
   placeholder: string;
   disabled?: boolean;
   detectedLink: DetectedLink | null;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   onUrlChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   onClear: () => void;
@@ -83,7 +83,7 @@ export function UniversalLinkInputUrlMode({
           Link URL
         </label>
         <Input
-          ref={inputRef}
+          ref={inputRef as React.RefObject<HTMLInputElement>}
           id='link-url-input'
           type='url'
           inputSize='lg'

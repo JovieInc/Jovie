@@ -4,8 +4,13 @@
  * Modular link input component for adding social links.
  */
 
-export type { UniversalLinkInputRef } from './UniversalLinkInput';
+export type {
+  UniversalLinkInputProps,
+  UniversalLinkInputRef,
+  UseUniversalLinkInputReturn,
+} from './types';
 export { UniversalLinkInput } from './UniversalLinkInput';
+export { useUniversalLinkInput } from './useUniversalLinkInput';
 
 export {
   fuzzyScore,
