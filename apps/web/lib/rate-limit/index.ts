@@ -40,6 +40,11 @@ export {
   // Auth & User
   avatarUploadLimiter,
   checkOnboardingRateLimit,
+  // Spotify convenience functions
+  checkSpotifyClaimRateLimit,
+  checkSpotifyPublicSearchRateLimit,
+  checkSpotifyRefreshRateLimit,
+  checkSpotifySearchRateLimit,
   // Convenience functions
   checkTrackingRateLimit,
   // Dashboard
@@ -55,6 +60,11 @@ export {
   // Public
   publicProfileLimiter,
   publicVisitLimiter,
+  // Spotify
+  spotifyClaimLimiter,
+  spotifyPublicSearchLimiter,
+  spotifyRefreshLimiter,
+  spotifySearchLimiter,
   // Tracking
   trackingClicksLimiter,
   trackingIpClicksLimiter,
