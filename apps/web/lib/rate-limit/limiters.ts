@@ -227,7 +227,9 @@ export const spotifySearchLimiter = createRateLimiter(
  * Rate limiter for profile claim attempts
  * CRITICAL: 5 attempts per hour per user - prevents claim abuse
  */
-export const spotifyClaimLimiter = createRateLimiter(RATE_LIMITERS.spotifyClaim);
+export const spotifyClaimLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifyClaim
+);
 
 /**
  * Rate limiter for artist data refresh
@@ -312,7 +314,8 @@ export async function checkSpotifyRefreshRateLimit(
   if (!result.success) {
     return {
       ...result,
-      reason: 'Artist data was recently refreshed. Please wait before refreshing again.',
+      reason:
+        'Artist data was recently refreshed. Please wait before refreshing again.',
     };
   }
   return result;

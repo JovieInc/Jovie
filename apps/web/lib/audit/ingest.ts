@@ -12,7 +12,6 @@
  */
 
 import { headers } from 'next/headers';
-import { getClientIP } from '@/lib/rate-limit/utils';
 
 // ============================================================================
 // Types
@@ -89,9 +88,7 @@ export async function getRequestContext(): Promise<{
 /**
  * Extract client IP from headers directly.
  */
-async function getClientIPFromHeaders(
-  headersList: Headers
-): Promise<string> {
+async function getClientIPFromHeaders(headersList: Headers): Promise<string> {
   // Priority: CF > Vercel > Real IP > Forwarded
   const cfConnectingIp = headersList.get('cf-connecting-ip');
   const xForwardedFor = headersList.get('x-forwarded-for');
@@ -141,9 +138,8 @@ function sanitizeMetadata(
 
   for (const [key, value] of Object.entries(metadata)) {
     const lowerKey = key.toLowerCase();
-    const isSensitive = sensitiveKeys.some(
-      (sensitive) =>
-        lowerKey.includes(sensitive.toLowerCase())
+    const isSensitive = sensitiveKeys.some(sensitive =>
+      lowerKey.includes(sensitive.toLowerCase())
     );
 
     if (isSensitive) {

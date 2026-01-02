@@ -18,32 +18,23 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
+import { logSearchEvent, logSearchRateLimited } from '@/lib/audit/ingest';
+import {
+  handleIngestError,
+  rateLimitedError,
+  unauthorizedError,
+  validationError,
+} from '@/lib/errors/ingest';
+import {
+  checkSpotifyPublicSearchRateLimit,
+  checkSpotifySearchRateLimit,
+} from '@/lib/rate-limit';
+import { type SearchArtistResult, spotifyClient } from '@/lib/spotify/client';
+import { type SanitizedArtist } from '@/lib/spotify/sanitize';
 import {
   artistSearchSchema,
   spotifyArtistIdSchema,
-  type ArtistSearchInput,
 } from '@/lib/validation/schemas/spotify';
-import {
-  checkSpotifySearchRateLimit,
-  checkSpotifyPublicSearchRateLimit,
-  checkSpotifyClaimRateLimit,
-  checkSpotifyRefreshRateLimit,
-  getClientIP,
-} from '@/lib/rate-limit';
-import { spotifyClient, type SearchArtistResult } from '@/lib/spotify/client';
-import { sanitizeArtistData, type SanitizedArtist } from '@/lib/spotify/sanitize';
-import {
-  IngestError,
-  handleIngestError,
-  rateLimitedError,
-  validationError,
-  unauthorizedError,
-  spotifyApiError,
-} from '@/lib/errors/ingest';
-import {
-  logSearchEvent,
-  logSearchRateLimited,
-} from '@/lib/audit/ingest';
 
 // ============================================================================
 // Types

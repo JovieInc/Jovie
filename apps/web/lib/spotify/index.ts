@@ -7,42 +7,40 @@
 
 // Client and API functions
 export {
-  spotifyClient,
-  isSpotifyAvailable,
-  searchSpotifyArtists,
   getSpotifyArtist,
+  isSpotifyAvailable,
   type SearchArtistResult,
+  searchSpotifyArtists,
+  spotifyClient,
 } from './client';
-
-// Data sanitization
-export {
-  sanitizeArtistData,
-  sanitizeSearchResult,
-  sanitizeImageUrl,
-  sanitizeSpotifyUrl,
-  sanitizeExternalUrls,
-  sanitizeText,
-  sanitizeName,
-  sanitizeBio,
-  ALLOWED_IMAGE_HOSTS,
-  ALLOWED_EXTERNAL_DOMAINS,
-  type RawSpotifyArtist,
-  type SanitizedArtist,
-} from './sanitize';
-
 // Environment and configuration
 export {
-  isSpotifyConfigured,
-  validateSpotifyEnv,
   getSpotifyConfig,
-  requireSpotifyConfig,
   getSpotifyEnv,
-  validateSpotifyConfigOnStartup,
-  SPOTIFY_API_BASE,
+  isSpotifyConfigured,
+  requireSpotifyConfig,
   SPOTIFY_ACCOUNTS_BASE,
+  SPOTIFY_API_BASE,
   SPOTIFY_DEFAULT_TIMEOUT_MS,
-  SPOTIFY_TOKEN_REFRESH_BUFFER_MS,
   SPOTIFY_TOKEN_LIFETIME_MS,
-  type SpotifyEnv,
+  SPOTIFY_TOKEN_REFRESH_BUFFER_MS,
   type SpotifyConfig,
+  type SpotifyEnv,
+  validateSpotifyConfigOnStartup,
+  validateSpotifyEnv,
 } from './env';
+// Data sanitization
+export {
+  ALLOWED_EXTERNAL_DOMAINS,
+  ALLOWED_IMAGE_HOSTS,
+  type RawSpotifyArtist,
+  type SanitizedArtist,
+  sanitizeArtistData,
+  sanitizeBio,
+  sanitizeExternalUrls,
+  sanitizeImageUrl,
+  sanitizeName,
+  sanitizeSearchResult,
+  sanitizeSpotifyUrl,
+  sanitizeText,
+} from './sanitize';

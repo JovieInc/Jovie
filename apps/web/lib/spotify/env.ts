@@ -46,7 +46,12 @@ const OptionalSpotifyEnvSchema = z.object({
   // OAuth redirect URI (defaults to calculated value)
   SPOTIFY_REDIRECT_URI: z.string().url().optional(),
   // Custom API timeout in milliseconds
-  SPOTIFY_API_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).optional(),
+  SPOTIFY_API_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(30000)
+    .optional(),
 });
 
 // ============================================================================
@@ -69,10 +74,7 @@ export interface SpotifyConfig extends SpotifyEnv, Partial<OptionalSpotifyEnv> {
  * Does not throw, just returns boolean.
  */
 export function isSpotifyConfigured(): boolean {
-  return !!(
-    process.env.SPOTIFY_CLIENT_ID &&
-    process.env.SPOTIFY_CLIENT_SECRET
-  );
+  return !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
 }
 
 /**
@@ -92,7 +94,7 @@ export function validateSpotifyEnv(): {
     return {
       success: false,
       errors: result.error.issues.map(
-        (issue) => `${issue.path.join('.')}: ${issue.message}`
+        issue => `${issue.path.join('.')}: ${issue.message}`
       ),
     };
   }

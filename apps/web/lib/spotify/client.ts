@@ -14,25 +14,22 @@
  */
 
 import 'server-only';
+import { type IngestErrorCode, spotifyApiError } from '@/lib/errors/ingest';
 import {
   getSpotifyEnv,
   isSpotifyConfigured,
-  SPOTIFY_API_BASE,
   SPOTIFY_ACCOUNTS_BASE,
+  SPOTIFY_API_BASE,
   SPOTIFY_DEFAULT_TIMEOUT_MS,
-  SPOTIFY_TOKEN_REFRESH_BUFFER_MS,
   SPOTIFY_TOKEN_LIFETIME_MS,
+  SPOTIFY_TOKEN_REFRESH_BUFFER_MS,
 } from './env';
 import {
-  sanitizeSearchResult,
-  sanitizeArtistData,
   type RawSpotifyArtist,
   type SanitizedArtist,
+  sanitizeArtistData,
+  sanitizeSearchResult,
 } from './sanitize';
-import {
-  spotifyApiError,
-  type IngestErrorCode,
-} from '@/lib/errors/ingest';
 
 // ============================================================================
 // Types
@@ -99,7 +96,10 @@ class SpotifyClientManager {
     const now = Date.now();
 
     // Check if current token is still valid (with buffer)
-    if (this.accessToken && now < this.tokenExpiresAt - SPOTIFY_TOKEN_REFRESH_BUFFER_MS) {
+    if (
+      this.accessToken &&
+      now < this.tokenExpiresAt - SPOTIFY_TOKEN_REFRESH_BUFFER_MS
+    ) {
       return this.accessToken;
     }
 
@@ -143,7 +143,10 @@ class SpotifyClientManager {
       });
 
       if (!response.ok) {
-        console.error('[Spotify Client] Token refresh failed:', response.status);
+        console.error(
+          '[Spotify Client] Token refresh failed:',
+          response.status
+        );
         this.accessToken = null;
         this.tokenExpiresAt = 0;
         return null;
@@ -198,9 +201,12 @@ class SpotifyClientManager {
 
       let errorDetails: unknown;
       try {
-        errorDetails = await response.json() as SpotifyErrorResponse;
+        errorDetails = (await response.json()) as SpotifyErrorResponse;
       } catch {
-        errorDetails = { status: response.status, statusText: response.statusText };
+        errorDetails = {
+          status: response.status,
+          statusText: response.statusText,
+        };
       }
 
       throw spotifyApiError(errorDetails, errorCode);
@@ -216,7 +222,10 @@ class SpotifyClientManager {
     status: number
   ): Extract<
     IngestErrorCode,
-    'SPOTIFY_API_ERROR' | 'SPOTIFY_NOT_FOUND' | 'SPOTIFY_RATE_LIMITED' | 'SPOTIFY_UNAVAILABLE'
+    | 'SPOTIFY_API_ERROR'
+    | 'SPOTIFY_NOT_FOUND'
+    | 'SPOTIFY_RATE_LIMITED'
+    | 'SPOTIFY_UNAVAILABLE'
   > {
     switch (status) {
       case 404:

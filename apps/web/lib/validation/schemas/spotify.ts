@@ -61,7 +61,7 @@ export const artistSearchQuerySchema = z
   .min(1, 'Search query required')
   .max(100, 'Query too long')
   .regex(SEARCH_QUERY_REGEX, 'Invalid characters in query')
-  .transform((s) => s.trim());
+  .transform(s => s.trim());
 
 /**
  * Complete artist search input schema.
@@ -93,11 +93,8 @@ export const handleSchema = z
   .string()
   .min(3, 'Handle must be at least 3 characters')
   .max(30, 'Handle too long')
-  .regex(
-    /^[a-z0-9_]+$/,
-    'Handle: lowercase letters, numbers, underscores only'
-  )
-  .transform((s) => s.toLowerCase());
+  .regex(/^[a-z0-9_]+$/, 'Handle: lowercase letters, numbers, underscores only')
+  .transform(s => s.toLowerCase());
 
 /**
  * Inferred TypeScript type for handles.

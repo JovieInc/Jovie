@@ -153,7 +153,11 @@ export function unauthorizedError(details?: string): IngestError {
  */
 export function validationError(
   message: string,
-  code: 'INVALID_INPUT' | 'INVALID_SPOTIFY_ID' | 'INVALID_HANDLE' | 'INVALID_QUERY' = 'INVALID_INPUT'
+  code:
+    | 'INVALID_INPUT'
+    | 'INVALID_SPOTIFY_ID'
+    | 'INVALID_HANDLE'
+    | 'INVALID_QUERY' = 'INVALID_INPUT'
 ): IngestError {
   return new IngestError(code, message);
 }
@@ -163,13 +167,18 @@ export function validationError(
  */
 export function spotifyApiError(
   internalDetails?: unknown,
-  code: 'SPOTIFY_API_ERROR' | 'SPOTIFY_NOT_FOUND' | 'SPOTIFY_RATE_LIMITED' | 'SPOTIFY_UNAVAILABLE' = 'SPOTIFY_API_ERROR'
+  code:
+    | 'SPOTIFY_API_ERROR'
+    | 'SPOTIFY_NOT_FOUND'
+    | 'SPOTIFY_RATE_LIMITED'
+    | 'SPOTIFY_UNAVAILABLE' = 'SPOTIFY_API_ERROR'
 ): IngestError {
   const messages: Record<string, string> = {
     SPOTIFY_API_ERROR: 'Failed to fetch data from Spotify. Please try again.',
     SPOTIFY_NOT_FOUND: 'Artist not found on Spotify.',
     SPOTIFY_RATE_LIMITED: 'Spotify rate limit reached. Please try again later.',
-    SPOTIFY_UNAVAILABLE: 'Spotify is temporarily unavailable. Please try again later.',
+    SPOTIFY_UNAVAILABLE:
+      'Spotify is temporarily unavailable. Please try again later.',
   };
 
   return new IngestError(code, messages[code], {
@@ -183,13 +192,19 @@ export function spotifyApiError(
  * Create an artist claim error.
  */
 export function claimError(
-  code: 'ARTIST_ALREADY_CLAIMED' | 'HANDLE_TAKEN' | 'NOT_ARTIST_OWNER' | 'SPOTIFY_NOT_CONNECTED' | 'CLAIM_IN_PROGRESS',
+  code:
+    | 'ARTIST_ALREADY_CLAIMED'
+    | 'HANDLE_TAKEN'
+    | 'NOT_ARTIST_OWNER'
+    | 'SPOTIFY_NOT_CONNECTED'
+    | 'CLAIM_IN_PROGRESS',
   details?: unknown
 ): IngestError {
   const messages: Record<string, string> = {
     ARTIST_ALREADY_CLAIMED: 'This artist has already been claimed.',
     HANDLE_TAKEN: 'This handle is already in use. Please choose another.',
-    NOT_ARTIST_OWNER: 'You must be the owner of this Spotify artist account to claim it.',
+    NOT_ARTIST_OWNER:
+      'You must be the owner of this Spotify artist account to claim it.',
     SPOTIFY_NOT_CONNECTED: 'Please connect your Spotify account first.',
     CLAIM_IN_PROGRESS: 'A claim for this artist is already in progress.',
   };
@@ -301,7 +316,8 @@ export function getUserFriendlyMessage(code: IngestErrorCode): string {
     RATE_LIMITED: 'Too many requests. Please wait and try again.',
     INVALID_INPUT: 'Invalid input. Please check your data and try again.',
     INVALID_SPOTIFY_ID: 'Invalid Spotify artist ID.',
-    INVALID_HANDLE: 'Invalid handle. Use only lowercase letters, numbers, and underscores.',
+    INVALID_HANDLE:
+      'Invalid handle. Use only lowercase letters, numbers, and underscores.',
     INVALID_QUERY: 'Invalid search query.',
     UNAUTHORIZED: 'Please sign in to continue.',
     NOT_ARTIST_OWNER: 'You must be the owner of this Spotify artist account.',

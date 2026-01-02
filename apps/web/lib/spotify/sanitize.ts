@@ -142,7 +142,9 @@ export function sanitizeGenre(genre: string): string {
  * @param url - Raw image URL
  * @returns Sanitized HTTPS URL or null if invalid
  */
-export function sanitizeImageUrl(url: string | undefined | null): string | null {
+export function sanitizeImageUrl(
+  url: string | undefined | null
+): string | null {
   if (!url) return null;
 
   try {
@@ -185,7 +187,9 @@ export function sanitizeExternalUrls(
 
   const sanitized: Record<string, string> = {};
 
-  for (const [key, allowedDomains] of Object.entries(ALLOWED_EXTERNAL_DOMAINS)) {
+  for (const [key, allowedDomains] of Object.entries(
+    ALLOWED_EXTERNAL_DOMAINS
+  )) {
     const url = urls[key];
     if (!url) continue;
 
@@ -194,12 +198,15 @@ export function sanitizeExternalUrls(
 
       // Verify domain is in allowed list for this URL type
       if (!allowedDomains.includes(parsed.hostname)) {
-        console.warn('[Spotify Sanitize] Blocked external URL with invalid domain', {
-          key,
-          url,
-          hostname: parsed.hostname,
-          allowed: allowedDomains,
-        });
+        console.warn(
+          '[Spotify Sanitize] Blocked external URL with invalid domain',
+          {
+            key,
+            url,
+            hostname: parsed.hostname,
+            allowed: allowedDomains,
+          }
+        );
         continue;
       }
 
@@ -208,7 +215,10 @@ export function sanitizeExternalUrls(
 
       sanitized[key] = parsed.toString();
     } catch {
-      console.warn('[Spotify Sanitize] Invalid external URL format', { key, url });
+      console.warn('[Spotify Sanitize] Invalid external URL format', {
+        key,
+        url,
+      });
     }
   }
 
@@ -259,7 +269,9 @@ export function sanitizeSpotifyUrl(
  * @param count - Raw follower count
  * @returns Sanitized non-negative integer
  */
-export function sanitizeFollowerCount(count: number | undefined | null): number {
+export function sanitizeFollowerCount(
+  count: number | undefined | null
+): number {
   if (count === undefined || count === null || isNaN(count)) {
     return 0;
   }
@@ -273,7 +285,9 @@ export function sanitizeFollowerCount(count: number | undefined | null): number 
  * @param popularity - Raw popularity score
  * @returns Sanitized popularity between 0-100
  */
-export function sanitizePopularity(popularity: number | undefined | null): number {
+export function sanitizePopularity(
+  popularity: number | undefined | null
+): number {
   if (popularity === undefined || popularity === null || isNaN(popularity)) {
     return 0;
   }
@@ -351,7 +365,4 @@ export function sanitizeSearchResult(raw: RawSpotifyArtist): {
 // Exports for specific use cases
 // ============================================================================
 
-export {
-  ALLOWED_IMAGE_HOSTS,
-  ALLOWED_EXTERNAL_DOMAINS,
-};
+export { ALLOWED_IMAGE_HOSTS, ALLOWED_EXTERNAL_DOMAINS };
