@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
@@ -13,13 +14,27 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
+/**
+ * Timing-safe verification of Bearer token to prevent timing attacks.
+ */
 function isAuthorized(request: NextRequest): boolean {
   if (!CRON_SECRET) {
     return false;
   }
 
   const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${CRON_SECRET}`;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+
+  const provided = authHeader.slice(7); // Remove 'Bearer ' prefix
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(CRON_SECRET);
+
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 function isWithinPacificSendWindow(now: Date): boolean {

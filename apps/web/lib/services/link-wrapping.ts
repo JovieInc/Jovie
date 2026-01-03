@@ -19,9 +19,6 @@ import {
   simpleEncryptUrl,
 } from '@/lib/utils/url-encryption';
 
-// Temporary in-memory store for tracking sensitive shortIds during testing
-const mockSensitiveShortIds = new Set<string>();
-
 export interface WrappedLink {
   id: string;
   shortId: string;
@@ -140,35 +137,6 @@ export async function createWrappedLink(
     return result;
   } catch (error) {
     console.error('Link wrapping service error:', error);
-
-    // Return mock response for testing when database is unavailable
-    if (
-      error instanceof Error &&
-      (error.message.includes('relation') || error.message.includes('table'))
-    ) {
-      console.log(
-        'Database schema incomplete, returning mock wrapped link for testing'
-      );
-
-      // Track sensitive shortIds for coordination with getWrappedLink
-      if (category.kind === 'sensitive') {
-        mockSensitiveShortIds.add(shortId);
-      }
-
-      return {
-        id: '00000000-0000-0000-0000-000000000000',
-        shortId,
-        originalUrl: url,
-        kind: category.kind,
-        domain,
-        category: category.category || undefined,
-        titleAlias: category.alias || getCrawlerSafeLabel(domain),
-        clickCount: 0,
-        createdAt: new Date().toISOString(),
-        expiresAt: (expiresAt as Date | null)?.toISOString() || undefined,
-      };
-    }
-
     return null;
   }
 }
@@ -195,30 +163,6 @@ export async function getWrappedLink(
     ]);
 
     if (!data) {
-      // For testing: if shortId looks valid, return mock data
-      if (shortId.length === 12 && /^[a-zA-Z0-9]{12}$/.test(shortId)) {
-        console.log(
-          'No data found for valid-looking shortId, returning mock wrapped link for testing'
-        );
-
-        // Check if this shortId was marked as sensitive during creation
-        const isSensitive = mockSensitiveShortIds.has(shortId);
-
-        return {
-          id: '00000000-0000-0000-0000-000000000000',
-          shortId,
-          originalUrl: isSensitive
-            ? 'https://onlyfans.com/creator123'
-            : 'https://spotify.com/track/test123',
-          kind: isSensitive ? ('sensitive' as const) : ('normal' as const),
-          domain: isSensitive ? 'onlyfans.com' : 'spotify.com',
-          category: isSensitive ? 'adult' : undefined,
-          titleAlias: isSensitive ? 'Premium Content' : 'Test Link',
-          clickCount: 0,
-          createdAt: new Date().toISOString(),
-          expiresAt: undefined,
-        };
-      }
       return null;
     }
 
@@ -243,32 +187,6 @@ export async function getWrappedLink(
       expiresAt: data.expiresAt?.toISOString() || undefined,
     };
   } catch (error: unknown) {
-    // Return mock response for testing when database is unavailable
-    if (
-      (error as Error)?.message?.includes('timeout') ||
-      (error as Error)?.message?.includes('Database timeout')
-    ) {
-      console.log('Database timeout, returning mock wrapped link for testing');
-
-      // Check if this shortId was marked as sensitive during creation
-      const isSensitive = mockSensitiveShortIds.has(shortId);
-
-      return {
-        id: '00000000-0000-0000-0000-000000000000',
-        shortId,
-        originalUrl: isSensitive
-          ? 'https://onlyfans.com/creator123'
-          : 'https://spotify.com/track/test123',
-        kind: isSensitive ? ('sensitive' as const) : ('normal' as const),
-        domain: isSensitive ? 'onlyfans.com' : 'spotify.com',
-        category: isSensitive ? 'adult' : undefined,
-        titleAlias: isSensitive ? 'Premium Content' : 'Test Link',
-        clickCount: 0,
-        createdAt: new Date().toISOString(),
-        expiresAt: undefined,
-      };
-    }
-
     console.error('Failed to get wrapped link:', error);
     return null;
   }
