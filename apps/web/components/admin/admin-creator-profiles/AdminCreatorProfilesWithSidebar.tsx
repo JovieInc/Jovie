@@ -45,7 +45,7 @@ const SendInviteDialog = dynamic(
 
 const ContactSidebar = dynamic(
   () =>
-    import('@/components/organisms/ContactSidebar').then(mod => ({
+    import('@/components/organisms/contact-sidebar').then(mod => ({
       default: mod.ContactSidebar,
     })),
   {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ArtistContactsButton } from '@/components/profile/ArtistContactsButton';
+import { ArtistContactsButton } from '@/components/profile/artist-contacts-button';
 import { encodeContactPayload } from '@/lib/contacts/obfuscation';
 import type { PublicContact } from '@/types/contacts';
 

@@ -14,7 +14,7 @@ export * from './HeroSection';
 export * from './HowItWorksSection';
 export * from './ListenSection';
 export * from './ProfileSection';
-export * from './ProfileShell';
+export * from './profile-shell';
 export * from './SmartHandleInput';
 export * from './SocialBar';
 export * from './TipSection';

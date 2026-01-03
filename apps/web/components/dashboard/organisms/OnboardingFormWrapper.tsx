@@ -1,6 +1,6 @@
 'use client';
 
-import { AppleStyleOnboardingForm } from './AppleStyleOnboardingForm';
+import { AppleStyleOnboardingForm } from './apple-style-onboarding';
 
 interface OnboardingFormWrapperProps {
   initialDisplayName?: string;

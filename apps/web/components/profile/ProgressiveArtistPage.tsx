@@ -10,7 +10,7 @@ import { Artist, LegacySocialLink } from '@/types/db';
 // Lazy load the animated version
 const AnimatedArtistPage = dynamic(
   () =>
-    import('@/components/profile/AnimatedArtistPage').then(mod => ({
+    import('@/components/profile/animated-artist-page').then(mod => ({
       default: mod.AnimatedArtistPage,
     })),
   {
