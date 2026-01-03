@@ -1,35 +1,38 @@
 /**
  * Dashboard actions barrel export.
  *
- * This module re-exports all public APIs from domain-specific action modules,
- * providing a clean single import path for dashboard functionality.
+ * This module re-exports server actions only. Types and constants should be
+ * imported directly from their source modules to avoid "use server" conflicts.
  */
 
-// Tipping statistics types and helpers
-export { type TippingStats, createEmptyTippingStats } from './tipping-stats';
+// Creator profile management server actions
+export { publishProfileBasics, updateCreatorProfile } from './creator-profile';
+
+// Core dashboard data fetching
+export {
+  getDashboardData,
+  getDashboardDataCached,
+  getDashboardDataFresh,
+  prefetchDashboardData,
+} from './dashboard-data';
 
 // Profile selection logic
-export { profileIsPublishable, selectDashboardProfile } from './profile-selection';
-
-// Social links types, constants, and server actions
 export {
-  type ProfileSocialLink,
-  type DspPlatform,
-  DSP_PLATFORMS,
-  getProfileSocialLinks,
-} from './social-links';
+  profileIsPublishable,
+  selectDashboardProfile,
+} from './profile-selection';
 
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
 
-// Creator profile management server actions
-export { updateCreatorProfile, publishProfileBasics } from './creator-profile';
+// Social links server actions
+export { getProfileSocialLinks } from './social-links';
 
-// Core dashboard data fetching
-export {
-  type DashboardData,
-  prefetchDashboardData,
-  getDashboardData,
-  getDashboardDataFresh,
-  getDashboardDataCached,
-} from './dashboard-data';
+// Tipping statistics helpers
+export { createEmptyTippingStats } from './tipping-stats';
+
+// Types and constants should be imported directly from source modules:
+// - import type { DashboardData } from './dashboard-data';
+// - import type { DspPlatform, ProfileSocialLink } from './social-links';
+// - import { DSP_PLATFORMS } from './social-links';
+// - import type { TippingStats } from './tipping-stats';

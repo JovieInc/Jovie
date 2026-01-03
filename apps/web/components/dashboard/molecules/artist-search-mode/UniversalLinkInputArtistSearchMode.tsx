@@ -72,7 +72,7 @@ export function UniversalLinkInputArtistSearchMode({
           Search Spotify artists
         </label>
         <Input
-          ref={inputRef as React.RefObject<HTMLInputElement>}
+          ref={inputRef}
           id='artist-search-input'
           type='text'
           inputSize='lg'

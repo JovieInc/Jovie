@@ -175,11 +175,26 @@ export default async function RootLayout({
       />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
-      {/* DNS Prefetch for critical external resources */}
+      {/* DNS Prefetch and Preconnect for critical external resources */}
+      {/* Spotify CDN - artist images */}
       <link rel='dns-prefetch' href='https://i.scdn.co' />
-      <link rel='dns-prefetch' href='https://api.spotify.com' />
-      <link rel='dns-prefetch' href='https://images.unsplash.com' />
       <link rel='preconnect' href='https://i.scdn.co' crossOrigin='' />
+      {/* Spotify API */}
+      <link rel='dns-prefetch' href='https://api.spotify.com' />
+      {/* Vercel Blob Storage - avatar images */}
+      <link rel='dns-prefetch' href='https://public.blob.vercel-storage.com' />
+      <link
+        rel='preconnect'
+        href='https://public.blob.vercel-storage.com'
+        crossOrigin=''
+      />
+      {/* Clerk Auth - authentication */}
+      <link rel='dns-prefetch' href='https://clerk.jovie.co' />
+      <link rel='preconnect' href='https://clerk.jovie.co' crossOrigin='' />
+      <link rel='dns-prefetch' href='https://img.clerk.com' />
+      <link rel='preconnect' href='https://img.clerk.com' crossOrigin='' />
+      {/* Unsplash - fallback images */}
+      <link rel='dns-prefetch' href='https://images.unsplash.com' />
       <link
         rel='preconnect'
         href='https://images.unsplash.com'

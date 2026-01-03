@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 
 const EnhancedDashboardLinks = dynamic(
   () =>

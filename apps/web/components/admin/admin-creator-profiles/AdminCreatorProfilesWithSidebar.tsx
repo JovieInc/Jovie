@@ -1,14 +1,30 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
+import {
+  getNextSort,
+  SortableColumnKey,
+} from '@/components/admin/creator-sort-config';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
+import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
+import { useRowSelection } from '@/components/admin/table/useRowSelection';
+import { useCreatorActions } from '@/components/admin/useCreatorActions';
+import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { useToast } from '@/components/molecules/ToastContainer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
-import { useAdminCreatorProfiles } from './useAdminCreatorProfiles';
+import { useAvatarUpload } from './useAvatarUpload';
+import { useContactHydration } from './useContactHydration';
+import { useIngestRefresh } from './useIngestRefresh';
 import { CONTACT_PANEL_WIDTH } from './utils';
 
 const DeleteCreatorDialog = dynamic(
@@ -38,6 +54,14 @@ const ContactSidebar = dynamic(
   }
 );
 
+function useOptionalTableMeta() {
+  try {
+    return useTableMeta();
+  } catch {
+    return null;
+  }
+}
+
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
   page,
@@ -48,28 +72,44 @@ export function AdminCreatorProfilesWithSidebar({
   mode = 'admin',
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
   const {
-    router,
-    showToast,
-    profilesWithActions,
-    verificationStatuses,
+    profiles,
+    statuses: verificationStatuses,
     toggleVerification,
+  } = useCreatorVerification(initialProfiles);
+
+  const {
+    profiles: profilesWithActions,
     toggleFeatured,
     toggleMarketing,
     deleteCreatorOrUser,
-    selectedId,
-    openMenuProfileId,
-    setOpenMenuProfileId,
-    sidebarOpen,
-    isMobile,
-    deleteDialogOpen,
-    setDeleteDialogOpen,
-    profileToDelete,
-    setProfileToDelete,
-    inviteDialogOpen,
-    setInviteDialogOpen,
-    profileToInvite,
-    setProfileToInvite,
+  } = useCreatorActions(profiles);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openMenuProfileId, setOpenMenuProfileId] = useState<string | null>(
+    null
+  );
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const tableMetaCtx = useOptionalTableMeta();
+  const setTableMeta = React.useMemo(
+    () => tableMetaCtx?.setTableMeta ?? (() => {}),
+    [tableMetaCtx]
+  );
+
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [profileToDelete, setProfileToDelete] = useState<
+    (typeof profilesWithActions)[number] | null
+  >(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [profileToInvite, setProfileToInvite] = useState<
+    (typeof profilesWithActions)[number] | null
+  >(null);
+
+  const {
     totalPages,
     canPrev,
     canNext,
@@ -78,30 +118,120 @@ export function AdminCreatorProfilesWithSidebar({
     prevHref,
     nextHref,
     clearHref,
-    handleSortChange,
+    buildHref,
+  } = useAdminTablePaginationLinks({
+    basePath,
+    page,
+    pageSize,
+    search,
+    sort,
+    total,
+  });
+
+  const handleSortChange = useCallback(
+    (column: SortableColumnKey) => {
+      router.push(buildHref({ page: 1, sort: getNextSort(sort, column) }));
+    },
+    [buildHref, router, sort]
+  );
+
+  const filteredProfiles = profilesWithActions;
+
+  const rowIds = useMemo(
+    () => filteredProfiles.map(profile => profile.id),
+    [filteredProfiles]
+  );
+
+  const {
     selectedIds,
     selectedCount,
     headerCheckboxState,
     toggleSelect,
     toggleSelectAll,
+  } = useRowSelection(rowIds);
+
+  const {
+    setDraftContact,
     effectiveContact,
     hydrateContactSocialLinks,
     handleContactChange,
-    ingestRefreshStatuses,
-    refreshIngest,
-    handleAvatarUpload,
-    handleRowClick,
-    handleKeyDown,
-    handleSidebarClose,
-  } = useAdminCreatorProfiles({
-    profiles: initialProfiles,
-    page,
-    pageSize,
-    total,
-    search,
-    sort,
-    basePath,
+  } = useContactHydration({
+    profiles: filteredProfiles,
+    selectedId,
   });
+
+  const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
+    selectedId,
+    onRefreshComplete: hydrateContactSocialLinks,
+  });
+
+  const { handleAvatarUpload } = useAvatarUpload();
+
+  const handleRowClick = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      setSidebarOpen(true);
+      setDraftContact(null);
+    },
+    [setDraftContact]
+  );
+
+  React.useEffect(() => {
+    if (!sidebarOpen || !selectedId) return;
+    void hydrateContactSocialLinks(selectedId);
+  }, [hydrateContactSocialLinks, selectedId, sidebarOpen]);
+
+  const { handleKeyDown } = useAdminTableKeyboardNavigation({
+    items: filteredProfiles,
+    selectedId,
+    onSelect: setSelectedId,
+    onToggleSidebar: () => setSidebarOpen(open => !open),
+    onCloseSidebar: () => setSidebarOpen(false),
+    isSidebarOpen: sidebarOpen,
+    getId: profile => profile.id,
+  });
+
+  const handleSidebarClose = () => {
+    setSidebarOpen(false);
+  };
+
+  React.useEffect(() => {
+    if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
+      setSelectedId(profilesWithActions[0]!.id);
+      setDraftContact(null);
+    }
+  }, [sidebarOpen, selectedId, profilesWithActions, setDraftContact]);
+
+  React.useEffect(() => {
+    const toggle = () => {
+      setSidebarOpen(prev => {
+        const next = !prev;
+        if (next && !selectedId && filteredProfiles[0]) {
+          setSelectedId(filteredProfiles[0]!.id);
+          setDraftContact(null);
+        }
+        return next;
+      });
+    };
+
+    setTableMeta({
+      rowCount: filteredProfiles.length,
+      toggle,
+      rightPanelWidth:
+        sidebarOpen && Boolean(effectiveContact) ? CONTACT_PANEL_WIDTH : 0,
+    });
+
+    return () => {
+      setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
+    };
+  }, [
+    filteredProfiles,
+    selectedId,
+    setTableMeta,
+    sidebarOpen,
+    effectiveContact,
+    setDraftContact,
+  ]);
 
   return (
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>

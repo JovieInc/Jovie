@@ -52,16 +52,13 @@ export default async function AppShellLayout({
   prefetchDashboardData();
 
   try {
-    const [dashboardData, userId] = await Promise.all([
-      getDashboardDataCached(),
-      authPromise,
-    ]);
+    // Wait for auth gate to complete first - it already checked onboarding state
+    const userId = await authPromise;
 
-    // Double-check onboarding status from dashboard data
-    // This catches edge cases where profile was created but onboarding not completed
-    if (dashboardData.needsOnboarding) {
-      redirect('/onboarding');
-    }
+    // Get dashboard data - auth gate already validated access, so this is safe
+    // No need to double-check onboarding here as resolveUserState() already did it
+    // This prevents redirect loops caused by stale cached data
+    const dashboardData = await getDashboardDataCached();
 
     return (
       <MyStatsig userId={userId}>

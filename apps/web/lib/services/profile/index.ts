@@ -36,6 +36,7 @@ export {
   getProfileSummary,
   getProfileWithLinks,
   getProfileWithUser,
+  getTopProfilesForStaticGeneration,
   isClaimTokenValid,
 } from './queries';
 // Types

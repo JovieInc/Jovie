@@ -20,6 +20,7 @@ import {
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
+import { getTopProfilesForStaticGeneration } from '@/lib/services/profile';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -346,11 +347,20 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
-// Note: generateStaticParams removed to allow edge runtime
-// Edge runtime provides better performance for dynamic profile pages
+// ISR: Revalidate public profiles every hour
+// This works with generateStaticParams to pre-render top profiles at build time
+// and revalidate them in the background on subsequent requests
+export const revalidate = 3600; // 1 hour
 
-// Cache the full HTML at the edge for 60s to make repeat visits instant.
-// The underlying DB query is also cached via unstable_cache with the same TTL.
-// 404s are still rendered correctly on cache miss.
-// Note: revalidate removed for cacheComponents compatibility
-// Using unstable_cache() for caching instead
+// Pre-render top profiles at build time for instant TTFB
+// Featured and claimed profiles are prioritized
+export async function generateStaticParams(): Promise<{ username: string }[]> {
+  try {
+    const profiles = await getTopProfilesForStaticGeneration(100);
+    return profiles;
+  } catch (error) {
+    console.error('[generateStaticParams] Failed to fetch profiles:', error);
+    // Return empty array on error - pages will be generated on-demand
+    return [];
+  }
+}

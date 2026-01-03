@@ -10,7 +10,7 @@ export interface ArtistSearchModeProps {
   onExit: (nextUrl?: string) => void;
   onQueryChange?: (value: string) => void;
   focusInput: (cursor?: CursorPosition) => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLInputElement>;
 }
 
 export type { ArtistSearchProvider, DetectedLink, CursorPosition };

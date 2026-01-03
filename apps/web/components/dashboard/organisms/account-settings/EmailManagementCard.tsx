@@ -13,36 +13,151 @@ import {
   ShieldExclamationIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { useMemo, useState } from 'react';
 
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
+import { useToast } from '@/components/molecules/ToastContainer';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
-import type { ClerkUserResource } from './types';
-import { useEmailManagement } from './useEmailManagement';
+import type {
+  ClerkEmailAddressResource,
+  ClerkUserResource,
+  EmailStatus,
+} from './types';
+import { extractErrorMessage, syncEmailToDatabase } from './utils';
 
 export interface EmailManagementCardProps {
   user: ClerkUserResource;
 }
 
 export function EmailManagementCard({ user }: EmailManagementCardProps) {
-  const {
-    newEmail,
-    setNewEmail,
-    verificationCode,
-    setVerificationCode,
-    pendingEmail,
-    emailStatus,
-    emailError,
-    syncingEmailId,
-    primaryEmailId,
-    sortedEmails,
-    resetEmailForm,
-    handleStartEmailUpdate,
-    handleVerifyEmail,
-    handleMakePrimary,
-    handleRemoveEmail,
-  } = useEmailManagement(user);
+  const { showToast } = useToast();
+
+  const [newEmail, setNewEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [pendingEmail, setPendingEmail] =
+    useState<ClerkEmailAddressResource | null>(null);
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [syncingEmailId, setSyncingEmailId] = useState<string | null>(null);
+
+  const primaryEmailId = user.primaryEmailAddressId ?? null;
+
+  const sortedEmails = useMemo(() => {
+    const addresses = [...user.emailAddresses];
+    return addresses.sort((a, b) => {
+      if (a.id === primaryEmailId) return -1;
+      if (b.id === primaryEmailId) return 1;
+      const aVerified = a.verification?.status === 'verified';
+      const bVerified = b.verification?.status === 'verified';
+      if (aVerified && !bVerified) return -1;
+      if (!aVerified && bVerified) return 1;
+      return a.emailAddress.localeCompare(b.emailAddress);
+    });
+  }, [user.emailAddresses, primaryEmailId]);
+
+  const resetEmailForm = () => {
+    setNewEmail('');
+    setVerificationCode('');
+    setPendingEmail(null);
+    setEmailStatus('idle');
+    setEmailError(null);
+  };
+
+  const handleStartEmailUpdate = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setEmailStatus('sending');
+    setEmailError(null);
+
+    try {
+      const createdEmail = await user.createEmailAddress({
+        email: newEmail,
+      });
+      setPendingEmail(createdEmail);
+      await createdEmail.prepareVerification({ strategy: 'email_code' });
+      setEmailStatus('code');
+      showToast({
+        type: 'success',
+        message: `Verification code sent to ${newEmail}`,
+      });
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setEmailStatus('idle');
+      setEmailError(message);
+    }
+  };
+
+  const handleVerifyEmail = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!pendingEmail) {
+      return;
+    }
+
+    setEmailStatus('verifying');
+    setEmailError(null);
+
+    try {
+      const verifiedEmail = await pendingEmail.attemptVerification({
+        code: verificationCode.trim(),
+      });
+
+      if (verifiedEmail.verification?.status !== 'verified') {
+        throw new Error('Verification code is invalid or expired.');
+      }
+
+      setSyncingEmailId(verifiedEmail.id);
+      await user.update({ primaryEmailAddressId: verifiedEmail.id });
+      await syncEmailToDatabase(verifiedEmail.emailAddress);
+      await user.reload();
+      resetEmailForm();
+      setSyncingEmailId(null);
+      showToast({
+        type: 'success',
+        message: 'Primary email updated successfully.',
+      });
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setEmailStatus('code');
+      setEmailError(message);
+      setSyncingEmailId(null);
+    }
+  };
+
+  const handleMakePrimary = async (email: ClerkEmailAddressResource) => {
+    setSyncingEmailId(email.id);
+
+    try {
+      await user.update({ primaryEmailAddressId: email.id });
+      await syncEmailToDatabase(email.emailAddress);
+      await user.reload();
+      showToast({
+        type: 'success',
+        message: 'Primary email updated.',
+      });
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      showToast({ type: 'error', message });
+    } finally {
+      setSyncingEmailId(null);
+    }
+  };
+
+  const handleRemoveEmail = async (email: ClerkEmailAddressResource) => {
+    setSyncingEmailId(email.id);
+    try {
+      await email.destroy();
+      await user.reload();
+      showToast({ type: 'success', message: 'Email removed.' });
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      showToast({ type: 'error', message });
+    } finally {
+      setSyncingEmailId(null);
+    }
+  };
 
   return (
     <DashboardCard variant='settings'>

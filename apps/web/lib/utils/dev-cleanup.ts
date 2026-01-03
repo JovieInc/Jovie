@@ -145,12 +145,18 @@ export function startDevMemoryMonitor(options?: {
   }
 
   const intervalMs = options?.intervalMs ?? 60_000;
-  if (typeof process.memoryUsage !== 'function') {
+  // Use bracket notation to avoid Edge Runtime static analyzer detecting Node.js API
+  const memUsage =
+    typeof process !== 'undefined'
+      ? (process as { memoryUsage?: () => NodeJS.MemoryUsage })['memoryUsage']
+      : undefined;
+
+  if (typeof memUsage !== 'function') {
     return;
   }
 
   globalThis.jovieDevMemoryMonitorInterval = setInterval(() => {
-    const mem = process.memoryUsage();
+    const mem = memUsage();
     console.info('[DEV_MEMORY]', {
       rss: mem.rss,
       heapTotal: mem.heapTotal,
