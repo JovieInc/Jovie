@@ -23,9 +23,12 @@ export function useActivityFeed({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasLoadedOnceRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchActivity = useCallback(async () => {
+    abortControllerRef.current?.abort();
     const controller = new AbortController();
+    abortControllerRef.current = controller;
     const isInitialLoad = !hasLoadedOnceRef.current;
     if (isInitialLoad) {
       setIsLoading(true);
@@ -60,6 +63,9 @@ export function useActivityFeed({
   useEffect(() => {
     if (!gate) return;
     void fetchActivity();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [gate, fetchActivity, refreshSignal]);
 
   useEffect(() => {

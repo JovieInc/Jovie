@@ -1,5 +1,6 @@
 'use client';
 
+import { ComputerDesktopIcon } from '@heroicons/react/24/outline';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { MoonIcon, SunIcon } from './ThemeIcons';
@@ -64,7 +65,15 @@ export function DashboardThemeToggle({
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              <span className='text-lg mb-1'>{option.icon}</span>
+              <span className='mb-1 flex items-center justify-center'>
+                {option.value === 'light' ? (
+                  <SunIcon className='h-5 w-5 text-secondary-token' />
+                ) : option.value === 'dark' ? (
+                  <MoonIcon className='h-5 w-5 text-secondary-token' />
+                ) : (
+                  <ComputerDesktopIcon className='h-5 w-5 text-secondary-token' />
+                )}
+              </span>
               <span className='text-xs font-medium'>{option.label}</span>
               {theme === option.value && option.value === 'system' && (
                 <span className='text-xs text-secondary-token mt-1'>
