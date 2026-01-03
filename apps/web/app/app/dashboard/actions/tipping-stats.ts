@@ -1,6 +1,12 @@
 /**
  * Tipping statistics types and helpers.
  *
+ * @deprecated This file's exports have moved to @/lib/db/server
+ * Import from there instead:
+ * - import { createEmptyTippingStats, type TippingStats } from '@/lib/db/server';
+ *
+ * This file remains for backward compatibility and will be removed in a future version.
+ *
  * This module provides the TippingStats interface and a factory function
  * for creating empty stats objects. It's dependency-free and imported by
  * other dashboard action modules.

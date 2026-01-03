@@ -52,32 +52,12 @@ export interface ProfileSocialLink {
 }
 
 /**
- * List of Digital Streaming Platform (DSP) identifiers.
- * Used to distinguish music streaming links from other social links.
- * Includes both hyphenated and underscored variants for compatibility.
+ * NOTE: DSP_PLATFORMS and DspPlatform type moved to canonical source.
+ * Import from: @/lib/services/social-links/types
+ *
+ * This module now imports these from the centralized location to avoid
+ * exporting non-async constants from a 'use server' file.
  */
-export const DSP_PLATFORMS = [
-  'amazon-music',
-  'amazon_music',
-  'apple-music',
-  'apple_music',
-  'bandcamp',
-  'deezer',
-  'netease',
-  'pandora',
-  'soundcloud',
-  'spotify',
-  'tencent-music',
-  'tencent_music',
-  'tidal',
-  'youtube-music',
-  'youtube_music',
-] as const;
-
-/**
- * Type representing a valid DSP platform identifier.
- */
-export type DspPlatform = (typeof DSP_PLATFORMS)[number];
 
 /**
  * Fetches social links for a given profile owned by the current user.
