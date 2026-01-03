@@ -40,7 +40,8 @@ const EXPECTED_TABLES = [
 ] as const;
 
 // Tables that are deprecated/legacy and can be ignored
-const LEGACY_TABLES = ['artist_contacts'] as const;
+// Note: artist_contacts was removed in migration 0031 (replaced by creator_contacts)
+const LEGACY_TABLES: readonly string[] = [] as const;
 
 interface ValidationResult {
   valid: boolean;
