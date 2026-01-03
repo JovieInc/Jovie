@@ -14,5 +14,6 @@ export type LoadingState =
   | { type: 'idle' }
   | { type: 'submitting' }
   | { type: 'verifying' }
+  | { type: 'completing' } // Session propagation after OTP verification
   | { type: 'resending' }
   | { type: 'oauth'; provider: 'google' | 'spotify' };

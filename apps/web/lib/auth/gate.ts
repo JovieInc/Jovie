@@ -81,6 +81,86 @@ function isProfileComplete(profile: {
 }
 
 /**
+ * Helper function to create a DB user with exponential backoff retry logic.
+ *
+ * Handles transient database errors that might occur during the Clerk
+ * session propagation window after OTP verification.
+ *
+ * @param clerkUserId - The Clerk user ID
+ * @param email - User's email address
+ * @param waitlistEntryId - Optional waitlist entry ID
+ * @param maxRetries - Maximum retry attempts (default: 3)
+ * @returns Created/updated user ID or null if all retries fail
+ */
+async function createUserWithRetry(
+  clerkUserId: string,
+  email: string | null,
+  waitlistEntryId: string | undefined,
+  maxRetries = 3
+): Promise<string | null> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Exponential backoff: 0ms, 1000ms, 2000ms
+      if (attempt > 0) {
+        const delay = Math.min(1000 * attempt, 3000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        console.log(
+          `[AUTH] Retry attempt ${attempt + 1}/${maxRetries} for user creation`
+        );
+      }
+
+      const [createdUser] = await db
+        .insert(users)
+        .values({
+          clerkId: clerkUserId,
+          email,
+          status: 'active',
+          waitlistEntryId,
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: {
+            email,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: users.id });
+
+      if (!createdUser) {
+        throw new Error('User creation returned no result');
+      }
+
+      console.log(
+        `[AUTH] User created/updated successfully (attempt ${attempt + 1})`
+      );
+      return createdUser.id;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+      console.error(
+        `[AUTH] User creation failed (attempt ${attempt + 1}/${maxRetries}):`,
+        lastError
+      );
+
+      // Don't retry on constraint violations or permanent errors
+      if (
+        lastError.message?.includes('duplicate key') ||
+        lastError.message?.includes('constraint')
+      ) {
+        break;
+      }
+    }
+  }
+
+  console.error(
+    `[AUTH] User creation failed after ${maxRetries} attempts:`,
+    lastError
+  );
+  return null;
+}
+
+/**
  * Centralized auth gate function that resolves the current user's state.
  *
  * This is the single source of truth for auth state resolution. It replaces
@@ -170,7 +250,7 @@ export async function resolveUserState(options?: {
   }
 
   // 2b. If no DB user exists, create one if requested
-  let dbUserId = dbUser?.id ?? null;
+  let dbUserId: string | null = dbUser?.id ?? null;
 
   if (!dbUserId) {
     if (createDbUserIfMissing && email) {
@@ -209,18 +289,24 @@ export async function resolveUserState(options?: {
         };
       }
 
-      // User is claimed or approved - create DB user
-      const [createdUser] = await db
-        .insert(users)
-        .values({
-          clerkId: clerkUserId,
-          email,
-          status: 'active',
-          waitlistEntryId: waitlistResult.entryId ?? undefined,
-        })
-        .returning({ id: users.id });
+      // User is claimed or approved - create DB user with retry logic
+      dbUserId = await createUserWithRetry(
+        clerkUserId,
+        email,
+        waitlistResult.entryId ?? undefined
+      );
 
-      dbUserId = createdUser.id;
+      if (!dbUserId) {
+        console.error('[AUTH] Failed to create user record after retries');
+        return {
+          state: UserState.NEEDS_ONBOARDING,
+          clerkUserId,
+          dbUserId: null,
+          profileId: null,
+          redirectTo: '/onboarding',
+          context: { ...baseContext, email },
+        };
+      }
     } else if (!createDbUserIfMissing) {
       return {
         state: UserState.NEEDS_DB_USER,
