@@ -185,8 +185,23 @@ export async function GET(request: NextRequest) {
       toDelete.forEach(([key]) => searchCache.delete(key));
     }
 
+    // Clean up expired rate limit entries
+    if (rateLimitMap.size > 1000) {
+      const now = Date.now();
+      for (const [ip, entry] of rateLimitMap.entries()) {
+        if (now > entry.resetAt) {
+          rateLimitMap.delete(ip);
+        }
+      }
+    }
+
     return NextResponse.json(results, { headers: rateLimitHeaders });
-  } catch {
+  } catch (error) {
+    console.error('[Spotify Search] Search failed:', {
+      query: q,
+      limit,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
