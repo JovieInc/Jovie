@@ -168,7 +168,7 @@ export default async function RootLayout({
     var pref = ls && ls !== 'system' ? ls : (mql.matches ? 'dark' : 'light');
     var root = document.documentElement;
     if (pref === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
-  } catch (e) {}
+  } catch (e) { /* Theme detection failed - defaults will apply */ }
 })();
 `,
         }}

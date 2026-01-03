@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
-import { captureError, captureWarning } from '@/lib/error-tracking';
+import { captureError } from '@/lib/error-tracking';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
@@ -49,94 +49,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// In-memory cache for mock responses to reduce server load during testing
-// Cache expires after 10 seconds to balance performance with realistic behavior
-// Max size of 1000 entries to prevent memory exhaustion during load testing
-const mockResponseCache = new Map<
-  string,
-  { result: { available: boolean }; expiry: number }
->();
-const MOCK_CACHE_TTL = 10 * 1000; // 10 seconds
-const MOCK_CACHE_MAX_SIZE = 1000; // Max entries to prevent memory exhaustion
-
-// Helper function to get cached mock response
-function getCachedMockResponse(handle: string) {
-  const cached = mockResponseCache.get(handle);
-  if (cached && cached.expiry > Date.now()) {
-    return cached.result;
-  }
-  return null;
-}
-
-// Helper function to cache mock response with LRU-style eviction
-function cacheMockResponse(handle: string, result: { available: boolean }) {
-  // Evict oldest entries if cache is full
-  if (mockResponseCache.size >= MOCK_CACHE_MAX_SIZE) {
-    const now = Date.now();
-    // First, remove expired entries
-    for (const [key, value] of mockResponseCache.entries()) {
-      if (value.expiry < now) {
-        mockResponseCache.delete(key);
-      }
-    }
-    // If still too full, remove oldest 10%
-    if (mockResponseCache.size >= MOCK_CACHE_MAX_SIZE) {
-      const keysToDelete = Array.from(mockResponseCache.keys()).slice(
-        0,
-        Math.ceil(MOCK_CACHE_MAX_SIZE * 0.1)
-      );
-      for (const key of keysToDelete) {
-        mockResponseCache.delete(key);
-      }
-    }
-  }
-
-  mockResponseCache.set(handle, {
-    result,
-    expiry: Date.now() + MOCK_CACHE_TTL,
-  });
-}
-
-// Helper function to create mock response with appropriate cache headers
-function createMockResponse(handle: string) {
-  // Check cache first
-  const cachedResponse = getCachedMockResponse(handle);
-  if (cachedResponse) {
-    return NextResponse.json(cachedResponse, {
-      headers: {
-        'Cache-Control': `public, max-age=10`, // 10 second cache for mock responses
-        'X-Mock-Response': 'true',
-        'X-Cache-Status': 'hit',
-      },
-    });
-  }
-
-  // Mock some common handles as taken for realistic testing
-  const commonHandles = [
-    'admin',
-    'root',
-    'test',
-    'user',
-    'api',
-    'www',
-    'mail',
-    'ftp',
-    'support',
-  ];
-  const isCommonHandle = commonHandles.includes(handle.toLowerCase());
-  const result = { available: !isCommonHandle };
-
-  // Cache the result
-  cacheMockResponse(handle, result);
-
-  return NextResponse.json(result, {
-    headers: {
-      'Cache-Control': `public, max-age=10`, // 10 second cache for mock responses
-      'X-Mock-Response': 'true',
-      'X-Cache-Status': 'miss',
-    },
-  });
-}
 export async function GET(request: Request) {
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
@@ -228,23 +140,15 @@ export async function GET(request: Request) {
       );
     }
 
-    // Handle timeout and provide mock response
+    // Handle timeout - return error instead of mock data
     if (
       (error as Error)?.message?.includes('timeout') ||
       (error as Error)?.message?.includes('Database timeout')
     ) {
-      await captureWarning(
-        'Database timeout, providing cached mock handle availability for testing',
-        error,
-        { handle }
+      return respondWithConstantTime(
+        { available: false, error: 'Service temporarily unavailable' },
+        { status: 503 }
       );
-
-      // Still maintain constant timing even for mock responses
-      const delay = calculateConstantTimeDelay(startTime);
-      if (delay > 0) {
-        await sleep(delay);
-      }
-      return createMockResponse(handle.toLowerCase());
     }
 
     return respondWithConstantTime(
