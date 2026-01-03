@@ -1,15 +1,14 @@
+'server only';
+
 /**
- * Profile selection logic for dashboard.
+ * Server-safe utilities for dashboard actions.
  *
- * @deprecated This file's exports have moved to @/lib/db/server
- * Import from there instead:
- * - import { profileIsPublishable, selectDashboardProfile } from '@/lib/db/server';
+ * This module uses 'server only' (not 'use server') to allow exporting
+ * non-async utility functions and constants without triggering build errors.
  *
- * This file remains for backward compatibility and will be removed in a future version.
- *
- * This module provides functions to determine which creator profile
- * should be displayed on the dashboard. It handles profile selection
- * based on publishability and recency.
+ * Following the pattern established in:
+ * - lib/entitlements/server.ts
+ * - lib/flags/server.ts
  */
 
 import type { CreatorProfile } from '@/lib/db/schema';
@@ -23,6 +22,8 @@ import type { CreatorProfile } from '@/lib/db/schema';
  * - A display name
  * - Is set to public
  * - Has completed onboarding at least once
+ *
+ * Moved from app/app/dashboard/actions/profile-selection.ts
  *
  * @param profile - The creator profile to check, or null
  * @returns true if the profile is publishable, false otherwise
@@ -49,6 +50,8 @@ export function profileIsPublishable(profile: CreatorProfile | null): boolean {
  * 2. If no publishable profile, the most recently updated profile
  * 3. If update times are equal, the most recently created profile
  *
+ * Moved from app/app/dashboard/actions/profile-selection.ts
+ *
  * @param profiles - Array of creator profiles to choose from
  * @returns The selected profile (first profile if array has at least one element)
  * @throws May throw if profiles array is empty
@@ -70,4 +73,42 @@ export function selectDashboardProfile(
   });
 
   return byRecency[0];
+}
+
+/**
+ * Statistics about tips received by a creator profile.
+ *
+ * Moved from app/app/dashboard/actions/tipping-stats.ts
+ */
+export interface TippingStats {
+  /** Total number of tip-related clicks (QR + link combined) */
+  tipClicks: number;
+  /** Number of tip clicks originating from QR codes */
+  qrTipClicks: number;
+  /** Number of tip clicks originating from links */
+  linkTipClicks: number;
+  /** Total number of tips submitted */
+  tipsSubmitted: number;
+  /** Total amount received in cents (all time) */
+  totalReceivedCents: number;
+  /** Amount received in cents for the current month */
+  monthReceivedCents: number;
+}
+
+/**
+ * Creates an empty TippingStats object with all values initialized to zero.
+ *
+ * Moved from app/app/dashboard/actions/tipping-stats.ts
+ *
+ * @returns A TippingStats object with all numeric fields set to 0
+ */
+export function createEmptyTippingStats(): TippingStats {
+  return {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  };
 }

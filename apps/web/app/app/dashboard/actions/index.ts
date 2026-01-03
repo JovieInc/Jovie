@@ -1,8 +1,21 @@
 /**
  * Dashboard actions barrel export.
  *
- * This module re-exports server actions only. Types and constants should be
- * imported directly from their source modules to avoid "use server" conflicts.
+ * IMPORTANT: This file does NOT have "use server" directive.
+ * It only re-exports server actions that are already marked with "use server"
+ * in their source files.
+ *
+ * This barrel exports ONLY async server actions. Non-async utilities have been
+ * moved to @/lib/db/server to comply with Next.js "use server" requirements.
+ *
+ * Non-async utilities are now in @/lib/db/server:
+ * - profileIsPublishable()
+ * - selectDashboardProfile()
+ * - createEmptyTippingStats()
+ * - TippingStats interface
+ *
+ * Constants are in their canonical locations:
+ * - DSP_PLATFORMS, DspPlatform from @/lib/services/social-links/types
  */
 
 // Creator profile management server actions
@@ -16,19 +29,15 @@ export {
   prefetchDashboardData,
 } from './dashboard-data';
 
-// Profile selection logic (server action only)
-export { selectDashboardProfile } from './profile-selection';
-
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
 
 // Social links server actions
 export { getProfileSocialLinks } from './social-links';
 
-// Types, constants, and utility functions should be imported directly from source modules:
+// Import non-async utilities directly from their new locations:
+// - import { profileIsPublishable, selectDashboardProfile } from '@/lib/db/server';
+// - import { createEmptyTippingStats, type TippingStats } from '@/lib/db/server';
+// - import { DSP_PLATFORMS, type DspPlatform } from '@/lib/services/social-links/types';
 // - import type { DashboardData } from './dashboard-data';
-// - import type { DspPlatform, ProfileSocialLink } from './social-links';
-// - import { DSP_PLATFORMS } from './social-links';
-// - import type { TippingStats } from './tipping-stats';
-// - import { profileIsPublishable } from './profile-selection';
-// - import { createEmptyTippingStats } from './tipping-stats';
+// - import type { ProfileSocialLink } from './social-links';
