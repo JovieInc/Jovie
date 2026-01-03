@@ -218,6 +218,13 @@
       "when": 1767038536446,
       "tag": "0030_warm_jetstream",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1735930800000,
+      "tag": "0031_add_missing_performance_indexes",
+      "breakpoints": false
     }
   ]
 }

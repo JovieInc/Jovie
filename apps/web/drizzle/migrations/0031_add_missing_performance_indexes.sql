@@ -11,47 +11,23 @@
 -- WHERE status = 'pending' AND run_at <= now AND attempts < max_attempts
 -- ORDER BY priority ASC, run_at ASC
 -- This index covers the WHERE clause and ORDER BY for optimal performance
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes
-    WHERE schemaname = 'public' AND indexname = 'idx_ingestion_jobs_claim_queue'
-  ) THEN
-    CREATE INDEX idx_ingestion_jobs_claim_queue
-      ON ingestion_jobs (status, priority, run_at)
-      WHERE status = 'pending';
-  END IF;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_claim_queue
+  ON ingestion_jobs (status, priority, run_at)
+  WHERE status = 'pending';
 
 -- Composite index for stuck job detection query pattern:
 -- WHERE status = 'processing' AND updated_at <= stuckBefore
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes
-    WHERE schemaname = 'public' AND indexname = 'idx_ingestion_jobs_stuck_detection'
-  ) THEN
-    CREATE INDEX idx_ingestion_jobs_stuck_detection
-      ON ingestion_jobs (status, updated_at)
-      WHERE status = 'processing';
-  END IF;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_stuck_detection
+  ON ingestion_jobs (status, updated_at)
+  WHERE status = 'processing';
 
 --------------------------------------------------------------------------------
 -- CREATOR_PROFILES: Add created_at index for sorting queries
 --------------------------------------------------------------------------------
 
 -- Index on created_at for sorting new creators, admin queries, and analytics
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes
-    WHERE schemaname = 'public' AND indexname = 'idx_creator_profiles_created_at'
-  ) THEN
-    CREATE INDEX idx_creator_profiles_created_at
-      ON creator_profiles (created_at DESC);
-  END IF;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_creator_profiles_created_at
+  ON creator_profiles (created_at DESC);
 
 --------------------------------------------------------------------------------
 -- CLEANUP: Remove orphaned artist_contacts table
