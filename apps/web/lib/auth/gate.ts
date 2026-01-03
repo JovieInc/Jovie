@@ -128,6 +128,10 @@ async function createUserWithRetry(
         })
         .returning({ id: users.id });
 
+      if (!createdUser) {
+        throw new Error('User creation returned no result');
+      }
+
       console.log(
         `[AUTH] User created/updated successfully (attempt ${attempt + 1})`
       );
