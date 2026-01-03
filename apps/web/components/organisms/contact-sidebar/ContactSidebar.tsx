@@ -10,25 +10,22 @@
 import { Button, Input, Label } from '@jovie/ui';
 import { Copy, ExternalLink, Plus, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
-import React, { useCallback, useMemo, useState } from 'react';
+import React from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
 import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { detectPlatform } from '@/lib/utils/platform-detection';
-import type { Contact, ContactSocialLink } from '@/types';
 
 import type { ContactSidebarProps } from './types';
+import { useContactSidebar } from './useContactSidebar';
 import {
   extractUsernameFromLabel,
   extractUsernameFromUrl,
   formatUsername,
-  isFormElement,
   isValidUrl,
-  sanitizeUsernameInput,
 } from './utils';
 
 export function ContactSidebar({
@@ -42,118 +39,30 @@ export function ContactSidebar({
   isSaving,
   onAvatarUpload,
 }: ContactSidebarProps) {
-  const [isAddingLink, setIsAddingLink] = useState(false);
-  const [newLinkUrl, setNewLinkUrl] = useState('');
-
-  const isEditable = mode === 'admin';
-  const hasContact = Boolean(contact);
-
-  const fullName = useMemo(() => {
-    if (!contact) return '';
-    const parts = [contact.firstName, contact.lastName]
-      .filter(Boolean)
-      .join(' ');
-    return parts || contact.displayName || contact.username;
-  }, [contact]);
-
-  const handleFieldChange = useCallback(
-    (updater: (current: Contact) => Contact) => {
-      if (!contact || !onContactChange) return;
-      onContactChange(updater(contact));
-    },
-    [contact, onContactChange]
-  );
-
-  const handleAvatarUpload = useCallback(
-    async (file: File) => {
-      if (!contact || !onAvatarUpload || !onContactChange) {
-        return contact?.avatarUrl ?? '';
-      }
-      track('contact_avatar_upload_start', { contactId: contact.id });
-      const newUrl = await onAvatarUpload(file, contact);
-      onContactChange({ ...contact, avatarUrl: newUrl });
-      track('contact_avatar_upload_success', { contactId: contact.id });
-      return newUrl;
-    },
-    [contact, onAvatarUpload, onContactChange]
-  );
-
-  const handleCopyProfileUrl = useCallback(async () => {
-    if (!contact?.username) return;
-    try {
-      const url = new URL(
-        `/${contact.username}`,
-        window.location.origin
-      ).toString();
-      await navigator.clipboard.writeText(url);
-    } catch (error) {
-      console.error('Failed to copy profile URL', error);
-    }
-  }, [contact]);
-
-  const handleNameChange = (field: 'firstName' | 'lastName', value: string) => {
-    handleFieldChange(current => ({ ...current, [field]: value }));
-  };
-
-  const handleUsernameChange = (raw: string) => {
-    const username = sanitizeUsernameInput(raw);
-    handleFieldChange(current => ({ ...current, username }));
-  };
-
-  const handleAddLink = () => {
-    if (!contact || !onContactChange) return;
-    const trimmedUrl = newLinkUrl.trim();
-    if (!isValidUrl(trimmedUrl)) return;
-
-    const detected = detectPlatform(trimmedUrl, fullName || contact.username);
-    if (!detected.isValid) return;
-
-    const nextLink: ContactSocialLink = {
-      id: undefined,
-      label: detected.suggestedTitle,
-      url: detected.normalizedUrl,
-      platformType: detected.platform.icon,
-    };
-
-    onContactChange({
-      ...contact,
-      socialLinks: [...contact.socialLinks, nextLink],
-    });
-
-    setIsAddingLink(false);
-    setNewLinkUrl('');
-  };
-
-  const handleRemoveLink = (index: number) => {
-    handleFieldChange(current => ({
-      ...current,
-      socialLinks: current.socialLinks.filter((_link, i) => i !== index),
-    }));
-  };
-
-  const handleNewLinkKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      if (isValidUrl(newLinkUrl)) {
-        handleAddLink();
-      }
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      setIsAddingLink(false);
-      setNewLinkUrl('');
-    }
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape' && !isFormElement(event.target)) {
-      onClose?.();
-    }
-  };
-
-  const canUploadAvatar =
-    isEditable && Boolean(onAvatarUpload && contact && onContactChange);
+  const {
+    isAddingLink,
+    setIsAddingLink,
+    newLinkUrl,
+    setNewLinkUrl,
+    isEditable,
+    hasContact,
+    fullName,
+    canUploadAvatar,
+    handleAvatarUpload,
+    handleCopyProfileUrl,
+    handleNameChange,
+    handleUsernameChange,
+    handleAddLink,
+    handleRemoveLink,
+    handleNewLinkKeyDown,
+    handleKeyDown,
+  } = useContactSidebar({
+    contact,
+    mode,
+    onClose,
+    onContactChange,
+    onAvatarUpload,
+  });
 
   return (
     <aside

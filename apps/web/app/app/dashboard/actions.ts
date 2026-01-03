@@ -14,7 +14,7 @@
  * - ./actions/dashboard-data - Core dashboard data fetching
  */
 
-// Types and constants (imported directly from source to avoid "use server" conflicts)
+// Types (imported directly from source to avoid "use server" conflicts)
 export type { DashboardData } from './actions/dashboard-data';
 // Server actions (from barrel)
 export {
