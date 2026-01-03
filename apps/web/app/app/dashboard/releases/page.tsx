@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/ReleaseProviderMatrix';
+import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { checkSpotifyConnection, loadReleaseMatrix } from './actions';
 import { primaryProviderKeys, providerConfig } from './config';

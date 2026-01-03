@@ -1,8 +1,8 @@
 'use client';
 
-import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
-import { DashboardActivityFeed } from '@/components/dashboard/organisms/DashboardActivityFeed';
+import { DashboardAnalyticsCards as AnalyticsCards } from '@/components/dashboard/organisms/DashboardAnalyticsCards';
 import { useDashboardOverviewControls } from '@/components/dashboard/organisms/DashboardOverviewControlsProvider';
+import { DashboardActivityFeed } from '@/components/dashboard/organisms/dashboard-activity-feed';
 
 export interface DashboardOverviewMetricsClientProps {
   profileId: string;
