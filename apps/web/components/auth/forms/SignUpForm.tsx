@@ -91,7 +91,7 @@ export function SignUpForm() {
         clearTimeout(redirectTimerRef.current);
       }
     };
-  }, [shouldSuggestSignIn, email, isRedirecting, router, buildSignInUrl]);
+  }, [shouldSuggestSignIn, email, router, buildSignInUrl]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
