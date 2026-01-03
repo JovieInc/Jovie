@@ -2,6 +2,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { AlertTriangle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { isSentryInitialized } from '@/lib/sentry/init';
 
@@ -18,6 +19,8 @@ export default function ErrorBoundary({
   context,
   message = 'We encountered an error loading this page. Please try again.',
 }: ErrorBoundaryProps) {
+  const router = useRouter();
+
   useEffect(() => {
     // Log error to console for debugging
     console.error(`[${context} Error]`, error);
@@ -64,7 +67,7 @@ export default function ErrorBoundary({
             </button>
             <button
               type='button'
-              onClick={() => (window.location.href = '/')}
+              onClick={() => router.push('/')}
               className='btn btn-md btn-secondary btn-press'
             >
               Go home
