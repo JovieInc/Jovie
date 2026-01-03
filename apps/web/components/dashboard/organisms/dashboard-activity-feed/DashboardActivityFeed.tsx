@@ -1,6 +1,6 @@
 'use client';
 
-import { BoltIcon } from '@heroicons/react/24/outline';
+import { Zap } from 'lucide-react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { DashboardActivityFeedProps } from './types';
@@ -73,7 +73,7 @@ export function DashboardActivityFeed({
             <div className='rounded-xl border border-subtle bg-surface-1/20 p-4'>
               <div className='flex items-start gap-3'>
                 <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'>
-                  <BoltIcon className='h-5 w-5 text-secondary-token' />
+                  <Zap className='h-5 w-5 text-secondary-token' />
                 </div>
 
                 <div className='min-w-0 flex-1'>
