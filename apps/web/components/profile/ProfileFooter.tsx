@@ -1,4 +1,4 @@
-import { Footer } from '@/components/organisms/Footer';
+import { Footer } from '@/components/organisms/footer-module';
 import { Artist } from '@/types/db';
 
 interface ProfileFooterProps {

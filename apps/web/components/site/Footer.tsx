@@ -1,4 +1,4 @@
-import { Footer as FooterOrganism } from '@/components/organisms/Footer';
+import { Footer as FooterOrganism } from '@/components/organisms/footer-module';
 
 type FooterVersion = 1 | 2 | 'minimal' | 'regular';
 

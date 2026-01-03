@@ -22,7 +22,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
-import { UserButton } from '@/components/organisms/UserButton';
+import { UserButton } from '@/components/organisms/user-button';
 import { cn } from '@/lib/utils';
 
 type SidebarRootProps = ComponentPropsWithoutRef<typeof Sidebar>;

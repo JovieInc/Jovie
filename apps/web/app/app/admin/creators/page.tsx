@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
+import { AdminCreatorProfilesWithSidebar } from '@/components/admin/admin-creator-profiles';
 import {
   type AdminCreatorProfilesSort,
   getAdminCreatorProfiles,
