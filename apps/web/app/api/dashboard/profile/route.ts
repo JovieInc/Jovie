@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -15,7 +14,7 @@ import {
 import { profileUpdateSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
-// Use Node.js runtime for compatibility with PostHog Node client and DB libs
+// Use Node.js runtime for compatibility with DB libs and server analytics
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
