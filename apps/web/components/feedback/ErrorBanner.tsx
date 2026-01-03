@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,8 @@ export interface ErrorBannerProps {
   actions?: ErrorBannerAction[];
   className?: string;
   testId?: string;
+  /** Optional callback to dismiss the banner. When provided, renders a close button. */
+  onDismiss?: () => void;
 }
 
 export function ErrorBanner({
@@ -22,6 +24,7 @@ export function ErrorBanner({
   actions = [],
   className,
   testId,
+  onDismiss,
 }: ErrorBannerProps) {
   const renderAction = (action: ErrorBannerAction, index: number) => {
     if (action.href) {
@@ -95,6 +98,17 @@ export function ErrorBanner({
             </div>
           ) : null}
         </div>
+
+        {onDismiss ? (
+          <button
+            type='button'
+            onClick={onDismiss}
+            aria-label='Dismiss error'
+            className='mt-0.5 shrink-0 self-start rounded-full border border-red-500/30 bg-transparent p-1.5 text-red-700 transition-colors hover:bg-red-500/10 hover:text-red-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-red-50 dark:border-red-800/50 dark:text-red-300 dark:hover:bg-red-900/40 dark:hover:text-red-100 dark:focus-visible:ring-offset-red-950'
+          >
+            <X className='h-4 w-4' aria-hidden='true' />
+          </button>
+        ) : null}
       </div>
     </div>
   );

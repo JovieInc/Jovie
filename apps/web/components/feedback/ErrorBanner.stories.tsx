@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from '@storybook/test';
+import { useState } from 'react';
 import { ErrorBanner } from './ErrorBanner';
 
 const meta: Meta<typeof ErrorBanner> = {
@@ -87,4 +89,65 @@ export const InContext: Story = {
       </div>
     </div>
   ),
+};
+
+export const Dismissible: Story = {
+  args: {
+    title: 'Something went wrong',
+    onDismiss: fn(),
+    className: 'w-96',
+  },
+};
+
+export const DismissibleWithDescription: Story = {
+  args: {
+    title: 'Failed to save changes',
+    description: 'Please check your connection and try again.',
+    onDismiss: fn(),
+    className: 'w-96',
+  },
+};
+
+export const DismissibleWithActions: Story = {
+  args: {
+    title: 'Failed to load profile',
+    description: 'We encountered an error while loading your profile data.',
+    actions: [
+      { label: 'Retry', onClick: fn() },
+      { label: 'Contact Support', href: '/support' },
+    ],
+    onDismiss: fn(),
+    className: 'w-96',
+  },
+};
+
+export const InteractiveDismiss: Story = {
+  render: function InteractiveDismissableBanner() {
+    const [visible, setVisible] = useState(true);
+
+    if (!visible) {
+      return (
+        <div className='w-96 p-4 text-center text-muted-foreground'>
+          <p className='mb-4'>Banner dismissed!</p>
+          <button
+            type='button'
+            onClick={() => setVisible(true)}
+            className='text-sm text-primary underline hover:no-underline'
+          >
+            Show again
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <ErrorBanner
+        title='Session expired'
+        description='Your session has expired. Please sign in again to continue.'
+        actions={[{ label: 'Sign In', href: '/signin' }]}
+        onDismiss={() => setVisible(false)}
+        className='w-96'
+      />
+    );
+  },
 };
