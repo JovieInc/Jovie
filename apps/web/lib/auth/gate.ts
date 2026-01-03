@@ -420,9 +420,7 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
  * Get waitlist invite details by claim token.
  * Returns the waitlist entry ID and email if the token is valid.
  */
-export async function getWaitlistInviteByToken(
-  token: string
-): Promise<{
+export async function getWaitlistInviteByToken(token: string): Promise<{
   waitlistEntryId: string;
   email: string;
   claimToken: string;

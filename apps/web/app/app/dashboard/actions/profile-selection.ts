@@ -47,7 +47,9 @@ export function profileIsPublishable(profile: CreatorProfile | null): boolean {
  * @returns The selected profile (first profile if array has at least one element)
  * @throws May throw if profiles array is empty
  */
-export function selectDashboardProfile(profiles: CreatorProfile[]): CreatorProfile {
+export function selectDashboardProfile(
+  profiles: CreatorProfile[]
+): CreatorProfile {
   const publishable = profiles.find(profileIsPublishable);
   if (publishable) return publishable;
 

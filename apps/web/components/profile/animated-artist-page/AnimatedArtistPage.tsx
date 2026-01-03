@@ -32,10 +32,10 @@ export function AnimatedArtistPage({
   showBackButton,
   enableDynamicEngagement = false,
 }: AnimatedArtistPageProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const {
-    isNavigating,
-    setIsNavigating,
+    isNavigating: _isNavigating,
+    setIsNavigating: _setIsNavigating,
     prefersReducedMotion,
     tippingEnabled,
     pageVariants,
