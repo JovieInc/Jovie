@@ -246,7 +246,7 @@ export async function resolveUserState(options?: {
   }
 
   // 2b. If no DB user exists, create one if requested
-  let dbUserId = dbUser?.id ?? null;
+  let dbUserId: string | null = dbUser?.id ?? null;
 
   if (!dbUserId) {
     if (createDbUserIfMissing && email) {
