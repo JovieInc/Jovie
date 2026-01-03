@@ -3,15 +3,15 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
+import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import type { AnimatedArtistPageProps } from './types';
 import { useAnimatedArtistPage } from './useAnimatedArtistPage';
 import { extractVenmoUsername, findVenmoLink, TIP_AMOUNTS } from './utils';
 
 const AnimatedListenInterface = dynamic(
   () =>
-    import('@/components/profile/AnimatedListenInterface').then(mod => ({
+    import('@/components/profile/animated-listen-interface').then(mod => ({
       default: mod.AnimatedListenInterface,
     })),
   { ssr: false }

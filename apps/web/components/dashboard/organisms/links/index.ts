@@ -18,7 +18,7 @@ export * from './config';
 // Hooks
 export * from './hooks';
 export * from './IngestedSuggestions';
-export * from './LinkCategoryGrid';
+export * from './link-category-grid';
 export * from './QuickAddSuggestions';
 // UI Components
 export * from './SortableLinkItem';

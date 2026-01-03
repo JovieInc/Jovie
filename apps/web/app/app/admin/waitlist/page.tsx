@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
-import { WaitlistTable } from '@/components/admin/WaitlistTable';
+import { WaitlistTable } from '@/components/admin/waitlist-table';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,

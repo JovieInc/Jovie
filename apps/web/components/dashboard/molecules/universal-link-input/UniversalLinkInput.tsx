@@ -9,7 +9,7 @@
 
 import { forwardRef, useImperativeHandle } from 'react';
 
-import { UniversalLinkInputArtistSearchMode } from '../UniversalLinkInputArtistSearchMode';
+import { UniversalLinkInputArtistSearchMode } from '../artist-search-mode';
 import { UniversalLinkInputUrlMode } from '../UniversalLinkInputUrlMode';
 import type { UniversalLinkInputProps } from './types';
 import { useUniversalLinkInput } from './useUniversalLinkInput';

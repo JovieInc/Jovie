@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/dashboard/DashboardDataContext';
-import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 

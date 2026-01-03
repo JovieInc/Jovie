@@ -2,6 +2,7 @@
 
 Generated: 2025-01-XX
 Status: IN_PROGRESS
+Last Updated: Session 2 - Batches 1-6 complete (37 deprecated files deleted)
 
 ## Executive Summary
 
@@ -217,13 +218,56 @@ Tasks:
 
 ## Completion Checklist
 
-- [ ] All deprecated re-export files deleted
-- [ ] Zero atomic design violations
+- [x] Import updates for deprecated files (Batch 1-2 complete)
+- [x] 37 deprecated re-export files deleted (Batch 3 + 5 + 6 complete)
+- [x] Atomic design violations fixed (Batch 4 - SidebarCollapseButton moved)
 - [ ] No duplicate component implementations
 - [ ] ≥50% Storybook coverage
 - [ ] ≥20% test coverage on critical components
 - [ ] Main branch stable and deployable
 - [ ] This document updated to COMPLETE
+
+---
+
+## Session Progress
+
+### Session 2 (Current)
+**Commits:**
+1. `refactor(ui): update imports to use modular paths instead of deprecated re-exports` (12 files)
+2. `refactor(ui): update more imports to use modular paths` (12 files)
+3. `refactor(ui): delete 19 deprecated re-export files` (24 files changed, -357 lines)
+4. `refactor(ui): fix atomic design violation - move SidebarCollapseButton to molecules`
+
+**Batch 3 - Deleted Files:**
+- molecules: UniversalLinkInput, UniversalLinkInputArtistSearchMode, PhoneMockupPreview, AnalyticsCards, EnhancedThemeToggle
+- organisms: DashboardActivityFeed, DashboardAudienceTable, DashboardThemeToggle, ReleaseProviderMatrix, SettingsProfileSection, AccountSettingsSection, AudienceMemberSidebar, UserButton, Footer
+- admin: WaitlistTable, AdminUsersTable, AdminCreatorProfilesWithSidebar, IngestProfileDropdown, CreatorActionsMenu
+
+**Batch 4 - Atomic Design Fix:**
+- Moved SidebarCollapseButton from atoms/ to molecules/ (imports useSidebar from organisms)
+
+**Batch 5 - Deleted Files:**
+- dashboard: DashboardAnalytics, LinkActions, SocialsForm, ProfileForm, AppleStyleOnboardingForm, ArtistSelectionForm, LinkCategoryGrid
+- profile: AnimatedArtistPage, AnimatedListenInterface, ArtistContactsButton, ArtistNotificationsCTA
+- organisms: ContactSidebar, ProfileShell, ProfileNotificationsMenu
+- site: ThemeToggle
+
+**Batch 6 - Deleted Files:**
+- home/ActionDrivenProfileSectionClient.tsx
+- auth/atoms/OtpInput.tsx
+- dashboard/DashboardNav.tsx
+
+**Remaining Deprecated Files (6 - intentionally kept):**
+- `Sidebar.tsx` - macOS case-sensitivity conflict with `sidebar/` directory
+- `ArtistAvatar.tsx` - Legacy wrapper for unified Avatar
+- `DashboardRefreshButton.tsx` - Wrapper with business logic (router refresh)
+- `CopyToClipboardButton.tsx` - Wrapper with business logic (analytics)
+- `FeedbackModal.tsx` - Wrapper with business logic (analytics)
+- `DashboardTipping.tsx` - Wrapper with business logic
+
+**Blockers Found:**
+- `Sidebar.tsx` cannot be deleted due to macOS case-sensitivity conflict with `sidebar/` directory
+- Some deprecated files are wrappers with business logic (not pure re-exports), need careful migration
 
 ---
 
@@ -233,3 +277,4 @@ Tasks:
 - Many deprecated files are re-exports for backward compatibility
 - Priority should be on removing deprecated files before adding new coverage
 - `packages/ui/` should be the home for truly shared, design-system-level atoms
+- **macOS case-sensitivity**: `Sidebar.tsx` and `sidebar/` conflict - keep using PascalCase import

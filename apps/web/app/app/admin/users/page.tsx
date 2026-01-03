@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { AdminUsersTable } from '@/components/admin/AdminUsersTable';
+import { AdminUsersTable } from '@/components/admin/admin-users-table';
 import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
 
 interface AdminUsersPageProps {

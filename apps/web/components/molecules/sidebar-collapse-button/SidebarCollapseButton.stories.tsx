@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
-import { SidebarCollapseButton } from './SidebarCollapseButton';
+import { SidebarCollapseButton } from '.';
 
 const meta: Meta<typeof SidebarCollapseButton> = {
-  title: 'Atoms/SidebarCollapseButton',
+  title: 'Molecules/SidebarCollapseButton',
   component: SidebarCollapseButton,
   tags: ['autodocs'],
   decorators: [

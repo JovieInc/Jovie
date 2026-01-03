@@ -3,8 +3,8 @@
 import { Badge, Checkbox } from '@jovie/ui';
 import { Check, Star } from 'lucide-react';
 import Link from 'next/link';
-import { CreatorActionsMenu } from '@/components/admin/CreatorActionsMenu';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
+import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 

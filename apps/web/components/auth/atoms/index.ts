@@ -7,4 +7,4 @@ export { AuthLink } from './AuthLink';
 export { AuthLinkPreviewCard } from './AuthLinkPreviewCard';
 export { AuthSpotifyIcon } from './AuthSpotifyIcon';
 export { AuthTextInput } from './AuthTextInput';
-export { OtpInput } from './OtpInput';
+export { OtpInput } from './otp-input';

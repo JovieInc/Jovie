@@ -36,7 +36,7 @@ export * from './SectionHeading';
 export * from './Select';
 export * from './Separator';
 export * from './Sheet';
-export * from './SidebarCollapseButton';
+// SidebarCollapseButton moved to molecules (imports from organisms)
 export * from './Skeleton';
 export * from './SkipToContent';
 export * from './SocialIcon';

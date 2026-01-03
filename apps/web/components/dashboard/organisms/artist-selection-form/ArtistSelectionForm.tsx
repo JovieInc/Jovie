@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Combobox } from '@/components/organisms/Combobox';
 import { Container } from '@/components/site/Container';
-import { ThemeToggle } from '@/components/site/ThemeToggle';
+import { ThemeToggle } from '@/components/site/theme-toggle';
 import { useArtistSelectionForm } from './useArtistSelectionForm';
 
 export function ArtistSelectionForm() {

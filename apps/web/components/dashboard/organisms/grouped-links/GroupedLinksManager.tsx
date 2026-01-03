@@ -17,7 +17,7 @@ import {
   useSuggestions,
 } from '../links/hooks';
 import { IngestedSuggestions } from '../links/IngestedSuggestions';
-import { LinkCategoryGrid } from '../links/LinkCategoryGrid';
+import { LinkCategoryGrid } from '../links/link-category-grid';
 import { QuickAddSuggestions } from '../links/QuickAddSuggestions';
 import { YouTubeCrossCategoryPrompt } from '../links/YouTubeCrossCategoryPrompt';
 import { buildPillLabel } from './buildPillLabel';

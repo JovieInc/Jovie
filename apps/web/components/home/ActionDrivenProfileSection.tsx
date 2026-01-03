@@ -1,7 +1,7 @@
 import {
   ActionDrivenProfileSectionClient,
   type ActionDrivenProfileSectionClientProps,
-} from '@/components/home/ActionDrivenProfileSectionClient';
+} from '@/components/home/action-driven-profile-section';
 
 const PROFILE_ARTIST = {
   name: 'Mara Vale',

@@ -14,8 +14,16 @@ export function useAnimatedArtistPage(): UseAnimatedArtistPageReturn {
 
   const tippingEnabled = tippingGate.value;
 
-  const pageVariants: Variants = useMemo(
-    () => ({
+  const pageVariants: Variants = useMemo(() => {
+    if (prefersReducedMotion) {
+      return {
+        initial: { opacity: 1 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+      };
+    }
+
+    return {
       initial: {
         opacity: 0,
         scale: 0.98,
@@ -43,9 +51,8 @@ export function useAnimatedArtistPage(): UseAnimatedArtistPageReturn {
           ease: [0.4, 0, 1, 1],
         },
       },
-    }),
-    []
-  );
+    };
+  }, [prefersReducedMotion]);
 
   return {
     isNavigating,

@@ -6,6 +6,25 @@ import { MoonIcon, SunIcon } from './ThemeIcons';
 import { type DashboardThemeToggleProps, THEME_OPTIONS } from './types';
 import { useDashboardTheme } from './useDashboardTheme';
 
+function SystemIcon({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden='true'
+      viewBox='0 0 24 24'
+      className={className}
+      fill='none'
+      stroke='currentColor'
+      strokeWidth={1.5}
+      strokeLinecap='round'
+      strokeLinejoin='round'
+    >
+      <path d='M3.75 5.75A2 2 0 0 1 5.75 3.75h12.5a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5.75a2 2 0 0 1-2-2v-8.5Z' />
+      <path d='M8.5 20.25h7' />
+      <path d='M12 16.25v4' />
+    </svg>
+  );
+}
+
 export function DashboardThemeToggle({
   onThemeChange,
   onThemeSave,
@@ -64,7 +83,15 @@ export function DashboardThemeToggle({
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              <span className='text-lg mb-1'>{option.icon}</span>
+              <span className='mb-1 flex items-center justify-center'>
+                {option.value === 'light' ? (
+                  <SunIcon className='h-5 w-5 text-secondary-token' />
+                ) : option.value === 'dark' ? (
+                  <MoonIcon className='h-5 w-5 text-secondary-token' />
+                ) : (
+                  <SystemIcon className='h-5 w-5 text-secondary-token' />
+                )}
+              </span>
               <span className='text-xs font-medium'>{option.label}</span>
               {theme === option.value && option.value === 'system' && (
                 <span className='text-xs text-secondary-token mt-1'>
