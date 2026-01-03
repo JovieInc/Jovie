@@ -94,7 +94,7 @@ function isProfileComplete(profile: {
  */
 async function createUserWithRetry(
   clerkUserId: string,
-  email: string,
+  email: string | null,
   waitlistEntryId: string | undefined,
   maxRetries = 3
 ): Promise<string | null> {
