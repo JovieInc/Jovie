@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
 import {
@@ -13,6 +14,9 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+/**
+ * Timing-safe verification of ingestion secret to prevent timing attacks.
+ */
 function isAuthorized(request: NextRequest): boolean {
   const secret = env.INGESTION_CRON_SECRET ?? process.env.CRON_SECRET;
 
@@ -21,7 +25,18 @@ function isAuthorized(request: NextRequest): boolean {
     return false;
   }
 
-  return request.headers.get('x-ingestion-secret') === secret;
+  const provided = request.headers.get('x-ingestion-secret');
+  if (!provided) {
+    return false;
+  }
+
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(secret);
+
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 export async function POST(request: NextRequest) {

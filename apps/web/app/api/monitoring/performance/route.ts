@@ -34,44 +34,11 @@ export async function GET(): Promise<NextResponse<PerformanceResponse>> {
       );
     }
 
-    // In a real implementation, you would fetch metrics from your database or analytics service
-    // For now, we'll return mock data
-    const mockMetrics: PerformanceMetric[] = [
-      {
-        name: 'lcp',
-        value: 1250,
-        rating: 'good' as const,
-        timestamp: Date.now() - 60000,
-      },
-      {
-        name: 'fid',
-        value: 45,
-        rating: 'good' as const,
-        timestamp: Date.now() - 60000,
-      },
-      {
-        name: 'cls',
-        value: 0.05,
-        rating: 'good' as const,
-        timestamp: Date.now() - 60000,
-      },
-      {
-        name: 'fcp',
-        value: 950,
-        rating: 'good' as const,
-        timestamp: Date.now() - 60000,
-      },
-      {
-        name: 'ttfb',
-        value: 320,
-        rating: 'good' as const,
-        timestamp: Date.now() - 60000,
-      },
-    ];
-
+    // Performance metrics endpoint is not yet implemented
+    // TODO: Integrate with analytics service (e.g., Vercel Analytics, Sentry) to fetch real metrics
     return NextResponse.json(
-      { metrics: mockMetrics },
-      { headers: NO_STORE_HEADERS }
+      { error: 'Performance metrics not yet available', metrics: [] },
+      { status: 501, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     console.error('Error fetching performance metrics:', error);
