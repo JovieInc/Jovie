@@ -2,6 +2,7 @@
 
 Generated: 2025-01-XX
 Status: IN_PROGRESS
+Last Updated: Session 2 - Import updates completed
 
 ## Executive Summary
 
@@ -217,6 +218,7 @@ Tasks:
 
 ## Completion Checklist
 
+- [x] Import updates for deprecated files (Batch 1-2 complete)
 - [ ] All deprecated re-export files deleted
 - [ ] Zero atomic design violations
 - [ ] No duplicate component implementations
@@ -227,9 +229,32 @@ Tasks:
 
 ---
 
+## Session Progress
+
+### Session 2 (Current)
+**Commits:**
+1. `refactor(ui): update imports to use modular paths instead of deprecated re-exports` (12 files)
+2. `refactor(ui): update more imports to use modular paths` (12 files)
+
+**Files Updated:**
+- GroupedLinksManager.tsx, UniversalLinkInput tests, LinkActions test
+- DashboardOverviewMetricsClient.tsx, DashboardAudienceTable test
+- releases/page.tsx, EnhancedThemeToggle.tsx
+- DashboardAudienceTable.tsx, useDashboardAudienceTable.ts
+- SettingsPolished.tsx, admin pages, admin components
+- ClerkAuth.tsx, DashboardSidebar.tsx, user-button test
+- Footer components
+
+**Blockers Found:**
+- `Sidebar.tsx` cannot be deleted due to macOS case-sensitivity conflict with `sidebar/` directory
+- Some deprecated files are wrappers with business logic (not pure re-exports), need careful migration
+
+---
+
 ## Notes
 
 - The codebase has been undergoing modular refactoring (extracting hooks into subdirectories)
 - Many deprecated files are re-exports for backward compatibility
 - Priority should be on removing deprecated files before adding new coverage
 - `packages/ui/` should be the home for truly shared, design-system-level atoms
+- **macOS case-sensitivity**: `Sidebar.tsx` and `sidebar/` conflict - keep using PascalCase import
