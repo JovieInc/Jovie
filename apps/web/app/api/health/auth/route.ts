@@ -72,8 +72,10 @@ export async function GET() {
     );
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error('Unknown error');
+    // Log full error details server-side for debugging
+    console.error('[health/auth] Error:', error);
     return NextResponse.json(
-      { ok: false, error: error.message, stack: error.stack },
+      { ok: false, error: error.message },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

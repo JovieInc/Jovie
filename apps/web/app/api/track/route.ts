@@ -324,29 +324,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const socialLinkUpdate =
-      linkType === 'social' && linkId
-        ? db
-            .update(socialLinks)
-            .set({
-              clicks: drizzleSql`${socialLinks.clicks} + 1`,
-              updatedAt: new Date(),
-            })
-            .where(eq(socialLinks.id, linkId))
-            .catch(error =>
-              captureError('Failed to update social link click count', error, {
-                route: '/api/track',
-                creatorProfileId: profile.id,
-                handle,
-                linkId,
-                linkType,
-              })
-            )
-        : null;
-
-    if (socialLinkUpdate) {
-      // Fire-and-forget: failures are logged but should not block the request
-      void socialLinkUpdate;
+    // Update social link click count in the background
+    // Errors are captured but don't block the response
+    if (linkType === 'social' && linkId) {
+      db.update(socialLinks)
+        .set({
+          clicks: drizzleSql`${socialLinks.clicks} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(socialLinks.id, linkId))
+        .then(() => {
+          // Click count updated successfully
+        })
+        .catch(error => {
+          // Ensure error is always captured even if background task fails
+          void captureError(
+            'Failed to update social link click count',
+            error,
+            {
+              route: '/api/track',
+              creatorProfileId: profile.id,
+              handle,
+              linkId,
+              linkType,
+            }
+          );
+        });
     }
 
     return NextResponse.json(
