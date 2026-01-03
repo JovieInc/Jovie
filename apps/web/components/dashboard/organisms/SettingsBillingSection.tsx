@@ -1,7 +1,7 @@
 'use client';
 
-import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -22,7 +22,7 @@ export function SettingsBillingSection() {
   return (
     <DashboardCard variant='settings'>
       <div className='text-center py-4'>
-        <CreditCardIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
+        <CreditCard className='mx-auto h-12 w-12 text-secondary mb-4' />
         <h3 className='text-lg font-medium text-primary mb-2'>
           Manage your plan
         </h3>

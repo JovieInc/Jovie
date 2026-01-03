@@ -1,5 +1,5 @@
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ComponentPropsWithoutRef } from 'react';
@@ -72,7 +72,7 @@ export function DashboardSidebar({
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
-              <ArrowLeftIcon className='h-4 w-4' aria-hidden='true' />
+              <ArrowLeft className='h-4 w-4' aria-hidden='true' />
               <span className='truncate group-data-[collapsible=icon]:hidden'>
                 Back
               </span>

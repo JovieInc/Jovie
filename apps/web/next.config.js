@@ -158,7 +158,6 @@ const nextConfig = {
     // optimizeCss: true,
     optimizePackageImports: [
       '@headlessui/react',
-      '@heroicons/react',
       'lucide-react',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',

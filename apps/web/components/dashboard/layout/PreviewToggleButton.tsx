@@ -1,7 +1,7 @@
 'use client';
 
-import { DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Smartphone } from 'lucide-react';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
@@ -15,9 +15,7 @@ export function PreviewToggleButton() {
           ariaLabel={isOpen ? 'Hide preview' : 'Show preview'}
           pressed={isOpen}
           onClick={toggle}
-          icon={
-            <DevicePhoneMobileIcon className='h-4 w-4' aria-hidden='true' />
-          }
+          icon={<Smartphone className='h-4 w-4' aria-hidden='true' />}
         />
       </TooltipTrigger>
       <TooltipContent side='bottom'>
