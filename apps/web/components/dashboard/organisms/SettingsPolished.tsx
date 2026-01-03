@@ -1,6 +1,6 @@
 'use client';
 
-import { RocketLaunchIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { Rocket, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -141,7 +141,7 @@ export function SettingsPolished({
           renderProUpgradeCard(
             'Professional Appearance',
             'Remove Jovie branding to create a fully custom experience for your fans.',
-            SparklesIcon
+            Sparkles
           )
         ),
     },
@@ -157,7 +157,7 @@ export function SettingsPolished({
           renderProUpgradeCard(
             'Unlock Growth Tracking',
             'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-            RocketLaunchIcon
+            Rocket
           )
         ),
     },

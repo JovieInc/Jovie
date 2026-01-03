@@ -811,6 +811,9 @@ Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
+| 2025-01-02 | - | Cascade | _pending_ | Update WaitlistTable to re-export from modular structure (462→18 lines) |
+| 2025-01-02 | - | Cascade | _pending_ | Split UniversalLinkInput utilities into separate module (525→20 lines) |
+| 2025-01-02 | - | Cascade | _pending_ | Split AccountSettingsSection into focused modules (553→46 lines) |
 | 2025-01-01 | P2.3 | Cascade | _pending_ | Create BaseSidebar composable component (4 files, 292 lines) |
 | 2025-01-01 | P3.5.3 | Cascade | _pending_ | Extend social-links service with queries/mutations (3 files, 448 lines) |
 | 2025-01-01 | P3.5.1 | Cascade | _pending_ | Create unified profile service (4 files, 696 lines) |

@@ -1,7 +1,7 @@
 'use client';
 
-import { RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { Button, type ButtonProps } from '@jovie/ui';
+import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
@@ -124,7 +124,7 @@ export function UpgradeButton({
         size={mappedSize}
         className='inline-flex items-center gap-2'
       >
-        <RocketLaunchIcon className='h-4 w-4' />
+        <Rocket className='h-4 w-4' />
         {loading ? 'Loading...' : children}
       </Button>
       {error && (

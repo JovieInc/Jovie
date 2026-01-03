@@ -1,11 +1,5 @@
-import {
-  ChartBarIcon,
-  LinkIcon,
-  LockClosedIcon,
-  MagnifyingGlassIcon,
-  UsersIcon,
-} from '@heroicons/react/24/outline';
 import type { Meta, StoryObj } from '@storybook/react';
+import { BarChart3, Link as LinkIcon, Lock, Search, Users } from 'lucide-react';
 import { EmptyState, type EmptyStateProps } from './EmptyState';
 
 const meta: Meta<typeof EmptyState> = {
@@ -50,7 +44,7 @@ export const SearchVariant: Story = {
     variant: 'search',
     heading: 'No results found',
     description: 'Try different keywords or clear the current filters.',
-    icon: <MagnifyingGlassIcon className='h-6 w-6' aria-hidden='true' />,
+    icon: <Search className='h-6 w-6' aria-hidden='true' />,
     action: {
       label: 'Clear search',
       onClick: () => console.log('Search cleared'),
@@ -64,7 +58,7 @@ export const ErrorState: Story = {
     variant: 'error',
     heading: 'Something went wrong',
     description: 'Please try again or contact support if the issue persists.',
-    icon: <ChartBarIcon className='h-6 w-6' aria-hidden='true' />,
+    icon: <BarChart3 className='h-6 w-6' aria-hidden='true' />,
     action: {
       label: 'Retry',
       onClick: () => console.log('Retry clicked'),
@@ -82,7 +76,7 @@ export const PermissionState: Story = {
     heading: 'You need additional access',
     description:
       'Your current plan does not include this dashboard. Ask a workspace admin to grant access.',
-    icon: <LockClosedIcon className='h-6 w-6' aria-hidden='true' />,
+    icon: <Lock className='h-6 w-6' aria-hidden='true' />,
     action: {
       label: 'Request access',
       onClick: () => console.log('Request access'),
@@ -97,7 +91,7 @@ export const Gallery: Story = {
         {...args}
         heading='Invite your first audience member'
         description='Share your profile link to see who&apos;s visiting and subscribing.'
-        icon={<UsersIcon className='h-6 w-6' aria-hidden='true' />}
+        icon={<Users className='h-6 w-6' aria-hidden='true' />}
         action={{
           label: 'Copy profile link',
           onClick: () => console.log('Profile link copied'),
@@ -108,7 +102,7 @@ export const Gallery: Story = {
         variant='search'
         heading='No analytics yet'
         description='Once fans visit your profile, engagement data will appear here.'
-        icon={<ChartBarIcon className='h-6 w-6' aria-hidden='true' />}
+        icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
         secondaryAction={{
           label: 'View docs',
           href: '/docs',

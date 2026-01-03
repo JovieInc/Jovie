@@ -7,6 +7,8 @@
 
 export { ContactSidebar } from './ContactSidebar';
 export type { ContactSidebarProps } from './types';
+export type { UseContactSidebarReturn } from './useContactSidebar';
+export { useContactSidebar } from './useContactSidebar';
 export {
   extractUsernameFromLabel,
   extractUsernameFromUrl,

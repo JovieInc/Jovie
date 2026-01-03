@@ -7,8 +7,8 @@
  * Allows users to view and revoke sessions on other devices.
  */
 
-import { SignalSlashIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -88,7 +88,7 @@ export function SessionManagementCard({
       <div className='flex items-start justify-between gap-6'>
         <div className='flex-1'>
           <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-            <SignalSlashIcon className='h-5 w-5 text-accent' />
+            <WifiOff className='h-5 w-5 text-accent' />
             Active sessions
           </h3>
           <p className='mt-1 text-sm text-secondary max-w-lg'>

@@ -1,7 +1,7 @@
 'use client';
 
-import { XCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -25,7 +25,7 @@ export default function CheckoutCancelPage() {
     <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center'>
       <div className='w-full text-center'>
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15'>
-          <XCircleIcon className='h-8 w-8 text-amber-500' />
+          <XCircle className='h-8 w-8 text-amber-500' />
         </div>
 
         <h1 className='mt-6 text-3xl font-bold text-foreground'>

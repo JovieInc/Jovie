@@ -1,4 +1,4 @@
-import { ChartBarIcon } from '@heroicons/react/24/outline';
+import { BarChart3 } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { cn } from '@/lib/utils';
 import { cardTokens } from '../tokens/card-tokens';
@@ -15,7 +15,7 @@ interface AnalyticsCardProps {
   children?: ReactNode;
 }
 
-const FallbackIcon = ChartBarIcon;
+const FallbackIcon = BarChart3;
 
 export function AnalyticsCard({
   title,

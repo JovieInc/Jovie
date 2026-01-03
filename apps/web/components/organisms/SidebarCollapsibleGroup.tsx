@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronRight } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import {
   SidebarGroup,
@@ -46,7 +46,7 @@ export function SidebarCollapsibleGroup({
             <span className='truncate group-data-[collapsible=icon]:hidden text-[11px]'>
               {label}
             </span>
-            <ChevronRightIcon
+            <ChevronRight
               className={cn(
                 'h-4 w-4 shrink-0 transition-transform duration-200 ease-out',
                 open ? 'rotate-90' : 'rotate-0'
