@@ -2,7 +2,7 @@
 
 Generated: 2025-01-XX
 Status: IN_PROGRESS
-Last Updated: Session 2 - Import updates completed
+Last Updated: Session 2 - Batches 1-4 complete
 
 ## Executive Summary
 
@@ -219,8 +219,8 @@ Tasks:
 ## Completion Checklist
 
 - [x] Import updates for deprecated files (Batch 1-2 complete)
-- [ ] All deprecated re-export files deleted
-- [ ] Zero atomic design violations
+- [x] 19 deprecated re-export files deleted (Batch 3 complete)
+- [x] Atomic design violations fixed (Batch 4 - SidebarCollapseButton moved)
 - [ ] No duplicate component implementations
 - [ ] ≥50% Storybook coverage
 - [ ] ≥20% test coverage on critical components
@@ -235,15 +235,16 @@ Tasks:
 **Commits:**
 1. `refactor(ui): update imports to use modular paths instead of deprecated re-exports` (12 files)
 2. `refactor(ui): update more imports to use modular paths` (12 files)
+3. `refactor(ui): delete 19 deprecated re-export files` (24 files changed, -357 lines)
+4. `refactor(ui): fix atomic design violation - move SidebarCollapseButton to molecules`
 
-**Files Updated:**
-- GroupedLinksManager.tsx, UniversalLinkInput tests, LinkActions test
-- DashboardOverviewMetricsClient.tsx, DashboardAudienceTable test
-- releases/page.tsx, EnhancedThemeToggle.tsx
-- DashboardAudienceTable.tsx, useDashboardAudienceTable.ts
-- SettingsPolished.tsx, admin pages, admin components
-- ClerkAuth.tsx, DashboardSidebar.tsx, user-button test
-- Footer components
+**Batch 3 - Deleted Files:**
+- molecules: UniversalLinkInput, UniversalLinkInputArtistSearchMode, PhoneMockupPreview, AnalyticsCards, EnhancedThemeToggle
+- organisms: DashboardActivityFeed, DashboardAudienceTable, DashboardThemeToggle, ReleaseProviderMatrix, SettingsProfileSection, AccountSettingsSection, AudienceMemberSidebar, UserButton, Footer
+- admin: WaitlistTable, AdminUsersTable, AdminCreatorProfilesWithSidebar, IngestProfileDropdown, CreatorActionsMenu
+
+**Batch 4 - Atomic Design Fix:**
+- Moved SidebarCollapseButton from atoms/ to molecules/ (imports useSidebar from organisms)
 
 **Blockers Found:**
 - `Sidebar.tsx` cannot be deleted due to macOS case-sensitivity conflict with `sidebar/` directory
