@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useProfileNotifications } from '@/components/organisms/ProfileShell';
+import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import {
   COUNTRY_OPTIONS,
   type CountryOption,

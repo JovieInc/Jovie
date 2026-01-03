@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useProfileNotifications } from '@/components/organisms/ProfileShell';
-import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
+import { useProfileNotifications } from '@/components/organisms/profile-shell';
+import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { CTAButton } from '@/components/ui/CTAButton';
 import {
   type ProfileNextAction,

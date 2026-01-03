@@ -3,7 +3,7 @@
 import { Button, Input } from '@jovie/ui';
 import Link from 'next/link';
 import { useState } from 'react';
-import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
+import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {

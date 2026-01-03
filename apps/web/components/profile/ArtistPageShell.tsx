@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProfileShell } from '@/components/organisms/ProfileShell';
+import { ProfileShell } from '@/components/organisms/profile-shell';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 

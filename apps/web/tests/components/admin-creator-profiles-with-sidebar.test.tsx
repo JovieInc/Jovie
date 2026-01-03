@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
+import { AdminCreatorProfilesWithSidebar } from '@/components/admin/admin-creator-profiles';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import type {
   AdminCreatorProfileRow,

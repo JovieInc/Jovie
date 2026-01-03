@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DashboardAudienceTable } from '@/components/dashboard/organisms/DashboardAudienceTable';
+import { DashboardAudienceTable } from '@/components/dashboard/organisms/dashboard-audience-table';
 import type { AudienceMember } from '@/types';
 
 // Mock the useTableMeta hook

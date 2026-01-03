@@ -7,7 +7,7 @@ import type { AudienceMember } from '@/types';
 
 const DashboardAudienceTable = dynamic(
   () =>
-    import('@/components/dashboard/organisms/DashboardAudienceTable').then(
+    import('@/components/dashboard/organisms/dashboard-audience-table').then(
       mod => ({
         default: mod.DashboardAudienceTable,
       })

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LinkActions } from '@/components/dashboard/atoms/LinkActions';
+import { LinkActions } from '@/components/dashboard/atoms/link-actions';
 
 // Mock Tooltip components
 vi.mock('@jovie/ui', () => ({

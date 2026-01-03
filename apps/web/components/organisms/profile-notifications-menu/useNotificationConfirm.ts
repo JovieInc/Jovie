@@ -24,9 +24,14 @@ export function useNotificationConfirm(): UseNotificationConfirmReturn {
     if (!confirmChannel) return;
     setIsConfirming(true);
     void (async () => {
-      await onUnsubscribe(confirmChannel);
-      setIsConfirming(false);
-      setConfirmChannel(null);
+      try {
+        await onUnsubscribe(confirmChannel);
+        setConfirmChannel(null);
+      } catch {
+        setConfirmChannel(null);
+      } finally {
+        setIsConfirming(false);
+      }
     })();
   };
 

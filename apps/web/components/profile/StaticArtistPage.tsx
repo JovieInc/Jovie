@@ -1,5 +1,5 @@
-import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
+import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';

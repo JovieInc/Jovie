@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProfileShell } from '@/components/organisms/ProfileShell';
+import { ProfileShell } from '@/components/organisms/profile-shell';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';

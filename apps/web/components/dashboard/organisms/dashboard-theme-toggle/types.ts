@@ -19,11 +19,10 @@ export interface UseDashboardThemeReturn {
 export interface ThemeOption {
   value: ThemeValue;
   label: string;
-  icon: string;
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { value: 'light', label: 'Light', icon: '☀️' },
-  { value: 'dark', label: 'Dark', icon: '🌙' },
-  { value: 'system', label: 'System', icon: '💻' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
 ];

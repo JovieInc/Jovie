@@ -1,11 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import type { AdminCreatorProfilesWithSidebarProps } from '@/components/admin/AdminCreatorProfilesWithSidebar';
+import type { AdminCreatorProfilesWithSidebarProps } from '@/components/admin/admin-creator-profiles';
 
 const AdminCreatorProfilesWithSidebar = dynamic(
   () =>
-    import('@/components/admin/AdminCreatorProfilesWithSidebar').then(mod => ({
+    import('@/components/admin/admin-creator-profiles').then(mod => ({
       default: mod.AdminCreatorProfilesWithSidebar,
     })),
   {
