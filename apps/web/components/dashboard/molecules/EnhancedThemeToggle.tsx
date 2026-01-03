@@ -1,6 +1,6 @@
 'use client';
 
-import { DashboardThemeToggle as DashboardThemeToggleOrganism } from '@/components/dashboard/organisms/DashboardThemeToggle';
+import { DashboardThemeToggle as DashboardThemeToggleOrganism } from '@/components/dashboard/organisms/dashboard-theme-toggle';
 
 interface EnhancedThemeToggleProps {
   onThemeChange?: (theme: 'light' | 'dark' | 'system') => void;

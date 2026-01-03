@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
-import { AUDIENCE_MEMBER_SIDEBAR_WIDTH } from '@/components/dashboard/organisms/AudienceMemberSidebar';
+import { AUDIENCE_MEMBER_SIDEBAR_WIDTH } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type {
   AudienceRow,

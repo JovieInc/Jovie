@@ -6,7 +6,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
-} from '@/components/dashboard/molecules/UniversalLinkInput';
+} from '@/components/dashboard/molecules/universal-link-input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import '@/lib/utils/color';
