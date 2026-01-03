@@ -1153,3 +1153,76 @@ git push origin feat/auth-skeleton-loaders
 
 **Failure to commit at end of job is a violation of agent protocol.**
 **Commit messages that don't follow Conventional Commits format will be rejected by husky/commitlint.**
+
+## 17. Tech Debt Tracking (REQUIRED)
+
+AI agents **must** maintain the tech debt tracker at `TECH_DEBT_TRACKER.md` in the repo root.
+
+### When to Update the Tracker
+
+**You MUST update `TECH_DEBT_TRACKER.md` when:**
+
+1. **Fixing tech debt:** Move items from "Open Issues" to "Resolved Issues"
+2. **Discovering new tech debt:** Add items to the appropriate "Open Issues" section
+3. **Completing refactoring tasks:** Update the metrics dashboard
+
+### How to Update
+
+**When resolving an issue:**
+
+```markdown
+## Resolved Issues
+
+### YYYY-MM-DD
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Description of what was fixed | P0/P1/P2/P3 | Brief explanation | PR or commit ref |
+```
+
+**When discovering new tech debt:**
+
+```markdown
+### P1 - High (or appropriate priority)
+
+| File | Line(s) | Description |
+|------|---------|-------------|
+| path/to/file.ts | 42 | What the issue is |
+```
+
+### Priority Definitions
+
+- **P0 (Critical):** Blocks production, security vulnerabilities, data loss risks
+- **P1 (High):** Significant code quality issues, type safety problems
+- **P2 (Medium):** Deprecated code, TODO comments, minor improvements
+- **P3 (Low):** Nice-to-have cleanup, test organization
+
+### What Constitutes Tech Debt
+
+Track these items in `TECH_DEBT_TRACKER.md`:
+
+- `@ts-nocheck` or `@ts-ignore` without clear justification
+- Empty catch blocks
+- `console.*` statements in production code (use Sentry instead)
+- Files marked `@deprecated` without migration path
+- TODO/FIXME/HACK comments
+- TypeScript `any` types in production code
+- eslint-disable without justification
+- Large files (>500 lines) that should be split
+- Duplicated code patterns
+
+### Metrics to Track
+
+Update the metrics dashboard when counts change:
+
+```markdown
+| Metric | Count | Target | Last Updated |
+|--------|-------|--------|--------------|
+| `@ts-nocheck` files | X | 0 | YYYY-MM-DD |
+| `@ts-ignore` in production | X | <5 | YYYY-MM-DD |
+| Deprecated files | X | 0 | YYYY-MM-DD |
+| TODO comments | X | 0 | YYYY-MM-DD |
+| Empty catch blocks | X | 0 | YYYY-MM-DD |
+```
+
+**Failure to update the tech debt tracker when addressing or discovering tech debt is a violation of agent protocol.**
