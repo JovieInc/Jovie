@@ -2,7 +2,7 @@
 
 Generated: 2025-01-XX
 Status: IN_PROGRESS
-Last Updated: Session 2 - Batches 1-5 complete (34 deprecated files deleted)
+Last Updated: Session 2 - Batches 1-6 complete (37 deprecated files deleted)
 
 ## Executive Summary
 
@@ -219,7 +219,7 @@ Tasks:
 ## Completion Checklist
 
 - [x] Import updates for deprecated files (Batch 1-2 complete)
-- [x] 34 deprecated re-export files deleted (Batch 3 + 5 complete)
+- [x] 37 deprecated re-export files deleted (Batch 3 + 5 + 6 complete)
 - [x] Atomic design violations fixed (Batch 4 - SidebarCollapseButton moved)
 - [ ] No duplicate component implementations
 - [ ] ≥50% Storybook coverage
@@ -251,6 +251,19 @@ Tasks:
 - profile: AnimatedArtistPage, AnimatedListenInterface, ArtistContactsButton, ArtistNotificationsCTA
 - organisms: ContactSidebar, ProfileShell, ProfileNotificationsMenu
 - site: ThemeToggle
+
+**Batch 6 - Deleted Files:**
+- home/ActionDrivenProfileSectionClient.tsx
+- auth/atoms/OtpInput.tsx
+- dashboard/DashboardNav.tsx
+
+**Remaining Deprecated Files (6 - intentionally kept):**
+- `Sidebar.tsx` - macOS case-sensitivity conflict with `sidebar/` directory
+- `ArtistAvatar.tsx` - Legacy wrapper for unified Avatar
+- `DashboardRefreshButton.tsx` - Wrapper with business logic (router refresh)
+- `CopyToClipboardButton.tsx` - Wrapper with business logic (analytics)
+- `FeedbackModal.tsx` - Wrapper with business logic (analytics)
+- `DashboardTipping.tsx` - Wrapper with business logic
 
 **Blockers Found:**
 - `Sidebar.tsx` cannot be deleted due to macOS case-sensitivity conflict with `sidebar/` directory
