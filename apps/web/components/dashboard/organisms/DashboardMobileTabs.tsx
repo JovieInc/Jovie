@@ -1,12 +1,13 @@
 'use client';
 
 import {
-  BanknotesIcon,
-  HomeIcon,
-  IdentificationIcon,
-  UserCircleIcon,
-  UsersIcon,
-} from '@heroicons/react/24/outline';
+  Banknote,
+  Home,
+  IdCard,
+  type LucideIcon,
+  UserCircle,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { STATSIG_FLAGS } from '@/lib/flags';
@@ -17,7 +18,7 @@ type DashboardMobileTab = {
   id: string;
   label: string;
   href: string;
-  icon: typeof HomeIcon;
+  icon: LucideIcon;
 };
 
 const DASHBOARD_TABS: DashboardMobileTab[] = [
@@ -25,31 +26,31 @@ const DASHBOARD_TABS: DashboardMobileTab[] = [
     id: 'overview',
     label: 'Overview',
     href: '/app/dashboard/overview',
-    icon: HomeIcon,
+    icon: Home,
   },
   {
     id: 'profile',
     label: 'Profile',
     href: '/app/dashboard/profile',
-    icon: UserCircleIcon,
+    icon: UserCircle,
   },
   {
     id: 'contacts',
     label: 'Contacts',
     href: '/app/dashboard/contacts',
-    icon: IdentificationIcon,
+    icon: IdCard,
   },
   {
     id: 'audience',
     label: 'Audience',
     href: '/app/dashboard/audience',
-    icon: UsersIcon,
+    icon: Users,
   },
   {
     id: 'earnings',
     label: 'Earnings',
     href: '/app/dashboard/tipping',
-    icon: BanknotesIcon,
+    icon: Banknote,
   },
 ];
 

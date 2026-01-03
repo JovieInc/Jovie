@@ -1,7 +1,7 @@
 'use client';
 
-import { CogIcon, CreditCardIcon, UserIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { CreditCard, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 
 export function AccountDashboard() {
@@ -23,7 +23,7 @@ export function AccountDashboard() {
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <CreditCardIcon className='h-8 w-8 text-blue-500' />
+              <CreditCard className='h-8 w-8 text-blue-500' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
@@ -45,7 +45,7 @@ export function AccountDashboard() {
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <UserIcon className='h-8 w-8 text-green-500' />
+              <User className='h-8 w-8 text-green-500' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
@@ -67,7 +67,7 @@ export function AccountDashboard() {
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <CogIcon className='h-8 w-8 text-purple-500' />
+              <Settings className='h-8 w-8 text-purple-500' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>

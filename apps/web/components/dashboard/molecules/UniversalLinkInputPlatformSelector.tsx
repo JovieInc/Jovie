@@ -1,14 +1,11 @@
 import {
-  ChevronDownIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/20/solid';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { ChevronDown, Search } from 'lucide-react';
 
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { isBrandDark } from '@/lib/utils/color';
@@ -64,7 +61,7 @@ export function UniversalLinkInputPlatformSelector({
               className='w-3.5 h-3.5'
             />
           </div>
-          <ChevronDownIcon
+          <ChevronDown
             className='absolute right-1 top-1 h-3 w-3 text-tertiary-token'
             aria-hidden='true'
           />
@@ -99,7 +96,7 @@ export function UniversalLinkInputPlatformSelector({
                 <SocialIcon platform={platform.icon} className='w-3 h-3' />
               </div>
               <span>{platform.name}</span>
-              <MagnifyingGlassIcon className='w-3 h-3 text-tertiary-token ml-auto' />
+              <Search className='w-3 h-3 text-tertiary-token ml-auto' />
             </DropdownMenuItem>
           );
         })}

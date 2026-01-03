@@ -1,11 +1,8 @@
 'use client';
 
 import * as Headless from '@headlessui/react';
-import {
-  ChevronDownIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/20/solid';
 import { clsx } from 'clsx';
+import { ChevronDown, Search } from 'lucide-react';
 import {
   forwardRef,
   useCallback,
@@ -207,7 +204,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       {isLoading ? (
                         <LoadingSpinner size='sm' className='text-white/50' />
                       ) : (
-                        <ChevronDownIcon
+                        <ChevronDown
                           className={clsx(
                             'h-4 w-4 text-white/50 transition-transform',
                             open && 'rotate-180'
@@ -241,10 +238,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       )}
                       aria-label={`${ctaText} for ${value?.name || 'selected artist'}`}
                     >
-                      <MagnifyingGlassIcon
-                        className='h-4 w-4 mr-2'
-                        aria-hidden='true'
-                      />
+                      <Search className='h-4 w-4 mr-2' aria-hidden='true' />
                       {ctaText}
                     </button>
                   )}

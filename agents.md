@@ -885,6 +885,7 @@ CodeRabbit is already installed in the terminal. Run it as a way to review your 
 - **Headless UI:** Prefer `@headlessui/react` and `@floating-ui/*` for dialogs, menus, sheets, tooltips, and popovers.
 - **Billing:** Stripe (`stripe` on server, `@stripe/stripe-js` on client); no Clerk Billing.
 - **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
+- **Icons:** Use **Lucide React only** (`lucide-react`). Do not use Heroicons, Simple Icons (except for brand logos via `SocialIcon`), or other icon libraries. Import icons directly (e.g., `import { Check, X } from 'lucide-react'`) and use the `<Icon name="..." />` wrapper component for dynamic icon names.
 
 ### 8.4 Tailwind & Layout
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { RefreshCw } from 'lucide-react';
 import { useTransition } from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
@@ -32,7 +32,7 @@ export function DashboardRefreshButton({
       disabled={isPending}
       onClick={handleClick}
       icon={
-        <ArrowPathIcon
+        <RefreshCw
           className={
             isPending
               ? 'h-5 w-5 animate-spin motion-reduce:animate-none'

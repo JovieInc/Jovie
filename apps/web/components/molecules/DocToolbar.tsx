@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowDownTrayIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { Download, Printer } from 'lucide-react';
 import { APP_NAME } from '@/constants/app';
 
 export interface DocToolbarProps {
@@ -45,7 +45,7 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
         className='rounded-none border-0 px-3 text-neutral-900 hover:bg-gray-50 hover:text-neutral-900 dark:text-neutral-100 dark:hover:bg-white/10 dark:hover:text-white'
       >
         <span className='inline-flex items-center gap-2'>
-          <PrinterIcon className='h-4 w-4' />
+          <Printer className='h-4 w-4' />
           Print
         </span>
       </Button>
@@ -58,7 +58,7 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
         className='rounded-none border-0 px-3 text-neutral-900 hover:bg-gray-50 hover:text-neutral-900 dark:text-neutral-100 dark:hover:bg-white/10 dark:hover:text-white'
       >
         <span className='inline-flex items-center gap-2'>
-          <ArrowDownTrayIcon className='h-4 w-4' />
+          <Download className='h-4 w-4' />
           Download PDF
         </span>
       </Button>

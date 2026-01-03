@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { CheckCircle, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 
@@ -45,7 +45,7 @@ export function CompletionBanner(): JSX.Element | null {
         className='shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2 ring-1 ring-inset ring-white/5 dark:ring-white/10'
         aria-hidden='true'
       >
-        <CheckCircleIcon className='h-5 w-5 text-emerald-500' />
+        <CheckCircle className='h-5 w-5 text-emerald-500' />
       </div>
       <div className='min-w-0 flex-1 space-y-1'>
         <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
@@ -64,7 +64,7 @@ export function CompletionBanner(): JSX.Element | null {
         aria-label='Dismiss banner'
         className='shrink-0 rounded-full border border-subtle bg-transparent p-1.5 text-tertiary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base'
       >
-        <XMarkIcon className='h-4 w-4' aria-hidden='true' />
+        <X className='h-4 w-4' aria-hidden='true' />
       </button>
     </DashboardCard>
   );

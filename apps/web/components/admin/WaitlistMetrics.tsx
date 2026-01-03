@@ -1,9 +1,4 @@
-import {
-  CheckCircleIcon,
-  EnvelopeIcon,
-  SparklesIcon,
-  XCircleIcon,
-} from '@heroicons/react/24/outline';
+import { CheckCircle, Mail, Sparkles, XCircle } from 'lucide-react';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
 
@@ -54,28 +49,28 @@ export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
       <MetricCard
         label='New'
         value={metrics.new}
-        icon={SparklesIcon}
+        icon={Sparkles}
         colorClass='text-blue-600 dark:text-blue-400'
         bgClass='bg-blue-500/10 dark:bg-blue-500/15'
       />
       <MetricCard
         label='Invited'
         value={metrics.invited}
-        icon={EnvelopeIcon}
+        icon={Mail}
         colorClass='text-indigo-600 dark:text-indigo-400'
         bgClass='bg-indigo-500/10 dark:bg-indigo-500/15'
       />
       <MetricCard
         label='Claimed'
         value={metrics.claimed}
-        icon={CheckCircleIcon}
+        icon={CheckCircle}
         colorClass='text-emerald-600 dark:text-emerald-400'
         bgClass='bg-emerald-500/10 dark:bg-emerald-500/15'
       />
       <MetricCard
         label='Rejected'
         value={metrics.rejected}
-        icon={XCircleIcon}
+        icon={XCircle}
         colorClass='text-rose-500 dark:text-rose-400'
         bgClass='bg-rose-500/10 dark:bg-rose-500/15'
       />

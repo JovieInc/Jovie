@@ -1,7 +1,7 @@
 'use client';
 
-import { WalletIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { Wallet } from 'lucide-react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { Input } from '@/components/atoms/Input';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
@@ -54,7 +54,7 @@ export function DashboardTipping() {
         {hasVenmoHandle ? (
           isEditing ? (
             <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
-              <WalletIcon className='h-4 w-4 text-accent' />
+              <Wallet className='h-4 w-4 text-accent' />
               <span className='text-sm font-medium text-primary-token'>
                 Venmo
               </span>
@@ -90,7 +90,7 @@ export function DashboardTipping() {
             </div>
           ) : (
             <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
-              <WalletIcon className='h-4 w-4 text-accent' />
+              <Wallet className='h-4 w-4 text-accent' />
               <span className='rounded-md bg-surface-2 px-2 py-1 font-sans text-sm text-primary-token'>
                 {artist.venmo_handle}
               </span>
@@ -113,7 +113,7 @@ export function DashboardTipping() {
           <SectionHeader
             title='Venmo Handle'
             description='Your handle will appear on your profile so fans can tip you directly.'
-            right={<WalletIcon className='h-6 w-6 text-accent' />}
+            right={<Wallet className='h-6 w-6 text-accent' />}
             className='px-5 py-4 border-b border-subtle'
           />
 

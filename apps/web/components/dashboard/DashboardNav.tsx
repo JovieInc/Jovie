@@ -1,23 +1,23 @@
 'use client';
 
-import {
-  ArrowTopRightOnSquareIcon,
-  BanknotesIcon,
-  BellIcon,
-  ChartPieIcon,
-  DocumentDuplicateIcon,
-  HomeIcon,
-  IdentificationIcon,
-  MusicalNoteIcon,
-  PaintBrushIcon,
-  RocketLaunchIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
-  UserCircleIcon,
-  UserPlusIcon,
-  UsersIcon,
-} from '@heroicons/react/24/outline';
 import { Kbd } from '@jovie/ui';
+import {
+  Banknote,
+  Bell,
+  Copy,
+  ExternalLink,
+  Home,
+  IdCard,
+  Music,
+  Paintbrush,
+  PieChart,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  UserCircle,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
@@ -47,35 +47,35 @@ const primaryNavigation = [
     name: 'Overview',
     href: '/app/dashboard/overview',
     id: 'overview',
-    icon: HomeIcon,
+    icon: Home,
     description: 'Dashboard overview and quick stats',
   },
   {
     name: 'Profile',
     href: '/app/dashboard/profile',
     id: 'links',
-    icon: UserCircleIcon,
+    icon: UserCircle,
     description: 'Update your profile and links',
   },
   {
     name: 'Contacts',
     href: '/app/dashboard/contacts',
     id: 'contacts',
-    icon: IdentificationIcon,
+    icon: IdCard,
     description: 'Manage your team and contact routes',
   },
   {
     name: 'Releases',
     href: '/app/dashboard/releases',
     id: 'releases',
-    icon: MusicalNoteIcon,
+    icon: Music,
     description: 'Link out every provider with one smart link',
   },
   {
     name: 'Audience',
     href: '/app/dashboard/audience',
     id: 'audience',
-    icon: UsersIcon,
+    icon: Users,
     description: 'Understand your audience demographics',
   },
 ];
@@ -96,7 +96,7 @@ const secondaryNavigation = [
     name: 'Earnings',
     href: '/app/dashboard/tipping',
     id: 'tipping',
-    icon: BanknotesIcon,
+    icon: Banknote,
     description: 'Manage tips and monetization',
   },
 ];
@@ -106,37 +106,37 @@ const settingsNavigation = [
     name: 'Account',
     href: '/app/settings/account',
     id: 'account',
-    icon: ShieldCheckIcon,
+    icon: ShieldCheck,
   },
   {
     name: 'Appearance',
     href: '/app/settings/appearance',
     id: 'appearance',
-    icon: PaintBrushIcon,
+    icon: Paintbrush,
   },
   {
     name: 'Notifications',
     href: '/app/settings/notifications',
     id: 'notifications',
-    icon: BellIcon,
+    icon: Bell,
   },
   {
     name: 'Remove Branding',
     href: '/app/settings/remove-branding',
     id: 'remove-branding',
-    icon: SparklesIcon,
+    icon: Sparkles,
   },
   {
     name: 'Ad Pixels',
     href: '/app/settings/ad-pixels',
     id: 'ad-pixels',
-    icon: RocketLaunchIcon,
+    icon: Rocket,
   },
   {
     name: 'Billing',
     href: '/app/settings/billing',
     id: 'billing',
-    icon: BanknotesIcon,
+    icon: Banknote,
   },
 ];
 
@@ -145,35 +145,35 @@ const adminNavigation: typeof primaryNavigation = [
     name: 'Overview',
     href: '/app/admin',
     id: 'admin_overview',
-    icon: ShieldCheckIcon,
+    icon: ShieldCheck,
     description: 'Internal metrics and operations',
   },
   {
     name: 'Waitlist',
     href: '/app/admin/waitlist',
     id: 'admin_waitlist',
-    icon: UserPlusIcon,
+    icon: UserPlus,
     description: 'Review and manage waitlist signups',
   },
   {
     name: 'Creators',
     href: '/app/admin/creators',
     id: 'admin_creators',
-    icon: UsersIcon,
+    icon: Users,
     description: 'Manage creator profiles and verification',
   },
   {
     name: 'Users',
     href: '/app/admin/users',
     id: 'admin_users',
-    icon: UserCircleIcon,
+    icon: UserCircle,
     description: 'Review signed up users and billing status',
   },
   {
     name: 'Activity',
     href: '/app/admin/activity',
     id: 'admin_activity',
-    icon: ChartPieIcon,
+    icon: PieChart,
     description: 'Review recent system and creator activity',
   },
 ];
@@ -296,7 +296,7 @@ export function DashboardNav(_props: DashboardNavProps) {
                     }
                   }}
                 >
-                  <DocumentDuplicateIcon aria-hidden='true' />
+                  <Copy aria-hidden='true' />
                 </SidebarMenuAction>
                 <SidebarMenuAction asChild>
                   <Link
@@ -305,7 +305,7 @@ export function DashboardNav(_props: DashboardNavProps) {
                     rel='noopener noreferrer'
                     aria-label='Open public profile in a new tab'
                   >
-                    <ArrowTopRightOnSquareIcon aria-hidden='true' />
+                    <ExternalLink aria-hidden='true' />
                   </Link>
                 </SidebarMenuAction>
               </SidebarMenuActions>

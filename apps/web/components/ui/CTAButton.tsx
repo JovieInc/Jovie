@@ -1,7 +1,7 @@
 'use client';
 
-import { CheckIcon } from '@heroicons/react/24/solid';
 import { Button, type ButtonProps } from '@jovie/ui';
+import { Check } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -68,7 +68,7 @@ export const CTAButton = React.forwardRef<
         {isLoading ? (
           <LoadingSpinner size='sm' tone='inverse' />
         ) : isSuccess ? (
-          <CheckIcon aria-hidden className='h-4 w-4' />
+          <Check aria-hidden className='h-4 w-4' />
         ) : (
           icon
         )}

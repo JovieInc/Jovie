@@ -18,21 +18,21 @@
 export type { DashboardData } from './actions/dashboard-data';
 // Server actions (from barrel)
 export {
-  createEmptyTippingStats,
   getDashboardData,
   getDashboardDataCached,
   getDashboardDataFresh,
   getProfileSocialLinks,
   prefetchDashboardData,
-  profileIsPublishable,
   publishProfileBasics,
   selectDashboardProfile,
   setSidebarCollapsed,
   updateCreatorProfile,
 } from './actions/index';
+export { profileIsPublishable } from './actions/profile-selection';
 export type {
   DspPlatform,
   ProfileSocialLink,
 } from './actions/social-links';
 export { DSP_PLATFORMS } from './actions/social-links';
 export type { TippingStats } from './actions/tipping-stats';
+export { createEmptyTippingStats } from './actions/tipping-stats';

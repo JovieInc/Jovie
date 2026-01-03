@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-} from '@heroicons/react/24/outline';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
@@ -96,9 +93,9 @@ export function BillingDashboard() {
         <div className='flex items-center'>
           <div className='shrink-0'>
             {billingInfo?.isPro ? (
-              <CheckCircleIcon className='h-8 w-8 text-emerald-500' />
+              <CheckCircle className='h-8 w-8 text-emerald-500' />
             ) : (
-              <ExclamationTriangleIcon className='h-8 w-8 text-amber-500' />
+              <AlertTriangle className='h-8 w-8 text-amber-500' />
             )}
           </div>
           <div className='ml-4'>
@@ -164,7 +161,7 @@ export function BillingDashboard() {
         </h3>
         <ul className='space-y-2 text-sm text-muted-foreground'>
           <li className='flex items-center'>
-            <CheckCircleIcon className='mr-2 h-4 w-4 text-emerald-500' />
+            <CheckCircle className='mr-2 h-4 w-4 text-emerald-500' />
             Remove Jovie branding
           </li>
         </ul>

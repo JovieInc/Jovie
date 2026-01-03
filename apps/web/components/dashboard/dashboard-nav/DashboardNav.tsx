@@ -1,10 +1,7 @@
 'use client';
 
-import {
-  ArrowTopRightOnSquareIcon,
-  DocumentDuplicateIcon,
-} from '@heroicons/react/24/outline';
 import { Kbd } from '@jovie/ui';
+import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
@@ -107,7 +104,7 @@ export function DashboardNav(_props: DashboardNavProps) {
                     }
                   }}
                 >
-                  <DocumentDuplicateIcon aria-hidden='true' />
+                  <Copy aria-hidden='true' className='size-4' />
                 </SidebarMenuAction>
                 <SidebarMenuAction asChild>
                   <Link
@@ -116,7 +113,7 @@ export function DashboardNav(_props: DashboardNavProps) {
                     rel='noopener noreferrer'
                     aria-label='Open public profile in a new tab'
                   >
-                    <ArrowTopRightOnSquareIcon aria-hidden='true' />
+                    <ExternalLink aria-hidden='true' className='size-4' />
                   </Link>
                 </SidebarMenuAction>
               </SidebarMenuActions>

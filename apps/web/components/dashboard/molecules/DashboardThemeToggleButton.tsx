@@ -1,6 +1,6 @@
 'use client';
 
-import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
+import { Moon, Sun } from 'lucide-react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export interface DashboardThemeToggleButtonProps {
@@ -26,9 +26,9 @@ export function DashboardThemeToggleButton({
       onClick={handleClick}
       icon={
         isDark ? (
-          <MoonIcon className='h-4 w-4' aria-hidden='true' />
+          <Moon className='h-4 w-4' aria-hidden='true' />
         ) : (
-          <SunIcon className='h-4 w-4' aria-hidden='true' />
+          <Sun className='h-4 w-4' aria-hidden='true' />
         )
       }
     />

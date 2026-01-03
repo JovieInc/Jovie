@@ -1,4 +1,4 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -76,7 +76,7 @@ export function ErrorBanner({
     >
       <div className='flex gap-3'>
         <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-red-500/10 text-red-700 dark:bg-red-900/60 dark:text-red-200'>
-          <ExclamationTriangleIcon className='h-5 w-5' aria-hidden='true' />
+          <AlertTriangle className='h-5 w-5' aria-hidden='true' />
         </span>
 
         <div className='flex-1 min-w-0 space-y-1'>

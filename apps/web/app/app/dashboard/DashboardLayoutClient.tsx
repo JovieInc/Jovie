@@ -1,11 +1,7 @@
 'use client';
 
-import {
-  Bars3Icon,
-  UserGroupIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { Menu, Users, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import React, {
   createContext,
@@ -278,7 +274,7 @@ function DashboardLayoutInner({
       className='h-9 w-9'
       disabled={!tableMeta.toggle}
     >
-      <UserGroupIcon className='h-5 w-5' />
+      <Users className='h-5 w-5' />
     </Button>
   ) : null;
 
@@ -291,11 +287,7 @@ function DashboardLayoutInner({
       aria-expanded={openMobile}
       className='h-11 w-11'
     >
-      {openMobile ? (
-        <XMarkIcon className='h-6 w-6' />
-      ) : (
-        <Bars3Icon className='h-6 w-6' />
-      )}
+      {openMobile ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
     </Button>
   ) : null;
 

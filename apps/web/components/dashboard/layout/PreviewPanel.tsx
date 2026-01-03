@@ -1,10 +1,7 @@
 'use client';
 
-import {
-  ArrowTopRightOnSquareIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { ExternalLink, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
@@ -39,7 +36,7 @@ export function PreviewPanel() {
         <DashboardHeaderActionButton
           ariaLabel='Close preview'
           onClick={close}
-          icon={<XMarkIcon className='h-4 w-4' aria-hidden='true' />}
+          icon={<X className='h-4 w-4' aria-hidden='true' />}
         />
       </div>
 
@@ -87,7 +84,7 @@ export function PreviewPanel() {
                 target='_blank'
                 rel='noopener noreferrer'
               >
-                <ArrowTopRightOnSquareIcon className='h-4 w-4 mr-1.5' />
+                <ExternalLink className='h-4 w-4 mr-1.5' />
                 Open Jovie Profile
               </Link>
             </Button>
