@@ -32,11 +32,11 @@ import {
   users,
 } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import {
   profileIsPublishable,
   selectDashboardProfile,
 } from './profile-selection';
-import { DSP_PLATFORMS } from './social-links';
 import { createEmptyTippingStats, type TippingStats } from './tipping-stats';
 
 /**

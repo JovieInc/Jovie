@@ -14,6 +14,7 @@
  * - ./actions/dashboard-data - Core dashboard data fetching
  */
 
+export type { DspPlatform } from '@/lib/services/social-links/types';
 // Types (imported directly from source to avoid "use server" conflicts)
 export type { DashboardData } from './actions/dashboard-data';
 // Server actions (async functions only - from barrel)
@@ -28,10 +29,7 @@ export {
   setSidebarCollapsed,
   updateCreatorProfile,
 } from './actions/index';
-export type {
-  DspPlatform,
-  ProfileSocialLink,
-} from './actions/social-links';
+export type { ProfileSocialLink } from './actions/social-links';
 export type { TippingStats } from './actions/tipping-stats';
 
 // Non-async exports (constants and helper functions)
