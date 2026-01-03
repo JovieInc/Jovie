@@ -6,7 +6,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 import {
