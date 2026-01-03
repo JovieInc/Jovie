@@ -31,13 +31,14 @@ import {
   userSettings,
   users,
 } from '@/lib/db/schema';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import {
+  createEmptyTippingStats,
   profileIsPublishable,
   selectDashboardProfile,
-} from './profile-selection';
-import { createEmptyTippingStats, type TippingStats } from './tipping-stats';
+  type TippingStats,
+} from '@/lib/db/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 /**
  * Complete dashboard data structure containing all information
