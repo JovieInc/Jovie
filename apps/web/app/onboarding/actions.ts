@@ -483,12 +483,23 @@ export async function completeOnboarding({
       '🔴 ERROR STACK:',
       error instanceof Error ? error.stack : 'No stack available'
     );
+    console.error('🔴 ERROR DETAILS:', {
+      username,
+      displayName,
+      email,
+      timestamp: new Date().toISOString(),
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
 
     // Normalize unknown errors into onboarding-shaped errors for consistent handling
     const resolvedError =
       error instanceof Error && /^\[([A-Z_]+)\]/.test(error.message)
         ? error
         : onboardingErrorToError(mapDatabaseError(error));
+
+    // Log the resolved error type for monitoring
+    console.error('🔴 RESOLVED ERROR TYPE:', resolvedError.message);
 
     throw resolvedError;
   }

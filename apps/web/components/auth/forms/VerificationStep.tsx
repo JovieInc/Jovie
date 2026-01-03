@@ -36,6 +36,10 @@ interface VerificationStepProps {
    */
   isVerifying: boolean;
   /**
+   * Whether signup completion (session propagation) is in progress
+   */
+  isCompleting?: boolean;
+  /**
    * Whether resend is in progress
    */
   isResending: boolean;
@@ -64,6 +68,7 @@ export function VerificationStep({
   onSubmit,
   onResend,
   isVerifying,
+  isCompleting = false,
   isResending,
   error,
   onBack,
@@ -177,7 +182,12 @@ export function VerificationStep({
           aria-busy={isVerifying}
           className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
         >
-          {isVerifying ? (
+          {isCompleting ? (
+            <>
+              <ButtonSpinner />
+              <span>Completing signup...</span>
+            </>
+          ) : isVerifying ? (
             <>
               <ButtonSpinner />
               <span>Verifying...</span>

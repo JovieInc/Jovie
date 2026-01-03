@@ -125,9 +125,15 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           // Set the active session
           await setActive({ session: result.createdSessionId });
 
-          // Navigate to onboarding
+          // CRITICAL: Wait for session to propagate before redirecting
+          // This prevents race conditions where onboarding page loads before
+          // the session is fully available, causing redirect loops
+          base.setLoadingState({ type: 'completing' });
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Navigate to onboarding with fresh_signup flag for loop detection
           const redirectUrl = base.getRedirectUrl();
-          base.router.push(redirectUrl);
+          base.router.push(`${redirectUrl}?fresh_signup=true`);
 
           return true;
         }

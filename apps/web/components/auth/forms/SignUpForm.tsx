@@ -162,7 +162,11 @@ export function SignUpForm() {
             onCodeChange={setCode}
             onSubmit={verifyCode}
             onResend={resendCode}
-            isVerifying={loadingState.type === 'verifying'}
+            isVerifying={
+              loadingState.type === 'verifying' ||
+              loadingState.type === 'completing'
+            }
+            isCompleting={loadingState.type === 'completing'}
             isResending={loadingState.type === 'resending'}
             error={error}
             onBack={handleBack}

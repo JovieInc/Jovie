@@ -115,6 +115,30 @@ export function useOnboardingSubmit({
           error instanceof Error ? error.message.match(/^\[([A-Z_]+)\]/) : null;
         const errorCode = errorCodeMatch?.[1];
 
+        // Special handling for database errors during signup
+        if (errorMessage.includes('DATABASE_ERROR')) {
+          console.error(
+            '[ONBOARDING] Database error detected, suggesting retry'
+          );
+          setState(prev => ({
+            ...prev,
+            error:
+              'We had trouble setting up your account. Please try again in a moment.',
+            step: 'validating',
+            progress: 0,
+            isSubmitting: false,
+          }));
+          track('onboarding_error', {
+            user_id: userId,
+            handle: resolvedHandle,
+            error_message: errorMessage,
+            error_code: 'DATABASE_ERROR',
+            error_step: 'submission',
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        }
+
         track('onboarding_error', {
           user_id: userId,
           handle: resolvedHandle,
