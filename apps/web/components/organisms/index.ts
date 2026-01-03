@@ -18,4 +18,4 @@ export * from './ProfileShell';
 export * from './SmartHandleInput';
 export * from './SocialBar';
 export * from './TipSection';
-export * from './UserButton';
+export * from './user-button';

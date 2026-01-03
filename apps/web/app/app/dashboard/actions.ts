@@ -16,7 +16,7 @@
 
 // Types (imported directly from source to avoid "use server" conflicts)
 export type { DashboardData } from './actions/dashboard-data';
-// Server actions (from barrel)
+// Server actions (async functions only - from barrel)
 export {
   getDashboardData,
   getDashboardDataCached,
@@ -28,11 +28,19 @@ export {
   setSidebarCollapsed,
   updateCreatorProfile,
 } from './actions/index';
-export { profileIsPublishable } from './actions/profile-selection';
 export type {
   DspPlatform,
   ProfileSocialLink,
 } from './actions/social-links';
-export { DSP_PLATFORMS } from './actions/social-links';
 export type { TippingStats } from './actions/tipping-stats';
-export { createEmptyTippingStats } from './actions/tipping-stats';
+
+// Non-async exports (constants and helper functions)
+// Note: These MUST be imported directly from source to avoid "use server" conflicts
+// Import like: import { DSP_PLATFORMS } from '@/app/app/dashboard/actions/social-links'
+// import { createEmptyTippingStats } from '@/app/app/dashboard/actions/tipping-stats'
+// import { profileIsPublishable } from '@/app/app/dashboard/actions/profile-selection'
+
+// Re-exports commented out to prevent build errors with Next.js server actions
+// export { DSP_PLATFORMS } from './actions/social-links';
+// export { createEmptyTippingStats } from './actions/tipping-stats';
+// export { profileIsPublishable } from './actions/profile-selection';
