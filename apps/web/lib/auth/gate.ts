@@ -303,7 +303,7 @@ export async function resolveUserState(options?: {
           clerkUserId,
           dbUserId: null,
           profileId: null,
-          redirectTo: '/onboarding',
+          redirectTo: '/onboarding?fresh_signup=true',
           context: { ...baseContext, email },
         };
       }
@@ -313,7 +313,7 @@ export async function resolveUserState(options?: {
         clerkUserId,
         dbUserId: null,
         profileId: null,
-        redirectTo: '/onboarding',
+        redirectTo: '/onboarding?fresh_signup=true',
         context: { ...baseContext, email },
       };
     } else {
@@ -400,7 +400,7 @@ export async function resolveUserState(options?: {
       clerkUserId,
       dbUserId,
       profileId: null,
-      redirectTo: '/onboarding',
+      redirectTo: '/onboarding?fresh_signup=true',
       context: { ...baseContext, email, claimToken },
     };
   }
@@ -412,7 +412,7 @@ export async function resolveUserState(options?: {
       clerkUserId,
       dbUserId,
       profileId: profile.id,
-      redirectTo: '/onboarding',
+      redirectTo: '/onboarding?fresh_signup=true',
       context: { ...baseContext, email },
     };
   }
