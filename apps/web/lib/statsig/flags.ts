@@ -11,11 +11,6 @@
  * 4. Set expiry date (max 14 days for experimental flags)
  */
 export const STATSIG_FLAGS = {
-  // Core Features
-  TIPPING: 'feature_tipping',
-  NOTIFICATIONS: 'feature_notifications',
-  ANALYTICS: 'feature_analytics',
-
   // Auth Features
   AUTH_SPOTIFY_ONLY: 'feature_auth_spotify_only',
 
@@ -24,7 +19,6 @@ export const STATSIG_FLAGS = {
   // Onboarding Features
 
   // Profile Features
-  AVATAR_UPLOADER: 'feature_avatar_uploader',
   CONTACTS: 'feature_contacts',
   DYNAMIC_ENGAGEMENT: 'feature_dynamic_engagement',
 

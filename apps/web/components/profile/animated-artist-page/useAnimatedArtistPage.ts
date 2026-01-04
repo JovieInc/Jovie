@@ -2,17 +2,13 @@
 
 import type { Variants } from 'framer-motion';
 import { useMemo, useState } from 'react';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { UseAnimatedArtistPageReturn } from './types';
 
 export function useAnimatedArtistPage(): UseAnimatedArtistPageReturn {
   const [isNavigating, setIsNavigating] = useState(false);
   const prefersReducedMotion = useReducedMotion();
-  const tippingGate = useFeatureGate(STATSIG_FLAGS.TIPPING);
-
-  const tippingEnabled = tippingGate.value;
+  const tippingEnabled = true;
 
   const pageVariants: Variants = useMemo(() => {
     if (prefersReducedMotion) {

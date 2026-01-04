@@ -1,8 +1,6 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 
 const DashboardTipping = dynamic(
   () =>
@@ -30,23 +28,5 @@ const DashboardTipping = dynamic(
 );
 
 export function DashboardTippingGate() {
-  const tippingGate = useFeatureGate(STATSIG_FLAGS.TIPPING);
-
-  if (!tippingGate.value) {
-    return (
-      <div className='flex items-center justify-center'>
-        <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
-          <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
-            Tipping is not available yet
-          </h1>
-          <p className='text-secondary-token'>
-            We&apos;re focusing on getting the core Jovie profile experience
-            right before launching tipping.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return <DashboardTipping />;
 }

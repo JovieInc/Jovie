@@ -8,8 +8,6 @@ import {
   useProfileVisitTracking,
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { LegacySocialLink } from '@/types/db';
 import type {
@@ -42,11 +40,10 @@ export function useProfileShell({
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
   const mode = searchParams?.get('mode') ?? 'profile';
   const forceNotifications = searchParams?.get('preview') === '1';
   const notificationsEnabled =
-    forceNotificationsEnabled || notificationsGate.value || forceNotifications;
+    forceNotificationsEnabled || true || forceNotifications;
   const source = searchParams?.get('source');
 
   useTipPageTracking({

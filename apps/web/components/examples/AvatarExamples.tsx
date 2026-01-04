@@ -10,8 +10,6 @@
 import { useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   formatAcceptedImageTypes,
@@ -167,13 +165,10 @@ export function ConditionalAvatarExample({
 }: {
   userOwnsProfile: boolean;
 }) {
-  const { value: avatarUploaderEnabled } = useFeatureGate(
-    STATSIG_FLAGS.AVATAR_UPLOADER
-  );
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Determine if upload should be enabled
-  const uploadEnabled = userOwnsProfile && avatarUploaderEnabled;
+  const uploadEnabled = userOwnsProfile;
 
   if (uploadEnabled) {
     return (
