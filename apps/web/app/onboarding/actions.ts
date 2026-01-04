@@ -232,7 +232,7 @@ export async function completeOnboarding({
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
 
-    const userEmail = email ?? null;
+    const userEmail = email ?? clerkIdentity.email ?? null;
 
     // CRITICAL: Use SERIALIZABLE isolation level to prevent race conditions
     // where two users could claim the same handle simultaneously.
