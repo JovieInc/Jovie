@@ -104,6 +104,16 @@ export function mapDatabaseError(error: unknown): OnboardingError {
     null
   )?.toLowerCase();
 
+  const transactionRollbackCodes = new Set(['40001', '40P01', '25P02']);
+  const transactionRollbackPatterns = [
+    'failed query: rollback',
+    'transaction rolled back',
+    'transaction was aborted',
+    'current transaction is aborted',
+    'serialization failure',
+    'deadlock detected',
+  ];
+
   // Unique constraint violations
   if (errorCode === '23505' || errorMessage.includes('duplicate')) {
     // Handle various forms of username unique errors (normalized/index names)
@@ -150,6 +160,19 @@ export function mapDatabaseError(error: unknown): OnboardingError {
       OnboardingErrorCode.DATABASE_ERROR,
       'Invalid reference data',
       unwrapped.message || (errorRecord?.message as string)
+    );
+  }
+
+  // Transaction rollback errors (e.g., serialization failures, deadlocks)
+  if (
+    (errorCode && transactionRollbackCodes.has(errorCode)) ||
+    transactionRollbackPatterns.some(pattern => errorMessage.includes(pattern))
+  ) {
+    return createOnboardingError(
+      OnboardingErrorCode.TRANSACTION_FAILED,
+      'Profile creation failed. Please try again',
+      unwrapped.message || (errorRecord?.message as string),
+      true // Retryable – caller can safely retry onboarding
     );
   }
 

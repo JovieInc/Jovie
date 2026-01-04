@@ -47,4 +47,19 @@ describe('onboardingErrorToError', () => {
 
     expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
   });
+
+  it('maps transaction rollbacks to TRANSACTION_FAILED', () => {
+    const dbError = {
+      message: 'Failed query: rollback',
+      cause: {
+        message: 'Transaction rolled back due to serialization failure',
+      },
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.TRANSACTION_FAILED);
+    expect(mapped.retryable).toBe(true);
+    expect(mapped.message).toBe('Profile creation failed. Please try again');
+  });
 });
