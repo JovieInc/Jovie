@@ -259,6 +259,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathname === '/sign-up';
 
     const isAuthCallbackPath =
+      pathname === '/sso-callback' ||
       pathname === '/signup/sso-callback' ||
       pathname === '/signin/sso-callback';
 

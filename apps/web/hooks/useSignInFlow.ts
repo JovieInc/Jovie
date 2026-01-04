@@ -56,7 +56,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
   // Use shared auth flow base
   const base = useAuthFlowBase({
-    defaultRedirectUrl: '/app/dashboard/overview',
+    defaultRedirectUrl: '/app/dashboard',
     useStoredRedirectUrl: true,
   });
 
