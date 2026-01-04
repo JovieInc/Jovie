@@ -5,7 +5,7 @@
  * Uses shared base logic from useAuthFlowBase.
  */
 
-import { useSignIn } from '@clerk/nextjs/legacy';
+import { useSignIn } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 import { isSignUpSuggested, parseClerkError } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
@@ -88,7 +88,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
         // Find email_code strategy in supported first factors
         const emailCodeFactor = result.supportedFirstFactors?.find(
-          factor => factor.strategy === 'email_code'
+          (factor: { strategy: string }) => factor.strategy === 'email_code'
         );
 
         if (!emailCodeFactor || !('emailAddressId' in emailCodeFactor)) {
@@ -178,7 +178,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
     try {
       // Find email_code factor
       const emailCodeFactor = signIn.supportedFirstFactors?.find(
-        factor => factor.strategy === 'email_code'
+        (factor: { strategy: string }) => factor.strategy === 'email_code'
       );
 
       if (!emailCodeFactor || !('emailAddressId' in emailCodeFactor)) {
