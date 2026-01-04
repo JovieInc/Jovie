@@ -1,31 +1,20 @@
-# Testing Optimization Plan
+# Testing Optimization Plan – Progress Update
 
-## Progress Update — Payment Flow (Stripe)
-- Added end-to-end coverage for the Standard upgrade path via Stripe Checkout, including success, card-decline, and pricing fetch failure scenarios.
-- Hardened billing E2E determinism by programmatically cancelling or applying subscriptions through signed webhook calls after each run.
-- Documented required Stripe test configuration so the suite can exercise real payment flows instead of brittle mocks.
+## What changed
+- Set the default Vitest configuration to the optimized fast profile for local development.
+- Added a dedicated `vitest.config.ci.mts` to keep the full suite (coverage, forks pool, standard setup) available for CI.
+- Updated scripts so `pnpm test`/`pnpm test:fast` run the fast profile while `pnpm test:ci` targets the full suite.
 
-## Stripe Test Setup
-1. Configure the following environment variables (test mode keys only):
-   - `STRIPE_SECRET_KEY`
-   - `STRIPE_WEBHOOK_SECRET`
-   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-   - `STRIPE_PRICE_STANDARD_MONTHLY` **or** `STRIPE_PRICE_STANDARD_YEARLY`
-2. Ensure the configured price IDs are active in the Stripe test dashboard.
-3. Use the built-in Stripe test cards when prompted:
-   - Success: `4242 4242 4242 4242`, expiry `12/34`, CVC `123`, ZIP `94107`.
-   - Decline: `4000 0000 0000 0002` (hard decline), same expiry/CVC/ZIP.
-4. Webhooks: the payment E2E tests generate signed webhook payloads (`checkout.session.completed` + subscription lifecycle events) against `/api/stripe/webhooks`, so no external Stripe CLI forwarding is required for local runs.
-5. Authentication: the tests rely on the configured Clerk E2E user (`E2E_CLERK_USER_USERNAME`/`E2E_CLERK_USER_PASSWORD`) to reach `/billing`.
+## Fast profile status
+- Run: `pnpm test:fast` (Vitest fast profile)
+- Result: **failed** — multiple suites still require full mocks and runtime context.
+- Duration: ~7m 4s
+- Failure themes:
+  - Route handlers expecting request context (`headers`/`cache`) and database connectivity (`DATABASE_URL` missing).
+  - API/unit suites relying on full mocks for Stripe/Clerk/Next cache utilities.
+  - Snapshot-style exports mismatch (atoms barrel) due to different setup path.
 
-## How to Run
-- Full suite: `pnpm test:e2e`
-- Stripe-only focus (faster feedback):
-  - `pnpm test:e2e -- --grep "Billing payment flow - Stripe Checkout"`
-- Lint & types (must stay green):
-  - `pnpm lint`
-  - `pnpm typecheck`
-
-## Next Steps
-- Add coverage for retrying failed webhook processing in staging (simulate delayed delivery) to further de-risk billing regressions.
-- Capture Playwright traces for the Stripe flows in CI to speed up debugging if card collection UIs drift.
+## Next actions
+- Extend the fast setup to include lightweight mocks for `next/headers`, `next/cache`, and database/session helpers, or tag those suites to run only in the CI config.
+- Revisit exclusion patterns to trim slow API suites from the fast profile while keeping core unit coverage.
+- Re-run `pnpm test:fast` after tightening mocks/exclusions to target <2 minute wall-clock time.

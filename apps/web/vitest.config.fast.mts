@@ -1,6 +1,11 @@
 import react from '@vitejs/plugin-react';
+import dotenv from 'dotenv';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
+
+// Load environment variables from .env.test if it exists to keep parity with the
+// standard configuration while using the optimized defaults locally.
+dotenv.config({ path: '.env.test' });
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
