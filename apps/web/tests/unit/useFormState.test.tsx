@@ -408,11 +408,12 @@ describe('useFormState', () => {
       // Function that always fails
       const mockAsyncFn = vi.fn().mockRejectedValue(new Error('Network error'));
 
-      let promise: Promise<unknown>;
+      let promise!: Promise<unknown>;
 
       await act(async () => {
         promise = result.current.handleAsync(mockAsyncFn);
       });
+      void promise.catch(() => {});
 
       // First attempt is immediate
       expect(mockAsyncFn).toHaveBeenCalledTimes(1);
@@ -461,10 +462,11 @@ describe('useFormState', () => {
 
       const mockAsyncFn = vi.fn().mockRejectedValue(new Error('Test error'));
 
-      let promise: Promise<unknown>;
+      let promise!: Promise<unknown>;
 
       await act(async () => {
         promise = result.current.handleAsync(mockAsyncFn);
+        void promise.catch(() => {});
       });
 
       // After first failure, retryAttempt should be 0
@@ -512,10 +514,11 @@ describe('useFormState', () => {
         });
       });
 
-      let promise: Promise<unknown>;
+      let promise!: Promise<unknown>;
 
       await act(async () => {
         promise = result.current.handleAsync(mockAsyncFn);
+        void promise.catch(() => {});
       });
 
       // Initial attempt (attempt 0) - waiting for first call to complete
@@ -1261,6 +1264,10 @@ describe('useFormState', () => {
     });
 
     afterEach(() => {
+      // Ensure no timers leak between tests. Don't run pending timers because
+      // some tests intentionally schedule rejecting timers, and executing them
+      // during teardown can surface as unhandled rejections.
+      vi.clearAllTimers();
       vi.useRealTimers();
       vi.restoreAllMocks();
     });
@@ -1368,10 +1375,11 @@ describe('useFormState', () => {
         .fn()
         .mockRejectedValue(new Error('Persistent error'));
 
-      let promise: Promise<unknown>;
+      let promise!: Promise<unknown>;
 
       await act(async () => {
         promise = result.current.handleAsync(mockAsyncFn);
+        void promise.catch(() => {});
       });
 
       // Advance through the retry
@@ -1393,10 +1401,11 @@ describe('useFormState', () => {
       expect(result.current.canRetry).toBe(true);
 
       // Call retry() - should reset retryAttempt to 0
-      let retryPromise: Promise<unknown>;
+      let retryPromise!: Promise<unknown>;
       await act(async () => {
         retryPromise = result.current.retry();
       });
+      void retryPromise.catch(() => {});
 
       // retryAttempt should be reset to 0 for fresh retry cycle
       expect(result.current.retryAttempt).toBe(0);
@@ -1519,10 +1528,11 @@ describe('useFormState', () => {
       onRetry.mockClear();
 
       // Now call manual retry() - should start fresh with 3 more attempts
-      let retryPromise: Promise<unknown>;
+      let retryPromise!: Promise<unknown>;
 
       await act(async () => {
         retryPromise = result.current.retry();
+        void retryPromise.catch(() => {});
       });
 
       // First attempt of retry cycle
@@ -1592,16 +1602,35 @@ describe('useFormState', () => {
 
       // Create a mock that fails but takes some time (50ms) to reject
       // This allows us to observe the canRetry state during the retry
-      const mockAsyncFn = vi.fn().mockImplementation(() => {
+      const mockAsyncFn = vi.fn().mockImplementation((signal: AbortSignal) => {
         return new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Test error')), 50);
+          const timeoutId = setTimeout(
+            () => reject(new Error('Test error')),
+            50
+          );
+
+          if (signal.aborted) {
+            clearTimeout(timeoutId);
+            reject(new DOMException('Aborted', 'AbortError'));
+            return;
+          }
+
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timeoutId);
+              reject(new DOMException('Aborted', 'AbortError'));
+            },
+            { once: true }
+          );
         });
       });
 
       // Start initial operation (don't await yet)
-      let promise: Promise<unknown>;
+      let promise!: Promise<unknown>;
       await act(async () => {
         promise = result.current.handleAsync(mockAsyncFn);
+        void promise.catch(() => {});
       });
 
       // Advance time to complete first operation
@@ -1617,9 +1646,10 @@ describe('useFormState', () => {
       expect(result.current.canRetry).toBe(true);
 
       // Start retry
-      let retryPromise: Promise<unknown>;
+      let retryPromise!: Promise<unknown>;
       await act(async () => {
         retryPromise = result.current.retry();
+        void retryPromise.catch(() => {});
       });
 
       // canRetry should be false while retry is in progress

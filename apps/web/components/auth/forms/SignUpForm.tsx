@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardContent } from '@jovie/ui';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
@@ -182,12 +183,12 @@ export function SignUpForm() {
             ) : (
               <>
                 Account already exists.{' '}
-                <a
+                <Link
                   href={buildSignInUrl(email)}
                   className='text-primary-token hover:underline focus-ring-themed rounded-md'
                 >
                   Sign in instead
-                </a>
+                </Link>
               </>
             )}
           </p>

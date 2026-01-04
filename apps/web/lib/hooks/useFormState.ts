@@ -495,116 +495,124 @@ export function useFormState(
     });
 
   const handleAsync = useCallback(
-    async <T>(asyncFn: (signal: AbortSignal) => Promise<T>): Promise<T> => {
-      // Abort any previous in-flight request before starting new one
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      // Create new AbortController for this request
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      // Initialize state for new async operation
-      // Use a single setState call to avoid race conditions where
-      // setError/setSuccess might reset loading to false
-      setState(prev => ({
-        ...prev,
-        loading: true,
-        error: '',
-        success: '',
-        retryCount: maxRetries,
-        retryAttempt: 0,
-        isRetrying: false,
-      }));
-
-      let lastError: Error | unknown;
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          // Check if aborted before each attempt
-          if (controller.signal.aborted) {
-            throw new DOMException('Aborted', 'AbortError');
-          }
-
-          // Update retry attempt counter
-          setState(prev => ({
-            ...prev,
-            retryAttempt: attempt,
-            isRetrying: attempt > 0,
-          }));
-
-          // Pass signal to async function for cancellation support
-          const result = await asyncFn(controller.signal);
-
-          // Clear stored function on success - no retry needed
-          lastAsyncFnRef.current = null;
-          setState(prev => ({
-            ...prev,
-            loading: false,
-            canRetry: false,
-            isRetrying: false,
-          }));
-          return result;
-        } catch (error) {
-          lastError = error;
-
-          // Don't retry on AbortError (DOMException is not instanceof Error)
-          const isAbortError =
-            error &&
-            typeof error === 'object' &&
-            'name' in error &&
-            error.name === 'AbortError';
-          if (isAbortError) {
-            // Clear retry state and don't set error for aborted requests
-            setState(prev => ({
-              ...prev,
-              loading: false,
-              isRetrying: false,
-              canRetry: false,
-            }));
-            throw error;
-          }
-
-          // Check if we can retry
-          const isLastAttempt = attempt >= maxRetries;
-
-          if (isLastAttempt) {
-            // Final attempt failed - store function for manual retry
-            lastAsyncFnRef.current = asyncFn as (
-              signal: AbortSignal
-            ) => Promise<unknown>;
-            const errorMessage =
-              error instanceof Error ? error.message : 'An error occurred';
-            // Set final error state
-            setState(prev => ({
-              ...prev,
-              canRetry: true,
-              isRetrying: false,
-              loading: false,
-              error: errorMessage,
-            }));
-            throw error;
-          }
-
-          // Not the last attempt - prepare for retry
-          // Call onRetry callback before waiting
-          if (onRetry && error instanceof Error) {
-            onRetry(attempt + 1, error);
-          }
-
-          // Calculate backoff delay and wait
-          const backoffDelay = calculateBackoffDelay(
-            attempt,
-            baseDelay,
-            maxDelay
-          );
-          await delay(backoffDelay);
+    <T>(asyncFn: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+      const promise = (async (): Promise<T> => {
+        // Abort any previous in-flight request before starting new one
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
         }
-      }
 
-      // This should never be reached, but TypeScript needs it
-      throw lastError;
+        // Create new AbortController for this request
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        // Initialize state for new async operation
+        // Use a single setState call to avoid race conditions where
+        // setError/setSuccess might reset loading to false
+        setState(prev => ({
+          ...prev,
+          loading: true,
+          error: '',
+          success: '',
+          retryCount: maxRetries,
+          retryAttempt: 0,
+          isRetrying: false,
+        }));
+
+        let lastError: Error | unknown;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            // Check if aborted before each attempt
+            if (controller.signal.aborted) {
+              throw new DOMException('Aborted', 'AbortError');
+            }
+
+            // Update retry attempt counter
+            setState(prev => ({
+              ...prev,
+              retryAttempt: attempt,
+              isRetrying: attempt > 0,
+            }));
+
+            // Pass signal to async function for cancellation support
+            const result = await asyncFn(controller.signal);
+
+            // Clear stored function on success - no retry needed
+            lastAsyncFnRef.current = null;
+            setState(prev => ({
+              ...prev,
+              loading: false,
+              canRetry: false,
+              isRetrying: false,
+            }));
+            return result;
+          } catch (error) {
+            lastError = error;
+
+            // Don't retry on AbortError (DOMException is not instanceof Error)
+            const isAbortError =
+              error &&
+              typeof error === 'object' &&
+              'name' in error &&
+              error.name === 'AbortError';
+            if (isAbortError) {
+              // Clear retry state and don't set error for aborted requests
+              setState(prev => ({
+                ...prev,
+                loading: false,
+                isRetrying: false,
+                canRetry: false,
+              }));
+              throw error;
+            }
+
+            // Check if we can retry
+            const isLastAttempt = attempt >= maxRetries;
+
+            if (isLastAttempt) {
+              // Final attempt failed - store function for manual retry
+              lastAsyncFnRef.current = asyncFn as (
+                signal: AbortSignal
+              ) => Promise<unknown>;
+              const errorMessage =
+                error instanceof Error ? error.message : 'An error occurred';
+              // Set final error state
+              setState(prev => ({
+                ...prev,
+                canRetry: true,
+                isRetrying: false,
+                loading: false,
+                error: errorMessage,
+              }));
+              throw error;
+            }
+
+            // Not the last attempt - prepare for retry
+            // Call onRetry callback before waiting
+            if (onRetry && error instanceof Error) {
+              onRetry(attempt + 1, error);
+            }
+
+            // Calculate backoff delay and wait
+            const backoffDelay = calculateBackoffDelay(
+              attempt,
+              baseDelay,
+              maxDelay
+            );
+            await delay(backoffDelay);
+          }
+        }
+
+        // This should never be reached, but TypeScript needs it
+        throw lastError;
+      })();
+
+      // Attach a handler immediately to avoid unhandled rejections for callers
+      // that create the promise but don't attach handlers until later.
+      void promise.catch(() => {});
+
+      return promise;
     },
     [maxRetries, baseDelay, maxDelay, onRetry]
   );

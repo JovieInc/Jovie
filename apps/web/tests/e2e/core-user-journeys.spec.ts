@@ -38,7 +38,7 @@ test.describe('Core User Journeys', () => {
     await expect(page).toHaveURL(/mode=listen/);
 
     // Should not redirect to auth
-    await expect(page).not.toHaveURL(/sign-in/);
+    await expect(page).not.toHaveURL(/signin/);
   });
 
   test('Tip mode works without authentication', async ({ page }) => {
@@ -51,7 +51,7 @@ test.describe('Core User Journeys', () => {
     await expect(page).toHaveURL(/mode=tip/);
 
     // Should not redirect to auth
-    await expect(page).not.toHaveURL(/sign-in/);
+    await expect(page).not.toHaveURL(/signin/);
   });
 
   test('Dashboard redirects unauthenticated users', async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe('Core User Journeys', () => {
     });
 
     // Should redirect to sign-in
-    await expect(page).toHaveURL(/sign-in/);
+    await expect(page).toHaveURL(/signin/);
   });
 
   test('No console errors on key pages', async ({ page }) => {

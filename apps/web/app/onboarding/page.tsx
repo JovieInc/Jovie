@@ -1,4 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
@@ -64,12 +65,12 @@ export default async function OnboardingPage({
               We're having trouble setting up your account. Please try logging
               out and signing in again.
             </p>
-            <a
+            <Link
               href='/signout'
               className='inline-block text-primary hover:underline font-medium'
             >
               Return to login
-            </a>
+            </Link>
           </div>
         </div>
       </AuthLayout>

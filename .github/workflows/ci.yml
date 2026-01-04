@@ -881,6 +881,23 @@ jobs:
           # Chrome-only for PRs - faster feedback, Firefox runs on main only
           cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium ${{ steps.quarantine.outputs.allowed_specs }}
 
+      - name: E2E Auth Smoke (PR Gate)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/auth-smoke.spec.ts') != '' }}
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          SMOKE_ONLY: '1'
+          # Auth smoke requires real Clerk keys in CI
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          # Auth smoke signs in a configured E2E user
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          # Optional: enable deterministic spotify-only UI check
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
+        run: |
+          cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
+
       - name: E2E Full (Main Branch)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |

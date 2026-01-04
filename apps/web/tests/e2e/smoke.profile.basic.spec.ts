@@ -13,6 +13,11 @@ test.describe('Basic Profile smoke tests @smoke', () => {
   test('taylorswift profile page loads with correct title @smoke', async ({
     page,
   }) => {
+    const dbUrl = process.env.DATABASE_URL || '';
+    if (!dbUrl || dbUrl.includes('dummy')) {
+      test.skip();
+    }
+
     await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Should not redirect to 404
@@ -33,6 +38,11 @@ test.describe('Basic Profile smoke tests @smoke', () => {
   });
 
   test('profile page responds correctly @smoke', async ({ page }) => {
+    const dbUrl = process.env.DATABASE_URL || '';
+    if (!dbUrl || dbUrl.includes('dummy')) {
+      test.skip();
+    }
+
     const response = await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Should get 200 OK response
@@ -56,6 +66,11 @@ test.describe('Basic Profile smoke tests @smoke', () => {
   });
 
   test('listen mode URL works @smoke', async ({ page }) => {
+    const dbUrl = process.env.DATABASE_URL || '';
+    if (!dbUrl || dbUrl.includes('dummy')) {
+      test.skip();
+    }
+
     await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=listen`);
 
     // Should stay on listen mode URL
@@ -71,6 +86,11 @@ test.describe('Basic Profile smoke tests @smoke', () => {
   });
 
   test('tip mode URL works @smoke', async ({ page }) => {
+    const dbUrl = process.env.DATABASE_URL || '';
+    if (!dbUrl || dbUrl.includes('dummy')) {
+      test.skip();
+    }
+
     await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=tip`);
 
     // Should stay on tip mode URL

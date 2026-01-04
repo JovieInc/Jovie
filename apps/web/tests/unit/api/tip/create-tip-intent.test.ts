@@ -2,26 +2,15 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockStripePaymentIntentsCreate = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/stripe/client', () => ({
-  stripe: {
+vi.mock('stripe', () => {
+  const Stripe = vi.fn().mockImplementation(() => ({
     paymentIntents: {
       create: mockStripePaymentIntentsCreate,
     },
-  },
-}));
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
-  users: {},
-}));
+  }));
+  return { default: Stripe };
+});
 
 vi.mock('@/lib/utils/rate-limit', () => ({
   checkRateLimit: vi.fn().mockReturnValue(false),
@@ -38,6 +27,8 @@ describe('POST /api/create-tip-intent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+
+    process.env.STRIPE_SECRET_KEY = 'test_stripe_key';
   });
 
   it('returns 400 for invalid amount', async () => {
@@ -47,7 +38,7 @@ describe('POST /api/create-tip-intent', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: -100,
-        creatorProfileId: 'profile_123',
+        handle: 'taylorswift',
       }),
     });
 
@@ -58,14 +49,26 @@ describe('POST /api/create-tip-intent', () => {
     expect(data.error).toBeDefined();
   });
 
-  it('returns 404 when creator not found', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
+  it('returns 400 for invalid handle', async () => {
+    const { POST } = await import('@/app/api/create-tip-intent/route');
+    const request = new NextRequest('http://localhost/api/create-tip-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 500,
+        handle: 'not a handle',
       }),
     });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBeDefined();
+  });
+
+  it('returns 500 when stripe is not configured', async () => {
+    delete process.env.STRIPE_SECRET_KEY;
 
     const { POST } = await import('@/app/api/create-tip-intent/route');
     const request = new NextRequest('http://localhost/api/create-tip-intent', {
@@ -73,31 +76,15 @@ describe('POST /api/create-tip-intent', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: 500,
-        creatorProfileId: 'profile_123',
+        handle: 'taylorswift',
       }),
     });
 
     const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(404);
-    expect(data.error).toContain('not found');
+    expect(response.status).toBe(500);
   });
 
   it('creates payment intent successfully', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            {
-              id: 'profile_123',
-              stripeAccountId: 'acct_123',
-              displayName: 'Test Creator',
-            },
-          ]),
-        }),
-      }),
-    });
     mockStripePaymentIntentsCreate.mockResolvedValue({
       id: 'pi_123',
       client_secret: 'pi_123_secret',
@@ -109,7 +96,7 @@ describe('POST /api/create-tip-intent', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: 500,
-        creatorProfileId: 'profile_123',
+        handle: 'taylorswift',
       }),
     });
 
@@ -118,5 +105,6 @@ describe('POST /api/create-tip-intent', () => {
 
     expect(response.status).toBe(200);
     expect(data.clientSecret).toBeDefined();
+    expect(mockStripePaymentIntentsCreate).toHaveBeenCalledTimes(1);
   });
 });
