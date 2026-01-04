@@ -37,8 +37,6 @@ export default defineConfig({
       'tests/integration/**',
       'node_modules/**',
       '.next/**',
-      // Temporarily exclude known slow tests during optimization
-      'tests/lib/database-performance.test.ts',
     ],
 
     // Performance optimizations
