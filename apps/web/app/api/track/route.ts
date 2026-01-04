@@ -61,11 +61,7 @@ function inferAudienceDeviceType(
   if (!userAgent) return 'unknown';
   const ua = userAgent.toLowerCase();
   if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (
-    ua.includes('mobi') ||
-    ua.includes('iphone') ||
-    ua.includes('android')
-  ) {
+  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
     return 'mobile';
   }
   return 'desktop';
@@ -136,9 +132,7 @@ export async function POST(request: NextRequest) {
 
     // Validate linkType is a valid enum value
     if (
-      !VALID_LINK_TYPES.includes(
-        linkType as (typeof VALID_LINK_TYPES)[number]
-      )
+      !VALID_LINK_TYPES.includes(linkType as (typeof VALID_LINK_TYPES)[number])
     ) {
       return NextResponse.json(
         {
@@ -280,8 +274,7 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore =
-        (resolvedMember.engagementScore ?? 0) + weight;
+      const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
       const intentLevel = deriveIntentLevel(
         resolvedMember.visits ?? 0,
         actionCount
@@ -299,8 +292,7 @@ export async function POST(request: NextRequest) {
           geoCity: geoCity ?? resolvedMember.geoCity ?? null,
           geoCountry: geoCountry ?? resolvedMember.geoCountry ?? null,
           spotifyConnected:
-            Boolean(resolvedMember.spotifyConnected) ||
-            linkType === 'listen',
+            Boolean(resolvedMember.spotifyConnected) || linkType === 'listen',
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 
@@ -356,17 +348,13 @@ export async function POST(request: NextRequest) {
         })
         .catch(error => {
           // Ensure error is always captured even if background task fails
-          void captureError(
-            'Failed to update social link click count',
-            error,
-            {
-              route: '/api/track',
-              creatorProfileId: profile.id,
-              handle,
-              linkId,
-              linkType,
-            }
-          );
+          void captureError('Failed to update social link click count', error, {
+            route: '/api/track',
+            creatorProfileId: profile.id,
+            handle,
+            linkId,
+            linkType,
+          });
         });
     }
 

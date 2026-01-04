@@ -73,9 +73,7 @@ async function getStripeMrr(): Promise<{
     return await getAdminStripeOverviewMetrics();
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : 'Unknown error fetching MRR';
+      error instanceof Error ? error.message : 'Unknown error fetching MRR';
     console.error('Error computing Stripe MRR for admin overview:', error);
     return { mrrUsd: 0, activeSubscribers: 0, error: message };
   }
@@ -95,10 +93,7 @@ async function getWaitlistCount(): Promise<{
       error instanceof Error
         ? error.message
         : 'Unknown error fetching waitlist count';
-    console.error(
-      'Error computing waitlist count for admin overview:',
-      error
-    );
+    console.error('Error computing waitlist count for admin overview:', error);
     return { count: 0, error: message };
   }
 }
