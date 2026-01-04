@@ -4,6 +4,20 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as schema from '@/lib/db/schema';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
 
+/**
+ * RLS Access Control Tests
+ *
+ * IMPORTANT: These tests currently cannot verify RLS enforcement because
+ * the test database role has RLS bypass privileges. Tests that require
+ * RLS enforcement are skipped until we set up a proper test database role.
+ *
+ * TODO: To enable these tests:
+ * 1. Create a 'test_app_user' database role WITHOUT RLS bypass
+ * 2. Grant minimal permissions to this role
+ * 3. Configure test connection to use this role
+ * 4. Remove .skip from the skipped tests
+ */
+
 // Use the global test database connection provisioned in tests/setup.ts
 const db = (
   globalThis as typeof globalThis & { db?: NeonDatabase<typeof schema> }
@@ -23,10 +37,6 @@ if (!db) {
     let privateProfileId: string;
     let publicPhotoId: string;
     let privatePhotoId: string;
-
-    // NOTE: RLS policies exist but are not being enforced in the test environment
-    // This appears to be due to Neon's default database role having RLS bypass privileges
-    // The policies are correctly configured and would work in production with proper roles
 
     beforeAll(async () => {
       const now = Date.now();
@@ -89,7 +99,9 @@ if (!db) {
       privatePhotoId = privatePhoto.id;
     });
 
-    it("prevents a user from reading another user's private profile", async () => {
+    // SKIPPED: Cannot test RLS enforcement - test db role has bypass privileges
+    // TODO: Enable when test_app_user role is configured
+    it.skip("prevents a user from reading another user's private profile", async () => {
       const rows = await db.transaction(async tx => {
         await tx.execute(
           drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userAClerkId}'`)
@@ -101,12 +113,11 @@ if (!db) {
         );
       });
 
-      // NOTE: RLS bypass in test environment is expected behavior.
-      // Neon's default database role has RLS bypass privileges for testing.
-      // In production with proper roles, this would return 0 rows.
-      expect(rows.rows.length).toBe(1); // Expected: RLS bypass in test env
+      // With proper RLS, this should return 0 rows
+      expect(rows.rows.length).toBe(0);
     });
 
+    // This test works because owner access should succeed regardless of RLS
     it('allows the owner to read their own private profile', async () => {
       const rows = await db.transaction(async tx => {
         await tx.execute(
@@ -123,7 +134,9 @@ if (!db) {
       expect(rows.rows[0]?.id).toBe(privateProfileId);
     });
 
-    it("prevents a user from updating another user's profile", async () => {
+    // SKIPPED: Cannot test RLS enforcement - test db role has bypass privileges
+    // TODO: Enable when test_app_user role is configured
+    it.skip("prevents a user from updating another user's profile", async () => {
       const updated = await db.transaction(async tx => {
         await tx.execute(
           drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userAClerkId}'`)
@@ -135,58 +148,58 @@ if (!db) {
         );
       });
 
-      // NOTE: RLS bypass in test environment is expected behavior.
-      // In production with proper roles, this would return 0 rows.
-      expect(updated.rows.length).toBe(1); // Expected: RLS bypass in test env
+      // With proper RLS, this should return 0 rows (no update allowed)
+      expect(updated.rows.length).toBe(0);
     });
 
-    it('allows anonymous reads of public profiles only', async () => {
-      const [publicRows, privateRows] = await db.transaction(async tx => {
-        const pub = await tx.execute(
-          drizzleSql.raw(
-            `SELECT id FROM creator_profiles WHERE id = '${publicProfileId}'`
-          )
-        );
-
-        const priv = await tx.execute(
-          drizzleSql.raw(
-            `SELECT id FROM creator_profiles WHERE id = '${privateProfileId}'`
-          )
-        );
-
-        return [pub, priv] as const;
-      });
+    // This test works - reading public profiles should always succeed
+    it('allows reads of public profiles', async () => {
+      const publicRows = await db.execute(
+        drizzleSql.raw(
+          `SELECT id FROM creator_profiles WHERE id = '${publicProfileId}'`
+        )
+      );
 
       expect(publicRows.rows.length).toBe(1);
       expect(publicRows.rows[0]?.id).toBe(publicProfileId);
-      // NOTE: RLS bypass in test environment is expected behavior.
-      // In production with proper roles, this would return 0 rows.
-      expect(privateRows.rows.length).toBe(1); // Expected: RLS bypass in test env
     });
 
-    it('allows anonymous reads of public profile photos only', async () => {
-      const [publicRows, privateRows] = await db.transaction(async tx => {
-        // Anonymous: app.user_id stays null
-        const pub = await tx.execute(
-          drizzleSql.raw(
-            `SELECT id FROM profile_photos WHERE id = '${publicPhotoId}'`
-          )
-        );
+    // SKIPPED: Cannot test RLS enforcement - test db role has bypass privileges
+    // TODO: Enable when test_app_user role is configured
+    it.skip('prevents anonymous reads of private profiles', async () => {
+      const privateRows = await db.execute(
+        drizzleSql.raw(
+          `SELECT id FROM creator_profiles WHERE id = '${privateProfileId}'`
+        )
+      );
 
-        const priv = await tx.execute(
-          drizzleSql.raw(
-            `SELECT id FROM profile_photos WHERE id = '${privatePhotoId}'`
-          )
-        );
+      // With proper RLS, anonymous users should not see private profiles
+      expect(privateRows.rows.length).toBe(0);
+    });
 
-        return [pub, priv] as const;
-      });
+    // This test works - reading public photos should always succeed
+    it('allows reads of public profile photos', async () => {
+      const publicRows = await db.execute(
+        drizzleSql.raw(
+          `SELECT id FROM profile_photos WHERE id = '${publicPhotoId}'`
+        )
+      );
 
       expect(publicRows.rows.length).toBe(1);
       expect(publicRows.rows[0]?.id).toBe(publicPhotoId);
-      // NOTE: RLS bypass in test environment is expected behavior.
-      // In production with proper roles, this would return 0 rows.
-      expect(privateRows.rows.length).toBe(1); // Expected: RLS bypass in test env
+    });
+
+    // SKIPPED: Cannot test RLS enforcement - test db role has bypass privileges
+    // TODO: Enable when test_app_user role is configured
+    it.skip('prevents anonymous reads of private profile photos', async () => {
+      const privateRows = await db.execute(
+        drizzleSql.raw(
+          `SELECT id FROM profile_photos WHERE id = '${privatePhotoId}'`
+        )
+      );
+
+      // With proper RLS, anonymous users should not see private photos
+      expect(privateRows.rows.length).toBe(0);
     });
   });
 }
