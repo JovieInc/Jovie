@@ -20,30 +20,19 @@ export const STATSIG_FLAGS = {
   AUTH_SPOTIFY_ONLY: 'feature_auth_spotify_only',
 
   // UI/UX Features
-  ARTIST_SEARCH: 'feature_artist_search',
-  TIP_PROMO: 'feature_tip_promo',
 
   // Onboarding Features
-  PROGRESSIVE_ONBOARDING: 'feature_progressive_onboarding',
-  MINIMALIST_ONBOARDING: 'feature_minimalist_onboarding',
-  APPLE_STYLE_ONBOARDING: 'feature_apple_style_onboarding',
 
   // Profile Features
-  PROFILE_SETTINGS: 'feature_profile_settings',
-  AVATAR_UPLOAD: 'feature_avatar_upload',
   AVATAR_UPLOADER: 'feature_avatar_uploader',
   CONTACTS: 'feature_contacts',
   DYNAMIC_ENGAGEMENT: 'feature_dynamic_engagement',
 
   // Backend Features
-  UNIVERSAL_NOTIFICATIONS: 'feature_universal_notifications',
   AUDIENCE_V2: 'feature_audience_v2',
-  CLICK_ANALYTICS_RPC: 'feature_click_analytics_rpc',
 
   // Integration Features
-  PRICING_USE_CLERK: 'feature_pricing_use_clerk',
   LINK_INGESTION: 'feature_link_ingestion',
-  DISCOG_SMART_LINKS: 'feature_discog_smart_links',
 } as const;
 
 export type StatsigFlagName =
