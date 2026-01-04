@@ -255,7 +255,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const isAuthPath =
       pathname === '/signin' ||
       pathname === '/sign-in' ||
-      pathname === '/signin/sso-callback' ||
       pathname === '/signup' ||
       pathname === '/sign-up';
 
@@ -273,8 +272,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       return path;
     };
 
-    if (userId && (isAuthPath || isAuthCallbackPath)) {
-      // If the user is already signed in and hits any auth page, check for redirect_url
+    // Let SSO callback routes complete without middleware interference
+    // The AuthenticateWithRedirectCallback component will handle routing based on user state
+    if (userId && isAuthPath && !isAuthCallbackPath) {
+      // If the user is already signed in and hits a non-callback auth page, check for redirect_url
       const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
       if (
         redirectUrl &&

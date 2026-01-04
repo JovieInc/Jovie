@@ -11,7 +11,7 @@ export default function SignInSsoCallbackPage() {
   return (
     <div className='flex items-center justify-center min-h-[200px]'>
       <AuthenticateWithRedirectCallback
-        signInFallbackRedirectUrl='/app/dashboard/overview'
+        signInFallbackRedirectUrl='/app/dashboard'
         signUpFallbackRedirectUrl='/onboarding?fresh_signup=true'
       />
     </div>
