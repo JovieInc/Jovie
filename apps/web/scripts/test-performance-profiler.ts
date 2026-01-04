@@ -60,10 +60,13 @@ class TestPerformanceProfiler {
     console.log('🔍 Starting test performance analysis...\n');
 
     // Run tests with verbose output and capture timing data
-    const testOutput = this.runTestsWithTiming();
+    const { output: testOutput, durationMs } = this.runTestsWithTiming();
 
     // Parse the output to extract performance metrics
     this.parseTestOutput(testOutput);
+    if (!this.results.totalDuration) {
+      this.results.totalDuration = durationMs;
+    }
 
     // Calculate performance statistics
     this.calculatePerformanceStats();
@@ -80,24 +83,49 @@ class TestPerformanceProfiler {
     return this.results;
   }
 
-  private runTestsWithTiming(): string {
+  private runTestsWithTiming(): { output: string; durationMs: number } {
     console.log('⏱️  Running test suite with timing analysis...');
+    const startTime = Date.now();
 
     try {
       const output = execSync('pnpm test:fast --reporter=verbose', {
         encoding: 'utf8',
         stdio: 'pipe',
-        timeout: 120000, // 2 minutes timeout
+        maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
+        timeout: 360000, // 6 minutes timeout to align with budget ceilings
       });
 
-      return output;
+      return { output, durationMs: Date.now() - startTime };
     } catch (error: unknown) {
       // Tests might fail but we still want the timing data
       if (error && typeof error === 'object') {
-        const errorObj = error as { stdout?: string; output?: string[] };
-        return errorObj.stdout || errorObj.output?.join('') || '';
+        const errorObj = error as {
+          stdout?: string | Buffer;
+          output?: Array<string | Buffer | null>;
+        };
+        const stdout = errorObj.stdout
+          ? Buffer.isBuffer(errorObj.stdout)
+            ? errorObj.stdout.toString('utf8')
+            : errorObj.stdout
+          : '';
+
+        if (stdout) {
+          return { output: stdout, durationMs: Date.now() - startTime };
+        }
+
+        if (Array.isArray(errorObj.output)) {
+          const output = errorObj.output
+            .filter(Boolean)
+            .map(chunk =>
+              Buffer.isBuffer(chunk)
+                ? chunk.toString('utf8')
+                : (chunk as string)
+            )
+            .join('');
+          return { output, durationMs: Date.now() - startTime };
+        }
       }
-      return '';
+      return { output: '', durationMs: Date.now() - startTime };
     }
   }
 
