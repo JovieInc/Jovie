@@ -111,6 +111,67 @@ main.jov.ie  jov.ie
 - ✅ **Feature PRs:** Typecheck + lint (fast feedback)
 - ✅ **Main deploys:** Full CI + E2E tests + manual review for production
 - ✅ **Production:** Manual approval + automated verification
+- ✅ **Vercel Deployment Checks:** CI must pass before production promotion (see setup below)
+
+---
+
+## 🛡️ **CRITICAL: Vercel Deployment Checks Setup**
+
+> **One-time setup required.** Without this, Vercel's Git integration can deploy to production even when CI fails.
+
+### **Why This Is Required**
+
+Vercel has two deployment triggers:
+1. **GitHub Actions CI** - Our `deploy` job with proper test gating
+2. **Vercel Git Integration** - Auto-deploys on push (bypasses CI!)
+
+Without Deployment Checks configured, a push to `main` triggers BOTH:
+- CI runs tests → deploy job waits for tests to pass ✅
+- Vercel Git integration → deploys immediately, ignoring CI ❌
+
+### **Setup Steps (Vercel Dashboard)**
+
+1. Go to **Vercel Dashboard** → Select the **Jovie project**
+2. Navigate to **Settings** → **Deployments** tab
+3. Scroll to **"Deployment Checks"** section
+4. Click **"+ Add Checks"**
+5. Select **GitHub** as the provider
+6. Add the following check:
+   - **Check name:** `CI` (matches our GitHub Actions workflow)
+   - This requires the CI workflow to pass before production promotion
+
+### **Verification**
+
+After setup, the Deployment Checks section should show:
+
+```
+✓ GitHub: CI
+  Blocks production deployment until CI workflow passes
+```
+
+### **What Happens After Setup**
+
+1. Push to `main` → Vercel starts build
+2. GitHub Actions CI runs in parallel
+3. Vercel **waits** for CI to report success
+4. If CI fails → deployment is **blocked** from production ✅
+5. If CI passes → deployment is promoted to production ✅
+
+### **Why Not Use vercel.json?**
+
+Deployment Checks cannot be configured via `vercel.json` - this is a Vercel dashboard-only setting. We keep Git integration enabled because:
+- ✅ PR preview deployments work automatically
+- ✅ Vercel comments on PRs with preview URLs
+- ✅ Production is still gated by CI via Deployment Checks
+
+### **Troubleshooting**
+
+If a failed CI build reaches production:
+1. Verify Deployment Checks are configured (Settings → Deployments)
+2. Ensure the check name matches exactly: `CI`
+3. Check that "Deployment Protection" is not bypassing checks
+
+---
 
 ### **Database Strategy:**
 
