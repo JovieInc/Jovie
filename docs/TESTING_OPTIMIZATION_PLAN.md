@@ -1,5 +1,6 @@
 # Testing Optimization Plan
 
+<<<<<<< HEAD
 This plan keeps testing lean, fast, and trustworthy so we can ship confidently. Updates below reflect current progress.
 
 ## Progress Update (2026-01-04)
@@ -15,6 +16,7 @@ This plan keeps testing lean, fast, and trustworthy so we can ship confidently. 
 2. Apply the checklist to upcoming PRs touching auth, onboarding, and monetization paths.
 3. Track flake rates on E2E suites weekly and prune unstable cases.
 4. Define performance budgets per critical API and add thresholded tests where missing.
+<<<<<<< HEAD
 
 ---
 
@@ -151,3 +153,18 @@ Each PR should update the "Progress Tracking" section with:
 **Last Updated**: 2026-01-04
 **Next Review**: After Phase 1 completion
 **Owner**: Test Optimization Team
+=======
+=======
+## Progress
+- [x] Reduced Button component unit tests to core behaviors (render, click, disabled, `asChild`).
+- [x] Streamlined CTAButton, DataCard, and InfoBox tests to emphasize interaction coverage over prop permutations.
+- [ ] Apply the same behavior-first approach to remaining UI component tests with redundant variant or size matrices.
+
+## Pattern for Component Tests
+1. Favor behavioral assertions: render once, trigger the primary interaction, and verify disabled or loading states block callbacks.
+2. Keep one representative variant check only when it guards logic (e.g., link vs. button rendering), avoiding exhaustive style matrix assertions.
+3. Prefer meaningful accessibility hooks (roles, labels, `href`) over className snapshots to reduce brittleness.
+4. Trim rerender loops that only swap props; add separate focused tests only when behavior diverges.
+5. Keep test files concise (~3–4 assertions) so maintenance stays low while behavior remains guarded.
+>>>>>>> de76d989a (test: streamline component behavior coverage)
+>>>>>>> 67e04e677 (test: streamline component behavior coverage)
