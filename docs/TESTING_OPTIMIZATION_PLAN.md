@@ -1,18 +1,31 @@
 # Testing Optimization Plan
 
-## Progress Update (2026-01-04)
+## Progress Update — Payment Flow (Stripe)
+- Added end-to-end coverage for the Standard upgrade path via Stripe Checkout, including success, card-decline, and pricing fetch failure scenarios.
+- Hardened billing E2E determinism by programmatically cancelling or applying subscriptions through signed webhook calls after each run.
+- Documented required Stripe test configuration so the suite can exercise real payment flows instead of brittle mocks.
 
-- Added admin ingestion pipeline integration coverage that exercises CSV-style input through data processing, profile creation, and notification responses in `apps/web/tests/integration/admin-ingestion.test.ts`.
-- Verified the new flow against a real database connection to keep Neon parity with production and to validate ingestion job creation alongside profile enrichment.
+## Stripe Test Setup
+1. Configure the following environment variables (test mode keys only):
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+   - `STRIPE_PRICE_STANDARD_MONTHLY` **or** `STRIPE_PRICE_STANDARD_YEARLY`
+2. Ensure the configured price IDs are active in the Stripe test dashboard.
+3. Use the built-in Stripe test cards when prompted:
+   - Success: `4242 4242 4242 4242`, expiry `12/34`, CVC `123`, ZIP `94107`.
+   - Decline: `4000 0000 0000 0002` (hard decline), same expiry/CVC/ZIP.
+4. Webhooks: the payment E2E tests generate signed webhook payloads (`checkout.session.completed` + subscription lifecycle events) against `/api/stripe/webhooks`, so no external Stripe CLI forwarding is required for local runs.
+5. Authentication: the tests rely on the configured Clerk E2E user (`E2E_CLERK_USER_USERNAME`/`E2E_CLERK_USER_PASSWORD`) to reach `/billing`.
 
-- `pnpm lint`: ~6.9s
-- `pnpm typecheck`: ~20.0s
-- `pnpm test:e2e`: ~3m28s — build aborted before tests because Turbopack could not download the Inter font from Google Fonts (network fetch failure in `apps/web/app/layout.tsx`). Re-run should succeed once font downloads are accessible or cached.
+## How to Run
+- Full suite: `pnpm test:e2e`
+- Stripe-only focus (faster feedback):
+  - `pnpm test:e2e -- --grep "Billing payment flow - Stripe Checkout"`
+- Lint & types (must stay green):
+  - `pnpm lint`
+  - `pnpm typecheck`
 
-- Extend ingestion coverage to job retry/backoff behavior and stuck job recovery paths.
-- Add smoke coverage for claim-token email notifications once the invite system is wired to ingestion events.
-
-## Test Data Notes
-
-- Integration cases generate unique handles per run and clean up `creator_profiles`, `social_links`, and related `ingestion_jobs` records after execution.
-- Tests require `DATABASE_URL` to point to a writable test branch; no seed data is necessary beyond what the test inserts.
+## Next Steps
+- Add coverage for retrying failed webhook processing in staging (simulate delayed delivery) to further de-risk billing regressions.
+- Capture Playwright traces for the Stripe flows in CI to speed up debugging if card collection UIs drift.
