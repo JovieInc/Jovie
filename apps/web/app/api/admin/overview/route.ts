@@ -11,6 +11,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 interface AdminOverviewResponse {
   mrrUsd: number;
   waitlistCount: number;
+  errors?: {
+    mrr?: string;
+    waitlist?: string;
+  };
 }
 
 export async function GET() {
@@ -32,12 +36,20 @@ export async function GET() {
     }
 
     const mrrData = await getStripeMrr();
-    const waitlistCount = await getWaitlistCount();
+    const waitlistData = await getWaitlistCount();
 
     const body: AdminOverviewResponse = {
       mrrUsd: mrrData.mrrUsd,
-      waitlistCount,
+      waitlistCount: waitlistData.count,
     };
+
+    // Add error flags if any data fetch failed
+    const errors: AdminOverviewResponse['errors'] = {};
+    if (mrrData.error) errors.mrr = mrrData.error;
+    if (waitlistData.error) errors.waitlist = waitlistData.error;
+    if (Object.keys(errors).length > 0) {
+      body.errors = errors;
+    }
 
     return NextResponse.json(body, { headers: NO_STORE_HEADERS });
   } catch (error) {
@@ -52,6 +64,7 @@ export async function GET() {
 async function getStripeMrr(): Promise<{
   mrrUsd: number;
   activeSubscribers: number;
+  error?: string;
 }> {
   try {
     const { getAdminStripeOverviewMetrics } = await import(
@@ -59,19 +72,28 @@ async function getStripeMrr(): Promise<{
     );
     return await getAdminStripeOverviewMetrics();
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown error fetching MRR';
     console.error('Error computing Stripe MRR for admin overview:', error);
-    return { mrrUsd: 0, activeSubscribers: 0 };
+    return { mrrUsd: 0, activeSubscribers: 0, error: message };
   }
 }
 
-async function getWaitlistCount(): Promise<number> {
+async function getWaitlistCount(): Promise<{
+  count: number;
+  error?: string;
+}> {
   try {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(waitlistEntries);
-    return Number(row?.count ?? 0);
+    return { count: Number(row?.count ?? 0) };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unknown error fetching waitlist count';
     console.error('Error computing waitlist count for admin overview:', error);
-    return 0;
+    return { count: 0, error: message };
   }
 }

@@ -39,7 +39,22 @@ const searchCache = new Map<
 >();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Simple rate limiting per IP (in-memory, resets on deploy)
+/**
+ * In-memory rate limiting per IP
+ *
+ * LIMITATION: This rate limiting resets on each deployment and is per-instance
+ * in a serverless environment. This means:
+ * - Rate limits reset when the app redeploys
+ * - Different serverless instances have independent rate limit state
+ *
+ * For production-grade rate limiting, consider:
+ * - Vercel Edge Config or KV for persistent state
+ * - Upstash Redis for distributed rate limiting
+ * - Cloudflare Rate Limiting at the edge
+ *
+ * Current implementation provides basic protection against abuse while
+ * keeping infrastructure simple. Monitor usage and upgrade if needed.
+ */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX = 30; // 30 requests per minute per IP
@@ -52,21 +67,35 @@ function getClientIp(request: NextRequest): string {
   );
 }
 
-function isRateLimited(ip: string): boolean {
+interface RateLimitResult {
+  limited: boolean;
+  remaining: number;
+  resetAt: number;
+}
+
+function checkRateLimit(ip: string): RateLimitResult {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
 
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return false;
+    return {
+      limited: false,
+      remaining: RATE_LIMIT_MAX - 1,
+      resetAt: now + RATE_LIMIT_WINDOW,
+    };
   }
 
   if (entry.count >= RATE_LIMIT_MAX) {
-    return true;
+    return { limited: true, remaining: 0, resetAt: entry.resetAt };
   }
 
   entry.count++;
-  return false;
+  return {
+    limited: false,
+    remaining: RATE_LIMIT_MAX - entry.count,
+    resetAt: entry.resetAt,
+  };
 }
 
 /**
@@ -102,12 +131,29 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Rate limiting
+  // Rate limiting with headers for client visibility
   const clientIp = getClientIp(request);
-  if (isRateLimited(clientIp)) {
+  const rateLimit = checkRateLimit(clientIp);
+
+  const rateLimitHeaders = {
+    ...NO_STORE_HEADERS,
+    'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+    'X-RateLimit-Remaining': String(rateLimit.remaining),
+    'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetAt / 1000)),
+  } as const;
+
+  if (rateLimit.limited) {
     return NextResponse.json(
       { error: 'Too many requests', code: 'RATE_LIMITED' },
-      { status: 429, headers: NO_STORE_HEADERS }
+      {
+        status: 429,
+        headers: {
+          ...rateLimitHeaders,
+          'Retry-After': String(
+            Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+          ),
+        },
+      }
     );
   }
 
@@ -115,7 +161,7 @@ export async function GET(request: NextRequest) {
   const cacheKey = `${q.toLowerCase()}:${limit}`;
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cached.data, { headers: NO_STORE_HEADERS });
+    return NextResponse.json(cached.data, { headers: rateLimitHeaders });
   }
 
   try {
@@ -130,7 +176,8 @@ export async function GET(request: NextRequest) {
         imageUrl: artist.images?.[0]?.url,
         followers: artist.followers?.total,
         popularity: artist.popularity,
-        // Spotify doesn't expose verified status via search API; omit or set undefined
+        // Spotify doesn't expose verified status via search API;
+        // omit or set undefined
         verified: undefined,
       })
     );
@@ -149,11 +196,26 @@ export async function GET(request: NextRequest) {
       toDelete.forEach(([key]) => searchCache.delete(key));
     }
 
-    return NextResponse.json(results, { headers: NO_STORE_HEADERS });
-  } catch {
+    // Clean up expired rate limit entries
+    if (rateLimitMap.size > 1000) {
+      const now = Date.now();
+      for (const [ip, entry] of rateLimitMap.entries()) {
+        if (now > entry.resetAt) {
+          rateLimitMap.delete(ip);
+        }
+      }
+    }
+
+    return NextResponse.json(results, { headers: rateLimitHeaders });
+  } catch (error) {
+    console.error('[Spotify Search] Search failed:', {
+      query: q,
+      limit,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: 'Search failed', code: 'SEARCH_FAILED' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: rateLimitHeaders }
     );
   }
 }

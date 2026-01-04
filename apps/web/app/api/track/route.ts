@@ -39,7 +39,8 @@ export const runtime = 'nodejs';
 // Valid link types enum for validation
 const VALID_LINK_TYPES = ['listen', 'social', 'tip', 'other'] as const;
 
-// Username validation regex (alphanumeric, underscore, hyphen, 3-30 chars)
+// Username validation regex
+// (alphanumeric, underscore, hyphen, 3-30 chars)
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 
 /**
@@ -110,7 +111,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Missing required fields: handle, linkType, and target are required',
+            'Missing required fields: handle, linkType, and target ' +
+            'are required',
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -121,7 +123,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Invalid handle format. Must be 3-30 alphanumeric characters, underscores, or hyphens',
+            'Invalid handle format. Must be 3-30 alphanumeric ' +
+            'characters, underscores, or hyphens',
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -133,7 +136,9 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         {
-          error: `Invalid linkType. Must be one of: ${VALID_LINK_TYPES.join(', ')}`,
+          error: `Invalid linkType. Must be one of: ${VALID_LINK_TYPES.join(
+            ', '
+          )}`,
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -196,7 +201,12 @@ export async function POST(request: NextRequest) {
           intentLevel: 'low',
           deviceType: audienceDeviceType,
           referrerHistory: referrer
-            ? [{ url: referrer.trim(), timestamp: new Date().toISOString() }]
+            ? [
+                {
+                  url: referrer.trim(),
+                  timestamp: new Date().toISOString(),
+                },
+              ]
             : [],
           latestActions: [],
           geoCity: geoCity ?? null,
@@ -324,29 +334,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const socialLinkUpdate =
-      linkType === 'social' && linkId
-        ? db
-            .update(socialLinks)
-            .set({
-              clicks: drizzleSql`${socialLinks.clicks} + 1`,
-              updatedAt: new Date(),
-            })
-            .where(eq(socialLinks.id, linkId))
-            .catch(error =>
-              captureError('Failed to update social link click count', error, {
-                route: '/api/track',
-                creatorProfileId: profile.id,
-                handle,
-                linkId,
-                linkType,
-              })
-            )
-        : null;
-
-    if (socialLinkUpdate) {
-      // Fire-and-forget: failures are logged but should not block the request
-      void socialLinkUpdate;
+    // Update social link click count in the background
+    // Errors are captured but don't block the response
+    if (linkType === 'social' && linkId) {
+      db.update(socialLinks)
+        .set({
+          clicks: drizzleSql`${socialLinks.clicks} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(socialLinks.id, linkId))
+        .then(() => {
+          // Click count updated successfully
+        })
+        .catch(error => {
+          // Ensure error is always captured even if background task fails
+          void captureError('Failed to update social link click count', error, {
+            route: '/api/track',
+            creatorProfileId: profile.id,
+            handle,
+            linkId,
+            linkType,
+          });
+        });
     }
 
     return NextResponse.json(

@@ -3,6 +3,9 @@ import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+// Username validation regex (alphanumeric, underscore, hyphen, 3-30 chars)
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
+
 export async function GET(
   request: NextRequest,
   _context: { params: Promise<{}> }
@@ -14,6 +17,18 @@ export async function GET(
     if (!username) {
       return NextResponse.json(
         { error: 'Username is required' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Validate username format to prevent injection attacks
+    if (!USERNAME_REGEX.test(username)) {
+      return NextResponse.json(
+        {
+          error:
+            'Invalid username format. Must be 3-30 alphanumeric ' +
+            'characters, underscores, or hyphens',
+        },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }

@@ -44,7 +44,8 @@ export async function GET() {
           userId,
           hasProfile: false,
           message:
-            'User authenticated but not found in database (expected for new users)',
+            'User authenticated but not found in database ' +
+            '(expected for new users)',
         },
         { headers: NO_STORE_HEADERS }
       );
@@ -72,8 +73,10 @@ export async function GET() {
     );
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error('Unknown error');
+    // Log full error details server-side for debugging
+    console.error('[health/auth] Error:', error);
     return NextResponse.json(
-      { ok: false, error: error.message, stack: error.stack },
+      { ok: false, error: error.message },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
