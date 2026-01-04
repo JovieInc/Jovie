@@ -45,7 +45,7 @@ export default async function WaitlistLayout({
   }
 
   if (authResult.state === UserState.ACTIVE) {
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   if (authResult.state === UserState.NEEDS_ONBOARDING) {
@@ -61,5 +61,5 @@ export default async function WaitlistLayout({
     redirect(authResult.redirectTo);
   }
 
-  redirect('/app/dashboard/overview');
+  redirect('/app/dashboard');
 }

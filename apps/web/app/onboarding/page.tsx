@@ -84,7 +84,7 @@ export default async function OnboardingPage({
       redirect(authResult.redirectTo);
     }
     // Fallback (should never reach here)
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   const user = await currentUser();
