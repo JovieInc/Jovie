@@ -13,7 +13,9 @@ export default function MarketingError({ error, reset }: ErrorProps) {
       error={error}
       reset={reset}
       context='Marketing'
-      message='We encountered an error loading this page. Please try again.'
+      message={
+        'We encountered an error loading this page. Please try again.'
+      }
     />
   );
 }

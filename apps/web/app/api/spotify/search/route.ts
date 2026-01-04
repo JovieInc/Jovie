@@ -79,7 +79,11 @@ function checkRateLimit(ip: string): RateLimitResult {
 
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return { limited: false, remaining: RATE_LIMIT_MAX - 1, resetAt: now + RATE_LIMIT_WINDOW };
+    return {
+    limited: false,
+    remaining: RATE_LIMIT_MAX - 1,
+    resetAt: now + RATE_LIMIT_WINDOW,
+  };
   }
 
   if (entry.count >= RATE_LIMIT_MAX) {
@@ -87,7 +91,11 @@ function checkRateLimit(ip: string): RateLimitResult {
   }
 
   entry.count++;
-  return { limited: false, remaining: RATE_LIMIT_MAX - entry.count, resetAt: entry.resetAt };
+  return {
+    limited: false,
+    remaining: RATE_LIMIT_MAX - entry.count,
+    resetAt: entry.resetAt,
+  };
 }
 
 /**
@@ -141,7 +149,9 @@ export async function GET(request: NextRequest) {
         status: 429,
         headers: {
           ...rateLimitHeaders,
-          'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+          'Retry-After': String(
+            Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+          ),
         },
       }
     );
@@ -166,7 +176,8 @@ export async function GET(request: NextRequest) {
         imageUrl: artist.images?.[0]?.url,
         followers: artist.followers?.total,
         popularity: artist.popularity,
-        // Spotify doesn't expose verified status via search API; omit or set undefined
+        // Spotify doesn't expose verified status via search API;
+        // omit or set undefined
         verified: undefined,
       })
     );

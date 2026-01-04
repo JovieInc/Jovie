@@ -44,7 +44,8 @@ export async function GET() {
           userId,
           hasProfile: false,
           message:
-            'User authenticated but not found in database (expected for new users)',
+            'User authenticated but not found in database ' +
+            '(expected for new users)',
         },
         { headers: NO_STORE_HEADERS }
       );

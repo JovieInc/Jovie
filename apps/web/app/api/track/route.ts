@@ -39,7 +39,8 @@ export const runtime = 'nodejs';
 // Valid link types enum for validation
 const VALID_LINK_TYPES = ['listen', 'social', 'tip', 'other'] as const;
 
-// Username validation regex (alphanumeric, underscore, hyphen, 3-30 chars)
+// Username validation regex
+// (alphanumeric, underscore, hyphen, 3-30 chars)
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 
 /**
@@ -60,7 +61,11 @@ function inferAudienceDeviceType(
   if (!userAgent) return 'unknown';
   const ua = userAgent.toLowerCase();
   if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
+  if (
+    ua.includes('mobi') ||
+    ua.includes('iphone') ||
+    ua.includes('android')
+  ) {
     return 'mobile';
   }
   return 'desktop';
@@ -110,7 +115,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Missing required fields: handle, linkType, and target are required',
+            'Missing required fields: handle, linkType, and target ' +
+            'are required',
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -121,7 +127,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Invalid handle format. Must be 3-30 alphanumeric characters, underscores, or hyphens',
+            'Invalid handle format. Must be 3-30 alphanumeric ' +
+            'characters, underscores, or hyphens',
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -129,11 +136,15 @@ export async function POST(request: NextRequest) {
 
     // Validate linkType is a valid enum value
     if (
-      !VALID_LINK_TYPES.includes(linkType as (typeof VALID_LINK_TYPES)[number])
+      !VALID_LINK_TYPES.includes(
+        linkType as (typeof VALID_LINK_TYPES)[number]
+      )
     ) {
       return NextResponse.json(
         {
-          error: `Invalid linkType. Must be one of: ${VALID_LINK_TYPES.join(', ')}`,
+          error: `Invalid linkType. Must be one of: ${VALID_LINK_TYPES.join(
+            ', '
+          )}`,
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -196,7 +207,12 @@ export async function POST(request: NextRequest) {
           intentLevel: 'low',
           deviceType: audienceDeviceType,
           referrerHistory: referrer
-            ? [{ url: referrer.trim(), timestamp: new Date().toISOString() }]
+            ? [
+                {
+                  url: referrer.trim(),
+                  timestamp: new Date().toISOString(),
+                },
+              ]
             : [],
           latestActions: [],
           geoCity: geoCity ?? null,
@@ -264,7 +280,8 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
+      const updatedScore =
+        (resolvedMember.engagementScore ?? 0) + weight;
       const intentLevel = deriveIntentLevel(
         resolvedMember.visits ?? 0,
         actionCount
@@ -282,7 +299,8 @@ export async function POST(request: NextRequest) {
           geoCity: geoCity ?? resolvedMember.geoCity ?? null,
           geoCountry: geoCountry ?? resolvedMember.geoCountry ?? null,
           spotifyConnected:
-            Boolean(resolvedMember.spotifyConnected) || linkType === 'listen',
+            Boolean(resolvedMember.spotifyConnected) ||
+            linkType === 'listen',
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 

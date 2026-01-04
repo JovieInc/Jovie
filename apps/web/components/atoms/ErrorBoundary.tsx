@@ -17,7 +17,8 @@ export default function ErrorBoundary({
   error,
   reset,
   context,
-  message = 'We encountered an error loading this page. Please try again.',
+  message = 'We encountered an error loading this page. ' +
+    'Please try again.',
 }: ErrorBoundaryProps) {
   const router = useRouter();
 
@@ -37,7 +38,10 @@ export default function ErrorBoundary({
   return (
     <div className='flex flex-col items-center justify-center min-h-[400px] p-6 text-center'>
       <div
-        className='w-full max-w-md rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'
+        className={
+          'w-full max-w-md rounded-2xl border border-subtle ' +
+          'bg-surface-1 p-6 shadow-sm'
+        }
         role='alert'
         aria-live='polite'
       >

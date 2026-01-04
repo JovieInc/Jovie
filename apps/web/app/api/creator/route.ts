@@ -26,7 +26,8 @@ export async function GET(
       return NextResponse.json(
         {
           error:
-            'Invalid username format. Must be 3-30 alphanumeric characters, underscores, or hyphens',
+            'Invalid username format. Must be 3-30 alphanumeric ' +
+            'characters, underscores, or hyphens',
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
