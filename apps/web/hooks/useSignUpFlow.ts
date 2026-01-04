@@ -54,9 +54,10 @@ export interface UseSignUpFlowReturn {
 export function useSignUpFlow(): UseSignUpFlowReturn {
   const { signUp, setActive, isLoaded } = useSignUp();
 
-  // Use shared auth flow base - sign-up always goes to onboarding
+  // Use shared auth flow base - sign-up always goes to onboarding with fresh_signup flag
+  // The flag is critical to prevent redirect loops when the session isn't fully propagated
   const base = useAuthFlowBase({
-    defaultRedirectUrl: '/onboarding',
+    defaultRedirectUrl: '/onboarding?fresh_signup=true',
     useStoredRedirectUrl: false,
   });
 
@@ -131,9 +132,9 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           base.setLoadingState({ type: 'completing' });
           await new Promise(resolve => setTimeout(resolve, 500));
 
-          // Navigate to onboarding with fresh_signup flag for loop detection
+          // Navigate to onboarding (fresh_signup flag is already included in defaultRedirectUrl)
           const redirectUrl = base.getRedirectUrl();
-          base.router.push(`${redirectUrl}?fresh_signup=true`);
+          base.router.push(redirectUrl);
 
           return true;
         }
