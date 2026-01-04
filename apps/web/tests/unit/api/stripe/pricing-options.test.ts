@@ -1,14 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockGetAvailablePricing = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/stripe/config', () => ({
-  STRIPE_PRICES: {
-    pro_monthly: 'price_monthly',
-    pro_yearly: 'price_yearly',
-  },
-  PRICING_OPTIONS: [
-    { id: 'pro_monthly', name: 'Pro Monthly', price: 9.99 },
-    { id: 'pro_yearly', name: 'Pro Yearly', price: 99.99 },
-  ],
+  getAvailablePricing: mockGetAvailablePricing,
 }));
 
 describe('GET /api/stripe/pricing-options', () => {
@@ -18,6 +13,25 @@ describe('GET /api/stripe/pricing-options', () => {
   });
 
   it('returns pricing options', async () => {
+    mockGetAvailablePricing.mockReturnValue([
+      {
+        priceId: 'price_monthly',
+        amount: 500,
+        currency: 'usd',
+        interval: 'month',
+        description: 'Standard Monthly',
+        plan: 'standard',
+      },
+      {
+        priceId: 'price_yearly',
+        amount: 5000,
+        currency: 'usd',
+        interval: 'year',
+        description: 'Standard Yearly',
+        plan: 'standard',
+      },
+    ]);
+
     const { GET } = await import('@/app/api/stripe/pricing-options/route');
     const response = await GET();
     const data = await response.json();

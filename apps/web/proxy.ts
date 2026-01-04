@@ -286,8 +286,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           new URL(normalizeRedirectPath(redirectUrl), req.url)
         );
       } else {
-        // Default to waitlist so the app can route the user to the correct next step.
-        res = NextResponse.redirect(new URL('/waitlist', req.url));
+        // Default to the app shell; it will route users to the correct next step.
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -306,9 +306,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           new URL(normalizeRedirectPath(pathname), req.url)
         );
       } else if (req.nextUrl.pathname === '/') {
-        // Redirect to /waitlist which will route users to the appropriate destination
-        // based on their state (onboarding needed, dashboard, etc.)
-        res = NextResponse.redirect(new URL('/waitlist', req.url));
+        // Redirect to the app shell which will route users to the appropriate destination.
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       } else {
         res = NextResponse.next({ request: { headers: requestHeaders } });
       }

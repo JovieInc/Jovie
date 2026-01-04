@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCheckRateLimit = vi.hoisted(() => vi.fn());
+const mockValidateEnvironment = vi.hoisted(() => vi.fn());
+const mockGetEnvironmentInfo = vi.hoisted(() => vi.fn());
+const mockIsValidationCompleted = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/utils/rate-limit', () => ({
   checkRateLimit: mockCheckRateLimit,
@@ -13,11 +16,36 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   }),
 }));
 
+vi.mock('@/lib/env-server', () => ({
+  validateEnvironment: mockValidateEnvironment,
+  getEnvironmentInfo: mockGetEnvironmentInfo,
+}));
+
+vi.mock('@/lib/startup/environment-validator', () => ({
+  isValidationCompleted: mockIsValidationCompleted,
+}));
+
 describe('GET /api/health/env', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
     mockCheckRateLimit.mockReturnValue(false);
+    mockValidateEnvironment.mockReturnValue({
+      valid: true,
+      errors: [],
+      warnings: [],
+      critical: [],
+    });
+    mockGetEnvironmentInfo.mockReturnValue({
+      nodeEnv: 'test',
+      platform: 'darwin',
+      nodeVersion: process.version,
+      hasDatabase: false,
+      hasClerk: false,
+      hasStripe: false,
+      hasCloudinary: false,
+    });
+    mockIsValidationCompleted.mockReturnValue(true);
   });
 
   it('returns 429 when rate limited', async () => {
@@ -30,7 +58,9 @@ describe('GET /api/health/env', () => {
     const data = await response.json();
 
     expect(response.status).toBe(429);
-    expect(data.error).toBeDefined();
+    expect(data.details?.currentValidation?.errors).toContain(
+      'Rate limit exceeded'
+    );
   });
 
   it('returns environment status', async () => {
@@ -42,6 +72,6 @@ describe('GET /api/health/env', () => {
 
     expect(response.status).toBe(200);
     expect(data).toHaveProperty('timestamp');
-    expect(data).toHaveProperty('checks');
+    expect(data).toHaveProperty('details');
   });
 });

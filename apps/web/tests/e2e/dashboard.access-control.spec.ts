@@ -377,7 +377,7 @@ test.describe('Dashboard Access Control', () => {
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Should redirect to sign-in page
-    await page.waitForURL('**/sign-in**', { timeout: 10_000 });
+    await page.waitForURL('**/signin**', { timeout: 10_000 });
 
     // Verify sign-in form is present
     const signInForm = page.locator(

@@ -42,12 +42,13 @@ vi.mock('@/components/organisms/ContactSidebar', () => ({
   ContactSidebar: () => null,
 }));
 
-vi.mock('@/components/admin/CreatorActionsMenu', () => ({
+vi.mock('@/components/admin/creator-actions-menu', () => ({
   CreatorActionsMenu: () => (
     <button type='button' aria-label='Creator actions'>
       ⋯
     </button>
   ),
+  copyTextToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/components/organisms/UserButton', () => ({

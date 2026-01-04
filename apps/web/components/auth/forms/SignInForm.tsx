@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardContent } from '@jovie/ui';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
@@ -148,12 +149,12 @@ export function SignInForm() {
         {shouldSuggestSignUp && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
             No account found.{' '}
-            <a
+            <Link
               href='/signup'
               className='text-primary-token hover:underline focus-ring-themed rounded-md'
             >
               Sign up instead
-            </a>
+            </Link>
           </p>
         )}
       </CardContent>

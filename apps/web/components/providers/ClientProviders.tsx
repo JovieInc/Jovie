@@ -290,8 +290,6 @@ export function ClientProviders({
     '/link-in-bio',
     '/pricing',
     '/support',
-    '/signin',
-    '/signup',
     '/waitlist',
   ];
   const isMarketingRoute =

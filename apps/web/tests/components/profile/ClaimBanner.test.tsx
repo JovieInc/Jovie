@@ -82,8 +82,9 @@ describe('ClaimBanner', () => {
 
       render(<ClaimBanner {...defaultProps} displayName='Test Artist' />);
 
-      const banner = screen.getByTestId('claim-banner');
-      expect(banner).toHaveAttribute('role', 'banner');
+      const banner = screen.getByRole('banner', {
+        name: 'Claim profile banner',
+      });
       expect(banner).toHaveAttribute('aria-label', 'Claim profile banner');
 
       const cta = screen.getByTestId('claim-banner-cta');

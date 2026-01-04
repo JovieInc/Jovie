@@ -3,6 +3,27 @@ import { vi } from 'vitest';
 
 let mocksSetup = false;
 
+const clerkMocks = vi.hoisted(() => {
+  return {
+    useUser: vi.fn(() => ({
+      isSignedIn: false,
+      user: null,
+      isLoaded: true,
+    })),
+    useClerk: vi.fn(() => ({
+      signOut: vi.fn(),
+      openUserProfile: vi.fn(),
+    })),
+    useAuth: vi.fn(() => ({
+      has: vi.fn(() => false),
+    })),
+    useSession: vi.fn(() => ({
+      session: null,
+      isLoaded: true,
+    })),
+  };
+});
+
 // Define mocked components outside the function to avoid hoisting issues
 const MockedComponents = {
   // Dialog components
@@ -265,32 +286,11 @@ export function setupComponentMocks() {
     return;
   }
 
-  // Mock Clerk components and hooks
-  const mockUseUser = vi.fn(() => ({
-    isSignedIn: false,
-    user: null,
-    isLoaded: true,
-  }));
-
-  const mockUseClerk = vi.fn(() => ({
-    signOut: vi.fn(),
-    openUserProfile: vi.fn(),
-  }));
-
-  const mockUseAuth = vi.fn(() => ({
-    has: vi.fn(() => false),
-  }));
-
-  const mockUseSession = vi.fn(() => ({
-    session: null,
-    isLoaded: true,
-  }));
-
   vi.mock('@clerk/nextjs', () => ({
-    useUser: mockUseUser,
-    useClerk: mockUseClerk,
-    useAuth: mockUseAuth,
-    useSession: mockUseSession,
+    useUser: clerkMocks.useUser,
+    useClerk: clerkMocks.useClerk,
+    useAuth: clerkMocks.useAuth,
+    useSession: clerkMocks.useSession,
     ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
     SignIn: ({ children }: { children: React.ReactNode }) => children,
     SignUp: ({ children }: { children: React.ReactNode }) => children,

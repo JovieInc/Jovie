@@ -46,29 +46,39 @@ describe('GET /api/dashboard/activity/recent', () => {
   });
 
   it('returns recent activity for authenticated user', async () => {
+    const profileId = '00000000-0000-4000-8000-000000000001';
     mockWithDbSession.mockImplementation(async callback => {
       return callback('user_123');
     });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
-          }),
+    mockDbSelect.mockImplementation(() => {
+      const limitFn = vi.fn().mockResolvedValue([]);
+      const orderByFn = vi.fn().mockReturnValue({ limit: limitFn });
+      const whereFn = vi
+        .fn()
+        .mockReturnValue({ orderBy: orderByFn, limit: limitFn });
+
+      const profileLimitFn = vi.fn().mockResolvedValue([{ id: profileId }]);
+      const innerJoinFn = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: profileLimitFn,
         }),
-        leftJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
+      });
+      const leftJoinFn = vi.fn().mockReturnValue({ where: whereFn });
+
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin: innerJoinFn,
+          leftJoin: leftJoinFn,
+          where: whereFn,
+          orderBy: orderByFn,
+          limit: limitFn,
         }),
-      }),
+      };
     });
 
     const { GET } = await import('@/app/api/dashboard/activity/recent/route');
     const request = new NextRequest(
-      'http://localhost/api/dashboard/activity/recent?profileId=profile_123'
+      `http://localhost/api/dashboard/activity/recent?profileId=${profileId}`
     );
 
     const response = await GET(request);

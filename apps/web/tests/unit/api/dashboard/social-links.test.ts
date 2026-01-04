@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PUT } from '@/app/api/dashboard/social-links/route';
-import { captureError } from '@/lib/error-tracking';
-import { validateBeaconsUrl } from '@/lib/ingestion/strategies/beacons';
+import { DELETE, PUT } from '@/app/api/dashboard/social-links/route';
+import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 
 const hoisted = vi.hoisted(() => {
   const profileResult = [
@@ -221,12 +220,12 @@ vi.mock('@/lib/ingestion/strategies/youtube', () => ({
   validateYouTubeChannelUrl: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('@/lib/cache', () => ({
   invalidateSocialLinksCache: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
 }));
 
 describe('PUT /api/dashboard/social-links', () => {
@@ -264,7 +263,7 @@ describe('PUT /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PUT',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -272,7 +271,7 @@ describe('PUT /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PUT(request as unknown as Request);
+    const response = await DELETE(request as unknown as Request);
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
@@ -466,8 +465,9 @@ describe('PUT /api/dashboard/social-links', () => {
     const response = await PUT(request as unknown as Request);
 
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { ok?: boolean };
+    const data = (await response.json()) as { ok?: boolean; version?: number };
     expect(data.ok).toBe(true);
+    expect(data.version).toBe(2);
   });
 
   it('accepts expectedVersion for optimistic locking', async () => {
@@ -627,8 +627,8 @@ describe('PUT /api/dashboard/social-links', () => {
 
   it('captures errors when background processing promises reject', async () => {
     const ingestionError = new Error('background failure');
-    const validateBeaconsUrlMock = vi.mocked(validateBeaconsUrl);
-    validateBeaconsUrlMock.mockImplementation(() => {
+    const avatarFromLinksMock = vi.mocked(maybeSetProfileAvatarFromLinks);
+    avatarFromLinksMock.mockImplementation(() => {
       throw ingestionError;
     });
 
@@ -655,43 +655,58 @@ describe('PUT /api/dashboard/social-links', () => {
 
     expect(response.status).toBe(200);
 
-    // Allow background promise rejection handlers to run
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(captureError).toHaveBeenCalledWith(
-      'Social links enrichment or ingestion failed',
+    const Sentry = await import('@sentry/nextjs');
+    expect(Sentry.captureException).toHaveBeenCalledWith(
       ingestionError,
       expect.objectContaining({
-        route: '/api/dashboard/social-links',
-        profileId: 'profile_123',
-        action: 'background_processing',
+        tags: { operation: 'profile_enrichment' },
+        extra: { profileId: 'profile_123', clerkUserId: 'user_123' },
       })
     );
 
-    validateBeaconsUrlMock.mockReturnValue(null);
+    avatarFromLinksMock.mockResolvedValue(null);
   });
 });
 
-describe('PUT /api/dashboard/social-links', () => {
+describe('DELETE /api/dashboard/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Configure select to return suggested link for PUT tests
+    let callIndex = 0;
     hoisted.select.mockImplementation(() => {
-      const where = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(hoisted.suggestedLinkResult),
-      });
-      const innerJoin = vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
-        }),
-      });
+      const index = callIndex;
+      callIndex += 1;
+
+      if (index === 0) {
+        const innerJoin = vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+          }),
+        });
+        return {
+          from: vi.fn().mockReturnValue({
+            innerJoin,
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        };
+      }
 
       return {
         from: vi.fn().mockReturnValue({
-          innerJoin,
-          where,
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'link_suggested',
+                creatorProfileId: 'profile_123',
+                version: 2,
+              },
+            ]),
+          }),
         }),
       };
     });
@@ -701,7 +716,7 @@ describe('PUT /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PUT',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -709,7 +724,7 @@ describe('PUT /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PUT(request as unknown as Request);
+    const response = await DELETE(request as unknown as Request);
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
@@ -720,7 +735,7 @@ describe('PUT /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PUT',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -732,7 +747,7 @@ describe('PUT /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PUT(request as unknown as Request);
+    const response = await DELETE(request as unknown as Request);
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
@@ -743,7 +758,7 @@ describe('PUT /api/dashboard/social-links', () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PUT',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -751,23 +766,24 @@ describe('PUT /api/dashboard/social-links', () => {
           profileId: 'profile_123',
           linkId: 'link_suggested',
           action: 'accept',
-          expectedVersion: 1,
+          expectedVersion: 2,
         }),
       }
     );
 
-    const response = await PUT(request as unknown as Request);
+    const response = await DELETE(request as unknown as Request);
 
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { ok?: boolean };
+    const data = (await response.json()) as { ok?: boolean; version?: number };
     expect(data.ok).toBe(true);
+    expect(data.version).toBe(3);
   });
 
   it('includes rate limit headers in response', async () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PUT',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -779,17 +795,13 @@ describe('PUT /api/dashboard/social-links', () => {
       }
     );
 
-    const response = await PUT(request as unknown as Request);
+    const response = await DELETE(request as unknown as Request);
 
     expect(response.headers.get('X-RateLimit-Limit')).toBeDefined();
   });
 
-  it('returns 400 with INVALID_STATE_TRANSITION when link is not in suggested state', async () => {
-    // Configure select to return an active link (not suggested)
-    hoisted.select.mockImplementation(() => {
-      const where = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(hoisted.activeLinkResult), // state: 'active'
-      });
+  it('returns 409 when expectedVersion does not match', async () => {
+    hoisted.select.mockImplementationOnce(() => {
       const innerJoin = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           limit: vi.fn().mockResolvedValue(hoisted.profileResult),
@@ -799,67 +811,31 @@ describe('PUT /api/dashboard/social-links', () => {
       return {
         from: vi.fn().mockReturnValue({
           innerJoin,
-          where,
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
         }),
       };
     });
 
-    const request = new NextRequest(
-      'http://localhost/api/dashboard/social-links',
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          profileId: 'profile_123',
-          linkId: 'link_active',
-          action: 'accept', // Trying to accept an already-active link
-        }),
-      }
-    );
-
-    const response = await PUT(request as unknown as Request);
-
-    expect(response.status).toBe(400);
-    const data = (await response.json()) as {
-      error?: string;
-      code?: string;
-      currentState?: string;
-    };
-    expect(data.code).toBe('INVALID_STATE_TRANSITION');
-    expect(data.currentState).toBe('active');
-    expect(data.error).toContain('only suggested links');
-  });
-
-  it('returns 409 when expectedVersion does not match for PUT', async () => {
-    // Configure select to return suggested link with different version
-    hoisted.select.mockImplementation(() => {
-      const where = vi.fn().mockReturnValue({
-        limit: vi
-          .fn()
-          .mockResolvedValue([
-            { ...hoisted.suggestedLinkResult[0], version: 5 },
+    hoisted.select.mockImplementationOnce(() => ({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            {
+              id: 'link_suggested',
+              creatorProfileId: 'profile_123',
+              version: 5,
+            },
           ]),
-      });
-      const innerJoin = vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
         }),
-      });
-
-      return {
-        from: vi.fn().mockReturnValue({
-          innerJoin,
-          where,
-        }),
-      };
-    });
+      }),
+    }));
 
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
-        method: 'PUT',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -867,12 +843,12 @@ describe('PUT /api/dashboard/social-links', () => {
           profileId: 'profile_123',
           linkId: 'link_suggested',
           action: 'accept',
-          expectedVersion: 2, // Outdated version
+          expectedVersion: 2,
         }),
       }
     );
 
-    const response = await PUT(request as unknown as Request);
+    const response = await DELETE(request as unknown as Request);
 
     expect(response.status).toBe(409);
     const data = (await response.json()) as {

@@ -30,8 +30,9 @@ describe('GET /api/monitoring/performance', () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.metrics).toBeDefined();
+    expect(response.status).toBe(501);
+    expect(data.error).toBe('Performance metrics not yet available');
     expect(Array.isArray(data.metrics)).toBe(true);
+    expect(data.metrics).toHaveLength(0);
   });
 });

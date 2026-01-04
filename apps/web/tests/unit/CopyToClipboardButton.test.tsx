@@ -125,7 +125,7 @@ describe('CopyToClipboardButton', () => {
 
     await flushPromises();
 
-    expect(button).toHaveTextContent('✓ Copied!');
+    expect(button).toHaveTextContent('Copied!');
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
       'https://jov.ie/test-profile'
     );
@@ -191,7 +191,7 @@ describe('CopyToClipboardButton', () => {
 
     await flushPromises();
 
-    expect(button).toHaveTextContent('✓ Copied!');
+    expect(button).toHaveTextContent('Copied!');
     expect(mockCreateElement).toHaveBeenCalledWith('textarea');
     expect(mockTextarea.value).toBe('https://jov.ie/test-profile');
     expect(mockTextarea.focus).toHaveBeenCalled();
@@ -261,7 +261,7 @@ describe('CopyToClipboardButton', () => {
 
     await flushPromises();
 
-    expect(button).toHaveTextContent('✓ Copied!');
+    expect(button).toHaveTextContent('Copied!');
     // Should try clipboard first, then fall back
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
       'https://jov.ie/test-profile'

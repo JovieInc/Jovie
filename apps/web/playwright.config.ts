@@ -11,6 +11,10 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 
+const webServerCommand = process.env.DATABASE_URL
+  ? 'pnpm run dev:local'
+  : 'doppler run -- pnpm run dev:local';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -84,8 +88,13 @@ export default defineConfig({
         webServer: {
           // Use dev:local to avoid doppler dependency when running locally
           // In CI with ephemeral DB, doppler is configured via environment
-          command:
-            'NODE_ENV=test PORT=3100 NEXT_DISABLE_TOOLBAR=1 pnpm run dev:local',
+          command: webServerCommand,
+          env: {
+            ...process.env,
+            NODE_ENV: 'test',
+            PORT: '3100',
+            NEXT_DISABLE_TOOLBAR: '1',
+          },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,
           timeout: 60000,

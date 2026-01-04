@@ -11,10 +11,16 @@ test.describe('Onboarding smoke @smoke', () => {
   test('unauthenticated /app/dashboard redirects to /sign-in @smoke', async ({
     page,
   }) => {
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+    const sk = process.env.CLERK_SECRET_KEY || '';
+    if (!pk || !sk || pk.includes('dummy') || sk.includes('dummy')) {
+      test.skip();
+    }
+
     const res = await smokeNavigate(page, '/app/dashboard');
 
     // Should land on sign-in
-    await expect(page).toHaveURL(/\/sign-in/, {
+    await expect(page).toHaveURL(/\/signin/, {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     expect(res?.ok(), 'Expected the sign-in page to respond OK').toBeTruthy();

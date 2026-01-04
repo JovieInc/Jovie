@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCheckRateLimit = vi.hoisted(() => vi.fn());
+const mockValidateEnvironment = vi.hoisted(() => vi.fn());
+const mockGetEnvironmentInfo = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/utils/rate-limit', () => ({
   checkRateLimit: mockCheckRateLimit,
@@ -13,11 +15,19 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   }),
 }));
 
+vi.mock('@/lib/env-server', () => ({
+  validateEnvironment: mockValidateEnvironment,
+  getEnvironmentInfo: mockGetEnvironmentInfo,
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     execute: vi.fn().mockResolvedValue({ rows: [{ ok: true }] }),
   },
   checkDbHealth: vi.fn().mockResolvedValue({ healthy: true, latency: 5 }),
+  validateDbConnection: vi
+    .fn()
+    .mockResolvedValue({ connected: true, latency: 5 }),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -37,6 +47,21 @@ describe('GET /api/health/comprehensive', () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockCheckRateLimit.mockReturnValue(false);
+    mockValidateEnvironment.mockReturnValue({
+      valid: true,
+      errors: [],
+      warnings: [],
+      critical: [],
+    });
+    mockGetEnvironmentInfo.mockReturnValue({
+      nodeEnv: 'test',
+      platform: 'darwin',
+      nodeVersion: process.version,
+      hasDatabase: false,
+      hasClerk: false,
+      hasStripe: false,
+      hasCloudinary: false,
+    });
   });
 
   it('returns 429 when rate limited', async () => {
@@ -60,8 +85,10 @@ describe('GET /api/health/comprehensive', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toHaveProperty('healthy');
+    expect(data).toHaveProperty('ok');
     expect(data).toHaveProperty('checks');
     expect(data).toHaveProperty('timestamp');
+    expect(data).toHaveProperty('service');
+    expect(data).toHaveProperty('summary');
   });
 });

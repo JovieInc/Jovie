@@ -1,31 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
-const mockStripePortalCreate = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
+const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
-  stripe: {
-    billingPortal: {
-      sessions: {
-        create: mockStripePortalCreate,
-      },
-    },
-  },
+  createBillingPortalSession: mockCreateBillingPortalSession,
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  users: {},
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  getUserBillingInfo: mockGetUserBillingInfo,
 }));
 
 describe('POST /api/stripe/portal', () => {
@@ -47,12 +35,11 @@ describe('POST /api/stripe/portal', () => {
 
   it('returns 400 when user has no Stripe customer ID', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ stripeCustomerId: null }]),
-        }),
-      }),
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        stripeCustomerId: null,
+      },
     });
 
     const { POST } = await import('@/app/api/stripe/portal/route');
@@ -60,19 +47,18 @@ describe('POST /api/stripe/portal', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain('customer');
+    expect(data.error).toBe('No billing account found');
   });
 
   it('creates portal session for user with Stripe customer', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ stripeCustomerId: 'cus_123' }]),
-        }),
-      }),
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        stripeCustomerId: 'cus_123',
+      },
     });
-    mockStripePortalCreate.mockResolvedValue({
+    mockCreateBillingPortalSession.mockResolvedValue({
       id: 'bps_123',
       url: 'https://billing.stripe.com/session/bps_123',
     });

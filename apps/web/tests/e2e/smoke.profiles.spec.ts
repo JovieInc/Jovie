@@ -15,6 +15,11 @@ import {
 for (const handle of PUBLIC_HANDLES) {
   test.describe(`Public profile: /${handle} @smoke`, () => {
     test(`renders and shows primary CTA @smoke`, async ({ page }, testInfo) => {
+      const dbUrl = process.env.DATABASE_URL || '';
+      if (!dbUrl || dbUrl.includes('dummy')) {
+        test.skip();
+      }
+
       const { getContext, cleanup } = setupPageMonitoring(page);
 
       try {

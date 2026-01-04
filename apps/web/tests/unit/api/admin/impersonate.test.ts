@@ -24,6 +24,12 @@ vi.mock('@/lib/admin/impersonation', () => ({
   isImpersonationEnabled: mockIsImpersonationEnabled,
 }));
 
+vi.mock('next/headers', () => ({
+  headers: vi.fn().mockResolvedValue({
+    get: vi.fn().mockReturnValue(null),
+  }),
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: vi.fn(),
 }));

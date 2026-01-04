@@ -75,13 +75,6 @@ export default function WaitlistPage() {
   }, [primaryGoal, selectedPrimaryGoalIndex, step]);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) {
-      router.replace('/signin?redirect_url=/waitlist');
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  useEffect(() => {
     setIsHydrating(false);
   }, []);
 

@@ -86,6 +86,7 @@ export function useClipboard(
   const copy = useCallback(
     async (text: string): Promise<boolean> => {
       let success = false;
+      let lastError: Error | null = null;
 
       try {
         // Try modern Clipboard API first
@@ -97,16 +98,13 @@ export function useClipboard(
           success = fallbackCopy(text);
         }
       } catch (error) {
+        lastError =
+          error instanceof Error ? error : new Error('Copy failed (clipboard)');
         // Try fallback if modern API failed
         try {
           success = fallbackCopy(text);
         } catch {
           success = false;
-        }
-
-        if (!success) {
-          const err = error instanceof Error ? error : new Error('Copy failed');
-          onError?.(err);
         }
       }
 
@@ -115,7 +113,9 @@ export function useClipboard(
         onSuccess?.();
       } else {
         setStatus('error');
-        if (!onError) {
+        if (onError) {
+          onError(lastError ?? new Error('Copy failed'));
+        } else {
           console.error('Failed to copy to clipboard');
         }
       }
