@@ -2,6 +2,10 @@ export interface ClerkEmailAddress {
   emailAddress?: string | null;
 }
 
+export interface ClerkPrivateMetadata {
+  fullName?: string | null;
+}
+
 export interface ClerkUserIdentityInput {
   primaryEmailAddress?: ClerkEmailAddress | null;
   emailAddresses?: ClerkEmailAddress[] | null;
@@ -10,12 +14,23 @@ export interface ClerkUserIdentityInput {
   lastName?: string | null;
   username?: string | null;
   imageUrl?: string | null;
+  privateMetadata?: ClerkPrivateMetadata | null;
 }
+
+export type ClerkDisplayNameSource =
+  | 'private_metadata_full_name'
+  | 'clerk_full_name'
+  | 'clerk_name_parts'
+  | 'clerk_first_name'
+  | 'clerk_username'
+  | 'email_local_part'
+  | null;
 
 export interface ClerkResolvedIdentity {
   email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  displayNameSource: ClerkDisplayNameSource;
 }
 
 function normalizeEmail(email: string): string {
@@ -37,6 +52,9 @@ export function resolveClerkIdentity(
 
   const email = emailRaw ? normalizeEmail(emailRaw) : null;
 
+  const privateMetadataFullName = (
+    user?.privateMetadata?.fullName ?? ''
+  ).trim();
   const fullName = (user?.fullName ?? '').trim();
   const firstName = (user?.firstName ?? '').trim();
   const lastName = (user?.lastName ?? '').trim();
@@ -44,12 +62,29 @@ export function resolveClerkIdentity(
   const nameFromParts = [firstName, lastName].filter(Boolean).join(' ').trim();
   const username = (user?.username ?? '').trim();
 
+  const derivedFromEmail = email ? deriveDisplayNameFromEmail(email) : null;
+
   const displayName =
+    privateMetadataFullName ||
     fullName ||
     nameFromParts ||
     firstName ||
     username ||
-    (email ? deriveDisplayNameFromEmail(email) : null);
+    derivedFromEmail;
+
+  const displayNameSource: ClerkDisplayNameSource = privateMetadataFullName
+    ? 'private_metadata_full_name'
+    : fullName
+      ? 'clerk_full_name'
+      : nameFromParts
+        ? 'clerk_name_parts'
+        : firstName
+          ? 'clerk_first_name'
+          : username
+            ? 'clerk_username'
+            : derivedFromEmail
+              ? 'email_local_part'
+              : null;
 
   const avatarUrl = user?.imageUrl ?? null;
 
@@ -57,5 +92,6 @@ export function resolveClerkIdentity(
     email,
     displayName: displayName || null,
     avatarUrl,
+    displayNameSource,
   };
 }

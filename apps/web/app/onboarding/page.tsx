@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
+import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import {
   canAccessOnboarding,
   resolveUserState,
@@ -87,8 +88,8 @@ export default async function OnboardingPage({
   }
 
   const user = await currentUser();
-  const userEmail =
-    authResult.context.email ?? user?.emailAddresses?.[0]?.emailAddress ?? null;
+  const clerkIdentity = resolveClerkIdentity(user);
+  const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId!;
 
   // Get dashboard data for form initialization
@@ -99,16 +100,10 @@ export default async function OnboardingPage({
 
   const displayNameSource = existingProfile?.displayName
     ? 'profile'
-    : user?.fullName
-      ? 'clerk_full_name'
-      : null;
+    : clerkIdentity.displayNameSource;
 
   const initialDisplayName =
-    existingProfile?.displayName ||
-    user?.fullName ||
-    user?.username ||
-    user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] ||
-    '';
+    existingProfile?.displayName || clerkIdentity.displayName || '';
 
   const initialHandle =
     resolvedSearchParams?.handle ||
@@ -117,7 +112,10 @@ export default async function OnboardingPage({
     '';
 
   const skipNameStep =
-    displayNameSource === 'profile' || displayNameSource === 'clerk_full_name';
+    displayNameSource === 'profile' ||
+    displayNameSource === 'private_metadata_full_name' ||
+    displayNameSource === 'clerk_full_name' ||
+    displayNameSource === 'clerk_name_parts';
 
   return (
     <AuthLayout
