@@ -1,6 +1,6 @@
 # Testing Strategy for Continuous Deployment
 
-This document outlines the testing strategy to enable safe, frequent deployments to production (multiple times per day) without regressions.
+This document outlines the testing strategy to enable safe, frequent deployments to production (multiple times per day) without regressions. Pair it with the actionable guardrails in [`docs/TESTING_GUIDELINES.md`](./TESTING_GUIDELINES.md) for when to choose each test type and how to review them well.
 
 ## Testing Pyramid
 
