@@ -192,7 +192,6 @@ Migrating an existing slow test?
 ## Help & Examples
 
 - **Full guide:** `tests/TEST_OPTIMIZATION_GUIDE.md`
-- **Examples:** `tests/unit/*.optimized.test.tsx`
 - **Benchmark:** `scripts/benchmark-test-performance.sh`
 - **Analyze:** `scripts/analyze-test-dependencies.sh`
 
@@ -217,8 +216,7 @@ pnpm test -- --reporter=verbose
 1. Start with Pattern A (pure test)
 2. Add mocks inline as needed (Pattern B)
 3. Only use global setup if truly needed
-4. Check .optimized.test examples
-5. Ask: "Does this really need database/mocks/CSS?"
+4. Ask: "Does this really need database/mocks/CSS?"
 
 ## Remember
 

@@ -412,9 +412,8 @@ setupComponentMocks();
 
 ## Reference Files
 
-- `/Users/timwhite/Documents/GitHub/TBF/Jovie/tests/setup.ts` - Core setup
-- `/Users/timwhite/Documents/GitHub/TBF/Jovie/tests/setup-browser.ts` - Browser globals
-- `/Users/timwhite/Documents/GitHub/TBF/Jovie/tests/setup-mocks.ts` - Component mocks
-- `/Users/timwhite/Documents/GitHub/TBF/Jovie/tests/setup-db.ts` - Database setup
-- `/Users/timwhite/Documents/GitHub/TBF/Jovie/tests/unit/*.optimized.test.tsx` - Example migrations
-- `/Users/timwhite/Documents/GitHub/TBF/Jovie/vitest.config.mts` - Test runner config
+- `tests/setup.ts` - Core setup
+- `tests/setup-browser.ts` - Browser globals
+- `tests/setup-mocks.ts` - Component mocks
+- `tests/setup-db.ts` - Database setup
+- `vitest.config.mts` - Test runner config
