@@ -8,10 +8,21 @@
 
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
-import { afterEach, expect } from 'vitest';
+import { afterEach, expect, vi } from 'vitest';
 
 // Extend expect with jest-dom matchers (lightweight, always needed)
 expect.extend(matchers);
+
+// Mock React's cache function globally for all tests so server components using
+// cache() continue to work in the fast config without requiring a full Next.js
+// request context.
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    cache: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
 
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {

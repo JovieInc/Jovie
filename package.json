@@ -34,6 +34,7 @@
     "lint:fix": "turbo lint:fix",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
+    "test:ci": "turbo test:ci",
     "test:fast": "turbo test:fast",
     "test:e2e": "turbo test:e2e",
     "test:guard": "pnpm --filter=@jovie/web run test:guard",
