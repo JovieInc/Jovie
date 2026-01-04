@@ -2,8 +2,6 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 
 interface Props {
   params: Promise<{
@@ -14,22 +12,15 @@ interface Props {
 export default function TipPage({ params }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tippingGate = useFeatureGate(STATSIG_FLAGS.TIPPING);
 
   useEffect(() => {
     // Get the username from params and redirect
     params.then(({ username }) => {
-      if (tippingGate.value) {
-        const source = searchParams?.get('source');
-        const sourceParam = source
-          ? `&source=${encodeURIComponent(source)}`
-          : '';
-        router.replace(`/${username}?mode=tip${sourceParam}`);
-      } else {
-        router.replace(`/${username}`);
-      }
+      const source = searchParams?.get('source');
+      const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
+      router.replace(`/${username}?mode=tip${sourceParam}`);
     });
-  }, [params, router, tippingGate.value, searchParams]);
+  }, [params, router, searchParams]);
 
   // Show loading while redirecting
   return (

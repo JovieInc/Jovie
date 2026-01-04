@@ -14,8 +14,6 @@ import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsPr
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
 import { useBillingStatus } from '@/hooks/useBillingStatus';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
@@ -35,9 +33,7 @@ export function SettingsPolished({
   const billingStatus = useBillingStatus();
   const { isPro } = billingStatus;
   const [isBillingLoading, setIsBillingLoading] = useState(false);
-
-  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
-  const notificationsEnabled = notificationsGate.value;
+  const notificationsEnabled = true;
 
   const handleBilling = async () => {
     setIsBillingLoading(true);

@@ -1,14 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
@@ -38,11 +36,7 @@ export default function NotificationsPage() {
   const [isArtistLoading, setIsArtistLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const { success: notifySuccess, error: notifyError } = useNotifications();
-  const searchParams = useSearchParams();
-
-  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
-  const forceNotifications = searchParams?.get('preview') === '1';
-  const notificationsEnabled = notificationsGate.value || forceNotifications;
+  const notificationsEnabled = true;
 
   useEffect(() => {
     if (!notificationsEnabled) {
