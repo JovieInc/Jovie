@@ -1,6 +1,6 @@
 # Tech Debt Tracker
 
-> **Last Updated:** 2026-01-04
+> **Last Updated:** 2026-01-05
 > **Maintainers:** All AI agents and developers
 
 This document tracks technical debt in the Jovie codebase. AI agents **must** update this file when they address or discover tech debt items.
@@ -36,15 +36,21 @@ When you **discover** new tech debt:
 
 | Metric | Count | Target | Last Updated |
 |--------|-------|--------|--------------|
-| `@ts-nocheck` files | **0** | 0 | 2026-01-03 |
-| `@ts-ignore` in production | ~15 | <5 | 2026-01-03 |
-| Deprecated files | 30+ | 0 | 2026-01-03 |
-| TODO comments | 6 | 0 | 2026-01-03 |
-| Empty catch blocks | **0** | 0 | 2026-01-03 |
+| `@ts-nocheck` files | **0** | 0 | 2026-01-05 |
+| `@ts-ignore` in production | ~15 | <5 | 2026-01-05 |
+| Deprecated files | 30+ | 0 | 2026-01-05 |
+| TODO comments | 6 | 0 | 2026-01-05 |
+| Empty catch blocks | **0** | 0 | 2026-01-05 |
 
 ---
 
 ## Resolved Issues
+
+### 2026-01-05
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Oversized `apps/web/tests/unit/api/dashboard/social-links.test.ts` | P3 | Replaced with concise contract tests (~140 lines) to remove redundant mocks | feat/test-optimize-1-2 |
 
 ### 2026-01-03
 
@@ -150,7 +156,7 @@ Consider splitting for maintainability:
 
 | File | Lines |
 |------|-------|
-| `tests/unit/api/dashboard/social-links.test.ts` | 1,107 |
+| `tests/unit/useFormState.test.tsx` | 2,116 |
 | `tests/unit/lib/stripe/webhooks/handlers/payment-handler.test.ts` | 982 |
 
 ### P3 - Low (Stale Documentation)
