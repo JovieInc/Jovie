@@ -909,6 +909,113 @@ CodeRabbit is already installed in the terminal. Run it as a way to review your 
 - Import server helpers (e.g., `auth`) from `@clerk/nextjs/server` and client hooks/components from `@clerk/nextjs`.
 - Ensure Clerk environment and allowed frontend URLs are configured for preview and production domains.
 
+#### 9.2.0 Auth Decision Path (CRITICAL)
+
+**GOLDEN RULE: There must be exactly ONE canonical "am I authed?" decision path, and it must behave identically in Edge + Server runtimes.**
+
+- **Single source of truth:** All auth decisions flow through `lib/auth/gate.ts` → `resolveUserState()`
+- **Edge + Server compatible:** `resolveUserState()` uses only Edge-compatible APIs (no Node.js dependencies)
+- **Database-driven authorization:** Clerk provides authentication (who you are), database determines authorization (what you can access)
+- **Never duplicate auth logic:** Do NOT create separate auth checks in middleware, layouts, or components
+- **Consistent state enum:** Use `UserState` enum (UNAUTHENTICATED, NEEDS_DB_USER, NEEDS_ONBOARDING, ACTIVE, etc.) everywhere
+
+**Anti-patterns to avoid:**
+- ❌ Checking `auth()` in one place and `currentUser()` in another
+- ❌ Different auth logic in middleware vs. layouts
+- ❌ Client-side auth checks that diverge from server-side
+- ❌ Hardcoded redirect URLs scattered across codebase
+- ❌ Conditional auth flows based on runtime (Edge vs. Node)
+
+**Correct pattern:**
+```typescript
+// Server-side (RSC, API routes, middleware)
+import { resolveUserState, canAccessApp } from '@/lib/auth/gate';
+
+const authResult = await resolveUserState();
+if (!canAccessApp(authResult.state)) {
+  redirect(authResult.redirectTo!);
+}
+```
+
+#### 9.2.0.1 Redirect Protocol (CRITICAL)
+
+**GOLDEN RULE: Redirects must respect x-forwarded-proto / canonical host, and you should NOT be dynamically inventing callback URLs in multiple places.**
+
+- **Single redirect URL builder:** Use `lib/auth/redirect.ts` helper for ALL redirect URL construction
+- **Protocol awareness:** Respect `x-forwarded-proto` header in production (HTTPS), localhost in dev
+- **Canonical host:** Use environment variable `NEXT_PUBLIC_APP_URL` as single source of truth
+- **Never hardcode URLs:** Do NOT create callback URLs like `/signin/sso-callback` in multiple places
+- **Middleware compatibility:** Redirect URLs must work in Edge runtime (no Node.js dependencies)
+
+**Anti-patterns to avoid:**
+- ❌ `redirectUrl: '/signup/sso-callback'` hardcoded in OAuth flow
+- ❌ `new URL('/callback', 'https://meetjovie.com')` scattered across files
+- ❌ Different callback URLs in `useSignInFlow.ts` vs. `useSignUpFlow.ts`
+- ❌ HTTP redirects in production (must use HTTPS)
+- ❌ Localhost redirects in production deployments
+
+**Correct pattern:**
+```typescript
+import { buildRedirectUrl } from '@/lib/auth/redirect';
+
+// OAuth flow
+const redirectUrl = buildRedirectUrl('/signin/sso-callback');
+const redirectUrlComplete = buildRedirectUrl('/app/dashboard/overview');
+
+await signIn.authenticateWithRedirect({
+  strategy: 'oauth_google',
+  redirectUrl,           // Uses canonical host + protocol
+  redirectUrlComplete,   // Uses canonical host + protocol
+});
+```
+
+#### 9.2.0.2 Onboarding Gating (CRITICAL)
+
+**GOLDEN RULE: Onboarding gating should be one-directional and resilient.**
+
+**Principle:**
+- **One-way gate:** Signed in but not onboarded → ALWAYS land on onboarding until done
+- **Data independence:** Onboarding routes must NOT depend on data that is only created at the end
+- **Fresh signup detection:** Use `?fresh_signup=true` flag to prevent redirect loops
+- **DB user creation timing:** Create DB user record BEFORE redirecting to onboarding (not after)
+
+**Anti-patterns to avoid:**
+- ❌ Onboarding page checks if user has `dbUserId`, but `dbUserId` is only created after onboarding
+- ❌ Redirect loop: onboarding → check DB → no record → back to auth → onboarding → ...
+- ❌ Different onboarding entry points (OAuth vs. email OTP) with inconsistent state
+- ❌ Onboarding completion check depends on data created in final step
+- ❌ Missing `fresh_signup=true` flag on OAuth callback redirects
+
+**Correct pattern:**
+```typescript
+// In auth gate (lib/auth/gate.ts)
+if (!profile) {
+  return {
+    state: UserState.NEEDS_ONBOARDING,
+    redirectTo: '/onboarding?fresh_signup=true', // ✅ Flag prevents loop
+    clerkUserId,
+    dbUserId, // ✅ DB user already created by this point
+  };
+}
+
+// In onboarding page
+const isFreshSignup = searchParams.get('fresh_signup') === 'true';
+if (!authResult.dbUserId && !isFreshSignup) {
+  // ✅ Detect redirect loop - user shouldn't be here
+  return <ErrorPage message="Redirect loop detected" />;
+}
+```
+
+**Required flow for new users:**
+1. User completes OAuth or email OTP authentication
+2. Auth gate detects no profile exists
+3. Auth gate **creates DB user record** with retry logic
+4. Auth gate redirects to `/onboarding?fresh_signup=true`
+5. Onboarding page verifies `dbUserId` exists OR `fresh_signup=true` flag is set
+6. User completes onboarding steps
+7. Profile creation marks onboarding as complete
+8. Future requests pass `canAccessApp()` check
+
 #### 9.2.1 Auth + Onboarding Flow (Current Baseline)
 
 - **Authentication model:**
