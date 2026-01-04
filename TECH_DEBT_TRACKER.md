@@ -1,6 +1,6 @@
 # Tech Debt Tracker
 
-> **Last Updated:** 2026-01-03
+> **Last Updated:** 2026-01-04
 > **Maintainers:** All AI agents and developers
 
 This document tracks technical debt in the Jovie codebase. AI agents **must** update this file when they address or discover tech debt items.
@@ -52,6 +52,12 @@ When you **discover** new tech debt:
 |------|----------|------------|-----------|
 | `@ts-nocheck` in `app/api/dashboard/profile/route.ts` | P0 | Removed file-level suppression; Drizzle type issues handled with targeted `@ts-expect-error` | `claude/audit-tech-debt-dQNmv` |
 | Empty catch block in `app/layout.tsx:171` | P0 | Added explanatory comment for intentional silent failure in theme detection | `claude/audit-tech-debt-dQNmv` |
+
+### 2026-01-04
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Oversized `apps/web/tests/unit/useFormState.test.tsx` (2,116 lines) | P3 | Rebuilt focused 150-line suite covering core hook behaviors and removed bloat | `feat/test-optimize-1-1` |
 
 ---
 
@@ -144,7 +150,6 @@ Consider splitting for maintainability:
 
 | File | Lines |
 |------|-------|
-| `tests/unit/useFormState.test.tsx` | 2,116 |
 | `tests/unit/api/dashboard/social-links.test.ts` | 1,107 |
 | `tests/unit/lib/stripe/webhooks/handlers/payment-handler.test.ts` | 982 |
 
