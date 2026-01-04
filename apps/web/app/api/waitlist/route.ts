@@ -1,8 +1,9 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
+import { getWaitlistAccess } from '@/lib/auth/gate';
 import { db, waitlistEntries } from '@/lib/db';
-import { waitlistInvites } from '@/lib/db/schema';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -118,38 +119,21 @@ export async function GET() {
   }
 
   const user = await currentUser();
-  const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
-  if (!emailRaw) {
+  const clerkIdentity = resolveClerkIdentity(user);
+  if (!clerkIdentity.email) {
     return NextResponse.json(
       { hasEntry: false, status: null, inviteToken: null },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
-  const email = normalizeEmail(emailRaw);
-
-  const [entry] = await db
-    .select({ id: waitlistEntries.id, status: waitlistEntries.status })
-    .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
-    .limit(1);
-
-  const inviteToken = await (async () => {
-    if (!entry?.id || entry.status !== 'invited') return null;
-    const [invite] = await db
-      .select({ claimToken: waitlistInvites.claimToken })
-      .from(waitlistInvites)
-      .where(eq(waitlistInvites.waitlistEntryId, entry.id))
-      .orderBy(desc(waitlistInvites.createdAt))
-      .limit(1);
-    return invite?.claimToken ?? null;
-  })();
+  const result = await getWaitlistAccess(clerkIdentity.email);
 
   return NextResponse.json(
     {
-      hasEntry: Boolean(entry),
-      status: entry?.status ?? null,
-      inviteToken,
+      hasEntry: Boolean(result.entryId),
+      status: result.status ?? null,
+      inviteToken: result.claimToken ?? null,
     },
     { headers: NO_STORE_HEADERS }
   );

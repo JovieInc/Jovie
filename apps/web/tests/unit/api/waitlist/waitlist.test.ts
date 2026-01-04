@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockCurrentUser = vi.hoisted(() => vi.fn());
+const mockGetWaitlistAccess = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
@@ -11,6 +12,15 @@ vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
   currentUser: mockCurrentUser,
 }));
+
+vi.mock('@/lib/auth/gate', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/auth/gate')>('@/lib/auth/gate');
+  return {
+    ...actual,
+    getWaitlistAccess: mockGetWaitlistAccess,
+  };
+});
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -84,17 +94,10 @@ describe('Waitlist API', () => {
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-            limit: vi
-              .fn()
-              .mockResolvedValue([{ id: 'entry_123', status: 'new' }]),
-          }),
-        }),
+      mockGetWaitlistAccess.mockResolvedValue({
+        entryId: 'entry_123',
+        status: 'new',
+        claimToken: null,
       });
 
       const { GET } = await import('@/app/api/waitlist/route');
