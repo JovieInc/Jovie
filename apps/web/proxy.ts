@@ -306,7 +306,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           new URL(normalizeRedirectPath(pathname), req.url)
         );
       } else if (req.nextUrl.pathname === '/') {
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+        // Redirect to /waitlist which will route users to the appropriate destination
+        // based on their state (onboarding needed, dashboard, etc.)
+        res = NextResponse.redirect(new URL('/waitlist', req.url));
       } else {
         res = NextResponse.next({ request: { headers: requestHeaders } });
       }
