@@ -928,6 +928,48 @@ jobs:
           path: apps/web/test-results/
           retention-days: 7
 
+  ci-test-performance:
+    name: Test Performance Budgets
+    needs: [ci-typecheck, ci-biome]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'test'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping test performance budgets; no relevant paths changed."
+          exit 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Generate test performance profile
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm test:profile
+
+      - name: Enforce test performance budgets
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          SUITE="critical"
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            SUITE="full"
+          fi
+
+          TEST_PERFORMANCE_SUITE="$SUITE" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="$SUITE" --use-baseline
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
     # Only needs build - no DB dependencies for fast UI-only PRs
@@ -1013,6 +1055,7 @@ jobs:
       - ci-pr-neon-migrate
       - ci-build
       - ci-unit-tests
+      - ci-test-performance
       - ci-e2e-tests
       - ci-pr-vercel-preview
     runs-on: ubuntu-latest
@@ -1118,6 +1161,10 @@ jobs:
                 label: 'Unit Tests',
                 jobName: 'Unit Tests',
                 runFullCi: process.env.UNIT_RUN_FULL_CI
+              },
+              {
+                label: 'Test Performance Budgets',
+                jobName: 'Test Performance Budgets'
               },
               {
                 label: 'E2E Tests',

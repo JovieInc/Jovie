@@ -1,352 +1,46 @@
 {
-  "timestamp": "2025-12-20T05:19:24.353Z",
+  "timestamp": "2026-01-04T18:28:42.672Z",
   "metrics": {
-    "totalDuration": 21360,
-    "setupTime": 11600,
-    "testExecutionTime": 19030,
-    "environmentTime": 28020,
-    "transformTime": 1890,
-    "collectTime": 10750,
-    "prepareTime": 5060,
+    "totalDuration": 360073,
+    "setupTime": 0,
+    "testExecutionTime": 0,
+    "environmentTime": 0,
+    "transformTime": 0,
+    "collectTime": 0,
+    "prepareTime": 0,
     "testResults": [
       {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Basic Functionality > renders trigger and shows content on click",
-        "duration": 120,
+        "name": "lib/http/parse-json.test.ts > parseJsonBody > returns parsed JSON for valid payloads",
+        "duration": 29,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Basic Functionality > closes on outside click",
-        "duration": 45,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Basic Functionality > closes on escape key",
+        "name": "lib/http/parse-json.test.ts > parseJsonBody > logs and captures parse failures",
         "duration": 14,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Controlled State > works in controlled mode",
-        "duration": 8,
+        "name": "lib/http/parse-json.test.ts > parseJsonBody > includes error details in development mode",
+        "duration": 37,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Controlled State > calls onOpenChange when trigger is clicked",
-        "duration": 11,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Accessibility > has proper ARIA attributes",
-        "duration": 10,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Accessibility > manages focus correctly - does not trap focus like Dialog",
-        "duration": 24,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Accessibility > supports keyboard navigation",
-        "duration": 9,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Styling and Variants > applies custom className",
-        "duration": 8,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Styling and Variants > renders arrow when showArrow is true",
-        "duration": 8,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Styling and Variants > does not render arrow by default",
-        "duration": 8,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Styling and Variants > has proper positioning attributes",
-        "duration": 7,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Interactive Content > supports interactive content without focus trapping",
-        "duration": 10,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Interactive Content > supports form submission within popover",
-        "duration": 12,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > SSR Compatibility > renders without hydration errors",
-        "duration": 4,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > SSR Compatibility > handles Portal rendering gracefully",
-        "duration": 8,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Edge Cases > handles rapid open/close cycles",
+        "name": "lib/http/parse-json.test.ts > parseJsonBody > returns fallback when empty body is allowed",
         "duration": 3,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/popover.test.tsx > Popover > Edge Cases > handles children prop changes",
-        "duration": 7,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > renders with default variant",
-        "duration": 16,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > applies hoverable variant classes",
-        "duration": 2,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > forwards refs correctly",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > has correct displayName",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > supports asChild with article element",
-        "duration": 2,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > supports asChild with section element",
-        "duration": 2,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > merges custom className with default classes",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card > passes through HTML attributes",
-        "duration": 23,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardHeader > renders with default classes",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardHeader > forwards refs correctly",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardHeader > has correct displayName",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardHeader > supports asChild",
-        "duration": 4,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardTitle > renders as h3 by default",
-        "duration": 6,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardTitle > forwards refs correctly",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardTitle > has correct displayName",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardTitle > supports asChild with different heading levels",
-        "duration": 3,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardTitle > supports asChild with non-heading elements",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardDescription > renders as paragraph by default",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardDescription > forwards refs correctly",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardDescription > has correct displayName",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardDescription > supports asChild",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardContent > renders with default classes",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardContent > forwards refs correctly",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardContent > has correct displayName",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardContent > supports asChild",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardFooter > renders with default classes",
-        "duration": 1,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardFooter > forwards refs correctly",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardFooter > has correct displayName",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > CardFooter > supports asChild",
-        "duration": 0,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card composition > renders complete card structure",
-        "duration": 3,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/card.test.tsx > Card composition > works with semantic HTML structure",
-        "duration": 2,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/button.test.tsx > Button > renders with text",
-        "duration": 50,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/button.test.tsx > Button > applies variant and size classes",
-        "duration": 4,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/button.test.tsx > Button > forwards refs",
-        "duration": 2,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/button.test.tsx > Button > supports asChild",
-        "duration": 4,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/button.test.tsx > Button > respects disabled state",
-        "duration": 7,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "packages/ui/atoms/button.test.tsx > Button > renders spinner when loading",
-        "duration": 7,
         "tests": 1,
         "status": "passed"
       }
     ],
     "slowTests": [],
     "performanceStats": {
-      "p50": 3,
-      "p95": 45,
-      "p99": 120,
-      "average": 8.436363636363636,
-      "median": 3
+      "p50": 29,
+      "p95": 37,
+      "p99": 37,
+      "average": 20.75,
+      "median": 29
     }
   },
   "targets": {

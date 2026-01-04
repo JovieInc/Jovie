@@ -18,6 +18,11 @@ interface PerformanceThresholds {
   slowTestCount: number; // Maximum number of tests exceeding individualTest threshold
 }
 
+interface PerformanceBudget {
+  maxTotalDuration: number;
+  description?: string;
+}
+
 interface TestMetrics {
   totalDuration: number;
   setupTime: number;
@@ -28,6 +33,12 @@ interface TestMetrics {
 }
 
 class TestPerformanceGuard {
+  private readonly defaultSuite = 'full';
+
+  private resolvedConfigPath?: string;
+
+  private resolvedBaselinePath?: string;
+
   private thresholds: PerformanceThresholds = {
     totalDuration: 120000, // 120 seconds (CI environments need more time for cold starts)
     p95: 200, // 200ms
@@ -35,6 +46,25 @@ class TestPerformanceGuard {
     individualTest: 200, // 200ms
     slowTestCount: 5, // Max 5 slow tests allowed
   };
+
+  private budgets: Record<string, PerformanceBudget> = {
+    smoke: {
+      maxTotalDuration: 30000,
+      description:
+        'Smoke suite should finish under 30s to keep deploy feedback instant.',
+    },
+    critical: {
+      maxTotalDuration: 120000,
+      description: 'Critical regression suite must stay under 2 minutes.',
+    },
+    full: {
+      maxTotalDuration: 300000,
+      description:
+        'Full coverage runs should stay under 5 minutes to guard against drift.',
+    },
+  };
+
+  private options = this.parseOptions();
 
   private metrics: TestMetrics = {
     totalDuration: 0,
@@ -52,8 +82,25 @@ class TestPerformanceGuard {
       // Load custom thresholds if available
       this.loadCustomThresholds();
 
-      // Run tests and capture metrics
-      await this.runTestsAndCaptureMetrics();
+      const suiteBudget = this.budgets[this.options.suite];
+      console.log(
+        `🎯 Target suite: ${this.options.suite} (${suiteBudget ? `${suiteBudget.maxTotalDuration}ms budget` : 'no budget configured'})`
+      );
+
+      const usedBaseline =
+        this.options.useBaseline && this.loadBaselineMetrics();
+
+      if (usedBaseline) {
+        const source = this.resolvedBaselinePath
+          ? ` from ${this.resolvedBaselinePath}`
+          : '';
+        console.log(
+          `📂 Using existing test-performance-baseline.json metrics${source}\n`
+        );
+      } else {
+        // Run tests and capture metrics
+        await this.runTestsAndCaptureMetrics();
+      }
 
       // Check against thresholds
       const violations = this.checkThresholds();
@@ -71,27 +118,40 @@ class TestPerformanceGuard {
 
   private async runTestsAndCaptureMetrics(): Promise<void> {
     console.log('⏱️  Running test suite with performance monitoring...');
+    const startTime = Date.now();
 
     try {
       const output = execSync('pnpm test:fast --reporter=verbose', {
         encoding: 'utf8',
         stdio: 'pipe',
-        timeout: 120000,
+        maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
+        timeout: 360000,
       });
 
       this.parseTestOutput(output);
     } catch (error: unknown) {
       // Parse output even if tests fail
-      if (
-        error &&
-        typeof error === 'object' &&
-        'stdout' in error &&
-        typeof error.stdout === 'string'
-      ) {
-        this.parseTestOutput(error.stdout);
-      } else {
+      let parsedOutput = false;
+      if (error && typeof error === 'object') {
+        const stdout =
+          'stdout' in error && error.stdout
+            ? Buffer.isBuffer(error.stdout)
+              ? error.stdout.toString('utf8')
+              : (error.stdout as string)
+            : '';
+        if (stdout) {
+          this.parseTestOutput(stdout);
+          parsedOutput = true;
+        }
+      }
+
+      if (!parsedOutput) {
         throw new Error('Failed to run tests or capture output');
       }
+    }
+
+    if (!this.metrics.totalDuration) {
+      this.metrics.totalDuration = Date.now() - startTime;
     }
   }
 
@@ -158,6 +218,7 @@ class TestPerformanceGuard {
 
   private checkThresholds(): string[] {
     const violations: string[] = [];
+    const suiteBudget = this.budgets[this.options.suite];
 
     // Check total duration
     if (this.metrics.totalDuration > this.thresholds.totalDuration) {
@@ -187,6 +248,15 @@ class TestPerformanceGuard {
       );
     }
 
+    if (
+      suiteBudget &&
+      this.metrics.totalDuration > suiteBudget.maxTotalDuration
+    ) {
+      violations.push(
+        `Suite "${this.options.suite}" duration (${this.metrics.totalDuration}ms) exceeds budget (${suiteBudget.maxTotalDuration}ms)`
+      );
+    }
+
     return violations;
   }
 
@@ -208,6 +278,16 @@ class TestPerformanceGuard {
     console.log(
       `   Slow Tests: ${this.metrics.slowTests.length} (threshold: ${this.thresholds.slowTestCount})`
     );
+
+    const suiteBudget = this.budgets[this.options.suite];
+    if (suiteBudget) {
+      console.log(
+        `   Suite Budget (${this.options.suite}): ${this.metrics.totalDuration}ms (budget: ${suiteBudget.maxTotalDuration}ms)`
+      );
+      if (suiteBudget.description) {
+        console.log(`   Note: ${suiteBudget.description}`);
+      }
+    }
     console.log('');
 
     // Violations
@@ -242,16 +322,96 @@ class TestPerformanceGuard {
 
   // Load custom thresholds from config file if it exists
   private loadCustomThresholds(): void {
-    const configPath = join(process.cwd(), 'test-performance-config.json');
-    if (existsSync(configPath)) {
+    const configPath = this.resolveFilePath('test-performance-config.json');
+    if (configPath) {
       try {
         const config = JSON.parse(readFileSync(configPath, 'utf8'));
+        this.resolvedConfigPath = configPath;
         this.thresholds = { ...this.thresholds, ...config.thresholds };
-        console.log('📋 Loaded custom performance thresholds');
+        if (config.budgets && typeof config.budgets === 'object') {
+          this.budgets = { ...this.budgets, ...config.budgets };
+          this.options.suite = this.resolveSuiteName(this.options.suite);
+        }
+        console.log(
+          `📋 Loaded custom performance thresholds from ${configPath}`
+        );
       } catch {
         console.warn('⚠️  Failed to load custom thresholds, using defaults');
       }
     }
+  }
+
+  private loadBaselineMetrics(): boolean {
+    const baselinePath = this.resolveFilePath('test-performance-baseline.json');
+    if (!baselinePath) return false;
+
+    try {
+      const content = JSON.parse(readFileSync(baselinePath, 'utf8'));
+      const metrics = (content.metrics ?? content) as Partial<{
+        totalDuration: number;
+        setupTime: number;
+        testExecutionTime: number;
+        environmentTime: number;
+        slowTests: Array<{ name: string; duration: number }>;
+        p95: number;
+        performanceStats?: { p95?: number };
+      }>;
+
+      this.metrics = {
+        totalDuration: metrics.totalDuration ?? 0,
+        setupTime: metrics.setupTime ?? 0,
+        testExecutionTime: metrics.testExecutionTime ?? 0,
+        environmentTime: metrics.environmentTime ?? 0,
+        slowTests: (metrics.slowTests ?? []).map(test => ({
+          name: test.name,
+          duration: test.duration,
+        })),
+        p95:
+          metrics.performanceStats?.p95 ?? metrics.p95 ?? this.metrics.p95 ?? 0,
+      };
+
+      this.resolvedBaselinePath = baselinePath;
+
+      return true;
+    } catch {
+      console.warn(
+        '⚠️  Failed to parse test-performance-baseline.json; falling back to live run'
+      );
+      return false;
+    }
+  }
+
+  private parseOptions(): { suite: string; useBaseline: boolean } {
+    const suiteArg = process.argv.find(arg => arg.startsWith('--suite='));
+    const requestedSuite =
+      suiteArg?.split('=')[1] ||
+      process.env.TEST_PERFORMANCE_SUITE ||
+      this.defaultSuite;
+
+    const suite = this.resolveSuiteName(requestedSuite.toLowerCase());
+    const useBaseline =
+      process.argv.includes('--use-baseline') ||
+      process.env.TEST_PERFORMANCE_USE_BASELINE === 'true';
+
+    return { suite, useBaseline };
+  }
+
+  private resolveSuiteName(candidate: string): string {
+    if (candidate && this.budgets[candidate]) {
+      return candidate;
+    }
+
+    return this.defaultSuite;
+  }
+
+  private resolveFilePath(filename: string): string | null {
+    const candidates = [
+      join(process.cwd(), filename),
+      join(__dirname, '..', '..', filename),
+    ];
+
+    const resolved = candidates.find(path => existsSync(path));
+    return resolved ?? null;
   }
 }
 
