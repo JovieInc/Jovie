@@ -2,38 +2,43 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
-const mockStripeCheckoutCreate = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
+const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
+const mockEnsureStripeCustomer = vi.hoisted(() => vi.fn());
+const mockGetActivePriceIds = vi.hoisted(() => vi.fn());
+const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
+const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
+  createCheckoutSession: mockCreateCheckoutSession,
+  createBillingPortalSession: mockCreateBillingPortalSession,
   stripe: {
-    checkout: {
-      sessions: {
-        create: mockStripeCheckoutCreate,
-      },
+    subscriptions: {
+      list: mockStripeSubscriptionsList,
     },
   },
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  users: {},
-  creatorProfiles: {},
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  ensureStripeCustomer: mockEnsureStripeCustomer,
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
-  STRIPE_PRICES: {
-    pro_monthly: 'price_123',
-    pro_yearly: 'price_456',
+  getActivePriceIds: mockGetActivePriceIds,
+  getPriceMappingDetails: mockGetPriceMappingDetails,
+  PRICE_MAPPINGS: {
+    price_123: {
+      priceId: 'price_123',
+      plan: 'standard',
+      amount: 500,
+      currency: 'usd',
+      interval: 'month',
+      description: 'Standard Monthly',
+    },
   },
 }));
 
@@ -62,20 +67,21 @@ describe('POST /api/stripe/checkout', () => {
 
   it('creates checkout session for authenticated user', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            {
-              id: 'user_db_123',
-              stripeCustomerId: 'cus_123',
-              email: 'test@example.com',
-            },
-          ]),
-        }),
-      }),
+    mockGetActivePriceIds.mockReturnValue(['price_123']);
+    mockGetPriceMappingDetails.mockReturnValue({
+      priceId: 'price_123',
+      plan: 'standard',
+      amount: 500,
+      currency: 'usd',
+      interval: 'month',
+      description: 'Standard Monthly',
     });
-    mockStripeCheckoutCreate.mockResolvedValue({
+    mockEnsureStripeCustomer.mockResolvedValue({
+      success: true,
+      customerId: 'cus_123',
+    });
+    mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
+    mockCreateCheckoutSession.mockResolvedValue({
       id: 'cs_123',
       url: 'https://checkout.stripe.com/pay/cs_123',
     });
@@ -92,5 +98,6 @@ describe('POST /api/stripe/checkout', () => {
 
     expect(response.status).toBe(200);
     expect(data.url).toBeDefined();
+    expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(1);
   });
 });

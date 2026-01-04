@@ -273,10 +273,10 @@ export async function assertValidPageState(
   const currentUrl = page.url();
 
   const isOnAuthPage =
-    currentUrl.includes('/sign-in') ||
-    currentUrl.includes('/sign-up') ||
     currentUrl.includes('/signin') ||
     currentUrl.includes('/signup') ||
+    currentUrl.includes('/sign-in') ||
+    currentUrl.includes('/sign-up') ||
     (currentUrl.includes('clerk') && currentUrl.includes('handshake'));
 
   const isOnExpectedPath = options.expectedPaths.some(path =>

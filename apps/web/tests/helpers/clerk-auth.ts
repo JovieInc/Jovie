@@ -1,4 +1,4 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
+import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 
 /**
@@ -72,7 +72,10 @@ export async function createOrReuseTestUserSession(page: Page, email: string) {
  */
 export async function signInUser(
   page: Page,
-  { username = process.env.E2E_CLERK_USER_USERNAME } = {}
+  {
+    username = process.env.E2E_CLERK_USER_USERNAME,
+    password = process.env.E2E_CLERK_USER_PASSWORD,
+  }: { username?: string; password?: string } = {}
 ) {
   if (!username) {
     throw new ClerkTestError(
@@ -81,7 +84,7 @@ export async function signInUser(
     );
   }
 
-  // Set up Clerk testing token to bypass bot detection
+  // Set up Clerk testing token to bypass bot protection
   await setupClerkTestingToken({ page });
 
   // Initialize app and Clerk on the page
@@ -95,8 +98,23 @@ export async function signInUser(
     { timeout: 10000 }
   );
 
-  // Create or reuse a session for the configured test user
-  await createOrReuseTestUserSession(page, username);
+  // Prefer the official Clerk testing helper.
+  // If the identifier is an email, use token-based sign-in.
+  if (username.includes('@')) {
+    await clerk.signIn({ page, emailAddress: username });
+  } else {
+    if (!password) {
+      throw new ClerkTestError(
+        'E2E_CLERK_USER_PASSWORD is required when signing in with a non-email identifier.',
+        'MISSING_CREDENTIALS'
+      );
+    }
+
+    await clerk.signIn({
+      page,
+      signInParams: { strategy: 'password', identifier: username, password },
+    });
+  }
 
   // Verify we're authenticated by checking for user button or dashboard
   await expect(

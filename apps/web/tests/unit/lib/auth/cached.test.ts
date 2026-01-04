@@ -4,7 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { mockAuth, mockCurrentUser, mockCache } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockCurrentUser: vi.fn(),
-  mockCache: vi.fn(fn => fn), // React's cache() passes through the function in tests
+  mockCache: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => {
+    let hasValue = false;
+    let value: ReturnType<T>;
+
+    return ((...args: never[]) => {
+      if (!hasValue) {
+        hasValue = true;
+        value = fn(...args) as ReturnType<T>;
+      }
+      return value;
+    }) as T;
+  }),
 }));
 
 // Mock Clerk's auth functions

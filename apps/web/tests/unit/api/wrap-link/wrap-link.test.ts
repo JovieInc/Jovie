@@ -1,20 +1,24 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/utils/rate-limit', () => ({
-  checkRateLimit: vi.fn().mockReturnValue(false),
-  createRateLimitHeaders: vi.fn().mockReturnValue({}),
-  getClientIP: vi.fn().mockReturnValue('127.0.0.1'),
-  getRateLimitStatus: vi.fn().mockReturnValue({
-    limit: 100,
-    remaining: 99,
-    resetTime: Date.now() + 60000,
-  }),
+const mockCreateWrappedLink = vi.hoisted(() => vi.fn());
+const mockIsValidUrl = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/services/link-wrapping', () => ({
+  createWrappedLink: mockCreateWrappedLink,
 }));
 
-vi.mock('@/lib/url/encryption', () => ({
-  encryptUrl: vi.fn().mockReturnValue('encrypted_url_token'),
-  decryptUrl: vi.fn().mockReturnValue('https://example.com'),
+vi.mock('@/lib/utils/url-encryption', () => ({
+  isValidUrl: mockIsValidUrl,
+}));
+
+vi.mock('@/lib/utils/bot-detection', () => ({
+  detectBot: vi.fn().mockReturnValue({ isBot: false }),
+  checkRateLimit: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('POST /api/wrap-link', () => {
@@ -24,6 +28,8 @@ describe('POST /api/wrap-link', () => {
   });
 
   it('returns 400 for invalid URL', async () => {
+    mockIsValidUrl.mockReturnValue(false);
+
     const { POST } = await import('@/app/api/wrap-link/route');
     const request = new NextRequest('http://localhost/api/wrap-link', {
       method: 'POST',
@@ -39,13 +45,24 @@ describe('POST /api/wrap-link', () => {
   });
 
   it('wraps valid URL successfully', async () => {
+    mockIsValidUrl.mockReturnValue(true);
+    mockCreateWrappedLink.mockResolvedValue({
+      shortId: 'abc123',
+      kind: 'wrapped',
+      domain: 'jov.ie',
+      category: 'external',
+      titleAlias: null,
+      createdAt: new Date().toISOString(),
+      expiresAt: null,
+    });
+
     const { POST } = await import('@/app/api/wrap-link/route');
     const request = new NextRequest('http://localhost/api/wrap-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         url: 'https://example.com/path',
-        profileId: 'profile_123',
+        platform: 'external',
       }),
     });
 
@@ -53,6 +70,7 @@ describe('POST /api/wrap-link', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.wrappedUrl).toBeDefined();
+    expect(data.normalUrl).toBe('/go/abc123');
+    expect(data.sensitiveUrl).toBe('/out/abc123');
   });
 });

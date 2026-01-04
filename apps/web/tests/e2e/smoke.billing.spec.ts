@@ -28,8 +28,6 @@ test.describe('Billing Smoke Tests @smoke', () => {
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/sign-in') ||
-          url.pathname.includes('/sign-up') ||
           url.pathname.includes('/billing')
       );
 
@@ -79,8 +77,6 @@ test.describe('Billing Smoke Tests @smoke', () => {
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/sign-in') ||
-          url.pathname.includes('/sign-up') ||
           url.pathname.includes('/account')
       );
 
@@ -122,8 +118,6 @@ test.describe('Billing Smoke Tests @smoke', () => {
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/sign-in') ||
-          url.pathname.includes('/sign-up') ||
           url.pathname.includes('/billing/success')
       );
 
@@ -171,8 +165,6 @@ test.describe('Billing Smoke Tests @smoke', () => {
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/sign-in') ||
-          url.pathname.includes('/sign-up') ||
           url.pathname.includes('/billing/cancel')
       );
 

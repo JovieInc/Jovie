@@ -16,6 +16,9 @@ export const STATSIG_FLAGS = {
   NOTIFICATIONS: 'feature_notifications',
   ANALYTICS: 'feature_analytics',
 
+  // Auth Features
+  AUTH_SPOTIFY_ONLY: 'feature_auth_spotify_only',
+
   // UI/UX Features
   ARTIST_SEARCH: 'feature_artist_search',
   TIP_PROMO: 'feature_tip_promo',

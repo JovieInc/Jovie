@@ -32,6 +32,41 @@ function MyStatsigEnabled({
   const { client } = useClientAsyncInit(sdkKey, user, {
     logLevel: LogLevel.Debug,
     plugins,
+    ...(process.env.NODE_ENV === 'test'
+      ? {
+          overrideAdapter: {
+            getGateOverride: current => {
+              const overrides = (
+                window as unknown as {
+                  __STATSIG_OVERRIDES__?: Record<string, boolean>;
+                }
+              ).__STATSIG_OVERRIDES__;
+
+              const override = overrides?.[current.name];
+              if (typeof override !== 'boolean') {
+                return null;
+              }
+
+              return {
+                ...current,
+                value: override,
+                ruleID: 'override',
+                details: {
+                  ...current.details,
+                  reason: 'OverrideAdapter',
+                },
+                __evaluation: current.__evaluation
+                  ? {
+                      ...current.__evaluation,
+                      value: override,
+                      rule_id: 'override',
+                    }
+                  : null,
+              };
+            },
+          },
+        }
+      : null),
   });
 
   return (
