@@ -1,27 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockIsAdmin = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
-vi.mock('@/lib/admin/roles', () => ({
-  isAdmin: mockIsAdmin,
+vi.mock('@/lib/admin/stripe-metrics', () => ({
+  getAdminStripeOverviewMetrics: vi
+    .fn()
+    .mockResolvedValue({ mrrUsd: 123, activeSubscribers: 4 }),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
   },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  users: {},
-  creatorProfiles: {},
-  socialLinks: {},
+  waitlistEntries: {},
 }));
 
 describe('GET /api/admin/overview', () => {
@@ -31,7 +27,15 @@ describe('GET /api/admin/overview', () => {
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: null,
+      email: null,
+      isAuthenticated: false,
+      isAdmin: false,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
 
     const { GET } = await import('@/app/api/admin/overview/route');
     const response = await GET();
@@ -42,8 +46,15 @@ describe('GET /api/admin/overview', () => {
   });
 
   it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockIsAdmin.mockResolvedValue(false);
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'user_123',
+      email: 'user@example.com',
+      isAuthenticated: true,
+      isAdmin: false,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
 
     const { GET } = await import('@/app/api/admin/overview/route');
     const response = await GET();
@@ -54,12 +65,17 @@ describe('GET /api/admin/overview', () => {
   });
 
   it('returns overview stats for admins', async () => {
-    mockAuth.mockResolvedValue({ userId: 'admin_123' });
-    mockIsAdmin.mockResolvedValue(true);
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: true,
+      hasAdvancedFeatures: true,
+      canRemoveBranding: true,
+    });
     mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ count: 100 }]),
-      }),
+      from: vi.fn().mockResolvedValue([{ count: 100 }]),
     });
 
     const { GET } = await import('@/app/api/admin/overview/route');
@@ -67,6 +83,9 @@ describe('GET /api/admin/overview', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toHaveProperty('stats');
+    expect(data).toEqual({
+      mrrUsd: 123,
+      waitlistCount: 100,
+    });
   });
 });

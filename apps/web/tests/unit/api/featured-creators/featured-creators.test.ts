@@ -13,11 +13,6 @@ vi.mock('@/lib/db/schema', () => ({
   socialLinks: {},
 }));
 
-vi.mock('@/lib/cache/featured', () => ({
-  getCachedFeaturedCreators: vi.fn().mockResolvedValue(null),
-  setCachedFeaturedCreators: vi.fn().mockResolvedValue(undefined),
-}));
-
 describe('GET /api/featured-creators', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,24 +22,24 @@ describe('GET /api/featured-creators', () => {
   it('returns featured creators', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        leftJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'profile_1',
-                  username: 'creator1',
-                  displayName: 'Creator One',
-                  avatarUrl: 'https://example.com/avatar1.jpg',
-                },
-                {
-                  id: 'profile_2',
-                  username: 'creator2',
-                  displayName: 'Creator Two',
-                  avatarUrl: 'https://example.com/avatar2.jpg',
-                },
-              ]),
-            }),
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'profile_1',
+                username: 'creator1',
+                displayName: 'Creator One',
+                avatarUrl: 'https://example.com/avatar1.jpg',
+                creatorType: 'artist',
+              },
+              {
+                id: 'profile_2',
+                username: 'creator2',
+                displayName: 'Creator Two',
+                avatarUrl: 'https://example.com/avatar2.jpg',
+                creatorType: 'artist',
+              },
+            ]),
           }),
         }),
       }),
@@ -55,8 +50,14 @@ describe('GET /api/featured-creators', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.creators).toBeDefined();
-    expect(Array.isArray(data.creators)).toBe(true);
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(2);
+    expect(data[0]).toEqual({
+      id: 'profile_1',
+      handle: 'creator1',
+      name: 'Creator One',
+      src: 'https://example.com/avatar1.jpg',
+    });
   });
 
   it('handles database errors gracefully', async () => {

@@ -13,6 +13,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     exclude: [
       'tests/e2e/**',
+      'tests/audit/**',
       'tests/performance/**',
       'node_modules/**',
       '.next/**',

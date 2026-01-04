@@ -1,37 +1,81 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockIsAdmin = vi.hoisted(() => vi.fn());
+const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
-vi.mock('@/lib/admin/roles', () => ({
-  isAdmin: mockIsAdmin,
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi
+    .fn()
+    .mockImplementation(
+      async (operation: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+          insert: vi.fn().mockReturnValue({
+            values: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([
+                {
+                  id: 'profile_123',
+                  username: 'test',
+                  usernameNormalized: 'test',
+                  displayName: 'Test',
+                  avatarUrl: null,
+                  claimToken: 'claim_token',
+                  isClaimed: false,
+                  claimTokenExpiresAt: new Date('2030-01-01T00:00:00.000Z'),
+                  avatarLockedByUser: false,
+                  displayNameLocked: false,
+                },
+              ]),
+            }),
+          }),
+        };
+
+        return operation(tx);
+      }
+    ),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
-        }),
-      }),
-    }),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
+vi.mock('@/lib/ingestion/strategies/linktree', () => ({
+  isValidHandle: vi.fn().mockReturnValue(true),
+  validateLinktreeUrl: vi
+    .fn()
+    .mockImplementation(
+      (url: string) => `https://linktr.ee/${url.split('/').pop()}`
+    ),
+  extractLinktreeHandle: vi.fn().mockReturnValue('test'),
+  normalizeHandle: vi.fn().mockReturnValue('test'),
+  fetchLinktreeDocument: vi.fn().mockResolvedValue('<html></html>'),
+  extractLinktree: vi.fn().mockReturnValue({
+    displayName: 'Test',
+    avatarUrl: null,
+    links: [],
+  }),
+}));
+
+vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
+  maybeCopyIngestionAvatarFromLinks: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/ingestion/processor', () => ({
+  enqueueFollowupIngestionJobs: vi.fn().mockResolvedValue(undefined),
+  normalizeAndMergeExtraction: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/ingestion/status-manager', () => ({
+  IngestionStatusManager: {
+    markProcessing: vi.fn().mockResolvedValue(undefined),
+    markIdleOrFailed: vi.fn().mockResolvedValue(undefined),
   },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
-  ingestionJobs: {},
 }));
 
 describe('Admin Creator Ingest API', () => {
@@ -42,7 +86,15 @@ describe('Admin Creator Ingest API', () => {
 
   describe('POST /api/admin/creator-ingest', () => {
     it('returns 401 when not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: null,
+        email: null,
+        isAuthenticated: false,
+        isAdmin: false,
+        isPro: false,
+        hasAdvancedFeatures: false,
+        canRemoveBranding: false,
+      });
 
       const { POST } = await import('@/app/api/admin/creator-ingest/route');
       const request = new NextRequest(
@@ -50,7 +102,7 @@ describe('Admin Creator Ingest API', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId: 'profile_123' }),
+          body: JSON.stringify({ url: 'https://linktr.ee/test' }),
         }
       );
 
@@ -62,8 +114,15 @@ describe('Admin Creator Ingest API', () => {
     });
 
     it('returns 403 when user is not admin', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_123' });
-      mockIsAdmin.mockResolvedValue(false);
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: 'user_123',
+        email: 'user@example.com',
+        isAuthenticated: true,
+        isAdmin: false,
+        isPro: false,
+        hasAdvancedFeatures: false,
+        canRemoveBranding: false,
+      });
 
       const { POST } = await import('@/app/api/admin/creator-ingest/route');
       const request = new NextRequest(
@@ -71,7 +130,7 @@ describe('Admin Creator Ingest API', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId: 'profile_123' }),
+          body: JSON.stringify({ url: 'https://linktr.ee/test' }),
         }
       );
 
@@ -83,8 +142,15 @@ describe('Admin Creator Ingest API', () => {
     });
 
     it('triggers ingestion for admins', async () => {
-      mockAuth.mockResolvedValue({ userId: 'admin_123' });
-      mockIsAdmin.mockResolvedValue(true);
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: 'admin_123',
+        email: 'admin@example.com',
+        isAuthenticated: true,
+        isAdmin: true,
+        isPro: true,
+        hasAdvancedFeatures: true,
+        canRemoveBranding: true,
+      });
 
       const { POST } = await import('@/app/api/admin/creator-ingest/route');
       const request = new NextRequest(
@@ -92,7 +158,7 @@ describe('Admin Creator Ingest API', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId: 'profile_123' }),
+          body: JSON.stringify({ url: 'https://linktr.ee/test' }),
         }
       );
 
@@ -100,7 +166,8 @@ describe('Admin Creator Ingest API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
+      expect(data.ok).toBe(true);
+      expect(data.profile).toBeDefined();
     });
   });
 });

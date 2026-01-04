@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockWithDbSession = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
-  withDbSession: mockWithDbSession,
+  withDbSessionTx: mockWithDbSession,
 }));
 
 vi.mock('@/lib/db/schema', () => ({

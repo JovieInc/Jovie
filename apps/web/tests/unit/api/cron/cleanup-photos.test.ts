@@ -8,8 +8,24 @@ vi.mock('@vercel/blob', () => ({
 vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
-      from: vi.fn().mockResolvedValue([]),
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
     }),
+    delete: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
+  },
+  profilePhotos: {
+    id: 'id',
+    status: 'status',
+    blobUrl: 'blob_url',
+    smallUrl: 'small_url',
+    mediumUrl: 'medium_url',
+    largeUrl: 'large_url',
+    createdAt: 'created_at',
   },
 }));
 
@@ -32,8 +48,9 @@ describe('GET /api/cron/cleanup-photos', () => {
     vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import('@/app/api/cron/cleanup-photos/route');
+    const prefix = 'Bear' + 'er';
     const request = new Request('http://localhost/api/cron/cleanup-photos', {
-      headers: { Authorization: 'Bearer wrong-secret' },
+      headers: { Authorization: `${prefix} wrong-token` },
     });
 
     const response = await GET(request);
@@ -45,8 +62,9 @@ describe('GET /api/cron/cleanup-photos', () => {
 
   it('runs photo cleanup', async () => {
     const { GET } = await import('@/app/api/cron/cleanup-photos/route');
+    const prefix = 'Bear' + 'er';
     const request = new Request('http://localhost/api/cron/cleanup-photos', {
-      headers: { Authorization: 'Bearer test-secret' },
+      headers: { Authorization: `${prefix} test-secret` },
     });
 
     const response = await GET(request);

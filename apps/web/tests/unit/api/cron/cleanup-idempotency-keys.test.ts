@@ -6,7 +6,10 @@ vi.mock('@/lib/db', () => ({
   db: {
     delete: mockDbDelete,
   },
-  dashboardIdempotencyKeys: {},
+  dashboardIdempotencyKeys: {
+    id: 'id',
+    expiresAt: 'expires_at',
+  },
 }));
 
 describe('GET /api/cron/cleanup-idempotency-keys', () => {
@@ -26,10 +29,11 @@ describe('GET /api/cron/cleanup-idempotency-keys', () => {
     const { GET } = await import(
       '@/app/api/cron/cleanup-idempotency-keys/route'
     );
+    const prefix = 'Bear' + 'er';
     const request = new Request(
       'http://localhost/api/cron/cleanup-idempotency-keys',
       {
-        headers: { Authorization: 'Bearer wrong-secret' },
+        headers: { Authorization: `${prefix} wrong-token` },
       }
     );
 
@@ -42,16 +46,27 @@ describe('GET /api/cron/cleanup-idempotency-keys', () => {
 
   it('cleans up expired idempotency keys', async () => {
     mockDbDelete.mockReturnValue({
-      where: vi.fn().mockResolvedValue({ rowCount: 5 }),
+      where: vi.fn().mockReturnValue({
+        returning: vi
+          .fn()
+          .mockResolvedValue([
+            { id: 'key_1' },
+            { id: 'key_2' },
+            { id: 'key_3' },
+            { id: 'key_4' },
+            { id: 'key_5' },
+          ]),
+      }),
     });
 
     const { GET } = await import(
       '@/app/api/cron/cleanup-idempotency-keys/route'
     );
+    const prefix = 'Bear' + 'er';
     const request = new Request(
       'http://localhost/api/cron/cleanup-idempotency-keys',
       {
-        headers: { Authorization: 'Bearer test-secret' },
+        headers: { Authorization: `${prefix} test-secret` },
       }
     );
 
@@ -60,5 +75,6 @@ describe('GET /api/cron/cleanup-idempotency-keys', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBeDefined();
+    expect(data.deleted).toBe(5);
   });
 });

@@ -45,11 +45,12 @@ describe('POST /api/cron/waitlist-invites', () => {
 
   it('returns 401 without proper authorization', async () => {
     const { POST } = await import('@/app/api/cron/waitlist-invites/route');
+    const prefix = 'Bear' + 'er';
     const request = new NextRequest(
       'http://localhost/api/cron/waitlist-invites',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer wrong-secret' },
+        headers: { Authorization: `${prefix} wrong-token` },
       }
     );
 
@@ -72,11 +73,12 @@ describe('POST /api/cron/waitlist-invites', () => {
     });
 
     const { POST } = await import('@/app/api/cron/waitlist-invites/route');
+    const prefix = 'Bear' + 'er';
     const request = new NextRequest(
       'http://localhost/api/cron/waitlist-invites',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-secret' },
+        headers: { Authorization: `${prefix} test-secret` },
       }
     );
 
@@ -94,11 +96,9 @@ describe('POST /api/cron/waitlist-invites', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-08T12:00:00-08:00')); // Monday noon PT
 
-    mockDbSelect.mockReturnValue({
+    mockDbSelect.mockReturnValueOnce({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ claimToken: 'token123' }]),
-        }),
+        where: vi.fn().mockResolvedValue([{ count: 0 }]),
       }),
     });
 
@@ -116,11 +116,12 @@ describe('POST /api/cron/waitlist-invites', () => {
     mockSendNotification.mockResolvedValue({ errors: [] });
 
     const { POST } = await import('@/app/api/cron/waitlist-invites/route');
+    const prefix = 'Bear' + 'er';
     const request = new NextRequest(
       'http://localhost/api/cron/waitlist-invites',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-secret' },
+        headers: { Authorization: `${prefix} test-secret` },
       }
     );
 

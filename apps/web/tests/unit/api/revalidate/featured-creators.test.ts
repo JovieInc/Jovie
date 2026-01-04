@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockRevalidatePath = vi.hoisted(() => vi.fn());
 const mockRevalidateTag = vi.hoisted(() => vi.fn());
 const mockUpdateTag = vi.hoisted(() => vi.fn());
 
 vi.mock('next/cache', () => ({
-  revalidatePath: mockRevalidatePath,
   revalidateTag: mockRevalidateTag,
   updateTag: mockUpdateTag,
 }));
@@ -14,7 +12,7 @@ describe('POST /api/revalidate/featured-creators', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    process.env.REVALIDATION_SECRET = 'test-secret';
+    process.env.REVALIDATE_SECRET = 'unit-test-token';
   });
 
   it('returns 401 without proper authorization', async () => {
@@ -25,7 +23,7 @@ describe('POST /api/revalidate/featured-creators', () => {
       'http://localhost/api/revalidate/featured-creators',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer wrong-secret' },
+        headers: { Authorization: 'Bearer wrong-token' },
       }
     );
 
@@ -44,7 +42,7 @@ describe('POST /api/revalidate/featured-creators', () => {
       'http://localhost/api/revalidate/featured-creators',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-secret' },
+        headers: { Authorization: 'Bearer unit-test-token' },
       }
     );
 
@@ -53,6 +51,7 @@ describe('POST /api/revalidate/featured-creators', () => {
 
     expect(response.status).toBe(200);
     expect(data.revalidated).toBe(true);
-    expect(mockRevalidatePath).toHaveBeenCalled();
+    expect(mockUpdateTag).toHaveBeenCalledWith('featured-creators');
+    expect(mockRevalidateTag).toHaveBeenCalledWith('featured-creators', 'max');
   });
 });

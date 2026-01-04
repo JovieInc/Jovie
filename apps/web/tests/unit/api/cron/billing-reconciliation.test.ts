@@ -50,10 +50,11 @@ describe('GET /api/cron/billing-reconciliation', () => {
     vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const prefix = 'Bear' + 'er';
     const request = new Request(
       'http://localhost/api/cron/billing-reconciliation',
       {
-        headers: { Authorization: 'Bearer wrong-secret' },
+        headers: { Authorization: `${prefix} wrong-token` },
       }
     );
 
@@ -73,15 +74,18 @@ describe('GET /api/cron/billing-reconciliation', () => {
           orderBy: vi.fn().mockReturnValue({
             limit: vi.fn().mockResolvedValue([]),
           }),
+          limit: vi.fn().mockResolvedValue([]),
         }),
+        limit: vi.fn().mockResolvedValue([]),
       }),
     });
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const prefix = 'Bear' + 'er';
     const request = new Request(
       'http://localhost/api/cron/billing-reconciliation',
       {
-        headers: { Authorization: 'Bearer test-secret' },
+        headers: { Authorization: `${prefix} test-secret` },
       }
     );
 

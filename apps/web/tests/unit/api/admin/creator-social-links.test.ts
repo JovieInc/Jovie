@@ -1,29 +1,17 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockIsAdmin = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
-const mockDbUpdate = vi.hoisted(() => vi.fn());
+const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
-}));
-
-vi.mock('@/lib/admin/roles', () => ({
-  isAdmin: mockIsAdmin,
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
-    update: mockDbUpdate,
   },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  socialLinks: {},
-  creatorProfiles: {},
 }));
 
 describe('Admin Creator Social Links API', () => {
@@ -34,7 +22,15 @@ describe('Admin Creator Social Links API', () => {
 
   describe('GET /api/admin/creator-social-links', () => {
     it('returns 401 when not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: null,
+        email: null,
+        isAuthenticated: false,
+        isAdmin: false,
+        isPro: false,
+        hasAdvancedFeatures: false,
+        canRemoveBranding: false,
+      });
 
       const { GET } = await import(
         '@/app/api/admin/creator-social-links/route'
@@ -51,8 +47,15 @@ describe('Admin Creator Social Links API', () => {
     });
 
     it('returns 403 when user is not admin', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_123' });
-      mockIsAdmin.mockResolvedValue(false);
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: 'user_123',
+        email: 'user@example.com',
+        isAuthenticated: true,
+        isAdmin: false,
+        isPro: false,
+        hasAdvancedFeatures: false,
+        canRemoveBranding: false,
+      });
 
       const { GET } = await import(
         '@/app/api/admin/creator-social-links/route'
@@ -69,17 +72,28 @@ describe('Admin Creator Social Links API', () => {
     });
 
     it('returns social links for admins', async () => {
-      mockAuth.mockResolvedValue({ userId: 'admin_123' });
-      mockIsAdmin.mockResolvedValue(true);
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: 'admin_123',
+        email: 'admin@example.com',
+        isAuthenticated: true,
+        isAdmin: true,
+        isPro: true,
+        hasAdvancedFeatures: true,
+        canRemoveBranding: true,
+      });
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([
-            {
-              id: 'link_1',
-              platform: 'instagram',
-              url: 'https://instagram.com/test',
-            },
-          ]),
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([
+              {
+                id: 'link_1',
+                label: 'Instagram',
+                platform: 'instagram',
+                platformType: 'social',
+                url: 'https://instagram.com/test',
+              },
+            ]),
+          }),
         }),
       });
 
@@ -94,7 +108,8 @@ describe('Admin Creator Social Links API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.links).toBeDefined();
+      expect(data.success).toBe(true);
+      expect(Array.isArray(data.links)).toBe(true);
     });
   });
 });
