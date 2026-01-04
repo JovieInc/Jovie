@@ -166,6 +166,7 @@ function isRetryableError(error: unknown): boolean {
     /connection.*reset/i,
     /connection.*terminated/i,
     /connection.*closed/i,
+    /server conn crashed\??/i,
     /connection.*unexpectedly/i,
     /timeout/i,
     /network/i,
