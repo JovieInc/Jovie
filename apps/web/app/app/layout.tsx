@@ -1,8 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
-import { redirect } from 'next/navigation';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { canAccessApp, resolveUserState } from '@/lib/auth/gate';
+import { resolveUserState } from '@/lib/auth/gate';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
@@ -13,26 +12,16 @@ import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 
 /**
- * Centralized auth gate for the app shell.
- * Uses resolveUserState() to determine user access and redirect appropriately.
+ * Get user ID for the app shell.
+ * NO MORE REDIRECTS - proxy.ts already routed us correctly.
  *
- * Returns the clerkUserId for downstream use (e.g., Statsig).
+ * If we're here, proxy.ts determined the user is active and can access the app.
+ * We just need to get the clerkUserId for downstream use (e.g., Statsig).
  */
-async function ensureAppAccess(): Promise<string> {
-  return Sentry.startSpan({ op: 'auth', name: 'app.authGate' }, async () => {
+async function getAppUserId(): Promise<string> {
+  return Sentry.startSpan({ op: 'auth', name: 'app.getUserId' }, async () => {
     const authResult = await resolveUserState();
-
-    // Handle each state with appropriate redirect
-    if (!canAccessApp(authResult.state)) {
-      // resolveUserState always provides redirectTo for non-ACTIVE states
-      if (authResult.redirectTo) {
-        redirect(authResult.redirectTo);
-      }
-      // Fallback (should never reach here)
-      redirect('/signin?redirect_url=/app/dashboard');
-    }
-
-    // Return clerkUserId for downstream use
+    // proxy.ts already ensured user is ACTIVE, just return userId
     return authResult.clerkUserId!;
   });
 }
@@ -42,17 +31,13 @@ export default async function AppShellLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Use centralized auth gate - handles all auth state checks including:
-  // - UNAUTHENTICATED → /signin
-  // - NEEDS_WAITLIST_SUBMISSION/WAITLIST_PENDING → /waitlist
-  // - WAITLIST_INVITED → /claim/[token]
-  // - NEEDS_ONBOARDING/NEEDS_DB_USER → /onboarding
-  // - BANNED → /banned
-  const authPromise = ensureAppAccess();
+  // NO MORE AUTH GATE - proxy.ts already routed us correctly!
+  // If we're rendering this layout, user is ACTIVE and can access the app.
+  const authPromise = getAppUserId();
   prefetchDashboardData();
 
   try {
-    // Wait for auth gate to complete first - it already checked onboarding state
+    // Get user ID for Statsig and dashboard data
     const userId = await authPromise;
 
     // Get dashboard data - auth gate already validated access, so this is safe

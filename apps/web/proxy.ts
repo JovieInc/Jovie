@@ -9,6 +9,7 @@ import {
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
 import { MARKETING_HOSTNAME, PROFILE_HOSTNAME } from '@/constants/domains';
+import { getUserState } from '@/lib/auth/proxy-state';
 import {
   buildContentSecurityPolicy,
   SCRIPT_NONCE_HEADER,
@@ -302,15 +303,40 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       url.pathname = '/signup';
       res = NextResponse.redirect(url);
     } else if (userId) {
-      // Handle authenticated user redirects
-      if (pathname.startsWith('/dashboard')) {
+      // Check complete user state to route correctly - eliminates redirect loops
+      const userState = await getUserState(userId);
+
+      // Route based on complete state - NO MORE LOOPS
+      if (userState.needsWaitlist && pathname !== '/waitlist') {
+        // User needs waitlist - rewrite to waitlist page
+        res = NextResponse.rewrite(new URL('/waitlist', req.url), {
+          request: { headers: requestHeaders },
+        });
+      } else if (userState.needsOnboarding && pathname !== '/onboarding') {
+        // User needs onboarding - rewrite to onboarding page
+        res = NextResponse.rewrite(new URL('/onboarding', req.url), {
+          request: { headers: requestHeaders },
+        });
+      } else if (!userState.needsWaitlist && pathname === '/waitlist') {
+        // Active user trying to access waitlist → redirect to dashboard
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+      } else if (!userState.needsOnboarding && pathname === '/onboarding') {
+        // Active user trying to access onboarding → redirect to dashboard
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+      } else if (
+        pathname === '/' ||
+        pathname === '/signin' ||
+        pathname === '/signup'
+      ) {
+        // Fully authenticated user hitting auth pages → redirect to dashboard
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+      } else if (pathname.startsWith('/dashboard')) {
+        // Legacy /dashboard paths → normalize to /app/dashboard
         res = NextResponse.redirect(
           new URL(normalizeRedirectPath(pathname), req.url)
         );
-      } else if (req.nextUrl.pathname === '/') {
-        // Redirect to the app shell which will route users to the appropriate destination.
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       } else {
+        // All other paths - user is authenticated and on correct page
         res = NextResponse.next({ request: { headers: requestHeaders } });
       }
     } else {
@@ -393,8 +419,16 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     }
 
     return res;
-  } catch {
-    // Fallback to basic middleware behavior if Clerk auth fails
+  } catch (error) {
+    // Log errors for observability - silent failures can mask security issues
+    console.error('[proxy] Middleware error:', {
+      error,
+      pathname: req.nextUrl.pathname,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    // Fallback to basic middleware behavior
+    // Note: Individual pages have their own auth checks (resolveUserState)
     return NextResponse.next();
   }
 }
