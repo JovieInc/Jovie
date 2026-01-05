@@ -96,7 +96,7 @@ export function OtpInput({
           'bg-transparent border-none outline-none'
         )}
         tabIndex={-1}
-        aria-hidden='true'
+        aria-label='Autofill verification code'
         data-testid='otp-autofill-input'
       />
 
@@ -122,8 +122,8 @@ export function OtpInput({
                 'h-14 w-11 sm:h-12 sm:w-10',
                 'bg-surface-0 text-primary-token',
                 isFocused
-                  ? 'border-strong ring-2 ring-[rgb(var(--focus-ring))]/30 scale-105'
-                  : 'border-default',
+                  ? 'border-subtle ring-2 ring-[rgb(var(--focus-ring))]/30 scale-105'
+                  : 'border-subtle',
                 error && 'border-destructive',
                 isComplete && digit && 'border-green-500 dark:border-green-400',
                 disabled && 'opacity-50 cursor-not-allowed',

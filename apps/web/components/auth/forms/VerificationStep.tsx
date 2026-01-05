@@ -2,13 +2,9 @@
 
 import * as React from 'react';
 import { useCallback, useId, useState } from 'react';
-import { AuthBackButton, AuthButton, OtpInput } from '../atoms';
+import { AUTH_CLASSES } from '@/lib/auth/constants';
+import { AuthBackButton, AuthButton, FormError, OtpInput } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
-
-const FIELD_ERROR_CLASSES =
-  'mt-3 text-sm text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200';
-const STEP_TRANSITION_CLASSES =
-  'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
 
 interface VerificationStepProps {
   /**
@@ -111,16 +107,21 @@ export function VerificationStep({
 
   const isLoading = isVerifying || isResending;
 
+  // Handle Escape key to go back
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onBack && !isLoading) {
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onBack, isLoading]);
+
   return (
-    <div className={STEP_TRANSITION_CLASSES}>
-      {/* Back button - positioned inline at top, not fixed */}
-      <div className='flex justify-start mb-6'>
-        <AuthBackButton
-          onClick={onBack}
-          ariaLabel='Use a different email'
-          inline
-        />
-      </div>
+    <div className={AUTH_CLASSES.stepTransition}>
+      {/* Back button - fixed positioning in browser chrome */}
+      <AuthBackButton onClick={onBack} ariaLabel='Use a different email' />
 
       <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         Check your email
@@ -162,11 +163,7 @@ export function VerificationStep({
             aria-label='Enter 6-digit verification code'
           />
 
-          {error && (
-            <p id={errorId} className={FIELD_ERROR_CLASSES} role='alert'>
-              {error}
-            </p>
-          )}
+          <FormError message={error} id={errorId} />
 
           {resendSuccess && !error && (
             <p className='mt-3 text-sm text-green-600 dark:text-green-400 text-center animate-in fade-in-0 duration-200'>

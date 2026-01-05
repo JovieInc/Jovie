@@ -6,11 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
+import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
-
-const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
 
 /**
  * Sign-in form using Clerk Core API.
@@ -48,7 +48,7 @@ export function SignInForm() {
       );
       if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
         window.sessionStorage.setItem(
-          AUTH_REDIRECT_URL_STORAGE_KEY,
+          AUTH_STORAGE_KEYS.REDIRECT_URL,
           redirectUrl
         );
       }
@@ -96,13 +96,6 @@ export function SignInForm() {
   return (
     <Card className='shadow-none border-0 bg-transparent p-0'>
       <CardContent className='space-y-3 p-0'>
-        {/* Global error display */}
-        <div className='min-h-[24px]' role='alert' aria-live='polite'>
-          {error && step === 'method' && (
-            <p className='text-destructive text-sm text-center'>{error}</p>
-          )}
-        </div>
-
         {/* Method selection step */}
         {step === 'method' && (
           <MethodSelector
@@ -118,31 +111,43 @@ export function SignInForm() {
 
         {/* Email input step */}
         {step === 'email' && (
-          <EmailStep
-            email={email}
-            onEmailChange={setEmail}
-            onSubmit={startEmailFlow}
-            isLoading={loadingState.type === 'submitting'}
-            error={error}
-            onBack={handleBack}
-            mode='signin'
-          />
+          <AccessibleStepWrapper
+            currentStep={1}
+            totalSteps={2}
+            stepTitle='Enter your email'
+          >
+            <EmailStep
+              email={email}
+              onEmailChange={setEmail}
+              onSubmit={startEmailFlow}
+              isLoading={loadingState.type === 'submitting'}
+              error={error}
+              onBack={handleBack}
+              mode='signin'
+            />
+          </AccessibleStepWrapper>
         )}
 
         {/* Verification step */}
         {step === 'verification' && (
-          <VerificationStep
-            email={email}
-            code={code}
-            onCodeChange={setCode}
-            onSubmit={verifyCode}
-            onResend={resendCode}
-            isVerifying={loadingState.type === 'verifying'}
-            isResending={loadingState.type === 'resending'}
-            error={error}
-            onBack={handleBack}
-            mode='signin'
-          />
+          <AccessibleStepWrapper
+            currentStep={2}
+            totalSteps={2}
+            stepTitle='Enter verification code'
+          >
+            <VerificationStep
+              email={email}
+              code={code}
+              onCodeChange={setCode}
+              onSubmit={verifyCode}
+              onResend={resendCode}
+              isVerifying={loadingState.type === 'verifying'}
+              isResending={loadingState.type === 'resending'}
+              error={error}
+              onBack={handleBack}
+              mode='signin'
+            />
+          </AccessibleStepWrapper>
         )}
 
         {/* Sign up suggestion when account not found */}

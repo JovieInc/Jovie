@@ -2,11 +2,8 @@
 
 import * as React from 'react';
 import { useCallback, useRef, useState } from 'react';
-import { AuthBackButton, AuthButton, AuthInput } from '../atoms';
+import { AuthBackButton, AuthButton, AuthInput, FormError } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
-
-const FIELD_ERROR_CLASSES =
-  'mt-3 text-sm text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200';
 
 interface EmailStepProps {
   /**
@@ -59,6 +56,17 @@ export function EmailStep({
   React.useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Handle Escape key to go back
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onBack && !isLoading) {
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onBack, isLoading]);
 
   const validateEmail = useCallback((value: string): boolean => {
     if (!value.trim()) {
@@ -123,11 +131,7 @@ export function EmailStep({
           disabled={isLoading}
         />
 
-        {displayError && (
-          <p className={FIELD_ERROR_CLASSES} role='alert'>
-            {displayError}
-          </p>
-        )}
+        <FormError message={displayError} />
       </div>
 
       <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>

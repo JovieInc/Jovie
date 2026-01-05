@@ -6,11 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
+import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
-
-const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
 
 /**
  * Sign-up form using Clerk Core API.
@@ -50,7 +50,7 @@ export function SignUpForm() {
       );
       if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
         window.sessionStorage.setItem(
-          AUTH_REDIRECT_URL_STORAGE_KEY,
+          AUTH_STORAGE_KEYS.REDIRECT_URL,
           redirectUrl
         );
       }
@@ -122,13 +122,6 @@ export function SignUpForm() {
   return (
     <Card className='shadow-none border-0 bg-transparent p-0'>
       <CardContent className='space-y-3 p-0'>
-        {/* Global error display */}
-        <div className='min-h-[24px]' role='alert' aria-live='polite'>
-          {error && step === 'method' && (
-            <p className='text-destructive text-sm text-center'>{error}</p>
-          )}
-        </div>
-
         {/* Method selection step */}
         {step === 'method' && (
           <MethodSelector
@@ -144,35 +137,47 @@ export function SignUpForm() {
 
         {/* Email input step */}
         {step === 'email' && (
-          <EmailStep
-            email={email}
-            onEmailChange={setEmail}
-            onSubmit={startEmailFlow}
-            isLoading={loadingState.type === 'submitting'}
-            error={error}
-            onBack={handleBack}
-            mode='signup'
-          />
+          <AccessibleStepWrapper
+            currentStep={1}
+            totalSteps={2}
+            stepTitle='Enter your email'
+          >
+            <EmailStep
+              email={email}
+              onEmailChange={setEmail}
+              onSubmit={startEmailFlow}
+              isLoading={loadingState.type === 'submitting'}
+              error={error}
+              onBack={handleBack}
+              mode='signup'
+            />
+          </AccessibleStepWrapper>
         )}
 
         {/* Verification step */}
         {step === 'verification' && (
-          <VerificationStep
-            email={email}
-            code={code}
-            onCodeChange={setCode}
-            onSubmit={verifyCode}
-            onResend={resendCode}
-            isVerifying={
-              loadingState.type === 'verifying' ||
-              loadingState.type === 'completing'
-            }
-            isCompleting={loadingState.type === 'completing'}
-            isResending={loadingState.type === 'resending'}
-            error={error}
-            onBack={handleBack}
-            mode='signup'
-          />
+          <AccessibleStepWrapper
+            currentStep={2}
+            totalSteps={2}
+            stepTitle='Enter verification code'
+          >
+            <VerificationStep
+              email={email}
+              code={code}
+              onCodeChange={setCode}
+              onSubmit={verifyCode}
+              onResend={resendCode}
+              isVerifying={
+                loadingState.type === 'verifying' ||
+                loadingState.type === 'completing'
+              }
+              isCompleting={loadingState.type === 'completing'}
+              isResending={loadingState.type === 'resending'}
+              error={error}
+              onBack={handleBack}
+              mode='signup'
+            />
+          </AccessibleStepWrapper>
         )}
 
         {/* Sign in suggestion when account exists - auto-redirects */}
