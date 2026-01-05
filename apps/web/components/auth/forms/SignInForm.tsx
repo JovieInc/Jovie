@@ -96,13 +96,6 @@ export function SignInForm() {
   return (
     <Card className='shadow-none border-0 bg-transparent p-0'>
       <CardContent className='space-y-3 p-0'>
-        {/* Global error display */}
-        <div className='min-h-[24px]' role='alert' aria-live='polite'>
-          {error && step === 'method' && (
-            <p className='text-destructive text-sm text-center'>{error}</p>
-          )}
-        </div>
-
         {/* Method selection step */}
         {step === 'method' && (
           <MethodSelector
