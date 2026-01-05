@@ -487,7 +487,16 @@ export async function completeOnboarding({
     );
 
     // Log database-specific error details
-    const dbError = error as any;
+    interface DatabaseErrorFields {
+      code?: string;
+      constraint?: string;
+      detail?: string;
+      hint?: string;
+      table?: string;
+      column?: string;
+      cause?: unknown;
+    }
+    const dbError = error as Partial<DatabaseErrorFields>;
     console.error('🔴 DATABASE ERROR DETAILS:', {
       code: dbError?.code,
       constraint: dbError?.constraint,
@@ -501,13 +510,13 @@ export async function completeOnboarding({
     console.error('🔴 REQUEST CONTEXT:', {
       username,
       displayName,
-      email,
+      hasEmail: Boolean(email), // Log presence without exposing PII
       timestamp: new Date().toISOString(),
       errorName: error instanceof Error ? error.name : 'Unknown',
       errorMessage: error instanceof Error ? error.message : String(error),
     });
 
-    // Capture to Sentry with full context
+    // Capture to Sentry with full context (avoid PII)
     Sentry.captureException(error, {
       tags: {
         context: 'onboarding_submission',
@@ -515,7 +524,7 @@ export async function completeOnboarding({
       },
       extra: {
         displayName,
-        email,
+        hasEmail: Boolean(email), // Log presence without exposing PII
         dbErrorCode: dbError?.code,
         dbConstraint: dbError?.constraint,
         dbDetail: dbError?.detail,
