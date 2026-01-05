@@ -4,7 +4,7 @@
  *
  * Note: Resource size budgets are set to current production values + 10% headroom.
  * These should be periodically reviewed and optimized.
- * Current baseline (2025-12-23):
+ * Current baseline (2026-12-23):
  * - Script: ~1455KB (includes Clerk, Statsig, Next.js runtime)
  * - Stylesheet: ~203KB (Tailwind + custom styles)
  * - Total: ~1750KB
