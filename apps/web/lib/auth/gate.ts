@@ -498,7 +498,7 @@ export function getRedirectForState(
     case UserState.UNAUTHENTICATED:
       return '/signin';
     case UserState.NEEDS_DB_USER:
-      return '/onboarding';
+      return '/onboarding?fresh_signup=true';
     case UserState.NEEDS_WAITLIST_SUBMISSION:
       return '/waitlist';
     case UserState.WAITLIST_PENDING:
@@ -508,7 +508,7 @@ export function getRedirectForState(
         ? `/claim/${encodeURIComponent(claimToken)}`
         : '/waitlist';
     case UserState.NEEDS_ONBOARDING:
-      return '/onboarding';
+      return '/onboarding?fresh_signup=true';
     case UserState.BANNED:
       return '/banned';
     case UserState.ACTIVE:

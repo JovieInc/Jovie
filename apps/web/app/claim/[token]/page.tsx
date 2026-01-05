@@ -107,7 +107,7 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     logger.warn('Claim attempt with invalid token', {
       token: token.slice(0, 8),
     });
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   // Check token expiration
@@ -116,12 +116,12 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
       profileId: profile.id,
       expiredAt: profile.claimTokenExpiresAt,
     });
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   // If already claimed, just send the user to their dashboard
   if (profile.isClaimed || profile.userId) {
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   // Get or create DB user ID from auth result
@@ -162,7 +162,7 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
       attemptedProfileId: profile.id,
     });
     // Redirect to their existing profile's dashboard
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   // Atomic claim update with race-safe WHERE clause
@@ -206,7 +206,7 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
       profileId: profile.id,
       userId: dbUserId,
     });
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   if (waitlistInvite) {
@@ -243,5 +243,5 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     redirect(`/onboarding?handle=${encodeURIComponent(usernameNormalized)}`);
   }
 
-  redirect('/app/dashboard/overview');
+  redirect('/app/dashboard');
 }
