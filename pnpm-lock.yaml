@@ -231,8 +231,8 @@ importers:
         specifier: ^2.0.1
         version: 2.0.1
       isomorphic-dompurify:
-        specifier: 2.34.0
-        version: 2.34.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+        specifier: 2.35.0
+        version: 2.35.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
       lucide-react:
         specifier: ^0.556.0
         version: 0.556.0(react@18.3.1)
@@ -7260,8 +7260,8 @@ packages:
     resolution: {integrity: sha512-WhB9zCku7EGTj/HQQRz5aUQEUeoQZH2bWcltRErOpymJ4boYE6wL9Tbr23krRPSZ+C5zqNSrSw+Cc7sZZ4b7vg==}
     engines: {node: '>=0.10.0'}
 
-  isomorphic-dompurify@2.34.0:
-    resolution: {integrity: sha512-7VeB/tDBQ8jt1+syT563hmmejY01nuwizpUIFPfM1aw3iTgLLiVP4/Nh+PKhNoa1V/H+E6ZlNcowsXLbChPCpw==}
+  isomorphic-dompurify@2.35.0:
+    resolution: {integrity: sha512-a9+LQqylQCU8f1zmsYmg2tfrbdY2YS/Hc+xntcq/mDI2MY3Q108nq8K23BWDIg6YGC5JsUMC15fj2ZMqCzt/+A==}
     engines: {node: '>=20.19.5'}
 
   isomorphic-ws@4.0.1:
@@ -17847,7 +17847,7 @@ snapshots:
 
   isobject@3.0.1: {}
 
-  isomorphic-dompurify@2.34.0(bufferutil@4.1.0)(utf-8-validate@5.0.10):
+  isomorphic-dompurify@2.35.0(bufferutil@4.1.0)(utf-8-validate@5.0.10):
     dependencies:
       dompurify: 3.3.1
       jsdom: 26.1.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
