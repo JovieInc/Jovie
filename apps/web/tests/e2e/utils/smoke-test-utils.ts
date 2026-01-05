@@ -633,9 +633,20 @@ export function buildRobustSelector(options: {
   if (options.ariaLabel) {
     return `[aria-label="${options.ariaLabel}"]`;
   }
+  if (options.text !== undefined) {
+    // Use Playwright's text selector syntax
+    if (typeof options.text === 'string') {
+      // Escape quotes in the text string
+      const escapedText = options.text.replace(/"/g, '\\"');
+      return `text="${escapedText}"`;
+    } else {
+      // RegExp: convert to Playwright regex text selector
+      return `text=/${options.text.source}/${options.text.flags}`;
+    }
+  }
   if (options.css) {
     return options.css;
   }
-  // Text-based selectors are least preferred
+  // Fallback to match any element (should rarely be reached)
   return '*';
 }
