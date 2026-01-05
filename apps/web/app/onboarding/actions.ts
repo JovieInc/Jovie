@@ -1,6 +1,7 @@
 'use server';
 
 import { auth, currentUser } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
@@ -478,18 +479,47 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    // Enhanced logging with database-specific fields
     console.error('🔴 ONBOARDING ERROR:', error);
     console.error(
       '🔴 ERROR STACK:',
       error instanceof Error ? error.stack : 'No stack available'
     );
-    console.error('🔴 ERROR DETAILS:', {
+
+    // Log database-specific error details
+    const dbError = error as any;
+    console.error('🔴 DATABASE ERROR DETAILS:', {
+      code: dbError?.code,
+      constraint: dbError?.constraint,
+      detail: dbError?.detail,
+      hint: dbError?.hint,
+      table: dbError?.table,
+      column: dbError?.column,
+      cause: dbError?.cause,
+    });
+
+    console.error('🔴 REQUEST CONTEXT:', {
       username,
       displayName,
       email,
       timestamp: new Date().toISOString(),
       errorName: error instanceof Error ? error.name : 'Unknown',
       errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    // Capture to Sentry with full context
+    Sentry.captureException(error, {
+      tags: {
+        context: 'onboarding_submission',
+        username: username ?? 'unknown',
+      },
+      extra: {
+        displayName,
+        email,
+        dbErrorCode: dbError?.code,
+        dbConstraint: dbError?.constraint,
+        dbDetail: dbError?.detail,
+      },
     });
 
     // Normalize unknown errors into onboarding-shaped errors for consistent handling
