@@ -91,13 +91,15 @@ describe('auth gate - UserState and resolveUserState', () => {
       );
 
       expect(getRedirectForState(UserState.UNAUTHENTICATED)).toBe('/signin');
-      expect(getRedirectForState(UserState.NEEDS_DB_USER)).toBe('/onboarding');
+      expect(getRedirectForState(UserState.NEEDS_DB_USER)).toBe(
+        '/onboarding?fresh_signup=true'
+      );
       expect(getRedirectForState(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
         '/waitlist'
       );
       expect(getRedirectForState(UserState.WAITLIST_PENDING)).toBe('/waitlist');
       expect(getRedirectForState(UserState.NEEDS_ONBOARDING)).toBe(
-        '/onboarding'
+        '/onboarding?fresh_signup=true'
       );
       expect(getRedirectForState(UserState.BANNED)).toBe('/banned');
       expect(getRedirectForState(UserState.ACTIVE)).toBeNull();

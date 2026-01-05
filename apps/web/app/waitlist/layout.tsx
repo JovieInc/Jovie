@@ -45,11 +45,11 @@ export default async function WaitlistLayout({
   }
 
   if (authResult.state === UserState.ACTIVE) {
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   if (authResult.state === UserState.NEEDS_ONBOARDING) {
-    redirect('/onboarding');
+    redirect('/onboarding?fresh_signup=true');
   }
 
   if (authResult.state === UserState.BANNED) {
@@ -61,5 +61,5 @@ export default async function WaitlistLayout({
     redirect(authResult.redirectTo);
   }
 
-  redirect('/app/dashboard/overview');
+  redirect('/app/dashboard');
 }
