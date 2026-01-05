@@ -22,7 +22,7 @@ export default async function ContactsPage() {
   const profileId = profile?.id;
 
   if (!profile || !profileId) {
-    redirect('/app/dashboard/overview');
+    redirect('/app/dashboard');
   }
 
   const artist = convertDrizzleCreatorProfileToArtist(profile);

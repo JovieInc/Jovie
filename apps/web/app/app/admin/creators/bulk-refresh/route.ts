@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    const redirectUrl = new URL('/app/dashboard/overview', request.url);
+    const redirectUrl = new URL('/app/dashboard', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 
