@@ -155,15 +155,32 @@ test.describe('Homepage Smoke @smoke @critical', () => {
         'Homepage body is empty or too short'
       ).toBe(true);
 
-      // Check for navigation or logo (any svg/img) using robust checks
-      const hasSvg = await elementVisible(page, 'svg', {
+      // Check for logo using data-testid (more reliable than generic svg/img selector)
+      const logo = page.getByTestId('site-logo');
+      const logoLink = page.getByTestId('site-logo-link');
+
+      // First try the data-testid approach (preferred)
+      const hasLogoByTestId = await elementVisible(page, '[data-testid="site-logo"]', {
         timeout: SMOKE_TIMEOUTS.QUICK,
       });
-      const hasImg = await elementVisible(page, 'img', {
+      const hasLogoLinkByTestId = await elementVisible(page, '[data-testid="site-logo-link"]', {
         timeout: SMOKE_TIMEOUTS.QUICK,
       });
 
-      expect(hasSvg || hasImg, 'Homepage missing logo/icon').toBe(true);
+      // Fallback to generic selector if data-testid not found (backwards compatibility)
+      const hasLogoGeneric =
+        !hasLogoByTestId &&
+        ((await elementVisible(page, 'svg', {
+          timeout: SMOKE_TIMEOUTS.QUICK,
+        })) ||
+          (await elementVisible(page, 'img', {
+            timeout: SMOKE_TIMEOUTS.QUICK,
+          })));
+
+      expect(
+        hasLogoByTestId || hasLogoLinkByTestId || hasLogoGeneric,
+        'Homepage missing logo/icon'
+      ).toBe(true);
 
       // Check for main CTA or navigation using robust checks
       const hasButton = await elementVisible(page, 'button', {
@@ -177,6 +194,12 @@ test.describe('Homepage Smoke @smoke @critical', () => {
         hasButton || hasLink,
         'Homepage missing interactive elements'
       ).toBe(true);
+
+      // Check for header navigation
+      const hasHeader = await elementVisible(page, '[data-testid="header-nav"]', {
+        timeout: SMOKE_TIMEOUTS.QUICK,
+      });
+      expect(hasHeader, 'Homepage missing header navigation').toBe(true);
 
       const context = getContext();
       await assertNoCriticalErrors(context, testInfo);
