@@ -107,6 +107,17 @@ export function VerificationStep({
 
   const isLoading = isVerifying || isResending;
 
+  // Handle Escape key to go back
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onBack && !isLoading) {
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onBack, isLoading]);
+
   return (
     <div className={AUTH_CLASSES.stepTransition}>
       {/* Back button - fixed positioning in browser chrome */}

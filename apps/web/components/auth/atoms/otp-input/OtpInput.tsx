@@ -96,7 +96,7 @@ export function OtpInput({
           'bg-transparent border-none outline-none'
         )}
         tabIndex={-1}
-        aria-hidden='true'
+        aria-label='Autofill verification code'
         data-testid='otp-autofill-input'
       />
 

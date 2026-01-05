@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
@@ -110,31 +111,43 @@ export function SignInForm() {
 
         {/* Email input step */}
         {step === 'email' && (
-          <EmailStep
-            email={email}
-            onEmailChange={setEmail}
-            onSubmit={startEmailFlow}
-            isLoading={loadingState.type === 'submitting'}
-            error={error}
-            onBack={handleBack}
-            mode='signin'
-          />
+          <AccessibleStepWrapper
+            currentStep={1}
+            totalSteps={2}
+            stepTitle='Enter your email'
+          >
+            <EmailStep
+              email={email}
+              onEmailChange={setEmail}
+              onSubmit={startEmailFlow}
+              isLoading={loadingState.type === 'submitting'}
+              error={error}
+              onBack={handleBack}
+              mode='signin'
+            />
+          </AccessibleStepWrapper>
         )}
 
         {/* Verification step */}
         {step === 'verification' && (
-          <VerificationStep
-            email={email}
-            code={code}
-            onCodeChange={setCode}
-            onSubmit={verifyCode}
-            onResend={resendCode}
-            isVerifying={loadingState.type === 'verifying'}
-            isResending={loadingState.type === 'resending'}
-            error={error}
-            onBack={handleBack}
-            mode='signin'
-          />
+          <AccessibleStepWrapper
+            currentStep={2}
+            totalSteps={2}
+            stepTitle='Enter verification code'
+          >
+            <VerificationStep
+              email={email}
+              code={code}
+              onCodeChange={setCode}
+              onSubmit={verifyCode}
+              onResend={resendCode}
+              isVerifying={loadingState.type === 'verifying'}
+              isResending={loadingState.type === 'resending'}
+              error={error}
+              onBack={handleBack}
+              mode='signin'
+            />
+          </AccessibleStepWrapper>
         )}
 
         {/* Sign up suggestion when account not found */}

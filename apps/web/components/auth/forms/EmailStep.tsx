@@ -57,6 +57,17 @@ export function EmailStep({
     inputRef.current?.focus();
   }, []);
 
+  // Handle Escape key to go back
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onBack && !isLoading) {
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onBack, isLoading]);
+
   const validateEmail = useCallback((value: string): boolean => {
     if (!value.trim()) {
       setLocalError('Please enter your email address.');
