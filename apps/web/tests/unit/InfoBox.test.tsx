@@ -45,7 +45,10 @@ describe('InfoBox', () => {
       </InfoBox>
     );
 
-    const container = screen.getByText('Custom content').closest('div');
+    // Find the outer container (has rounded-lg border p-4 from InfoBox)
+    const container = screen
+      .getByText('Custom content')
+      .closest('div')?.parentElement;
     expect(container).toHaveClass('custom-info');
   });
 });

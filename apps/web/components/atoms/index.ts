@@ -12,6 +12,7 @@ export * from './Copyright';
 export * from './Divider';
 export * from './DropdownMenu';
 export * from './DSPButton';
+export * from './ErrorBoundary';
 export * from './GradientText';
 export * from './HeaderIconButton';
 export * from './HeaderText';
