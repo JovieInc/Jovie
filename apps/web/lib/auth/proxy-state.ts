@@ -18,6 +18,8 @@ export interface ProxyUserState {
  *
  * IMPORTANT: Filters out soft-deleted and banned users for security.
  *
+ * SIMPLIFIED: Uses waitlistApproval field instead of join to waitlistEntries table.
+ *
  * @param clerkUserId - The Clerk user ID from auth()
  * @returns Boolean flags indicating what the user needs
  */
@@ -30,7 +32,8 @@ export async function getUserState(
     const [result] = await db
       .select({
         dbUserId: users.id,
-        waitlistEntryId: users.waitlistEntryId,
+        waitlistApproval: users.waitlistApproval, // New simplified field
+        waitlistEntryId: users.waitlistEntryId, // Legacy fallback during migration
         profileId: creatorProfiles.id,
         profileComplete: creatorProfiles.onboardingCompletedAt,
       })
@@ -56,12 +59,16 @@ export async function getUserState(
       return { needsWaitlist: true, needsOnboarding: false, isActive: false };
     }
 
-    // Has DB user but no waitlist entry → needs waitlist
-    if (!result.waitlistEntryId) {
+    // Check waitlist approval using new field (with legacy fallback)
+    // waitlistApproval: null = not submitted, 'pending' = awaiting approval, 'approved' = ready for onboarding
+    const isWaitlistApproved =
+      result.waitlistApproval === 'approved' || result.waitlistEntryId !== null; // Legacy fallback
+
+    if (!isWaitlistApproved) {
       return { needsWaitlist: true, needsOnboarding: false, isActive: false };
     }
 
-    // Has waitlist but no profile or incomplete profile → needs onboarding
+    // Has waitlist approval but no profile or incomplete profile → needs onboarding
     if (!result.profileId || !result.profileComplete) {
       return { needsWaitlist: false, needsOnboarding: true, isActive: false };
     }

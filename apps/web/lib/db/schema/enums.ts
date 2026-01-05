@@ -153,6 +153,12 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
+// User waitlist approval status (simpler than separate waitlistEntries table)
+export const userWaitlistApprovalEnum = pgEnum('user_waitlist_approval', [
+  'pending',
+  'approved',
+]);
+
 // Creator Claim Invite Enums
 export const claimInviteStatusEnum = pgEnum('claim_invite_status', [
   'pending',

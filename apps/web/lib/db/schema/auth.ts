@@ -8,7 +8,11 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { themeModeEnum, userStatusEnum } from './enums';
+import {
+  themeModeEnum,
+  userStatusEnum,
+  userWaitlistApprovalEnum,
+} from './enums';
 
 // Users table
 export const users = pgTable(
@@ -26,7 +30,8 @@ export const users = pgTable(
     billingUpdatedAt: timestamp('billing_updated_at'),
     billingVersion: integer('billing_version').default(1).notNull(),
     lastBillingEventAt: timestamp('last_billing_event_at'),
-    waitlistEntryId: uuid('waitlist_entry_id'),
+    waitlistEntryId: uuid('waitlist_entry_id'), // Legacy - kept for migration compatibility
+    waitlistApproval: userWaitlistApprovalEnum('waitlist_approval'), // New simplified waitlist system
     deletedAt: timestamp('deleted_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -35,6 +40,9 @@ export const users = pgTable(
     statusIdx: index('idx_users_status').on(table.status),
     waitlistEntryIdIdx: index('idx_users_waitlist_entry_id').on(
       table.waitlistEntryId
+    ),
+    waitlistApprovalIdx: index('idx_users_waitlist_approval').on(
+      table.waitlistApproval
     ),
   })
 );
