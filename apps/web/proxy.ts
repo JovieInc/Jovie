@@ -419,8 +419,16 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     }
 
     return res;
-  } catch {
-    // Fallback to basic middleware behavior if Clerk auth fails
+  } catch (error) {
+    // Log errors for observability - silent failures can mask security issues
+    console.error('[proxy] Middleware error:', {
+      error,
+      pathname: req.nextUrl.pathname,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    // Fallback to basic middleware behavior
+    // Note: Individual pages have their own auth checks (resolveUserState)
     return NextResponse.next();
   }
 }
