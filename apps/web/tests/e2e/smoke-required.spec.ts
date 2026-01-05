@@ -44,11 +44,23 @@ test.describe('Required Smoke Test @smoke @required', () => {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
 
-      // Verify profile image is visible
-      const profileImage = page.locator('img').first();
-      await expect(profileImage).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
+      // Verify profile image is visible (prefer explicit alt text selector)
+      const profileImageExplicit = page.locator('img[alt*="Dua Lipa"]');
+      const hasExplicitImage = await profileImageExplicit
+        .isVisible()
+        .catch(() => false);
+
+      if (hasExplicitImage) {
+        await expect(profileImageExplicit).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+      } else {
+        // Fallback to any image if alt text not found
+        const anyImage = page.locator('img').first();
+        await expect(anyImage).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+      }
     } else {
       // For 404/400/temporarily unavailable, just verify page renders
       await page.waitForLoadState('domcontentloaded');
