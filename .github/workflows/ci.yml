@@ -80,10 +80,6 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
         run: pnpm --filter=@jovie/web run next:proxy-guard
-      - name: Notify Vercel
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: 'Vercel - jovie: guardrails'
 
   ci-biome:
     name: Lint
@@ -130,10 +126,6 @@ jobs:
           else
             pnpm biome ci --reporter=github .
           fi
-      - name: Notify Vercel
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: 'Vercel - jovie: lint'
 
   ci-typecheck:
     name: Typecheck
@@ -186,10 +178,6 @@ jobs:
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-      - name: Notify Vercel
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: 'Vercel - jovie: typecheck'
 
   ci-cache-warm:
     name: Cache Warm (pnpm + Next build cache)
@@ -379,11 +367,6 @@ jobs:
           ./scripts/validate-migrations.sh
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
-      - name: Notify Vercel
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: 'Vercel - jovie: migration-guard'
 
   ci-drizzle-check:
     name: Drizzle Check
@@ -654,11 +637,6 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
-      - name: Notify Vercel
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: 'Vercel - jovie: build'
 
   ci-unit-tests:
     name: Unit Tests
@@ -735,11 +713,6 @@ jobs:
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-      - name: Notify Vercel
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: 'Vercel - jovie: unit-tests'
 
   ci-merge-smoke:
     name: Merge Group Smoke
