@@ -138,7 +138,10 @@ export function Logo({
 
   if (variant === 'fullAlt') {
     return (
-      <span className={cn('inline-flex items-center gap-2', className)}>
+      <span
+        className={cn('inline-flex items-center gap-2', className)}
+        data-testid={dataTestId}
+      >
         {icon}
         {altWordmark()}
       </span>
@@ -146,7 +149,10 @@ export function Logo({
   }
 
   return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
+    <span
+      className={cn('inline-flex items-center gap-2', className)}
+      data-testid={dataTestId}
+    >
       {icon}
       {wordmark()}
     </span>

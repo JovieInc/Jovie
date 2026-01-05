@@ -157,12 +157,20 @@ test.describe('Homepage Smoke @smoke @critical', () => {
 
       // Check for logo using data-testid (more reliable than generic svg/img selector)
       // First try the data-testid approach (preferred)
-      const hasLogoByTestId = await elementVisible(page, '[data-testid="site-logo"]', {
-        timeout: SMOKE_TIMEOUTS.QUICK,
-      });
-      const hasLogoLinkByTestId = await elementVisible(page, '[data-testid="site-logo-link"]', {
-        timeout: SMOKE_TIMEOUTS.QUICK,
-      });
+      const hasLogoByTestId = await elementVisible(
+        page,
+        '[data-testid="site-logo"]',
+        {
+          timeout: SMOKE_TIMEOUTS.QUICK,
+        }
+      );
+      const hasLogoLinkByTestId = await elementVisible(
+        page,
+        '[data-testid="site-logo-link"]',
+        {
+          timeout: SMOKE_TIMEOUTS.QUICK,
+        }
+      );
 
       // Fallback to generic selector if data-testid not found (backwards compatibility)
       const hasLogoGeneric =
@@ -193,9 +201,13 @@ test.describe('Homepage Smoke @smoke @critical', () => {
       ).toBe(true);
 
       // Check for header navigation
-      const hasHeader = await elementVisible(page, '[data-testid="header-nav"]', {
-        timeout: SMOKE_TIMEOUTS.QUICK,
-      });
+      const hasHeader = await elementVisible(
+        page,
+        '[data-testid="header-nav"]',
+        {
+          timeout: SMOKE_TIMEOUTS.QUICK,
+        }
+      );
       expect(hasHeader, 'Homepage missing header navigation').toBe(true);
 
       const context = getContext();
