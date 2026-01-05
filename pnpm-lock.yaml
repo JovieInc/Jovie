@@ -334,8 +334,8 @@ importers:
         specifier: ^9.35.0
         version: 9.39.1
       '@next/bundle-analyzer':
-        specifier: ^16.0.10
-        version: 16.0.10(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+        specifier: ^16.1.1
+        version: 16.1.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)
       '@playwright/test':
         specifier: ^1.55.0
         version: 1.57.0
@@ -1921,8 +1921,8 @@ packages:
     resolution: {integrity: sha512-I5sbpSIAHiB+b6UttofhrN/UJXII+4tZPAq1qugzwCwLIL8EZLV7F/JyHUrEIiGgQpEXzpnjlJ+zwcEhheGvCw==}
     engines: {node: '>=19.0.0'}
 
-  '@next/bundle-analyzer@16.0.10':
-    resolution: {integrity: sha512-AHA6ZomhQuRsJtkoRvsq+hIuwA6F26mQzQT8ICcc2dL3BvHRcWOA+EiFr+BgWFY++EE957xVDqMIJjLApyxnwA==}
+  '@next/bundle-analyzer@16.1.1':
+    resolution: {integrity: sha512-aNJy301GGH8k36rDgrYdnyYEdjRQg6csMi1njzqHo+3qyZvOOWMHSv+p7SztNTzP5RU2KRwX0pPwYBtDcE+vVA==}
 
   '@next/env@13.5.11':
     resolution: {integrity: sha512-fbb2C7HChgM7CemdCY+y3N1n8pcTKdqtQLbC7/EQtPdLvlMUT9JX/dBYl8MMZAtYG4uVMyPFHXckb68q/NRwqg==}
@@ -12101,7 +12101,7 @@ snapshots:
       '@types/node': 22.19.3
       '@types/pg': 8.15.6
 
-  '@next/bundle-analyzer@16.0.10(bufferutil@4.1.0)(utf-8-validate@5.0.10)':
+  '@next/bundle-analyzer@16.1.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)':
     dependencies:
       webpack-bundle-analyzer: 4.10.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
