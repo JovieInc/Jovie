@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, waitlistEntries } from '@/lib/db';
-import { waitlistInvites } from '@/lib/db/schema';
+import { users, waitlistInvites } from '@/lib/db/schema';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -333,6 +333,12 @@ export async function POST(request: Request) {
         }
       }
 
+      // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
+      await db
+        .update(users)
+        .set({ waitlistApproval: 'pending' })
+        .where(eq(users.clerkId, userId));
+
       return NextResponse.json(
         { success: true, status: existing.status },
         { headers: NO_STORE_HEADERS }
@@ -367,6 +373,12 @@ export async function POST(request: Request) {
       void _selectedPlan;
       await db.insert(waitlistEntries).values(fallbackValues);
     }
+
+    // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
+    await db
+      .update(users)
+      .set({ waitlistApproval: 'pending' })
+      .where(eq(users.clerkId, userId));
 
     return NextResponse.json(
       { success: true, status: 'new' },
