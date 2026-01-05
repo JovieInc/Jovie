@@ -340,8 +340,8 @@ importers:
         specifier: ^1.55.0
         version: 1.57.0
       '@storybook/addon-a11y':
-        specifier: ^10.1.4
-        version: 10.1.4(storybook@10.1.10(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(utf-8-validate@5.0.10))
+        specifier: ^10.1.11
+        version: 10.1.11(storybook@10.1.10(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(utf-8-validate@5.0.10))
       '@storybook/addon-docs':
         specifier: ^10.1.11
         version: 10.1.11(@types/react@18.3.27)(esbuild@0.27.2)(rollup@4.54.0)(storybook@10.1.10(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(utf-8-validate@5.0.10))(vite@6.4.1(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))(webpack@5.103.0(@swc/core@1.15.3(@swc/helpers@0.5.18))(esbuild@0.27.2))
@@ -3409,10 +3409,10 @@ packages:
   '@statsig/web-analytics@3.31.0':
     resolution: {integrity: sha512-CmDzhKWuEWOkPmok6RC0K8Gq0C9SUTwYuIpExAxbHuf+GD+YAOHhWDnKnWKFaN9mBaTRcIvciX0hT/W+cGD0ug==}
 
-  '@storybook/addon-a11y@10.1.4':
-    resolution: {integrity: sha512-go7SshAyu+pnK7Prq3UnCBCB7DxAQkPMnebsv3fnboeTZHnDXQqfmHdZ15o+pH0JsCedC05RYsdbjd2rMHMvFQ==}
+  '@storybook/addon-a11y@10.1.11':
+    resolution: {integrity: sha512-3sr6HmcDgW1+TQAV9QtWBE3HlGyfFXVZY3RECTNLNH6fRC+rYQCItisvQIVxQpyftLSQ8EAMN9JQzs495MjWNg==}
     peerDependencies:
-      storybook: ^10.1.4
+      storybook: ^10.1.11
 
   '@storybook/addon-docs@10.1.11':
     resolution: {integrity: sha512-Jwm291Fhim2eVcZIVlkG1B2skb0ZI9oru6nqMbJxceQZlvZmcIa4oxvS1oaMTKw2DJnCv97gLm57P/YvRZ8eUg==}
@@ -13734,7 +13734,7 @@ snapshots:
       '@statsig/js-client': 3.31.0
       web-vitals: 5.0.3
 
-  '@storybook/addon-a11y@10.1.4(storybook@10.1.10(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(utf-8-validate@5.0.10))':
+  '@storybook/addon-a11y@10.1.11(storybook@10.1.10(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(utf-8-validate@5.0.10))':
     dependencies:
       '@storybook/global': 5.0.0
       axe-core: 4.11.0
