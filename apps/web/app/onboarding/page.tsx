@@ -1,4 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
+import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
@@ -25,16 +27,50 @@ export default async function OnboardingPage({
   // proxy.ts already ensured user needsOnboarding
   // Just get user data and render the form
   const authResult = await resolveUserState();
+
+  // Defensive check: ensure we have a valid Clerk user ID
+  if (!authResult.clerkUserId) {
+    const error = new Error('Missing clerkUserId despite proxy routing');
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_defensive_check' },
+      level: 'error',
+    });
+    console.error('[onboarding] Missing clerkUserId despite proxy routing');
+    redirect('/signin?redirect_url=/onboarding');
+  }
+
   const user = await currentUser();
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
-  const userId = authResult.clerkUserId!;
+  const userId = authResult.clerkUserId;
 
-  // Get dashboard data for form initialization
-  // No need to check needsOnboarding here - auth gate already validated access
-  // Removing this check prevents redirect loops caused by race conditions
-  const dashboardData = await getDashboardData();
-  const existingProfile = dashboardData.selectedProfile;
+  // Try to get existing profile data if available (user might be partially onboarded)
+  // This is optional - if it fails, we just don't pre-fill
+  let existingProfile = null;
+  try {
+    const dashboardData = await getDashboardData();
+    existingProfile = dashboardData.selectedProfile;
+  } catch (error) {
+    // Log the error for debugging - distinguish between expected "no profile" and actual errors
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.warn('[onboarding] Failed to load existing profile:', {
+      error: errorMessage,
+      clerkUserId: authResult.clerkUserId,
+    });
+
+    // Capture database/connection errors to Sentry (but not "no profile" errors)
+    if (
+      errorMessage.includes('database') ||
+      errorMessage.includes('connection') ||
+      errorMessage.includes('timeout')
+    ) {
+      Sentry.captureException(error, {
+        tags: { context: 'onboarding_profile_load' },
+        extra: { clerkUserId: authResult.clerkUserId },
+      });
+    }
+  }
 
   const displayNameSource = existingProfile?.displayName
     ? 'profile'

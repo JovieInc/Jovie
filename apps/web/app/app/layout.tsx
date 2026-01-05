@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { redirect } from 'next/navigation';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { resolveUserState } from '@/lib/auth/gate';
@@ -21,8 +22,20 @@ import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 async function getAppUserId(): Promise<string> {
   return Sentry.startSpan({ op: 'auth', name: 'app.getUserId' }, async () => {
     const authResult = await resolveUserState();
+
+    // Defensive check: ensure we have a valid Clerk user ID
+    if (!authResult.clerkUserId) {
+      const error = new Error('Missing clerkUserId despite proxy routing');
+      Sentry.captureException(error, {
+        tags: { context: 'app_layout_defensive_check' },
+        level: 'error',
+      });
+      console.error('[app-layout] Missing clerkUserId despite proxy routing');
+      redirect('/signin?redirect_url=/app/dashboard');
+    }
+
     // proxy.ts already ensured user is ACTIVE, just return userId
-    return authResult.clerkUserId!;
+    return authResult.clerkUserId;
   });
 }
 
