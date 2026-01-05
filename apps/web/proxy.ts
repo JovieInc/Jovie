@@ -317,6 +317,12 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         res = NextResponse.rewrite(new URL('/onboarding', req.url), {
           request: { headers: requestHeaders },
         });
+      } else if (!userState.needsWaitlist && pathname === '/waitlist') {
+        // Active user trying to access waitlist → redirect to dashboard
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+      } else if (!userState.needsOnboarding && pathname === '/onboarding') {
+        // Active user trying to access onboarding → redirect to dashboard
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       } else if (
         pathname === '/' ||
         pathname === '/signin' ||
