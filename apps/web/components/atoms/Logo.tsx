@@ -63,7 +63,7 @@ export function Logo({
             height={39}
             priority={priority}
             aria-hidden={ariaHidden}
-            data-testid={testId ? `${testId}-dark` : undefined}
+            data-testid={testId}
             className={cn(imgClassName, 'hidden dark:block')}
           />
         </>
@@ -127,6 +127,7 @@ export function Logo({
       priority={priority}
       alt={ariaHidden ? '' : 'Jovie'}
       aria-hidden={ariaHidden}
+      data-testid={dataTestId}
       className={variant === 'icon' ? className : undefined}
     />
   );
