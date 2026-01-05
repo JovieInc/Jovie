@@ -34,8 +34,8 @@ test.describe('Onboarding smoke @smoke', () => {
     try {
       const res = await smokeNavigate(page, '/app/dashboard');
 
-      // Should land on sign-in
-      await expect(page).toHaveURL(/\/signin/, {
+      // Should land on sign-in (handles both /signin and /sign-in URL patterns)
+      await expect(page).toHaveURL(/\/sign-?in/, {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       expect(res?.ok(), 'Expected the sign-in page to respond OK').toBeTruthy();

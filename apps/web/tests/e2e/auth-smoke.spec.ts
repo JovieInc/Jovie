@@ -74,7 +74,8 @@ test.describe('Auth smoke @smoke', () => {
 
     try {
       await smokeNavigate(page, '/app/dashboard');
-      await expect(page).toHaveURL(/\/signin/, {
+      // Handle both /signin and /sign-in URL patterns
+      await expect(page).toHaveURL(/\/sign-?in/, {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
 
