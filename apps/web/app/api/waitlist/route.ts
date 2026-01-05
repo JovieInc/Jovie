@@ -335,11 +335,22 @@ export async function POST(request: Request) {
           }
         }
 
-        // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
+        // Upsert users.waitlistApproval to 'pending' so getUserState() recognizes submission
+        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
         await tx
-          .update(users)
-          .set({ waitlistApproval: 'pending' })
-          .where(eq(users.clerkId, userId));
+          .insert(users)
+          .values({
+            clerkId: userId,
+            email: emailRaw,
+            waitlistApproval: 'pending',
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: {
+              waitlistApproval: 'pending',
+              updatedAt: new Date(),
+            },
+          });
       });
 
       // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
@@ -384,11 +395,22 @@ export async function POST(request: Request) {
         await tx.insert(waitlistEntries).values(fallbackValues);
       }
 
-      // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
+      // Upsert users.waitlistApproval to 'pending' so getUserState() recognizes submission
+      // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
       await tx
-        .update(users)
-        .set({ waitlistApproval: 'pending' })
-        .where(eq(users.clerkId, userId));
+        .insert(users)
+        .values({
+          clerkId: userId,
+          email: emailRaw,
+          waitlistApproval: 'pending',
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: {
+            waitlistApproval: 'pending',
+            updatedAt: new Date(),
+          },
+        });
     });
 
     // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
