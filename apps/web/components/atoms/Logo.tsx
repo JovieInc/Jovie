@@ -12,6 +12,7 @@ interface LogoProps {
   tone?: BrandLogoTone;
   priority?: boolean;
   'aria-hidden'?: boolean;
+  'data-testid'?: string;
 }
 
 export function Logo({
@@ -21,6 +22,7 @@ export function Logo({
   tone = 'auto',
   priority = false,
   'aria-hidden': ariaHidden,
+  'data-testid': dataTestId,
 }: LogoProps) {
   const sizeClasses = {
     xs: 'h-4 w-auto',
@@ -38,7 +40,7 @@ export function Logo({
     xl: 40,
   };
 
-  const altWordmark = (wordmarkClassName?: string) => {
+  const altWordmark = (wordmarkClassName?: string, testId?: string) => {
     const imgClassName = cn(sizeClasses[size], wordmarkClassName);
 
     if (tone === 'auto') {
@@ -51,6 +53,7 @@ export function Logo({
             height={39}
             priority={priority}
             aria-hidden={ariaHidden}
+            data-testid={testId}
             className={cn(imgClassName, 'dark:hidden')}
           />
           <Image
@@ -60,6 +63,7 @@ export function Logo({
             height={39}
             priority={priority}
             aria-hidden={ariaHidden}
+            data-testid={testId ? `${testId}-dark` : undefined}
             className={cn(imgClassName, 'hidden dark:block')}
           />
         </>
@@ -79,12 +83,13 @@ export function Logo({
         height={39}
         priority={priority}
         aria-hidden={ariaHidden}
+        data-testid={testId}
         className={imgClassName}
       />
     );
   };
 
-  const wordmark = (wordmarkClassName?: string) => (
+  const wordmark = (wordmarkClassName?: string, testId?: string) => (
     <svg
       xmlns='http://www.w3.org/2000/svg'
       xmlnsXlink='http://www.w3.org/1999/xlink'
@@ -92,6 +97,7 @@ export function Logo({
       role='img'
       aria-hidden={ariaHidden}
       aria-label={ariaHidden ? undefined : 'Jovie logo'}
+      data-testid={testId}
       className={cn(
         sizeClasses[size],
         'text-black dark:text-white transition-colors duration-200',
@@ -107,11 +113,11 @@ export function Logo({
   );
 
   if (variant === 'word') {
-    return wordmark(className);
+    return wordmark(className, dataTestId);
   }
 
   if (variant === 'wordAlt') {
-    return altWordmark(className);
+    return altWordmark(className, dataTestId);
   }
 
   const icon = (
@@ -131,7 +137,10 @@ export function Logo({
 
   if (variant === 'fullAlt') {
     return (
-      <span className={cn('inline-flex items-center gap-2', className)}>
+      <span
+        className={cn('inline-flex items-center gap-2', className)}
+        data-testid={dataTestId}
+      >
         {icon}
         {altWordmark()}
       </span>
@@ -139,7 +148,10 @@ export function Logo({
   }
 
   return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
+    <span
+      className={cn('inline-flex items-center gap-2', className)}
+      data-testid={dataTestId}
+    >
       {icon}
       {wordmark()}
     </span>
