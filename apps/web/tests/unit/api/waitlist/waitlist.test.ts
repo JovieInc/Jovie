@@ -23,6 +23,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/schema', () => ({
+  users: {},
   waitlistInvites: {},
 }));
 
@@ -177,6 +178,11 @@ describe('Waitlist API', () => {
       mockDbInsert.mockReturnValue({
         values: vi.fn().mockResolvedValue(undefined),
       });
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
 
       const { POST } = await import('@/app/api/waitlist/route');
       const request = new Request('http://localhost/api/waitlist', {
@@ -194,6 +200,53 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.status).toBe('new');
+    });
+
+    it('sets users.waitlistApproval to pending after submission', async () => {
+      const mockUpdateSet = vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      });
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        fullName: 'Test User',
+      });
+      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+      mockDbInsert.mockReturnValue({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: mockUpdateSet,
+      });
+
+      const { POST } = await import('@/app/api/waitlist/route');
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/testuser',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+
+      // Verify users.waitlistApproval was updated to 'pending'
+      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockUpdateSet).toHaveBeenCalledWith({
+        waitlistApproval: 'pending',
+      });
     });
   });
 });
