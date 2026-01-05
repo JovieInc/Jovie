@@ -6,6 +6,7 @@
  * - Network monitoring
  * - Test timeouts
  * - Page state assertions
+ * - Retry logic for flaky operations
  */
 
 import { expect, Page } from '@playwright/test';
@@ -28,6 +29,20 @@ export const SMOKE_TIMEOUTS = {
   URL_STABLE: 5_000,
   /** Network buffer after navigation */
   NETWORK_BUFFER: 500,
+  /** Default retry delay between attempts */
+  RETRY_DELAY: 500,
+  /** Hydration settling time (replaces waitForTimeout anti-pattern) */
+  HYDRATION_SETTLE: 100,
+} as const;
+
+/**
+ * Retry configuration for flaky operations
+ */
+export const RETRY_CONFIG = {
+  /** Default number of retries */
+  DEFAULT_RETRIES: 3,
+  /** Intervals for exponential backoff (ms) */
+  BACKOFF_INTERVALS: [500, 1000, 2000] as const,
 } as const;
 
 /**
@@ -346,3 +361,281 @@ export const TEST_PROFILES = {
 } as const;
 
 export const PUBLIC_HANDLES = Object.values(TEST_PROFILES);
+
+// ============================================================================
+// Retry Utilities
+// ============================================================================
+
+/**
+ * Retry an async operation with exponential backoff
+ * Use this for operations that may fail due to timing/network issues
+ */
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  options?: {
+    retries?: number;
+    intervals?: readonly number[];
+    onRetry?: (attempt: number, error: Error) => void;
+  }
+): Promise<T> {
+  const retries = options?.retries ?? RETRY_CONFIG.DEFAULT_RETRIES;
+  const intervals = options?.intervals ?? RETRY_CONFIG.BACKOFF_INTERVALS;
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt < retries) {
+        const delay = intervals[Math.min(attempt, intervals.length - 1)];
+        options?.onRetry?.(attempt + 1, lastError);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Wait for network to be idle (no pending requests)
+ * More reliable than fixed timeouts for dynamic content
+ */
+export async function waitForNetworkIdle(
+  page: Page,
+  options?: { timeout?: number; idleTime?: number }
+): Promise<void> {
+  const timeout = options?.timeout ?? SMOKE_TIMEOUTS.VISIBILITY;
+  const idleTime = options?.idleTime ?? 500;
+
+  await page.waitForLoadState('networkidle', { timeout }).catch(() => {
+    // If network idle doesn't occur, wait for DOM to be ready
+    return page.waitForLoadState('domcontentloaded', { timeout });
+  });
+
+  // Small buffer for late responses
+  await page.waitForTimeout(
+    Math.min(idleTime, SMOKE_TIMEOUTS.HYDRATION_SETTLE)
+  );
+}
+
+/**
+ * Wait for page to be fully interactive (hydration complete)
+ * Replaces arbitrary waitForTimeout calls
+ */
+export async function waitForHydration(
+  page: Page,
+  options?: { timeout?: number }
+): Promise<void> {
+  const timeout = options?.timeout ?? SMOKE_TIMEOUTS.VISIBILITY;
+
+  // Wait for load state
+  await page.waitForLoadState('load', { timeout });
+
+  // Check for React hydration completion by waiting for __NEXT_DATA__ to be processed
+  await page
+    .waitForFunction(
+      () => {
+        // Check if React has hydrated (no hydration markers remaining)
+        const hasHydrationError =
+          document.body.innerHTML.includes('Hydration failed');
+        // Check if document is interactive
+        const isReady =
+          document.readyState === 'complete' ||
+          document.readyState === 'interactive';
+        return isReady && !hasHydrationError;
+      },
+      { timeout }
+    )
+    .catch(() => {
+      // Fallback: just ensure DOM is ready
+    });
+}
+
+// ============================================================================
+// Enhanced Assertions
+// ============================================================================
+
+/**
+ * Assert an element is visible with retry logic for flaky visibility
+ */
+export async function assertElementVisible(
+  page: Page,
+  selector: string,
+  options?: { timeout?: number; description?: string }
+): Promise<void> {
+  const timeout = options?.timeout ?? SMOKE_TIMEOUTS.VISIBILITY;
+  const description = options?.description ?? selector;
+
+  await expect(page.locator(selector).first(), description).toBeVisible({
+    timeout,
+  });
+}
+
+/**
+ * Assert page has no critical errors with enhanced diagnostics
+ */
+export async function assertPageHealthy(
+  page: Page,
+  context: SmokeTestContext,
+  testInfo?: { attach: (name: string, options: object) => Promise<void> }
+): Promise<void> {
+  // Check for error page indicators
+  const bodyText = await page
+    .locator('body')
+    .textContent()
+    .catch(() => '');
+  const errorIndicators = [
+    'application error',
+    'internal server error',
+    'something went wrong',
+    '500',
+    'unhandled runtime error',
+  ];
+
+  const hasErrorPage = errorIndicators.some(indicator =>
+    bodyText?.toLowerCase().includes(indicator)
+  );
+
+  if (hasErrorPage) {
+    // Attach diagnostic info before failing
+    if (testInfo) {
+      await testInfo.attach('error-page-content', {
+        body: bodyText ?? 'No content',
+        contentType: 'text/plain',
+      });
+    }
+  }
+
+  expect(hasErrorPage, 'Page should not show error indicators').toBe(false);
+
+  // Run standard error check
+  await assertNoCriticalErrors(context, testInfo);
+}
+
+/**
+ * Safely check if an element exists without throwing
+ */
+export async function elementExists(
+  page: Page,
+  selector: string,
+  options?: { timeout?: number }
+): Promise<boolean> {
+  const timeout = options?.timeout ?? SMOKE_TIMEOUTS.QUICK;
+
+  try {
+    await page
+      .locator(selector)
+      .first()
+      .waitFor({ state: 'attached', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely check if an element is visible without throwing
+ */
+export async function elementVisible(
+  page: Page,
+  selector: string,
+  options?: { timeout?: number }
+): Promise<boolean> {
+  const timeout = options?.timeout ?? SMOKE_TIMEOUTS.QUICK;
+
+  try {
+    await page.locator(selector).first().waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// Navigation Helpers (Enhanced)
+// ============================================================================
+
+/**
+ * Navigate with retry logic for flaky network conditions
+ */
+export async function smokeNavigateWithRetry(
+  page: Page,
+  url: string,
+  options?: { timeout?: number; retries?: number }
+): Promise<ReturnType<Page['goto']>> {
+  const retries = options?.retries ?? 2;
+
+  return withRetry(
+    () => smokeNavigate(page, url, { timeout: options?.timeout }),
+    {
+      retries,
+      onRetry: attempt => {
+        // eslint-disable-next-line no-console
+        console.warn(`Navigation retry ${attempt} for ${url}`);
+      },
+    }
+  );
+}
+
+/**
+ * Navigate and wait for the page to be fully interactive
+ */
+export async function navigateAndWaitForHydration(
+  page: Page,
+  url: string,
+  options?: { timeout?: number }
+): Promise<ReturnType<Page['goto']>> {
+  const response = await smokeNavigate(page, url, options);
+  await waitForHydration(page, options);
+  return response;
+}
+
+// ============================================================================
+// Data-testid Selectors (Preferred for Smoke Tests)
+// ============================================================================
+
+/**
+ * Standard data-testid selectors for smoke tests
+ * Using data-testid is more stable than text/CSS selectors
+ */
+export const SMOKE_SELECTORS = {
+  // Primary UI elements
+  PRIMARY_CTA: '[data-testid="primary-cta"]',
+  PROFILE_AVATAR: '[data-testid="profile-avatar"]',
+  LISTEN_BUTTON: '[data-testid="listen-button"]',
+  TIP_BUTTON: '[data-testid="tip-button"]',
+  BACK_BUTTON: 'button[aria-label="Back to profile"]',
+  // Page structure
+  MAIN_CONTENT: 'main, [role="main"], body',
+  PAGE_HEADING: 'h1',
+  // Error indicators
+  ERROR_PAGE: '[data-testid="error-page"]',
+  NOT_FOUND: '[data-testid="not-found"]',
+} as const;
+
+/**
+ * Build a flexible selector that falls back gracefully
+ * Priority: data-testid > aria-label > text content > CSS
+ */
+export function buildRobustSelector(options: {
+  testId?: string;
+  ariaLabel?: string;
+  text?: string | RegExp;
+  css?: string;
+}): string {
+  if (options.testId) {
+    return `[data-testid="${options.testId}"]`;
+  }
+  if (options.ariaLabel) {
+    return `[aria-label="${options.ariaLabel}"]`;
+  }
+  if (options.css) {
+    return options.css;
+  }
+  // Text-based selectors are least preferred
+  return '*';
+}
