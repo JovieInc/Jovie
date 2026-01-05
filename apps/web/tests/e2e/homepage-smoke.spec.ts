@@ -118,20 +118,32 @@ test.describe('Homepage Smoke @smoke @critical', () => {
       'Homepage body is empty or too short'
     ).toBe(true);
 
-    // Check for navigation or logo (any svg/img)
-    const hasLogo =
-      (await page
+    // Check for logo using data-testid (more reliable than generic svg/img selector)
+    const logo = page.getByTestId('site-logo');
+    const logoLink = page.getByTestId('site-logo-link');
+
+    // First try the data-testid approach (preferred)
+    const hasLogoByTestId = await logo.isVisible().catch(() => false);
+    const hasLogoLinkByTestId = await logoLink.isVisible().catch(() => false);
+
+    // Fallback to generic selector if data-testid not found (backwards compatibility)
+    const hasLogoGeneric =
+      !hasLogoByTestId &&
+      ((await page
         .locator('svg')
         .first()
         .isVisible()
         .catch(() => false)) ||
-      (await page
-        .locator('img')
-        .first()
-        .isVisible()
-        .catch(() => false));
+        (await page
+          .locator('img')
+          .first()
+          .isVisible()
+          .catch(() => false)));
 
-    expect(hasLogo, 'Homepage missing logo/icon').toBe(true);
+    expect(
+      hasLogoByTestId || hasLogoLinkByTestId || hasLogoGeneric,
+      'Homepage missing logo/icon'
+    ).toBe(true);
 
     // Check for main CTA or navigation
     const hasInteractiveElement =
@@ -149,5 +161,10 @@ test.describe('Homepage Smoke @smoke @critical', () => {
     expect(hasInteractiveElement, 'Homepage missing interactive elements').toBe(
       true
     );
+
+    // Check for header navigation
+    const header = page.getByTestId('header-nav');
+    const hasHeader = await header.isVisible().catch(() => false);
+    expect(hasHeader, 'Homepage missing header navigation').toBe(true);
   });
 });

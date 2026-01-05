@@ -82,11 +82,17 @@ test.describe('Homepage', () => {
   });
 
   test('has proper navigation elements', async ({ page }) => {
-    // Check header navigation
-    await expect(page.getByRole('link', { name: 'Jovie' })).toBeVisible();
+    // Check header navigation is present
+    const header = page.getByTestId('header-nav');
+    await expect(header).toBeVisible();
 
-    // Check if logo is present
-    const logo = page.locator('svg[viewBox="0 0 136 39"]');
+    // Check if logo link is present and accessible
+    const logoLink = page.getByTestId('site-logo-link');
+    await expect(logoLink).toBeVisible();
+    await expect(logoLink).toHaveAttribute('aria-label', 'Jovie');
+
+    // Check if logo SVG is rendered
+    const logo = page.getByTestId('site-logo');
     await expect(logo).toBeVisible();
   });
 

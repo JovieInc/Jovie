@@ -7,6 +7,7 @@ interface LogoLinkProps {
   className?: string;
   logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   variant?: LogoVariant;
+  'data-testid'?: string;
 }
 
 export function LogoLink({
@@ -14,14 +15,16 @@ export function LogoLink({
   className,
   logoSize = 'sm',
   variant = 'word',
+  'data-testid': dataTestId = 'site-logo',
 }: LogoLinkProps) {
   return (
     <Link
       href={href}
       className={cn('flex items-center space-x-2', className)}
       aria-label='Jovie'
+      data-testid={`${dataTestId}-link`}
     >
-      <Logo size={logoSize} variant={variant} />
+      <Logo size={logoSize} variant={variant} data-testid={dataTestId} />
     </Link>
   );
 }
