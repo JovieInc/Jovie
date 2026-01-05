@@ -30,11 +30,18 @@ export default async function OnboardingPage({
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId!;
 
-  // Get dashboard data for form initialization
-  // No need to check needsOnboarding here - auth gate already validated access
-  // Removing this check prevents redirect loops caused by race conditions
-  const dashboardData = await getDashboardData();
-  const existingProfile = dashboardData.selectedProfile;
+  // Try to get existing profile data if available (user might be partially onboarded)
+  // This is optional - if it fails, we just don't pre-fill
+  let existingProfile = null;
+  try {
+    const dashboardData = await getDashboardData();
+    existingProfile = dashboardData.selectedProfile;
+  } catch {
+    // User might not have profile yet - that's fine, they're onboarding
+    console.log(
+      '[onboarding] No existing profile found (expected for new users)'
+    );
+  }
 
   const displayNameSource = existingProfile?.displayName
     ? 'profile'
