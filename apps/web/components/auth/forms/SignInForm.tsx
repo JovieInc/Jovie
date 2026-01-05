@@ -6,11 +6,10 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
+import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
-
-const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
 
 /**
  * Sign-in form using Clerk Core API.
@@ -48,7 +47,7 @@ export function SignInForm() {
       );
       if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
         window.sessionStorage.setItem(
-          AUTH_REDIRECT_URL_STORAGE_KEY,
+          AUTH_STORAGE_KEYS.REDIRECT_URL,
           redirectUrl
         );
       }
@@ -96,13 +95,6 @@ export function SignInForm() {
   return (
     <Card className='shadow-none border-0 bg-transparent p-0'>
       <CardContent className='space-y-3 p-0'>
-        {/* Global error display */}
-        <div className='min-h-[24px]' role='alert' aria-live='polite'>
-          {error && step === 'method' && (
-            <p className='text-destructive text-sm text-center'>{error}</p>
-          )}
-        </div>
-
         {/* Method selection step */}
         {step === 'method' && (
           <MethodSelector

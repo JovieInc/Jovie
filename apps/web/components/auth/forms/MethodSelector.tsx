@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import * as React from 'react';
 import { useMemo } from 'react';
+import { AUTH_CLASSES } from '@/lib/auth/constants';
 import type { AuthMethod, LoadingState } from '@/lib/auth/types';
 import { useFeatureGate } from '@/lib/flags/client';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
@@ -14,10 +15,6 @@ import {
 } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
-const STEP_TRANSITION_CLASSES =
-  'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
-const OAUTH_BUTTON_MOBILE_CLASSES =
-  'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150';
 const FOOTER_LINK_CLASSES =
   'text-primary-token hover:underline focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md touch-manipulation';
 
@@ -115,7 +112,7 @@ export function MethodSelector({
           onClick={onGoogleClick}
           disabled={isAnyLoading}
           aria-busy={isGoogleLoading}
-          className={`${className} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
+          className={`${className} ${AUTH_CLASSES.oauthButtonMobile}`}
         >
           {isGoogleLoading ? (
             <>
@@ -143,7 +140,7 @@ export function MethodSelector({
         onClick={onSpotifyClick}
         disabled={isAnyLoading}
         aria-busy={isSpotifyLoading}
-        className={`${className} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
+        className={`${className} ${AUTH_CLASSES.oauthButtonMobile}`}
       >
         {isSpotifyLoading ? (
           <>
@@ -161,7 +158,7 @@ export function MethodSelector({
   };
 
   return (
-    <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
+    <div className={`space-y-4 ${AUTH_CLASSES.stepTransition}`}>
       <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
       </h1>

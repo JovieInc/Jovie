@@ -2,11 +2,8 @@
 
 import * as React from 'react';
 import { useCallback, useRef, useState } from 'react';
-import { AuthBackButton, AuthButton, AuthInput } from '../atoms';
+import { AuthBackButton, AuthButton, AuthInput, FormError } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
-
-const FIELD_ERROR_CLASSES =
-  'mt-3 text-sm text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200';
 
 interface EmailStepProps {
   /**
@@ -123,11 +120,7 @@ export function EmailStep({
           disabled={isLoading}
         />
 
-        {displayError && (
-          <p className={FIELD_ERROR_CLASSES} role='alert'>
-            {displayError}
-          </p>
-        )}
+        <FormError message={displayError} />
       </div>
 
       <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
