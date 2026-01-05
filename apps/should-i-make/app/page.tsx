@@ -383,7 +383,7 @@ function ResultScreen({ result }: { result: Result }) {
           </p>
           <p className='text-lg text-muted mt-4'>
             If you're making a 4-minute cinematic masterpiece... ask yourself if
-            that's really what moves the needle in 2025.
+            that's really what moves the needle in 2026.
           </p>
         </>
       ),

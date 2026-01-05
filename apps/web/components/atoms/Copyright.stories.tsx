@@ -27,6 +27,6 @@ export const Default: Story = {
 export const Light: Story = {
   args: {
     variant: 'light',
-    year: 2025,
+    year: new Date().getFullYear(),
   },
 };

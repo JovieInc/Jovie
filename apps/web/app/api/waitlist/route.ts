@@ -298,40 +298,60 @@ export async function POST(request: Request) {
 
     if (existing) {
       // Avoid overwriting invited/claimed/rejected states.
-      if (existing.status === 'new') {
-        const updateValues = {
-          fullName,
-          primaryGoal: primaryGoal ?? null,
-          primarySocialUrl,
-          primarySocialPlatform: platform,
-          primarySocialUrlNormalized: normalizedUrl,
-          spotifyUrl: spotifyUrl ?? null,
-          spotifyUrlNormalized,
-          heardAbout: sanitizedHeardAbout,
-          selectedPlan: selectedPlan ?? null,
-          updatedAt: new Date(),
-        };
+      // Wrap in transaction to ensure atomicity between waitlist and user updates
+      await db.transaction(async tx => {
+        if (existing.status === 'new') {
+          const updateValues = {
+            fullName,
+            primaryGoal: primaryGoal ?? null,
+            primarySocialUrl,
+            primarySocialPlatform: platform,
+            primarySocialUrlNormalized: normalizedUrl,
+            spotifyUrl: spotifyUrl ?? null,
+            spotifyUrlNormalized,
+            heardAbout: sanitizedHeardAbout,
+            selectedPlan: selectedPlan ?? null,
+            updatedAt: new Date(),
+          };
 
-        try {
-          await db
-            .update(waitlistEntries)
-            .set(updateValues)
-            .where(eq(waitlistEntries.id, existing.id));
-        } catch (error) {
-          if (!isMissingWaitlistSchemaError(error)) throw error;
-          const {
-            primaryGoal: _primaryGoal,
-            selectedPlan: _selectedPlan,
-            ...fallbackValues
-          } = updateValues;
-          void _primaryGoal;
-          void _selectedPlan;
-          await db
-            .update(waitlistEntries)
-            .set(fallbackValues)
-            .where(eq(waitlistEntries.id, existing.id));
+          try {
+            await tx
+              .update(waitlistEntries)
+              .set(updateValues)
+              .where(eq(waitlistEntries.id, existing.id));
+          } catch (error) {
+            if (!isMissingWaitlistSchemaError(error)) throw error;
+            const {
+              primaryGoal: _primaryGoal,
+              selectedPlan: _selectedPlan,
+              ...fallbackValues
+            } = updateValues;
+            void _primaryGoal;
+            void _selectedPlan;
+            await tx
+              .update(waitlistEntries)
+              .set(fallbackValues)
+              .where(eq(waitlistEntries.id, existing.id));
+          }
         }
-      }
+
+        // Upsert users.waitlistApproval to 'pending' so getUserState() recognizes submission
+        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
+        await tx
+          .insert(users)
+          .values({
+            clerkId: userId,
+            email: emailRaw,
+            waitlistApproval: 'pending',
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: {
+              waitlistApproval: 'pending',
+              updatedAt: new Date(),
+            },
+          });
+      });
 
       // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
       await db
@@ -345,7 +365,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Insert waitlist entry
+    // Insert waitlist entry and update user in transaction for atomicity
     const insertValues = {
       fullName,
       email,
@@ -360,19 +380,38 @@ export async function POST(request: Request) {
       status: 'new' as const,
     };
 
-    try {
-      await db.insert(waitlistEntries).values(insertValues);
-    } catch (error) {
-      if (!isMissingWaitlistSchemaError(error)) throw error;
-      const {
-        primaryGoal: _primaryGoal,
-        selectedPlan: _selectedPlan,
-        ...fallbackValues
-      } = insertValues;
-      void _primaryGoal;
-      void _selectedPlan;
-      await db.insert(waitlistEntries).values(fallbackValues);
-    }
+    await db.transaction(async tx => {
+      try {
+        await tx.insert(waitlistEntries).values(insertValues);
+      } catch (error) {
+        if (!isMissingWaitlistSchemaError(error)) throw error;
+        const {
+          primaryGoal: _primaryGoal,
+          selectedPlan: _selectedPlan,
+          ...fallbackValues
+        } = insertValues;
+        void _primaryGoal;
+        void _selectedPlan;
+        await tx.insert(waitlistEntries).values(fallbackValues);
+      }
+
+      // Upsert users.waitlistApproval to 'pending' so getUserState() recognizes submission
+      // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
+      await tx
+        .insert(users)
+        .values({
+          clerkId: userId,
+          email: emailRaw,
+          waitlistApproval: 'pending',
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: {
+            waitlistApproval: 'pending',
+            updatedAt: new Date(),
+          },
+        });
+    });
 
     // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
     await db

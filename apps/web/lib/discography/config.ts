@@ -40,7 +40,7 @@ export const DEFAULT_RELEASE_TEMPLATES: ReleaseTemplate[] = [
   {
     id: 'midnight-parade',
     title: 'Midnight Parade',
-    releaseDate: '2025-01-26',
+    releaseDate: '2026-01-26',
     artworkUrl:
       'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=640&q=80',
     providers: {
@@ -55,7 +55,7 @@ export const DEFAULT_RELEASE_TEMPLATES: ReleaseTemplate[] = [
   {
     id: 'stillness',
     title: 'Stillness',
-    releaseDate: '2025-02-10',
+    releaseDate: '2026-02-10',
     artworkUrl:
       'https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=640&q=80',
     providers: {
