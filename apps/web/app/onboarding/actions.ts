@@ -473,7 +473,7 @@ export async function completeOnboarding({
       // Invalidate dashboard data cache to prevent stale data causing redirect loops
       // This ensures the app layout gets fresh data showing onboarding is complete
       revalidatePath('/app', 'layout');
-      redirect('/app/dashboard/overview');
+      redirect('/app/dashboard');
     }
 
     return completion;
