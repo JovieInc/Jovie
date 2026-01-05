@@ -156,9 +156,6 @@ test.describe('Homepage Smoke @smoke @critical', () => {
       ).toBe(true);
 
       // Check for logo using data-testid (more reliable than generic svg/img selector)
-      const logo = page.getByTestId('site-logo');
-      const logoLink = page.getByTestId('site-logo-link');
-
       // First try the data-testid approach (preferred)
       const hasLogoByTestId = await elementVisible(page, '[data-testid="site-logo"]', {
         timeout: SMOKE_TIMEOUTS.QUICK,
