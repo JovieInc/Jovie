@@ -1,7 +1,6 @@
 'server only';
 
-import { and, eq } from 'drizzle-orm';
-import { cache } from 'react';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 
@@ -12,19 +11,22 @@ export interface ProxyUserState {
 }
 
 /**
- * Lightweight user state check for proxy.ts (uncached)
+ * Lightweight user state check for proxy.ts
  *
  * This performs a single optimized query to determine user state for routing.
  * Used by proxy.ts to make ONE auth decision at the edge, eliminating redirect loops.
  *
+ * IMPORTANT: Filters out soft-deleted and banned users for security.
+ *
  * @param clerkUserId - The Clerk user ID from auth()
  * @returns Boolean flags indicating what the user needs
  */
-async function getUserStateUncached(
+export async function getUserState(
   clerkUserId: string
 ): Promise<ProxyUserState> {
   try {
     // Single query with join - optimized for proxy performance
+    // Filter out deleted and banned users to prevent misrouting
     const [result] = await db
       .select({
         dbUserId: users.id,
@@ -40,7 +42,13 @@ async function getUserStateUncached(
           eq(creatorProfiles.isClaimed, true)
         )
       )
-      .where(eq(users.clerkId, clerkUserId))
+      .where(
+        and(
+          eq(users.clerkId, clerkUserId),
+          isNull(users.deletedAt), // Exclude soft-deleted users
+          ne(users.status, 'banned') // Exclude banned users
+        )
+      )
       .limit(1);
 
     // No DB user → needs waitlist/signup
@@ -72,11 +80,3 @@ async function getUserStateUncached(
     return { needsWaitlist: true, needsOnboarding: false, isActive: false };
   }
 }
-
-/**
- * Request-scoped cached version of getUserState
- *
- * Uses React's cache() to deduplicate calls within the same request.
- * This prevents multiple DB queries when proxy.ts needs to check state multiple times.
- */
-export const getUserState = cache(getUserStateUncached);
