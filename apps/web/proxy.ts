@@ -1,4 +1,5 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import {
   type NextFetchEvent,
   type NextRequest,
@@ -425,6 +426,12 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       error,
       pathname: req.nextUrl.pathname,
       message: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    // Capture in Sentry for production monitoring
+    Sentry.captureException(error, {
+      tags: { context: 'proxy_middleware' },
+      extra: { pathname: req.nextUrl.pathname },
     });
 
     // Fallback to basic middleware behavior

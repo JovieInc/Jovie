@@ -30,6 +30,11 @@ export default async function OnboardingPage({
 
   // Defensive check: ensure we have a valid Clerk user ID
   if (!authResult.clerkUserId) {
+    const error = new Error('Missing clerkUserId despite proxy routing');
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_defensive_check' },
+      level: 'error',
+    });
     console.error('[onboarding] Missing clerkUserId despite proxy routing');
     redirect('/signin?redirect_url=/onboarding');
   }

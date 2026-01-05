@@ -25,6 +25,11 @@ async function getAppUserId(): Promise<string> {
 
     // Defensive check: ensure we have a valid Clerk user ID
     if (!authResult.clerkUserId) {
+      const error = new Error('Missing clerkUserId despite proxy routing');
+      Sentry.captureException(error, {
+        tags: { context: 'app_layout_defensive_check' },
+        level: 'error',
+      });
       console.error('[app-layout] Missing clerkUserId despite proxy routing');
       redirect('/signin?redirect_url=/app/dashboard');
     }
