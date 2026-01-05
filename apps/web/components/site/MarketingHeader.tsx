@@ -65,7 +65,7 @@ export function MarketingHeader({
     <Header
       sticky={false}
       logoSize={logoSize}
-      logoVariant='wordAlt'
+      logoVariant='word'
       hideNav={resolvedHideNav}
       hidePricingLink={hidePricingLink}
       containerSize='md'
