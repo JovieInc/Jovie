@@ -169,7 +169,7 @@
     "@clerk/testing": "^1.13.26",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.35.0",
-    "@next/bundle-analyzer": "^16.0.10",
+    "@next/bundle-analyzer": "^16.1.1",
     "@playwright/test": "^1.55.0",
     "@storybook/addon-a11y": "^10.1.4",
     "@storybook/addon-docs": "^10.1.11",
