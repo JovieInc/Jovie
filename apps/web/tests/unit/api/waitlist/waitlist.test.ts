@@ -6,6 +6,7 @@ const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockDbExecute = vi.hoisted(() => vi.fn());
+const mockDbTransaction = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -18,6 +19,7 @@ vi.mock('@/lib/db', () => ({
     insert: mockDbInsert,
     update: mockDbUpdate,
     execute: mockDbExecute,
+    transaction: mockDbTransaction,
   },
   waitlistEntries: {},
 }));
@@ -52,6 +54,17 @@ describe('Waitlist API', () => {
     vi.clearAllMocks();
     vi.resetModules();
     process.env.DATABASE_URL = 'postgres://test@localhost/test';
+
+    // Mock transaction to execute callback with tx object that has same methods as db
+    mockDbTransaction.mockImplementation(async callback => {
+      const tx = {
+        select: mockDbSelect,
+        insert: mockDbInsert,
+        update: mockDbUpdate,
+        execute: mockDbExecute,
+      };
+      return await callback(tx);
+    });
   });
 
   describe('GET /api/waitlist', () => {
@@ -176,7 +189,9 @@ describe('Waitlist API', () => {
         }),
       });
       mockDbInsert.mockReturnValue({
-        values: vi.fn().mockResolvedValue(undefined),
+        values: vi.fn().mockReturnValue({
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        }),
       });
       mockDbUpdate.mockReturnValue({
         set: vi.fn().mockReturnValue({
@@ -203,8 +218,9 @@ describe('Waitlist API', () => {
     });
 
     it('sets users.waitlistApproval to pending after submission', async () => {
-      const mockUpdateSet = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+      const mockValues = vi.fn().mockReturnValue({
+        onConflictDoUpdate: mockOnConflict,
       });
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
@@ -220,10 +236,7 @@ describe('Waitlist API', () => {
         }),
       });
       mockDbInsert.mockReturnValue({
-        values: vi.fn().mockResolvedValue(undefined),
-      });
-      mockDbUpdate.mockReturnValue({
-        set: mockUpdateSet,
+        values: mockValues,
       });
 
       const { POST } = await import('@/app/api/waitlist/route');
@@ -242,11 +255,21 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
 
-      // Verify users.waitlistApproval was updated to 'pending'
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(mockUpdateSet).toHaveBeenCalledWith({
+      // Verify users table was upserted with waitlistApproval='pending'
+      expect(mockDbInsert).toHaveBeenCalled();
+      expect(mockValues).toHaveBeenCalledWith({
+        clerkId: 'user_123',
+        email: 'test@example.com',
         waitlistApproval: 'pending',
       });
+      expect(mockOnConflict).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({
+            waitlistApproval: 'pending',
+            updatedAt: expect.any(Date),
+          }),
+        })
+      );
     });
   });
 });
