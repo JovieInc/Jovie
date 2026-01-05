@@ -278,19 +278,27 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Let SSO callback routes complete without middleware interference
     // The AuthenticateWithRedirectCallback component will handle routing based on user state
     if (userId && isAuthPath && !isAuthCallbackPath) {
-      // If the user is already signed in and hits a non-callback auth page, check for redirect_url
+      // Check complete user state to determine where authenticated user should go
+      const userState = await getUserState(userId);
+
       const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
-      if (
+
+      // If user needs waitlist/onboarding, send them there (ignore redirect_url)
+      if (userState.needsWaitlist) {
+        res = NextResponse.redirect(new URL('/waitlist', req.url));
+      } else if (userState.needsOnboarding) {
+        res = NextResponse.redirect(new URL('/onboarding', req.url));
+      } else if (
         redirectUrl &&
         redirectUrl.startsWith('/') &&
         !redirectUrl.startsWith('//')
       ) {
-        // Honor the redirect_url if it's a valid internal path (e.g., /claim/token)
+        // User is fully active - honor redirect_url for things like /claim/token
         res = NextResponse.redirect(
           new URL(normalizeRedirectPath(redirectUrl), req.url)
         );
       } else {
-        // Default to the app shell; it will route users to the correct next step.
+        // Fully active user, no redirect_url - go to dashboard
         res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       }
     } else if (!userId && pathname === '/sign-in') {
