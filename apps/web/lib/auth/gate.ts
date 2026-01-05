@@ -308,6 +308,44 @@ export async function resolveUserState(options?: {
         };
       }
     } else if (!createDbUserIfMissing) {
+      // Even when not creating DB user, check waitlist status to avoid redirect loops
+      // This is important for the waitlist layout which uses createDbUserIfMissing: false
+      if (email) {
+        const waitlistResult = await checkWaitlistAccessInternal(email);
+
+        if (
+          waitlistResult.status === 'new' ||
+          waitlistResult.status === 'rejected' ||
+          !waitlistResult.status
+        ) {
+          // Not on waitlist - need to submit application
+          return {
+            state: UserState.NEEDS_WAITLIST_SUBMISSION,
+            clerkUserId,
+            dbUserId: null,
+            profileId: null,
+            redirectTo: '/waitlist',
+            context: { ...baseContext, email },
+          };
+        }
+
+        if (waitlistResult.status === 'invited' && waitlistResult.claimToken) {
+          return {
+            state: UserState.WAITLIST_INVITED,
+            clerkUserId,
+            dbUserId: null,
+            profileId: null,
+            redirectTo: `/claim/${encodeURIComponent(waitlistResult.claimToken)}`,
+            context: {
+              ...baseContext,
+              email,
+              claimToken: waitlistResult.claimToken,
+            },
+          };
+        }
+      }
+
+      // User is approved/claimed on waitlist but no DB user yet
       return {
         state: UserState.NEEDS_DB_USER,
         clerkUserId,
