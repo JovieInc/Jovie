@@ -329,51 +329,9 @@ export async function resolveUserState(options?: {
     }
   }
 
-  // 3. Check waitlist access for existing users without waitlist linkage
-  // This handles users who existed before the waitlist system
-  if (!dbUser?.waitlistEntryId && email) {
-    const waitlistResult = await checkWaitlistAccessInternal(email);
-
-    // If user has no waitlist entry and hasn't been approved, check their access
-    if (waitlistResult.status === 'new') {
-      return {
-        state: UserState.WAITLIST_PENDING,
-        clerkUserId,
-        dbUserId,
-        profileId: null,
-        redirectTo: '/waitlist',
-        context: { ...baseContext, email },
-      };
-    }
-
-    if (waitlistResult.status === 'rejected') {
-      return {
-        state: UserState.NEEDS_WAITLIST_SUBMISSION,
-        clerkUserId,
-        dbUserId,
-        profileId: null,
-        redirectTo: '/waitlist',
-        context: { ...baseContext, email },
-      };
-    }
-
-    if (waitlistResult.status === 'invited' && waitlistResult.claimToken) {
-      return {
-        state: UserState.WAITLIST_INVITED,
-        clerkUserId,
-        dbUserId,
-        profileId: null,
-        redirectTo: `/claim/${encodeURIComponent(waitlistResult.claimToken)}`,
-        context: {
-          ...baseContext,
-          email,
-          claimToken: waitlistResult.claimToken,
-        },
-      };
-    }
-  }
-
-  // 4. Query creator profile
+  // 3. Query creator profile first to determine if user is mid-onboarding
+  // We need to check this before waitlist logic to avoid redirect loops
+  // for users who just signed up via OAuth and are completing onboarding
   const [profile] = await db
     .select({
       id: creatorProfiles.id,
