@@ -1230,6 +1230,61 @@ jobs:
                 body: summaryBody
               });
             }
+  # CRITICAL: Required smoke tests run BEFORE production deploy
+  # These tests verify the most critical user flows: public profiles + auth
+  ci-smoke-required:
+    name: Smoke Tests (Required)
+    needs: [ci-fast, ci-build, neon-db]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Resolve Neon DB URL (job-local)
+        id: resolve_neon
+        uses: neondatabase/create-branch-action@f642cf9c91ab9bf742ec8217b9615e0e42e437dd # v6.1.1
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ needs.neon-db.outputs.branch_name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run Required Smoke Tests
+        run: |
+          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-required.spec.ts --project=chromium --reporter=line
+        env:
+          DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: smoke-required-report-${{ github.run_id }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
   # CRITICAL: Homepage smoke test runs BEFORE production deploy
   # This prevents broken homepages from reaching production
   ci-homepage-smoke:
@@ -1273,7 +1328,7 @@ jobs:
           retention-days: 3
 
   deploy:
-    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-homepage-smoke] # Homepage smoke must pass before deploy
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required, ci-homepage-smoke] # Required smoke + homepage smoke must pass before deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
