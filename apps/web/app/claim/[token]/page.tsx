@@ -129,11 +129,19 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
   let dbUserId = authResult.dbUserId;
 
   if (!dbUserId) {
+    // Defensive check: ensure we have a valid Clerk user ID
+    if (!authResult.clerkUserId) {
+      logger.error(
+        '[CLAIM] Missing clerkUserId in auth result during user creation'
+      );
+      redirect('/signin');
+    }
+
     // Fallback: create user if somehow missing (shouldn't happen with createDbUserIfMissing=true)
     const [createdUser] = await db
       .insert(users)
       .values({
-        clerkId: authResult.clerkUserId!,
+        clerkId: authResult.clerkUserId,
         email: authResult.context.email,
         status: 'active',
       })
