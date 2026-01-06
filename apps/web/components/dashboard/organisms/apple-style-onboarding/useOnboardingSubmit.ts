@@ -116,7 +116,12 @@ export function useOnboardingSubmit({
       } catch (error) {
         // Handle Next.js redirect special case
         if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-          setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
+          setState(prev => ({
+            ...prev,
+            step: 'complete',
+            progress: 100,
+            isSubmitting: false,
+          }));
           return;
         }
 
