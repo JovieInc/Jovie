@@ -26,6 +26,108 @@ function shouldDisableStripeEventsTable(error: unknown): boolean {
   return mentionsTable && isMissingRelation;
 }
 
+/**
+ * Fetches waitlist count with error handling
+ */
+async function getWaitlistCount(): Promise<number> {
+  try {
+    const [row] = await db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(waitlistEntries);
+    return Number(row?.count ?? 0);
+  } catch (error) {
+    console.error('Error fetching waitlist count:', error);
+    return 0;
+  }
+}
+
+/**
+ * Computes financial runway and profitability metrics
+ */
+function computeFinancialMetrics(
+  monthlyRevenue: number,
+  monthlyExpense: number,
+  balance: number,
+  revenueGrowth30d: number
+): {
+  runwayMonths: number | null;
+  netBurn: number;
+  monthsToProfitability: number | null;
+} {
+  const netBurn = monthlyExpense - monthlyRevenue;
+  const runwayMonths = netBurn > 0 ? balance / netBurn : null;
+  const monthsToProfitability =
+    netBurn > 0 && revenueGrowth30d > 0 ? netBurn / revenueGrowth30d : null;
+
+  return { runwayMonths, netBurn, monthsToProfitability };
+}
+
+/**
+ * Determines if company is "default alive" based on Paul Graham's definition
+ */
+function isDefaultAlive(
+  netBurn: number,
+  monthsToProfitability: number | null,
+  runwayMonths: number | null
+): boolean {
+  return (
+    netBurn <= 0 ||
+    (monthsToProfitability != null &&
+      runwayMonths != null &&
+      monthsToProfitability <= runwayMonths)
+  );
+}
+
+/**
+ * Generates human-readable status detail message
+ */
+function computeDefaultStatusDetail(
+  netBurn: number,
+  monthsToProfitability: number | null,
+  runwayMonths: number | null,
+  isAlive: boolean
+): string {
+  if (netBurn <= 0) {
+    return 'Revenue already exceeds spend at the current run rate.';
+  }
+  if (monthsToProfitability == null) {
+    return 'Revenue growth is not yet outpacing burn at the current trajectory.';
+  }
+  if (runwayMonths == null) {
+    return 'Runway is currently unlimited based on cash flow.';
+  }
+  if (isAlive) {
+    return `Runway covers roughly ${monthsToProfitability.toFixed(1)} months to profitability.`;
+  }
+  return 'At the current growth rate, runway ends before profitability.';
+}
+
+/**
+ * Generates error message for missing financial data sources
+ */
+function getMissingServicesMessage(
+  stripeMetrics: { isConfigured: boolean; isAvailable: boolean },
+  mercuryMetrics: { isConfigured: boolean; isAvailable: boolean }
+): string {
+  const missingServices: string[] = [];
+
+  if (!stripeMetrics.isConfigured) {
+    missingServices.push('Stripe (not configured)');
+  } else if (!stripeMetrics.isAvailable) {
+    missingServices.push('Stripe (unavailable)');
+  }
+
+  if (!mercuryMetrics.isConfigured) {
+    missingServices.push('Mercury (not configured)');
+  } else if (!mercuryMetrics.isAvailable) {
+    missingServices.push('Mercury (unavailable)');
+  }
+
+  return missingServices.length > 0
+    ? `Cannot calculate status: ${missingServices.join(', ')}`
+    : 'Financial data sources unavailable.';
+}
+
 export interface AdminUsagePoint {
   label: string;
   value: number;
@@ -326,17 +428,7 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
     const [stripeMetrics, mercuryMetrics, waitlistCount] = await Promise.all([
       getAdminStripeOverviewMetrics(),
       getAdminMercuryMetrics(),
-      (async () => {
-        try {
-          const [row] = await db
-            .select({ count: drizzleSql<number>`count(*)::int` })
-            .from(waitlistEntries);
-          return Number(row?.count ?? 0);
-        } catch (error) {
-          console.error('Error fetching waitlist count:', error);
-          return 0;
-        }
-      })(),
+      getWaitlistCount(),
     ]);
 
     const stripeAvailability: DataAvailability = {
@@ -357,59 +449,33 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
     let runwayMonths: number | null = null;
     let netBurn = 0;
     let monthsToProfitability: number | null = null;
-    let isDefaultAlive = false;
+    let isAlive = false;
     let defaultStatusDetail = '';
 
     if (canCalculateFinancials) {
-      const monthlyRevenue = stripeMetrics.mrrUsd;
-      const monthlyExpense = mercuryMetrics.burnRateUsd;
-      netBurn = monthlyExpense - monthlyRevenue;
-      runwayMonths = netBurn > 0 ? mercuryMetrics.balanceUsd / netBurn : null;
+      const financialMetrics = computeFinancialMetrics(
+        stripeMetrics.mrrUsd,
+        mercuryMetrics.burnRateUsd,
+        mercuryMetrics.balanceUsd,
+        stripeMetrics.mrrGrowth30dUsd
+      );
 
-      const revenueGrowth30d = stripeMetrics.mrrGrowth30dUsd;
-      monthsToProfitability =
-        netBurn > 0 && revenueGrowth30d > 0 ? netBurn / revenueGrowth30d : null;
+      runwayMonths = financialMetrics.runwayMonths;
+      netBurn = financialMetrics.netBurn;
+      monthsToProfitability = financialMetrics.monthsToProfitability;
 
-      isDefaultAlive =
-        netBurn <= 0 ||
-        (monthsToProfitability != null &&
-          runwayMonths != null &&
-          monthsToProfitability <= runwayMonths);
-
-      if (netBurn <= 0) {
-        defaultStatusDetail =
-          'Revenue already exceeds spend at the current run rate.';
-      } else if (monthsToProfitability == null) {
-        defaultStatusDetail =
-          'Revenue growth is not yet outpacing burn at the current trajectory.';
-      } else if (runwayMonths == null) {
-        defaultStatusDetail =
-          'Runway is currently unlimited based on cash flow.';
-      } else if (isDefaultAlive) {
-        defaultStatusDetail = `Runway covers roughly ${monthsToProfitability.toFixed(
-          1
-        )} months to profitability.`;
-      } else {
-        defaultStatusDetail =
-          'At the current growth rate, runway ends before profitability.';
-      }
+      isAlive = isDefaultAlive(netBurn, monthsToProfitability, runwayMonths);
+      defaultStatusDetail = computeDefaultStatusDetail(
+        netBurn,
+        monthsToProfitability,
+        runwayMonths,
+        isAlive
+      );
     } else {
-      const missingServices: string[] = [];
-      if (!stripeMetrics.isConfigured) {
-        missingServices.push('Stripe (not configured)');
-      } else if (!stripeMetrics.isAvailable) {
-        missingServices.push('Stripe (unavailable)');
-      }
-      if (!mercuryMetrics.isConfigured) {
-        missingServices.push('Mercury (not configured)');
-      } else if (!mercuryMetrics.isAvailable) {
-        missingServices.push('Mercury (unavailable)');
-      }
-
-      defaultStatusDetail =
-        missingServices.length > 0
-          ? `Cannot calculate status: ${missingServices.join(', ')}`
-          : 'Financial data sources unavailable.';
+      defaultStatusDetail = getMissingServicesMessage(
+        stripeMetrics,
+        mercuryMetrics
+      );
     }
 
     return {
@@ -419,7 +485,7 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
       balanceUsd: mercuryMetrics.balanceUsd,
       burnRateUsd: mercuryMetrics.burnRateUsd,
       runwayMonths,
-      defaultStatus: isDefaultAlive ? 'alive' : 'dead',
+      defaultStatus: isAlive ? 'alive' : 'dead',
       defaultStatusDetail,
       waitlistCount,
       stripeAvailability,
