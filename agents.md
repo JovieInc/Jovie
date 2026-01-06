@@ -2,6 +2,34 @@
 
 This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo so we ship fast while keeping `main` clean.
 
+## Core rules (read this first)
+
+- **Work style:** One user-visible outcome per PR, keep scope tight, keep changes reversible.
+- **Branches:** Create feature branches from `main` (`feat/…`, `fix/…`, `chore/…`). Never push directly to `main`.
+- **Protected repo settings:** Never modify repository settings, branch protection rules, or `.github/rulesets/*`.
+- **Domains:** Multi-domain setup. Public profiles live on `jov.ie`; marketing/app/auth live on `meetjovie.com`.
+- **Middleware entrypoint:** Do not create `middleware.ts`. This repo uses `apps/web/proxy.ts` and enforces it via `pnpm next:proxy-guard`.
+- **Runtime:** Edge for latency-sensitive public reads; Node for Stripe and Node-only libraries. Never import Node-only deps into Edge code.
+- **DB access:** Use `@/lib/db` helpers; do not invent new DB clients.
+- **DB migrations:** Generate via `pnpm --filter=@jovie/web run drizzle:generate`. Treat migrations as append-only once merged to `main`.
+- **Feature flags & analytics:** Use the existing wrappers/systems (`apps/web/lib/flags/*`, `apps/web/lib/analytics/*`). Do not add new analytics SDKs.
+- **UI conventions:** Prefer Server Components; add `'use client'` only when needed. Use `next/link`, `next/image`, and `next/font`.
+- **Tailwind:** Treat Tailwind config as locked. If you touch styling infra, run `pnpm --filter=@jovie/web run tailwind:check`.
+- **Icons:** UI icons via `apps/web/components/atoms/Icon.tsx` (`lucide-react`). Social/brand icons via `apps/web/components/atoms/SocialIcon.tsx` (`simple-icons`).
+
+## Runbooks and source-of-truth links
+
+- **Auth/routing/runtime:** `docs/AUTH_ROUTING_RUNTIME.md`
+- **Database + migrations:** `docs/DB_MIGRATIONS.md`
+- **Tailwind lockdown:** `docs/TAILWIND_LOCKDOWN.md`
+- **Feature gates registry:** `docs/STATSIG_FEATURE_GATES.md`
+- **AI automation:** `docs/AI_AUTOMATION.md`
+- **CI/CD flow:** `.github/CI_CD_FLOW.md`
+- **Branch protection (human-owned):** `.github/BRANCH_PROTECTION.md`
+
+<details>
+<summary>Legacy: detailed agent notes (kept for history). Prefer the Core rules + runbooks above.</summary>
+
 ## Quickstart for AI agents
 
 - **Single source of truth:** Treat this file as the canonical ruleset for all AI agents in this repo.
@@ -1333,3 +1361,5 @@ Update the metrics dashboard when counts change:
 ```
 
 **Failure to update the tech debt tracker when addressing or discovering tech debt is a violation of agent protocol.**
+
+</details>

@@ -8,6 +8,7 @@ import {
   waitlistEntries,
   waitlistInvites,
 } from '@/lib/db/schema';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 
 /**
@@ -34,6 +35,8 @@ export enum UserState {
   ACTIVE = 'ACTIVE',
   /** User has been banned */
   BANNED = 'BANNED',
+  /** User creation failed after retries - prevents redirect loops */
+  USER_CREATION_FAILED = 'USER_CREATION_FAILED',
 }
 
 /**
@@ -57,6 +60,7 @@ export interface AuthGateResult {
     isPro: boolean;
     email: string | null;
     claimToken?: string;
+    errorCode?: string;
   };
 }
 
@@ -118,11 +122,13 @@ async function createUserWithRetry(
           email,
           status: 'active',
           waitlistEntryId,
+          waitlistApproval: waitlistEntryId ? 'approved' : null,
         })
         .onConflictDoUpdate({
           target: users.clerkId,
           set: {
             email,
+            waitlistApproval: waitlistEntryId ? 'approved' : null,
             updatedAt: new Date(),
           },
         })
@@ -298,13 +304,30 @@ export async function resolveUserState(options?: {
 
       if (!dbUserId) {
         console.error('[AUTH] Failed to create user record after retries');
+
+        // Capture to Sentry for monitoring
+        await captureCriticalError(
+          'User creation failed after retries',
+          new Error('User creation failed after maximum retry attempts'),
+          {
+            clerkUserId,
+            email,
+            waitlistEntryId: waitlistResult.entryId,
+            context: 'resolveUserState',
+          }
+        );
+
         return {
-          state: UserState.NEEDS_ONBOARDING,
+          state: UserState.USER_CREATION_FAILED,
           clerkUserId,
           dbUserId: null,
           profileId: null,
-          redirectTo: '/onboarding?fresh_signup=true',
-          context: { ...baseContext, email },
+          redirectTo: '/error/user-creation-failed',
+          context: {
+            ...baseContext,
+            email,
+            errorCode: 'USER_CREATION_FAILED',
+          },
         };
       }
     } else if (!createDbUserIfMissing) {
@@ -511,6 +534,8 @@ export function getRedirectForState(
       return '/onboarding?fresh_signup=true';
     case UserState.BANNED:
       return '/banned';
+    case UserState.USER_CREATION_FAILED:
+      return '/error/user-creation-failed';
     case UserState.ACTIVE:
       return null;
     default:
