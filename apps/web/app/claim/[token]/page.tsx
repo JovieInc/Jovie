@@ -219,15 +219,28 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
 
   if (waitlistInvite) {
     try {
-      await db
-        .update(waitlistEntries)
-        .set({ status: 'claimed', updatedAt: now })
-        .where(
-          and(
-            eq(waitlistEntries.id, waitlistInvite.waitlistEntryId),
-            eq(waitlistEntries.status, 'invited')
-          )
-        );
+      // Atomically update both waitlist entry and user approval status
+      await db.transaction(async tx => {
+        await tx
+          .update(waitlistEntries)
+          .set({ status: 'claimed', updatedAt: now })
+          .where(
+            and(
+              eq(waitlistEntries.id, waitlistInvite.waitlistEntryId),
+              eq(waitlistEntries.status, 'invited')
+            )
+          );
+
+        // Sync user approval status and link to waitlist entry
+        await tx
+          .update(users)
+          .set({
+            waitlistApproval: 'approved',
+            waitlistEntryId: waitlistInvite.waitlistEntryId,
+            updatedAt: now,
+          })
+          .where(eq(users.id, dbUserId));
+      });
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         logger.warn('Failed to update waitlist entry status after claim', {

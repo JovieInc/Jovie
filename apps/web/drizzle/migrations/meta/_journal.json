@@ -232,6 +232,13 @@
       "when": 1767628508400,
       "tag": "0032_lean_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1736208000000,
+      "tag": "0033_fix_stored_function_waitlist",
+      "breakpoints": false
     }
   ]
 }
