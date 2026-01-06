@@ -16,7 +16,7 @@ interface ContactAvatarProps {
   fullName: string;
   username: string;
   canUploadAvatar: boolean;
-  onAvatarUpload?: (file: File) => void;
+  onAvatarUpload?: (file: File) => Promise<string>;
 }
 
 export function ContactAvatar({

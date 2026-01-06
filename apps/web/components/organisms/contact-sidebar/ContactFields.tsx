@@ -12,8 +12,8 @@ import React from 'react';
 import { formatUsername } from './utils';
 
 interface ContactFieldsProps {
-  firstName: string | null;
-  lastName: string | null;
+  firstName: string | null | undefined;
+  lastName: string | null | undefined;
   username: string;
   isEditable: boolean;
   onNameChange: (field: 'firstName' | 'lastName', value: string) => void;

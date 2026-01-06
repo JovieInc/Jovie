@@ -4,7 +4,9 @@
  * Type definitions for the ContactSidebar component.
  */
 
-import type { Contact, ContactSidebarMode } from '@/types';
+import type { Contact as BaseContact, ContactSidebarMode } from '@/types';
+
+export type Contact = BaseContact;
 
 export interface ContactSidebarProps {
   contact: Contact | null;

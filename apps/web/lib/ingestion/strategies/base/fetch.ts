@@ -192,7 +192,12 @@ async function fetchWithRedirects(
  */
 function shouldRetryError(error: unknown): boolean {
   if (error instanceof ExtractionError) {
-    return !['NOT_FOUND', 'RATE_LIMITED', 'INVALID_URL'].includes(error.code);
+    return ![
+      'NOT_FOUND',
+      'RATE_LIMITED',
+      'INVALID_URL',
+      'INVALID_HOST',
+    ].includes(error.code);
   }
   return true;
 }
