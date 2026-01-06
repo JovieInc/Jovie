@@ -79,7 +79,6 @@ export type {
   Tip,
   User,
 } from './db';
-
 // Re-export utility functions
 export {
   convertArtistToCreatorProfile,
@@ -87,6 +86,16 @@ export {
   isArtistProfile,
   isPodcasterProfile,
 } from './db';
+export type {
+  HudAccessMode,
+  HudBranding,
+  HudDeploymentRun,
+  HudDeploymentState,
+  HudDeployments,
+  HudMetrics,
+  HudOperationsStatus,
+  HudOverviewMetrics,
+} from './hud';
 
 // =====================================
 // CONSTANTS FOR SHARED ENUMS

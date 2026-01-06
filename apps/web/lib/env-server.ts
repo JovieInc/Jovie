@@ -60,6 +60,15 @@ const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+
+  // HUD (internal kiosk display)
+  HUD_KIOSK_TOKEN: z.string().optional(),
+  HUD_STARTUP_NAME: z.string().optional(),
+  HUD_STARTUP_LOGO_URL: z.string().url().optional(),
+  HUD_GITHUB_TOKEN: z.string().optional(),
+  HUD_GITHUB_OWNER: z.string().optional(),
+  HUD_GITHUB_REPO: z.string().optional(),
+  HUD_GITHUB_WORKFLOW: z.string().optional(),
 });
 
 const rawServerEnv = {
@@ -86,6 +95,14 @@ const rawServerEnv = {
   STATSIG_SERVER_API_KEY: process.env.STATSIG_SERVER_API_KEY,
   URL_ENCRYPTION_KEY: process.env.URL_ENCRYPTION_KEY,
   CRON_SECRET: process.env.CRON_SECRET,
+
+  HUD_KIOSK_TOKEN: process.env.HUD_KIOSK_TOKEN,
+  HUD_STARTUP_NAME: process.env.HUD_STARTUP_NAME,
+  HUD_STARTUP_LOGO_URL: process.env.HUD_STARTUP_LOGO_URL,
+  HUD_GITHUB_TOKEN: process.env.HUD_GITHUB_TOKEN,
+  HUD_GITHUB_OWNER: process.env.HUD_GITHUB_OWNER,
+  HUD_GITHUB_REPO: process.env.HUD_GITHUB_REPO,
+  HUD_GITHUB_WORKFLOW: process.env.HUD_GITHUB_WORKFLOW,
 };
 
 const parsed = ServerEnvSchema.safeParse(rawServerEnv);
@@ -168,6 +185,28 @@ export const env = {
   CRON_SECRET: parsed.success
     ? parsed.data.CRON_SECRET
     : process.env.CRON_SECRET,
+
+  HUD_KIOSK_TOKEN: parsed.success
+    ? parsed.data.HUD_KIOSK_TOKEN
+    : process.env.HUD_KIOSK_TOKEN,
+  HUD_STARTUP_NAME: parsed.success
+    ? parsed.data.HUD_STARTUP_NAME
+    : process.env.HUD_STARTUP_NAME,
+  HUD_STARTUP_LOGO_URL: parsed.success
+    ? parsed.data.HUD_STARTUP_LOGO_URL
+    : process.env.HUD_STARTUP_LOGO_URL,
+  HUD_GITHUB_TOKEN: parsed.success
+    ? parsed.data.HUD_GITHUB_TOKEN
+    : process.env.HUD_GITHUB_TOKEN,
+  HUD_GITHUB_OWNER: parsed.success
+    ? parsed.data.HUD_GITHUB_OWNER
+    : process.env.HUD_GITHUB_OWNER,
+  HUD_GITHUB_REPO: parsed.success
+    ? parsed.data.HUD_GITHUB_REPO
+    : process.env.HUD_GITHUB_REPO,
+  HUD_GITHUB_WORKFLOW: parsed.success
+    ? parsed.data.HUD_GITHUB_WORKFLOW
+    : process.env.HUD_GITHUB_WORKFLOW,
 } as const;
 
 // Environment validation utilities

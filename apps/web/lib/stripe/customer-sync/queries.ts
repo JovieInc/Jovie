@@ -24,6 +24,107 @@ import {
 } from './types';
 
 /**
+ * Checks if database error is due to missing column during migration
+ */
+function isMissingColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const code =
+    typeof (error as { code?: string })?.code === 'string'
+      ? (error as { code?: string }).code
+      : undefined;
+
+  return (
+    (code === '42703' &&
+      (message.includes('is_admin') ||
+        message.includes('billing_version') ||
+        message.includes('last_billing_event_at'))) ||
+    message.includes('users.is_admin') ||
+    message.includes('users.billing_version')
+  );
+}
+
+/**
+ * Merges legacy data with default values for missing new fields
+ */
+function mergeWithDefaults<T extends readonly UserBillingFieldKey[]>(
+  legacyData: Record<string, unknown>,
+  requestedFields: T
+): Record<string, unknown> {
+  const merged = { ...legacyData };
+
+  // Add default values for new fields that were requested but unavailable
+  if (requestedFields.includes('isAdmin') && !('isAdmin' in merged)) {
+    merged.isAdmin = false;
+  }
+  if (
+    requestedFields.includes('billingVersion') &&
+    !('billingVersion' in merged)
+  ) {
+    merged.billingVersion = 1;
+  }
+  if (
+    requestedFields.includes('lastBillingEventAt') &&
+    !('lastBillingEventAt' in merged)
+  ) {
+    merged.lastBillingEventAt = null;
+  }
+
+  return merged;
+}
+
+/**
+ * Attempts to fetch user data with legacy field fallback
+ */
+async function fetchUserDataWithFallback<
+  T extends readonly UserBillingFieldKey[],
+>(
+  clerkUserId: string,
+  fields: T,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  selectObj: any // Must be any to satisfy Drizzle's SelectedFields type
+): Promise<Record<string, unknown> | undefined> {
+  try {
+    const [result] = await db
+      .select(selectObj)
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    return result as Record<string, unknown> | undefined;
+  } catch (error) {
+    if (!isMissingColumnError(error)) {
+      throw error;
+    }
+
+    // Determine which legacy fields to fetch (intersection of requested and available)
+    const legacyFieldsToFetch = fields.filter(f =>
+      LEGACY_FIELDS.includes(f)
+    ) as UserBillingFieldKey[];
+
+    if (legacyFieldsToFetch.length === 0) {
+      // All requested fields are new columns that don't exist yet
+      throw error;
+    }
+
+    const legacySelectObj = buildSelectObject(
+      legacyFieldsToFetch as unknown as T
+    );
+
+    const [legacyResult] = await db
+      .select(legacySelectObj)
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!legacyResult) {
+      return undefined;
+    }
+
+    return mergeWithDefaults(legacyResult as Record<string, unknown>, fields);
+  }
+}
+
+/**
  * Core query function for fetching user billing data.
  * All other billing queries should delegate to this function.
  *
@@ -62,82 +163,12 @@ export async function fetchUserBillingData<
   const { clerkUserId, fields = BILLING_FIELDS_FULL as unknown as T } = options;
 
   try {
-    // Build the select object dynamically based on requested fields
     const selectObj = buildSelectObject(fields);
-
-    let userData: Record<string, unknown> | undefined;
-
-    try {
-      const [result] = await db
-        .select(selectObj)
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1);
-
-      userData = result as Record<string, unknown> | undefined;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const code =
-        typeof (error as { code?: string })?.code === 'string'
-          ? (error as { code?: string }).code
-          : undefined;
-
-      // Handle missing columns during migration rollout
-      // This provides backwards compatibility when new columns haven't been deployed
-      const isMissingColumn =
-        (code === '42703' &&
-          (message.includes('is_admin') ||
-            message.includes('billing_version') ||
-            message.includes('last_billing_event_at'))) ||
-        message.includes('users.is_admin') ||
-        message.includes('users.billing_version');
-
-      if (!isMissingColumn) {
-        throw error;
-      }
-
-      // Determine which legacy fields to fetch (intersection of requested and available)
-      const legacyFieldsToFetch = fields.filter(f =>
-        LEGACY_FIELDS.includes(f)
-      ) as UserBillingFieldKey[];
-
-      if (legacyFieldsToFetch.length === 0) {
-        // All requested fields are new columns that don't exist yet
-        throw error;
-      }
-
-      const legacySelectObj = buildSelectObject(
-        legacyFieldsToFetch as unknown as T
-      );
-
-      const [legacyResult] = await db
-        .select(legacySelectObj)
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1);
-
-      if (legacyResult) {
-        // Merge legacy data with defaults for missing fields
-        userData = { ...(legacyResult as Record<string, unknown>) };
-
-        // Add default values for new fields that were requested but unavailable
-        if (fields.includes('isAdmin') && !('isAdmin' in userData)) {
-          userData.isAdmin = false;
-        }
-        if (
-          fields.includes('billingVersion') &&
-          !('billingVersion' in userData)
-        ) {
-          userData.billingVersion = 1;
-        }
-        if (
-          fields.includes('lastBillingEventAt') &&
-          !('lastBillingEventAt' in userData)
-        ) {
-          userData.lastBillingEventAt = null;
-        }
-      }
-    }
+    const userData = await fetchUserDataWithFallback(
+      clerkUserId,
+      fields,
+      selectObj
+    );
 
     if (!userData) {
       return { success: false, error: 'User not found' };

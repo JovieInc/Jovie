@@ -4,7 +4,16 @@
  * Type definitions for the ContactSidebar component.
  */
 
-import type { Contact, ContactSidebarMode } from '@/types';
+import type { Contact as BaseContact, ContactSidebarMode } from '@/types';
+
+export type Contact = BaseContact;
+
+export interface SocialLink {
+  id?: string;
+  url: string;
+  label?: string;
+  platformType?: string;
+}
 
 export interface ContactSidebarProps {
   contact: Contact | null;
