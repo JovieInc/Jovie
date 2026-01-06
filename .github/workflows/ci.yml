@@ -179,66 +179,6 @@ jobs:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
-  ci-cache-warm:
-    name: Cache Warm (pnpm + Next build cache)
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping cache warm."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping cache warm."
-            exit 0
-          fi
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache Turbo
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
-        with:
-          path: .turbo
-          # Use content hash for better cache hit rates (not commit SHA which changes every commit)
-          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - name: Cache Next build cache
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
-        with:
-          path: |
-            apps/web/.next/cache
-            .turbo
-          # Use content hash only - no commit SHA for better cache reuse across commits
-          key: ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json', 'apps/web/**/*.ts', 'apps/web/**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}-
-            ${{ runner.os }}-next-
-          save-always: true
-      - name: Warm Next build cache
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
-        run: pnpm turbo build --filter=@jovie/web
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN || 'placeholder' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN || 'placeholder' }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY || 'placeholder' }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
-
   neon-db:
     name: Neon DB
     # Only run for push to main or PRs with testing label
@@ -580,8 +520,8 @@ jobs:
 
   ci-build:
     name: Build
-    # Optimized: only wait for typecheck and lint, not full ci-fast (guardrails can run in parallel)
-    needs: [ci-typecheck, ci-biome]
+    # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect build output)
+    needs: [ci-typecheck]
     # Build runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -640,8 +580,8 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests
-    # Optimized: only wait for typecheck and lint, not full ci-fast (guardrails can run in parallel)
-    needs: [ci-typecheck, ci-biome]
+    # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect tests)
+    needs: [ci-typecheck]
     # Unit tests run on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -1074,6 +1014,7 @@ jobs:
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
           UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
+          PR_PREVIEW_URL: ${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -1194,10 +1135,17 @@ jobs:
               return `| ${row.label} | ${statusLabel} | ${context} | ${timing} |`;
             });
 
+            // Add preview URL section if available
+            let previewUrlSection = '';
+            if (process.env.PR_PREVIEW_URL) {
+              previewUrlSection = `\n🔗 **Preview Deployment**: ${process.env.PR_PREVIEW_URL}\n`;
+            }
+
             const summaryBody = [
               '## CI Summary',
               '',
               'A crisp snapshot of this PR run — executed vs. skipped, with timing for every key lane.',
+              previewUrlSection,
               '',
               '| Job | Status | Context | Time |',
               '| --- | ------ | ------- | ---- |',
