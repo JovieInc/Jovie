@@ -83,8 +83,9 @@ async function fetchRunJobs(token, owner, repo, runId) {
 
 /**
  * Fetch artifacts for a workflow run (for JSON test results)
+ * Currently unused but kept for future Playwright JSON report parsing
  */
-async function fetchRunArtifacts(token, owner, repo, runId) {
+async function _fetchRunArtifacts(token, owner, repo, runId) {
   try {
     const data = await githubRequest(
       `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts`,
@@ -101,8 +102,9 @@ async function fetchRunArtifacts(token, owner, repo, runId) {
 
 /**
  * Parse test name from job step
+ * Currently unused but kept for future granular test name parsing
  */
-function parseTestName(stepName) {
+function _parseTestName(stepName) {
   // Extract test file name from step output
   // Example: "tests/e2e/profile.spec.ts:42:5 › should render profile"
   const match = stepName.match(/tests\/e2e\/([^:]+\.spec\.ts)/);
