@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { type DbType, db } from '@/lib/db';
 import {
   creatorProfiles,
+  users,
   waitlistEntries,
   waitlistInvites,
 } from '@/lib/db/schema';
@@ -162,6 +163,14 @@ export async function POST(request: Request) {
           .set({ status: 'invited', updatedAt: new Date() })
           .where(eq(waitlistEntries.id, entry.id));
 
+        // Sync user's waitlist approval status
+        if (entry.email) {
+          await tx
+            .update(users)
+            .set({ waitlistApproval: 'approved', updatedAt: new Date() })
+            .where(eq(users.email, entry.email));
+        }
+
         return {
           inviteId: existingInvite.id,
           claimToken: existingInvite.claimToken,
@@ -253,6 +262,14 @@ export async function POST(request: Request) {
           .set({ status: 'invited', updatedAt: new Date() })
           .where(eq(waitlistEntries.id, entry.id));
 
+        // Sync user's waitlist approval status
+        if (entry.email) {
+          await tx
+            .update(users)
+            .set({ waitlistApproval: 'approved', updatedAt: new Date() })
+            .where(eq(users.email, entry.email));
+        }
+
         return { inviteId: existing.id, claimToken: existing.claimToken };
       }
 
@@ -260,6 +277,14 @@ export async function POST(request: Request) {
         .update(waitlistEntries)
         .set({ status: 'invited', updatedAt: new Date() })
         .where(eq(waitlistEntries.id, entry.id));
+
+      // Sync user's waitlist approval status
+      if (entry.email) {
+        await tx
+          .update(users)
+          .set({ waitlistApproval: 'approved', updatedAt: new Date() })
+          .where(eq(users.email, entry.email));
+      }
 
       return { inviteId: invite.id, claimToken: invite.claimToken };
     });
