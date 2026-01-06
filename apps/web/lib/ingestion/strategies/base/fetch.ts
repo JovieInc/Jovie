@@ -60,7 +60,7 @@ function validateResponseStatus(response: Response): void {
 function validateAndBuildResult(
   html: string,
   response: Response,
-  currentUrl: string
+  finalUrl: string
 ): FetchResult {
   if (!html || html.trim().length === 0) {
     throw new ExtractionError('Empty response from server', 'EMPTY_RESPONSE');
@@ -74,7 +74,7 @@ function validateAndBuildResult(
     !contentType.includes('application/xhtml')
   ) {
     logger.warn('Non-HTML content type received', {
-      url: currentUrl,
+      url: finalUrl,
       contentType,
     });
   }
@@ -82,7 +82,7 @@ function validateAndBuildResult(
   // Basic HTML validation
   if (!html.includes('<') && !html.includes('>')) {
     logger.warn('Response does not appear to be HTML', {
-      url: currentUrl,
+      url: finalUrl,
       contentLength: html.length,
     });
   }
@@ -90,7 +90,7 @@ function validateAndBuildResult(
   return {
     html,
     statusCode: response.status,
-    finalUrl: response.url,
+    finalUrl,
     contentType,
   };
 }

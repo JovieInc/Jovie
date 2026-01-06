@@ -13,7 +13,7 @@ import React from 'react';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
-import type { Contact } from './types';
+import type { Contact, SocialLink } from './types';
 import {
   extractUsernameFromLabel,
   extractUsernameFromUrl,
@@ -60,9 +60,6 @@ export function ContactSocialLinks({
             aria-label='Add social link'
             onClick={() => {
               onSetIsAddingLink(true);
-              setTimeout(() => {
-                // focus handled by browser via autoFocus below
-              }, 0);
             }}
           >
             <Plus className='h-4 w-4' />
@@ -79,14 +76,14 @@ export function ContactSocialLinks({
 
       {contact.socialLinks.length > 0 && (
         <div className='flex flex-wrap gap-2'>
-          {contact.socialLinks.map((link: any, index: number) => {
+          {contact.socialLinks.map((link: SocialLink, index: number) => {
             const username =
               extractUsernameFromUrl(link.url) ??
               extractUsernameFromLabel(link.label) ??
               '';
             const displayUsername = formatUsername(username);
             const platformId =
-              (link.platformType as string | undefined) ||
+              link.platformType ||
               detectPlatform(link.url, fullName || contact.username).platform
                 .icon;
 
