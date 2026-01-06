@@ -31,7 +31,6 @@ import type { DashboardNavProps, NavItem } from './types';
 import { copyToClipboard } from './utils';
 
 export function DashboardNav(_props: DashboardNavProps) {
-  void _props;
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const notifications = useNotifications();

@@ -62,7 +62,9 @@ export function useActivityFeed({
 
   useEffect(() => {
     if (!gate) return;
-    void fetchActivity();
+    fetchActivity().catch(error => {
+      console.error('[useActivityFeed] Failed to fetch activity:', error);
+    });
     return () => {
       abortControllerRef.current?.abort();
     };

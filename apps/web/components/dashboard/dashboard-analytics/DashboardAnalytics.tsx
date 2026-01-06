@@ -34,7 +34,9 @@ export function DashboardAnalytics() {
           <DashboardRefreshButton
             ariaLabel='Refresh analytics'
             onRefreshed={() => {
-              void refresh();
+              refresh().catch(error => {
+                console.error('[DashboardAnalytics] Failed to refresh:', error);
+              });
             }}
           />
           <RangeToggle
