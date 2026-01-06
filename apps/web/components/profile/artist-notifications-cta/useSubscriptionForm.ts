@@ -162,7 +162,7 @@ export function useSubscriptionForm({
       return;
     }
 
-    void validateCurrent();
+    validateCurrent();
   }, [channel, phoneInput, emailInput, validateCurrent]);
 
   const handleConfirmSubscription = useCallback(async () => {
@@ -279,7 +279,9 @@ export function useSubscriptionForm({
       event => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          void handleSubscribe();
+          handleSubscribe().catch(error => {
+            console.error('[SubscriptionForm] Subscribe failed:', error);
+          });
         }
       },
       [handleSubscribe]

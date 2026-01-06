@@ -165,12 +165,20 @@ export function useDashboardAudienceTable({
     () => [
       {
         label: 'Copy emails',
-        onClick: () => void copySelectedEmails(),
+        onClick: () => {
+          copySelectedEmails().catch(error => {
+            console.error('[AudienceTable] Failed to copy emails:', error);
+          });
+        },
         disabled: selectedCount === 0,
       },
       {
         label: 'Copy phone numbers',
-        onClick: () => void copySelectedPhones(),
+        onClick: () => {
+          copySelectedPhones().catch(error => {
+            console.error('[AudienceTable] Failed to copy phones:', error);
+          });
+        },
         disabled: selectedCount === 0,
       },
       {
