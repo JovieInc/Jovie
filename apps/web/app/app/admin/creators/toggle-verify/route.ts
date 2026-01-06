@@ -13,7 +13,7 @@ export const POST = createAdminRouteHandler({
     isVerified: payload.nextVerified,
   }),
   errorContext: {
-    route: '/api/admin/creators/toggle-verify',
+    route: '/app/admin/creators/toggle-verify',
     action: 'toggle_verify_creator',
   },
   errorMessage: 'Failed to update verification',

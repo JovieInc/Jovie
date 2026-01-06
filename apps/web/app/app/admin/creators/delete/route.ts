@@ -9,7 +9,7 @@ export const POST = createAdminRouteHandler({
   actionFn: deleteCreatorOrUserAction,
   parsePayload: parseDeletePayload,
   errorContext: {
-    route: '/api/admin/creators/delete',
+    route: '/app/admin/creators/delete',
     action: 'delete_creator',
   },
   errorMessage: 'Failed to delete creator/user',

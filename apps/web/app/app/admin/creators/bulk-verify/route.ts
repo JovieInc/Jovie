@@ -9,7 +9,7 @@ export const POST = createAdminRouteHandler({
   actionFn: bulkSetCreatorsVerifiedAction,
   parsePayload: parseBulkVerifyPayload,
   errorContext: {
-    route: '/api/admin/creators/bulk-verify',
+    route: '/app/admin/creators/bulk-verify',
     action: 'bulk_verify_creators',
   },
   errorMessage: 'Failed to update verification',

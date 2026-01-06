@@ -13,7 +13,7 @@ export const POST = createAdminRouteHandler({
     marketingOptOut: payload.nextMarketingOptOut,
   }),
   errorContext: {
-    route: '/api/admin/creators/toggle-marketing',
+    route: '/app/admin/creators/toggle-marketing',
     action: 'toggle_marketing_creator',
   },
   errorMessage: 'Failed to update marketing preferences',

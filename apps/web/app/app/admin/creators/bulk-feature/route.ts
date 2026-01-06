@@ -9,7 +9,7 @@ export const POST = createAdminRouteHandler({
   actionFn: bulkSetCreatorsFeaturedAction,
   parsePayload: parseBulkFeaturePayload,
   errorContext: {
-    route: '/api/admin/creators/bulk-feature',
+    route: '/app/admin/creators/bulk-feature',
     action: 'bulk_feature_creators',
   },
   errorMessage: 'Failed to update featured status',

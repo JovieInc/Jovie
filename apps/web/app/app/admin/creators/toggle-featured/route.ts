@@ -13,7 +13,7 @@ export const POST = createAdminRouteHandler({
     isFeatured: payload.nextFeatured,
   }),
   errorContext: {
-    route: '/api/admin/creators/toggle-featured',
+    route: '/app/admin/creators/toggle-featured',
     action: 'toggle_featured_creator',
   },
   errorMessage: 'Failed to update featured status',

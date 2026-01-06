@@ -13,7 +13,7 @@ export const POST = createAdminRouteHandler({
     queuedCount: result.queuedCount,
   }),
   errorContext: {
-    route: '/api/admin/creators/bulk-refresh',
+    route: '/app/admin/creators/bulk-refresh',
     action: 'bulk_refresh_creators',
   },
   errorMessage: 'Failed to queue ingestion jobs',
