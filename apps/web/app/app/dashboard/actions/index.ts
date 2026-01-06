@@ -10,7 +10,6 @@
  *
  * Non-async utilities are now in @/lib/db/server:
  * - profileIsPublishable()
- * - selectDashboardProfile()
  * - createEmptyTippingStats()
  * - TippingStats interface
  *
@@ -29,15 +28,19 @@ export {
   prefetchDashboardData,
 } from './dashboard-data';
 
+// Profile selection logic (server action only)
+export { selectDashboardProfile } from './profile-selection';
+
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
 
 // Social links server actions
 export { getProfileSocialLinks } from './social-links';
 
-// Import non-async utilities directly from their new locations:
-// - import { profileIsPublishable, selectDashboardProfile } from '@/lib/db/server';
-// - import { createEmptyTippingStats, type TippingStats } from '@/lib/db/server';
-// - import { DSP_PLATFORMS, type DspPlatform } from '@/lib/services/social-links/types';
+// Types, constants, and utility functions should be imported directly from source modules:
 // - import type { DashboardData } from './dashboard-data';
-// - import type { ProfileSocialLink } from './social-links';
+// - import type { DspPlatform, ProfileSocialLink } from './social-links';
+// - import { DSP_PLATFORMS } from './social-links';
+// - import type { TippingStats } from './tipping-stats';
+// - import { profileIsPublishable } from './profile-selection';
+// - import { createEmptyTippingStats } from './tipping-stats';
