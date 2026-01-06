@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Slack notification on failure
-        if: ${{ needs.e2e-full-matrix.result == 'failure' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.e2e-full-matrix.result == 'failure' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -117,7 +117,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notification on success
-        if: ${{ needs.e2e-full-matrix.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.e2e-full-matrix.result == 'success' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom

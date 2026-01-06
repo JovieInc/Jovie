@@ -23,7 +23,14 @@ export default defineConfig({
   retries: isCI ? (isSmokeOnly ? 1 : 2) : 0,
   // Smoke tests: more parallelism since tests are faster
   workers: isCI ? (isSmokeOnly ? 6 : 4) : undefined,
-  reporter: isCI ? [['line'], ['html', { open: 'never' }]] : 'html',
+  reporter: isCI
+    ? [
+        ['line'],
+        ['html', { open: 'never' }],
+        // JSON reporter for flakiness tracking
+        ['json', { outputFile: 'test-results/results.json' }],
+      ]
+    : 'html',
 
   // Global timeout settings
   timeout: isSmokeOnly ? 30_000 : 60_000, // 30s for smoke, 60s for full

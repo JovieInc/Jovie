@@ -578,6 +578,40 @@ jobs:
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
+      - name: Pre-deploy Lighthouse performance check
+        if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cd apps/web
+
+          # Start Next.js server in background
+          pnpm start &
+          SERVER_PID=$!
+
+          # Wait for server to be ready
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              echo "Server is ready!"
+              break
+            fi
+            sleep 1
+          done
+
+          # Run Lighthouse CI with build config
+          npx lhci autorun --config=.lighthouserc.build.json || {
+            echo "⚠️ Lighthouse checks failed - performance regression detected"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          }
+
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
   ci-unit-tests:
     name: Unit Tests
     # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect tests)
@@ -1341,6 +1375,9 @@ jobs:
       fallback_health_url: https://jov.ie/api/health
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   deploy-notify:
     name: Notify production deploy
