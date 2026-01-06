@@ -77,7 +77,7 @@ const StatsigProviders = dynamic<StatsigProvidersProps>(
 interface ClientProvidersProps {
   children: React.ReactNode;
   initialThemeMode?: ThemeMode;
-  publishableKey: string;
+  publishableKey: string | undefined;
 }
 
 interface ClientProvidersInnerBaseProps {
@@ -298,6 +298,7 @@ export function ClientProviders({
   const enableStatsig = !isMarketingRoute;
 
   const shouldBypassClerk =
+    !publishableKey ||
     process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
     isMockPublishableKey(publishableKey);
 
@@ -314,7 +315,7 @@ export function ClientProviders({
 
   return (
     <ClerkProvider
-      publishableKey={publishableKey}
+      publishableKey={publishableKey!}
       appearance={clerkAppearance}
       proxyUrl={clerkProxyUrl}
     >
