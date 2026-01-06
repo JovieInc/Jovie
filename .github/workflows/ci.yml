@@ -1004,6 +1004,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+          COREPACK_ENABLE_STRICT: 0
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -1358,6 +1360,8 @@ jobs:
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
+      - name: Upgrade corepack
+        run: npm install -g corepack@latest && corepack enable
       - name: Pull env (production)
         run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
         env:
@@ -1372,6 +1376,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+          COREPACK_ENABLE_STRICT: 0
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
