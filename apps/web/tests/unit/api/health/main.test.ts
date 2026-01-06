@@ -67,7 +67,8 @@ describe('GET /api/health', () => {
 
     expect(response.status).toBe(200);
     expect(data.status).toBe('ok');
-    expect(data.database.ok).toBe(true);
+    expect(data.database).toBe('ok');
+    expect(data.timestamp).toBeDefined();
   });
 
   it('returns degraded status when database fails', async () => {
@@ -83,6 +84,7 @@ describe('GET /api/health', () => {
 
     expect(response.status).toBe(200);
     expect(data.status).toBe('degraded');
-    expect(data.database.ok).toBe(false);
+    expect(data.database).toBe('error');
+    expect(data.timestamp).toBeDefined();
   });
 });
