@@ -768,12 +768,8 @@ jobs:
       - name: Install Playwright
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
-          # PRs: Chrome-only for faster feedback; main branch: full browser matrix
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            pnpm --filter=@jovie/web exec playwright install chromium --with-deps
-          else
-            pnpm --filter=@jovie/web exec playwright install chromium firefox --with-deps
-          fi
+          # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
+          pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Load quarantined E2E specs
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}

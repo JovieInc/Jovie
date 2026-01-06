@@ -1,0 +1,141 @@
+name: E2E Full Browser Matrix
+
+on:
+  schedule:
+    # Run every Monday at 6:00 AM UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: 'Test file pattern (leave empty for all tests)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-full-matrix:
+    name: E2E (Chrome + Firefox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run database migrations
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: e2e-weekly
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-${{ matrix.browser }}-
+
+      - name: Install Playwright (${{ matrix.browser }})
+        run: pnpm --filter=@jovie/web exec playwright install ${{ matrix.browser }} --with-deps
+
+      - name: Run E2E tests (${{ matrix.browser }})
+        run: |
+          cd apps/web
+          if [ -n "${{ github.event.inputs.test_filter }}" ]; then
+            pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
+          else
+            pnpm playwright test --project=${{ matrix.browser }} --reporter=line
+          fi
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: e2e-full-${{ matrix.browser }}-report-${{ github.run_id }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Upload Test Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
+          path: apps/web/test-results/
+          retention-days: 7
+
+  notify:
+    name: Notify Results
+    needs: [e2e-full-matrix]
+    if: ${{ always() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack notification on failure
+        if: ${{ needs.e2e-full-matrix.result == 'failure' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'E2E Full Matrix'
+          custom_payload: |
+            {
+              "text": "⚠️ Weekly E2E full browser matrix failed",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Workflow", "value": "E2E Full Browser Matrix (Chrome + Firefox)", "short": true },
+                    { "title": "Status", "value": "Failed", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notification on success
+        if: ${{ needs.e2e-full-matrix.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#monitoring'
+          author_name: 'E2E Full Matrix'
+          custom_payload: |
+            {
+              "text": "✅ Weekly E2E full browser matrix passed",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Workflow", "value": "E2E Full Browser Matrix (Chrome + Firefox)", "short": true },
+                    { "title": "Status", "value": "Success", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
