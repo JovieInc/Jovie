@@ -114,5 +114,6 @@ export function extractErrorCode(error: unknown): string | undefined {
  */
 export function isDatabaseError(error: unknown): boolean {
   const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  return errorMessage.includes('DATABASE_ERROR');
+  const message = errorMessage.toUpperCase();
+  return message.includes('DATABASE_ERROR');
 }
