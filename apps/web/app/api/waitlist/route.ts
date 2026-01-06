@@ -353,12 +353,6 @@ export async function POST(request: Request) {
           });
       });
 
-      // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
-      await db
-        .update(users)
-        .set({ waitlistApproval: 'pending' })
-        .where(eq(users.clerkId, userId));
-
       return NextResponse.json(
         { success: true, status: existing.status },
         { headers: NO_STORE_HEADERS }
@@ -412,12 +406,6 @@ export async function POST(request: Request) {
           },
         });
     });
-
-    // Update users.waitlistApproval to 'pending' so getUserState() recognizes submission
-    await db
-      .update(users)
-      .set({ waitlistApproval: 'pending' })
-      .where(eq(users.clerkId, userId));
 
     return NextResponse.json(
       { success: true, status: 'new' },
