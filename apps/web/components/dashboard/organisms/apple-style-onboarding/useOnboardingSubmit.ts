@@ -4,7 +4,17 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
+import {
+  extractErrorCode,
+  isDatabaseError,
+  mapErrorToUserMessage,
+} from './errors';
 import type { HandleValidationState, OnboardingState } from './types';
+import {
+  canSubmitOnboarding,
+  getResolvedHandle,
+  validateDisplayName,
+} from './validation';
 
 interface UseOnboardingSubmitOptions {
   userId: string;
@@ -49,20 +59,23 @@ export function useOnboardingSubmit({
     async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
 
-      const resolvedHandle = (handle || handleInput).trim().toLowerCase();
+      const resolvedHandle = getResolvedHandle(handle, handleInput);
       const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
 
+      // Early return if form cannot be submitted
       if (
-        state.isSubmitting ||
-        Boolean(state.error) ||
-        !handleValidation.clientValid ||
-        handleValidation.checking ||
-        !handleValidation.available ||
-        !resolvedHandle
+        !canSubmitOnboarding({
+          handle,
+          handleInput,
+          handleValidation,
+          isSubmitting: state.isSubmitting,
+          hasError: Boolean(state.error),
+        })
       ) {
         return;
       }
 
+      // Track submission start
       track('onboarding_submission_started', {
         user_id: userId,
         handle: resolvedHandle,
@@ -82,13 +95,10 @@ export function useOnboardingSubmit({
       }));
 
       try {
-        const trimmedName = fullName.trim();
-        if (!trimmedName) {
-          throw new Error('[DISPLAY_NAME_REQUIRED] Display name is required');
-        }
+        validateDisplayName(fullName);
         await completeOnboarding({
           username: resolvedHandle,
-          displayName: trimmedName,
+          displayName: fullName.trim(),
           email: userEmail,
           redirectToDashboard: false,
         });
@@ -104,6 +114,7 @@ export function useOnboardingSubmit({
 
         goToNextStep();
       } catch (error) {
+        // Handle Next.js redirect special case
         if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
           setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
           return;
@@ -111,12 +122,10 @@ export function useOnboardingSubmit({
 
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        const errorCodeMatch =
-          error instanceof Error ? error.message.match(/^\[([A-Z_]+)\]/) : null;
-        const errorCode = errorCodeMatch?.[1];
+        const errorCode = extractErrorCode(error);
 
-        // Special handling for database errors during signup
-        if (errorMessage.includes('DATABASE_ERROR')) {
+        // Handle database errors with retry suggestion
+        if (isDatabaseError(error)) {
           console.error(
             '[ONBOARDING] Database error detected, suggesting retry'
           );
@@ -139,6 +148,7 @@ export function useOnboardingSubmit({
           return;
         }
 
+        // Track error
         track('onboarding_error', {
           user_id: userId,
           handle: resolvedHandle,
@@ -148,42 +158,18 @@ export function useOnboardingSubmit({
           timestamp: new Date().toISOString(),
         });
 
-        let userMessage = 'Could not save. Please try again.';
-        const message = errorMessage.toUpperCase();
-        if (message.includes('INVALID_SESSION')) {
-          userMessage = 'Could not save. Please refresh and try again.';
-        } else if (message.includes('USERNAME_TAKEN')) {
-          userMessage = 'Not available. Try another handle.';
-        } else if (message.includes('EMAIL_IN_USE')) {
-          userMessage =
-            'This email is already in use. Please sign in with the original account or use a different email.';
+        // Map error to user-friendly message
+        const { userMessage, shouldRedirectToSignIn } = mapErrorToUserMessage(
+          error,
+          redirectUrl
+        );
+
+        // Handle sign-in redirect for email conflicts
+        if (shouldRedirectToSignIn) {
           router.push(
             `/signin?redirect_url=${encodeURIComponent(redirectUrl)}`
           );
           return;
-        } else if (
-          message.includes('RATE_LIMITED') ||
-          message.includes('TOO_MANY_ATTEMPTS')
-        ) {
-          userMessage = 'Too many attempts. Please try again in a few moments.';
-        } else if (
-          message.includes('INVALID_USERNAME') ||
-          message.includes('USERNAME_RESERVED') ||
-          message.includes('USERNAME_INVALID_FORMAT') ||
-          message.includes('USERNAME_TOO_SHORT') ||
-          message.includes('USERNAME_TOO_LONG')
-        ) {
-          userMessage = "That handle can't be used. Try another one.";
-        } else if (message.includes('DISPLAY_NAME_REQUIRED')) {
-          userMessage = 'Please enter your name to continue.';
-        }
-
-        if (
-          process.env.NODE_ENV === 'development' &&
-          userMessage === 'Could not save. Please try again.' &&
-          errorCode
-        ) {
-          userMessage = `Could not save (${errorCode}). Please try again.`;
         }
 
         setState(prev => ({
@@ -200,9 +186,7 @@ export function useOnboardingSubmit({
       goToNextStep,
       handle,
       handleInput,
-      handleValidation.available,
-      handleValidation.checking,
-      handleValidation.clientValid,
+      handleValidation,
       router,
       setProfileReadyHandle,
       state.error,
