@@ -227,35 +227,38 @@ export default async function RootLayout({
 
   const bodyClassName = `${inter.variable} font-sans bg-base text-primary-token`;
 
-  // Early return if no publishable key
+  // Early return if no publishable key (only in production)
   if (!publishableKey) {
     if (
       process.env.NODE_ENV === 'test' ||
       process.env.NODE_ENV === 'development'
     ) {
       logger.debug('Bypassing Clerk authentication (no keys provided)');
-    }
-
-    return (
-      <html lang='en'>
-        {headContent}
-        <body className={bodyClassName}>
-          <div className='flex items-center justify-center min-h-screen'>
-            <div className='text-center'>
-              <h1 className='text-2xl font-bold text-red-600 mb-4'>
-                Configuration Error
-              </h1>
-              <p className='text-gray-600'>
-                Clerk publishable key is not configured.
-              </p>
+      // In test/dev mode, continue rendering without Clerk
+    } else {
+      // In production, show configuration error
+      return (
+        <html lang='en'>
+          {headContent}
+          <body className={bodyClassName}>
+            <div className='flex items-center justify-center min-h-screen'>
+              <div className='text-center'>
+                <h1 className='text-2xl font-bold text-red-600 mb-4'>
+                  Configuration Error
+                </h1>
+                <p className='text-gray-600'>
+                  Clerk publishable key is not configured.
+                </p>
+              </div>
             </div>
-          </div>
-        </body>
-      </html>
-    );
+          </body>
+        </html>
+      );
+    }
   }
 
-  // publishableKey is guaranteed to be defined here
+  // publishableKey may be undefined in test/dev mode
+  // ClientProviders handles bypassing Clerk authentication when key is missing
   return (
     <html lang='en'>
       {headContent}
