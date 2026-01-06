@@ -3,6 +3,7 @@ import path from 'path';
 import { cache } from 'react';
 import { createMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { parseMarkdownFrontmatter } from '@/lib/docs/parseMarkdownFrontmatter';
+import { validatePathTraversal } from '@/lib/security/path-traversal';
 import type { MarkdownDocument } from '@/types/docs';
 
 const BLOG_DIRECTORY = path.join(process.cwd(), 'content', 'blog');
@@ -56,8 +57,9 @@ async function readBlogPostFile(slug: string): Promise<{
   content: string;
   data: Record<string, string>;
 }> {
-  const filePath = path.join(BLOG_DIRECTORY, `${slug}.md`);
-  const raw = await fs.readFile(filePath, 'utf-8');
+  // Validate path to prevent directory traversal attacks
+  const safePath = validatePathTraversal(`${slug}.md`, BLOG_DIRECTORY);
+  const raw = await fs.readFile(safePath, 'utf-8');
   return parseMarkdownFrontmatter(raw);
 }
 
