@@ -19,6 +19,203 @@ import { ExtractionError } from './types';
 import { sleep } from './utils';
 
 /**
+ * Validates and normalizes a URL, ensuring it uses HTTPS and is in the allowlist.
+ */
+function normalizeAndValidateUrl(
+  candidateUrl: string,
+  allowedHosts?: Set<string>
+): string {
+  const parsed = new URL(candidateUrl);
+  if (parsed.protocol !== 'https:') {
+    throw new ExtractionError('Invalid URL', 'INVALID_URL');
+  }
+  if (allowedHosts && !allowedHosts.has(parsed.hostname.toLowerCase())) {
+    throw new ExtractionError('Invalid host', 'INVALID_HOST');
+  }
+  return parsed.toString();
+}
+
+/**
+ * Validates HTTP response status and throws appropriate errors.
+ */
+function validateResponseStatus(response: Response): void {
+  if (response.status === 404) {
+    throw new ExtractionError('Profile not found', 'NOT_FOUND', 404);
+  }
+  if (response.status === 429) {
+    throw new ExtractionError('Rate limited by platform', 'RATE_LIMITED', 429);
+  }
+  if (!response.ok) {
+    throw new ExtractionError(
+      `HTTP ${response.status}: ${response.statusText}`,
+      'FETCH_FAILED',
+      response.status
+    );
+  }
+}
+
+/**
+ * Validates HTML content and returns the final result.
+ */
+function validateAndBuildResult(
+  html: string,
+  response: Response,
+  currentUrl: string
+): FetchResult {
+  if (!html || html.trim().length === 0) {
+    throw new ExtractionError('Empty response from server', 'EMPTY_RESPONSE');
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+
+  // Warn if response is not HTML (but don't fail)
+  if (
+    !contentType.includes('text/html') &&
+    !contentType.includes('application/xhtml')
+  ) {
+    logger.warn('Non-HTML content type received', {
+      url: currentUrl,
+      contentType,
+    });
+  }
+
+  // Basic HTML validation
+  if (!html.includes('<') && !html.includes('>')) {
+    logger.warn('Response does not appear to be HTML', {
+      url: currentUrl,
+      contentLength: html.length,
+    });
+  }
+
+  return {
+    html,
+    statusCode: response.status,
+    finalUrl: response.url,
+    contentType,
+  };
+}
+
+/**
+ * Handles manual redirect following with host validation.
+ */
+async function handleRedirect(
+  response: Response,
+  currentUrl: string,
+  redirects: number,
+  allowedHosts: Set<string>
+): Promise<string | null> {
+  const finalHost = new URL(response.url).hostname.toLowerCase();
+  if (!allowedHosts.has(finalHost)) {
+    throw new ExtractionError('Invalid host', 'INVALID_HOST');
+  }
+
+  const isRedirect =
+    response.status >= 300 &&
+    response.status < 400 &&
+    response.headers.get('location');
+
+  if (!isRedirect) {
+    return null;
+  }
+
+  if (redirects >= MAX_REDIRECTS) {
+    throw new ExtractionError('Too many redirects', 'FETCH_FAILED');
+  }
+
+  const location = response.headers.get('location');
+  if (!location) {
+    throw new ExtractionError('Invalid redirect', 'FETCH_FAILED');
+  }
+
+  return normalizeAndValidateUrl(
+    new URL(location, currentUrl).toString(),
+    allowedHosts
+  );
+}
+
+/**
+ * Fetches a URL with redirect handling.
+ */
+async function fetchWithRedirects(
+  initialUrl: string,
+  controller: AbortController,
+  options: {
+    userAgent: string;
+    headers: Record<string, string>;
+    allowedHosts?: Set<string>;
+    maxResponseBytes: number;
+  }
+): Promise<FetchResult> {
+  let currentUrl = initialUrl;
+  let redirects = 0;
+
+  while (true) {
+    const response = await fetch(currentUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': options.userAgent,
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        Connection: 'keep-alive',
+        ...options.headers,
+      },
+      redirect: options.allowedHosts ? 'manual' : 'follow',
+    });
+
+    if (options.allowedHosts) {
+      const nextUrl = await handleRedirect(
+        response,
+        currentUrl,
+        redirects,
+        options.allowedHosts
+      );
+      if (nextUrl) {
+        currentUrl = nextUrl;
+        redirects += 1;
+        continue;
+      }
+    }
+
+    validateResponseStatus(response);
+    const html = await readResponseTextWithLimit(
+      response,
+      options.maxResponseBytes
+    );
+    return validateAndBuildResult(html, response, currentUrl);
+  }
+}
+
+/**
+ * Determines if an error should be retried.
+ */
+function shouldRetryError(error: unknown): boolean {
+  if (error instanceof ExtractionError) {
+    return !['NOT_FOUND', 'RATE_LIMITED', 'INVALID_URL'].includes(error.code);
+  }
+  return true;
+}
+
+/**
+ * Converts an error to an ExtractionError with proper context.
+ */
+function normalizeError(
+  error: unknown,
+  timeoutMs: number
+): ExtractionError | Error {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return new ExtractionError(
+      `Request timed out after ${timeoutMs}ms`,
+      'FETCH_TIMEOUT',
+      undefined,
+      error
+    );
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
  * Fetches a document with timeout, retries, and proper error handling.
  * Designed for server-side use with AbortController.
  */
@@ -36,158 +233,31 @@ export async function fetchDocument(
   } = options;
 
   const normalizedUrl = normalizeUrl(url);
+  const initialUrl = normalizeAndValidateUrl(normalizedUrl, allowedHosts);
   let lastError: Error | null = null;
-
-  const normalizeAndValidate = (candidateUrl: string): string => {
-    const parsed = new URL(candidateUrl);
-    if (parsed.protocol !== 'https:') {
-      throw new ExtractionError('Invalid URL', 'INVALID_URL');
-    }
-    if (allowedHosts && !allowedHosts.has(parsed.hostname.toLowerCase())) {
-      throw new ExtractionError('Invalid host', 'INVALID_HOST');
-    }
-    return parsed.toString();
-  };
-
-  const initialUrl = normalizeAndValidate(normalizedUrl);
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let currentUrl = initialUrl;
-      let redirects = 0;
-      // In allowlist mode, block cross-host redirects by validating each hop before requesting.
-      // In non-allowlist mode, preserve existing fetch behavior.
-      while (true) {
-        const response = await fetch(currentUrl, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            Accept:
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            Connection: 'keep-alive',
-            ...headers,
-          },
-          redirect: allowedHosts ? 'manual' : 'follow',
-        });
-
-        if (allowedHosts) {
-          const finalHost = new URL(response.url).hostname.toLowerCase();
-          if (!allowedHosts.has(finalHost)) {
-            throw new ExtractionError('Invalid host', 'INVALID_HOST');
-          }
-
-          if (
-            response.status >= 300 &&
-            response.status < 400 &&
-            response.headers.get('location')
-          ) {
-            if (redirects >= MAX_REDIRECTS) {
-              throw new ExtractionError('Too many redirects', 'FETCH_FAILED');
-            }
-            const location = response.headers.get('location');
-            if (!location) {
-              throw new ExtractionError('Invalid redirect', 'FETCH_FAILED');
-            }
-            const nextUrl = normalizeAndValidate(
-              new URL(location, currentUrl).toString()
-            );
-            currentUrl = nextUrl;
-            redirects += 1;
-            continue;
-          }
-        }
-
-        clearTimeout(timeoutId);
-
-        // Handle specific HTTP status codes
-        if (response.status === 404) {
-          throw new ExtractionError('Profile not found', 'NOT_FOUND', 404);
-        }
-
-        if (response.status === 429) {
-          throw new ExtractionError(
-            'Rate limited by platform',
-            'RATE_LIMITED',
-            429
-          );
-        }
-
-        if (!response.ok) {
-          throw new ExtractionError(
-            `HTTP ${response.status}: ${response.statusText}`,
-            'FETCH_FAILED',
-            response.status
-          );
-        }
-
-        const contentType = response.headers.get('content-type') ?? '';
-
-        // Warn if response is not HTML (but don't fail - some platforms serve different content types)
-        if (
-          !contentType.includes('text/html') &&
-          !contentType.includes('application/xhtml')
-        ) {
-          logger.warn('Non-HTML content type received', {
-            url: currentUrl,
-            contentType,
-          });
-        }
-
-        const html = await readResponseTextWithLimit(
-          response,
-          maxResponseBytes
-        );
-
-        if (!html || html.trim().length === 0) {
-          throw new ExtractionError(
-            'Empty response from server',
-            'EMPTY_RESPONSE'
-          );
-        }
-
-        // Basic HTML validation - should contain at least some HTML-like content
-        if (!html.includes('<') && !html.includes('>')) {
-          logger.warn('Response does not appear to be HTML', {
-            url: currentUrl,
-            contentLength: html.length,
-          });
-        }
-
-        return {
-          html,
-          statusCode: response.status,
-          finalUrl: response.url,
-          contentType,
-        };
-      }
+      const result = await fetchWithRedirects(initialUrl, controller, {
+        userAgent,
+        headers,
+        allowedHosts,
+        maxResponseBytes,
+      });
+      clearTimeout(timeoutId);
+      return result;
     } catch (error) {
       clearTimeout(timeoutId);
 
-      // Don't retry on certain errors
-      if (error instanceof ExtractionError) {
-        if (['NOT_FOUND', 'RATE_LIMITED', 'INVALID_URL'].includes(error.code)) {
-          throw error;
-        }
+      if (!shouldRetryError(error)) {
+        throw error;
       }
 
-      // Handle abort (timeout)
-      if (error instanceof Error && error.name === 'AbortError') {
-        lastError = new ExtractionError(
-          `Request timed out after ${timeoutMs}ms`,
-          'FETCH_TIMEOUT',
-          undefined,
-          error
-        );
-      } else {
-        lastError = error instanceof Error ? error : new Error(String(error));
-      }
+      lastError = normalizeError(error, timeoutMs);
 
-      // Log retry attempt
       if (attempt < maxRetries) {
         logger.warn('Fetch attempt failed, retrying', {
           url: initialUrl,
@@ -200,7 +270,6 @@ export async function fetchDocument(
     }
   }
 
-  // All retries exhausted
   throw lastError instanceof ExtractionError
     ? lastError
     : new ExtractionError(
