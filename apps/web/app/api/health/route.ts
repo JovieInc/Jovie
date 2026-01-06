@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   checkRateLimit,
   createRateLimitHeaders,
@@ -12,8 +13,14 @@ import {
   getRateLimitStatus,
 } from '@/lib/utils/rate-limit';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
+/**
+ * Health check endpoint for uptime monitoring and deployment verification.
+ *
+ * Security considerations:
+ * - Rate limited to prevent abuse (30 req/60s per IP)
+ * - Only exposes minimal non-sensitive information
+ * - No CORS headers to prevent unauthorized cross-origin access
+ */
 export async function GET(request: Request) {
   // Rate limit check (30 req/60s for health endpoints)
   const clientIP = getClientIP(request);
@@ -35,11 +42,11 @@ export async function GET(request: Request) {
       }
     );
   }
+
+  // Minimal response - only status and timestamp (no environment details)
   const summary: Record<string, unknown> = {
-    time: new Date().toISOString(),
-    env: process.env.VERCEL_ENV || 'local',
-    branch: process.env.VERCEL_GIT_COMMIT_REF || process.env.GIT_BRANCH || null,
-    commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_SHA || null,
+    status: 'checking',
+    timestamp: new Date().toISOString(),
   };
 
   try {
@@ -47,7 +54,7 @@ export async function GET(request: Request) {
 
     if (!databaseUrl) {
       summary.status = 'degraded';
-      summary.database = { ok: false, error: 'missing_database_url' };
+      summary.database = 'unavailable';
       return NextResponse.json(summary, {
         status: 200,
         headers: NO_STORE_HEADERS,
@@ -63,17 +70,14 @@ export async function GET(request: Request) {
     const profileCount = result[0]?.count ?? 0;
 
     summary.status = 'ok';
-    summary.database = { ok: true, publicProfiles: profileCount };
+    summary.database = profileCount >= 3 ? 'ok' : 'degraded';
     return NextResponse.json(summary, {
       status: 200,
       headers: NO_STORE_HEADERS,
     });
-  } catch (e) {
+  } catch {
     summary.status = 'degraded';
-    summary.database = {
-      ok: false,
-      error: e instanceof Error ? e.message : 'unknown',
-    };
+    summary.database = 'error';
     return NextResponse.json(summary, {
       status: 200,
       headers: NO_STORE_HEADERS,
