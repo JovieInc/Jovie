@@ -131,83 +131,36 @@ await updateWaitlist(data); // Errors surface immediately
 
 ---
 
-## 🚀 Deployment Checklist
+## 🚀 Deployment (Clean Database)
 
-### Pre-Deployment (CRITICAL)
+Since we have zero users, deployment is straightforward:
 
-Run these validation queries in production to check for issues:
+### Steps
 
-```sql
--- 1. Check for duplicate emails (must return 0 rows)
-SELECT LOWER(email), COUNT(*) as count
-FROM waitlist_entries
-GROUP BY LOWER(email)
-HAVING COUNT(*) > 1;
+1. **Merge PR to main** - CI/CD will auto-deploy
 
--- 2. Check for duplicate usernames (must return 0 rows)
-SELECT username_normalized, COUNT(*) as count
-FROM creator_profiles
-GROUP BY username_normalized
-HAVING COUNT(*) > 1;
-
--- 3. Verify all users have userStatus (must return 0)
-SELECT COUNT(*)
-FROM users
-WHERE user_status IS NULL;
-
--- 4. Check for any 'rejected' status entries (should return 0)
-SELECT COUNT(*)
-FROM waitlist_entries
-WHERE status = 'rejected';
-```
-
-**⚠️ If any query returns data, fix duplicates manually before proceeding!**
-
-### Deployment Steps
-
-1. **Deploy Code Changes**
+2. **Run migrations**
    ```bash
-   git add .
-   git commit -m "feat: complete auth migration to single userStatus enum"
-   git push
-   ```
-
-2. **Run Migrations** (in order)
-   ```bash
-   # Migration 0035: Add constraints and remove 'rejected' enum
+   cd apps/web
    pnpm drizzle:migrate
-
-   # Migration 0036: Deprecate old fields and drop indexes
-   # Migration 0037: Update stored procedures
    ```
 
-3. **Monitor** (first 24 hours)
-   - Auth success rate (should remain at baseline)
-   - Onboarding completion rate
-   - Error rates in `/api/waitlist` endpoint
-   - Constraint violation errors (should be 0)
+3. **Verify flows work**
+   - Signup → Waitlist
+   - Admin approve
+   - Claim profile
+   - Complete onboarding
 
 ### Rollback Plan
 
 If issues occur:
 
-**Code Rollback:**
 ```bash
 git revert HEAD
 git push
 ```
 
-**Schema Rollback:**
-```sql
--- Drop new constraints
-DROP INDEX IF EXISTS idx_waitlist_entries_email_unique;
-DROP INDEX IF EXISTS idx_creator_profiles_username_unique;
-
--- Restore old indexes
-CREATE INDEX idx_users_status ON users(status);
-CREATE INDEX idx_users_waitlist_approval ON users(waitlist_approval);
-CREATE INDEX idx_users_waitlist_entry_id ON users(waitlist_entry_id);
-```
+Old columns still exist, so old code would work.
 
 ---
 
