@@ -208,7 +208,11 @@ export async function startImpersonation(
 
   // Get target user's database info
   const [targetUser] = await db
-    .select({ id: users.id, deletedAt: users.deletedAt, userStatus: users.userStatus })
+    .select({
+      id: users.id,
+      deletedAt: users.deletedAt,
+      userStatus: users.userStatus,
+    })
     .from(users)
     .where(eq(users.clerkId, targetClerkId))
     .limit(1);

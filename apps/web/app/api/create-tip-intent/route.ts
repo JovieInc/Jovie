@@ -2,10 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import {
-  createRateLimitHeaders,
-  paymentIntentLimiter,
-} from '@/lib/rate-limit';
+import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
 import {
   type TipIntentPayload,
   tipIntentSchema,

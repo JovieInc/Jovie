@@ -54,7 +54,6 @@ function normalizeSpotifyUrl(url: string): string {
   }
 }
 
-
 export async function GET() {
   const { userId } = await auth();
   if (!userId) {
