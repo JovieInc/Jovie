@@ -20,8 +20,6 @@ COMMENT ON COLUMN users.waitlist_approval IS
 COMMENT ON COLUMN users.waitlist_entry_id IS
   'DEPRECATED (2026-01): Historical data only. Do not write to this field. Will be removed in future migration.';
 
-RAISE NOTICE 'Added deprecation comments to old status fields';
-
 -- ============================================================================
 -- 2. Drop old indexes
 -- ============================================================================
@@ -31,8 +29,6 @@ RAISE NOTICE 'Added deprecation comments to old status fields';
 DROP INDEX IF EXISTS idx_users_status;
 DROP INDEX IF EXISTS idx_users_waitlist_approval;
 DROP INDEX IF EXISTS idx_users_waitlist_entry_id;
-
-RAISE NOTICE 'Dropped deprecated indexes';
 
 -- ============================================================================
 -- 3. Verification: Ensure userStatus is set for all users

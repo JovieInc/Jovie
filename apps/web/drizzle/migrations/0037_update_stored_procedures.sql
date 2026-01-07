@@ -13,16 +13,19 @@ DECLARE
   v_profile_id uuid;
   v_user_status user_status_lifecycle;
 BEGIN
-  -- SECURITY CHECK: Verify user has appropriate status before creating profile
-  -- User must be at least 'profile_claimed' or beyond to create a profile
+  -- SECURITY CHECK: Verify user has appropriate status before COMPLETING ONBOARDING
+  -- This function is called during onboarding completion, NOT during profile claim
+  -- User must be at least 'profile_claimed' (already claimed via claim flow) before onboarding
   SELECT user_status INTO v_user_status
   FROM users
   WHERE clerk_id = p_clerk_user_id;
 
-  -- If user doesn't exist or hasn't claimed a profile yet, reject the operation
+  -- If user hasn't claimed a profile yet, reject onboarding completion
+  -- Allowed states: profile_claimed, onboarding_incomplete, active (re-running onboarding)
+  -- Rejected states: waitlist_pending, waitlist_approved (must claim first)
   IF v_user_status IS NULL OR v_user_status IN ('waitlist_pending', 'waitlist_approved') THEN
     RAISE EXCEPTION 'User must claim profile before completing onboarding. Clerk User ID: %, Status: %', p_clerk_user_id, COALESCE(v_user_status::text, 'NULL')
-      USING HINT = 'User must complete waitlist approval and claim flow before onboarding';
+      USING HINT = 'User must complete claim flow (profile_claimed) before onboarding';
   END IF;
 
   -- Create or update user with appropriate status

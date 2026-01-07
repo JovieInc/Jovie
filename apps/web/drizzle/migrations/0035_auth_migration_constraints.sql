@@ -58,18 +58,22 @@ END $$;
 -- to simplify the enum and prevent confusion.
 
 -- Step 1: Migrate any 'rejected' entries to 'new' (defensive - should be none)
-UPDATE waitlist_entries
-SET status = 'new'
-WHERE status = 'rejected';
-
--- Log how many rows were updated
 DO $$
 DECLARE
   rejected_count INTEGER;
+  updated_count INTEGER;
 BEGIN
+  -- First count rejected entries
   SELECT COUNT(*) INTO rejected_count
   FROM waitlist_entries
   WHERE status = 'rejected';
+
+  -- Then migrate them
+  UPDATE waitlist_entries
+  SET status = 'new'
+  WHERE status = 'rejected';
+
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
 
   IF rejected_count > 0 THEN
     RAISE WARNING 'Found and migrated % rejected entries to new status', rejected_count;
