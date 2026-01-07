@@ -224,8 +224,10 @@ jobs:
 
       - name: Guard against creating protected branch names
         if: ${{ github.event_name == 'pull_request' && steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
-          RAW="${{ github.head_ref || github.ref_name }}"
+          RAW="$HEAD_REF"
 
           # Block if PR branch name would create a protected branch
           if [[ "$RAW" == "main" ]] || [[ "$RAW" == "development" ]]; then
@@ -244,19 +246,25 @@ jobs:
       - name: Determine sanitized branch name
         id: sanitize-branch
         if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref || github.ref_name }}"
+          RAW="$HEAD_REF"
 
           # Avoid collisions with protected long-lived branches in Neon.
           # For push to main we reuse the long-lived Neon branch.
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            RAW="${{ github.ref_name }}"
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
+            RAW="$REF_NAME"
           fi
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
           BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -449,11 +457,15 @@ jobs:
       - name: Determine sanitized Neon branch name
         id: sanitize-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref }}"
+          RAW="$HEAD_REF"
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
           BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -589,8 +601,10 @@ jobs:
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
+        run: pnpm turbo build --filter=@jovie/web
         env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
@@ -696,16 +710,20 @@ jobs:
 
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
+        run: pnpm turbo test --filter=@jovie/web -- ${{ steps.quarantine.outputs.unit_excludes }}
         env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: cd apps/web && pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: cd apps/web && pnpm turbo test:fast -- --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
@@ -732,12 +750,16 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
   ci-e2e-tests:
-    name: E2E Tests
+    name: E2E Tests (Shard ${{ matrix.shard }})
     needs: [ci-build, neon-db]
     # E2E runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -872,7 +894,7 @@ jobs:
             exit 0
           fi
           # Chrome-only for PRs - faster feedback, Firefox runs on main only
-          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium --shard=${{ matrix.shard }}/4 ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/auth-smoke.spec.ts') != '' }}
@@ -898,18 +920,18 @@ jobs:
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test --reporter=line --shard=${{ matrix.shard }}/4 ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_quarantine == 'true' }}
         continue-on-error: true
-        run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
+        run: cd apps/web && pnpm playwright test --reporter=line --retries=2 --shard=${{ matrix.shard }}/4 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ github.job }}-playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
           retention-days: 7
 
@@ -917,7 +939,7 @@ jobs:
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ github.job }}-test-results-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 7
 

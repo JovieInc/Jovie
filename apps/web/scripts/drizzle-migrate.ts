@@ -88,7 +88,7 @@ function getCurrentBranch(): string {
  *
  * @returns 'production' for main/production branches (triggers safety checks), 'development' otherwise
  */
-function getEnvironment(): 'main' | 'production' | 'development' {
+function getEnvironment(): 'production' | 'development' {
   const envBranch = process.env.GIT_BRANCH;
   const gitBranch = getCurrentBranch();
   const branch = envBranch || gitBranch;

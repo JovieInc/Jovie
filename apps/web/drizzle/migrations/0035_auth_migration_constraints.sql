@@ -117,7 +117,9 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitlist_status') THEN
-    DROP TYPE waitlist_status CASCADE;
+    -- Drop without CASCADE to fail loudly if unexpected dependencies exist
+    -- All known dependencies (waitlist_entries.status) were migrated in Step 3
+    DROP TYPE waitlist_status;
     RAISE NOTICE 'Dropped old waitlist_status enum';
   END IF;
 

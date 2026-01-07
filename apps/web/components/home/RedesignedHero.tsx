@@ -12,7 +12,7 @@ export function RedesignedHero() {
         <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.4)_100%)]' />
       </div>
 
-      <Container size='homepage' className='relative z-10'>
+      <Container size='md' className='relative z-10'>
         <div className='text-left space-y-8'>
           {/* H1 - Linear Typography */}
           <h1 className='marketing-h1-linear text-primary-token'>

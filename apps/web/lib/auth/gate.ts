@@ -145,19 +145,16 @@ async function createUserWithRetry(
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      if (!waitlistEntryId) {
-        // User just signed up but hasn't joined waitlist yet
-        userStatus = 'waitlist_pending';
-      } else if (
-        existingUserData?.profileId &&
-        existingUserData.profileClaimed
-      ) {
-        // User has a claimed profile - check onboarding completion
+      if (existingUserData?.profileId && existingUserData.profileClaimed) {
+        // User has a claimed profile - check onboarding completion (highest priority)
         if (existingUserData.onboardingComplete) {
           userStatus = 'active';
         } else {
           userStatus = 'onboarding_incomplete';
         }
+      } else if (!waitlistEntryId) {
+        // User just signed up but hasn't joined waitlist yet
+        userStatus = 'waitlist_pending';
       } else {
         // User has waitlist entry but no claimed profile yet
         userStatus = 'waitlist_approved';

@@ -127,8 +127,11 @@ runs:
           is_protected_creator=false
           for protected_creator in "${PROTECTED_CREATORS_ARRAY[@]}"; do
             protected_creator=$(echo "$protected_creator" | xargs)
-            # Case-insensitive partial match (e.g., "itstimwhite" matches "Tim (user itstimwhite)")
-            if [[ "$branch_creator" =~ $protected_creator ]] || [[ "$protected_creator" =~ $branch_creator ]]; then
+            # Case-insensitive substring match: branch_creator must contain protected_creator
+            # (e.g., "itstimwhite" matches "Tim (user itstimwhite)" but NOT vice versa)
+            branch_creator_lower=$(echo "$branch_creator" | tr '[:upper:]' '[:lower:]')
+            protected_creator_lower=$(echo "$protected_creator" | tr '[:upper:]' '[:lower:]')
+            if [[ "$branch_creator_lower" == *"$protected_creator_lower"* ]]; then
               is_protected_creator=true
               break
             fi
