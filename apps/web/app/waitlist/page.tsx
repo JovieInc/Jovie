@@ -3,10 +3,9 @@
 import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AuthBackButton, AuthLayout } from '@/components/auth';
+import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
 import {
   ALLOWED_PLANS,
-  BUTTON_CLASSES,
   clearWaitlistStorage,
   type FormErrors,
   isValidUrl,
@@ -520,24 +519,24 @@ export default function WaitlistPage() {
           )}
 
           {step === 2 && (
-            <button
+            <AuthButton
               type='submit'
               disabled={isSubmitting || !isReadyToSubmit}
-              className={BUTTON_CLASSES}
+              variant='primary'
             >
               {isSubmitting ? 'Submitting…' : 'Join the waitlist'}
-            </button>
+            </AuthButton>
           )}
 
           {step === 1 && (
-            <button
+            <AuthButton
               type='button'
               onClick={handleNext}
               disabled={isSubmitting || !isCurrentStepValid}
-              className={BUTTON_CLASSES}
+              variant='primary'
             >
               Continue
-            </button>
+            </AuthButton>
           )}
 
           <div className='flex items-center justify-center pt-2'>

@@ -9,9 +9,6 @@ export type PrimaryGoal = 'streams' | 'merch' | 'tickets';
 
 export type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 
-export const BUTTON_CLASSES =
-  'w-full h-12 rounded-xl border border-subtle bg-surface-1 px-4 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
-
 export const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
 
 export const WAITLIST_STORAGE_KEYS = {
