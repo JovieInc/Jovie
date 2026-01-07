@@ -126,6 +126,78 @@
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* ============================================
+     GRADIENT SYSTEM - OKLCH Based
+     ============================================
+
+     Gradients for marketing and accent elements.
+     Uses restrained chroma for Linear's calm aesthetic.
+  */
+
+  /* Primary Gradient (Purple → Blue → Cyan) */
+  --gradient-primary-from: oklch(60% 0.18 271); /* Purple */
+  --gradient-primary-via: oklch(65% 0.15 255);  /* Purple-Blue */
+  --gradient-primary-to: oklch(70% 0.12 210);   /* Cyan */
+
+  /* Secondary Gradient (Blue → Purple) */
+  --gradient-secondary-from: oklch(55% 0.15 240); /* Blue */
+  --gradient-secondary-to: oklch(60% 0.18 271);   /* Purple */
+
+  /* Success Gradient (Green tones) */
+  --gradient-success-from: oklch(65% 0.15 150);
+  --gradient-success-to: oklch(70% 0.12 170);
+
+  /* Warning Gradient (Amber/Orange tones) */
+  --gradient-warning-from: oklch(70% 0.15 50);
+  --gradient-warning-to: oklch(75% 0.12 70);
+
+  /* Muted/Subtle Gradient (Very low chroma) */
+  --gradient-subtle-from: oklch(92% 0.02 240);
+  --gradient-subtle-to: oklch(95% 0.01 240);
+
+  /* ============================================
+     PLATFORM BRAND COLORS - OKLCH Equivalents
+     ============================================
+
+     Approximate brand colors using OKLCH for design system consistency.
+     Maintains brand recognition while using perceptually uniform colors.
+  */
+
+  /* Spotify */
+  --platform-spotify: oklch(65% 0.20 145); /* ~#1DB954 */
+  --platform-spotify-hover: oklch(60% 0.20 145);
+  --platform-spotify-foreground: oklch(10% 0 0);
+
+  /* Apple Music */
+  --platform-apple-music: oklch(60% 0.25 25); /* ~#FA243C */
+  --platform-apple-music-hover: oklch(55% 0.25 25);
+  --platform-apple-music-foreground: oklch(100% 0 0);
+
+  /* YouTube Music */
+  --platform-youtube: oklch(55% 0.22 15); /* ~#FF0000 */
+  --platform-youtube-hover: oklch(50% 0.22 15);
+  --platform-youtube-foreground: oklch(100% 0 0);
+
+  /* SoundCloud */
+  --platform-soundcloud: oklch(65% 0.15 30); /* ~#FF5500 */
+  --platform-soundcloud-hover: oklch(60% 0.15 30);
+  --platform-soundcloud-foreground: oklch(10% 0 0);
+
+  /* Bandcamp */
+  --platform-bandcamp: oklch(70% 0.12 200); /* ~#629aa9 */
+  --platform-bandcamp-hover: oklch(65% 0.12 200);
+  --platform-bandcamp-foreground: oklch(10% 0 0);
+
+  /* Tidal */
+  --platform-tidal: oklch(10% 0 0); /* Black */
+  --platform-tidal-hover: oklch(20% 0 0);
+  --platform-tidal-foreground: oklch(100% 0 0);
+
+  /* Deezer */
+  --platform-deezer: oklch(65% 0.20 255); /* Purple-blue */
+  --platform-deezer-hover: oklch(60% 0.20 255);
+  --platform-deezer-foreground: oklch(100% 0 0);
 }
 
 /* Dark mode - same generation logic, inverted lightness */
@@ -208,6 +280,23 @@
   --color-skeleton-shimmer: oklch(
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
+
+  /* Gradients - adjusted lightness for dark mode */
+  --gradient-primary-from: oklch(50% 0.18 271); /* Purple */
+  --gradient-primary-via: oklch(55% 0.15 255);  /* Purple-Blue */
+  --gradient-primary-to: oklch(60% 0.12 210);   /* Cyan */
+
+  --gradient-secondary-from: oklch(45% 0.15 240); /* Blue */
+  --gradient-secondary-to: oklch(50% 0.18 271);   /* Purple */
+
+  --gradient-success-from: oklch(55% 0.15 150);
+  --gradient-success-to: oklch(60% 0.12 170);
+
+  --gradient-warning-from: oklch(60% 0.15 50);
+  --gradient-warning-to: oklch(65% 0.12 70);
+
+  --gradient-subtle-from: oklch(18% 0.02 240);
+  --gradient-subtle-to: oklch(22% 0.01 240);
 }
 
 /* ============================================

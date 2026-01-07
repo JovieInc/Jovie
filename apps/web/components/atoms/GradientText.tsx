@@ -1,29 +1,39 @@
 import type { ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const variantClasses = {
-  primary:
-    'from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400',
-  secondary: 'from-gray-600 to-gray-800 dark:from-gray-300 dark:to-gray-100',
-  success:
-    'from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400',
-  warning:
-    'from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400',
-  'purple-cyan':
-    'from-purple-600 to-cyan-600 dark:from-purple-400 dark:to-cyan-400',
+/**
+ * OKLCH-based gradient variants
+ * Uses design system tokens for consistent, perceptually uniform gradients
+ */
+const gradientVariants = {
+  primary: 'gradient-primary',
+  secondary: 'gradient-secondary',
+  success: 'gradient-success',
+  warning: 'gradient-warning',
+  subtle: 'gradient-subtle',
+  // Legacy alias for backwards compatibility
+  'purple-cyan': 'gradient-primary',
 } as const;
+
+export type GradientVariant = keyof typeof gradientVariants;
 
 export interface GradientTextProps {
   /** Text content to display with gradient */
   children: ReactNode;
-  /** Gradient color scheme variant */
-  variant?: keyof typeof variantClasses;
+  /** Gradient color scheme variant (OKLCH-based) */
+  variant?: GradientVariant;
   /** Additional CSS classes */
   className?: string;
   /** Element type to render */
   as?: ElementType;
 }
 
+/**
+ * GradientText - Text with OKLCH gradient background
+ *
+ * Uses design system gradient tokens for consistent appearance across themes.
+ * Gradients automatically adapt to light/dark mode.
+ */
 export function GradientText({
   children,
   variant = 'primary',
@@ -32,11 +42,7 @@ export function GradientText({
 }: GradientTextProps) {
   return (
     <Component
-      className={cn(
-        'text-transparent bg-clip-text bg-gradient-to-r',
-        variantClasses[variant],
-        className
-      )}
+      className={cn('gradient-text', gradientVariants[variant], className)}
     >
       {children}
     </Component>

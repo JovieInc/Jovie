@@ -47,7 +47,7 @@ body {
 
 @layer base {
   :root {
-    --font-inter: "Inter";
+    --font-geist-sans: "Geist Sans";
 
     /* Safe area inset custom properties for iOS device support */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -397,6 +397,58 @@ body {
 
 @utility marketing-cta {
   @apply relative inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors;
+}
+
+/* ============================================
+   GRADIENT UTILITIES - OKLCH Based
+   ============================================ */
+
+@utility gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 100%;
+}
+
+@utility gradient-primary {
+  background-image: linear-gradient(
+    135deg,
+    var(--gradient-primary-from),
+    var(--gradient-primary-via),
+    var(--gradient-primary-to)
+  );
+}
+
+@utility gradient-secondary {
+  background-image: linear-gradient(
+    135deg,
+    var(--gradient-secondary-from),
+    var(--gradient-secondary-to)
+  );
+}
+
+@utility gradient-success {
+  background-image: linear-gradient(
+    135deg,
+    var(--gradient-success-from),
+    var(--gradient-success-to)
+  );
+}
+
+@utility gradient-warning {
+  background-image: linear-gradient(
+    135deg,
+    var(--gradient-warning-from),
+    var(--gradient-warning-to)
+  );
+}
+
+@utility gradient-subtle {
+  background-image: linear-gradient(
+    135deg,
+    var(--gradient-subtle-from),
+    var(--gradient-subtle-to)
+  );
 }
 
 @layer base {
