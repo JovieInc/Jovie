@@ -118,7 +118,12 @@ async function createUserWithRetry(
       // Derive userStatus based on actual user lifecycle state
       // This implements the proper state progression defined in migration 0034:
       // waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
-      let userStatus: 'waitlist_pending' | 'waitlist_approved' | 'profile_claimed' | 'onboarding_incomplete' | 'active';
+      let userStatus:
+        | 'waitlist_pending'
+        | 'waitlist_approved'
+        | 'profile_claimed'
+        | 'onboarding_incomplete'
+        | 'active';
 
       // Check if user already has an existing DB record with a claimed profile
       const [existingUserData] = await db
@@ -143,7 +148,10 @@ async function createUserWithRetry(
       if (!waitlistEntryId) {
         // User just signed up but hasn't joined waitlist yet
         userStatus = 'waitlist_pending';
-      } else if (existingUserData?.profileId && existingUserData.profileClaimed) {
+      } else if (
+        existingUserData?.profileId &&
+        existingUserData.profileClaimed
+      ) {
         // User has a claimed profile - check onboarding completion
         if (existingUserData.onboardingComplete) {
           userStatus = 'active';

@@ -153,7 +153,14 @@ export interface DbUserContext {
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;
-  userStatus: 'waitlist_pending' | 'waitlist_approved' | 'profile_claimed' | 'onboarding_incomplete' | 'active' | 'suspended' | 'banned';
+  userStatus:
+    | 'waitlist_pending'
+    | 'waitlist_approved'
+    | 'profile_claimed'
+    | 'onboarding_incomplete'
+    | 'active'
+    | 'suspended'
+    | 'banned';
 }
 
 /**
