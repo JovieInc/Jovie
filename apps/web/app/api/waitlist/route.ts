@@ -342,11 +342,13 @@ export async function POST(request: Request) {
           .values({
             clerkId: userId,
             email: emailRaw,
+            userStatus: 'waitlist_pending',
             waitlistApproval: 'pending',
           })
           .onConflictDoUpdate({
             target: users.clerkId,
             set: {
+              userStatus: 'waitlist_pending',
               waitlistApproval: 'pending',
               updatedAt: new Date(),
             },
@@ -396,11 +398,13 @@ export async function POST(request: Request) {
         .values({
           clerkId: userId,
           email: emailRaw,
+          userStatus: 'waitlist_pending',
           waitlistApproval: 'pending',
         })
         .onConflictDoUpdate({
           target: users.clerkId,
           set: {
+            userStatus: 'waitlist_pending',
             waitlistApproval: 'pending',
             updatedAt: new Date(),
           },

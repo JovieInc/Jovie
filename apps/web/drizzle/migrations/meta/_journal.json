@@ -239,6 +239,13 @@
       "when": 1736208000000,
       "tag": "0033_fix_stored_function_waitlist",
       "breakpoints": false
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1736260000000,
+      "tag": "0034_add_user_status_lifecycle",
+      "breakpoints": false
     }
   ]
 }

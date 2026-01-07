@@ -25,6 +25,7 @@ async function createTestUser() {
     clerkId,
     email: `test-${Date.now()}@example.com`,
     isPro: false,
+    userStatus: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

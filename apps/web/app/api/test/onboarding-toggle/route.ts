@@ -47,7 +47,12 @@ export async function POST(request: Request) {
         existingUser?.id ??
         (await tx
           .insert(users)
-          .values({ clerkId: userId, email, status: 'active' })
+          .values({
+            clerkId: userId,
+            email,
+            status: 'active',
+            userStatus: 'active',
+          })
           .onConflictDoUpdate({
             target: users.clerkId,
             set: { email, updatedAt: new Date() },

@@ -159,6 +159,17 @@ export const userWaitlistApprovalEnum = pgEnum('user_waitlist_approval', [
   'approved',
 ]);
 
+// User status lifecycle enum - single source of truth for user state
+export const userStatusLifecycleEnum = pgEnum('user_status_lifecycle', [
+  'waitlist_pending',
+  'waitlist_approved',
+  'profile_claimed',
+  'onboarding_incomplete',
+  'active',
+  'suspended',
+  'banned',
+]);
+
 // Creator Claim Invite Enums
 export const claimInviteStatusEnum = pgEnum('claim_invite_status', [
   'pending',

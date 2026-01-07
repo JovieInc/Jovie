@@ -144,6 +144,7 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
         clerkId: authResult.clerkUserId,
         email: authResult.context.email,
         status: 'active',
+        userStatus: 'active',
       })
       .returning({ id: users.id });
 

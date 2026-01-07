@@ -69,7 +69,7 @@ async function analyzeTestSuccess() {
 
   if (!fs.existsSync(reportPath)) {
     console.log('No flakiness report found. Skipping auto-unquarantine.');
-    return {};
+    return { flakyTests: new Set() };
   }
 
   const report = fs.readFileSync(reportPath, 'utf8');
@@ -106,8 +106,10 @@ async function processQuarantine() {
     return { unquarantined: [], updated: false };
   }
 
-  const { flakyTests } = await analyzeTestSuccess();
+  const { flakyTests = new Set() } = await analyzeTestSuccess();
   const unquarantined = [];
+  let hasCounterChanges = false;
+
   const updatedTests = quarantineData.tests.filter(entry => {
     const testName = entry.test || entry.name;
 
@@ -118,11 +120,13 @@ async function processQuarantine() {
           `   ⚠️  ${testName}: Still flaky, resetting success counter`
         );
         entry.consecutiveSuccesses = 0;
+        hasCounterChanges = true;
       }
       return true; // Keep in quarantine
     }
 
     // Test is not flaky - increment success counter
+    hasCounterChanges = true;
     entry.consecutiveSuccesses = (entry.consecutiveSuccesses || 0) + 1;
 
     if (entry.consecutiveSuccesses >= CONSECUTIVE_SUCCESS_THRESHOLD) {
@@ -140,9 +144,7 @@ async function processQuarantine() {
   });
 
   // Save updated quarantine file
-  const updated =
-    unquarantined.length > 0 ||
-    updatedTests.length !== quarantineData.tests.length;
+  const updated = unquarantined.length > 0 || hasCounterChanges;
 
   if (updated) {
     quarantineData.tests = updatedTests;
