@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { type DbType, db } from '@/lib/db';
 import {
   creatorProfiles,
-  users,
   waitlistEntries,
   waitlistInvites,
 } from '@/lib/db/schema';
