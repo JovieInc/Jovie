@@ -121,6 +121,7 @@ async function createUserWithRetry(
           clerkId: clerkUserId,
           email,
           status: 'active',
+          userStatus: waitlistEntryId ? 'active' : 'waitlist_pending',
           waitlistEntryId,
           waitlistApproval: waitlistEntryId ? 'approved' : null,
         })
@@ -128,6 +129,7 @@ async function createUserWithRetry(
           target: users.clerkId,
           set: {
             email,
+            userStatus: waitlistEntryId ? 'active' : 'waitlist_pending',
             waitlistApproval: waitlistEntryId ? 'approved' : null,
             updatedAt: new Date(),
           },

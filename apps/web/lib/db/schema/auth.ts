@@ -11,6 +11,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import {
   themeModeEnum,
   userStatusEnum,
+  userStatusLifecycleEnum,
   userWaitlistApprovalEnum,
 } from './enums';
 
@@ -22,7 +23,15 @@ export const users = pgTable(
     clerkId: text('clerk_id').unique().notNull(),
     name: text('name'),
     email: text('email').unique(),
+
+    // NEW: Single source of truth for user lifecycle
+    userStatus: userStatusLifecycleEnum('user_status').notNull(),
+
+    // DEPRECATED: Will be removed in future PR after migration stabilizes
     status: userStatusEnum('status').notNull().default('active'),
+    waitlistEntryId: uuid('waitlist_entry_id'), // Legacy - kept for migration compatibility
+    waitlistApproval: userWaitlistApprovalEnum('waitlist_approval'), // New simplified waitlist system
+
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
     stripeCustomerId: text('stripe_customer_id').unique(),
@@ -30,13 +39,15 @@ export const users = pgTable(
     billingUpdatedAt: timestamp('billing_updated_at'),
     billingVersion: integer('billing_version').default(1).notNull(),
     lastBillingEventAt: timestamp('last_billing_event_at'),
-    waitlistEntryId: uuid('waitlist_entry_id'), // Legacy - kept for migration compatibility
-    waitlistApproval: userWaitlistApprovalEnum('waitlist_approval'), // New simplified waitlist system
     deletedAt: timestamp('deleted_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    // NEW: Primary index for user lifecycle state
+    userStatusIdx: index('idx_users_user_status').on(table.userStatus),
+
+    // DEPRECATED: Legacy indexes
     statusIdx: index('idx_users_status').on(table.status),
     waitlistEntryIdIdx: index('idx_users_waitlist_entry_id').on(
       table.waitlistEntryId

@@ -45,7 +45,10 @@ if (!db) {
 
       const [userA, userB] = await db
         .insert(users)
-        .values([{ clerkId: userAClerkId }, { clerkId: userBClerkId }])
+        .values([
+          { clerkId: userAClerkId, userStatus: 'active' },
+          { clerkId: userBClerkId, userStatus: 'active' },
+        ])
         .returning({ id: users.id });
 
       const [publicProfile, privateProfile] = await db
