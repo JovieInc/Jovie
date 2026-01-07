@@ -29,7 +29,7 @@ const authInputClasses = cn(
   // Mobile-optimized sizing - min 48px height for touch targets
   'h-12 min-h-[48px]',
   // iOS zoom prevention - 16px minimum font size
-  'text-base sm:text-[15px]',
+  'text-base sm:text-sm',
   // Touch optimizations
   'touch-manipulation',
   '[-webkit-tap-highlight-color:transparent]',

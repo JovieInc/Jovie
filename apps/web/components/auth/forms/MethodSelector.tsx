@@ -159,7 +159,7 @@ export function MethodSelector({
 
   return (
     <div className={`space-y-4 ${AUTH_CLASSES.stepTransition}`}>
-      <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+      <h1 className='text-xl leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
       </h1>
 

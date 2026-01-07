@@ -123,12 +123,12 @@ export function VerificationStep({
       {/* Back button - fixed positioning in browser chrome */}
       <AuthBackButton onClick={onBack} ariaLabel='Use a different email' />
 
-      <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+      <h1 className='text-xl leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         Check your email
       </h1>
 
       <p
-        className='mt-6 mb-10 sm:mb-12 text-[15px] leading-relaxed text-secondary-token text-center px-2'
+        className='mt-6 mb-10 sm:mb-12 text-base sm:text-sm leading-relaxed text-secondary-token text-center px-2'
         id='otp-description'
       >
         We&apos;ve sent you a 6-digit{' '}
