@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-xl flex items-center justify-center gap-3',
+    'w-full rounded-[--radius-xl] flex items-center justify-center gap-3',
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
     // Mobile-optimized height (min 48px for touch targets)
