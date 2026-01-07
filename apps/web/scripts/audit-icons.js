@@ -4,7 +4,7 @@
  * Icon Usage Audit Script
  *
  * This script audits the codebase for icon usage patterns and identifies:
- * 1. Direct SVG imports that should use Heroicons
+ * 1. Direct SVG imports that should use Lucide React
  * 2. Inline SVG usage that could be replaced with standard icons
  * 3. Direct SimpleIcons usage that should use SocialIcon component
  * 4. Custom SVG usage that may need approval
@@ -97,7 +97,7 @@ function analyzeFile(filePath) {
           line: getLineNumber(content, importStatement),
           message: `Direct SVG import: ${importStatement.trim()}`,
           suggestion:
-            'Use Heroicons for UI icons or SocialIcon for social/brand icons',
+            'Use Lucide React for UI icons or SocialIcon for social/brand icons',
         });
       }
     }
@@ -117,7 +117,7 @@ function analyzeFile(filePath) {
         line: getLineNumber(content, svg),
         message: `Inline SVG found (${svg.substring(0, 50)}...)`,
         suggestion:
-          'Use Heroicons for UI icons or SocialIcon for social/brand icons',
+          'Use Lucide React for UI icons or SocialIcon for social/brand icons',
       });
     }
   }
@@ -219,7 +219,7 @@ function generateReport(results) {
   });
 
   log('cyan', '\n🔧 RECOMMENDED ACTIONS:');
-  log('reset', '1. Replace direct SVG imports with Heroicons for UI icons');
+  log('reset', '1. Replace direct SVG imports with Lucide React for UI icons');
   log('reset', '2. Use SocialIcon component for social media and brand icons');
   log(
     'reset',
@@ -233,7 +233,7 @@ function generateReport(results) {
 
   log('cyan', '\n📚 RESOURCES:');
   log('reset', '• Icon Standards: docs/ICON_STANDARDS.md');
-  log('reset', '• Heroicons: https://heroicons.com');
+  log('reset', '• Lucide React: https://lucide.dev');
   log('reset', '• SimpleIcons: https://simpleicons.org');
   log('reset', '• SocialIcon component: components/atoms/SocialIcon.tsx');
 }
