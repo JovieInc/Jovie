@@ -6,33 +6,32 @@ This document defines the standardized approach to icon usage in the Jovie proje
 
 ## Icon Libraries
 
-### 1. Heroicons v2 - General Purpose Icons
+### 1. Lucide React - General Purpose Icons
 
 **Use for:** All general-purpose UI icons (navigation, actions, states, etc.)
 
 ```tsx
-import { ChevronRightIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
-import { HeartIcon, StarIcon } from '@heroicons/react/24/solid';
+import { Icon } from '@/components/atoms/Icon';
 
 // ✅ Correct usage
-<ChevronRightIcon className="h-5 w-5" />
-<XMarkIcon className="h-4 w-4" />
+<Icon name="ChevronRight" className="h-5 w-5" />
+<Icon name="X" className="h-4 w-4" />
 ```
 
 **Common categories:**
-- Navigation: `ChevronRightIcon`, `ArrowLeftIcon`, `HomeIcon`
-- Actions: `PlusIcon`, `TrashIcon`, `PencilIcon`, `ShareIcon`
-- States: `CheckIcon`, `XMarkIcon`, `ExclamationTriangleIcon`
-- UI Elements: `Bars3Icon`, `MagnifyingGlassIcon`, `CogIcon`
+- Navigation: `ChevronRight`, `ArrowLeft`, `Home`
+- Actions: `Plus`, `Trash`, `Pencil`, `Share`
+- States: `Check`, `X`, `AlertTriangle`
+- UI Elements: `Menu`, `Search`, `Settings`
 
 ### 2. SimpleIcons - Social Media, DSP, and Brand Icons
 
 **Use for:** All social media platforms, digital service providers (DSPs), and brand-specific icons
 
 ```tsx
-import { siSpotify, siInstagram, siApplemusic } from 'simple-icons';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 
-// ✅ Correct usage - use the existing SocialIcon component
+// ✅ Correct usage
 <SocialIcon platform="spotify" className="h-5 w-5" />
 <SocialIcon platform="instagram" className="h-4 w-4" />
 ```
@@ -59,7 +58,7 @@ import { siSpotify, siInstagram, siApplemusic } from 'simple-icons';
 **Approval required for:**
 - New custom SVG icons
 - Inline SVG elements
-- Icons that could potentially be replaced with Heroicons or SimpleIcons
+- Icons that could potentially be replaced with Lucide or SimpleIcons
 
 ## Decision Tree
 
@@ -69,13 +68,13 @@ Need an icon?
 │   ├── Yes → Use SimpleIcons via SocialIcon component
 │   └── No → Continue
 ├── Is it a general UI icon (navigation, actions, states)?
-│   ├── Yes → Use Heroicons v2
+│   ├── Yes → Use Lucide React via Icon component
 │   └── No → Continue
 ├── Is it the Jovie brand logo or unique brand element?
 │   ├── Yes → Use custom SVG (approved)
 │   └── No → Continue
-└── Does an equivalent exist in Heroicons?
-    ├── Yes → Use Heroicons v2
+└── Does an equivalent exist in Lucide?
+    ├── Yes → Use Lucide React
     ├── No → Request approval for custom SVG
     └── Unsure → Ask in #design channel
 ```
@@ -85,19 +84,19 @@ Need an icon?
 ### IconButton Component
 
 ```tsx
-import { CogIcon } from '@heroicons/react/24/outline';
+import { Icon } from '@/components/atoms/Icon';
 
 <IconButton ariaLabel="Settings">
-  <CogIcon className="h-4 w-4" />
+  <Icon name="Settings" className="h-4 w-4" />
 </IconButton>
 ```
 
 ### IconBadge Component
 
 ```tsx
-import { BoltIcon } from '@heroicons/react/24/outline';
+import { Icon } from '@/components/atoms/Icon';
 
-<IconBadge Icon={BoltIcon} colorVar="--color-yellow-500" />
+<IconBadge Icon={<Icon name="Bolt" />} colorVar="--color-yellow-500" />
 ```
 
 ### SocialIcon Component
@@ -117,6 +116,8 @@ The following ESLint rule enforces these standards:
 - `@jovie/icon-usage`: Prevents direct SVG imports and inline SVG usage without approval
 - Provides helpful error messages guiding to correct icon libraries
 - Maintains allowlist for approved custom SVGs
+
+**Note:** The ESLint rule currently references Heroicons but should be updated to reference Lucide React to match current implementation.
 
 ### Pre-commit Hooks
 
@@ -155,9 +156,9 @@ Current approved custom SVGs:
   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
 </svg>
 
-// ✅ After - Heroicons
-import { StarIcon } from '@heroicons/react/24/solid';
-<StarIcon className="h-5 w-5" />
+// ✅ After - Lucide React
+import { Icon } from '@/components/atoms/Icon';
+<Icon name="Star" className="h-5 w-5" />
 ```
 
 ### From Direct SimpleIcons to SocialIcon Component
@@ -185,8 +186,8 @@ import { siSpotify } from 'simple-icons';
 
 ### Common ESLint Errors
 
-**Error**: `Direct SVG import detected. Use Heroicons for general UI icons.`
-**Solution**: Replace with appropriate Heroicon import
+**Error**: `Direct SVG import detected. Use Lucide React for general UI icons.`
+**Solution**: Replace with appropriate Lucide icon via Icon component
 
 **Error**: `Inline SVG detected. Use SocialIcon component for social media icons.`
 **Solution**: Use `<SocialIcon platform="..." />` instead
@@ -196,16 +197,17 @@ import { siSpotify } from 'simple-icons';
 
 ### Finding the Right Icon
 
-1. **Heroicons**: Browse at [heroicons.com](https://heroicons.com)
+1. **Lucide React**: Browse at [lucide.dev](https://lucide.dev)
 2. **SimpleIcons**: Browse at [simpleicons.org](https://simpleicons.org)
 3. **Existing Usage**: Search codebase for similar use cases
 4. **Ask for Help**: Use #design channel for guidance
 
 ## Resources
 
-- [Heroicons Documentation](https://heroicons.com)
+- [Lucide React Documentation](https://lucide.dev)
 - [SimpleIcons Documentation](https://simpleicons.org)
 - [Existing SocialIcon Component](../components/atoms/SocialIcon.tsx)
+- [Existing Icon Component](../components/atoms/Icon.tsx)
 - [IconButton Component](../components/atoms/IconButton.tsx)
 - [IconBadge Component](../components/atoms/IconBadge.tsx)
 

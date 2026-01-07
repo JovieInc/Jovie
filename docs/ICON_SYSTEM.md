@@ -5,7 +5,7 @@ A comprehensive, standardized icon system that ensures consistency, accessibilit
 ## Overview
 
 The Jovie Icon System enforces the use of two primary icon libraries:
-- **Heroicons v2** for general-purpose UI icons
+- **Lucide React** for general-purpose UI icons
 - **SimpleIcons** for social media, DSP, and brand icons
 
 Custom SVGs are only allowed for approved use cases like brand logos and unique UI elements.
@@ -14,11 +14,11 @@ Custom SVGs are only allowed for approved use cases like brand logos and unique 
 
 ### For General UI Icons
 ```tsx
-import { ChevronRightIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { Icon } from '@/components/atoms/Icon';
 
-<ChevronRightIcon className="h-5 w-5" />
-<XMarkIcon className="h-4 w-4" />
-<CheckIcon className="h-6 w-6" />
+<Icon name="ChevronRight" className="h-5 w-5" />
+<Icon name="X" className="h-4 w-4" />
+<Icon name="Check" className="h-6 w-6" />
 ```
 
 ### For Social/Brand Icons
@@ -34,8 +34,8 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 ```tsx
 import { Icon } from '@/components/atoms/Icon';
 
-<Icon name="chevron-right" size="md" />
-<Icon name="check-circle" size="lg" className="text-green-500" />
+<Icon name="chevron-right" className="h-5 w-5" />
+<Icon name="check-circle" className="h-6 w-6 text-green-500" />
 ```
 
 ## Architecture
@@ -116,13 +116,14 @@ import { Icon } from '@/components/atoms/Icon';
 ### ARIA Attributes
 ```tsx
 // Decorative icons (default)
-<ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+<Icon name="ChevronRight" className="h-5 w-5" />
 
 // Meaningful icons
-<CheckIcon 
+<Icon 
+  name="Check" 
   className="h-5 w-5" 
-  aria-label="Success" 
-  aria-hidden="false" 
+  ariaLabel="Success" 
+  ariaHidden={false}
 />
 ```
 
@@ -137,24 +138,25 @@ import { Icon } from '@/components/atoms/Icon';
 ```
 Need an icon?
 ├── Social/Brand? → Use SocialIcon component
-├── General UI? → Use Heroicons
+├── General UI? → Use Lucide React via Icon component
 ├── Brand logo? → Use approved custom SVG
 └── Unique element? → Request custom SVG approval
 ```
 
 ### 2. Implementation
 ```tsx
-// Step 1: Import the icon
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+// Step 1: Import the Icon component
+import { Icon } from '@/components/atoms/Icon';
 
 // Step 2: Use with standard sizing
-<ChevronRightIcon className="h-5 w-5" />
+<Icon name="ChevronRight" className="h-5 w-5" />
 
 // Step 3: Add accessibility if needed
-<ChevronRightIcon 
+<Icon 
+  name="ChevronRight"
   className="h-5 w-5" 
-  aria-label="Next page"
-  aria-hidden="false"
+  ariaLabel="Next page"
+  ariaHidden={false}
 />
 ```
 
@@ -196,7 +198,7 @@ pnpm test
 - Unused icons are automatically removed
 
 ### Bundle Size
-- Heroicons: ~1KB per icon (optimized)
+- Lucide React: ~1KB per icon (optimized)
 - SimpleIcons: ~500B per icon (optimized)
 - Custom SVGs: Varies (should be optimized)
 
@@ -242,11 +244,11 @@ pnpm audit:icons
 pnpm lint
 
 # Update dependencies
-pnpm update @heroicons/react simple-icons
+pnpm update lucide-react simple-icons
 ```
 
 ### Version Updates
-1. **Heroicons Updates**
+1. **Lucide React Updates**
    - Check for new icons and deprecations
    - Update icon registry if needed
    - Test for breaking changes
@@ -270,8 +272,8 @@ pnpm exec eslint path/to/file.tsx
 ```
 
 #### Icon Not Found
-1. Check Heroicons website for alternatives
-2. Search icon registry: `searchIcons('keyword')`
+1. Check Lucide React website for alternatives
+2. Search components for similar usage
 3. Consider SocialIcon for social/brand icons
 4. Request custom SVG if truly unique
 
@@ -294,13 +296,13 @@ pnpm exec eslint path/to/file.tsx
 
 ## Migration from Legacy System
 
-See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration instructions.
+See [ICON_MIGRATION_GUIDE.md](./ICON_MIGRATION_GUIDE.md) for detailed migration instructions.
 
 ## Contributing
 
 ### Adding New Icons to Registry
-1. Verify icon exists in Heroicons
-2. Add to `lib/icons/registry.ts`
+1. Verify icon exists in Lucide React
+2. Add to `components/atoms/Icon.tsx` if needed
 3. Include proper categorization and keywords
 4. Add tests for new icons
 5. Update documentation
@@ -320,9 +322,9 @@ See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration instructio
 ## Resources
 
 - **Standards**: [ICON_STANDARDS.md](./ICON_STANDARDS.md)
-- **Migration**: [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
+- **Migration**: [ICON_MIGRATION_GUIDE.md](./ICON_MIGRATION_GUIDE.md)
 - **Review Checklist**: [DESIGN_REVIEW_CHECKLIST.md](./DESIGN_REVIEW_CHECKLIST.md)
-- **Heroicons**: [heroicons.com](https://heroicons.com)
+- **Lucide React**: [lucide.dev](https://lucide.dev)
 - **SimpleIcons**: [simpleicons.org](https://simpleicons.org)
 - **Accessibility**: [WCAG Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
 
