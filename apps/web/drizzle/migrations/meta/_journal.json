@@ -267,6 +267,13 @@
       "when": 1736300200000,
       "tag": "0037_update_stored_procedures",
       "breakpoints": false
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1736300300000,
+      "tag": "0038_enforce_data_invariants",
+      "breakpoints": false
     }
   ]
 }

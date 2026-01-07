@@ -84,6 +84,11 @@ export const creatorProfiles = pgTable(
     )
       .on(table.usernameNormalized)
       .where(drizzleSql`username_normalized IS NOT NULL`),
+    oneClaimedProfilePerUser: uniqueIndex(
+      'idx_creator_profiles_one_claimed_per_user'
+    )
+      .on(table.userId)
+      .where(drizzleSql`is_claimed = true`),
   })
 );
 

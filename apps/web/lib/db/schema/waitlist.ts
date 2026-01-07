@@ -56,6 +56,9 @@ export const waitlistInvites = pgTable(
     waitlistEntryIdUnique: uniqueIndex('idx_waitlist_invites_entry_id').on(
       table.waitlistEntryId
     ),
+    claimTokenUnique: uniqueIndex('idx_waitlist_invites_claim_token_unique').on(
+      table.claimToken
+    ),
   })
 );
 
