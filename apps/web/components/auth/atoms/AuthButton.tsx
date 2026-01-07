@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-[--radius-xl] flex items-center justify-center gap-3',
+    'w-full rounded-md flex items-center justify-center gap-3',
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
     // Mobile-optimized height (min 48px for touch targets)
@@ -32,7 +32,7 @@ const authButtonVariants = cva(
           'active:shadow-none',
         ].join(' '),
         primaryLight: [
-          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
+          'border border-border bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
           'shadow-(--shadow-sm)',
           'hover:bg-surface-1',
           'active:bg-surface-2 active:shadow-none',
@@ -44,7 +44,7 @@ const authButtonVariants = cva(
           'active:shadow-none',
         ].join(' '),
         secondary: [
-          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
+          'border border-border bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
           'shadow-(--shadow-sm)',
           'hover:bg-surface-1',
           'active:bg-surface-2 active:shadow-none',

@@ -21,9 +21,9 @@ interface AuthInputProps
 
 const authInputClasses = cn(
   // Base styling
-  'border border-subtle bg-surface-0 text-primary-token',
+  'border border-border bg-surface-0 text-primary-token',
   'placeholder:text-tertiary-token',
-  'rounded-[--radius-xl]',
+  'rounded-md',
   // Focus ring
   'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
   // Mobile-optimized sizing - min 48px height for touch targets
