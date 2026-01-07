@@ -246,6 +246,27 @@
       "when": 1736260000000,
       "tag": "0034_add_user_status_lifecycle",
       "breakpoints": false
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1736300000000,
+      "tag": "0035_auth_migration_constraints",
+      "breakpoints": false
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1736300100000,
+      "tag": "0036_deprecate_old_status_fields",
+      "breakpoints": false
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1736300200000,
+      "tag": "0037_update_stored_procedures",
+      "breakpoints": false
     }
   ]
 }

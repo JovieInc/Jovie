@@ -22,7 +22,7 @@ BEGIN
     SELECT 1 FROM pg_indexes
     WHERE indexname = 'idx_waitlist_entries_email_unique'
   ) THEN
-    CREATE UNIQUE INDEX idx_waitlist_entries_email_unique
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_entries_email_unique
       ON waitlist_entries (LOWER(email));
     RAISE NOTICE 'Created unique index on waitlist_entries.email';
   ELSE
@@ -43,7 +43,7 @@ BEGIN
     SELECT 1 FROM pg_indexes
     WHERE indexname = 'idx_creator_profiles_username_unique'
   ) THEN
-    CREATE UNIQUE INDEX idx_creator_profiles_username_unique
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_creator_profiles_username_unique
       ON creator_profiles (username_normalized);
     RAISE NOTICE 'Created unique index on creator_profiles.username_normalized';
   ELSE
