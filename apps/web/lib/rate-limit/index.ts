@@ -56,6 +56,8 @@ export {
   healthLimiter,
   // Onboarding
   onboardingLimiter,
+  // Payment
+  paymentIntentLimiter,
   publicClickLimiter,
   // Public
   publicProfileLimiter,

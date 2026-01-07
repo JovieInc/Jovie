@@ -1,6 +1,11 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  createRateLimitHeaders,
+  paymentIntentLimiter,
+} from '@/lib/rate-limit';
 import {
   type TipIntentPayload,
   tipIntentSchema,
@@ -13,6 +18,30 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(req: NextRequest) {
   try {
+    // Require authentication for payment intents
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Rate limiting: 10 payment intents per hour per user
+    const rateLimitResult = await paymentIntentLimiter.limit(userId);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many payment intent requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json(
         { error: 'Stripe not configured' },

@@ -87,6 +87,19 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
+  // Payment Operations
+  // ---------------------------------------------------------------------------
+
+  /** Payment intents: 10 intents per hour per user - CRITICAL for Stripe API protection */
+  paymentIntent: {
+    name: 'Payment Intent',
+    limit: 10,
+    window: '1 h',
+    prefix: 'payment_intent',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
   // Tracking & Analytics
   // ---------------------------------------------------------------------------
 
