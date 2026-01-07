@@ -13,35 +13,33 @@ export function RedesignedHero() {
       </div>
 
       <Container size='homepage' className='relative z-10'>
-        <div className='max-w-4xl mx-auto'>
-          <div className='max-w-2xl text-left space-y-8'>
-            {/* H1 - Linear Typography */}
-            <h1 className='marketing-h1-linear text-primary-token'>
-              Turn fans into subscribers.
-            </h1>
+        <div className='text-left space-y-8'>
+          {/* H1 - Linear Typography */}
+          <h1 className='marketing-h1-linear text-primary-token'>
+            Turn fans into subscribers.
+          </h1>
 
-            {/* Lead - Secondary color hierarchy */}
-            <p className='marketing-lead-linear text-secondary-token'>
-              Replace your link stack with an AI-driven profile that converts
-              more fans and improves automatically.
-            </p>
+          {/* Lead - Tertiary color for proper fade */}
+          <p className='marketing-lead-linear text-tertiary-token'>
+            Replace your link stack with an AI-driven profile that converts more
+            fans and improves automatically.
+          </p>
 
-            {/* CTAs - Linear button treatment */}
-            <div className='flex flex-col sm:flex-row items-start gap-3'>
-              <LinearButton variant='primary' href='/waitlist'>
-                Request early access
-                <ArrowRight className='h-4 w-4 ml-1' />
-              </LinearButton>
-              <LinearButton variant='secondary' href='#how-it-works'>
-                See how it works ↓
-              </LinearButton>
-            </div>
-
-            {/* Supporting text - Tertiary */}
-            <p className='text-sm text-tertiary-token'>
-              Limited access. Zero setup.
-            </p>
+          {/* CTAs - Linear button treatment */}
+          <div className='flex flex-col sm:flex-row items-start gap-3'>
+            <LinearButton variant='primary' href='/waitlist'>
+              Request early access
+              <ArrowRight className='h-4 w-4 ml-1' />
+            </LinearButton>
+            <LinearButton variant='secondary' href='#how-it-works'>
+              See how it works ↓
+            </LinearButton>
           </div>
+
+          {/* Supporting text - Tertiary */}
+          <p className='text-sm text-tertiary-token'>
+            Limited access. Zero setup.
+          </p>
         </div>
       </Container>
 

@@ -379,7 +379,6 @@ body {
   font-size: 1.0625rem; /* 17px - Linear's --text-large-size */
   line-height: 1.6;
   letter-spacing: 0;
-  color: #8a8f98; /* Linear's --color-text-tertiary */
   font-feature-settings:
     "cv01",
     "ss03",
