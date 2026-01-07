@@ -33,11 +33,15 @@ export function HeaderNav({
   return (
     <header
       data-testid='header-nav'
-      className={cn('sticky top-0 z-50 w-full bg-base', className)}
-      style={{ fontSynthesisWeight: 'none' }}
+      className={cn('sticky top-0 z-100 w-full bg-base', className)}
+      style={{
+        fontSynthesisWeight: 'none',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}
     >
       <Container size={containerSize}>
-        <div className='flex h-16 items-center'>
+        <div className='flex h-16 items-center' style={{ height: '64px' }}>
           {/* Logo - Left side */}
           <div className='flex items-center'>
             <LogoLink logoSize={logoSize} variant={logoVariant} />

@@ -4,18 +4,18 @@ import Link from 'next/link';
 
 export function AuthActions() {
   return (
-    <div className='flex items-center gap-3 sm:gap-2'>
-      {/* Login - Geist secondary/ghost button */}
+    <div className='flex items-center gap-2'>
+      {/* Login - Linear secondary button */}
       <Link
         href='/signin'
-        className='inline-flex items-center justify-center h-9 min-h-[44px] px-3 sm:px-4 text-sm font-medium rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 focus-ring-themed'
+        className='inline-flex items-center justify-center h-8 px-3 text-[.875rem] leading-[1.5] tracking-[-.013em] font-normal rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 focus-ring-themed select-none whitespace-nowrap'
       >
         Log in
       </Link>
-      {/* Sign up - Geist primary button */}
+      {/* Sign up - Linear primary button */}
       <Link
         href='/waitlist'
-        className='inline-flex items-center justify-center h-9 min-h-[44px] px-3 sm:px-4 text-sm font-medium rounded-md bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 transition-colors duration-150 focus-ring-themed'
+        className='inline-flex items-center justify-center h-8 px-3 text-[.875rem] leading-[1.5] tracking-[-.013em] font-normal rounded-md bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 transition-colors duration-150 focus-ring-themed select-none whitespace-nowrap'
       >
         Request early access
       </Link>
