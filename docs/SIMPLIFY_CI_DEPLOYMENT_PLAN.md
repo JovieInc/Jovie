@@ -1,5 +1,26 @@
 # Simplify CI/CD: Deploy Directly from Main
 
+## ✅ MIGRATION COMPLETE (January 2026)
+
+This migration has been completed. The repository now uses trunk-based development:
+
+**Current State:**
+- **Production Branch**: `main` → deploys to jov.ie
+- **Development Branch**: `development` → local development only
+- **Neon Branches**: `main` (production), `development` (local dev)
+- **Ephemeral Branches**: Auto-created per PR, auto-deleted on close
+
+### Cleanup Completed (2026-01-07):
+- ✅ Deleted rogue "production" Neon branch (created 2026-01-07, had separate data)
+- ✅ Removed legacy "br-main" and "br-production" from protected branch lists
+- ✅ Updated manual migration script from `drizzle:migrate:prod` to `drizzle:migrate:main`
+- ✅ Updated CI workflow protected branches to: `main,development`
+- ✅ Added documentation to migration scripts explaining branch naming
+
+---
+
+## Original Migration Plan (Historical Reference)
+
 ## Overview
 
 Migrate from a two-branch model (`main` → `production`) to trunk-based development where `main` deploys directly to production.

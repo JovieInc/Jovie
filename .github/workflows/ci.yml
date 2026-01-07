@@ -218,8 +218,27 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,br-main'
+          protected_branches: 'main,development'
           cleanup_threshold: '7'
+
+      - name: Guard against creating protected branch names
+        if: ${{ github.event_name == 'pull_request' && steps.check-backend.outputs.needs_db == 'true' }}
+        run: |
+          RAW="${{ github.head_ref || github.ref_name }}"
+
+          # Block if PR branch name would create a protected branch
+          if [[ "$RAW" == "main" ]] || [[ "$RAW" == "development" ]]; then
+            echo "❌ ERROR: Cannot create ephemeral Neon branch with protected name '$RAW'"
+            echo "This would conflict with long-lived Neon branches."
+            echo "Please rename your PR branch to something else (e.g., feat/your-feature)"
+            exit 1
+          fi
+
+          # Warn if PR name contains legacy protected names (but allow)
+          if [[ "$RAW" == "production" ]] || [[ "$RAW" =~ ^br- ]]; then
+            echo "⚠️  WARNING: Branch name '$RAW' contains legacy pattern"
+            echo "Consider renaming to avoid confusion with old branch naming conventions"
+          fi
 
       - name: Determine sanitized branch name
         id: sanitize-branch
@@ -406,7 +425,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,br-main'
+          protected_branches: 'main,development'
           cleanup_threshold: '7'
 
       - name: Check for relevant changes

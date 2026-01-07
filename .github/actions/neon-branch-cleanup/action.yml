@@ -15,7 +15,7 @@ inputs:
   protected_branches:
     description: 'Comma-separated list of branch names to never delete'
     required: false
-    default: 'main,production,br-main,br-production'
+    default: 'main,development'
   cleanup_threshold:
     description: 'Start cleanup when this many branches exist (should be less than limit)'
     required: false

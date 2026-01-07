@@ -61,7 +61,7 @@
     "drizzle:migrate:ci": "tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:preflight": "doppler run -- tsx scripts/drizzle-migrate-preflight.ts",
     "drizzle:migrate:preview": "doppler run -c stg -- GIT_BRANCH=preview tsx scripts/drizzle-migrate.ts",
-    "drizzle:migrate:prod": "doppler run -c prd -- GIT_BRANCH=production tsx scripts/drizzle-migrate.ts",
+    "drizzle:migrate:main": "doppler run -c prd -- GIT_BRANCH=main tsx scripts/drizzle-migrate.ts",
     "drizzle:push": "doppler run -- drizzle-kit push",
     "neon:migrate:preview": "doppler run -- tsx scripts/neon-migrate-preview.ts",
     "neon:migrate:preview:compare": "doppler run -- tsx scripts/neon-migrate-preview.ts --compare",

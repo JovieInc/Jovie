@@ -72,7 +72,22 @@ function getCurrentBranch(): string {
   }
 }
 
-// Get environment from GIT_BRANCH env variable or current git branch
+/**
+ * Determines the environment based on Git branch name.
+ *
+ * Environment Mapping (Trunk-Based Development):
+ * - 'main' → production (our only production branch)
+ * - 'production' → production (legacy check for safety - this branch should not exist)
+ * - anything else → development (ephemeral PR branches, 'development' branch)
+ *
+ * Safety checks (confirmation prompts, ALLOW_PROD_MIGRATIONS flag) apply to 'production' environment only.
+ *
+ * Note: We keep the 'production' check as defense-in-depth. Even if someone uses old scripts
+ * that reference a "production" branch, safety checks will still apply. The actual production
+ * Neon branch is named "main".
+ *
+ * @returns 'production' for main/production branches (triggers safety checks), 'development' otherwise
+ */
 function getEnvironment(): 'main' | 'production' | 'development' {
   const envBranch = process.env.GIT_BRANCH;
   const gitBranch = getCurrentBranch();
