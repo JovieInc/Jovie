@@ -207,7 +207,7 @@ describe('Admin Impersonation', () => {
       const mockLimit = vi
         .fn()
         .mockResolvedValueOnce([{ id: 'admin-db-id' }])
-        .mockResolvedValueOnce([{ id: 'target-db-id', status: 'banned' }]);
+        .mockResolvedValueOnce([{ id: 'target-db-id', userStatus: 'banned' }]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });
       mockFrom.mockReturnValue({ where: mockWhere });
@@ -232,7 +232,7 @@ describe('Admin Impersonation', () => {
       const mockLimit = vi
         .fn()
         .mockResolvedValueOnce([{ id: 'admin-db-id' }])
-        .mockResolvedValueOnce([{ id: 'admin-db-id', status: 'active' }]);
+        .mockResolvedValueOnce([{ id: 'admin-db-id', userStatus: 'active' }]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });
       mockFrom.mockReturnValue({ where: mockWhere });
@@ -255,7 +255,7 @@ describe('Admin Impersonation', () => {
         .fn()
         .mockResolvedValueOnce([{ id: 'admin-db-id' }])
         .mockResolvedValueOnce([
-          { id: 'target-db-id', status: 'active', deletedAt: null },
+          { id: 'target-db-id', userStatus: 'active', deletedAt: null },
         ]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockStripePaymentIntentsCreate = vi.hoisted(() => vi.fn());
+const mockAuth = vi.hoisted(() => vi.fn());
 
 vi.mock('stripe', () => {
   const Stripe = vi.fn().mockImplementation(() => ({
@@ -12,15 +13,15 @@ vi.mock('stripe', () => {
   return { default: Stripe };
 });
 
-vi.mock('@/lib/utils/rate-limit', () => ({
-  checkRateLimit: vi.fn().mockReturnValue(false),
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: mockAuth,
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  paymentIntentLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true }),
+  },
   createRateLimitHeaders: vi.fn().mockReturnValue({}),
-  getClientIP: vi.fn().mockReturnValue('127.0.0.1'),
-  getRateLimitStatus: vi.fn().mockReturnValue({
-    limit: 100,
-    remaining: 99,
-    resetTime: Date.now() + 60000,
-  }),
 }));
 
 describe('POST /api/create-tip-intent', () => {
@@ -29,6 +30,9 @@ describe('POST /api/create-tip-intent', () => {
     vi.resetModules();
 
     process.env.STRIPE_SECRET_KEY = 'test_stripe_key';
+
+    // Mock authenticated user by default
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
   });
 
   it('returns 400 for invalid amount', async () => {
