@@ -5,17 +5,14 @@ import { db, waitlistEntries } from '@/lib/db';
 import { users, waitlistInvites } from '@/lib/db/schema';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
-import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
 import { waitlistRequestSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 function deriveFullName(params: {
   userFullName: string | null | undefined;
@@ -32,37 +29,6 @@ function deriveFullName(params: {
   if (localPart) return localPart;
 
   return 'Jovie user';
-}
-
-/**
- * Platform detection for waitlist primary social URL
- * Maps common social media domains to platform identifiers
- */
-function detectPlatformFromUrl(url: string): {
-  platform: string;
-  normalizedUrl: string;
-} {
-  const normalizedUrl = normalizeUrl(url);
-
-  const platformPatterns: Array<{ pattern: RegExp; platform: string }> = [
-    { pattern: /(?:www\.)?instagram\.com/i, platform: 'instagram' },
-    { pattern: /(?:www\.)?tiktok\.com/i, platform: 'tiktok' },
-    { pattern: /(?:www\.)?youtube\.com|youtu\.be/i, platform: 'youtube' },
-    { pattern: /(?:twitter\.com|x\.com)/i, platform: 'x' },
-    { pattern: /(?:www\.)?twitch\.tv/i, platform: 'twitch' },
-    { pattern: /(?:linktr\.ee|linktree\.com)/i, platform: 'linktree' },
-    { pattern: /(?:www\.)?facebook\.com/i, platform: 'facebook' },
-    { pattern: /(?:www\.)?threads\.net/i, platform: 'threads' },
-    { pattern: /(?:www\.)?snapchat\.com/i, platform: 'snapchat' },
-  ];
-
-  for (const { pattern, platform } of platformPatterns) {
-    if (pattern.test(normalizedUrl)) {
-      return { platform, normalizedUrl };
-    }
-  }
-
-  return { platform: 'unknown', normalizedUrl };
 }
 
 /**
@@ -88,25 +54,6 @@ function normalizeSpotifyUrl(url: string): string {
   }
 }
 
-function isMissingWaitlistSchemaError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const msg = error.message.toLowerCase();
-  const mentionsWaitlist = msg.includes('waitlist_entries');
-  const missingTable =
-    msg.includes('does not exist') ||
-    msg.includes('undefined_table') ||
-    msg.includes('relation');
-  const missingColumn =
-    msg.includes('column') && msg.includes('does not exist');
-  const mentionsNewColumns =
-    msg.includes('primary_goal') || msg.includes('selected_plan');
-
-  return (
-    (mentionsWaitlist && missingTable) ||
-    (mentionsWaitlist && missingColumn) ||
-    (mentionsWaitlist && mentionsNewColumns)
-  );
-}
 
 export async function GET() {
   const { userId } = await auth();
@@ -314,28 +261,13 @@ export async function POST(request: Request) {
             updatedAt: new Date(),
           };
 
-          try {
-            await tx
-              .update(waitlistEntries)
-              .set(updateValues)
-              .where(eq(waitlistEntries.id, existing.id));
-          } catch (error) {
-            if (!isMissingWaitlistSchemaError(error)) throw error;
-            const {
-              primaryGoal: _primaryGoal,
-              selectedPlan: _selectedPlan,
-              ...fallbackValues
-            } = updateValues;
-            void _primaryGoal;
-            void _selectedPlan;
-            await tx
-              .update(waitlistEntries)
-              .set(fallbackValues)
-              .where(eq(waitlistEntries.id, existing.id));
-          }
+          await tx
+            .update(waitlistEntries)
+            .set(updateValues)
+            .where(eq(waitlistEntries.id, existing.id));
         }
 
-        // Upsert users.waitlistApproval to 'pending' so getUserState() recognizes submission
+        // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
         // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
         await tx
           .insert(users)
@@ -343,13 +275,11 @@ export async function POST(request: Request) {
             clerkId: userId,
             email: emailRaw,
             userStatus: 'waitlist_pending',
-            waitlistApproval: 'pending',
           })
           .onConflictDoUpdate({
             target: users.clerkId,
             set: {
               userStatus: 'waitlist_pending',
-              waitlistApproval: 'pending',
               updatedAt: new Date(),
             },
           });
@@ -377,21 +307,9 @@ export async function POST(request: Request) {
     };
 
     await db.transaction(async tx => {
-      try {
-        await tx.insert(waitlistEntries).values(insertValues);
-      } catch (error) {
-        if (!isMissingWaitlistSchemaError(error)) throw error;
-        const {
-          primaryGoal: _primaryGoal,
-          selectedPlan: _selectedPlan,
-          ...fallbackValues
-        } = insertValues;
-        void _primaryGoal;
-        void _selectedPlan;
-        await tx.insert(waitlistEntries).values(fallbackValues);
-      }
+      await tx.insert(waitlistEntries).values(insertValues);
 
-      // Upsert users.waitlistApproval to 'pending' so getUserState() recognizes submission
+      // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
       // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
       await tx
         .insert(users)
@@ -399,13 +317,11 @@ export async function POST(request: Request) {
           clerkId: userId,
           email: emailRaw,
           userStatus: 'waitlist_pending',
-          waitlistApproval: 'pending',
         })
         .onConflictDoUpdate({
           target: users.clerkId,
           set: {
             userStatus: 'waitlist_pending',
-            waitlistApproval: 'pending',
             updatedAt: new Date(),
           },
         });
@@ -417,24 +333,6 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
-
-    if (isMissingWaitlistSchemaError(error)) {
-      const debugMsg =
-        error instanceof Error
-          ? error.message
-          : 'Run pnpm drizzle:migrate to update waitlist schema.';
-      return NextResponse.json(
-        {
-          success: false,
-          ...sanitizeErrorResponse(
-            'Waitlist is temporarily unavailable.',
-            debugMsg,
-            { code: 'waitlist_schema_error' }
-          ),
-        },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
-    }
 
     return NextResponse.json(
       { success: false, error: 'Something went wrong. Please try again.' },

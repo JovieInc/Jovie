@@ -138,13 +138,13 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     }
 
     // Fallback: create user if somehow missing (shouldn't happen with createDbUserIfMissing=true)
+    // User has claimed a profile but hasn't completed onboarding yet
     const [createdUser] = await db
       .insert(users)
       .values({
         clerkId: authResult.clerkUserId,
         email: authResult.context.email,
-        status: 'active',
-        userStatus: 'active',
+        userStatus: 'profile_claimed', // They need to complete onboarding
       })
       .returning({ id: users.id });
 
@@ -232,12 +232,12 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
             )
           );
 
-        // Sync user approval status and link to waitlist entry
+        // Update user status to profile_claimed and link to waitlist entry
         await tx
           .update(users)
           .set({
-            waitlistApproval: 'approved',
-            waitlistEntryId: waitlistInvite.waitlistEntryId,
+            userStatus: 'profile_claimed',
+            waitlistEntryId: waitlistInvite.waitlistEntryId, // Keep for historical tracking
             updatedAt: now,
           })
           .where(eq(users.id, dbUserId));

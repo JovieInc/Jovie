@@ -115,22 +115,34 @@ async function createUserWithRetry(
         );
       }
 
+      // TODO: Properly derive userStatus based on actual state
+      // This is a temporary simplified mapping until we implement full state derivation
+      // See migration 0034_add_user_status_lifecycle.sql for proper lifecycle states
+      //
+      // Proper logic should:
+      // 1. Check if user has waitlistEntryId (approved/claimed)
+      // 2. Check if user has claimed profile in creator_profiles
+      // 3. Check if profile has onboardingCompletedAt set
+      // 4. Return: waitlist_approved | profile_claimed | onboarding_incomplete | active
+      //
+      // For now, using simplified binary logic:
+      // - If waitlistEntryId exists: user was approved, so 'active' (they may have claimed and completed onboarding)
+      // - If no waitlistEntryId: user just signed up, so 'waitlist_pending'
+      const userStatus = waitlistEntryId ? 'active' : 'waitlist_pending';
+
       const [createdUser] = await db
         .insert(users)
         .values({
           clerkId: clerkUserId,
           email,
-          status: 'active',
-          userStatus: waitlistEntryId ? 'active' : 'waitlist_pending',
-          waitlistEntryId,
-          waitlistApproval: waitlistEntryId ? 'approved' : null,
+          userStatus,
+          waitlistEntryId, // Keep for historical tracking only
         })
         .onConflictDoUpdate({
           target: users.clerkId,
           set: {
             email,
-            userStatus: waitlistEntryId ? 'active' : 'waitlist_pending',
-            waitlistApproval: waitlistEntryId ? 'approved' : null,
+            userStatus,
             updatedAt: new Date(),
           },
         })
@@ -217,11 +229,10 @@ export async function resolveUserState(options?: {
   const [dbUser] = await db
     .select({
       id: users.id,
-      status: users.status,
+      userStatus: users.userStatus,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
       deletedAt: users.deletedAt,
-      waitlistEntryId: users.waitlistEntryId,
     })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
@@ -245,8 +256,8 @@ export async function resolveUserState(options?: {
     };
   }
 
-  // Handle explicitly banned users
-  if (dbUser?.status === 'banned') {
+  // Handle explicitly banned or suspended users
+  if (dbUser?.userStatus === 'banned' || dbUser?.userStatus === 'suspended') {
     return {
       state: UserState.BANNED,
       clerkUserId,
