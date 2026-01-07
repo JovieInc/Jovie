@@ -6,10 +6,9 @@ This document lists all feature gates used in the Jovie application and provides
 
 ### Using Statsig MCP (Recommended)
 
-When you have the Statsig MCP server configured in Claude Code:
+When you have the Statsig MCP server configured:
 
 ```bash
-# The MCP server should already be configured in .claude.json
 # Use Claude Code with Statsig MCP tools to create gates
 ```
 
@@ -201,7 +200,7 @@ Per `agents.md`:
 
 ## Statsig MCP Integration
 
-The Statsig MCP server is configured in `.claude.json` and enables:
+The Statsig MCP server enables:
 - Programmatic gate creation
 - Gate status checking
 - Experiment management

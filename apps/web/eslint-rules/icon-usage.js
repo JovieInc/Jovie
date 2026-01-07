@@ -2,7 +2,7 @@
  * ESLint rule to enforce icon usage standards in Jovie project
  *
  * Rules:
- * 1. Use Heroicons for general-purpose UI icons
+ * 1. Use Lucide React for general-purpose UI icons
  * 2. Use SimpleIcons via SocialIcon component for social/brand icons
  * 3. Only allow custom SVGs for approved use cases
  */
@@ -19,7 +19,7 @@ const APPROVED_CUSTOM_SVGS = [
   // Add more approved custom SVGs here
 ];
 
-// Common UI icons that should use Heroicons
+// Common UI icons that should use Lucide React
 const COMMON_UI_ICONS = [
   'chevron',
   'arrow',
@@ -81,7 +81,7 @@ module.exports = {
     type: 'problem',
     docs: {
       description:
-        'Enforce icon usage standards (Heroicons for UI, SimpleIcons for social/brand)',
+        'Enforce icon usage standards (Lucide React for UI, SimpleIcons for social/brand)',
       category: 'Best Practices',
       recommended: true,
     },
@@ -89,13 +89,13 @@ module.exports = {
     schema: [],
     messages: {
       directSvgImport:
-        'Direct SVG import detected. Use Heroicons for general UI icons or SocialIcon component for social/brand icons.',
+        'Direct SVG import detected. Use Lucide React for general UI icons or SocialIcon component for social/brand icons.',
       inlineSvg:
-        'Inline SVG detected. Use Heroicons for UI icons or SocialIcon component for social/brand icons.',
+        'Inline SVG detected. Use Lucide React for UI icons or SocialIcon component for social/brand icons.',
       customSvgNotApproved:
         'Custom SVG usage requires approval. See docs/ICON_STANDARDS.md for the approval process.',
-      useHeroicons:
-        'Use Heroicons for general UI icons. Import from @heroicons/react/24/outline or @heroicons/react/24/solid.',
+      useLucideReact:
+        'Use Lucide React for general UI icons. Import from lucide-react.',
       useSocialIcon:
         'Use SocialIcon component for social media and brand icons: <SocialIcon platform="{{platform}}" />',
       directSimpleIcons:
@@ -218,7 +218,7 @@ module.exports = {
             } else if (containsUIIcon(templateValue)) {
               context.report({
                 node,
-                messageId: 'useHeroicons',
+                messageId: 'useLucideReact',
               });
             } else {
               context.report({

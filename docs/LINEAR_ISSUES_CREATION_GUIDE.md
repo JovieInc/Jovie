@@ -2,7 +2,7 @@
 
 ## Instructions for Creating Linear Issues
 
-Since the Linear MCP server isn't available, please create these issues manually in Linear using the details below.
+Since the Linear MCP server may not be available, please create these issues manually in Linear using the details below.
 
 ## How to Create Issues
 
