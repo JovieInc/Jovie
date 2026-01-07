@@ -115,20 +115,45 @@ async function createUserWithRetry(
         );
       }
 
-      // TODO: Properly derive userStatus based on actual state
-      // This is a temporary simplified mapping until we implement full state derivation
-      // See migration 0034_add_user_status_lifecycle.sql for proper lifecycle states
-      //
-      // Proper logic should:
-      // 1. Check if user has waitlistEntryId (approved/claimed)
-      // 2. Check if user has claimed profile in creator_profiles
-      // 3. Check if profile has onboardingCompletedAt set
-      // 4. Return: waitlist_approved | profile_claimed | onboarding_incomplete | active
-      //
-      // For now, using simplified binary logic:
-      // - If waitlistEntryId exists: user was approved, so 'active' (they may have claimed and completed onboarding)
-      // - If no waitlistEntryId: user just signed up, so 'waitlist_pending'
-      const userStatus = waitlistEntryId ? 'active' : 'waitlist_pending';
+      // Derive userStatus based on actual user lifecycle state
+      // This implements the proper state progression defined in migration 0034:
+      // waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
+      let userStatus: 'waitlist_pending' | 'waitlist_approved' | 'profile_claimed' | 'onboarding_incomplete' | 'active';
+
+      // Check if user already has an existing DB record with a claimed profile
+      const [existingUserData] = await db
+        .select({
+          userId: users.id,
+          currentStatus: users.userStatus,
+          profileId: creatorProfiles.id,
+          profileClaimed: creatorProfiles.isClaimed,
+          onboardingComplete: creatorProfiles.onboardingCompletedAt,
+        })
+        .from(users)
+        .leftJoin(
+          creatorProfiles,
+          and(
+            eq(creatorProfiles.userId, users.id),
+            eq(creatorProfiles.isClaimed, true)
+          )
+        )
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!waitlistEntryId) {
+        // User just signed up but hasn't joined waitlist yet
+        userStatus = 'waitlist_pending';
+      } else if (existingUserData?.profileId && existingUserData.profileClaimed) {
+        // User has a claimed profile - check onboarding completion
+        if (existingUserData.onboardingComplete) {
+          userStatus = 'active';
+        } else {
+          userStatus = 'onboarding_incomplete';
+        }
+      } else {
+        // User has waitlist entry but no claimed profile yet
+        userStatus = 'waitlist_approved';
+      }
 
       const [createdUser] = await db
         .insert(users)
