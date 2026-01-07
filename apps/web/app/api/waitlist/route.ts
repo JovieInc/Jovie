@@ -236,10 +236,12 @@ export async function POST(request: Request) {
       ? normalizeSpotifyUrl(spotifyUrl)
       : null;
 
+    // Check for existing entry using lowercase email comparison
+    // The email variable is already normalized (lowercase) via normalizeEmail()
     const [existing] = await db
       .select({ id: waitlistEntries.id, status: waitlistEntries.status })
       .from(waitlistEntries)
-      .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+      .where(drizzleSql`lower(${waitlistEntries.email}) = lower(${email})`)
       .limit(1);
 
     if (existing) {
@@ -332,6 +334,16 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
+
+    // Check if this is a unique constraint violation on email
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('idx_waitlist_entries_email_unique') ||
+        errorMessage.includes('duplicate key') && errorMessage.includes('email')) {
+      return NextResponse.json(
+        { success: false, error: 'You have already joined the waitlist with this email address.' },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
 
     return NextResponse.json(
       { success: false, error: 'Something went wrong. Please try again.' },
