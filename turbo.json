@@ -25,7 +25,6 @@
         "STATSIG_*",
         "NEON_*",
         "DATABASE_URL",
-        "DATABASE_URL_MAIN",
         "SPOTIFY_*",
         "CLOUDINARY_*",
         "RESEND_*",

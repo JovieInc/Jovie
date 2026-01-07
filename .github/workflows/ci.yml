@@ -998,27 +998,13 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-      - name: Deploy (PR preview, fast deployment for UI-only changes)
+      - name: Deploy (PR preview)
         id: pr_deploy
         run: |
-          # For fast preview PRs: use main secrets (no Neon dependency)
-          # Fallback hierarchy for maximum compatibility
-          POOLED_URL=""
-          if [ -n "$DATABASE_URL_MAIN" ]; then
-            POOLED_URL="$DATABASE_URL_MAIN"
-            echo "Using main database URL"
-          elif [ -n "$DATABASE_URL" ]; then
-            POOLED_URL="$DATABASE_URL"
-            echo "Using fallback database URL"
-          else
-            # Provide cheap stub for UI-only deployments that might not need DB
-            POOLED_URL="postgresql://stub:stub@localhost:5432/main_stub"
-            echo "Using stub database URL for UI-only deployment"
-          fi
-
-          # Deploy preview with DATABASE_URL injected only for this deployment
+          # Deploy preview
+          # DATABASE_URL comes from Vercel preview environment (synced from Doppler stg config)
+          # GIT_BRANCH helps backend identify the deployment context
           deployment_url=$(vercel deploy --prebuilt \
-            --env DATABASE_URL="$POOLED_URL" \
             --env GIT_BRANCH="${GIT_BRANCH}" \
             --token $VERCEL_TOKEN)
 
@@ -1027,9 +1013,6 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          # Use main secrets - no Neon dependency for fast deployments
-          DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
   ci-summary:
