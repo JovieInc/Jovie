@@ -2,113 +2,6 @@ import { desc, sql as drizzleSql } from 'drizzle-orm';
 import { db, doesTableExist, waitlistEntries } from '@/lib/db';
 import type { WaitlistEntry } from '@/lib/db/schema';
 
-function isMissingWaitlistSchemaError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-
-  const msg = error.message.toLowerCase();
-  const mentionsWaitlist = msg.includes('waitlist_entries');
-  const missingTable =
-    msg.includes('does not exist') ||
-    msg.includes('undefined_table') ||
-    msg.includes('relation');
-  const missingColumn =
-    msg.includes('column') && msg.includes('does not exist');
-  const mentionsKnownNewColumns =
-    msg.includes('primary_goal') || msg.includes('selected_plan');
-
-  return (
-    (mentionsWaitlist && (missingTable || missingColumn)) ||
-    (mentionsWaitlist && mentionsKnownNewColumns)
-  );
-}
-
-async function getAdminWaitlistEntriesFallback(params: {
-  page: number;
-  pageSize: number;
-  offset: number;
-}): Promise<GetAdminWaitlistResult> {
-  try {
-    const countResult = await db.execute(
-      drizzleSql<{
-        count: number;
-      }>`SELECT count(*)::int AS count FROM waitlist_entries`
-    );
-    const total = Number(countResult.rows?.[0]?.count ?? 0);
-
-    const result = await db.execute(
-      drizzleSql`
-        SELECT
-          id,
-          full_name,
-          email,
-          primary_social_url,
-          primary_social_platform,
-          primary_social_url_normalized,
-          spotify_url,
-          spotify_url_normalized,
-          heard_about,
-          status,
-          primary_social_follower_count,
-          created_at,
-          updated_at
-        FROM waitlist_entries
-        ORDER BY created_at DESC
-        LIMIT ${params.pageSize}
-        OFFSET ${params.offset}
-      `
-    );
-
-    const rawRows = result.rows ?? [];
-    const entries: WaitlistEntryRow[] = rawRows.map(row => {
-      const createdAtRaw = row.created_at;
-      const updatedAtRaw = row.updated_at;
-
-      return {
-        id: String(row.id),
-        fullName: String(row.full_name),
-        email: String(row.email),
-        primaryGoal: null,
-        primarySocialUrl: String(row.primary_social_url),
-        primarySocialPlatform: String(row.primary_social_platform),
-        primarySocialUrlNormalized: String(row.primary_social_url_normalized),
-        spotifyUrl: row.spotify_url != null ? String(row.spotify_url) : null,
-        spotifyUrlNormalized:
-          row.spotify_url_normalized != null
-            ? String(row.spotify_url_normalized)
-            : null,
-        heardAbout: row.heard_about != null ? String(row.heard_about) : null,
-        status: String(row.status) as WaitlistEntry['status'],
-        primarySocialFollowerCount:
-          row.primary_social_follower_count != null
-            ? Number(row.primary_social_follower_count)
-            : null,
-        createdAt:
-          createdAtRaw instanceof Date
-            ? createdAtRaw
-            : new Date(String(createdAtRaw)),
-        updatedAt:
-          updatedAtRaw instanceof Date
-            ? updatedAtRaw
-            : new Date(String(updatedAtRaw)),
-      };
-    });
-
-    return {
-      entries,
-      page: params.page,
-      pageSize: params.pageSize,
-      total,
-    };
-  } catch {
-    return {
-      entries: [],
-      page: params.page,
-      pageSize: params.pageSize,
-      total: 0,
-    };
-  }
-}
-
 export interface WaitlistEntryRow {
   id: string;
   fullName: string;
@@ -143,7 +36,6 @@ export interface WaitlistMetrics {
   new: number;
   invited: number;
   claimed: number;
-  rejected: number;
 }
 
 /**
@@ -152,7 +44,7 @@ export interface WaitlistMetrics {
 export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
   const hasWaitlistTable = await doesTableExist('waitlist_entries');
   if (!hasWaitlistTable) {
-    return { total: 0, new: 0, invited: 0, claimed: 0, rejected: 0 };
+    return { total: 0, new: 0, invited: 0, claimed: 0 };
   }
 
   try {
@@ -169,7 +61,6 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
       new: 0,
       invited: 0,
       claimed: 0,
-      rejected: 0,
     };
 
     for (const row of result) {
@@ -178,14 +69,10 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
       if (row.status === 'new') metrics.new = count;
       else if (row.status === 'invited') metrics.invited = count;
       else if (row.status === 'claimed') metrics.claimed = count;
-      else if (row.status === 'rejected') metrics.rejected = count;
     }
 
     return metrics;
   } catch (error) {
-    if (isMissingWaitlistSchemaError(error)) {
-      return { total: 0, new: 0, invited: 0, claimed: 0, rejected: 0 };
-    }
     throw error;
   }
 }
@@ -249,9 +136,6 @@ export async function getAdminWaitlistEntries(
       total,
     };
   } catch (error) {
-    if (isMissingWaitlistSchemaError(error)) {
-      return getAdminWaitlistEntriesFallback({ page, pageSize, offset });
-    }
     throw error;
   }
 }

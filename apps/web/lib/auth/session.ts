@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -153,7 +153,14 @@ export interface DbUserContext {
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;
-  status: 'active' | 'pending' | 'banned';
+  userStatus:
+    | 'waitlist_pending'
+    | 'waitlist_approved'
+    | 'profile_claimed'
+    | 'onboarding_incomplete'
+    | 'active'
+    | 'suspended'
+    | 'banned';
 }
 
 /**
@@ -200,7 +207,7 @@ export async function getDbUser(
       email: users.email,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
-      status: users.status,
+      userStatus: users.userStatus,
     })
     .from(users)
     .where(eq(users.clerkId, userId))

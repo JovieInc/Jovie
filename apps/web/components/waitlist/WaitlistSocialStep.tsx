@@ -85,7 +85,7 @@ export function WaitlistSocialStep({
             aria-checked={socialPlatform === option.value}
             tabIndex={socialPlatform === option.value ? 0 : -1}
             onClick={() => onPlatformSelect(option.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
+            className={`rounded-[--radius-full] px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
               socialPlatform === option.value
                 ? 'bg-surface-2 text-primary-token border-border'
                 : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1'
@@ -125,7 +125,7 @@ export function WaitlistSocialStep({
           />
         </>
       ) : (
-        <div className='w-full flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
+        <div className='w-full flex items-center gap-2 rounded-[--radius-lg] border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--color-bg-base)'>
           <span className='text-sm text-secondary-token whitespace-nowrap'>
             {getSocialPlatformPrefix(socialPlatform).display}
           </span>

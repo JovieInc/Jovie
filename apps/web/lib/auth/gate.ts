@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
@@ -115,22 +115,67 @@ async function createUserWithRetry(
         );
       }
 
+      // Derive userStatus based on actual user lifecycle state
+      // This implements the proper state progression defined in migration 0034:
+      // waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
+      let userStatus:
+        | 'waitlist_pending'
+        | 'waitlist_approved'
+        | 'profile_claimed'
+        | 'onboarding_incomplete'
+        | 'active';
+
+      // Check if user already has an existing DB record with a claimed profile
+      const [existingUserData] = await db
+        .select({
+          userId: users.id,
+          currentStatus: users.userStatus,
+          profileId: creatorProfiles.id,
+          profileClaimed: creatorProfiles.isClaimed,
+          onboardingComplete: creatorProfiles.onboardingCompletedAt,
+        })
+        .from(users)
+        .leftJoin(
+          creatorProfiles,
+          and(
+            eq(creatorProfiles.userId, users.id),
+            eq(creatorProfiles.isClaimed, true)
+          )
+        )
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!waitlistEntryId) {
+        // User just signed up but hasn't joined waitlist yet
+        userStatus = 'waitlist_pending';
+      } else if (
+        existingUserData?.profileId &&
+        existingUserData.profileClaimed
+      ) {
+        // User has a claimed profile - check onboarding completion
+        if (existingUserData.onboardingComplete) {
+          userStatus = 'active';
+        } else {
+          userStatus = 'onboarding_incomplete';
+        }
+      } else {
+        // User has waitlist entry but no claimed profile yet
+        userStatus = 'waitlist_approved';
+      }
+
       const [createdUser] = await db
         .insert(users)
         .values({
           clerkId: clerkUserId,
           email,
-          status: 'active',
-          userStatus: waitlistEntryId ? 'active' : 'waitlist_pending',
-          waitlistEntryId,
-          waitlistApproval: waitlistEntryId ? 'approved' : null,
+          userStatus,
+          waitlistEntryId, // Keep for historical tracking only
         })
         .onConflictDoUpdate({
           target: users.clerkId,
           set: {
             email,
-            userStatus: waitlistEntryId ? 'active' : 'waitlist_pending',
-            waitlistApproval: waitlistEntryId ? 'approved' : null,
+            userStatus,
             updatedAt: new Date(),
           },
         })
@@ -217,11 +262,10 @@ export async function resolveUserState(options?: {
   const [dbUser] = await db
     .select({
       id: users.id,
-      status: users.status,
+      userStatus: users.userStatus,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
       deletedAt: users.deletedAt,
-      waitlistEntryId: users.waitlistEntryId,
     })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
@@ -245,8 +289,8 @@ export async function resolveUserState(options?: {
     };
   }
 
-  // Handle explicitly banned users
-  if (dbUser?.status === 'banned') {
+  // Handle explicitly banned or suspended users
+  if (dbUser?.userStatus === 'banned' || dbUser?.userStatus === 'suspended') {
     return {
       state: UserState.BANNED,
       clerkUserId,

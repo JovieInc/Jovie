@@ -305,9 +305,18 @@ export async function PUT(req: Request) {
             throw new Error(`Avatar fetch failed: ${avatarResponse.status}`);
           }
 
-          const contentType =
-            avatarResponse.headers.get('content-type') || 'image/png';
+          const contentType = avatarResponse.headers.get('content-type') || '';
+          // Validate content type is an image
+          if (!contentType.startsWith('image/')) {
+            throw new Error(`Invalid content type: ${contentType}`);
+          }
+
           const arrayBuffer = await avatarResponse.arrayBuffer();
+          // Validate file size (max 5MB)
+          if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
+            throw new Error('Avatar file size exceeds 5MB limit');
+          }
+
           const blob = new Blob([arrayBuffer], { type: contentType });
 
           const clerk = await clerkClient();

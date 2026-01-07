@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
@@ -18,7 +18,7 @@ export interface ProxyUserState {
  *
  * IMPORTANT: Filters out soft-deleted and banned users for security.
  *
- * SIMPLIFIED: Uses waitlistApproval field instead of join to waitlistEntries table.
+ * Uses userStatus lifecycle enum as single source of truth for auth state.
  *
  * @param clerkUserId - The Clerk user ID from auth()
  * @returns Boolean flags indicating what the user needs
@@ -32,8 +32,7 @@ export async function getUserState(
     const [result] = await db
       .select({
         dbUserId: users.id,
-        waitlistApproval: users.waitlistApproval, // New simplified field
-        waitlistEntryId: users.waitlistEntryId, // Legacy fallback during migration
+        userStatus: users.userStatus, // Single source of truth for user lifecycle state
         profileId: creatorProfiles.id,
         profileComplete: creatorProfiles.onboardingCompletedAt,
       })
@@ -49,7 +48,7 @@ export async function getUserState(
         and(
           eq(users.clerkId, clerkUserId),
           isNull(users.deletedAt), // Exclude soft-deleted users
-          ne(users.status, 'banned') // Exclude banned users
+          ne(users.userStatus, 'banned') // Exclude banned users
         )
       )
       .limit(1);
@@ -59,10 +58,13 @@ export async function getUserState(
       return { needsWaitlist: true, needsOnboarding: false, isActive: false };
     }
 
-    // Check waitlist approval using new field (with legacy fallback)
-    // waitlistApproval: null = not submitted, 'pending' = awaiting approval, 'approved' = ready for onboarding
+    // Check waitlist approval using userStatus lifecycle
+    // userStatus progression: waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
     const isWaitlistApproved =
-      result.waitlistApproval === 'approved' || result.waitlistEntryId !== null; // Legacy fallback
+      result.userStatus === 'waitlist_approved' ||
+      result.userStatus === 'profile_claimed' ||
+      result.userStatus === 'onboarding_incomplete' ||
+      result.userStatus === 'active';
 
     if (!isWaitlistApproved) {
       return { needsWaitlist: true, needsOnboarding: false, isActive: false };

@@ -56,6 +56,19 @@ export const dashboardLinksLimiter = createRateLimiter(
 );
 
 // ============================================================================
+// Payment Operations
+// ============================================================================
+
+/**
+ * Payment intent creation rate limiter
+ * Limit: 10 payment intents per hour per user
+ * CRITICAL: Prevents Stripe API abuse and protects against payment intent spam
+ */
+export const paymentIntentLimiter = createRateLimiter(
+  RATE_LIMITERS.paymentIntent
+);
+
+// ============================================================================
 // Tracking & Analytics
 // ============================================================================
 
@@ -331,6 +344,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     onboarding: onboardingLimiter,
     handleCheck: handleCheckLimiter,
     dashboardLinks: dashboardLinksLimiter,
+    paymentIntent: paymentIntentLimiter,
     trackingClicks: trackingClicksLimiter,
     trackingVisits: trackingVisitsLimiter,
     trackingIpClicks: trackingIpClicksLimiter,

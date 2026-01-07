@@ -38,7 +38,7 @@ const LINK_FOCUS_CLASSES =
 export function AuthLayout({
   children,
   formTitle,
-  formTitleClassName = 'text-[18px] leading-6 font-medium text-primary-token mb-4 text-center',
+  formTitleClassName = 'text-lg leading-6 font-medium text-primary-token mb-4 text-center',
   footerPrompt = "Don't have access?",
   footerLinkText = 'Join the waitlist',
   footerLinkHref = '/waitlist',

@@ -110,7 +110,7 @@ export function EmailStep({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-5 sm:space-y-4'>
-      <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+      <h1 className='text-xl leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         What&apos;s your email address?
       </h1>
 
@@ -134,7 +134,7 @@ export function EmailStep({
         <FormError message={displayError} />
       </div>
 
-      <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
+      <p className='text-base sm:text-sm leading-relaxed text-secondary-token text-center px-2'>
         {mode === 'signin'
           ? "We'll email a 6-digit code to keep your account secure."
           : "We'll send a 6-digit code to verify your email."}

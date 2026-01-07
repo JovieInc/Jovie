@@ -27,10 +27,12 @@ export const users = pgTable(
     // NEW: Single source of truth for user lifecycle
     userStatus: userStatusLifecycleEnum('user_status').notNull(),
 
-    // DEPRECATED: Will be removed in future PR after migration stabilizes
+    // DEPRECATED (2026-01): Remove after migration 0036 deploys and code stabilizes (2-4 weeks). Use userStatus instead.
     status: userStatusEnum('status').notNull().default('active'),
-    waitlistEntryId: uuid('waitlist_entry_id'), // Legacy - kept for migration compatibility
-    waitlistApproval: userWaitlistApprovalEnum('waitlist_approval'), // New simplified waitlist system
+    // DEPRECATED (2026-01): Historical data only. Do not write to this field.
+    waitlistEntryId: uuid('waitlist_entry_id'),
+    // DEPRECATED (2026-01): Remove after migration 0036 deploys and code stabilizes (2-4 weeks). Use userStatus instead.
+    waitlistApproval: userWaitlistApprovalEnum('waitlist_approval'),
 
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
@@ -47,14 +49,11 @@ export const users = pgTable(
     // NEW: Primary index for user lifecycle state
     userStatusIdx: index('idx_users_user_status').on(table.userStatus),
 
-    // DEPRECATED: Legacy indexes
-    statusIdx: index('idx_users_status').on(table.status),
-    waitlistEntryIdIdx: index('idx_users_waitlist_entry_id').on(
-      table.waitlistEntryId
-    ),
-    waitlistApprovalIdx: index('idx_users_waitlist_approval').on(
-      table.waitlistApproval
-    ),
+    // DEPRECATED: Legacy indexes (dropped in migration 0036)
+    // These are commented out because the indexes no longer exist in the database
+    // statusIdx: index('idx_users_status').on(table.status),
+    // waitlistEntryIdIdx: index('idx_users_waitlist_entry_id').on(table.waitlistEntryId),
+    // waitlistApprovalIdx: index('idx_users_waitlist_approval').on(table.waitlistApproval),
   })
 );
 

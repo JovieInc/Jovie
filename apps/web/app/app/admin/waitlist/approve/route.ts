@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { type DbType, db } from '@/lib/db';
 import {
   creatorProfiles,
-  users,
   waitlistEntries,
   waitlistInvites,
 } from '@/lib/db/schema';
@@ -12,6 +11,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -22,46 +22,6 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 function safeRandomHandle(): string {
   const token = randomUUID().replace(/-/g, '').slice(0, 12);
   return `c${token}`;
-}
-
-function extractHandleCandidateFromUrl(urlRaw: string): string | null {
-  try {
-    const url = new URL(urlRaw);
-    const host = url.hostname.toLowerCase();
-
-    // Define allowed hosts for each platform (add subdomains as needed)
-    const INSTAGRAM_HOSTS = ['instagram.com', 'www.instagram.com'];
-    const TIKTOK_HOSTS = ['tiktok.com', 'www.tiktok.com'];
-    const YOUTUBE_HOSTS = ['youtube.com', 'www.youtube.com', 'm.youtube.com'];
-    const LINKTREE_HOSTS = ['linktr.ee', 'www.linktr.ee'];
-
-    if (INSTAGRAM_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      return seg ? seg.replace(/^@/, '') : null;
-    }
-
-    if (TIKTOK_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      return seg ? seg.replace(/^@/, '') : null;
-    }
-
-    if (YOUTUBE_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      if (!seg) return null;
-
-      if (seg.startsWith('@')) return seg.slice(1);
-      return null;
-    }
-
-    if (LINKTREE_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      return seg ? seg.replace(/^@/, '') : null;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 async function findAvailableHandle(tx: DbType, base: string): Promise<string> {
@@ -163,13 +123,8 @@ export async function POST(request: Request) {
           .set({ status: 'invited', updatedAt: new Date() })
           .where(eq(waitlistEntries.id, entry.id));
 
-        // Sync user's waitlist approval status
-        if (entry.email) {
-          await tx
-            .update(users)
-            .set({ waitlistApproval: 'approved', updatedAt: new Date() })
-            .where(eq(users.email, entry.email));
-        }
+        // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
+        // No need to update users table here - the claim flow handles status transitions
 
         return {
           inviteId: existingInvite.id,
@@ -178,7 +133,7 @@ export async function POST(request: Request) {
       }
 
       const handleCandidate =
-        extractHandleCandidateFromUrl(entry.primarySocialUrlNormalized) ??
+        extractHandleFromUrl(entry.primarySocialUrlNormalized) ??
         entry.email.split('@')[0] ??
         safeRandomHandle();
 
@@ -262,14 +217,7 @@ export async function POST(request: Request) {
           .set({ status: 'invited', updatedAt: new Date() })
           .where(eq(waitlistEntries.id, entry.id));
 
-        // Sync user's waitlist approval status
-        if (entry.email) {
-          await tx
-            .update(users)
-            .set({ waitlistApproval: 'approved', updatedAt: new Date() })
-            .where(eq(users.email, entry.email));
-        }
-
+        // Note: User's userStatus will be updated when they claim the invite
         return { inviteId: existing.id, claimToken: existing.claimToken };
       }
 
@@ -278,13 +226,7 @@ export async function POST(request: Request) {
         .set({ status: 'invited', updatedAt: new Date() })
         .where(eq(waitlistEntries.id, entry.id));
 
-      // Sync user's waitlist approval status
-      if (entry.email) {
-        await tx
-          .update(users)
-          .set({ waitlistApproval: 'approved', updatedAt: new Date() })
-          .where(eq(users.email, entry.email));
-      }
+      // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
 
       return { inviteId: invite.id, claimToken: invite.claimToken };
     });

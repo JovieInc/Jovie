@@ -1,4 +1,4 @@
-import { CheckCircle, Mail, Sparkles, XCircle } from 'lucide-react';
+import { CheckCircle, Mail, Sparkles } from 'lucide-react';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +45,7 @@ interface WaitlistMetricsProps {
 
 export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
   return (
-    <div className='grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4'>
+    <div className='grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4'>
       <MetricCard
         label='New'
         value={metrics.new}
@@ -66,13 +66,6 @@ export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
         icon={CheckCircle}
         colorClass='text-emerald-600 dark:text-emerald-400'
         bgClass='bg-emerald-500/10 dark:bg-emerald-500/15'
-      />
-      <MetricCard
-        label='Rejected'
-        value={metrics.rejected}
-        icon={XCircle}
-        colorClass='text-rose-500 dark:text-rose-400'
-        bgClass='bg-rose-500/10 dark:bg-rose-500/15'
       />
     </div>
   );

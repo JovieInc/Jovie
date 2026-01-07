@@ -1,12 +1,11 @@
 'use client';
 
-import { useAuth, useClerk } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AuthBackButton, AuthLayout } from '@/components/auth';
+import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
 import {
   ALLOWED_PLANS,
-  BUTTON_CLASSES,
   clearWaitlistStorage,
   type FormErrors,
   isValidUrl,
@@ -26,7 +25,6 @@ import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
 
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { signOut } = useClerk();
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedPlan = useMemo(() => {
@@ -46,7 +44,6 @@ export default function WaitlistPage() {
   const [heardAbout, setHeardAbout] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
 
@@ -437,25 +434,8 @@ export default function WaitlistPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    if (isSubmitting || isSigningOut) return;
-    setIsSigningOut(true);
-
-    try {
-      await signOut(() => router.push('/'));
-    } catch (err) {
-      console.error('Waitlist sign out error:', err);
-      setIsSigningOut(false);
-    }
-  };
-
   if (isSubmitted) {
-    return (
-      <WaitlistSuccessView
-        isSigningOut={isSigningOut}
-        onSignOut={handleSignOut}
-      />
-    );
+    return <WaitlistSuccessView />;
   }
 
   const currentStepErrors = validateStep(step);
@@ -477,6 +457,8 @@ export default function WaitlistPage() {
       showFormTitle={false}
       showFooterPrompt={false}
       showLogo={false}
+      showLogoutButton
+      logoutRedirectUrl='/signin'
     >
       <div className='w-full'>
         <form onSubmit={handleSubmit} className='space-y-4'>
@@ -537,24 +519,24 @@ export default function WaitlistPage() {
           )}
 
           {step === 2 && (
-            <button
+            <AuthButton
               type='submit'
               disabled={isSubmitting || !isReadyToSubmit}
-              className={BUTTON_CLASSES}
+              variant='primary'
             >
               {isSubmitting ? 'Submitting…' : 'Join the waitlist'}
-            </button>
+            </AuthButton>
           )}
 
           {step === 1 && (
-            <button
+            <AuthButton
               type='button'
               onClick={handleNext}
               disabled={isSubmitting || !isCurrentStepValid}
-              className={BUTTON_CLASSES}
+              variant='primary'
             >
               Continue
-            </button>
+            </AuthButton>
           )}
 
           <div className='flex items-center justify-center pt-2'>
@@ -569,17 +551,6 @@ export default function WaitlistPage() {
               }}
               className='text-center'
             />
-          </div>
-
-          <div className='flex items-center justify-center'>
-            <button
-              type='button'
-              onClick={handleSignOut}
-              disabled={isSubmitting || isSigningOut}
-              className='text-sm text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-            >
-              {isSigningOut ? 'Signing out…' : 'Sign out'}
-            </button>
           </div>
         </form>
       </div>

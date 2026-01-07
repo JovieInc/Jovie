@@ -179,6 +179,11 @@ async function processWebhookEvent(
 
   if (!handler) {
     // Unhandled event types are expected - Stripe sends many event types
+    // Log unexpected events to help detect configuration issues or new event types
+    console.warn(
+      `[Stripe Webhook] Received unexpected event type: ${event.type}`,
+      { eventId: event.id, eventType: event.type }
+    );
     // We acknowledge them but don't process (return 200 to Stripe)
     return;
   }

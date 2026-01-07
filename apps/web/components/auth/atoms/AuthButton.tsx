@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-xl flex items-center justify-center gap-3',
+    'w-full rounded-[--radius-xl] flex items-center justify-center gap-3',
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
     // Mobile-optimized height (min 48px for touch targets)
@@ -26,25 +26,25 @@ const authButtonVariants = cva(
     variants: {
       variant: {
         primary: [
-          'bg-btn-primary px-4 text-[15px] leading-5 font-medium text-btn-primary-foreground',
+          'bg-btn-primary px-4 text-base sm:text-sm leading-5 font-medium text-btn-primary-foreground',
           'shadow-(--shadow-sm)',
           'hover:opacity-90',
           'active:shadow-none',
         ].join(' '),
         primaryLight: [
-          'border border-subtle bg-surface-0 px-4 text-[15px] leading-5 font-medium text-primary-token',
+          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
           'shadow-(--shadow-sm)',
           'hover:bg-surface-1',
           'active:bg-surface-2 active:shadow-none',
         ].join(' '),
         oauthPrimary: [
-          'bg-btn-primary px-4 text-[15px] leading-5 font-medium text-btn-primary-foreground',
+          'bg-btn-primary px-4 text-base sm:text-sm leading-5 font-medium text-btn-primary-foreground',
           'shadow-(--shadow-sm)',
           'hover:opacity-90',
           'active:shadow-none',
         ].join(' '),
         secondary: [
-          'border border-subtle bg-surface-0 px-4 text-[15px] leading-5 font-medium text-primary-token',
+          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
           'shadow-(--shadow-sm)',
           'hover:bg-surface-1',
           'active:bg-surface-2 active:shadow-none',

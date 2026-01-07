@@ -143,7 +143,6 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'new',
   'invited',
   'claimed',
-  'rejected',
 ]);
 
 export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [

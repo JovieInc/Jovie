@@ -217,7 +217,7 @@ describe('Waitlist API', () => {
       expect(data.status).toBe('new');
     });
 
-    it('sets users.waitlistApproval to pending after submission', async () => {
+    it('sets users.userStatus to waitlist_pending after submission', async () => {
       const mockOnConflict = vi.fn().mockResolvedValue(undefined);
       const mockValues = vi.fn().mockReturnValue({
         onConflictDoUpdate: mockOnConflict,
@@ -255,17 +255,17 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
 
-      // Verify users table was upserted with waitlistApproval='pending'
+      // Verify users table was upserted with userStatus='waitlist_pending'
       expect(mockDbInsert).toHaveBeenCalled();
       expect(mockValues).toHaveBeenCalledWith({
         clerkId: 'user_123',
         email: 'test@example.com',
-        waitlistApproval: 'pending',
+        userStatus: 'waitlist_pending',
       });
       expect(mockOnConflict).toHaveBeenCalledWith(
         expect.objectContaining({
           set: expect.objectContaining({
-            waitlistApproval: 'pending',
+            userStatus: 'waitlist_pending',
             updatedAt: expect.any(Date),
           }),
         })
