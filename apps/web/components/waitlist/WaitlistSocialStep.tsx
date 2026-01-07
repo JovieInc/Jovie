@@ -125,7 +125,7 @@ export function WaitlistSocialStep({
           />
         </>
       ) : (
-        <div className='w-full flex items-center gap-2 rounded-[--radius-lg] border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
+        <div className='w-full flex items-center gap-2 rounded-[--radius-lg] border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--color-bg-base)'>
           <span className='text-sm text-secondary-token whitespace-nowrap'>
             {getSocialPlatformPrefix(socialPlatform).display}
           </span>
