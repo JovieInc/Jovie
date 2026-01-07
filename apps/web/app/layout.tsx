@@ -238,7 +238,7 @@ export default async function RootLayout({
     } else {
       // In production, show configuration error
       return (
-        <html lang='en'>
+        <html lang='en' suppressHydrationWarning>
           {headContent}
           <body className={bodyClassName}>
             <div className='flex items-center justify-center min-h-screen'>
@@ -260,7 +260,7 @@ export default async function RootLayout({
   // publishableKey may be undefined in test/dev mode
   // ClientProviders handles bypassing Clerk authentication when key is missing
   return (
-    <html lang='en'>
+    <html lang='en' suppressHydrationWarning>
       {headContent}
       <body className={bodyClassName}>
         {/* Skip to main content link for keyboard accessibility */}
