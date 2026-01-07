@@ -16,6 +16,10 @@ inputs:
     description: 'Comma-separated list of branch names to never delete'
     required: false
     default: 'main,development'
+  protected_creators:
+    description: 'Comma-separated list of creator identifiers to never delete branches from (e.g., user emails or names). Branches created by these users are protected.'
+    required: false
+    default: 'itstimwhite,Tim (user itstimwhite)'
   cleanup_threshold:
     description: 'Start cleanup when this many branches exist (should be less than limit)'
     required: false
@@ -52,6 +56,7 @@ runs:
         NEON_PROJECT_ID: ${{ inputs.neon_project_id }}
         BRANCH_LIMIT: ${{ inputs.branch_limit }}
         PROTECTED_BRANCHES: ${{ inputs.protected_branches }}
+        PROTECTED_CREATORS: ${{ inputs.protected_creators }}
         CLEANUP_THRESHOLD: ${{ inputs.cleanup_threshold }}
       run: |
         set -euo pipefail
@@ -76,13 +81,16 @@ runs:
 
         echo "Branch count ($BRANCH_COUNT) is at or above threshold ($CLEANUP_THRESHOLD). Starting cleanup..."
 
-        # Convert protected branches to array for checking
-        IFS=',' read -ra PROTECTED_ARRAY <<< "$PROTECTED_BRANCHES"
+        # Convert protected branches and creators to arrays for checking
+        IFS=',' read -ra PROTECTED_BRANCHES_ARRAY <<< "$PROTECTED_BRANCHES"
+        IFS=',' read -ra PROTECTED_CREATORS_ARRAY <<< "$PROTECTED_CREATORS"
 
-        # Get branches sorted by creation time (oldest first), excluding protected ones
-        DELETABLE_BRANCHES=$(echo "$BRANCHES_JSON" | jq -r '
+        # Get branches sorted by creation time (oldest first)
+        # Include branch name and created_by/owner field for creator filtering
+        BRANCHES_DATA=$(echo "$BRANCHES_JSON" | jq -r '
           sort_by(.created_at) |
-          .[].name
+          .[] |
+          @json
         ')
 
         DELETED_COUNT=0
@@ -92,12 +100,17 @@ runs:
           TARGET_COUNT=1
         fi
 
-        while IFS= read -r branch_name; do
-          [ -z "$branch_name" ] && continue
+        while IFS= read -r branch_data; do
+          [ -z "$branch_data" ] && continue
 
-          # Skip protected branches
+          # Extract branch name and creator from JSON
+          branch_name=$(echo "$branch_data" | jq -r '.name')
+          # Try multiple fields for creator (Neon API may use different field names)
+          branch_creator=$(echo "$branch_data" | jq -r '.created_by // .owner // .creator // "unknown"')
+
+          # Skip protected branch names
           is_protected_branch=false
-          for protected in "${PROTECTED_ARRAY[@]}"; do
+          for protected in "${PROTECTED_BRANCHES_ARRAY[@]}"; do
             protected=$(echo "$protected" | xargs)
             if [[ "$branch_name" == "$protected" ]]; then
               is_protected_branch=true
@@ -106,7 +119,23 @@ runs:
           done
 
           if [ "$is_protected_branch" = true ]; then
-            echo "Skipping protected branch: $branch_name"
+            echo "Skipping protected branch name: $branch_name"
+            continue
+          fi
+
+          # Skip branches created by protected users
+          is_protected_creator=false
+          for protected_creator in "${PROTECTED_CREATORS_ARRAY[@]}"; do
+            protected_creator=$(echo "$protected_creator" | xargs)
+            # Case-insensitive partial match (e.g., "itstimwhite" matches "Tim (user itstimwhite)")
+            if [[ "$branch_creator" =~ $protected_creator ]] || [[ "$protected_creator" =~ $branch_creator ]]; then
+              is_protected_creator=true
+              break
+            fi
+          done
+
+          if [ "$is_protected_creator" = true ]; then
+            echo "Skipping branch created by protected user: $branch_name (creator: $branch_creator)"
             continue
           fi
 
@@ -117,16 +146,16 @@ runs:
             break
           fi
 
-          echo "Deleting old ephemeral branch: $branch_name"
+          echo "Deleting ephemeral branch: $branch_name (created by: $branch_creator)"
           if npx neonctl branches delete "$branch_name" \
             --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
             DELETED_COUNT=$((DELETED_COUNT + 1))
-            echo "  Deleted successfully"
+            echo "  ✓ Deleted successfully"
           else
-            echo "  Failed to delete (may already be deleted)"
+            echo "  ✗ Failed to delete (may already be deleted or in use)"
           fi
 
-        done <<< "$DELETABLE_BRANCHES"
+        done <<< "$BRANCHES_DATA"
 
         REMAINING=$((BRANCH_COUNT - DELETED_COUNT))
         echo ""

@@ -219,6 +219,7 @@ jobs:
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
           protected_branches: 'main,development'
+          protected_creators: 'itstimwhite,Tim (user itstimwhite)'
           cleanup_threshold: '7'
 
       - name: Guard against creating protected branch names
@@ -426,6 +427,7 @@ jobs:
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
           protected_branches: 'main,development'
+          protected_creators: 'itstimwhite,Tim (user itstimwhite)'
           cleanup_threshold: '7'
 
       - name: Check for relevant changes
