@@ -346,10 +346,12 @@ body {
 }
 
 @utility marketing-h1-linear {
-  font-size: clamp(2.5rem, 5vw + 1rem, 5rem); /* 40px → 80px */
-  font-weight: 538; /* Linear's exact weight */
-  letter-spacing: -0.0325em;
-  line-height: 1.1;
+  font-size: clamp(2.5rem, 5vw + 1rem, 4rem); /* 40px → 64px */
+  font-weight: 510;
+  letter-spacing: -0.022em;
+  line-height: 1.06;
+  color: #f7f8f8;
+  text-align: left;
   font-feature-settings:
     "cv01",
     "ss03",
@@ -374,15 +376,16 @@ body {
 }
 
 @utility marketing-lead-linear {
-  font-size: clamp(1rem, 1.5vw + 0.5rem, 1.25rem); /* 16px → 20px */
+  font-size: 1.0625rem; /* 17px - Linear's --text-large-size */
+  line-height: 1.6;
+  letter-spacing: 0;
+  color: #8a8f98; /* Linear's --color-text-tertiary */
   font-feature-settings:
     "cv01",
     "ss03",
     "rlig" 1,
     "calt" 1;
-  font-variation-settings: "opsz" 28;
-  letter-spacing: -0.011em;
-  line-height: 1.6;
+  font-variation-settings: "opsz" auto;
 }
 
 @utility marketing-body {
