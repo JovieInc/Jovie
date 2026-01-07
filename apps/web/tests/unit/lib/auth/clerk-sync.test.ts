@@ -229,7 +229,7 @@ describe('clerk-sync module', () => {
             limit: vi.fn().mockResolvedValue([
               {
                 id: 'user-uuid-123',
-                status: 'banned',
+                userStatus: 'banned',
                 isAdmin: false,
               },
             ]),
