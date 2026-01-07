@@ -107,7 +107,7 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
     const [dbUser] = await db
       .select({
         id: users.id,
-        status: users.status,
+        userStatus: users.userStatus,
         isAdmin: users.isAdmin,
       })
       .from(users)
@@ -148,14 +148,15 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
         profile.isPublic !== false
     );
 
-    // Map status - handle null case
-    const dbStatus = dbUser.status ?? 'active';
+    // Map userStatus lifecycle enum to Clerk's simpler status
     const clerkStatus: 'active' | 'pending' | 'banned' =
-      dbStatus === 'banned'
+      dbUser.userStatus === 'banned'
         ? 'banned'
-        : dbStatus === 'pending'
-          ? 'pending'
-          : 'active';
+        : dbUser.userStatus === 'suspended'
+          ? 'banned'
+          : dbUser.userStatus === 'waitlist_pending'
+            ? 'pending'
+            : 'active';
 
     const metadata: JovieClerkMetadata = {
       jovie_role: dbUser.isAdmin ? 'admin' : 'user',
@@ -225,7 +226,7 @@ export async function handleClerkUserDeleted(
       .update(users)
       .set({
         deletedAt: now,
-        status: 'banned',
+        userStatus: 'banned',
         updatedAt: now,
       })
       .where(eq(users.id, dbUser.id));

@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 /**
  * Admin Impersonation Module
@@ -208,7 +208,7 @@ export async function startImpersonation(
 
   // Get target user's database info
   const [targetUser] = await db
-    .select({ id: users.id, deletedAt: users.deletedAt, status: users.status })
+    .select({ id: users.id, deletedAt: users.deletedAt, userStatus: users.userStatus })
     .from(users)
     .where(eq(users.clerkId, targetClerkId))
     .limit(1);
@@ -217,7 +217,7 @@ export async function startImpersonation(
     return { success: false, error: 'Target user not found' };
   }
 
-  if (targetUser.deletedAt || targetUser.status === 'banned') {
+  if (targetUser.deletedAt || targetUser.userStatus === 'banned') {
     return {
       success: false,
       error: 'Cannot impersonate deleted or banned user',
