@@ -1,5 +1,5 @@
 name: 'Neon Branch Cleanup'
-description: 'Cleans up old ephemeral Neon branches when approaching the branch limit, protecting long-lived branches'
+description: 'Cleans up old ephemeral Neon branches when approaching the branch limit, protecting long-lived and manually-created branches'
 
 inputs:
   neon_api_key:
@@ -107,6 +107,14 @@ runs:
 
           if [ "$is_protected_branch" = true ]; then
             echo "Skipping protected branch: $branch_name"
+            continue
+          fi
+
+          # SAFETY: Only delete branches that match GitHub PR naming pattern
+          # Pattern: pr-<number>-<sanitized-branch-name> or preview-pr-<number>
+          # This protects manually-created branches (e.g., 'dev', 'staging', 'tim-dev')
+          if ! [[ "$branch_name" =~ ^(pr-[0-9]+-|preview-pr-[0-9]+) ]]; then
+            echo "Skipping non-ephemeral branch (no PR pattern): $branch_name"
             continue
           fi
 
