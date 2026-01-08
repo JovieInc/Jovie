@@ -52,9 +52,6 @@ export default async function AdminWaitlistPage({
             <p className='text-[10px] sm:text-xs uppercase tracking-wide text-tertiary-token'>
               Internal
             </p>
-            <h1 className='text-2xl sm:text-3xl font-semibold text-primary-token'>
-              Waitlist
-            </h1>
             <p className='text-xs sm:text-sm text-secondary-token'>
               Review waitlist submissions for early access.
             </p>

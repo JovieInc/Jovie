@@ -16,7 +16,6 @@ export default async function AdminActivityPage() {
         <p className='text-xs uppercase tracking-wide text-tertiary-token'>
           Admin
         </p>
-        <h1 className='text-3xl font-semibold text-primary-token'>Activity</h1>
         <p className='text-sm text-secondary-token'>
           Recent operational events and system activity for Jovie.
         </p>
