@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from '@jovie/ui';
 import Image from 'next/image';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,7 @@ function AddProviderUrlPopover({
 }: AddProviderUrlPopoverProps) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +101,7 @@ function AddProviderUrlPopover({
         className='w-72 p-3'
         onOpenAutoFocus={e => {
           e.preventDefault();
-          const input = e.currentTarget.querySelector('input');
-          input?.focus();
+          inputRef.current?.focus();
         }}
       >
         <form onSubmit={handleSubmit} className='space-y-3'>
@@ -116,6 +116,7 @@ function AddProviderUrlPopover({
             </span>
           </div>
           <Input
+            ref={inputRef}
             type='url'
             inputSize='sm'
             placeholder='Paste URL here...'

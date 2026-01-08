@@ -74,18 +74,19 @@ export function ReleasesEmptyState({
         clear();
         setShowResults(false);
         const artistUrl = `https://open.spotify.com/artist/${artistId}`;
+        onImportStart?.('');
 
         startTransition(async () => {
           try {
             const result = await connectSpotifyArtist({
               spotifyArtistId: artistId,
               spotifyArtistUrl: artistUrl,
+              artistName: '',
             });
 
             if (result.success) {
-              setSuccessMessage(result.message);
               setSearchQuery('');
-              onConnected?.();
+              onConnected?.(result.releases, result.artistName);
             } else {
               setError(result.message);
             }
@@ -102,7 +103,7 @@ export function ReleasesEmptyState({
       search(value);
       setShowResults(true);
     },
-    [search, clear, extractSpotifyArtistId, onConnected]
+    [search, clear, extractSpotifyArtistId, onConnected, onImportStart]
   );
 
   const handleArtistSelect = useCallback(

@@ -229,7 +229,7 @@ export function useReleaseProviderMatrix({
 
   return {
     rows,
-    setRows,
+    setRows: setRawRows,
     editingRelease,
     drafts,
     isSaving,
