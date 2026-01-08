@@ -212,15 +212,22 @@ describe('auth gate - edge cases', () => {
         selectionKeys.includes('id') &&
         selectionKeys.includes('status');
 
-      const baseQuery = {
+      const resolvedRows = isWaitlistSelection
+        ? [{ id: 'waitlist_1', status: 'claimed' }]
+        : [];
+
+      const queryWithWhere = {
         where: vi.fn().mockReturnValue({
-          limit: vi
-            .fn()
-            .mockResolvedValue(
-              isWaitlistSelection
-                ? [{ id: 'waitlist_1', status: 'claimed' }]
-                : []
-            ),
+          limit: vi.fn().mockResolvedValue(resolvedRows),
+        }),
+      };
+
+      const baseQuery = {
+        ...queryWithWhere,
+        leftJoin: vi.fn().mockReturnValue(queryWithWhere),
+        from: vi.fn().mockReturnValue({
+          ...queryWithWhere,
+          leftJoin: vi.fn().mockReturnValue(queryWithWhere),
         }),
       };
 
