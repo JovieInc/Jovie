@@ -326,10 +326,11 @@ function DashboardLayoutInner({
                 leading={MobileMenuButton}
                 sidebarTrigger={SidebarExpandButton}
                 className='border-sidebar-border bg-sidebar-surface'
+                showDivider={true}
                 action={
                   <>
-                    <DashboardThemeToggleButton />
                     {ContactToggleButton}
+                    <DashboardThemeToggleButton />
                   </>
                 }
               />
