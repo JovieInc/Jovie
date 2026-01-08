@@ -338,8 +338,8 @@ function DashboardLayoutInner({
                   useFullWidth
                     ? isAudienceRoute
                       ? 'w-full h-full min-h-0'
-                      : 'w-full h-full min-h-0 p-4 sm:p-6'
-                    : 'container mx-auto max-w-7xl p-6'
+                      : 'w-full h-full min-h-0 p-2'
+                    : 'container mx-auto max-w-7xl p-2'
                 }
               >
                 <div
@@ -354,7 +354,7 @@ function DashboardLayoutInner({
               </div>
             </>
           ) : (
-            <div className='flex h-full min-h-0 flex-col rounded-xl border border-subtle bg-surface-0 overflow-hidden'>
+            <div className='flex h-full min-h-0 flex-col rounded-lg border border-subtle bg-surface-0 overflow-hidden'>
               <DashboardHeader
                 breadcrumbs={crumbs}
                 leading={MobileMenuButton}
@@ -370,8 +370,8 @@ function DashboardLayoutInner({
                 className={cn(
                   'flex-1 min-h-0 overflow-y-auto',
                   useFullWidth
-                    ? 'px-4 sm:px-6 py-6'
-                    : 'container mx-auto max-w-7xl p-6'
+                    ? 'px-4 sm:px-6 py-2'
+                    : 'container mx-auto max-w-7xl p-2'
                 )}
               >
                 <div
