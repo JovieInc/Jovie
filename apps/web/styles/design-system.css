@@ -8,6 +8,47 @@
  * 4. Contrast is a continuous variable (0-100)
  *
  * @see https://linear.app/now/how-we-redesigned-the-linear-ui
+ *
+ * ============================================
+ * SEMANTIC TOKEN MAPPING GUIDE
+ * ============================================
+ *
+ * SURFACES (backgrounds):
+ *   bg-base         → App background
+ *   bg-surface-0    → Elevated (sidebars, panels)
+ *   bg-surface-1    → Cards, panels
+ *   bg-surface-2    → Interactive/hover states
+ *   bg-surface-3    → Pressed/active states
+ *   bg-frosted      → Glassmorphism backgrounds
+ *
+ * TEXT:
+ *   text-primary-token    → Primary content (headings, body)
+ *   text-secondary-token  → Secondary content (descriptions)
+ *   text-tertiary-token   → Meta text, captions, hints
+ *   text-quaternary-token → Disabled or very subtle text
+ *
+ * BORDERS:
+ *   border-subtle   → Subtle dividers, card borders
+ *   border-default  → Default interactive borders
+ *   border-strong   → Emphasized borders
+ *   border-frosted  → Glassmorphism borders
+ *
+ * STATUS COLORS:
+ *   text-success / bg-success-subtle  → Success states
+ *   text-warning / bg-warning-subtle  → Warning states
+ *   text-error / bg-error-subtle      → Error states
+ *   text-info / bg-info-subtle        → Informational states
+ *
+ * BUTTONS:
+ *   bg-btn-primary / text-btn-primary-foreground → Primary actions
+ *   btn-secondary                                → Secondary actions
+ *   btn-ghost                                    → Subtle actions
+ *
+ * FOCUS:
+ *   ring-accent / focus-ring → Focus indicators
+ *
+ * AVOID using raw Tailwind colors (gray-*, zinc-*, slate-*) in components.
+ * Instead, use the semantic tokens above for automatic theme switching.
  */
 
 /* ============================================
@@ -126,6 +167,13 @@
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* Frosted/glassmorphism tokens */
+  --color-frosted-bg: oklch(100% 0 0 / 60%);
+  --color-frosted-bg-hover: oklch(100% 0 0 / 80%);
+  --color-frosted-bg-ghost: oklch(100% 0 0 / 30%);
+  --color-frosted-bg-ghost-hover: oklch(100% 0 0 / 50%);
+  --color-frosted-border: oklch(0% 0 0 / 8%);
 }
 
 /* Dark mode - same generation logic, inverted lightness */
@@ -208,6 +256,13 @@
   --color-skeleton-shimmer: oklch(
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
+
+  /* Frosted/glassmorphism tokens - dark mode */
+  --color-frosted-bg: oklch(100% 0 0 / 10%);
+  --color-frosted-bg-hover: oklch(100% 0 0 / 20%);
+  --color-frosted-bg-ghost: oklch(100% 0 0 / 5%);
+  --color-frosted-bg-ghost-hover: oklch(100% 0 0 / 10%);
+  --color-frosted-border: oklch(100% 0 0 / 10%);
 }
 
 /* ============================================
@@ -314,8 +369,16 @@
    FEATURE ACCENT COLORS (OKLCH)
    ============================================
 
-   Perceptually uniform feature colors
-   All have ~same perceived brightness
+   Perceptually uniform feature colors.
+   All have ~same perceived brightness for visual harmony.
+
+   IMPORTANT: These colors are INTENTIONALLY hardcoded.
+   They represent per-feature branding and should NOT change
+   with theme switching. They are designed to work on both
+   light and dark backgrounds due to their balanced luminance.
+
+   Usage: Use these for feature-specific highlights, not for
+   general UI elements which should use semantic tokens.
 */
 :root {
   --accent-conv: oklch(55% 0.2 285); /* Conversion - purple */

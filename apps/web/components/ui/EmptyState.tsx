@@ -47,6 +47,14 @@ export interface EmptyStateProps {
   testId?: string;
 }
 
+/**
+ * EmptyState variant styles using semantic design tokens
+ *
+ * Follows Linear's design system principles:
+ * - Uses semantic color tokens (success, warning, error, info) instead of raw color values
+ * - Consistent with the OKLCH-based theme system in design-system.css
+ * - Automatically adapts to dark/light mode via CSS custom properties
+ */
 const variantStyles: Record<
   EmptyStateVariant,
   {
@@ -58,31 +66,31 @@ const variantStyles: Record<
 > = {
   default: {
     iconWrapper:
-      'bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200 dark:bg-gray-900/60 dark:text-gray-400 dark:ring-gray-800',
-    heading: 'text-gray-900 dark:text-gray-100',
-    description: 'text-gray-600 dark:text-gray-400',
-    secondary: 'text-indigo-600 dark:text-indigo-400',
+      'bg-surface-1 text-tertiary-token ring-1 ring-inset ring-border-subtle',
+    heading: 'text-primary-token',
+    description: 'text-secondary-token',
+    secondary: 'text-accent-token',
   },
   search: {
     iconWrapper:
-      'bg-sky-50 text-sky-600 ring-1 ring-inset ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/60',
-    heading: 'text-sky-800 dark:text-sky-200',
-    description: 'text-sky-700 dark:text-sky-300/90',
-    secondary: 'text-sky-600 dark:text-sky-300',
+      'bg-info-subtle text-info ring-1 ring-inset ring-info/20',
+    heading: 'text-primary-token',
+    description: 'text-secondary-token',
+    secondary: 'text-info',
   },
   error: {
     iconWrapper:
-      'bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/50',
-    heading: 'text-rose-700 dark:text-rose-200',
-    description: 'text-rose-600 dark:text-rose-300/90',
-    secondary: 'text-rose-600 dark:text-rose-300',
+      'bg-error-subtle text-error ring-1 ring-inset ring-error/20',
+    heading: 'text-primary-token',
+    description: 'text-secondary-token',
+    secondary: 'text-error',
   },
   permission: {
     iconWrapper:
-      'bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/50',
-    heading: 'text-amber-800 dark:text-amber-200',
-    description: 'text-amber-700 dark:text-amber-300/90',
-    secondary: 'text-amber-700 dark:text-amber-300',
+      'bg-warning-subtle text-warning ring-1 ring-inset ring-warning/20',
+    heading: 'text-primary-token',
+    description: 'text-secondary-token',
+    secondary: 'text-warning',
   },
 };
 

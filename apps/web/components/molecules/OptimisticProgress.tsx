@@ -94,11 +94,11 @@ export function OptimisticProgress({
     <div className='space-y-3' aria-live='polite' role='status'>
       {/* Progress bar */}
       <div className='space-y-2'>
-        <div className='flex justify-between text-sm text-gray-600 dark:text-gray-400'>
+        <div className='flex justify-between text-sm text-secondary-token'>
           <span>{currentStep?.label || 'Processing...'}</span>
           <span>{Math.round(state.progress)}%</span>
         </div>
-        <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden'>
+        <div className='w-full bg-surface-2 rounded-full h-2 overflow-hidden'>
           <div
             className='bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-100 ease-out'
             style={{ width: `${state.progress}%` }}
@@ -118,19 +118,19 @@ export function OptimisticProgress({
             key={step.key}
             className={`flex items-center space-x-1 text-xs transition-colors duration-200 ${
               index < state.currentStep
-                ? 'text-green-600 dark:text-green-400'
+                ? 'text-success'
                 : index === state.currentStep
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-gray-400 dark:text-gray-600'
+                  ? 'text-info'
+                  : 'text-tertiary-token'
             }`}
           >
             <div
               className={`w-2 h-2 rounded-full transition-colors duration-200 ${
                 index < state.currentStep
-                  ? 'bg-green-500'
+                  ? 'bg-[var(--color-success)]'
                   : index === state.currentStep
-                    ? 'bg-blue-500'
-                    : 'bg-gray-300 dark:bg-gray-600'
+                    ? 'bg-[var(--color-info)]'
+                    : 'bg-surface-2'
               }`}
             />
             <span className='hidden sm:inline'>{step.label}</span>
@@ -140,7 +140,7 @@ export function OptimisticProgress({
 
       {/* Completion indicator */}
       {state.isComplete && (
-        <div className='flex items-center justify-center space-x-2 text-green-600 dark:text-green-400 text-sm font-medium'>
+        <div className='flex items-center justify-center space-x-2 text-success text-sm font-medium'>
           <svg
             className='w-4 h-4'
             fill='currentColor'

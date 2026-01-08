@@ -23,8 +23,9 @@ export interface StepCardProps {
   [key: string]: unknown;
 }
 
+/** Card base classes using semantic design tokens */
 export const cardBaseClasses =
-  'relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl p-8 transition-all duration-300';
+  'relative bg-surface-0/80 dark:bg-frosted backdrop-blur-sm border border-subtle rounded-2xl p-8 transition-all duration-300';
 
 export const glowEffectClasses =
   'absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 transition-opacity duration-500 group-hover:opacity-100';
@@ -60,7 +61,7 @@ export function StepCard({
         <div
           className={cn(
             cardBaseClasses,
-            interactive && 'hover:border-gray-300 dark:hover:border-white/20'
+            interactive && 'hover:border-default'
           )}
         >
           <div className='text-center'>
@@ -76,12 +77,12 @@ export function StepCard({
               </div>
 
               {/* Title */}
-              <TitleTag className='mt-3 text-xl font-semibold text-gray-900 dark:text-white'>
+              <TitleTag className='mt-3 text-xl font-semibold text-primary-token'>
                 {title}
               </TitleTag>
 
               {/* Description */}
-              <p className='mt-3 leading-relaxed text-gray-600 dark:text-white/70'>
+              <p className='mt-3 leading-relaxed text-secondary-token'>
                 {description}
               </p>
             </div>

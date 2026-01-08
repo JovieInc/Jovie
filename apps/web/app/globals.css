@@ -687,6 +687,80 @@ body {
   border-color: var(--color-border-strong);
 }
 
+/* Frosted/glassmorphism utilities */
+@utility bg-frosted {
+  background-color: var(--color-frosted-bg);
+}
+
+@utility bg-frosted-hover {
+  background-color: var(--color-frosted-bg-hover);
+}
+
+@utility bg-frosted-ghost {
+  background-color: var(--color-frosted-bg-ghost);
+}
+
+@utility bg-frosted-ghost-hover {
+  background-color: var(--color-frosted-bg-ghost-hover);
+}
+
+@utility border-frosted {
+  border-color: var(--color-frosted-border);
+}
+
+/* Status color utilities (success, warning, error, info) */
+@utility bg-success-subtle {
+  background-color: var(--color-success-subtle);
+}
+
+@utility bg-warning-subtle {
+  background-color: var(--color-warning-subtle);
+}
+
+@utility bg-error-subtle {
+  background-color: var(--color-error-subtle);
+}
+
+@utility bg-info-subtle {
+  background-color: var(--color-info-subtle);
+}
+
+@utility text-success {
+  color: var(--color-success);
+}
+
+@utility text-warning {
+  color: var(--color-warning);
+}
+
+@utility text-error {
+  color: var(--color-error);
+}
+
+@utility text-info {
+  color: var(--color-info);
+}
+
+@utility ring-success {
+  --tw-ring-color: var(--color-success);
+}
+
+@utility ring-warning {
+  --tw-ring-color: var(--color-warning);
+}
+
+@utility ring-error {
+  --tw-ring-color: var(--color-error);
+}
+
+@utility ring-info {
+  --tw-ring-color: var(--color-info);
+}
+
+@utility ring-border-subtle {
+  --tw-ring-color: var(--color-border-subtle);
+}
+
 @utility text-accent-token {
   color: var(--color-accent);
 }

@@ -16,17 +16,18 @@ export function FrostedContainer({
   showGradientBlurs = true,
   className = '',
 }: FrostedContainerProps) {
+  /** Container variants using semantic design tokens */
   const variants = {
     default:
-      'bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-3xl shadow-xl shadow-black/5',
+      'bg-frosted backdrop-blur-lg border border-frosted rounded-3xl shadow-xl shadow-black/5',
     glass:
-      'bg-white/40 dark:bg-white/5 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 rounded-xl shadow-sm',
+      'bg-frosted-ghost backdrop-blur-md ring-1 ring-border-subtle rounded-xl shadow-sm',
     solid:
-      'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg',
+      'bg-base border border-subtle rounded-xl shadow-lg',
   };
 
   return (
-    <div className='relative min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200 overflow-hidden'>
+    <div className='relative min-h-screen bg-base transition-colors duration-200 overflow-hidden'>
       {/* Background Pattern */}
       {backgroundPattern !== 'none' && (
         <BackgroundPattern variant={backgroundPattern} />

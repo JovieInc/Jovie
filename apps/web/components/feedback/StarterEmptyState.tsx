@@ -37,6 +37,11 @@ export function StarterEmptyState({
     const baseClasses =
       'inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
 
+    /** Button variant styles using semantic tokens */
+    const primaryStyles = 'bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 focus-visible:ring-accent';
+    const secondaryStyles = 'border border-subtle bg-base text-primary-token hover:bg-surface-1 focus-visible:ring-accent';
+    const variantStyles = variant === 'primary' ? primaryStyles : secondaryStyles;
+
     if (action.href) {
       const isInternal = action.href.startsWith('/');
 
@@ -45,12 +50,7 @@ export function StarterEmptyState({
           <Link
             key={`${action.label}-${action.href}`}
             href={action.href}
-            className={cn(
-              baseClasses,
-              variant === 'primary'
-                ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-                : 'border border-subtle bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
-            )}
+            className={cn(baseClasses, variantStyles)}
           >
             {action.label}
           </Link>
@@ -62,12 +62,7 @@ export function StarterEmptyState({
           key={`${action.label}-${action.href}`}
           href={action.href}
           onClick={action.onClick}
-          className={cn(
-            baseClasses,
-            variant === 'primary'
-              ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-              : 'border border-subtle bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
-          )}
+          className={cn(baseClasses, variantStyles)}
         >
           {action.label}
         </a>
@@ -79,12 +74,7 @@ export function StarterEmptyState({
         key={action.label}
         type='button'
         onClick={action.onClick}
-        className={cn(
-          baseClasses,
-          variant === 'primary'
-            ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-            : 'border border-subtle bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
-        )}
+        className={cn(baseClasses, variantStyles)}
       >
         {action.label}
       </button>
@@ -98,12 +88,12 @@ export function StarterEmptyState({
       aria-live='polite'
       data-testid={testId ?? 'app-empty-state'}
       className={cn(
-        'rounded-2xl border border-dashed border-subtle bg-surface-1 p-6 shadow-sm dark:border-zinc-800',
+        'rounded-2xl border border-dashed border-subtle bg-surface-1 p-6 shadow-sm',
         className
       )}
     >
       <div className='flex items-start gap-4'>
-        <div className='flex h-12 w-12 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-sm ring-1 ring-subtle dark:bg-zinc-900 dark:text-white'>
+        <div className='flex h-12 w-12 items-center justify-center rounded-xl bg-base text-primary-token shadow-sm ring-1 ring-border-subtle'>
           {icon ?? <Sparkles className='h-6 w-6' aria-hidden='true' />}
         </div>
         <div className='flex-1 space-y-2'>
