@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
 import {
   creatorProfiles,
+  users,
   waitlistEntries,
   waitlistInvites,
 } from '@/lib/db/schema';
@@ -84,12 +85,8 @@ export async function POST(request: Request) {
     const result = await withSystemIngestionSession(
       async tx => {
         const now = new Date();
-        const markEntryInvited = async () =>
-          tx
-            .update(waitlistEntries)
-            .set({ status: 'invited', updatedAt: now })
-            .where(eq(waitlistEntries.id, entry.id));
 
+        // Lock waitlist entry for update
         const [entry] = await tx
           .select({
             id: waitlistEntries.id,
@@ -115,129 +112,153 @@ export async function POST(request: Request) {
           };
         }
 
-        const [existingInvite] = await tx
-          .select({
-            id: waitlistInvites.id,
-            claimToken: waitlistInvites.claimToken,
-          })
-          .from(waitlistInvites)
-          .where(eq(waitlistInvites.waitlistEntryId, entry.id))
+        // NEW FLOW: Get profile created during signup (via waitlistEntryId)
+        const [profile] = await tx
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.waitlistEntryId, entry.id))
           .limit(1);
 
-        if (existingInvite) {
-          await markEntryInvited();
+        if (!profile) {
+          // FALLBACK: Profile not found - this means signup happened before PR #1736
+          // Use old flow: create profile with claim token
+          const handleCandidate =
+            extractHandleFromUrl(entry.primarySocialUrlNormalized) ??
+            entry.email.split('@')[0] ??
+            safeRandomHandle();
 
-          // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
-          // No need to update users table here - the claim flow handles status transitions
+          const baseHandle = validateUsername(handleCandidate).isValid
+            ? handleCandidate
+            : safeRandomHandle();
 
-          return {
-            outcome: 'approved' as const,
-            inviteId: existingInvite.id,
-            claimToken: existingInvite.claimToken,
-          };
-        }
+          const usernameNormalized = await findAvailableHandle(tx, baseHandle);
 
-        const handleCandidate =
-          extractHandleFromUrl(entry.primarySocialUrlNormalized) ??
-          entry.email.split('@')[0] ??
-          safeRandomHandle();
+          const claimToken = randomUUID();
+          const claimTokenExpiresAt = new Date(now);
+          claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + 30);
 
-        const baseHandle = validateUsername(handleCandidate).isValid
-          ? handleCandidate
-          : safeRandomHandle();
+          const trimmedName = entry.fullName.trim();
+          const displayName = trimmedName
+            ? trimmedName.slice(0, 50)
+            : 'Jovie creator';
 
-        const usernameNormalized = await findAvailableHandle(tx, baseHandle);
-
-        const claimToken = randomUUID();
-        const claimTokenExpiresAt = new Date(now);
-        claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + 30);
-
-        const trimmedName = entry.fullName.trim();
-        const displayName = trimmedName
-          ? trimmedName.slice(0, 50)
-          : 'Jovie creator';
-
-        const [createdProfile] = await tx
-          .insert(creatorProfiles)
-          .values({
-            creatorType: 'creator',
-            username: usernameNormalized,
-            usernameNormalized,
-            displayName,
-            isPublic: true,
-            isVerified: false,
-            isFeatured: false,
-            marketingOptOut: false,
-            isClaimed: false,
-            claimToken,
-            claimTokenExpiresAt,
-            settings: {},
-            theme: {},
-            ingestionStatus: 'idle',
-            createdAt: now,
-            updatedAt: now,
-          })
-          .returning({ id: creatorProfiles.id });
-
-        if (!createdProfile) {
-          throw new Error('Failed to create creator profile');
-        }
-
-        const [invite] = await tx
-          .insert(waitlistInvites)
-          .values({
-            waitlistEntryId: entry.id,
-            creatorProfileId: createdProfile.id,
-            email: entry.email,
-            fullName: entry.fullName,
-            claimToken,
-            status: 'pending',
-            attempts: 0,
-            maxAttempts: 3,
-            runAt: now,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .onConflictDoNothing({
-            target: waitlistInvites.waitlistEntryId,
-          })
-          .returning({
-            id: waitlistInvites.id,
-            claimToken: waitlistInvites.claimToken,
-          });
-
-        if (!invite) {
-          const [existing] = await tx
-            .select({
-              id: waitlistInvites.id,
-              claimToken: waitlistInvites.claimToken,
+          const [createdProfile] = await tx
+            .insert(creatorProfiles)
+            .values({
+              creatorType: 'creator',
+              username: usernameNormalized,
+              usernameNormalized,
+              displayName,
+              isPublic: true,
+              isVerified: false,
+              isFeatured: false,
+              marketingOptOut: false,
+              isClaimed: false,
+              claimToken,
+              claimTokenExpiresAt,
+              settings: {},
+              theme: {},
+              ingestionStatus: 'idle',
+              createdAt: now,
+              updatedAt: now,
             })
-            .from(waitlistInvites)
-            .where(eq(waitlistInvites.waitlistEntryId, entry.id))
-            .limit(1);
+            .returning({ id: creatorProfiles.id });
 
-          if (!existing) {
-            throw new Error('Failed to enqueue waitlist invite');
+          if (!createdProfile) {
+            throw new Error('Failed to create creator profile');
           }
 
-          await markEntryInvited();
+          const [invite] = await tx
+            .insert(waitlistInvites)
+            .values({
+              waitlistEntryId: entry.id,
+              creatorProfileId: createdProfile.id,
+              email: entry.email,
+              fullName: entry.fullName,
+              claimToken,
+              status: 'pending',
+              attempts: 0,
+              maxAttempts: 3,
+              runAt: now,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoNothing({
+              target: waitlistInvites.waitlistEntryId,
+            })
+            .returning({
+              id: waitlistInvites.id,
+              claimToken: waitlistInvites.claimToken,
+            });
 
-          // Note: User's userStatus will be updated when they claim the invite
+          await tx
+            .update(waitlistEntries)
+            .set({ status: 'invited', updatedAt: now })
+            .where(eq(waitlistEntries.id, entry.id));
+
           return {
             outcome: 'approved' as const,
-            inviteId: existing.id,
-            claimToken: existing.claimToken,
+            flow: 'legacy_claim' as const,
+            inviteId: invite?.id,
+            claimToken: invite?.claimToken ?? claimToken,
           };
         }
 
-        await markEntryInvited();
+        // NEW FLOW: Get user by email
+        const [user] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(drizzleSql`lower(${users.email}) = lower(${entry.email})`)
+          .limit(1);
 
-        // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
+        if (!user) {
+          throw new Error(
+            'User not found for email - signup flow incomplete. User may need to sign in first.'
+          );
+        }
+
+        // NEW FLOW: Link profile to user and mark as claimed + public
+        await tx
+          .update(creatorProfiles)
+          .set({
+            userId: user.id,
+            isClaimed: true,
+            isPublic: true,
+            onboardingCompletedAt: now, // Skip onboarding
+            updatedAt: now,
+          })
+          .where(eq(creatorProfiles.id, profile.id));
+
+        // Update waitlist entry status to 'claimed' (skip 'invited' state)
+        await tx
+          .update(waitlistEntries)
+          .set({
+            status: 'claimed',
+            updatedAt: now,
+          })
+          .where(eq(waitlistEntries.id, entry.id));
+
+        // Update user status to 'active'
+        await tx
+          .update(users)
+          .set({
+            userStatus: 'active',
+            updatedAt: now,
+          })
+          .where(eq(users.id, user.id));
+
+        // NOTE: We don't create a waitlistInvite record for the simplified flow
+        // because there's no claim token or email to send. The waitlistInvites
+        // table is specifically for the legacy claim flow.
+        // Tracking is done via:
+        // - waitlistEntries.status = 'claimed'
+        // - creatorProfiles.isClaimed = true
+        // - users.userStatus = 'active'
 
         return {
           outcome: 'approved' as const,
-          inviteId: invite.id,
-          claimToken: invite.claimToken,
+          flow: 'simplified' as const,
+          profileId: profile.id,
         };
       },
       { isolationLevel: 'serializable' }
@@ -260,15 +281,33 @@ export async function POST(request: Request) {
       );
     }
 
+    // Handle different flows
+    if (result.flow === 'simplified') {
+      return NextResponse.json(
+        {
+          success: true,
+          status: 'claimed',
+          flow: 'simplified',
+          profileId: result.profileId,
+          message:
+            'Profile linked to user and activated. User can sign in immediately.',
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Legacy flow (for entries before PR #1736)
     return NextResponse.json(
       {
         success: true,
         status: 'invited',
+        flow: 'legacy_claim',
         inviteQueued: true,
         invite: {
           id: result.inviteId,
           claimToken: result.claimToken,
         },
+        message: 'Profile created with claim link. User must claim via email.',
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
