@@ -20,9 +20,6 @@ export default function AdminPage() {
     <div className='space-y-8'>
       <header>
         <h1 className='sr-only'>Admin Dashboard</h1>
-        <p className='text-xs uppercase tracking-wide text-tertiary-token'>
-          Internal
-        </p>
       </header>
 
       <Suspense fallback={<AdminKpiSectionSkeleton />}>

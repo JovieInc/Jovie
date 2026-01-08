@@ -114,10 +114,7 @@ export function DashboardAudienceTable({
 
       <div className='flex-1 min-h-0 overflow-hidden'>
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
-          <div
-            className='flex-1 min-h-[600px] overflow-auto'
-            ref={tableContainerRef}
-          >
+          <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
             {rows.length === 0 ? (
               <EmptyState
                 icon={emptyStateIcon}

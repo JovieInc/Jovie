@@ -1,4 +1,10 @@
-import { Button } from '@jovie/ui';
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -18,11 +24,11 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarSeparator,
-  SidebarShortcutHint,
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 
 type SidebarRootProps = ComponentPropsWithoutRef<typeof Sidebar>;
@@ -50,142 +56,153 @@ export function DashboardSidebar({
   const avatarUrl = dashboardData.selectedProfile?.avatarUrl;
 
   return (
-    <Sidebar
-      variant='sidebar'
-      collapsible='icon'
-      className={cn(
-        '[--sidebar-width:236px]',
-        '[--sidebar-width-icon:56px]',
-        'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
-        className
-      )}
-      {...props}
-    >
-      <SidebarHeader className='relative pb-0'>
-        <div className='group/toggle flex items-center gap-2 px-2 py-1'>
-          {isInSettings ? (
-            <Link
-              href='/app/dashboard/overview'
-              aria-label='Back'
-              className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                'group-data-[collapsible=icon]:justify-center'
-              )}
-            >
-              <ArrowLeft className='h-4 w-4' aria-hidden='true' />
-              <span className='truncate group-data-[collapsible=icon]:hidden'>
-                Back
-              </span>
-            </Link>
-          ) : (
-            <Link
-              href='/app/dashboard/overview'
-              aria-label='Go to dashboard'
-              className={cn(
-                'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                'group-data-[collapsible=icon]:justify-center'
-              )}
-            >
-              <div className='flex items-center justify-center'>
-                <BrandLogo size={20} tone='auto' className='h-7 w-7' />
-              </div>
-              <span className='sr-only group-data-[collapsible=icon]:hidden'>
-                Dashboard
-              </span>
-            </Link>
-          )}
-          <div className='group/shortcut ml-auto flex items-center gap-2'>
-            <SidebarShortcutHint className='hidden opacity-0 transition-opacity duration-200 lg:inline-flex group-hover/shortcut:opacity-100' />
-            <SidebarTrigger
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className={cn(
-                'h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                'group-data-[state=closed]:hidden'
-              )}
-            />
-          </div>
-        </div>
-        {!isInSettings && (
-          <div className='px-2 pb-3 pt-2 lg:hidden'>
-            <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
-              <OptimizedAvatar
-                src={avatarUrl}
-                alt={displayName}
-                size={64}
-                className='h-10 w-10'
-              />
-              <div className='min-w-0'>
-                <p className='truncate text-sm font-semibold text-sidebar-foreground'>
-                  {displayName}
-                </p>
-                {username ? (
-                  <p className='truncate text-xs text-sidebar-muted'>
-                    @{username}
-                  </p>
-                ) : null}
-              </div>
+    <TooltipProvider delayDuration={500} skipDelayDuration={200}>
+      <Sidebar
+        variant='sidebar'
+        collapsible='offcanvas'
+        className={cn(
+          '[--sidebar-width:236px]',
+          'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          className
+        )}
+        {...props}
+      >
+        <SidebarHeader className='relative pb-0'>
+          <div className='group/toggle flex items-center gap-2 px-2 py-1'>
+            {isInSettings ? (
+              <Link
+                href='/app/dashboard/overview'
+                aria-label='Back'
+                className={cn(
+                  'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                  'group-data-[collapsible=icon]:justify-center'
+                )}
+              >
+                <ArrowLeft className='h-4 w-4' aria-hidden='true' />
+                <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  Back
+                </span>
+              </Link>
+            ) : (
+              <Link
+                href='/app/dashboard/overview'
+                aria-label='Go to dashboard'
+                className={cn(
+                  'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                  'group-data-[collapsible=icon]:justify-center'
+                )}
+              >
+                <div className='flex items-center justify-center'>
+                  <BrandLogo size={20} tone='white' className='h-7 w-7' />
+                </div>
+                <span className='sr-only group-data-[collapsible=icon]:hidden'>
+                  Dashboard
+                </span>
+              </Link>
+            )}
+            <div className='ml-auto flex items-center gap-2'>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SidebarTrigger
+                    aria-label={
+                      isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                    }
+                    className={cn(
+                      'h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                      'group-data-[state=closed]:hidden'
+                    )}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side='bottom' showArrow={false} sideOffset={8}>
+                  <span className='text-xs font-medium text-white/90'>
+                    ⌘/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}
+                  </span>
+                </TooltipContent>
+              </Tooltip>
             </div>
-            {profileHref ? (
-              <div className='mt-3 flex items-center gap-2'>
-                <Button
-                  asChild
-                  size='sm'
-                  variant='secondary'
-                  className='flex-1 min-h-[44px]'
-                >
-                  <Link
-                    href={profileHref}
-                    target='_blank'
-                    rel='noopener noreferrer'
+          </div>
+          {!isInSettings && (
+            <div className='px-2 pb-3 pt-2 lg:hidden'>
+              <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
+                <OptimizedAvatar
+                  src={avatarUrl}
+                  alt={displayName}
+                  size={64}
+                  className='h-10 w-10'
+                />
+                <div className='min-w-0'>
+                  <p className='truncate text-sm font-semibold text-sidebar-foreground'>
+                    {displayName}
+                  </p>
+                  {username ? (
+                    <p className='truncate text-xs text-sidebar-muted'>
+                      @{username}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              {profileHref ? (
+                <div className='mt-3 flex items-center gap-2'>
+                  <Button
+                    asChild
+                    size='sm'
+                    variant='secondary'
+                    className='flex-1 min-h-[44px]'
                   >
-                    View profile
-                  </Link>
-                </Button>
-                <CopyToClipboardButton
-                  relativePath={profileHref}
-                  idleLabel='Copy link'
-                  successLabel='Copied'
-                  errorLabel='Copy failed'
-                  className='flex-1 min-h-[44px]'
+                    <Link
+                      href={profileHref}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      View profile
+                    </Link>
+                  </Button>
+                  <CopyToClipboardButton
+                    relativePath={profileHref}
+                    idleLabel='Copy link'
+                    successLabel='Copied'
+                    errorLabel='Copy failed'
+                    className='flex-1 min-h-[44px]'
+                  />
+                </div>
+              ) : null}
+            </div>
+          )}
+        </SidebarHeader>
+
+        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
+            <SidebarGroupContent className='flex-1'>
+              <DashboardNav />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+
+        {!isInSettings && (
+          <SidebarFooter className='mt-auto'>
+            <SidebarSeparator className='mx-0' />
+            <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
+              <DashboardRemoveBrandingCard />
+            </div>
+            <div className='px-2 py-3'>
+              <div
+                className={cn(
+                  isCollapsed
+                    ? 'flex items-center justify-center'
+                    : 'flex items-center'
+                )}
+              >
+                <UserButton
+                  showUserInfo={!isCollapsed}
+                  profileHref={profileHref}
+                  settingsHref='/app/settings'
                 />
               </div>
-            ) : null}
-          </div>
-        )}
-      </SidebarHeader>
-
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
-          <SidebarGroupContent className='flex-1'>
-            <DashboardNav />
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      {!isInSettings && (
-        <SidebarFooter className='mt-auto'>
-          <SidebarSeparator className='mx-0' />
-          <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
-            <DashboardRemoveBrandingCard />
-          </div>
-          <div className='px-2 py-3'>
-            <div
-              className={cn(
-                isCollapsed
-                  ? 'flex items-center justify-center'
-                  : 'flex items-center'
-              )}
-            >
-              <UserButton
-                showUserInfo={!isCollapsed}
-                profileHref={profileHref}
-                settingsHref='/app/settings'
-              />
             </div>
-          </div>
-        </SidebarFooter>
-      )}
-      <SidebarRail />
-    </Sidebar>
+          </SidebarFooter>
+        )}
+        <SidebarRail />
+      </Sidebar>
+    </TooltipProvider>
   );
 }
