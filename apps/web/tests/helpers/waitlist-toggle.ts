@@ -1,6 +1,6 @@
 import { type Page } from '@playwright/test';
 
-export type WaitlistToggleState = 'clear' | 'new' | 'claimed' | 'rejected';
+export type WaitlistToggleState = 'clear' | 'new' | 'claimed';
 
 export interface WaitlistToggleResponse {
   success: boolean;
