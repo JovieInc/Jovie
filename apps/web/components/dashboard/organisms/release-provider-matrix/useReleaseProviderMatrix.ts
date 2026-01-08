@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import { toast } from 'sonner';
 import {
   resetProviderOverride,
@@ -13,6 +20,8 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
   ReleaseProviderMatrixProps,
+  SortColumn,
+  SortState,
   UseReleaseProviderMatrixReturn,
 } from './types';
 
@@ -24,7 +33,7 @@ export function useReleaseProviderMatrix({
   ReleaseProviderMatrixProps,
   'spotifyConnected'
 >): UseReleaseProviderMatrixReturn {
-  const [rows, setRows] = useState<ReleaseViewModel[]>(releases);
+  const [rawRows, setRawRows] = useState<ReleaseViewModel[]>(releases);
   const [editingRelease, setEditingRelease] = useState<ReleaseViewModel | null>(
     null
   );
@@ -32,7 +41,35 @@ export function useReleaseProviderMatrix({
   const [isSaving, startSaving] = useTransition();
   const [isSyncing, startSyncing] = useTransition();
   const [headerElevated, setHeaderElevated] = useState(false);
+  const [sortState, setSortState] = useState<SortState>({
+    column: 'releaseDate',
+    direction: 'desc',
+  });
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sort rows based on current sort state
+  const rows = useMemo(() => {
+    const sorted = [...rawRows].sort((a, b) => {
+      if (sortState.column === 'title') {
+        const comparison = a.title.localeCompare(b.title);
+        return sortState.direction === 'asc' ? comparison : -comparison;
+      }
+      // releaseDate sorting
+      const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+      const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+      const comparison = dateA - dateB;
+      return sortState.direction === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [rawRows, sortState]);
+
+  const toggleSort = useCallback((column: SortColumn) => {
+    setSortState(prev => ({
+      column,
+      direction:
+        prev.column === column && prev.direction === 'desc' ? 'asc' : 'desc',
+    }));
+  }, []);
 
   useEffect(() => {
     const container = tableContainerRef.current;
@@ -73,7 +110,7 @@ export function useReleaseProviderMatrix({
   };
 
   const updateRow = (updated: ReleaseViewModel) => {
-    setRows(prev =>
+    setRawRows(prev =>
       prev.map(row => (row.id === updated.id ? { ...updated } : row))
     );
     setEditingRelease(current =>
@@ -113,6 +150,31 @@ export function useReleaseProviderMatrix({
       } catch (error) {
         console.error(error);
         toast.error('Failed to save override');
+      }
+    });
+  };
+
+  const handleAddUrl = async (
+    releaseId: string,
+    provider: ProviderKey,
+    url: string
+  ) => {
+    const release = rawRows.find(r => r.id === releaseId);
+    if (!release) return;
+
+    startSaving(async () => {
+      try {
+        const updated = await saveProviderOverride({
+          profileId: release.profileId,
+          releaseId,
+          provider,
+          url,
+        });
+        updateRow(updated);
+        toast.success(`${providerConfig[provider].label} link added`);
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to add link');
       }
     });
   };
@@ -167,7 +229,7 @@ export function useReleaseProviderMatrix({
 
   return {
     rows,
-    setRows,
+    setRows: setRawRows,
     editingRelease,
     drafts,
     isSaving,
@@ -177,12 +239,15 @@ export function useReleaseProviderMatrix({
     providerList,
     totalReleases,
     totalOverrides,
+    sortState,
+    toggleSort,
     openEditor,
     closeEditor,
     handleCopy,
     handleSave,
     handleReset,
     handleSync,
+    handleAddUrl,
     setDrafts,
   };
 }

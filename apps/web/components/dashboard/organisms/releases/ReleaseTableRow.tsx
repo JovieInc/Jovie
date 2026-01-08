@@ -1,7 +1,15 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import {
+  Badge,
+  Button,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import Image from 'next/image';
+import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -42,6 +50,111 @@ function ProviderStatusDot({
   );
 }
 
+interface AddProviderUrlPopoverProps {
+  providerLabel: string;
+  accent: string;
+  onSave: (url: string) => Promise<void>;
+  isSaving?: boolean;
+}
+
+function AddProviderUrlPopover({
+  providerLabel,
+  accent,
+  onSave,
+  isSaving,
+}: AddProviderUrlPopoverProps) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    try {
+      await onSave(trimmed);
+      setUrl('');
+      setOpen(false);
+    } catch {
+      // Error toast is shown by the hook; keep popover open so user can retry
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type='button'
+          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+        >
+          <Icon
+            name='Plus'
+            className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
+            aria-hidden='true'
+          />
+          <span className='group-hover/add:hidden'>Not found</span>
+          <span className='hidden group-hover/add:inline'>Click to add</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align='start'
+        className='w-72 p-3'
+        onOpenAutoFocus={e => {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
+        <form onSubmit={handleSubmit} className='space-y-3'>
+          <div className='flex items-center gap-2'>
+            <span
+              className='h-2 w-2 shrink-0 rounded-full'
+              style={{ backgroundColor: accent }}
+              aria-hidden='true'
+            />
+            <span className='text-xs font-medium text-primary-token'>
+              Add {providerLabel} link
+            </span>
+          </div>
+          <Input
+            ref={inputRef}
+            type='url'
+            inputSize='sm'
+            placeholder='Paste URL here...'
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            disabled={isSaving}
+            autoComplete='off'
+            className='text-xs'
+          />
+          <div className='flex justify-end gap-2'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => {
+                setUrl('');
+                setOpen(false);
+              }}
+              className='text-xs'
+            >
+              Cancel
+            </Button>
+            <Button
+              type='submit'
+              variant='primary'
+              size='sm'
+              disabled={!url.trim() || isSaving}
+              className='text-xs'
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface ReleaseTableRowProps {
   release: ReleaseViewModel;
   index: number;
@@ -50,6 +163,12 @@ interface ReleaseTableRowProps {
   providerConfig: Record<ProviderKey, ProviderConfig>;
   onCopy: (path: string, label: string, testId: string) => Promise<string>;
   onEdit: (release: ReleaseViewModel) => void;
+  onAddUrl?: (
+    releaseId: string,
+    provider: ProviderKey,
+    url: string
+  ) => Promise<void>;
+  isAddingUrl?: boolean;
 }
 
 export function ReleaseTableRow({
@@ -60,7 +179,20 @@ export function ReleaseTableRow({
   providerConfig,
   onCopy,
   onEdit,
+  onAddUrl,
+  isAddingUrl,
 }: ReleaseTableRowProps) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyWithFeedback = useCallback(
+    async (path: string, label: string, testId: string) => {
+      await onCopy(path, label, testId);
+      setCopiedId(testId);
+      setTimeout(() => setCopiedId(null), 2000);
+    },
+    [onCopy]
+  );
+
   const manualOverrideCount = release.providers.filter(
     provider => provider.source === 'manual'
   ).length;
@@ -76,20 +208,20 @@ export function ReleaseTableRow({
       <td className='px-4 py-4 align-middle sm:px-6'>
         <div className='flex items-center gap-3'>
           {/* Artwork thumbnail */}
-          <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+          <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
             {release.artworkUrl ? (
               <Image
                 src={release.artworkUrl}
                 alt={`${release.title} artwork`}
                 fill
                 className='object-cover'
-                sizes='48px'
+                sizes='40px'
               />
             ) : (
               <div className='flex h-full w-full items-center justify-center'>
                 <Icon
                   name='Disc3'
-                  className='h-6 w-6 text-tertiary-token'
+                  className='h-5 w-5 text-tertiary-token'
                   aria-hidden='true'
                 />
               </div>
@@ -110,38 +242,56 @@ export function ReleaseTableRow({
                 </Badge>
               )}
             </div>
-            <p className='mt-0.5 text-xs text-secondary-token'>
-              {release.releaseDate
-                ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })
-                : 'Release date TBD'}
-            </p>
           </div>
         </div>
       </td>
 
+      {/* Release date cell */}
+      <td className='px-4 py-4 align-middle sm:px-6'>
+        <span className='text-xs text-secondary-token'>
+          {release.releaseDate
+            ? new Date(release.releaseDate).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : 'TBD'}
+        </span>
+      </td>
+
       {/* Smart link cell */}
       <td className='px-4 py-4 align-middle sm:px-6'>
-        <Button
-          variant='secondary'
-          size='sm'
-          data-testid={`smart-link-copy-${release.id}`}
-          data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-          onClick={() =>
-            void onCopy(
-              release.smartLinkPath,
-              `${release.title} smart link`,
-              `smart-link-copy-${release.id}`
-            )
-          }
-          className='inline-flex items-center gap-2 text-xs'
-        >
-          <Icon name='Link' className='h-3.5 w-3.5' aria-hidden='true' />
-          Copy link
-        </Button>
+        {(() => {
+          const smartLinkTestId = `smart-link-copy-${release.id}`;
+          const isCopied = copiedId === smartLinkTestId;
+          return (
+            <Button
+              variant='secondary'
+              size='sm'
+              data-testid={smartLinkTestId}
+              data-url={`${getBaseUrl()}${release.smartLinkPath}`}
+              onClick={() =>
+                void handleCopyWithFeedback(
+                  release.smartLinkPath,
+                  `${release.title} smart link`,
+                  smartLinkTestId
+                )
+              }
+              className={cn(
+                'inline-flex items-center gap-2 text-xs transition-colors',
+                isCopied &&
+                  'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
+              )}
+            >
+              <Icon
+                name={isCopied ? 'Check' : 'Link'}
+                className='h-3.5 w-3.5'
+                aria-hidden='true'
+              />
+              {isCopied ? 'Copied!' : 'Copy link'}
+            </Button>
+          );
+        })()}
       </td>
 
       {/* Provider cells */}
@@ -152,6 +302,7 @@ export function ReleaseTableRow({
         const available = Boolean(provider?.url);
         const isManual = provider?.source === 'manual';
         const testId = `provider-copy-${release.id}-${providerKey}`;
+        const isCopied = copiedId === testId;
         const status = isManual
           ? 'manual'
           : available
@@ -176,21 +327,40 @@ export function ReleaseTableRow({
                   }
                   onClick={() => {
                     if (!provider?.path) return;
-                    void onCopy(
+                    void handleCopyWithFeedback(
                       provider.path,
                       `${release.title} – ${providerConfig[providerKey].label}`,
                       testId
                     );
                   }}
-                  className='group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                  className={cn(
+                    'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+                    isCopied
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                  )}
                 >
                   <Icon
-                    name='Copy'
-                    className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/btn:opacity-100'
+                    name={isCopied ? 'Check' : 'Copy'}
+                    className={cn(
+                      'h-3.5 w-3.5 transition-opacity',
+                      isCopied
+                        ? 'opacity-100'
+                        : 'opacity-0 group-hover/btn:opacity-100'
+                    )}
                     aria-hidden='true'
                   />
-                  <span>{isManual ? 'Custom' : 'Detected'}</span>
+                  <span>
+                    {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
+                  </span>
                 </button>
+              ) : onAddUrl ? (
+                <AddProviderUrlPopover
+                  providerLabel={providerConfig[providerKey].label}
+                  accent={providerConfig[providerKey].accent}
+                  onSave={url => onAddUrl(release.id, providerKey, url)}
+                  isSaving={isAddingUrl}
+                />
               ) : (
                 <span className='text-xs text-tertiary-token'>Not found</span>
               )}
