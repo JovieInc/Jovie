@@ -199,6 +199,58 @@ describe('auth gate - edge cases', () => {
     vi.resetModules();
   });
 
+  it('returns the same user id when concurrent upserts occur', async () => {
+    mockAuth.mockResolvedValue({ userId: 'clerk_123' });
+    mockCurrentUser.mockResolvedValue({
+      emailAddresses: [{ emailAddress: 'race@jovie.com' }],
+    });
+
+    mockDbSelect.mockImplementation((selection: Record<string, unknown>) => {
+      const selectionKeys = Object.keys(selection ?? {});
+      const isWaitlistSelection =
+        selectionKeys.length === 2 &&
+        selectionKeys.includes('id') &&
+        selectionKeys.includes('status');
+
+      const baseQuery = {
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue(
+              isWaitlistSelection
+                ? [{ id: 'waitlist_1', status: 'claimed' }]
+                : []
+            ),
+        }),
+      };
+
+      return {
+        ...baseQuery,
+        leftJoin: vi.fn().mockReturnValue(baseQuery),
+      };
+    });
+
+    mockDbInsert.mockImplementation(() => ({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 'user_123' }]),
+        }),
+      }),
+    }));
+
+    const { resolveUserState, UserState } = await import('@/lib/auth/gate');
+
+    const [firstResult, secondResult] = await Promise.all([
+      resolveUserState(),
+      resolveUserState(),
+    ]);
+
+    expect(firstResult.dbUserId).toBe('user_123');
+    expect(secondResult.dbUserId).toBe('user_123');
+    expect(firstResult.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(secondResult.state).toBe(UserState.NEEDS_ONBOARDING);
+  });
+
   it('throws when email is missing during user creation', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_123' });
     mockCurrentUser.mockResolvedValue({
