@@ -37,9 +37,9 @@ describe('onboardingErrorToError', () => {
       message: 'Failed query: SELECT create_profile_with_user(...)',
       cause: {
         code: '23505',
-        constraint: 'users_email_unique',
+        constraint: 'idx_users_email_unique',
         message:
-          'duplicate key value violates unique constraint "users_email_unique"',
+          'duplicate key value violates unique constraint "idx_users_email_unique"',
       },
     };
 

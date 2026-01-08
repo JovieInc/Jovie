@@ -131,7 +131,9 @@ export function mapDatabaseError(error: unknown): OnboardingError {
 
     if (
       constraint === 'users_email_unique' ||
-      errorMessage.includes('users_email_unique')
+      constraint === 'idx_users_email_unique' ||
+      errorMessage.includes('users_email_unique') ||
+      errorMessage.includes('idx_users_email_unique')
     ) {
       return createOnboardingError(
         OnboardingErrorCode.EMAIL_IN_USE,

@@ -213,6 +213,7 @@ describe('auth gate - edge cases', () => {
         selectionKeys.includes('status');
 
       const baseQuery = {
+        leftJoin: vi.fn(),
         where: vi.fn().mockReturnValue({
           limit: vi
             .fn()
@@ -224,9 +225,11 @@ describe('auth gate - edge cases', () => {
         }),
       };
 
+      baseQuery.leftJoin.mockReturnValue(baseQuery);
+
       return {
         ...baseQuery,
-        leftJoin: vi.fn().mockReturnValue(baseQuery),
+        from: vi.fn().mockReturnValue(baseQuery),
       };
     });
 

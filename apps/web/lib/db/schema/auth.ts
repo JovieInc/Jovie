@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -5,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -22,7 +24,7 @@ export const users = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     clerkId: text('clerk_id').unique().notNull(),
     name: text('name'),
-    email: text('email').unique(),
+    email: text('email'),
 
     // NEW: Single source of truth for user lifecycle
     userStatus: userStatusLifecycleEnum('user_status').notNull(),
@@ -48,6 +50,11 @@ export const users = pgTable(
   table => ({
     // NEW: Primary index for user lifecycle state
     userStatusIdx: index('idx_users_user_status').on(table.userStatus),
+
+    // Email uniqueness is enforced via a partial unique index to allow NULLs.
+    emailUniqueIdx: uniqueIndex('idx_users_email_unique')
+      .on(drizzleSql`LOWER(${table.email})`)
+      .where(drizzleSql`email IS NOT NULL`),
 
     // DEPRECATED: Legacy indexes (dropped in migration 0036)
     // These are commented out because the indexes no longer exist in the database

@@ -18,6 +18,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import {
@@ -37,14 +38,19 @@ import {
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   clerkId: text('clerk_id').unique().notNull(),
-  email: text('email').unique(),
+  email: text('email'),
   isPro: boolean('is_pro').default(false),
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   billingUpdatedAt: timestamp('billing_updated_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, table => ({
+  // Email uniqueness is enforced via a partial unique index to allow NULLs.
+  emailUniqueIdx: uniqueIndex('idx_users_email_unique')
+    .on(drizzleSql`LOWER(${table.email})`)
+    .where(drizzleSql`email IS NOT NULL`),
+}));
 
 // Separate user-level settings (distinct from creator profile)
 export const userSettings = pgTable('user_settings', {
