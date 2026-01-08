@@ -10,7 +10,6 @@
 
 import {
   getWaitlistAccess,
-  getWaitlistInviteByToken as getWaitlistInviteByTokenFromGate,
   type WaitlistAccessResult,
   type WaitlistStatus,
 } from '@/lib/auth/gate';
@@ -21,13 +20,6 @@ export type { WaitlistStatus };
 export interface WaitlistAccessLookup {
   entryId: string | null;
   status: WaitlistStatus | null;
-  inviteToken: string | null;
-}
-
-export interface WaitlistInviteLookup {
-  waitlistEntryId: string;
-  email: string;
-  claimToken: string;
 }
 
 /**
@@ -40,15 +32,5 @@ export async function getWaitlistAccessByEmail(
   return {
     entryId: result.entryId,
     status: result.status,
-    inviteToken: result.claimToken,
   };
-}
-
-/**
- * @deprecated Use `getWaitlistInviteByToken` from '@/lib/auth/gate' instead.
- */
-export async function getWaitlistInviteByToken(
-  token: string
-): Promise<WaitlistInviteLookup | null> {
-  return getWaitlistInviteByTokenFromGate(token);
 }

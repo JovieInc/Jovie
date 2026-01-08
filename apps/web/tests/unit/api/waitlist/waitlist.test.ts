@@ -27,6 +27,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/schema', () => ({
   users: {},
   waitlistInvites: {},
+  creatorProfiles: {},
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -49,6 +50,19 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   normalizeUrl: vi.fn(url => url),
 }));
 
+vi.mock('@/lib/utils/social-platform', () => ({
+  detectPlatformFromUrl: vi.fn(() => ({
+    platform: 'instagram',
+    normalizedUrl: 'https://instagram.com/testuser',
+  })),
+  extractHandleFromUrl: vi.fn(() => 'testuser'),
+}));
+
+vi.mock('@/lib/validation/username', () => ({
+  normalizeUsername: vi.fn(username => username.toLowerCase()),
+  validateUsername: vi.fn(() => ({ isValid: true })),
+}));
+
 describe('Waitlist API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,10 +70,29 @@ describe('Waitlist API', () => {
     process.env.DATABASE_URL = 'postgres://test@localhost/test';
 
     // Mock transaction to execute callback with tx object that has same methods as db
+    // Now supports .returning() for profile auto-creation flow
     mockDbTransaction.mockImplementation(async callback => {
+      const mockReturning = vi.fn().mockResolvedValue([
+        { id: 'entry_123' }, // Return value for waitlist entry insert
+      ]);
+      const mockValues = vi.fn().mockReturnValue({
+        returning: mockReturning,
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      });
+      const mockWhere = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([]), // No existing profiles
+      });
+      const mockFrom = vi.fn().mockReturnValue({
+        where: mockWhere,
+      });
+
       const tx = {
-        select: mockDbSelect,
-        insert: mockDbInsert,
+        select: vi.fn().mockReturnValue({
+          from: mockFrom,
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: mockValues,
+        }),
         update: mockDbUpdate,
         execute: mockDbExecute,
       };
@@ -218,10 +251,44 @@ describe('Waitlist API', () => {
     });
 
     it('sets users.userStatus to waitlist_pending after submission', async () => {
-      const mockOnConflict = vi.fn().mockResolvedValue(undefined);
-      const mockValues = vi.fn().mockReturnValue({
-        onConflictDoUpdate: mockOnConflict,
+      // Track calls to verify user status update
+      const mockOnConflictCalls: unknown[] = [];
+      const mockValuesCalls: unknown[] = [];
+
+      // Set up transaction mock to track calls
+      mockDbTransaction.mockImplementation(async callback => {
+        const mockOnConflict = vi.fn(arg => {
+          mockOnConflictCalls.push(arg);
+          return Promise.resolve(undefined);
+        });
+        const mockReturning = vi.fn().mockResolvedValue([{ id: 'entry_123' }]);
+        const mockValues = vi.fn(arg => {
+          mockValuesCalls.push(arg);
+          return {
+            returning: mockReturning,
+            onConflictDoUpdate: mockOnConflict,
+          };
+        });
+        const mockWhere = vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        });
+        const mockFrom = vi.fn().mockReturnValue({
+          where: mockWhere,
+        });
+
+        const tx = {
+          select: vi.fn().mockReturnValue({
+            from: mockFrom,
+          }),
+          insert: vi.fn().mockReturnValue({
+            values: mockValues,
+          }),
+          update: mockDbUpdate,
+          execute: mockDbExecute,
+        };
+        return await callback(tx);
       });
+
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ emailAddress: 'test@example.com' }],
@@ -234,9 +301,6 @@ describe('Waitlist API', () => {
             limit: vi.fn().mockResolvedValue([]),
           }),
         }),
-      });
-      mockDbInsert.mockReturnValue({
-        values: mockValues,
       });
 
       const { POST } = await import('@/app/api/waitlist/route');
@@ -255,14 +319,37 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
 
+      // Verify transaction was called
+      expect(mockDbTransaction).toHaveBeenCalled();
+
       // Verify users table was upserted with userStatus='waitlist_pending'
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(mockValues).toHaveBeenCalledWith({
+      // Should be the third insert call (after waitlist entry and profile)
+      const userInsertCall = mockValuesCalls.find(
+        (call: unknown) =>
+          typeof call === 'object' &&
+          call !== null &&
+          'userStatus' in call &&
+          call.userStatus === 'waitlist_pending'
+      );
+
+      expect(userInsertCall).toEqual({
         clerkId: 'user_123',
         email: 'test@example.com',
         userStatus: 'waitlist_pending',
       });
-      expect(mockOnConflict).toHaveBeenCalledWith(
+
+      // Verify onConflictDoUpdate was called with correct update
+      const onConflictCall = mockOnConflictCalls.find(
+        (call: unknown) =>
+          typeof call === 'object' &&
+          call !== null &&
+          'set' in call &&
+          typeof call.set === 'object' &&
+          call.set !== null &&
+          'userStatus' in call.set
+      );
+
+      expect(onConflictCall).toEqual(
         expect.objectContaining({
           set: expect.objectContaining({
             userStatus: 'waitlist_pending',

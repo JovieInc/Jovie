@@ -2,12 +2,7 @@ import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import {
-  creatorProfiles,
-  users,
-  waitlistEntries,
-  waitlistInvites,
-} from '@/lib/db/schema';
+import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 
@@ -27,8 +22,6 @@ export enum UserState {
   NEEDS_WAITLIST_SUBMISSION = 'NEEDS_WAITLIST_SUBMISSION',
   /** Waitlist application submitted but not yet approved */
   WAITLIST_PENDING = 'WAITLIST_PENDING',
-  /** Waitlist application approved, needs to claim invite */
-  WAITLIST_INVITED = 'WAITLIST_INVITED',
   /** User has access but needs to complete onboarding */
   NEEDS_ONBOARDING = 'NEEDS_ONBOARDING',
   /** Fully active user with complete profile */
@@ -59,7 +52,6 @@ export interface AuthGateResult {
     isAdmin: boolean;
     isPro: boolean;
     email: string | null;
-    claimToken?: string;
     errorCode?: string;
   };
 }
@@ -152,8 +144,8 @@ async function createUserWithRetry(
         existingUserData?.profileId &&
         existingUserData.profileClaimed
       ) {
-        // SIMPLIFIED FLOW: User has a claimed profile (linked on admin approval)
-        // Profile is auto-created on waitlist submission (PR#1736) and linked on approval (PR#1737)
+        // User has a claimed profile (linked on admin approval)
+        // Profile is auto-created on waitlist submission and linked on approval
         // Onboarding is skipped (onboardingCompletedAt set on approval), so user is active
         if (existingUserData.onboardingComplete) {
           userStatus = 'active';
@@ -161,8 +153,7 @@ async function createUserWithRetry(
           userStatus = 'onboarding_incomplete';
         }
       } else {
-        // LEGACY FLOW: User has waitlist entry but no claimed profile yet
-        // This path is for pre-PR#1736 entries or admin-ingested creators
+        // User has waitlist entry but no claimed profile yet
         userStatus = 'waitlist_approved';
       }
 
@@ -229,13 +220,11 @@ async function createUserWithRetry(
  * 4. Check waitlist/profile state → WAITLIST_*, NEEDS_ONBOARDING, ACTIVE
  *
  * @param options.createDbUserIfMissing - If true, creates a DB user row when missing (default: true)
- * @param options.claimToken - If provided, used for claim flow state resolution
  */
-export async function resolveUserState(options?: {
-  createDbUserIfMissing?: boolean;
-  claimToken?: string;
-}): Promise<AuthGateResult> {
-  const { createDbUserIfMissing = true, claimToken } = options ?? {};
+export async function resolveUserState(
+  options: { createDbUserIfMissing?: boolean } = {}
+): Promise<AuthGateResult> {
+  const { createDbUserIfMissing = true } = options;
 
   // Default empty result
   const emptyResult: AuthGateResult = {
@@ -331,25 +320,9 @@ export async function resolveUserState(options?: {
         };
       }
 
-      if (waitlistResult.status === 'invited' && waitlistResult.claimToken) {
-        // LEGACY FLOW: Invited but hasn't claimed yet (pre-PR#1736 waitlist entries or admin-ingested creators)
-        return {
-          state: UserState.WAITLIST_INVITED,
-          clerkUserId,
-          dbUserId: null,
-          profileId: null,
-          redirectTo: `/claim/${encodeURIComponent(waitlistResult.claimToken)}`,
-          context: {
-            ...baseContext,
-            email,
-            claimToken: waitlistResult.claimToken,
-          },
-        };
-      }
-
-      // SIMPLIFIED FLOW: User is claimed (profile already linked on approval) or approved
-      // For claimed users (post-PR#1736), profile is already linked and onboarding is complete
-      // Just need to create DB user row and they can access the app
+      // User is claimed (profile already linked on approval)
+      // Profile is auto-created on waitlist submission and linked on approval
+      // Onboarding is skipped, so user just needs DB user row to access the app
       dbUserId = await createUserWithRetry(
         clerkUserId,
         email,
@@ -436,7 +409,7 @@ export async function resolveUserState(options?: {
       dbUserId,
       profileId: null,
       redirectTo: '/onboarding?fresh_signup=true',
-      context: { ...baseContext, email, claimToken },
+      context: { ...baseContext, email },
     };
   }
 
@@ -471,18 +444,17 @@ export async function resolveUserState(options?: {
 // Waitlist Access Helpers (exported for reuse)
 // =============================================================================
 
-// Valid waitlist statuses: 'new' (submitted), 'invited', 'claimed'.
-export type WaitlistStatus = 'new' | 'invited' | 'claimed';
+// Valid waitlist statuses: 'new' (submitted), 'claimed' (approved).
+export type WaitlistStatus = 'new' | 'claimed';
 
 export interface WaitlistAccessResult {
   entryId: string | null;
   status: WaitlistStatus | null;
-  claimToken: string | null;
 }
 
 /**
  * Check waitlist access by email.
- * Returns the waitlist entry status and claim token if available.
+ * Returns the waitlist entry status.
  *
  * This is the single source of truth for waitlist status checks.
  * Use this instead of querying waitlist tables directly.
@@ -498,8 +470,7 @@ export async function getWaitlistAccess(
  */
 async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
-  status: 'new' | 'invited' | 'claimed' | null;
-  claimToken: string | null;
+  status: 'new' | 'claimed' | null;
 }> {
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -513,51 +484,13 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
     .limit(1);
 
   if (!entry) {
-    return { entryId: null, status: null, claimToken: null };
-  }
-
-  // If invited, get the claim token
-  if (entry.status === 'invited') {
-    const [invite] = await db
-      .select({ claimToken: waitlistInvites.claimToken })
-      .from(waitlistInvites)
-      .where(eq(waitlistInvites.waitlistEntryId, entry.id))
-      .limit(1);
-
-    return {
-      entryId: entry.id,
-      status: entry.status,
-      claimToken: invite?.claimToken ?? null,
-    };
+    return { entryId: null, status: null };
   }
 
   return {
     entryId: entry.id,
-    status: entry.status,
-    claimToken: null,
+    status: entry.status as 'new' | 'claimed',
   };
-}
-
-/**
- * Get waitlist invite details by claim token.
- * Returns the waitlist entry ID and email if the token is valid.
- */
-export async function getWaitlistInviteByToken(token: string): Promise<{
-  waitlistEntryId: string;
-  email: string;
-  claimToken: string;
-} | null> {
-  const [invite] = await db
-    .select({
-      waitlistEntryId: waitlistInvites.waitlistEntryId,
-      email: waitlistInvites.email,
-      claimToken: waitlistInvites.claimToken,
-    })
-    .from(waitlistInvites)
-    .where(eq(waitlistInvites.claimToken, token))
-    .limit(1);
-
-  return invite ?? null;
 }
 
 // =============================================================================
@@ -568,10 +501,7 @@ export async function getWaitlistInviteByToken(token: string): Promise<{
  * Returns redirect paths for each user state.
  * Used by routes to determine where to redirect users based on their state.
  */
-export function getRedirectForState(
-  state: UserState,
-  claimToken?: string
-): string | null {
+export function getRedirectForState(state: UserState): string | null {
   switch (state) {
     case UserState.UNAUTHENTICATED:
       return '/signin';
@@ -581,10 +511,6 @@ export function getRedirectForState(
       return '/waitlist';
     case UserState.WAITLIST_PENDING:
       return '/waitlist';
-    case UserState.WAITLIST_INVITED:
-      return claimToken
-        ? `/claim/${encodeURIComponent(claimToken)}`
-        : '/waitlist';
     case UserState.NEEDS_ONBOARDING:
       return '/onboarding?fresh_signup=true';
     case UserState.BANNED:

@@ -417,8 +417,20 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
 
+    // In development, return the actual error for debugging
+    const isDev = process.env.NODE_ENV === 'development';
+    const errorMessage =
+      isDev && error instanceof Error
+        ? error.message
+        : 'Something went wrong. Please try again.';
+
     return NextResponse.json(
-      { success: false, error: 'Something went wrong. Please try again.' },
+      {
+        success: false,
+        error: errorMessage,
+        ...(isDev &&
+          error instanceof Error && { stack: error.stack, details: error }),
+      },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
