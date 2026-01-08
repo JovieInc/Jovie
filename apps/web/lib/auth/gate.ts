@@ -181,8 +181,8 @@ async function createUserWithRetry(
         })
         .returning({ id: users.id });
 
-      if (!createdUser) {
-        throw new Error('User creation returned no result');
+      if (!createdUser?.id) {
+        throw new Error('Failed to create or retrieve user');
       }
 
       console.log(
