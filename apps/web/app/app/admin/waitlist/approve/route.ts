@@ -1,52 +1,15 @@
-import { randomUUID } from 'crypto';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { type DbType } from '@/lib/db';
-import {
-  creatorProfiles,
-  users,
-  waitlistEntries,
-  waitlistInvites,
-} from '@/lib/db/schema';
+import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
-import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-function safeRandomHandle(): string {
-  const token = randomUUID().replace(/-/g, '').slice(0, 12);
-  return `c${token}`;
-}
-
-async function findAvailableHandle(tx: DbType, base: string): Promise<string> {
-  const normalizedBase = normalizeUsername(base).slice(0, 30);
-  const maxAttempts = 20;
-
-  for (let i = 0; i < maxAttempts; i += 1) {
-    const suffix = i === 0 ? '' : `-${i}`;
-    const candidate = `${normalizedBase.slice(0, 30 - suffix.length)}${suffix}`;
-    if (!validateUsername(candidate).isValid) continue;
-
-    const [existing] = await tx
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, candidate))
-      .limit(1);
-
-    if (!existing) {
-      return candidate;
-    }
-  }
-
-  return safeRandomHandle();
-}
 
 export async function POST(request: Request) {
   let entitlements;
@@ -112,7 +75,7 @@ export async function POST(request: Request) {
           };
         }
 
-        // NEW FLOW: Get profile created during signup (via waitlistEntryId)
+        // Get profile created during signup (via waitlistEntryId)
         const [profile] = await tx
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
@@ -120,91 +83,12 @@ export async function POST(request: Request) {
           .limit(1);
 
         if (!profile) {
-          // FALLBACK: Profile not found - this means signup happened before PR #1736
-          // Use old flow: create profile with claim token
-          const handleCandidate =
-            extractHandleFromUrl(entry.primarySocialUrlNormalized) ??
-            entry.email.split('@')[0] ??
-            safeRandomHandle();
-
-          const baseHandle = validateUsername(handleCandidate).isValid
-            ? handleCandidate
-            : safeRandomHandle();
-
-          const usernameNormalized = await findAvailableHandle(tx, baseHandle);
-
-          const claimToken = randomUUID();
-          const claimTokenExpiresAt = new Date(now);
-          claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + 30);
-
-          const trimmedName = entry.fullName.trim();
-          const displayName = trimmedName
-            ? trimmedName.slice(0, 50)
-            : 'Jovie creator';
-
-          const [createdProfile] = await tx
-            .insert(creatorProfiles)
-            .values({
-              creatorType: 'creator',
-              username: usernameNormalized,
-              usernameNormalized,
-              displayName,
-              isPublic: true,
-              isVerified: false,
-              isFeatured: false,
-              marketingOptOut: false,
-              isClaimed: false,
-              claimToken,
-              claimTokenExpiresAt,
-              settings: {},
-              theme: {},
-              ingestionStatus: 'idle',
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning({ id: creatorProfiles.id });
-
-          if (!createdProfile) {
-            throw new Error('Failed to create creator profile');
-          }
-
-          const [invite] = await tx
-            .insert(waitlistInvites)
-            .values({
-              waitlistEntryId: entry.id,
-              creatorProfileId: createdProfile.id,
-              email: entry.email,
-              fullName: entry.fullName,
-              claimToken,
-              status: 'pending',
-              attempts: 0,
-              maxAttempts: 3,
-              runAt: now,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .onConflictDoNothing({
-              target: waitlistInvites.waitlistEntryId,
-            })
-            .returning({
-              id: waitlistInvites.id,
-              claimToken: waitlistInvites.claimToken,
-            });
-
-          await tx
-            .update(waitlistEntries)
-            .set({ status: 'invited', updatedAt: now })
-            .where(eq(waitlistEntries.id, entry.id));
-
-          return {
-            outcome: 'approved' as const,
-            flow: 'legacy_claim' as const,
-            inviteId: invite?.id,
-            claimToken: invite?.claimToken ?? claimToken,
-          };
+          throw new Error(
+            'Profile not found for waitlist entry. User must submit waitlist form to auto-create profile.'
+          );
         }
 
-        // NEW FLOW: Get user by email
+        // Get user by email
         const [user] = await tx
           .select({ id: users.id })
           .from(users)
@@ -213,11 +97,11 @@ export async function POST(request: Request) {
 
         if (!user) {
           throw new Error(
-            'User not found for email - signup flow incomplete. User may need to sign in first.'
+            'User not found for email. User may need to sign in first to create auth record.'
           );
         }
 
-        // NEW FLOW: Link profile to user and mark as claimed + public
+        // Link profile to user and mark as claimed + public
         await tx
           .update(creatorProfiles)
           .set({
@@ -247,17 +131,8 @@ export async function POST(request: Request) {
           })
           .where(eq(users.id, user.id));
 
-        // NOTE: We don't create a waitlistInvite record for the simplified flow
-        // because there's no claim token or email to send. The waitlistInvites
-        // table is specifically for the legacy claim flow.
-        // Tracking is done via:
-        // - waitlistEntries.status = 'claimed'
-        // - creatorProfiles.isClaimed = true
-        // - users.userStatus = 'active'
-
         return {
           outcome: 'approved' as const,
-          flow: 'simplified' as const,
           profileId: profile.id,
         };
       },
@@ -281,33 +156,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Handle different flows
-    if (result.flow === 'simplified') {
-      return NextResponse.json(
-        {
-          success: true,
-          status: 'claimed',
-          flow: 'simplified',
-          profileId: result.profileId,
-          message:
-            'Profile linked to user and activated. User can sign in immediately.',
-        },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Legacy flow (for entries before PR #1736)
     return NextResponse.json(
       {
         success: true,
-        status: 'invited',
-        flow: 'legacy_claim',
-        inviteQueued: true,
-        invite: {
-          id: result.inviteId,
-          claimToken: result.claimToken,
-        },
-        message: 'Profile created with claim link. User must claim via email.',
+        status: 'claimed',
+        profileId: result.profileId,
+        message:
+          'Profile linked to user and activated. User can sign in immediately.',
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
