@@ -354,7 +354,7 @@ function DashboardLayoutInner({
               </div>
             </>
           ) : (
-            <div className='flex h-full min-h-0 flex-col rounded-lg border border-subtle bg-surface-0 overflow-hidden'>
+            <div className='flex h-full min-h-0 flex-col rounded-lg border border-subtle bg-surface-0'>
               <DashboardHeader
                 breadcrumbs={crumbs}
                 leading={MobileMenuButton}

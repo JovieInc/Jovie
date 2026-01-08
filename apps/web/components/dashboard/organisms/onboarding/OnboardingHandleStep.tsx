@@ -86,9 +86,9 @@ export function OnboardingHandleStep({
               className={[
                 'pl-10 pr-10',
                 stateError || handleValidation.error
-                  ? 'border-red-500'
+                  ? 'border-error'
                   : !stateError && handleValidation.available
-                    ? 'border-green-500'
+                    ? 'border-success'
                     : undefined,
               ]
                 .filter(Boolean)
@@ -109,13 +109,13 @@ export function OnboardingHandleStep({
                     cy='10'
                     r='9'
                     stroke='currentColor'
-                    className='text-red-500'
+                    className='text-error'
                     strokeWidth='2'
                   />
                   <path
                     d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
                     stroke='currentColor'
-                    className='text-red-500'
+                    className='text-error'
                     strokeWidth='2'
                     strokeLinecap='round'
                   />
@@ -134,13 +134,13 @@ export function OnboardingHandleStep({
                     cy='10'
                     r='9'
                     stroke='currentColor'
-                    className='text-green-600'
+                    className='text-success'
                     strokeWidth='2'
                   />
                   <path
                     d='M6 10.2l2.6 2.6L14 7.4'
                     stroke='currentColor'
-                    className='text-green-600'
+                    className='text-success'
                     strokeWidth='2'
                     strokeLinecap='round'
                     strokeLinejoin='round'
@@ -162,11 +162,11 @@ export function OnboardingHandleStep({
                   Checking…
                 </div>
               ) : handleValidation.clientValid && handleValidation.available ? (
-                <div className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                <div className='text-success text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
                   Available
                 </div>
               ) : handleValidation.error ? (
-                <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+                <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
                   Not available
                 </div>
               ) : null

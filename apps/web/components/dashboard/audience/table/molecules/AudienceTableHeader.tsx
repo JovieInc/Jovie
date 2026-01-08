@@ -19,7 +19,7 @@ const MEMBER_COLUMNS = [
   { key: 'location', label: 'Location' },
   { key: 'device', label: 'Device' },
   { key: 'visits', label: 'Visits' },
-  { key: 'actions', label: 'Actions' },
+  { key: 'actions', label: 'Actions', align: 'right' as const },
   { key: 'lastSeen', label: 'Last seen' },
 ] as const;
 
@@ -68,6 +68,7 @@ export interface AudienceTableHeaderProps {
   headerCheckboxState: HeaderCheckboxState;
   selectedCount: number;
   headerElevated: boolean;
+  totalCount: number;
   onSortChange: (sort: string) => void;
   onToggleSelectAll: () => void;
   bulkActions: BulkAction[];
@@ -80,6 +81,7 @@ export function AudienceTableHeader({
   headerCheckboxState,
   selectedCount,
   headerElevated,
+  totalCount,
   onSortChange,
   onToggleSelectAll,
   bulkActions,
@@ -108,13 +110,22 @@ export function AudienceTableHeader({
           const isSortable = Boolean(sortKey);
           const isActive = isSortable && sortKey === sort;
           const activeDirection = isActive ? direction : undefined;
+          const columnAlign = 'align' in column ? column.align : 'left';
 
           return (
             <th
               key={column.key}
-              className='border-b border-subtle px-4 py-3 text-left sm:px-6'
+              className={cn(
+                'border-b border-subtle px-4 py-3 sm:px-6',
+                columnAlign === 'right' ? 'text-right' : 'text-left'
+              )}
             >
-              <div className='flex items-center justify-between gap-2'>
+              <div
+                className={cn(
+                  'flex items-center gap-2',
+                  columnAlign === 'right' ? 'justify-end' : 'justify-between'
+                )}
+              >
                 {isSortable ? (
                   <SortableHeaderButton
                     label={column.label}
@@ -128,37 +139,48 @@ export function AudienceTableHeader({
                 )}
 
                 {index === 0 ? (
-                  <div
-                    className={cn(
-                      'inline-flex items-center transition-all duration-150',
-                      selectedCount > 0
-                        ? 'opacity-100 translate-y-0'
-                        : 'pointer-events-none opacity-0 -translate-y-0.5'
-                    )}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant='secondary'
-                          size='sm'
-                          className='normal-case'
-                        >
-                          Bulk actions
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align='end'>
-                        {bulkActions.map((action, actionIndex) => (
-                          <DropdownMenuItem
-                            key={actionIndex}
-                            disabled={action.disabled}
-                            onClick={action.onClick}
+                  <>
+                    <div
+                      className={cn(
+                        'inline-flex items-center transition-all duration-150',
+                        selectedCount > 0
+                          ? 'opacity-100 translate-y-0'
+                          : 'pointer-events-none opacity-0 -translate-y-0.5'
+                      )}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant='secondary'
+                            size='sm'
+                            className='normal-case'
                           >
-                            {action.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                            Bulk actions
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end'>
+                          {bulkActions.map((action, actionIndex) => (
+                            <DropdownMenuItem
+                              key={actionIndex}
+                              disabled={action.disabled}
+                              onClick={action.onClick}
+                            >
+                              {action.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token transition-all duration-150',
+                        selectedCount > 0 &&
+                          'pointer-events-none opacity-0 -translate-y-0.5'
+                      )}
+                    >
+                      {totalCount} {totalCount === 1 ? 'person' : 'people'}
+                    </span>
+                  </>
                 ) : null}
               </div>
             </th>

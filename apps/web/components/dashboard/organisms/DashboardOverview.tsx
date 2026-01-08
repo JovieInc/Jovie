@@ -124,7 +124,7 @@ export function DashboardOverview({
             profileUrl={profileUrl}
           />
 
-          <section className='rounded-2xl border-0 bg-transparent p-1'>
+          <section className='rounded-2xl border-0 bg-transparent'>
             <div className='space-y-2 rounded-2xl bg-surface-1/40 p-3 shadow-none'>
               <div className='flex items-center justify-between gap-2.5'>
                 <div className='space-y-0.5'>

@@ -15,7 +15,7 @@ export const SidebarMenu = React.forwardRef<
   <ul
     ref={ref}
     data-sidebar='menu'
-    className={cn('flex w-full min-w-0 flex-col gap-1', className)}
+    className={cn('flex w-full min-w-0 flex-col gap-0.5', className)}
     {...props}
   />
 ));
@@ -35,7 +35,7 @@ export const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-2.5 py-1.5 text-left text-[13px] tracking-[0.03em] font-normal leading-5 outline-none ring-sidebar-ring transition-all duration-150 ease-out text-sidebar-muted hover:text-sidebar-foreground focus-visible:ring-2 data-[active=true]:text-sidebar-accent-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent active:duration-50 active:ease-linear group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground',
+  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-2 py-1 text-left text-xs tracking-tight font-normal leading-5 outline-none ring-sidebar-ring transition-all duration-150 ease-out text-sidebar-muted hover:text-sidebar-foreground focus-visible:ring-2 data-[active=true]:text-sidebar-accent-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent active:duration-50 active:ease-linear group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground',
   {
     variants: {
       variant: {
@@ -44,9 +44,9 @@ const sidebarMenuButtonVariants = cva(
           'bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]',
       },
       size: {
-        default: 'h-8',
-        sm: 'h-7 text-[13px]',
-        lg: 'h-9 group-data-[collapsible=icon]:!size-8',
+        default: 'h-7',
+        sm: 'h-6 text-xs',
+        lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },
     },
     defaultVariants: {
@@ -131,10 +131,10 @@ export const SidebarMenuActions = React.forwardRef<
     ref={ref}
     data-sidebar='menu-actions'
     className={cn(
-      'absolute right-1 top-1.5 flex items-center gap-1',
-      'peer-data-[size=sm]/menu-button:top-1',
-      'peer-data-[size=default]/menu-button:top-1.5',
-      'peer-data-[size=lg]/menu-button:top-2.5',
+      'absolute right-1 top-1 flex items-center gap-1',
+      'peer-data-[size=sm]/menu-button:top-0.5',
+      'peer-data-[size=default]/menu-button:top-1',
+      'peer-data-[size=lg]/menu-button:top-2',
       'group-data-[collapsible=icon]:hidden',
       showOnHover &&
         'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 group-focus-within/menu-item:pointer-events-auto group-hover/menu-item:pointer-events-auto lg:pointer-events-none lg:opacity-0',
@@ -158,7 +158,7 @@ export const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar='menu-action'
       className={cn(
-        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-muted/60 outline-none ring-sidebar-ring transition-colors duration-150 ease-out hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:text-sidebar-foreground [&>svg]:size-4 [&>svg]:shrink-0',
+        'relative flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-muted/60 outline-none ring-sidebar-ring transition-colors duration-150 ease-out hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:text-sidebar-foreground [&>svg]:size-3.5 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
         'peer-data-[active=true]/menu-button:text-sidebar-accent-foreground',
@@ -273,7 +273,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-muted outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors',
+        'flex h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-muted outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors',
         'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground hover:[&>svg]:text-sidebar-foreground',
         size === 'sm' && 'text-xs',
         size === 'md' && 'text-sm',

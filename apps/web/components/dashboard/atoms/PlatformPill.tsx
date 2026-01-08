@@ -205,10 +205,17 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
         </span>
 
-        <div className='min-w-0 max-w-[180px] truncate sm:max-w-[240px]'>
-          <span className='truncate'>{primaryText}</span>
+        <div className='min-w-0 flex-1'>
+          <span className={cn(primaryText.length > 40 && 'truncate')}>
+            {primaryText}
+          </span>
           {hasSecondary ? (
-            <span className='ml-2 truncate text-[10px] text-tertiary-token/80'>
+            <span
+              className={cn(
+                'ml-2 text-[10px] text-tertiary-token/80',
+                secondaryText && secondaryText.length > 40 && 'truncate'
+              )}
+            >
               {secondaryText}
             </span>
           ) : null}
