@@ -51,16 +51,59 @@ export function ReleasesEmptyState({
     limit: 5,
   });
 
+  // Check if a string is a Spotify artist URL and extract the ID
+  const extractSpotifyArtistId = useCallback((input: string): string | null => {
+    const trimmed = input.trim();
+    const artistMatch = trimmed.match(
+      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/
+    );
+    return artistMatch ? artistMatch[1] : null;
+  }, []);
+
   const handleSearchInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchQuery(value);
       setActiveResultIndex(-1);
+      setError(null);
+
+      // Check if it's a Spotify URL
+      const artistId = extractSpotifyArtistId(value);
+      if (artistId) {
+        // It's a Spotify URL - connect directly instead of searching
+        clear();
+        setShowResults(false);
+        const artistUrl = `https://open.spotify.com/artist/${artistId}`;
+        onImportStart?.('');
+
+        startTransition(async () => {
+          try {
+            const result = await connectSpotifyArtist({
+              spotifyArtistId: artistId,
+              spotifyArtistUrl: artistUrl,
+              artistName: '',
+            });
+
+            if (result.success) {
+              setSearchQuery('');
+              onConnected?.(result.releases, result.artistName);
+            } else {
+              setError(result.message);
+            }
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : 'Failed to connect artist'
+            );
+          }
+        });
+        return;
+      }
+
+      // Regular search
       search(value);
       setShowResults(true);
-      setError(null);
     },
-    [search]
+    [search, clear, extractSpotifyArtistId, onConnected, onImportStart]
   );
 
   const handleArtistSelect = useCallback(
@@ -107,16 +150,13 @@ export function ReleasesEmptyState({
         return;
       }
 
-      // Extract artist ID from URL
-      const artistMatch = trimmedUrl.match(
-        /open\.spotify\.com\/artist\/([a-zA-Z0-9]{22})/
-      );
-      if (!artistMatch) {
+      // Extract artist ID from URL using the same helper as paste detection
+      const artistId = extractSpotifyArtistId(trimmedUrl);
+      if (!artistId) {
         setError('Please enter a valid Spotify artist URL');
         return;
       }
 
-      const artistId = artistMatch[1];
       const artistUrl = `https://open.spotify.com/artist/${artistId}`;
 
       // Clear the form and show importing state
@@ -144,7 +184,7 @@ export function ReleasesEmptyState({
         }
       });
     },
-    [manualUrl, onConnected, onImportStart]
+    [manualUrl, onConnected, onImportStart, extractSpotifyArtistId]
   );
 
   const handleKeyDown = useCallback(
@@ -272,7 +312,7 @@ export function ReleasesEmptyState({
                 ref={inputRef}
                 type='text'
                 inputSize='lg'
-                placeholder='Search Spotify artists...'
+                placeholder='Search or paste a Spotify artist URL...'
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 onKeyDown={handleKeyDown}
@@ -290,7 +330,7 @@ export function ReleasesEmptyState({
                     : undefined
                 }
               />
-              {state === 'loading' && (
+              {(state === 'loading' || isPending) && (
                 <div className='h-4 w-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin' />
               )}
             </div>
