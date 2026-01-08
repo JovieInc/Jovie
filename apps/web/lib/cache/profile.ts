@@ -41,7 +41,6 @@ export async function invalidateProfileCache(
 
   // Invalidate dashboard pages that display profile data
   revalidatePath('/app/dashboard');
-  revalidatePath('/app/dashboard/overview');
   revalidatePath('/app/settings');
 }
 
@@ -112,6 +111,5 @@ export async function invalidateAvatarCache(
   // Dashboard also shows avatar
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
   revalidatePath('/app/dashboard');
-  revalidatePath('/app/dashboard/overview');
   revalidatePath('/app/settings');
 }

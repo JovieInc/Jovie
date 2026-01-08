@@ -25,7 +25,7 @@ const DASHBOARD_TABS: DashboardMobileTab[] = [
   {
     id: 'overview',
     label: 'Overview',
-    href: '/app/dashboard/overview',
+    href: '/app/dashboard',
     icon: Home,
   },
   {
@@ -49,7 +49,7 @@ const DASHBOARD_TABS: DashboardMobileTab[] = [
   {
     id: 'earnings',
     label: 'Earnings',
-    href: '/app/dashboard/tipping',
+    href: '/app/dashboard/earnings',
     icon: Banknote,
   },
 ];

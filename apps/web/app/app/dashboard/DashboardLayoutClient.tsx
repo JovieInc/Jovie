@@ -134,7 +134,7 @@ export default function DashboardLayoutClient({
         ? [{ label: 'Admin', href: '/app/admin' }]
         : mode === 'settings'
           ? [{ label: 'Settings', href: '/app/settings' }]
-          : [{ label: 'Dashboard', href: '/app/dashboard/overview' }];
+          : [{ label: 'Dashboard', href: '/app/dashboard' }];
     if (subs.length > 0) {
       let acc =
         mode === 'admin'

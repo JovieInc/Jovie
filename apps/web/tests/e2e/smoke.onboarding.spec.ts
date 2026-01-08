@@ -182,10 +182,10 @@ test.describe('Onboarding smoke @smoke', () => {
           )
           .toBe(true);
 
-        // 5) Submit and expect redirect to dashboard overview
+        // 5) Submit and expect redirect to dashboard
         await submit.click();
 
-        await page.waitForURL('**/app/dashboard/overview', {
+        await page.waitForURL('**/app/dashboard', {
           timeout: SMOKE_TIMEOUTS.NAVIGATION,
           waitUntil: 'domcontentloaded',
         });

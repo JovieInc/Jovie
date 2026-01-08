@@ -18,7 +18,7 @@ import type { NavItem } from './types';
 export const primaryNavigation: NavItem[] = [
   {
     name: 'Overview',
-    href: '/app/dashboard/overview',
+    href: '/app/dashboard',
     id: 'overview',
     icon: Home,
     description: 'Dashboard overview and quick stats',
@@ -59,14 +59,14 @@ export const navShortcuts: Record<string, string> = {
   contacts: '3',
   releases: '4',
   audience: '5',
-  tipping: '6',
+  earnings: '6',
 };
 
 export const secondaryNavigation: NavItem[] = [
   {
     name: 'Earnings',
-    href: '/app/dashboard/tipping',
-    id: 'tipping',
+    href: '/app/dashboard/earnings',
+    id: 'earnings',
     icon: Banknote,
     description: 'Manage tips and monetization',
   },
@@ -75,7 +75,7 @@ export const secondaryNavigation: NavItem[] = [
 export const settingsNavigation: NavItem[] = [
   {
     name: 'Account',
-    href: '/app/settings/account',
+    href: '/app/settings',
     id: 'account',
     icon: ShieldCheck,
   },
@@ -92,9 +92,9 @@ export const settingsNavigation: NavItem[] = [
     icon: Bell,
   },
   {
-    name: 'Remove Branding',
-    href: '/app/settings/remove-branding',
-    id: 'remove-branding',
+    name: 'Branding',
+    href: '/app/settings/branding',
+    id: 'branding',
     icon: Sparkles,
   },
   {

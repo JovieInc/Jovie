@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardDataCached } from '../dashboard/actions';
 
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
       redirect('/onboarding');
     }
 
-    redirect('/app/settings/account');
+    return <DashboardSettings focusSection='account' />;
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
       throw error;
