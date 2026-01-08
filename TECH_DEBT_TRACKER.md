@@ -1,6 +1,6 @@
 # Tech Debt Tracker
 
-> **Last Updated:** 2026-01-05
+> **Last Updated:** 2026-01-08
 > **Maintainers:** All AI agents and developers
 
 This document tracks technical debt in the Jovie codebase. AI agents **must** update this file when they address or discover tech debt items.
@@ -36,15 +36,21 @@ When you **discover** new tech debt:
 
 | Metric | Count | Target | Last Updated |
 |--------|-------|--------|--------------|
-| `@ts-nocheck` files | **0** | 0 | 2026-01-05 |
-| `@ts-ignore` in production | ~15 | <5 | 2026-01-05 |
-| Deprecated files | 30+ | 0 | 2026-01-05 |
-| TODO comments | 6 | 0 | 2026-01-05 |
-| Empty catch blocks | **0** | 0 | 2026-01-05 |
+| `@ts-nocheck` files | **0** | 0 | 2026-01-08 |
+| `@ts-ignore` in production | ~15 | <5 | 2026-01-08 |
+| Deprecated files | 30+ | 0 | 2026-01-08 |
+| TODO comments | 6 | 0 | 2026-01-08 |
+| Empty catch blocks | **0** | 0 | 2026-01-08 |
 
 ---
 
 ## Resolved Issues
+
+### 2026-01-08
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Dead waitlist `rejected` status checks in `apps/web/lib/auth/gate.ts` | P1 | Removed unreachable waitlist logic and aligned status types | chore/remove-rejected-status |
 
 ### 2026-01-05
 
@@ -179,6 +185,7 @@ Review and archive if completed:
 |------|--------|--------|
 | 2026-01-03 | Claude | Initial tracker created from tech debt audit |
 | 2026-01-03 | Claude | Resolved P0: `@ts-nocheck` and empty catch block |
+| 2026-01-08 | Codex | Logged removal of dead waitlist status checks |
 
 ---
 

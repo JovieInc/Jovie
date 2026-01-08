@@ -316,12 +316,8 @@ export async function resolveUserState(options?: {
       // Check waitlist status before creating user
       const waitlistResult = await checkWaitlistAccessInternal(email);
 
-      if (
-        waitlistResult.status === 'new' ||
-        waitlistResult.status === 'rejected' ||
-        !waitlistResult.status
-      ) {
-        // Not on waitlist or rejected - need to submit application
+      if (waitlistResult.status === 'new' || !waitlistResult.status) {
+        // Not on waitlist or still in application review - need to submit
         return {
           state: UserState.NEEDS_WAITLIST_SUBMISSION,
           clerkUserId,
@@ -470,7 +466,8 @@ export async function resolveUserState(options?: {
 // Waitlist Access Helpers (exported for reuse)
 // =============================================================================
 
-export type WaitlistStatus = 'new' | 'invited' | 'claimed' | 'rejected';
+// Valid waitlist statuses: 'new' (submitted), 'invited', 'claimed'.
+export type WaitlistStatus = 'new' | 'invited' | 'claimed';
 
 export interface WaitlistAccessResult {
   entryId: string | null;
@@ -496,7 +493,7 @@ export async function getWaitlistAccess(
  */
 async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
-  status: 'new' | 'invited' | 'claimed' | 'rejected' | null;
+  status: 'new' | 'invited' | 'claimed' | null;
   claimToken: string | null;
 }> {
   const normalizedEmail = email.trim().toLowerCase();
