@@ -114,7 +114,7 @@ export function useLinksPersistence({
     const versions = (activeInitialLinks || [])
       .map(l => l.version ?? 1)
       .filter(v => typeof v === 'number');
-    return versions.length > 0 ? Math.max(...versions) : 1;
+    return versions.length > 0 ? Math.max(...versions) : 0;
   });
 
   // Ref for async access to links
