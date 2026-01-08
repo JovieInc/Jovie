@@ -57,11 +57,11 @@ export function DashboardAudienceTable({
   });
 
   const emptyStateHeading =
-    mode === 'members' ? 'No audience yet' : 'No signups yet';
+    mode === 'members' ? 'Grow Your Audience' : 'Get Your First Subscriber';
   const emptyStateDescription =
     mode === 'members'
-      ? 'Share your profile to invite visitors. They will appear here as soon as they stop by.'
-      : 'Invite fans to tap the bell on your profile to receive notifications.';
+      ? 'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.'
+      : 'Encourage fans to tap the bell icon on your profile to get notified when you post new content or updates.';
   const emptyStateIcon =
     mode === 'members' ? (
       <Users className='h-6 w-6' aria-hidden='true' />
@@ -94,12 +94,16 @@ export function DashboardAudienceTable({
         <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
           <div>
             <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
-              Audience CRM
+              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
             </h1>
             <p className='mt-1 text-sm leading-6 text-secondary-token'>
-              {mode === 'members'
-                ? 'Every visitor, anonymous or identified, lives in this table.'
-                : 'Notification signups from your notification modal.'}
+              {rows.length === 0
+                ? mode === 'members'
+                  ? 'Track visitors and grow your fan base'
+                  : 'Build a subscriber base for notifications'
+                : mode === 'members'
+                  ? 'Every visitor, anonymous or identified, lives in this table.'
+                  : 'Notification signups from your notification modal.'}
             </p>
           </div>
           <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token'>
@@ -110,7 +114,10 @@ export function DashboardAudienceTable({
 
       <div className='flex-1 min-h-0 overflow-hidden'>
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
-          <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
+          <div
+            className='flex-1 min-h-[600px] overflow-auto'
+            ref={tableContainerRef}
+          >
             {rows.length === 0 ? (
               <EmptyState
                 icon={emptyStateIcon}
@@ -189,35 +196,37 @@ export function DashboardAudienceTable({
             )}
           </div>
 
-          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
-            <span className='tracking-wide'>{paginationLabel()}</span>
-            <div className='flex items-center gap-3'>
-              <AdminPageSizeSelect
-                initialPageSize={pageSize}
-                onPageSizeChange={onPageSizeChange}
-              />
-              <div className='flex gap-2'>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  disabled={page <= 1 || total === 0}
-                  className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                  onClick={() => onPageChange(Math.max(1, page - 1))}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  disabled={page >= totalPages || total === 0}
-                  className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                  onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-                >
-                  Next
-                </Button>
+          {rows.length > 0 && (
+            <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+              <span className='tracking-wide'>{paginationLabel()}</span>
+              <div className='flex items-center gap-3'>
+                <AdminPageSizeSelect
+                  initialPageSize={pageSize}
+                  onPageSizeChange={onPageSizeChange}
+                />
+                <div className='flex gap-2'>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    disabled={page <= 1 || total === 0}
+                    className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                    onClick={() => onPageChange(Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    disabled={page >= totalPages || total === 0}
+                    className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                    onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

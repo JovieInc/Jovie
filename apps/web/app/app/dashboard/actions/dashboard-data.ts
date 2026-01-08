@@ -273,7 +273,7 @@ async function fetchDashboardDataWithSession(
               ),
               0
             )
-          )`,
+          `,
           tipsSubmitted: drizzleSql`
             COALESCE(COUNT(${tips.id}), 0)
           `,
@@ -336,14 +336,19 @@ async function fetchDashboardDataWithSession(
 
     const errorType = errorObj?.constructor?.name ?? typeof errorObj;
 
-    // Log with full context for debugging
+    // Log with full context for debugging - serialize everything to avoid empty objects
     console.error('Error fetching dashboard data:', {
       message,
       code,
       errorType,
       errorString: String(error),
+      errorJson: JSON.stringify(error, Object.getOwnPropertyNames(error)),
       stack: (errorObj as Error).stack?.split('\n').slice(0, 3).join('\n'),
     });
+
+    // Also log the raw error for server-side debugging
+    console.error('Raw error object:', error);
+
     // On error, treat as needs onboarding to be safe
     return {
       user: null,

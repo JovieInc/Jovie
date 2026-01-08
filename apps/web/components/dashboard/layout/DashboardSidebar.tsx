@@ -94,8 +94,8 @@ export function DashboardSidebar({
               </span>
             </Link>
           )}
-          <div className='ml-auto flex items-center gap-2'>
-            <SidebarShortcutHint className='hidden lg:inline-flex' />
+          <div className='group/shortcut ml-auto flex items-center gap-2'>
+            <SidebarShortcutHint className='hidden opacity-0 transition-opacity duration-200 lg:inline-flex group-hover/shortcut:opacity-100' />
             <SidebarTrigger
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className={cn(

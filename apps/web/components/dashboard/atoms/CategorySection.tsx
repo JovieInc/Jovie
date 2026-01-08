@@ -35,8 +35,8 @@ export function CategorySection({
       <div
         className={cn(
           variant === 'flat'
-            ? 'mt-2 flex flex-wrap items-start gap-1.5'
-            : 'mt-2 flex flex-wrap items-start gap-2',
+            ? 'mt-2 flex items-start gap-1.5 overflow-x-auto'
+            : 'mt-2 flex items-start gap-2 overflow-x-auto',
           gridClassName
         )}
       >
