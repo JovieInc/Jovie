@@ -247,21 +247,34 @@ export async function syncFromSpotify(): Promise<{
 export async function checkSpotifyConnection(): Promise<{
   connected: boolean;
   spotifyId: string | null;
+  artistName: string | null;
 }> {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    return { connected: false, spotifyId: null };
+    return { connected: false, spotifyId: null, artistName: null };
   }
 
   try {
-    const profile = await requireProfile();
+    const data = await getDashboardData();
+
+    if (data.needsOnboarding || !data.selectedProfile) {
+      return { connected: false, spotifyId: null, artistName: null };
+    }
+
+    const settings = data.selectedProfile.settings as Record<
+      string,
+      unknown
+    > | null;
+    const artistName = (settings?.spotifyArtistName as string) ?? null;
+
     return {
-      connected: !!profile.spotifyId,
-      spotifyId: profile.spotifyId,
+      connected: !!data.selectedProfile.spotifyId,
+      spotifyId: data.selectedProfile.spotifyId ?? null,
+      artistName,
     };
   } catch {
-    return { connected: false, spotifyId: null };
+    return { connected: false, spotifyId: null, artistName: null };
   }
 }
 
@@ -271,10 +284,13 @@ export async function checkSpotifyConnection(): Promise<{
 export async function connectSpotifyArtist(params: {
   spotifyArtistId: string;
   spotifyArtistUrl: string;
+  artistName: string;
 }): Promise<{
   success: boolean;
   message: string;
   imported: number;
+  releases: ReleaseViewModel[];
+  artistName: string;
 }> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -283,13 +299,30 @@ export async function connectSpotifyArtist(params: {
   }
 
   const profile = await requireProfile();
+  const providerLabels = buildProviderLabels();
 
-  // Update the profile with the Spotify artist ID and URL
+  // Get current settings to merge with new data
+  const [currentProfile] = await db
+    .select({ settings: creatorProfiles.settings })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profile.id))
+    .limit(1);
+
+  const currentSettings = (currentProfile?.settings ?? {}) as Record<
+    string,
+    unknown
+  >;
+
+  // Update the profile with the Spotify artist ID, URL, and artist name in settings
   await db
     .update(creatorProfiles)
     .set({
       spotifyId: params.spotifyArtistId,
       spotifyUrl: params.spotifyArtistUrl,
+      settings: {
+        ...currentSettings,
+        spotifyArtistName: params.artistName,
+      },
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profile.id));
@@ -299,11 +332,18 @@ export async function connectSpotifyArtist(params: {
 
   revalidatePath('/app/dashboard/releases');
 
+  // Map releases to view models
+  const releases = result.releases.map(release =>
+    mapReleaseToViewModel(release, providerLabels, profile.id)
+  );
+
   if (result.success) {
     return {
       success: true,
       message: `Connected and synced ${result.imported} releases from Spotify.`,
       imported: result.imported,
+      releases,
+      artistName: params.artistName,
     };
   }
 
@@ -311,5 +351,7 @@ export async function connectSpotifyArtist(params: {
     success: false,
     message: result.errors[0] ?? 'Connected but failed to sync releases.',
     imported: 0,
+    releases,
+    artistName: params.artistName,
   };
 }

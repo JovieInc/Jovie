@@ -6,6 +6,7 @@ import { useCallback, useRef, useState, useTransition } from 'react';
 import { connectSpotifyArtist } from '@/app/app/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useArtistSearch } from '@/lib/hooks/useArtistSearch';
 import { cn } from '@/lib/utils';
 
@@ -20,10 +21,14 @@ function formatFollowers(count: number): string {
 }
 
 interface ReleasesEmptyStateProps {
-  onConnected?: () => void;
+  onConnected?: (releases: ReleaseViewModel[], artistName: string) => void;
+  onImportStart?: (artistName: string) => void;
 }
 
-export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
+export function ReleasesEmptyState({
+  onConnected,
+  onImportStart,
+}: ReleasesEmptyStateProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(-1);
@@ -31,7 +36,6 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
   const [manualUrl, setManualUrl] = useState('');
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLUListElement>(null);
@@ -62,21 +66,23 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
   const handleArtistSelect = useCallback(
     (artist: { id: string; name: string; url: string }) => {
       setError(null);
-      setSuccessMessage(null);
+
+      // Clear the search UI and show importing state immediately
+      setSearchQuery('');
+      setShowResults(false);
+      clear();
+      onImportStart?.(artist.name);
 
       startTransition(async () => {
         try {
           const result = await connectSpotifyArtist({
             spotifyArtistId: artist.id,
             spotifyArtistUrl: artist.url,
+            artistName: artist.name,
           });
 
           if (result.success) {
-            setSuccessMessage(result.message);
-            setSearchQuery('');
-            setShowResults(false);
-            clear();
-            onConnected?.();
+            onConnected?.(result.releases, result.artistName);
           } else {
             setError(result.message);
           }
@@ -87,14 +93,13 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
         }
       });
     },
-    [clear, onConnected]
+    [clear, onConnected, onImportStart]
   );
 
   const handleManualSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
       setError(null);
-      setSuccessMessage(null);
 
       const trimmedUrl = manualUrl.trim();
       if (!trimmedUrl) {
@@ -114,17 +119,21 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
       const artistId = artistMatch[1];
       const artistUrl = `https://open.spotify.com/artist/${artistId}`;
 
+      // Clear the form and show importing state
+      setManualUrl('');
+      setManualMode(false);
+      onImportStart?.('');
+
       startTransition(async () => {
         try {
           const result = await connectSpotifyArtist({
             spotifyArtistId: artistId,
             spotifyArtistUrl: artistUrl,
+            artistName: '', // Will be empty for manual mode
           });
 
           if (result.success) {
-            setSuccessMessage(result.message);
-            setManualUrl('');
-            onConnected?.();
+            onConnected?.(result.releases, result.artistName);
           } else {
             setError(result.message);
           }
@@ -135,7 +144,7 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
         }
       });
     },
-    [manualUrl, onConnected]
+    [manualUrl, onConnected, onImportStart]
   );
 
   const handleKeyDown = useCallback(
@@ -172,26 +181,6 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
     },
     [activeResultIndex, handleArtistSelect, results, showResults]
   );
-
-  if (successMessage) {
-    return (
-      <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
-        <div className='flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30'>
-          <Icon
-            name='Check'
-            className='h-8 w-8 text-green-600 dark:text-green-400'
-            aria-hidden='true'
-          />
-        </div>
-        <h3 className='mt-4 text-lg font-semibold text-primary-token'>
-          Artist connected
-        </h3>
-        <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-          {successMessage}
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
