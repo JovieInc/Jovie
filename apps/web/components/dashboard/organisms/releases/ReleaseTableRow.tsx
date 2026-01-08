@@ -343,11 +343,15 @@ export function ReleaseTableRow({
                     name={isCopied ? 'Check' : 'Copy'}
                     className={cn(
                       'h-3.5 w-3.5 transition-opacity',
-                      isCopied ? 'opacity-100' : 'opacity-0 group-hover/btn:opacity-100'
+                      isCopied
+                        ? 'opacity-100'
+                        : 'opacity-0 group-hover/btn:opacity-100'
                     )}
                     aria-hidden='true'
                   />
-                  <span>{isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}</span>
+                  <span>
+                    {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
+                  </span>
                 </button>
               ) : onAddUrl ? (
                 <AddProviderUrlPopover
