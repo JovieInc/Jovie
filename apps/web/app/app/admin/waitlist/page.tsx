@@ -50,9 +50,6 @@ export default async function AdminWaitlistPage({
           {/* Header - scrolls out of view */}
           <header className='py-4 sm:py-6'>
             <h1 className='sr-only'>Waitlist</h1>
-            <p className='text-[10px] sm:text-xs uppercase tracking-wide text-tertiary-token'>
-              Internal
-            </p>
           </header>
 
           {/* Metrics cards - scroll out of view */}

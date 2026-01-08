@@ -55,9 +55,6 @@ export default async function AdminUsersPage({
     <div className='flex h-full min-h-0 flex-col gap-8'>
       <header>
         <h1 className='sr-only'>Users</h1>
-        <p className='text-xs uppercase tracking-wide text-tertiary-token'>
-          Internal
-        </p>
       </header>
 
       <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8'>
