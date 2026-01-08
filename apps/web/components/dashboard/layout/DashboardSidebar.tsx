@@ -1,10 +1,4 @@
-import {
-  Button,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -24,6 +18,7 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarSeparator,
+  SidebarShortcutHint,
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
@@ -110,7 +105,8 @@ export function DashboardSidebar({
               )}
             />
           </div>
-          {!isInSettings && (
+        </div>
+        {!isInSettings && (
             <div className='px-2 pb-3 pt-2 lg:hidden'>
               <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
                 <OptimizedAvatar
@@ -192,6 +188,5 @@ export function DashboardSidebar({
         )}
         <SidebarRail />
       </Sidebar>
-    </TooltipProvider>
   );
 }
