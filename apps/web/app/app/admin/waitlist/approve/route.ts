@@ -83,6 +83,13 @@ export async function POST(request: Request) {
 
     const result = await withSystemIngestionSession(
       async tx => {
+        const now = new Date();
+        const markEntryInvited = async () =>
+          tx
+            .update(waitlistEntries)
+            .set({ status: 'invited', updatedAt: now })
+            .where(eq(waitlistEntries.id, entry.id));
+
         const [entry] = await tx
           .select({
             id: waitlistEntries.id,
@@ -118,10 +125,7 @@ export async function POST(request: Request) {
           .limit(1);
 
         if (existingInvite) {
-          await tx
-            .update(waitlistEntries)
-            .set({ status: 'invited', updatedAt: new Date() })
-            .where(eq(waitlistEntries.id, entry.id));
+          await markEntryInvited();
 
           // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
           // No need to update users table here - the claim flow handles status transitions
@@ -145,11 +149,13 @@ export async function POST(request: Request) {
         const usernameNormalized = await findAvailableHandle(tx, baseHandle);
 
         const claimToken = randomUUID();
-        const claimTokenExpiresAt = new Date();
+        const claimTokenExpiresAt = new Date(now);
         claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + 30);
 
-        const displayName =
-          entry.fullName.trim().slice(0, 50) || 'Jovie creator';
+        const trimmedName = entry.fullName.trim();
+        const displayName = trimmedName
+          ? trimmedName.slice(0, 50)
+          : 'Jovie creator';
 
         const [createdProfile] = await tx
           .insert(creatorProfiles)
@@ -168,8 +174,8 @@ export async function POST(request: Request) {
             settings: {},
             theme: {},
             ingestionStatus: 'idle',
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           })
           .returning({ id: creatorProfiles.id });
 
@@ -188,9 +194,9 @@ export async function POST(request: Request) {
             status: 'pending',
             attempts: 0,
             maxAttempts: 3,
-            runAt: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            runAt: now,
+            createdAt: now,
+            updatedAt: now,
           })
           .onConflictDoNothing({
             target: waitlistInvites.waitlistEntryId,
@@ -214,10 +220,7 @@ export async function POST(request: Request) {
             throw new Error('Failed to enqueue waitlist invite');
           }
 
-          await tx
-            .update(waitlistEntries)
-            .set({ status: 'invited', updatedAt: new Date() })
-            .where(eq(waitlistEntries.id, entry.id));
+          await markEntryInvited();
 
           // Note: User's userStatus will be updated when they claim the invite
           return {
@@ -227,10 +230,7 @@ export async function POST(request: Request) {
           };
         }
 
-        await tx
-          .update(waitlistEntries)
-          .set({ status: 'invited', updatedAt: new Date() })
-          .where(eq(waitlistEntries.id, entry.id));
+        await markEntryInvited();
 
         // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
 
