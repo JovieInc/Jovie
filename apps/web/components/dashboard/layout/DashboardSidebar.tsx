@@ -23,7 +23,6 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
-import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 
 type SidebarRootProps = ComponentPropsWithoutRef<typeof Sidebar>;
@@ -107,86 +106,86 @@ export function DashboardSidebar({
           </div>
         </div>
         {!isInSettings && (
-            <div className='px-2 pb-3 pt-2 lg:hidden'>
-              <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
-                <OptimizedAvatar
-                  src={avatarUrl}
-                  alt={displayName}
-                  size={64}
-                  className='h-10 w-10'
-                />
-                <div className='min-w-0'>
-                  <p className='truncate text-sm font-semibold text-sidebar-foreground'>
-                    {displayName}
+          <div className='px-2 pb-3 pt-2 lg:hidden'>
+            <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
+              <OptimizedAvatar
+                src={avatarUrl}
+                alt={displayName}
+                size={64}
+                className='h-10 w-10'
+              />
+              <div className='min-w-0'>
+                <p className='truncate text-sm font-semibold text-sidebar-foreground'>
+                  {displayName}
+                </p>
+                {username ? (
+                  <p className='truncate text-xs text-sidebar-muted'>
+                    @{username}
                   </p>
-                  {username ? (
-                    <p className='truncate text-xs text-sidebar-muted'>
-                      @{username}
-                    </p>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
-              {profileHref ? (
-                <div className='mt-3 flex items-center gap-2'>
-                  <Button
-                    asChild
-                    size='sm'
-                    variant='secondary'
-                    className='flex-1 min-h-[44px]'
+            </div>
+            {profileHref ? (
+              <div className='mt-3 flex items-center gap-2'>
+                <Button
+                  asChild
+                  size='sm'
+                  variant='secondary'
+                  className='flex-1 min-h-[44px]'
+                >
+                  <Link
+                    href={profileHref}
+                    target='_blank'
+                    rel='noopener noreferrer'
                   >
-                    <Link
-                      href={profileHref}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                    >
-                      View profile
-                    </Link>
-                  </Button>
-                  <CopyToClipboardButton
-                    relativePath={profileHref}
-                    idleLabel='Copy link'
-                    successLabel='Copied'
-                    errorLabel='Copy failed'
-                    className='flex-1 min-h-[44px]'
-                  />
-                </div>
-              ) : null}
-            </div>
-          )}
-        </SidebarHeader>
-
-        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-          <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
-            <SidebarGroupContent className='flex-1'>
-              <DashboardNav />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-
-        {!isInSettings && (
-          <SidebarFooter className='mt-auto'>
-            <SidebarSeparator className='mx-0' />
-            <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
-              <DashboardRemoveBrandingCard />
-            </div>
-            <div className='px-2 py-3'>
-              <div
-                className={cn(
-                  isCollapsed
-                    ? 'flex items-center justify-center'
-                    : 'flex items-center'
-                )}
-              >
-                <UserButton
-                  showUserInfo={!isCollapsed}
-                  profileHref={profileHref}
-                  settingsHref='/app/settings'
+                    View profile
+                  </Link>
+                </Button>
+                <CopyToClipboardButton
+                  relativePath={profileHref}
+                  idleLabel='Copy link'
+                  successLabel='Copied'
+                  errorLabel='Copy failed'
+                  className='flex-1 min-h-[44px]'
                 />
               </div>
-            </div>
-          </SidebarFooter>
+            ) : null}
+          </div>
         )}
-        <SidebarRail />
-      </Sidebar>
+      </SidebarHeader>
+
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
+          <SidebarGroupContent className='flex-1'>
+            <DashboardNav />
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      {!isInSettings && (
+        <SidebarFooter className='mt-auto'>
+          <SidebarSeparator className='mx-0' />
+          <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
+            <DashboardRemoveBrandingCard />
+          </div>
+          <div className='px-2 py-3'>
+            <div
+              className={cn(
+                isCollapsed
+                  ? 'flex items-center justify-center'
+                  : 'flex items-center'
+              )}
+            >
+              <UserButton
+                showUserInfo={!isCollapsed}
+                profileHref={profileHref}
+                settingsHref='/app/settings'
+              />
+            </div>
+          </div>
+        </SidebarFooter>
+      )}
+      <SidebarRail />
+    </Sidebar>
   );
 }
