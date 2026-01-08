@@ -152,14 +152,17 @@ async function createUserWithRetry(
         existingUserData?.profileId &&
         existingUserData.profileClaimed
       ) {
-        // User has a claimed profile - check onboarding completion
+        // SIMPLIFIED FLOW: User has a claimed profile (linked on admin approval)
+        // Profile is auto-created on waitlist submission (PR#1736) and linked on approval (PR#1737)
+        // Onboarding is skipped (onboardingCompletedAt set on approval), so user is active
         if (existingUserData.onboardingComplete) {
           userStatus = 'active';
         } else {
           userStatus = 'onboarding_incomplete';
         }
       } else {
-        // User has waitlist entry but no claimed profile yet
+        // LEGACY FLOW: User has waitlist entry but no claimed profile yet
+        // This path is for pre-PR#1736 entries or admin-ingested creators
         userStatus = 'waitlist_approved';
       }
 
@@ -329,7 +332,7 @@ export async function resolveUserState(options?: {
       }
 
       if (waitlistResult.status === 'invited' && waitlistResult.claimToken) {
-        // Invited but hasn't claimed yet
+        // LEGACY FLOW: Invited but hasn't claimed yet (pre-PR#1736 waitlist entries or admin-ingested creators)
         return {
           state: UserState.WAITLIST_INVITED,
           clerkUserId,
@@ -344,7 +347,9 @@ export async function resolveUserState(options?: {
         };
       }
 
-      // User is claimed or approved - create DB user with retry logic
+      // SIMPLIFIED FLOW: User is claimed (profile already linked on approval) or approved
+      // For claimed users (post-PR#1736), profile is already linked and onboarding is complete
+      // Just need to create DB user row and they can access the app
       dbUserId = await createUserWithRetry(
         clerkUserId,
         email,
