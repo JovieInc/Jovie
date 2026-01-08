@@ -22,6 +22,7 @@ export default async function ReleasesPage() {
       providerConfig={providerConfig}
       primaryProviders={primaryProviderKeys}
       spotifyConnected={spotifyStatus.connected}
+      spotifyArtistName={spotifyStatus.artistName}
     />
   );
 }
