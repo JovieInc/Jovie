@@ -1,14 +1,19 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { randomUUID } from 'crypto';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db, waitlistEntries } from '@/lib/db';
-import { users, waitlistInvites } from '@/lib/db/schema';
+import { db, type TransactionType, waitlistEntries } from '@/lib/db';
+import { creatorProfiles, users, waitlistInvites } from '@/lib/db/schema';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
-import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
+import {
+  detectPlatformFromUrl,
+  extractHandleFromUrl,
+} from '@/lib/utils/social-platform';
 import { waitlistRequestSchema } from '@/lib/validation/schemas';
+import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
 
@@ -52,6 +57,44 @@ function normalizeSpotifyUrl(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * Generate a safe random handle for creator profiles
+ */
+function safeRandomHandle(): string {
+  const token = randomUUID().replace(/-/g, '').slice(0, 12);
+  return `c${token}`;
+}
+
+/**
+ * Find an available username by trying base handle with numeric suffixes
+ * Ported from approve/route.ts for profile auto-creation on signup
+ */
+async function findAvailableHandle(
+  tx: TransactionType,
+  base: string
+): Promise<string> {
+  const normalizedBase = normalizeUsername(base).slice(0, 30);
+  const maxAttempts = 20;
+
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const suffix = i === 0 ? '' : `-${i}`;
+    const candidate = `${normalizedBase.slice(0, 30 - suffix.length)}${suffix}`;
+    if (!validateUsername(candidate).isValid) continue;
+
+    const [existing] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, candidate))
+      .limit(1);
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return safeRandomHandle();
 }
 
 export async function GET() {
@@ -306,9 +349,50 @@ export async function POST(request: Request) {
     };
 
     await db.transaction(async tx => {
-      await tx.insert(waitlistEntries).values(insertValues);
+      // 1. Insert waitlist entry
+      const [entry] = await tx
+        .insert(waitlistEntries)
+        .values(insertValues)
+        .returning({ id: waitlistEntries.id });
 
-      // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
+      if (!entry) {
+        throw new Error('Failed to create waitlist entry');
+      }
+
+      // 2. Auto-generate handle from social URL or email
+      const handleCandidate =
+        extractHandleFromUrl(normalizedUrl) ??
+        email.split('@')[0] ??
+        safeRandomHandle();
+
+      const baseHandle = validateUsername(handleCandidate).isValid
+        ? handleCandidate
+        : safeRandomHandle();
+
+      const usernameNormalized = await findAvailableHandle(tx, baseHandle);
+
+      // 3. Create unclaimed profile immediately (simplified signup flow)
+      // NOTE: Requires PR #1735 (waitlistEntryId column) to be merged first
+      const trimmedName = fullName.trim();
+      const displayName = trimmedName
+        ? trimmedName.slice(0, 50)
+        : 'Jovie creator';
+
+      await tx.insert(creatorProfiles).values({
+        creatorType: 'creator',
+        username: usernameNormalized,
+        usernameNormalized,
+        displayName,
+        isPublic: false, // Not public until approved
+        isClaimed: false, // Not claimed until approved
+        userId: null, // Will link on approval
+        waitlistEntryId: entry.id, // Link to waitlist entry (added in PR #1735)
+        settings: {},
+        theme: {},
+        ingestionStatus: 'idle',
+      });
+
+      // 4. Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
       // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
       await tx
         .insert(users)
