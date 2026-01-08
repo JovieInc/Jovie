@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { type DbType, db } from '@/lib/db';
+import { type DbType } from '@/lib/db';
 import {
   creatorProfiles,
   waitlistEntries,
@@ -81,125 +81,34 @@ export async function POST(request: Request) {
       );
     }
 
-    const [entry] = await db
-      .select({
-        id: waitlistEntries.id,
-        email: waitlistEntries.email,
-        fullName: waitlistEntries.fullName,
-        primarySocialUrlNormalized: waitlistEntries.primarySocialUrlNormalized,
-        status: waitlistEntries.status,
-      })
-      .from(waitlistEntries)
-      .where(eq(waitlistEntries.id, parsed.data.entryId))
-      .limit(1);
+    const result = await withSystemIngestionSession(
+      async tx => {
+        const [entry] = await tx
+          .select({
+            id: waitlistEntries.id,
+            email: waitlistEntries.email,
+            fullName: waitlistEntries.fullName,
+            primarySocialUrlNormalized:
+              waitlistEntries.primarySocialUrlNormalized,
+            status: waitlistEntries.status,
+          })
+          .from(waitlistEntries)
+          .where(eq(waitlistEntries.id, parsed.data.entryId))
+          .for('update')
+          .limit(1);
 
-    if (!entry) {
-      return NextResponse.json(
-        { success: false, error: 'Waitlist entry not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
+        if (!entry) {
+          return { outcome: 'not_found' as const };
+        }
 
-    if (entry.status === 'invited' || entry.status === 'claimed') {
-      return NextResponse.json(
-        { success: true, status: entry.status },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
-    }
+        if (entry.status !== 'new') {
+          return {
+            outcome: 'already_processed' as const,
+            status: entry.status,
+          };
+        }
 
-    const result = await withSystemIngestionSession(async tx => {
-      const [existingInvite] = await tx
-        .select({
-          id: waitlistInvites.id,
-          claimToken: waitlistInvites.claimToken,
-        })
-        .from(waitlistInvites)
-        .where(eq(waitlistInvites.waitlistEntryId, entry.id))
-        .limit(1);
-
-      if (existingInvite) {
-        await tx
-          .update(waitlistEntries)
-          .set({ status: 'invited', updatedAt: new Date() })
-          .where(eq(waitlistEntries.id, entry.id));
-
-        // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
-        // No need to update users table here - the claim flow handles status transitions
-
-        return {
-          inviteId: existingInvite.id,
-          claimToken: existingInvite.claimToken,
-        };
-      }
-
-      const handleCandidate =
-        extractHandleFromUrl(entry.primarySocialUrlNormalized) ??
-        entry.email.split('@')[0] ??
-        safeRandomHandle();
-
-      const baseHandle = validateUsername(handleCandidate).isValid
-        ? handleCandidate
-        : safeRandomHandle();
-
-      const usernameNormalized = await findAvailableHandle(tx, baseHandle);
-
-      const claimToken = randomUUID();
-      const claimTokenExpiresAt = new Date();
-      claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + 30);
-
-      const displayName = entry.fullName.trim().slice(0, 50) || 'Jovie creator';
-
-      const [createdProfile] = await tx
-        .insert(creatorProfiles)
-        .values({
-          creatorType: 'creator',
-          username: usernameNormalized,
-          usernameNormalized,
-          displayName,
-          isPublic: true,
-          isVerified: false,
-          isFeatured: false,
-          marketingOptOut: false,
-          isClaimed: false,
-          claimToken,
-          claimTokenExpiresAt,
-          settings: {},
-          theme: {},
-          ingestionStatus: 'idle',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning({ id: creatorProfiles.id });
-
-      if (!createdProfile) {
-        throw new Error('Failed to create creator profile');
-      }
-
-      const [invite] = await tx
-        .insert(waitlistInvites)
-        .values({
-          waitlistEntryId: entry.id,
-          creatorProfileId: createdProfile.id,
-          email: entry.email,
-          fullName: entry.fullName,
-          claimToken,
-          status: 'pending',
-          attempts: 0,
-          maxAttempts: 3,
-          runAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .onConflictDoNothing({
-          target: waitlistInvites.waitlistEntryId,
-        })
-        .returning({
-          id: waitlistInvites.id,
-          claimToken: waitlistInvites.claimToken,
-        });
-
-      if (!invite) {
-        const [existing] = await tx
+        const [existingInvite] = await tx
           .select({
             id: waitlistInvites.id,
             claimToken: waitlistInvites.claimToken,
@@ -208,8 +117,114 @@ export async function POST(request: Request) {
           .where(eq(waitlistInvites.waitlistEntryId, entry.id))
           .limit(1);
 
-        if (!existing) {
-          throw new Error('Failed to enqueue waitlist invite');
+        if (existingInvite) {
+          await tx
+            .update(waitlistEntries)
+            .set({ status: 'invited', updatedAt: new Date() })
+            .where(eq(waitlistEntries.id, entry.id));
+
+          // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
+          // No need to update users table here - the claim flow handles status transitions
+
+          return {
+            outcome: 'approved' as const,
+            inviteId: existingInvite.id,
+            claimToken: existingInvite.claimToken,
+          };
+        }
+
+        const handleCandidate =
+          extractHandleFromUrl(entry.primarySocialUrlNormalized) ??
+          entry.email.split('@')[0] ??
+          safeRandomHandle();
+
+        const baseHandle = validateUsername(handleCandidate).isValid
+          ? handleCandidate
+          : safeRandomHandle();
+
+        const usernameNormalized = await findAvailableHandle(tx, baseHandle);
+
+        const claimToken = randomUUID();
+        const claimTokenExpiresAt = new Date();
+        claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + 30);
+
+        const displayName =
+          entry.fullName.trim().slice(0, 50) || 'Jovie creator';
+
+        const [createdProfile] = await tx
+          .insert(creatorProfiles)
+          .values({
+            creatorType: 'creator',
+            username: usernameNormalized,
+            usernameNormalized,
+            displayName,
+            isPublic: true,
+            isVerified: false,
+            isFeatured: false,
+            marketingOptOut: false,
+            isClaimed: false,
+            claimToken,
+            claimTokenExpiresAt,
+            settings: {},
+            theme: {},
+            ingestionStatus: 'idle',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning({ id: creatorProfiles.id });
+
+        if (!createdProfile) {
+          throw new Error('Failed to create creator profile');
+        }
+
+        const [invite] = await tx
+          .insert(waitlistInvites)
+          .values({
+            waitlistEntryId: entry.id,
+            creatorProfileId: createdProfile.id,
+            email: entry.email,
+            fullName: entry.fullName,
+            claimToken,
+            status: 'pending',
+            attempts: 0,
+            maxAttempts: 3,
+            runAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .onConflictDoNothing({
+            target: waitlistInvites.waitlistEntryId,
+          })
+          .returning({
+            id: waitlistInvites.id,
+            claimToken: waitlistInvites.claimToken,
+          });
+
+        if (!invite) {
+          const [existing] = await tx
+            .select({
+              id: waitlistInvites.id,
+              claimToken: waitlistInvites.claimToken,
+            })
+            .from(waitlistInvites)
+            .where(eq(waitlistInvites.waitlistEntryId, entry.id))
+            .limit(1);
+
+          if (!existing) {
+            throw new Error('Failed to enqueue waitlist invite');
+          }
+
+          await tx
+            .update(waitlistEntries)
+            .set({ status: 'invited', updatedAt: new Date() })
+            .where(eq(waitlistEntries.id, entry.id));
+
+          // Note: User's userStatus will be updated when they claim the invite
+          return {
+            outcome: 'approved' as const,
+            inviteId: existing.id,
+            claimToken: existing.claimToken,
+          };
         }
 
         await tx
@@ -217,19 +232,33 @@ export async function POST(request: Request) {
           .set({ status: 'invited', updatedAt: new Date() })
           .where(eq(waitlistEntries.id, entry.id));
 
-        // Note: User's userStatus will be updated when they claim the invite
-        return { inviteId: existing.id, claimToken: existing.claimToken };
-      }
+        // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
 
-      await tx
-        .update(waitlistEntries)
-        .set({ status: 'invited', updatedAt: new Date() })
-        .where(eq(waitlistEntries.id, entry.id));
+        return {
+          outcome: 'approved' as const,
+          inviteId: invite.id,
+          claimToken: invite.claimToken,
+        };
+      },
+      { isolationLevel: 'serializable' }
+    );
 
-      // Note: User's userStatus will be updated to 'profile_claimed' when they claim the invite
+    if (result.outcome === 'not_found') {
+      return NextResponse.json(
+        { success: false, error: 'Waitlist entry not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
 
-      return { inviteId: invite.id, claimToken: invite.claimToken };
-    });
+    if (result.outcome === 'already_processed') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Entry already processed with status: ${result.status}`,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
 
     return NextResponse.json(
       {
