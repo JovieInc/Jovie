@@ -123,8 +123,8 @@ export function SettingsPolished({
         ),
     },
     {
-      id: 'remove-branding',
-      title: 'Remove Branding',
+      id: 'branding',
+      title: 'Branding',
       description:
         'Remove Jovie branding to create a fully custom experience for your fans.',
       render: () =>

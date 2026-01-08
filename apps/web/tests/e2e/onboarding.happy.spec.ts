@@ -135,9 +135,9 @@ test.describe('Onboarding Happy Path', () => {
       )
       .toBe(true);
 
-    // Step 5: Submit form and wait for redirect to dashboard overview
+    // Step 5: Submit form and wait for redirect to dashboard
     await Promise.all([
-      page.waitForURL('**/app/dashboard/overview', {
+      page.waitForURL('**/app/dashboard', {
         timeout: 15_000,
         waitUntil: 'domcontentloaded',
       }),
