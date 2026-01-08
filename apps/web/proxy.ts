@@ -316,12 +316,21 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       const userState = await getUserState(userId);
 
       // Route based on complete state - NO MORE LOOPS
-      if (userState.needsWaitlist && pathname !== '/waitlist') {
+      // IMPORTANT: Never rewrite API routes - they handle their own auth
+      if (
+        userState.needsWaitlist &&
+        pathname !== '/waitlist' &&
+        !pathname.startsWith('/api/')
+      ) {
         // User needs waitlist - rewrite to waitlist page
         res = NextResponse.rewrite(new URL('/waitlist', req.url), {
           request: { headers: requestHeaders },
         });
-      } else if (userState.needsOnboarding && pathname !== '/onboarding') {
+      } else if (
+        userState.needsOnboarding &&
+        pathname !== '/onboarding' &&
+        !pathname.startsWith('/api/')
+      ) {
         // User needs onboarding - rewrite to onboarding page
         res = NextResponse.rewrite(new URL('/onboarding', req.url), {
           request: { headers: requestHeaders },

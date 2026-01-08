@@ -19,6 +19,9 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+// Module-level log to verify this file is loaded
+console.log('[Waitlist Route Module] Loaded at', new Date().toISOString());
+
 function deriveFullName(params: {
   userFullName: string | null | undefined;
   userUsername: string | null | undefined;
@@ -98,6 +101,7 @@ async function findAvailableHandle(
 }
 
 export async function GET() {
+  console.log('[Waitlist API] GET request received');
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
@@ -154,12 +158,19 @@ export async function POST(request: Request) {
       );
     }
 
+    const isDev = process.env.NODE_ENV === 'development';
+
     // Abuse protection: apply the same lightweight in-memory limiter used for onboarding.
     // Always check a shared bucket for missing/unknown IPs.
-    const clientIP = extractClientIPFromRequest({ headers: request.headers });
-    await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: true });
-
-    const isDev = process.env.NODE_ENV === 'development';
+    // Skip in development to avoid rate limit during testing
+    if (!isDev) {
+      const clientIP = extractClientIPFromRequest({ headers: request.headers });
+      await enforceOnboardingRateLimit({
+        userId,
+        ip: clientIP,
+        checkIP: true,
+      });
+    }
     const databaseUrl = process.env.DATABASE_URL;
     const hasDatabaseUrl = Boolean(databaseUrl);
 
@@ -349,65 +360,70 @@ export async function POST(request: Request) {
     };
 
     await db.transaction(async tx => {
-      // 1. Insert waitlist entry
-      const [entry] = await tx
-        .insert(waitlistEntries)
-        .values(insertValues)
-        .returning({ id: waitlistEntries.id });
+      try {
+        // 1. Insert waitlist entry
+        const [entry] = await tx
+          .insert(waitlistEntries)
+          .values(insertValues)
+          .returning({ id: waitlistEntries.id });
 
-      if (!entry) {
-        throw new Error('Failed to create waitlist entry');
-      }
+        if (!entry) {
+          throw new Error('Failed to create waitlist entry');
+        }
 
-      // 2. Auto-generate handle from social URL or email
-      const handleCandidate =
-        extractHandleFromUrl(normalizedUrl) ??
-        email.split('@')[0] ??
-        safeRandomHandle();
+        // 2. Auto-generate handle from social URL or email
+        const handleCandidate =
+          extractHandleFromUrl(normalizedUrl) ??
+          email.split('@')[0] ??
+          safeRandomHandle();
 
-      const baseHandle = validateUsername(handleCandidate).isValid
-        ? handleCandidate
-        : safeRandomHandle();
+        const baseHandle = validateUsername(handleCandidate).isValid
+          ? handleCandidate
+          : safeRandomHandle();
 
-      const usernameNormalized = await findAvailableHandle(tx, baseHandle);
+        const usernameNormalized = await findAvailableHandle(tx, baseHandle);
 
-      // 3. Create unclaimed profile immediately (simplified signup flow)
-      // NOTE: Requires PR #1735 (waitlistEntryId column) to be merged first
-      const trimmedName = fullName.trim();
-      const displayName = trimmedName
-        ? trimmedName.slice(0, 50)
-        : 'Jovie creator';
+        // 3. Create unclaimed profile immediately (simplified signup flow)
+        // NOTE: Requires PR #1735 (waitlistEntryId column) to be merged first
+        const trimmedName = fullName.trim();
+        const displayName = trimmedName
+          ? trimmedName.slice(0, 50)
+          : 'Jovie creator';
 
-      await tx.insert(creatorProfiles).values({
-        creatorType: 'creator',
-        username: usernameNormalized,
-        usernameNormalized,
-        displayName,
-        isPublic: false, // Not public until approved
-        isClaimed: false, // Not claimed until approved
-        userId: null, // Will link on approval
-        waitlistEntryId: entry.id, // Link to waitlist entry (added in PR #1735)
-        settings: {},
-        theme: {},
-        ingestionStatus: 'idle',
-      });
-
-      // 4. Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-      // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
-      await tx
-        .insert(users)
-        .values({
-          clerkId: userId,
-          email: emailRaw,
-          userStatus: 'waitlist_pending',
-        })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: {
-            userStatus: 'waitlist_pending',
-            updatedAt: new Date(),
-          },
+        await tx.insert(creatorProfiles).values({
+          creatorType: 'creator',
+          username: usernameNormalized,
+          usernameNormalized,
+          displayName,
+          isPublic: false, // Not public until approved
+          isClaimed: false, // Not claimed until approved
+          // userId omitted - defaults to NULL, will be linked on approval
+          waitlistEntryId: entry.id, // Link to waitlist entry (added in PR #1735)
+          settings: {},
+          theme: {},
+          ingestionStatus: 'idle',
         });
+
+        // 4. Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
+        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
+        await tx
+          .insert(users)
+          .values({
+            clerkId: userId,
+            email: emailRaw,
+            userStatus: 'waitlist_pending',
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: {
+              userStatus: 'waitlist_pending',
+              updatedAt: new Date(),
+            },
+          });
+      } catch (txError) {
+        console.error('[Waitlist API] Transaction error:', txError);
+        throw txError;
+      }
     });
 
     return NextResponse.json(

@@ -273,7 +273,7 @@ async function fetchDashboardDataWithSession(
               ),
               0
             )
-          )`,
+          `,
           tipsSubmitted: drizzleSql`
             COALESCE(COUNT(${tips.id}), 0)
           `,
@@ -319,14 +319,36 @@ async function fetchDashboardDataWithSession(
       tippingStats,
     };
   } catch (error) {
-    const e = error as {
-      code?: string;
-      message?: string;
-      cause?: { code?: string; message?: string };
-    };
-    const code = e.code ?? e.cause?.code;
-    const message = e.message ?? e.cause?.message;
-    console.error('Error fetching dashboard data:', { code, message, error });
+    // Handle both standard and non-standard error objects
+    const errorObj = error as
+      | Error
+      | { code?: string; message?: string; cause?: unknown };
+
+    // Extract error details with multiple fallbacks
+    const message =
+      (errorObj as Error).message ??
+      (errorObj as { message?: string }).message ??
+      'Unknown error';
+
+    const code =
+      (errorObj as { code?: string }).code ??
+      (errorObj as { cause?: { code?: string } }).cause?.code;
+
+    const errorType = errorObj?.constructor?.name ?? typeof errorObj;
+
+    // Log with full context for debugging - serialize everything to avoid empty objects
+    console.error('Error fetching dashboard data:', {
+      message,
+      code,
+      errorType,
+      errorString: String(error),
+      errorJson: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      stack: (errorObj as Error).stack?.split('\n').slice(0, 3).join('\n'),
+    });
+
+    // Also log the raw error for server-side debugging
+    console.error('Raw error object:', error);
+
     // On error, treat as needs onboarding to be safe
     return {
       user: null,
