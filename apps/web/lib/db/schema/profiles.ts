@@ -22,6 +22,7 @@ import {
   ingestionStatusEnum,
   photoStatusEnum,
 } from './enums';
+import { waitlistEntries } from './waitlist';
 
 // Creator profiles table
 export const creatorProfiles = pgTable(
@@ -31,6 +32,12 @@ export const creatorProfiles = pgTable(
     userId: uuid('user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
+    waitlistEntryId: uuid('waitlist_entry_id').references(
+      () => waitlistEntries.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
     creatorType: creatorTypeEnum('creator_type').notNull(),
     username: text('username').notNull(),
     usernameNormalized: text('username_normalized').notNull(),
