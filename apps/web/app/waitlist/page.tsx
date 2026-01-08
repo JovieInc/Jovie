@@ -413,6 +413,17 @@ export default function WaitlistPage() {
         }),
       });
 
+      const contentType = response.headers.get('content-type') || '';
+
+      if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error(
+          '[Waitlist Page] Received non-JSON response:',
+          text.substring(0, 500)
+        );
+        throw new Error(`Expected JSON but got ${contentType}`);
+      }
+
       const result = await response.json();
 
       if (!response.ok) {
