@@ -99,8 +99,8 @@ export const updateSocialLinksSchema = z.object({
   profileId: z.string().min(1),
   /** Optional idempotency key for deduplication */
   idempotencyKey: z.string().max(128).optional(),
-  /** Expected version for optimistic locking */
-  expectedVersion: z.number().int().min(1).optional(),
+  /** Expected version for optimistic locking (0 = empty state) */
+  expectedVersion: z.number().int().min(0).optional(),
   /** Array of links to save (max 100) */
   links: z.array(socialLinkInputSchema).max(100).optional(),
 });
@@ -138,8 +138,8 @@ export const updateLinkStateSchema = z.object({
   linkId: z.string().min(1),
   /** Action to perform: accept or dismiss */
   action: linkActionSchema,
-  /** Expected version for optimistic locking */
-  expectedVersion: z.number().int().min(1).optional(),
+  /** Expected version for optimistic locking (0 = empty state) */
+  expectedVersion: z.number().int().min(0).optional(),
 });
 
 /**
