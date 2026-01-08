@@ -53,12 +53,10 @@ export default async function AdminUsersPage({
 
   return (
     <div className='flex h-full min-h-0 flex-col gap-8'>
-      <header className='space-y-2'>
+      <header>
+        <h1 className='sr-only'>Users</h1>
         <p className='text-xs uppercase tracking-wide text-tertiary-token'>
           Internal
-        </p>
-        <p className='text-sm text-secondary-token'>
-          Signed up users and billing status.
         </p>
       </header>
 

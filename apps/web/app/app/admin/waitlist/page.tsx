@@ -48,12 +48,10 @@ export default async function AdminWaitlistPage({
       <div className='flex-1 min-h-0 overflow-auto -mx-4 sm:-mx-6 lg:-mx-8'>
         <div className='px-4 sm:px-6 lg:px-8'>
           {/* Header - scrolls out of view */}
-          <header className='space-y-1 sm:space-y-2 py-4 sm:py-6'>
+          <header className='py-4 sm:py-6'>
+            <h1 className='sr-only'>Waitlist</h1>
             <p className='text-[10px] sm:text-xs uppercase tracking-wide text-tertiary-token'>
               Internal
-            </p>
-            <p className='text-xs sm:text-sm text-secondary-token'>
-              Review waitlist submissions for early access.
             </p>
           </header>
 

@@ -12,12 +12,10 @@ export default async function AdminActivityPage() {
 
   return (
     <div className='space-y-8'>
-      <header className='space-y-2'>
+      <header>
+        <h1 className='sr-only'>Activity</h1>
         <p className='text-xs uppercase tracking-wide text-tertiary-token'>
           Admin
-        </p>
-        <p className='text-sm text-secondary-token'>
-          Recent operational events and system activity for Jovie.
         </p>
       </header>
 
