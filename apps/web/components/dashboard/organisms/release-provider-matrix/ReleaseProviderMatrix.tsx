@@ -30,12 +30,15 @@ export function ReleaseProviderMatrix({
     providerList,
     totalReleases,
     totalOverrides,
+    sortState,
+    toggleSort,
     openEditor,
     closeEditor,
     handleCopy,
     handleSave,
     handleReset,
     handleSync,
+    handleAddUrl,
     setDrafts,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
@@ -75,12 +78,11 @@ export function ReleaseProviderMatrix({
                 disabled={isSyncing}
                 onClick={handleSync}
                 data-testid='sync-spotify-button'
-                className='inline-flex items-center gap-2'
               >
                 <Icon
                   name={isSyncing ? 'Loader2' : 'RefreshCw'}
                   className={cn(
-                    'h-4 w-4',
+                    'mr-2 h-4 w-4',
                     isSyncing && 'animate-spin motion-reduce:animate-none'
                   )}
                   aria-hidden='true'
@@ -117,13 +119,13 @@ export function ReleaseProviderMatrix({
                     size='sm'
                     disabled={isSyncing}
                     onClick={handleSync}
-                    className='mt-4 inline-flex items-center gap-2'
+                    className='mt-4'
                     data-testid='sync-spotify-empty-state'
                   >
                     <Icon
                       name={isSyncing ? 'Loader2' : 'RefreshCw'}
                       className={cn(
-                        'h-4 w-4',
+                        'mr-2 h-4 w-4',
                         isSyncing && 'animate-spin motion-reduce:animate-none'
                       )}
                       aria-hidden='true'
@@ -151,10 +153,57 @@ export function ReleaseProviderMatrix({
                   )}
                 >
                   <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                    <th className='w-[280px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
-                      Release
+                    <th className='w-[220px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
+                      <button
+                        type='button'
+                        onClick={() => toggleSort('title')}
+                        className='group inline-flex items-center gap-1.5 hover:text-primary-token transition-colors'
+                      >
+                        Release
+                        <Icon
+                          name={
+                            sortState.column === 'title'
+                              ? sortState.direction === 'asc'
+                                ? 'ArrowUp'
+                                : 'ArrowDown'
+                              : 'ArrowUpDown'
+                          }
+                          className={cn(
+                            'h-3.5 w-3.5 transition-opacity',
+                            sortState.column === 'title'
+                              ? 'opacity-100'
+                              : 'opacity-0 group-hover:opacity-50'
+                          )}
+                          aria-hidden='true'
+                        />
+                      </button>
                     </th>
-                    <th className='w-[160px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
+                    <th className='w-[120px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
+                      <button
+                        type='button'
+                        onClick={() => toggleSort('releaseDate')}
+                        className='group inline-flex items-center gap-1.5 hover:text-primary-token transition-colors'
+                      >
+                        Released
+                        <Icon
+                          name={
+                            sortState.column === 'releaseDate'
+                              ? sortState.direction === 'asc'
+                                ? 'ArrowUp'
+                                : 'ArrowDown'
+                              : 'ArrowUpDown'
+                          }
+                          className={cn(
+                            'h-3.5 w-3.5 transition-opacity',
+                            sortState.column === 'releaseDate'
+                              ? 'opacity-100'
+                              : 'opacity-0 group-hover:opacity-50'
+                          )}
+                          aria-hidden='true'
+                        />
+                      </button>
+                    </th>
+                    <th className='w-[140px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
                       Smart Link
                     </th>
                     {primaryProviders.map(provider => (
@@ -190,6 +239,8 @@ export function ReleaseProviderMatrix({
                       providerConfig={providerConfig}
                       onCopy={handleCopy}
                       onEdit={openEditor}
+                      onAddUrl={handleAddUrl}
+                      isAddingUrl={isSaving}
                     />
                   ))}
                 </tbody>

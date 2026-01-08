@@ -47,16 +47,58 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
     limit: 5,
   });
 
+  // Check if a string is a Spotify artist URL and extract the ID
+  const extractSpotifyArtistId = useCallback((input: string): string | null => {
+    const trimmed = input.trim();
+    const artistMatch = trimmed.match(
+      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/
+    );
+    return artistMatch ? artistMatch[1] : null;
+  }, []);
+
   const handleSearchInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchQuery(value);
       setActiveResultIndex(-1);
+      setError(null);
+
+      // Check if it's a Spotify URL
+      const artistId = extractSpotifyArtistId(value);
+      if (artistId) {
+        // It's a Spotify URL - connect directly instead of searching
+        clear();
+        setShowResults(false);
+        const artistUrl = `https://open.spotify.com/artist/${artistId}`;
+
+        startTransition(async () => {
+          try {
+            const result = await connectSpotifyArtist({
+              spotifyArtistId: artistId,
+              spotifyArtistUrl: artistUrl,
+            });
+
+            if (result.success) {
+              setSuccessMessage(result.message);
+              setSearchQuery('');
+              onConnected?.();
+            } else {
+              setError(result.message);
+            }
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : 'Failed to connect artist'
+            );
+          }
+        });
+        return;
+      }
+
+      // Regular search
       search(value);
       setShowResults(true);
-      setError(null);
     },
-    [search]
+    [search, clear, extractSpotifyArtistId, onConnected]
   );
 
   const handleArtistSelect = useCallback(
@@ -283,7 +325,7 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
                 ref={inputRef}
                 type='text'
                 inputSize='lg'
-                placeholder='Search Spotify artists...'
+                placeholder='Search or paste a Spotify artist URL...'
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 onKeyDown={handleKeyDown}
@@ -301,7 +343,7 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
                     : undefined
                 }
               />
-              {state === 'loading' && (
+              {(state === 'loading' || isPending) && (
                 <div className='h-4 w-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin' />
               )}
             </div>
