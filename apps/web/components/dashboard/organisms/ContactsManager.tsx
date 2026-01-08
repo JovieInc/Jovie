@@ -55,6 +55,7 @@ export function ContactsManager({
 
   return (
     <div className='space-y-4' data-testid='contacts-manager'>
+      <h1 className='sr-only'>Contacts</h1>
       <p className='text-secondary-token'>
         Add bookings, management, and press contacts so fans and industry know
         who to reach for {artistName}.
