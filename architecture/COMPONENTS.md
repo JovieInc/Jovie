@@ -234,7 +234,6 @@ describe('ProductFlyout', () => {
 ## Accessibility Requirements
 
 ### All Components
-- **Test IDs**: Use `data-testid` in kebab-case
 - **ARIA labels**: For screen readers when text isn't sufficient
 - **Keyboard navigation**: Tab order and keyboard interactions
 - **Focus management**: Visible focus indicators
@@ -245,12 +244,76 @@ export function Button({ children, ...props }: ButtonProps) {
   return (
     <button
       className="focus-ring" // Standard focus utility
-      data-testid="button"
       {...props}
     >
       {children}
     </button>
   )
+}
+```
+
+## data-testid Strategy
+
+> **Canonical reference:** See `agents.md` section 8.1.1 for the full policy.
+
+### Philosophy
+Selective and purposeful, not exhaustive. Prefer accessibility-based selectors (`getByRole`, `getByLabelText`) in tests. Add `data-testid` only when those selectors cannot reliably target an element.
+
+### Requirements by Tier
+
+| Tier | Requirement | Example |
+|------|-------------|---------|
+| **Organisms** | **REQUIRED** | `data-testid="profile-form"` on root, `data-testid="profile-save-button"` on submit |
+| **Molecules** | **RECOMMENDED** | Add when used in E2E/critical flows |
+| **Atoms** | **OPTIONAL** | Accept via props: `'data-testid'?: string` |
+
+### When to Add
+- Critical paths: auth, checkout, onboarding
+- Dynamic content: list items, cards (`data-testid="link-item-{id}"`)
+- Conditional UI: elements that appear/disappear
+- E2E smoke test entry points
+
+### When to Skip
+- Semantic HTML: use `getByRole('button')` instead
+- Static content: use `getByText('Welcome')`
+- Elements with clear accessibility selectors
+
+### Naming Convention
+```
+✅ data-testid="profile-save-button"
+✅ data-testid="onboarding-step-2"
+✅ data-testid="link-item-{id}"
+❌ data-testid="btn1"
+❌ data-testid="ProfileSaveButton"
+```
+
+### Atom Pattern (Accept via Props)
+```typescript
+interface ButtonProps {
+  children: React.ReactNode;
+  'data-testid'?: string;
+}
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ children, 'data-testid': testId, ...props }, ref) => (
+    <button ref={ref} data-testid={testId} {...props}>
+      {children}
+    </button>
+  )
+);
+```
+
+### Organism Pattern (Required on Root + Key Areas)
+```typescript
+export function ProfileForm({ onSave }: ProfileFormProps) {
+  return (
+    <form data-testid="profile-form" onSubmit={onSave}>
+      <Input name="displayName" />
+      <Button type="submit" data-testid="profile-save-button">
+        Save
+      </Button>
+    </form>
+  );
 }
 ```
 
@@ -333,15 +396,17 @@ export function Button<T extends ElementType = 'button'>({
 ✅ **Do**:
 - Search existing components before creating new ones
 - Use TypeScript interfaces for all props
-- Include data-testid for testing
+- Add `data-testid` to organisms (required) and molecules in critical flows (recommended)
+- Accept `data-testid` as optional prop in atoms
 - Write comprehensive Storybook stories
 - Follow naming conventions consistently
 - Keep components focused and single-purpose
 - Use forwardRef for DOM elements
-- Include accessibility attributes
+- Include accessibility attributes (semantic HTML, ARIA)
 
 ❌ **Don't**:
 - Put business logic in atoms
+- Add `data-testid` to every element (use accessibility selectors first)
 - Create overly generic components
 - Use default exports
 - Skip tests for new components

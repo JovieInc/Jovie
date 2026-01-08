@@ -859,9 +859,48 @@ CodeRabbit is already installed in the terminal. Run it as a way to review your 
 - **Organisms:** Self-contained sections that can own state and feature logic, under `components/organisms/`.
 - **Feature directories:** Use `components/<feature>/...` for domain-specific components that aren't widely reused.
 - **Props:** Interface named `<ComponentName>Props`; children typed as `React.ReactNode`.
-- **A11y & testing:** Add appropriate `aria-*` attributes; organisms must expose stable `data-testid` hooks.
+- **A11y & testing:** Add appropriate `aria-*` attributes; see section 8.1.1 for `data-testid` requirements.
 - **forwardRef:** Use `React.forwardRef` for DOM atoms/molecules and set `Component.displayName`.
 - **Deprecation:** Mark old components with `/** @deprecated Reason */` and point to the replacement.
+
+#### 8.1.1 data-testid Strategy
+
+**Philosophy:** Selective and purposeful, not exhaustive. Add `data-testid` when tests need stable selectors that accessibility-based selectors (`getByRole`, `getByLabelText`) cannot reliably provide.
+
+**Requirements by component tier:**
+
+| Tier | Requirement | Guidance |
+|------|-------------|----------|
+| **Organisms** | **REQUIRED** | Root element + major interactive areas (forms, buttons, key sections) |
+| **Molecules** | **RECOMMENDED** | Add when used in E2E tests or critical flows (auth, checkout, onboarding) |
+| **Atoms** | **OPTIONAL** | Accept via props (`data-testid?: string`), add only when a test needs it |
+
+**When to add `data-testid`:**
+- Critical user paths: checkout, auth, onboarding
+- Dynamic/repeated content: list items, cards, table rows
+- Conditional UI: elements that appear/disappear based on state
+- E2E smoke test entry points
+
+**When to skip `data-testid`:**
+- Semantic HTML elements: prefer `getByRole('button')`, `getByLabelText('Email')`
+- Static content: use `getByText('Welcome')` for headings/paragraphs
+- One-off elements with clear accessibility selectors
+
+**Naming convention:** `kebab-case`, descriptive of purpose
+```
+✅ data-testid="profile-save-button"
+✅ data-testid="onboarding-step-2"
+✅ data-testid="link-item-{id}"
+❌ data-testid="btn1"
+❌ data-testid="ProfileSaveButton"
+```
+
+**Just-in-time approach:** When writing an E2E test and you cannot reliably select an element with accessibility selectors, that's when you add the `data-testid` to the component. This keeps them purposeful and maintained.
+
+**Component completion checklist update:**
+- [ ] If organism: `data-testid` on root and key interactive areas
+- [ ] If touched by E2E test: stable `data-testid` selectors added
+- [ ] Accessibility: semantic HTML, proper ARIA attributes
 
 ### 8.2 Design Aesthetic & Copy
 
