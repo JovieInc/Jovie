@@ -5,6 +5,7 @@ export interface ReleaseProviderMatrixProps {
   providerConfig: Record<ProviderKey, { label: string; accent: string }>;
   primaryProviders: ProviderKey[];
   spotifyConnected?: boolean;
+  spotifyArtistName?: string | null;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;
@@ -26,6 +27,7 @@ export interface ProviderListItem {
 
 export interface UseReleaseProviderMatrixReturn {
   rows: ReleaseViewModel[];
+  setRows: React.Dispatch<React.SetStateAction<ReleaseViewModel[]>>;
   editingRelease: ReleaseViewModel | null;
   drafts: DraftState;
   isSaving: boolean;

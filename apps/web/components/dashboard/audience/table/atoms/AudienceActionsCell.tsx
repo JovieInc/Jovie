@@ -33,11 +33,11 @@ export function AudienceActionsCell({
   return (
     <td
       className={cn(
-        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
+        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6 text-right',
         className
       )}
     >
-      <div className='flex items-center gap-2'>
+      <div className='flex items-center justify-end gap-2'>
         {actions.slice(0, maxActions).map((action, idx) => {
           const iconName = resolveAudienceActionIcon(action.label);
           return (

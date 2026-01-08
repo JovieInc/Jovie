@@ -222,6 +222,7 @@ export function useReleaseProviderMatrix({
 
   return {
     rows,
+    setRows,
     editingRelease,
     drafts,
     isSaving,

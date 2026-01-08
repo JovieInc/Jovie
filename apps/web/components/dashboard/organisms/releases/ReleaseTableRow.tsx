@@ -44,7 +44,7 @@ function ProviderStatusDot({
       style={{ backgroundColor: accent }}
     >
       {status === 'manual' && (
-        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500' />
+        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--color-warning)]' />
       )}
     </span>
   );
@@ -231,7 +231,7 @@ export function ReleaseTableRow({
               {manualOverrideCount > 0 && (
                 <Badge
                   variant='secondary'
-                  className='shrink-0 border border-amber-200 bg-amber-50 text-[10px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'
+                  className='shrink-0 border border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[10px] text-[var(--color-warning-foreground)]'
                 >
                   {manualOverrideCount} edited
                 </Badge>

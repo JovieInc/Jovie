@@ -1,6 +1,6 @@
 import { VercelToolbar } from '@vercel/toolbar/next';
+import { GeistSans } from 'geist/font/sans';
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
 import React from 'react';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -14,15 +14,8 @@ import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
 
-// Configure Inter font with variable weight to support Linear's 538 weight
-const inter = Inter({
-  subsets: ['latin'],
-  weight: 'variable', // Use variable font for full weight range (100-900) including 538
-  display: 'swap',
-  variable: '--font-inter',
-  adjustFontFallback: true,
-  preload: true,
-});
+// Configure Geist Sans font - Linear's typography foundation
+const geistSans = GeistSans;
 
 export const metadata: Metadata = {
   title: {
@@ -225,7 +218,7 @@ export default async function RootLayout({
     </head>
   );
 
-  const bodyClassName = `${inter.variable} font-sans bg-base text-primary-token`;
+  const bodyClassName = `${geistSans.variable} font-sans bg-base text-primary-token`;
 
   // Early return if no publishable key (only in production)
   if (!publishableKey) {
