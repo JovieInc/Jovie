@@ -229,7 +229,7 @@ test.describe('Accessibility Audit', () => {
       '/app/dashboard/analytics',
       '/app/dashboard/audience',
       '/app/dashboard/contacts',
-      '/app/dashboard/tipping',
+      '/app/dashboard/earnings',
     ];
 
     const routes = publicRoutes;

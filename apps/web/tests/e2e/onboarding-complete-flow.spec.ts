@@ -34,7 +34,7 @@ async function bootstrapFreshUser(page: Page) {
     { timeout: 10_000 }
   );
 
-  await page.goto('/app/dashboard/overview', {
+  await page.goto('/app/dashboard', {
     waitUntil: 'domcontentloaded',
   });
 
