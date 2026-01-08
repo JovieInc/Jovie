@@ -53,7 +53,7 @@ function ProviderStatusDot({
 interface AddProviderUrlPopoverProps {
   providerLabel: string;
   accent: string;
-  onSave: (url: string) => void;
+  onSave: (url: string) => Promise<void>;
   isSaving?: boolean;
 }
 
@@ -66,13 +66,17 @@ function AddProviderUrlPopover({
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
-    onSave(trimmed);
-    setUrl('');
-    setOpen(false);
+    try {
+      await onSave(trimmed);
+      setUrl('');
+      setOpen(false);
+    } catch {
+      // Error toast is shown by the hook; keep popover open so user can retry
+    }
   };
 
   return (
@@ -349,7 +353,7 @@ export function ReleaseTableRow({
                 <AddProviderUrlPopover
                   providerLabel={providerConfig[providerKey].label}
                   accent={providerConfig[providerKey].accent}
-                  onSave={url => void onAddUrl(release.id, providerKey, url)}
+                  onSave={url => onAddUrl(release.id, providerKey, url)}
                   isSaving={isAddingUrl}
                 />
               ) : (

@@ -149,16 +149,13 @@ export function ReleasesEmptyState({
         return;
       }
 
-      // Extract artist ID from URL
-      const artistMatch = trimmedUrl.match(
-        /open\.spotify\.com\/artist\/([a-zA-Z0-9]{22})/
-      );
-      if (!artistMatch) {
+      // Extract artist ID from URL using the same helper as paste detection
+      const artistId = extractSpotifyArtistId(trimmedUrl);
+      if (!artistId) {
         setError('Please enter a valid Spotify artist URL');
         return;
       }
 
-      const artistId = artistMatch[1];
       const artistUrl = `https://open.spotify.com/artist/${artistId}`;
 
       // Clear the form and show importing state
@@ -186,7 +183,7 @@ export function ReleasesEmptyState({
         }
       });
     },
-    [manualUrl, onConnected, onImportStart]
+    [manualUrl, onConnected, onImportStart, extractSpotifyArtistId]
   );
 
   const handleKeyDown = useCallback(
