@@ -302,7 +302,14 @@ export async function resolveUserState(options?: {
   let dbUserId: string | null = dbUser?.id ?? null;
 
   if (!dbUserId) {
-    if (createDbUserIfMissing && email) {
+    if (createDbUserIfMissing) {
+      if (!email) {
+        console.error('[Auth Gate] Cannot create user without email', {
+          clerkUserId,
+        });
+        throw new Error('Email is required for user creation');
+      }
+
       // Check waitlist status before creating user
       const waitlistResult = await checkWaitlistAccessInternal(email);
 
