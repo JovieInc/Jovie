@@ -131,13 +131,9 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
-  --color-bg-base: oklch(12% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-0: oklch(
-    14% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-bg-surface-1: oklch(
-    16% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-bg-base: oklch(6.5% 0.005 240);
+  --color-bg-surface-0: oklch(3.5% 0.003 240);
+  --color-bg-surface-1: oklch(6.5% 0.005 240);
   --color-bg-surface-2: oklch(
     19% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -265,6 +261,54 @@
       65% var(--theme-base-chroma) var(--theme-base-hue)
     );
   }
+}
+
+/* ============================================
+   PLATFORM BRAND COLORS (OKLCH)
+   ============================================
+
+   Consistent brand colors for streaming platforms
+   and other third-party services
+*/
+:root {
+  /* Spotify */
+  --color-brand-spotify: oklch(68% 0.21 145);
+  --color-brand-spotify-hover: oklch(72% 0.21 145);
+  --color-brand-spotify-subtle: oklch(95% 0.06 145);
+
+  /* Apple Music */
+  --color-brand-apple: oklch(60% 0.2 10);
+  --color-brand-apple-hover: oklch(65% 0.2 10);
+  --color-brand-apple-subtle: oklch(95% 0.05 10);
+
+  /* YouTube */
+  --color-brand-youtube: oklch(60% 0.22 25);
+  --color-brand-youtube-hover: oklch(65% 0.22 25);
+  --color-brand-youtube-subtle: oklch(95% 0.05 25);
+
+  /* Additional text utilities */
+  --color-text-muted-secondary: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+}
+
+:root.dark {
+  /* Spotify - slightly brighter in dark mode */
+  --color-brand-spotify: oklch(70% 0.21 145);
+  --color-brand-spotify-subtle: oklch(20% 0.1 145);
+
+  /* Apple Music */
+  --color-brand-apple: oklch(70% 0.2 10);
+  --color-brand-apple-subtle: oklch(20% 0.1 10);
+
+  /* YouTube */
+  --color-brand-youtube: oklch(70% 0.22 25);
+  --color-brand-youtube-subtle: oklch(20% 0.1 25);
+
+  /* Additional text utilities */
+  --color-text-muted-secondary: oklch(
+    58% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 }
 
 /* ============================================
@@ -451,7 +495,7 @@
 }
 
 :root.dark {
-  --sidebar-background: 20 20 25;
+  --sidebar-background: 9 9 9;
   --sidebar-foreground: 244 244 245;
   --sidebar-primary: 244 244 245;
   --sidebar-primary-foreground: 12 12 12;
@@ -461,7 +505,7 @@
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 20 20 25;
+  --sidebar-surface: 9 9 9;
   --sidebar-surface-hover: 24 24 31;
   --sidebar-input-background: 24 24 31;
   --sidebar-input-border: 255 255 255 / 0.1;

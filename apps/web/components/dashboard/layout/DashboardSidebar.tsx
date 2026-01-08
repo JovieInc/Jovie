@@ -88,7 +88,7 @@ export function DashboardSidebar({
                 href='/app/dashboard/overview'
                 aria-label='Go to dashboard'
                 className={cn(
-                  'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                  'flex h-9 flex-1 items-center gap-3 rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                   'group-data-[collapsible=icon]:justify-center'
                 )}
               >

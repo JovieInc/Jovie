@@ -132,6 +132,7 @@
     "drizzle-orm": "^0.45.0",
     "flags": "^4.0.1",
     "framer-motion": "^12.23.26",
+    "geist": "^1.5.1",
     "import-in-the-middle": "^2.0.1",
     "isomorphic-dompurify": "2.35.0",
     "lucide-react": "^0.562.0",

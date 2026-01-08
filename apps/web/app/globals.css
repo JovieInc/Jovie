@@ -47,7 +47,7 @@ body {
 
 @layer base {
   :root {
-    --font-inter: "Inter";
+    --font-geist-sans: "Geist Sans";
 
     /* Safe area inset custom properties for iOS device support */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -55,12 +55,22 @@ body {
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
+
+  /* Linear Typography Features - apply font features globally */
+  body {
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    letter-spacing: -0.011em;
+  }
 }
 
 @theme {
   --font-sans:
-    var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+    var(--font-geist-sans), "Geist Sans", -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
 
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
@@ -88,6 +98,20 @@ body {
   /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
   --color-btn-primary: var(--color-btn-primary-bg);
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
+
+  /* Platform brand colors - exposed as Tailwind utilities */
+  --color-brand-spotify: var(--color-brand-spotify);
+  --color-brand-spotify-hover: var(--color-brand-spotify-hover);
+  --color-brand-spotify-subtle: var(--color-brand-spotify-subtle);
+  --color-brand-apple: var(--color-brand-apple);
+  --color-brand-apple-hover: var(--color-brand-apple-hover);
+  --color-brand-apple-subtle: var(--color-brand-apple-subtle);
+  --color-brand-youtube: var(--color-brand-youtube);
+  --color-brand-youtube-hover: var(--color-brand-youtube-hover);
+  --color-brand-youtube-subtle: var(--color-brand-youtube-subtle);
+
+  /* Additional text utilities */
+  --color-muted-secondary: var(--color-text-muted-secondary);
 }
 
 /* Safe area inset utilities for iOS device support */
@@ -157,6 +181,33 @@ body {
 
 @utility left-4-safe {
   left: calc(1rem + var(--safe-area-inset-left));
+}
+
+/* Linear Typography Utilities - for dashboard-specific typography needs */
+@utility dashboard-heading {
+  font-weight: 590;
+  letter-spacing: -0.025em;
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+}
+
+@utility dashboard-label {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+@utility dashboard-body {
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  letter-spacing: -0.011em;
 }
 
 @utility grid-bg {

@@ -228,7 +228,7 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
               <div className='absolute right-3 top-1/2 -translate-y-1/2'>
                 <SocialIcon
                   platform='spotify'
-                  className='h-5 w-5 text-[#1DB954]'
+                  className='h-5 w-5 text-brand-spotify'
                 />
               </div>
             </div>
@@ -236,7 +236,7 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
               <button
                 type='submit'
                 disabled={isPending || !manualUrl.trim()}
-                className='flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[#1DB954] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1ed760] disabled:opacity-50'
+                className='flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-spotify px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-spotify-hover disabled:opacity-50'
               >
                 {isPending ? (
                   <>
@@ -269,14 +269,14 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
             <div
               className={cn(
                 'relative flex w-full items-center gap-2 rounded-xl border bg-surface-1 px-3 py-2 shadow-sm transition-colors',
-                'focus-within:ring-2 focus-within:ring-[#1DB954]/50 focus-within:border-[#1DB954]',
+                'focus-within:ring-2 focus-within:ring-brand-spotify/50 focus-within:border-brand-spotify',
                 isPending && 'opacity-50'
               )}
             >
-              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#1DB954]/10'>
+              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-brand-spotify-subtle'>
                 <SocialIcon
                   platform='spotify'
-                  className='h-4 w-4 text-[#1DB954]'
+                  className='h-4 w-4 text-brand-spotify'
                 />
               </div>
               <Input
@@ -411,7 +411,7 @@ export function ReleasesEmptyState({ onConnected }: ReleasesEmptyStateProps) {
                         </div>
 
                         {artist.verified && (
-                          <div className='shrink-0 text-[#1DB954]'>
+                          <div className='shrink-0 text-brand-spotify'>
                             <svg
                               className='w-4 h-4'
                               viewBox='0 0 20 20'

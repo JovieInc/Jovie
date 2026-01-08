@@ -13,7 +13,7 @@ export const SidebarGroup = React.forwardRef<
       ref={ref}
       data-sidebar='group'
       className={cn(
-        'relative flex w-full min-w-0 flex-col p-2 transition-all duration-200 ease-out',
+        'relative flex w-full min-w-0 flex-col p-1.5 transition-all duration-200 ease-out',
         'group-data-[collapsible=icon]:px-0',
         className
       )}
@@ -34,8 +34,8 @@ export const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar='group-label'
       className={cn(
-        'flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 ease-out focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
-        'group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0',
+        'flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 ease-out focus-visible:ring-2 [&>svg]:size-3.5 [&>svg]:shrink-0',
+        'group-data-[collapsible=icon]:-mt-7 group-data-[collapsible=icon]:opacity-0',
         className
       )}
       {...props}
@@ -55,7 +55,7 @@ export const SidebarGroupAction = React.forwardRef<
       ref={ref}
       data-sidebar='group-action'
       className={cn(
-        'absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
+        'absolute right-2 top-2 flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-3.5 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
         'group-data-[collapsible=icon]:hidden',
