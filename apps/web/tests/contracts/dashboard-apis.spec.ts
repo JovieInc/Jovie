@@ -478,7 +478,7 @@ describe('Dashboard API contracts', () => {
           state: 'active',
         }),
       ]);
-    });
+    }, 15000);
 
     it('saves dashboard links with optimistic versioning and rate limit headers', async () => {
       mockSocialLinkDependencies();

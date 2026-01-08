@@ -169,7 +169,6 @@ async function createUserWithRetry(
           clerkId: clerkUserId,
           email,
           userStatus,
-          waitlistEntryId, // Keep for historical tracking only
         })
         .onConflictDoUpdate({
           target: users.clerkId,

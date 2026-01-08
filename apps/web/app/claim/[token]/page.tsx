@@ -237,7 +237,6 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
           .update(users)
           .set({
             userStatus: 'profile_claimed',
-            waitlistEntryId: waitlistInvite.waitlistEntryId, // Keep for historical tracking
             updatedAt: now,
           })
           .where(eq(users.id, dbUserId));
