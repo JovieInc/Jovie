@@ -15,8 +15,8 @@ test.describe('Dashboard Routing', () => {
   test('should navigate to overview page by default', async ({ page }) => {
     await page.goto('/app/dashboard');
 
-    // Should redirect to overview
-    await expect(page).toHaveURL('/app/dashboard/overview');
+    // Should stay on dashboard (overview is now the root)
+    await expect(page).toHaveURL('/app/dashboard');
 
     // Check that overview content is visible
     await expect(page.getByText('Dashboard')).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('Dashboard Routing', () => {
     await page.goto('/app/dashboard/analytics');
 
     // Analytics page is no longer a dedicated route; it should redirect
-    await expect(page).toHaveURL('/app/dashboard/overview');
+    await expect(page).toHaveURL('/app/dashboard');
 
     // Check that overview content is visible
     await expect(page.getByText('Welcome back')).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('Dashboard Routing', () => {
   });
 
   test('should navigate between dashboard pages', async ({ page }) => {
-    await page.goto('/app/dashboard/overview');
+    await page.goto('/app/dashboard');
 
     // Navigate to profile page
     await page.getByText('Profile').click();
@@ -69,18 +69,18 @@ test.describe('Dashboard Routing', () => {
 
     // Navigate to earnings page
     await page.getByText('Earnings').click();
-    await expect(page).toHaveURL('/app/dashboard/tipping');
+    await expect(page).toHaveURL('/app/dashboard/earnings');
 
     // Navigate back to overview
     await page.getByText('Overview').click();
-    await expect(page).toHaveURL('/app/dashboard/overview');
+    await expect(page).toHaveURL('/app/dashboard');
     await expect(page.getByText('Dashboard')).toBeVisible();
   });
 
   test('browser back/forward navigation should work correctly', async ({
     page,
   }) => {
-    await page.goto('/app/dashboard/overview');
+    await page.goto('/app/dashboard');
 
     // Navigate to profile page
     await page.getByText('Profile').click();
@@ -96,7 +96,7 @@ test.describe('Dashboard Routing', () => {
 
     // Go back to overview
     await page.goBack();
-    await expect(page).toHaveURL('/app/dashboard/overview');
+    await expect(page).toHaveURL('/app/dashboard');
 
     // Go forward to links
     await page.goForward();

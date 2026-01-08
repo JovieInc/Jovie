@@ -91,6 +91,77 @@ Each issue includes clear success criteria and expected outcomes. Track progress
 
 ---
 
+## 📋 New Issue to Create
+
+### Route Refactoring - Drop `/app` Prefix
+
+**Title**: 🟡 Refactor: Drop `/app` prefix from authenticated routes
+
+**Priority**: Medium
+
+**Assignee**: Codex
+
+**Labels**: refactoring, routing, dx
+
+**Description**:
+Follow-up to the route naming simplification (PR that merged `/app/dashboard/overview` → `/app/dashboard`, etc.). This issue completes the refactoring by removing the `/app` prefix entirely for a cleaner URL structure.
+
+**Current State** (after Phase 1):
+- `/app/dashboard` → Overview
+- `/app/dashboard/audience` → Audience
+- `/app/dashboard/earnings` → Earnings
+- `/app/settings` → Account settings
+- `/app/settings/branding` → Branding
+
+**Target State** (Phase 2):
+- `/dashboard` → Overview
+- `/dashboard/audience` → Audience
+- `/dashboard/earnings` → Earnings
+- `/settings` → Account settings
+- `/settings/branding` → Branding
+
+**Scope of Work** (~320 references to update):
+
+| Area | Count | Files |
+|------|-------|-------|
+| Hardcoded path strings | 280+ | 35 files |
+| `startsWith('/app')` checks | 17 | 4 files |
+| Middleware routing logic | 8 | proxy.ts |
+| E2E test files | 15+ | tests/e2e/ |
+
+**Key Files**:
+- `/apps/web/proxy.ts` - Remove `/app` from reserved pages, update auth routing
+- `/apps/web/lib/sentry/route-detector.ts` - Update DASHBOARD_ROUTES
+- `/apps/web/app/app/dashboard/DashboardLayoutClient.tsx` - Update pathname checks
+- `/apps/web/components/dashboard/` - Update navigation components
+- All test files referencing `/app/*` routes
+
+**Safety Notes**:
+- Auth is NOT tied to `/app` prefix (validated in exploration)
+- `/dashboard` and `/settings` are already reserved in `proxy.ts`
+- Redirects from `/app/*` → new paths needed for backwards compatibility
+
+**Instructions**:
+1. Update `proxy.ts` reserved pages and routing logic
+2. Move route folders or update Next.js routing
+3. Update all navigation component references
+4. Update all pathname checks in layouts
+5. Add redirects from old `/app/*` paths
+6. Update E2E and unit tests
+7. Run full test suite to verify
+
+**Expected Outcome**:
+- Cleaner URLs: `domain.com/dashboard` instead of `domain.com/app/dashboard`
+- No breaking changes (redirects preserve old URLs)
+- Improved user experience and URL memorability
+
+**PR Guidelines**:
+- Branch: `refactor/drop-app-prefix`
+- Include redirect testing in PR description
+- Verify auth flow still works correctly
+
+---
+
 **Status**: ✅ All 11 Linear issues created successfully
 **Next Action**: Start Phase 1 parallel execution
 **Timeline**: Week 1 (Phase 1), Week 2 (Phase 2), Week 3 (Phase 3)

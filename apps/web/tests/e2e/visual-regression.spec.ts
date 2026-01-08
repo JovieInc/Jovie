@@ -302,8 +302,8 @@ test.describe('Visual Regression @visual-regression', () => {
       });
     });
 
-    test('dashboard tipping - light mode', async ({ page }) => {
-      await page.goto('/app/dashboard/tipping', { waitUntil: 'networkidle' });
+    test('dashboard earnings - light mode', async ({ page }) => {
+      await page.goto('/app/dashboard/earnings', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
         test.skip(true, 'Not authenticated');
@@ -319,8 +319,8 @@ test.describe('Visual Regression @visual-regression', () => {
       });
     });
 
-    test('dashboard tipping - dark mode', async ({ page }) => {
-      await page.goto('/app/dashboard/tipping', { waitUntil: 'networkidle' });
+    test('dashboard earnings - dark mode', async ({ page }) => {
+      await page.goto('/app/dashboard/earnings', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
         test.skip(true, 'Not authenticated');
