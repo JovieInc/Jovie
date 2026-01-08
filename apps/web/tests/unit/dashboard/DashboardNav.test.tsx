@@ -93,9 +93,7 @@ describe('DashboardNav', () => {
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    const overviewLink = container.querySelector(
-      '[href="/app/dashboard"]'
-    );
+    const overviewLink = container.querySelector('[href="/app/dashboard"]');
     expect(overviewLink).toBeDefined();
     expect(overviewLink?.className).toContain('justify-center');
   });
