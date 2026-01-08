@@ -59,10 +59,7 @@ export function StepCard({
         {interactive && <div className={glowEffectClasses} />}
 
         <div
-          className={cn(
-            cardBaseClasses,
-            interactive && 'hover:border-default'
-          )}
+          className={cn(cardBaseClasses, interactive && 'hover:border-default')}
         >
           <div className='text-center'>
             {/* Icon circle */}

@@ -100,6 +100,6 @@ describe('EmptyState', () => {
     );
 
     const heading = screen.getByRole('heading', { name: /access denied/i });
-    expect(heading.className).toContain('text-rose');
+    expect(heading.className).toContain('text-primary-token');
   });
 });

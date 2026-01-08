@@ -29,14 +29,10 @@ export function FormStatus({
         </div>
       )}
 
-      {trimmedError && (
-        <p className='text-sm text-error'>{trimmedError}</p>
-      )}
+      {trimmedError && <p className='text-sm text-error'>{trimmedError}</p>}
 
       {trimmedSuccess && (
-        <p className='text-sm text-success'>
-          {trimmedSuccess}
-        </p>
+        <p className='text-sm text-success'>{trimmedSuccess}</p>
       )}
     </div>
   );

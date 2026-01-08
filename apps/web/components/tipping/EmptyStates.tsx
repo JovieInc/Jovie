@@ -89,9 +89,7 @@ export function TippingEmptyState({
           <h3 className='text-xl font-semibold text-primary-token'>
             {config.title}
           </h3>
-          <p className='text-secondary-token max-w-md'>
-            {config.description}
-          </p>
+          <p className='text-secondary-token max-w-md'>{config.description}</p>
         </div>
       </div>
     </div>

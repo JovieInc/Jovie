@@ -72,15 +72,13 @@ const variantStyles: Record<
     secondary: 'text-accent-token',
   },
   search: {
-    iconWrapper:
-      'bg-info-subtle text-info ring-1 ring-inset ring-info/20',
+    iconWrapper: 'bg-info-subtle text-info ring-1 ring-inset ring-info/20',
     heading: 'text-primary-token',
     description: 'text-secondary-token',
     secondary: 'text-info',
   },
   error: {
-    iconWrapper:
-      'bg-error-subtle text-error ring-1 ring-inset ring-error/20',
+    iconWrapper: 'bg-error-subtle text-error ring-1 ring-inset ring-error/20',
     heading: 'text-primary-token',
     description: 'text-secondary-token',
     secondary: 'text-error',

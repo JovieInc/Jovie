@@ -38,9 +38,12 @@ export function StarterEmptyState({
       'inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
 
     /** Button variant styles using semantic tokens */
-    const primaryStyles = 'bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 focus-visible:ring-accent';
-    const secondaryStyles = 'border border-subtle bg-base text-primary-token hover:bg-surface-1 focus-visible:ring-accent';
-    const variantStyles = variant === 'primary' ? primaryStyles : secondaryStyles;
+    const primaryStyles =
+      'bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 focus-visible:ring-accent';
+    const secondaryStyles =
+      'border border-subtle bg-base text-primary-token hover:bg-surface-1 focus-visible:ring-accent';
+    const variantStyles =
+      variant === 'primary' ? primaryStyles : secondaryStyles;
 
     if (action.href) {
       const isInternal = action.href.startsWith('/');

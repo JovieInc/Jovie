@@ -50,10 +50,7 @@ export function FormField({
   return (
     <div className={cn('space-y-2', className)}>
       {label && (
-        <label
-          htmlFor={id}
-          className='text-sm font-medium text-primary-token'
-        >
+        <label htmlFor={id} className='text-sm font-medium text-primary-token'>
           {label}
           {required && (
             <span className='text-error ml-1' aria-hidden='true'>

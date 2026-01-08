@@ -22,8 +22,7 @@ export function FrostedContainer({
       'bg-frosted backdrop-blur-lg border border-frosted rounded-3xl shadow-xl shadow-black/5',
     glass:
       'bg-frosted-ghost backdrop-blur-md ring-1 ring-border-subtle rounded-xl shadow-sm',
-    solid:
-      'bg-base border border-subtle rounded-xl shadow-lg',
+    solid: 'bg-base border border-subtle rounded-xl shadow-lg',
   };
 
   return (
