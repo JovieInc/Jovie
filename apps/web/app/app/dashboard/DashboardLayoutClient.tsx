@@ -27,6 +27,7 @@ import {
   SidebarProvider,
   useSidebar,
 } from '@/components/organisms/Sidebar';
+import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types';
 
 import type { DashboardData } from './actions';
@@ -296,7 +297,7 @@ function DashboardLayoutInner({
       <SkipToContent />
       <DashboardSidebar />
       <SidebarInset
-        className='flex flex-1 flex-col overflow-hidden transition-[margin-right] duration-300 ease-out'
+        className='flex flex-1 flex-col overflow-hidden bg-[var(--color-bg-base)] transition-[margin-right] duration-300 ease-out'
         style={{
           marginRight: isContactTableRoute
             ? (tableMeta.rightPanelWidth ?? 0)
@@ -305,54 +306,79 @@ function DashboardLayoutInner({
               : PREVIEW_PANEL_WIDTH,
         }}
       >
-        <DashboardHeader
-          breadcrumbs={crumbs}
-          leading={MobileMenuButton}
-          className={
-            isContactTableRoute
-              ? 'border-sidebar-border bg-sidebar-surface'
-              : undefined
-          }
-          action={
-            <>
-              <DashboardThemeToggleButton />
-              {isContactTableRoute ? (
-                ContactToggleButton
-              ) : showPreview ? (
-                <PreviewToggleButton />
-              ) : null}
-            </>
-          }
-        />
         <main
           id='main-content'
           className={
             isContactTableRoute
               ? 'flex-1 min-h-0 overflow-hidden'
-              : 'flex-1 min-h-0 overflow-auto'
+              : 'flex-1 min-h-0 overflow-hidden p-4 sm:p-6'
           }
         >
-          <div
-            className={
-              useFullWidth
-                ? isContactTableRoute
-                  ? isAudienceRoute
-                    ? 'w-full h-full min-h-0'
-                    : 'w-full h-full min-h-0 p-4 sm:p-6'
-                  : 'w-full px-4 sm:px-6 py-6'
-                : 'container mx-auto max-w-7xl p-6'
-            }
-          >
-            <div
-              className={
-                showMobileTabs
-                  ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                  : undefined
-              }
-            >
-              {children}
+          {isContactTableRoute ? (
+            <>
+              <DashboardHeader
+                breadcrumbs={crumbs}
+                leading={MobileMenuButton}
+                className='border-sidebar-border bg-sidebar-surface'
+                action={
+                  <>
+                    <DashboardThemeToggleButton />
+                    {ContactToggleButton}
+                  </>
+                }
+              />
+              <div
+                className={
+                  useFullWidth
+                    ? isAudienceRoute
+                      ? 'w-full h-full min-h-0'
+                      : 'w-full h-full min-h-0 p-4 sm:p-6'
+                    : 'container mx-auto max-w-7xl p-6'
+                }
+              >
+                <div
+                  className={
+                    showMobileTabs
+                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                      : undefined
+                  }
+                >
+                  {children}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className='flex h-full min-h-0 flex-col rounded-xl border border-subtle bg-surface-0 overflow-hidden'>
+              <DashboardHeader
+                breadcrumbs={crumbs}
+                leading={MobileMenuButton}
+                action={
+                  <>
+                    <DashboardThemeToggleButton />
+                    {showPreview ? <PreviewToggleButton /> : null}
+                  </>
+                }
+              />
+              <div
+                className={cn(
+                  'flex-1 min-h-0 overflow-y-auto',
+                  useFullWidth
+                    ? 'px-4 sm:px-6 py-6'
+                    : 'container mx-auto max-w-7xl p-6'
+                )}
+              >
+                <div
+                  className={
+                    showMobileTabs
+                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                      : undefined
+                  }
+                >
+                  {children}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </main>
         {showMobileTabs ? <DashboardMobileTabs /> : null}
       </SidebarInset>

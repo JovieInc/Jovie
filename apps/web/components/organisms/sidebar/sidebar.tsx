@@ -81,7 +81,7 @@ export const Sidebar = React.forwardRef<
               ? 'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
               : variant === 'inset'
                 ? 'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
-                : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) border-r border-sidebar-border',
+                : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
             className
           )}
           {...props}
