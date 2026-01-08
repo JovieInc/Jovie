@@ -105,23 +105,28 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
   }
 
   return (
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility
-    <div
-      className={`flex items-center gap-2 overflow-x-auto scrollbar-none ${className ?? ''}`}
-      aria-label='Quick link suggestions'
-    >
-      {suggestionPills.map(pill => (
-        <PlatformPill
-          key={pill.id}
-          platformIcon={pill.simpleIconId}
-          platformName={pill.label}
-          primaryText={pill.label}
-          suffix='+'
-          tone='faded'
-          onClick={() => onPlatformSelect(buildPrefillUrl(pill.id))}
-          className='whitespace-nowrap'
-        />
-      ))}
+    <div className={`relative ${className ?? ''}`}>
+      {/* Left fade gradient */}
+      <div className='pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-linear-to-r from-(--color-bg-surface-0) to-transparent' />
+
+      {/* Scrollable container */}
+      <div className='flex items-center gap-2 overflow-x-auto scrollbar-none px-1'>
+        {suggestionPills.map(pill => (
+          <PlatformPill
+            key={pill.id}
+            platformIcon={pill.simpleIconId}
+            platformName={pill.label}
+            primaryText={pill.label}
+            suffix='+'
+            tone='faded'
+            onClick={() => onPlatformSelect(buildPrefillUrl(pill.id))}
+            className='whitespace-nowrap shrink-0'
+          />
+        ))}
+      </div>
+
+      {/* Right fade gradient */}
+      <div className='pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-linear-to-l from-(--color-bg-surface-0) to-transparent' />
     </div>
   );
 });

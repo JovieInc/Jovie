@@ -90,27 +90,18 @@ export function DashboardAudienceTable({
       className='flex h-full min-h-0 flex-col'
       data-testid='dashboard-audience-table'
     >
-      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
-        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
-          <div>
-            <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
-              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-            </h1>
-            <p className='mt-1 text-sm leading-6 text-secondary-token'>
-              {rows.length === 0
-                ? mode === 'members'
-                  ? 'Track visitors and grow your fan base'
-                  : 'Build a subscriber base for notifications'
-                : mode === 'members'
-                  ? 'Every visitor, anonymous or identified, lives in this table.'
-                  : 'Notification signups from your notification modal.'}
-            </p>
-          </div>
-          <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token'>
-            {total} {total === 1 ? 'person' : 'people'}
-          </span>
-        </div>
-      </div>
+      <h1 className='sr-only'>
+        {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+      </h1>
+      <p className='sr-only'>
+        {rows.length === 0
+          ? mode === 'members'
+            ? 'Track visitors and grow your fan base'
+            : 'Build a subscriber base for notifications'
+          : mode === 'members'
+            ? 'Every visitor, anonymous or identified, lives in this table.'
+            : 'Notification signups from your notification modal.'}
+      </p>
 
       <div className='flex-1 min-h-0 overflow-hidden'>
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
@@ -145,6 +136,7 @@ export function DashboardAudienceTable({
                   headerCheckboxState={headerCheckboxState}
                   selectedCount={selectedCount}
                   headerElevated={headerElevated}
+                  totalCount={total}
                   onSortChange={onSortChange}
                   onToggleSelectAll={toggleSelectAll}
                   bulkActions={bulkActions}
