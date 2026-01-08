@@ -45,9 +45,6 @@ export function ReleaseProviderMatrix({
             <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
               Discography
             </p>
-            <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
-              Releases
-            </h1>
             <p className='mt-1 max-w-2xl text-sm leading-6 text-secondary-token'>
               Share one smart link per release and keep provider URLs pristine.
               Copy-ready variants for each DSP make sure fans land in the right

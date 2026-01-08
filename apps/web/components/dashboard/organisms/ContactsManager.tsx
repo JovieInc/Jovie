@@ -55,13 +55,10 @@ export function ContactsManager({
 
   return (
     <div className='space-y-4' data-testid='contacts-manager'>
-      <div className='space-y-1'>
-        <h1 className='text-2xl font-semibold text-primary-token'>Contacts</h1>
-        <p className='text-secondary-token'>
-          Add bookings, management, and press contacts so fans and industry know
-          who to reach for {artistName}.
-        </p>
-      </div>
+      <p className='text-secondary-token'>
+        Add bookings, management, and press contacts so fans and industry know
+        who to reach for {artistName}.
+      </p>
 
       {!hasContacts && (
         <DashboardCard variant='empty-state'>

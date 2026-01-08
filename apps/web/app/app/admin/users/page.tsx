@@ -57,7 +57,6 @@ export default async function AdminUsersPage({
         <p className='text-xs uppercase tracking-wide text-tertiary-token'>
           Internal
         </p>
-        <h1 className='text-3xl font-semibold text-primary-token'>Users</h1>
         <p className='text-sm text-secondary-token'>
           Signed up users and billing status.
         </p>
