@@ -199,11 +199,14 @@ describe('auth gate - edge cases', () => {
     vi.resetModules();
   });
 
-  it('handles missing email gracefully', async () => {
+  it('throws when email is missing during user creation', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_123' });
     mockCurrentUser.mockResolvedValue({
       emailAddresses: [],
     });
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     // Mock db to return no user
     mockDbSelect.mockReturnValue({
@@ -214,11 +217,16 @@ describe('auth gate - edge cases', () => {
       }),
     });
 
-    const { resolveUserState, UserState } = await import('@/lib/auth/gate');
-    const result = await resolveUserState();
+    const { resolveUserState } = await import('@/lib/auth/gate');
 
-    // Should redirect to waitlist when no email available
-    expect(result.state).toBe(UserState.NEEDS_WAITLIST_SUBMISSION);
-    expect(result.context.email).toBeNull();
+    await expect(resolveUserState()).rejects.toThrow(
+      'Email is required for user creation'
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[Auth Gate] Cannot create user without email',
+      { clerkUserId: 'clerk_123' }
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 });
