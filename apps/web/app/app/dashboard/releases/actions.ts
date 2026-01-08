@@ -1,8 +1,11 @@
 'use server';
 
+import { eq } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { db } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -260,4 +263,53 @@ export async function checkSpotifyConnection(): Promise<{
   } catch {
     return { connected: false, spotifyId: null };
   }
+}
+
+/**
+ * Connect a Spotify artist to the profile and sync releases
+ */
+export async function connectSpotifyArtist(params: {
+  spotifyArtistId: string;
+  spotifyArtistUrl: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  imported: number;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Update the profile with the Spotify artist ID and URL
+  await db
+    .update(creatorProfiles)
+    .set({
+      spotifyId: params.spotifyArtistId,
+      spotifyUrl: params.spotifyArtistUrl,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  // Sync releases from the connected artist
+  const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
+
+  revalidatePath('/app/dashboard/releases');
+
+  if (result.success) {
+    return {
+      success: true,
+      message: `Connected and synced ${result.imported} releases from Spotify.`,
+      imported: result.imported,
+    };
+  }
+
+  return {
+    success: false,
+    message: result.errors[0] ?? 'Connected but failed to sync releases.',
+    imported: 0,
+  };
 }
