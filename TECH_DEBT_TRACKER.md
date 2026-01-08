@@ -94,6 +94,7 @@ These require Drizzle ORM version alignment to fully resolve:
 | `app/[username]/page.tsx` | 124, 362 | `console.error` in public profile page |
 | `lib/admin/overview.ts` | 77, 137, 178, 200, 336, 429, 487, 519 | Multiple console calls in admin |
 | `lib/errors/ingest.ts` | 277, 286 | Error logging in ingest system |
+| `lib/auth/gate.ts` | 309-312 | Missing email guard logging |
 | `proxy.ts` | 372 | API request logging |
 | `components/home/ArtistSearch.tsx` | 25 | Search error logging |
 | `components/home/HeroExampleProfiles.tsx` | 70 | Hero profile error logging |
