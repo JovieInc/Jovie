@@ -247,23 +247,13 @@ export async function POST(request: Request) {
           })
           .where(eq(users.id, user.id));
 
-        // OPTIONAL: Still create waitlistInvite for tracking (no claim token needed)
-        await tx
-          .insert(waitlistInvites)
-          .values({
-            waitlistEntryId: entry.id,
-            creatorProfileId: profile.id,
-            email: entry.email,
-            fullName: entry.fullName,
-            claimToken: null as unknown as string, // No token needed for new flow
-            status: 'pending',
-            attempts: 0,
-            maxAttempts: 3,
-            runAt: now,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .onConflictDoNothing({ target: waitlistInvites.waitlistEntryId });
+        // NOTE: We don't create a waitlistInvite record for the simplified flow
+        // because there's no claim token or email to send. The waitlistInvites
+        // table is specifically for the legacy claim flow.
+        // Tracking is done via:
+        // - waitlistEntries.status = 'claimed'
+        // - creatorProfiles.isClaimed = true
+        // - users.userStatus = 'active'
 
         return {
           outcome: 'approved' as const,
