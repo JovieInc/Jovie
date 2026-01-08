@@ -220,13 +220,11 @@ async function createUserWithRetry(
  * 4. Check waitlist/profile state → WAITLIST_*, NEEDS_ONBOARDING, ACTIVE
  *
  * @param options.createDbUserIfMissing - If true, creates a DB user row when missing (default: true)
- * @param options.claimToken - If provided, used for claim flow state resolution
  */
-export async function resolveUserState(options?: {
-  createDbUserIfMissing?: boolean;
-  claimToken?: string;
-}): Promise<AuthGateResult> {
-  const { createDbUserIfMissing = true, claimToken } = options ?? {};
+export async function resolveUserState(
+  options: { createDbUserIfMissing?: boolean } = {}
+): Promise<AuthGateResult> {
+  const { createDbUserIfMissing = true } = options;
 
   // Default empty result
   const emptyResult: AuthGateResult = {
