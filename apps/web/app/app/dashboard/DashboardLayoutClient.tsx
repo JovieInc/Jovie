@@ -25,6 +25,7 @@ import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler'
 import {
   SidebarInset,
   SidebarProvider,
+  SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { cn } from '@/lib/utils';
@@ -292,6 +293,10 @@ function DashboardLayoutInner({
     </Button>
   ) : null;
 
+  const { state } = useSidebar();
+  const SidebarExpandButton =
+    !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <SkipToContent />
@@ -319,6 +324,7 @@ function DashboardLayoutInner({
               <DashboardHeader
                 breadcrumbs={crumbs}
                 leading={MobileMenuButton}
+                sidebarTrigger={SidebarExpandButton}
                 className='border-sidebar-border bg-sidebar-surface'
                 action={
                   <>
@@ -352,6 +358,7 @@ function DashboardLayoutInner({
               <DashboardHeader
                 breadcrumbs={crumbs}
                 leading={MobileMenuButton}
+                sidebarTrigger={SidebarExpandButton}
                 action={
                   <>
                     <DashboardThemeToggleButton />

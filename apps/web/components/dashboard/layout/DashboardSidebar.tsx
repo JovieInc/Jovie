@@ -24,11 +24,11 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarSeparator,
-  SidebarShortcutHint,
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 
 type SidebarRootProps = ComponentPropsWithoutRef<typeof Sidebar>;
@@ -59,10 +59,9 @@ export function DashboardSidebar({
     <TooltipProvider delayDuration={500} skipDelayDuration={200}>
       <Sidebar
         variant='sidebar'
-        collapsible='icon'
+        collapsible='offcanvas'
         className={cn(
           '[--sidebar-width:236px]',
-          '[--sidebar-width-icon:56px]',
           'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
           className
         )}
@@ -115,7 +114,9 @@ export function DashboardSidebar({
                   />
                 </TooltipTrigger>
                 <TooltipContent side='bottom' showArrow={false} sideOffset={8}>
-                  <SidebarShortcutHint />
+                  <span className='text-xs font-medium text-white/90'>
+                    ⌘/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}
+                  </span>
                 </TooltipContent>
               </Tooltip>
             </div>

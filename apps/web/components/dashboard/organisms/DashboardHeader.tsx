@@ -6,6 +6,7 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 export interface DashboardHeaderProps {
   breadcrumbs: DashboardBreadcrumbItem[];
   leading?: ReactNode;
+  sidebarTrigger?: ReactNode;
   action?: ReactNode;
   className?: string;
 }
@@ -13,6 +14,7 @@ export interface DashboardHeaderProps {
 export function DashboardHeader({
   breadcrumbs,
   leading,
+  sidebarTrigger,
   action,
   className,
 }: DashboardHeaderProps) {
@@ -26,6 +28,10 @@ export function DashboardHeader({
     >
       <div className='relative flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
+        {/* Sidebar expand button (desktop only, when collapsed) */}
+        {sidebarTrigger ? (
+          <div className='hidden lg:flex items-center'>{sidebarTrigger}</div>
+        ) : null}
         {/* Mobile: Show current page title centered */}
         <h1 className='flex-1 text-center text-[15px] font-semibold text-primary-token sm:hidden'>
           <span className='block max-w-[200px] truncate mx-auto'>

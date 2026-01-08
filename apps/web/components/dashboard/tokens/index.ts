@@ -7,6 +7,3 @@
  */
 
 export * from './card-tokens';
-export * from './form-tokens';
-export * from './modal-tokens';
-export * from './table-tokens';
