@@ -251,10 +251,10 @@ export function ReleaseTableRow({
         <span className='line-clamp-1 text-xs text-secondary-token'>
           {release.releaseDate
             ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
             : 'TBD'}
         </span>
       </td>
@@ -280,7 +280,7 @@ export function ReleaseTableRow({
               className={cn(
                 'inline-flex items-center text-xs transition-colors',
                 isCopied &&
-                'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
+                  'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
               )}
             >
               <Icon
@@ -362,7 +362,9 @@ export function ReleaseTableRow({
                   isSaving={isAddingUrl}
                 />
               ) : (
-                <span className='line-clamp-1 text-xs text-tertiary-token'>Not found</span>
+                <span className='line-clamp-1 text-xs text-tertiary-token'>
+                  Not found
+                </span>
               )}
             </div>
           </td>
