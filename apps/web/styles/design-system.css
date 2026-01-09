@@ -53,8 +53,12 @@
   /* Light mode surfaces - neutral grays without color tint */
   --color-bg-base: oklch(96% 0 0); /* #f4f4f4 - Sidebar bg (neutral gray) */
   --color-bg-surface-0: oklch(96% 0 0); /* Same as base */
-  --color-bg-surface-1: oklch(99% 0 0); /* #fcfcfc - Main content (pure neutral) */
-  --color-bg-surface-2: oklch(93% 0 0); /* #ededed - Contact sidebar (darker neutral) */
+  --color-bg-surface-1: oklch(
+    99% 0 0
+  ); /* #fcfcfc - Main content (pure neutral) */
+  --color-bg-surface-2: oklch(
+    93% 0 0
+  ); /* #ededed - Contact sidebar (darker neutral) */
   --color-bg-surface-3: oklch(90% 0 0); /* #e6e6e6 - Modals (darkest neutral) */
 
   /* Text hierarchy - contrast-aware */
