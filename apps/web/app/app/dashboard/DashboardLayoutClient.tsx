@@ -313,11 +313,7 @@ function DashboardLayoutInner({
       >
         <main
           id='main-content'
-          className={
-            isContactTableRoute
-              ? 'flex-1 min-h-0 overflow-hidden'
-              : 'flex-1 min-h-0 overflow-hidden p-1'
-          }
+          className='flex-1 min-h-0 overflow-hidden'
         >
           {isContactTableRoute ? (
             <>
@@ -355,7 +351,7 @@ function DashboardLayoutInner({
               </div>
             </>
           ) : (
-            <div className='flex h-full min-h-0 flex-col rounded-lg border border-subtle bg-surface-0'>
+            <div className='flex h-full min-h-0 flex-col bg-base'>
               <DashboardHeader
                 breadcrumbs={crumbs}
                 leading={MobileMenuButton}

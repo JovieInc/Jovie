@@ -230,7 +230,7 @@ export function ReleaseTableRow({
           {/* Title and metadata */}
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <span className='truncate text-sm font-semibold text-primary-token'>
+              <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
                 {release.title}
               </span>
               {manualOverrideCount > 0 && (
@@ -248,13 +248,13 @@ export function ReleaseTableRow({
 
       {/* Release date cell */}
       <td className='px-4 py-4 align-middle sm:px-6'>
-        <span className='text-xs text-secondary-token'>
+        <span className='line-clamp-1 text-xs text-secondary-token'>
           {release.releaseDate
             ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
             : 'TBD'}
         </span>
       </td>
@@ -278,14 +278,14 @@ export function ReleaseTableRow({
                 )
               }
               className={cn(
-                'inline-flex items-center gap-2 text-xs transition-colors',
+                'inline-flex items-center text-xs transition-colors',
                 isCopied &&
-                  'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
+                'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
               )}
             >
               <Icon
                 name={isCopied ? 'Check' : 'Link'}
-                className='h-3.5 w-3.5'
+                className='mr-1 h-3.5 w-3.5'
                 aria-hidden='true'
               />
               {isCopied ? 'Copied!' : 'Copy link'}
@@ -350,7 +350,7 @@ export function ReleaseTableRow({
                     )}
                     aria-hidden='true'
                   />
-                  <span>
+                  <span className='line-clamp-1'>
                     {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
                   </span>
                 </button>
@@ -362,7 +362,7 @@ export function ReleaseTableRow({
                   isSaving={isAddingUrl}
                 />
               ) : (
-                <span className='text-xs text-tertiary-token'>Not found</span>
+                <span className='line-clamp-1 text-xs text-tertiary-token'>Not found</span>
               )}
             </div>
           </td>

@@ -70,12 +70,12 @@ export function ReleaseProviderMatrix({
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
       {/* Main content area */}
       <div className='flex h-full min-h-0 flex-1 flex-col'>
-        <h1 className='sr-only'>Discography</h1>
-        <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
+        <h1 className='sr-only'>Releases</h1>
+        <div className='shrink-0 border-b border-subtle bg-base'>
           <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6'>
             <div className='flex items-center gap-3'>
               <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
-                Discography
+                Releases
               </p>
               {isConnected && artistName && (
                 <span className='inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954]'>
@@ -85,11 +85,6 @@ export function ReleaseProviderMatrix({
               )}
             </div>
             <div className='flex items-center gap-3'>
-              {totalReleases > 0 && (
-                <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token'>
-                  {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
-                </span>
-              )}
               {totalOverrides > 0 && (
                 <span className='inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'>
                   <Icon
@@ -125,7 +120,7 @@ export function ReleaseProviderMatrix({
         </div>
 
         <div className='flex-1 min-h-0 overflow-hidden'>
-          <div className='flex h-full min-h-0 flex-col bg-surface-1'>
+          <div className='flex h-full min-h-0 flex-col bg-base'>
             <div
               className='flex-1 min-h-0 overflow-auto'
               ref={tableContainerRef}
@@ -168,9 +163,9 @@ export function ReleaseProviderMatrix({
                   </caption>
                   <thead
                     className={cn(
-                      'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
+                      'sticky top-0 z-20 bg-base backdrop-blur-md',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                   >
                     <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
@@ -283,7 +278,7 @@ export function ReleaseProviderMatrix({
                     No releases yet
                   </h3>
                   <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                    Sync your discography from Spotify to start generating smart
+                    Sync your releases from Spotify to start generating smart
                     links for your releases.
                   </p>
                   <Button
@@ -309,7 +304,7 @@ export function ReleaseProviderMatrix({
             </div>
 
             {rows.length > 0 && (
-              <div className='sticky bottom-0 z-20 flex items-center justify-between border-t border-subtle bg-surface-1/75 px-4 py-3 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+              <div className='sticky bottom-0 z-20 flex items-center justify-between border-t border-subtle bg-base/75 px-4 py-3 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
                 <span>
                   {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
                   {totalOverrides > 0 && (

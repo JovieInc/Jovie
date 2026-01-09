@@ -157,6 +157,8 @@ export function ProfileEditorSection({
                 id='profile-username'
                 type='text'
                 aria-label='Username'
+                data-1p-ignore
+                autoComplete='off'
                 value={profileUsername}
                 onChange={e => onUsernameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'username')}

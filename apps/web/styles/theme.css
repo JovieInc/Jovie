@@ -65,20 +65,20 @@
   --border: var(--border-subtle);
   /* Feature accent colors remain consistent across themes */
 
-  /* Sidebar tokens - Linear-inspired dark mode sophistication */
-  --sidebar-background: 20 20 25;
-  /* Deep, rich dark background */
+  /* Sidebar tokens - elevated surface in dark mode (#17181a) */
+  --sidebar-background: 23 24 26;
+  /* Elevated surface above main content */
   --sidebar-foreground: 244 244 245;
   /* Warm white text */
   --sidebar-primary: 244 244 245;
   /* Primary text/icons */
   --sidebar-primary-foreground: 0 0 0;
   /* Dark text on light backgrounds */
-  --sidebar-accent: 24 24 31;
+  --sidebar-accent: 32 33 37;
   /* Subtle accent backgrounds */
   --sidebar-accent-foreground: 244 244 245;
   /* Text on accent backgrounds */
-  --sidebar-border: 255 255 255 / 0.1;
+  --sidebar-border: 255 255 255 / 0.08;
   /* Border colors with proper contrast */
   --sidebar-ring: 109 119 230 / 0.55;
   /* Focus ring (unchanged) */
@@ -88,13 +88,13 @@
   /* Secondary text with better contrast */
   --sidebar-muted-foreground: 148 150 156;
   /* Muted text that's still readable */
-  --sidebar-surface: 20 20 25;
+  --sidebar-surface: 23 24 26;
   /* Surface colors with depth */
-  --sidebar-surface-hover: 24 24 31;
+  --sidebar-surface-hover: 32 33 37;
   /* Hover states that feel responsive */
-  --sidebar-input-background: 24 24 31;
+  --sidebar-input-background: 32 33 37;
   /* Input backgrounds */
-  --sidebar-input-border: 255 255 255 / 0.1;
+  --sidebar-input-border: 255 255 255 / 0.08;
   /* Input borders */
 }
 
