@@ -4,7 +4,7 @@ description: Run CodeRabbit CLI review and fix all issues
 
 # CodeRabbit Review & Fix
 
-Run CodeRabbit CLI in the background to review uncommitted changes and fix any issues found. This workflow repeats iteratively until all issues are resolved.
+Run CodeRabbit CLI in the background to review uncommitted changes and fix any issues found. This workflow continues iteratively until all issues are resolved.
 
 ## Instructions
 
