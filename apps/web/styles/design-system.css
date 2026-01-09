@@ -50,20 +50,22 @@
 */
 
 :root {
-  /* Light mode surfaces - progressively darker */
-  --color-bg-base: oklch(99% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-0: oklch(
-    97.5% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-bg-surface-1: oklch(
+  /* Light mode surfaces - sidebar darker, content lighter */
+  --color-bg-base: oklch(
     96% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  ); /* Sidebar bg - darker */
+  --color-bg-surface-0: oklch(
+    96% var(--theme-base-chroma) var(--theme-base-hue)
+  ); /* Same as base */
+  --color-bg-surface-1: oklch(
+    99% var(--theme-base-chroma) var(--theme-base-hue)
+  ); /* Main content - lighter */
   --color-bg-surface-2: oklch(
     93% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  ); /* Contact sidebar - darker */
   --color-bg-surface-3: oklch(
     90% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  ); /* Modals */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -514,7 +516,9 @@
    SIDEBAR TOKENS (RGB triplets for alpha)
    ============================================ */
 :root {
-  --sidebar-background: 255 255 255;
+  /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
+  /* Maps to --color-bg-base (oklch(96% ...) ≈ rgb(244,244,245)) */
+  --sidebar-background: 244 244 245; /* Darker sidebar */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
@@ -524,7 +528,7 @@
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 107 114 128;
   --sidebar-muted-foreground: 113 113 122;
-  --sidebar-surface: 250 251 252;
+  --sidebar-surface: 244 244 245; /* Matches base */
   --sidebar-surface-hover: 245 246 248;
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 231 235;
