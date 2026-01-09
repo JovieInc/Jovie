@@ -65,9 +65,11 @@
   --border: var(--border-subtle);
   /* Feature accent colors remain consistent across themes */
 
-  /* Sidebar tokens - elevated surface in dark mode (#17181a) */
-  --sidebar-background: 23 24 26;
-  /* Elevated surface above main content */
+  /* Sidebar tokens - DUPLICATE: defined in design-system.css (single source of truth) */
+  /* TODO: Remove this section once design-system.css is confirmed as sole source */
+  /* Maps to --color-bg-base (oklch(3.5% 0 0) = #090909 = rgb(9,9,9)) */
+  --sidebar-background: 9 9 9;
+  /* Matches base background */
   --sidebar-foreground: 244 244 245;
   /* Warm white text */
   --sidebar-primary: 244 244 245;
@@ -88,8 +90,8 @@
   /* Secondary text with better contrast */
   --sidebar-muted-foreground: 148 150 156;
   /* Muted text that's still readable */
-  --sidebar-surface: 23 24 26;
-  /* Surface colors with depth */
+  --sidebar-surface: 9 9 9;
+  /* Matches base background */
   --sidebar-surface-hover: 32 33 37;
   /* Hover states that feel responsive */
   --sidebar-input-background: 32 33 37;

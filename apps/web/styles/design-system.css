@@ -138,11 +138,11 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
-  --color-bg-base: oklch(3.5% 0 0);
-  --color-bg-surface-0: oklch(3.5% 0 0);
-  --color-bg-surface-1: oklch(6.5% 0.005 240);
-  --color-bg-surface-2: oklch(10% 0.005 240);
-  --color-bg-surface-3: oklch(14% 0.005 240);
+  --color-bg-base: oklch(3.5% 0 0); /* #090909 - sidebar & page bg */
+  --color-bg-surface-0: oklch(3.5% 0 0); /* Same as base */
+  --color-bg-surface-1: oklch(6.5% 0.005 240); /* #101011 - main content */
+  --color-bg-surface-2: oklch(9.5% 0.005 240); /* #17181a - contact sidebar */
+  --color-bg-surface-3: oklch(14% 0.005 240); /* Modals, tooltips */
 
   /* Text hierarchy - inverted for dark mode */
   --color-text-primary-token: oklch(96% 0 0);
@@ -531,7 +531,13 @@
 }
 
 :root.dark {
+<<<<<<< HEAD
   --sidebar-background: 9 9 9;
+=======
+  /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
+  /* Maps to --color-bg-base (oklch(3.5% 0 0) = #090909 = rgb(9,9,9)) */
+  --sidebar-background: 9 9 9; /* Matches base */
+>>>>>>> b1b2828c5 (feat(ui): standardize dashboard layout styling and visual hierarchy)
   --sidebar-foreground: 244 244 245;
   --sidebar-primary: 244 244 245;
   --sidebar-primary-foreground: 12 12 12;
@@ -541,7 +547,11 @@
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
+<<<<<<< HEAD
   --sidebar-surface: 9 9 9;
+=======
+  --sidebar-surface: 9 9 9; /* Matches base */
+>>>>>>> b1b2828c5 (feat(ui): standardize dashboard layout styling and visual hierarchy)
   --sidebar-surface-hover: 32 33 37;
   --sidebar-input-background: 32 33 37;
   --sidebar-input-border: 255 255 255 / 0.08;
