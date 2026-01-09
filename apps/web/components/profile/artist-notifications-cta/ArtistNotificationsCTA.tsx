@@ -37,6 +37,7 @@ export function ArtistNotificationsCTA({
   } = useSubscriptionForm({ artist });
 
   const inputId = useId();
+  const disclaimerId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
 
@@ -170,6 +171,7 @@ export function ArtistNotificationsCTA({
               <input
                 ref={inputRef}
                 id={inputId}
+                aria-describedby={disclaimerId}
                 type={channel === 'sms' ? 'tel' : 'email'}
                 inputMode={channel === 'sms' ? 'numeric' : 'email'}
                 className='w-full h-12 px-4 bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground placeholder:opacity-80 border-none focus:outline-none focus:ring-0'
@@ -214,6 +216,7 @@ export function ArtistNotificationsCTA({
         </button>
 
         <p
+          id={disclaimerId}
           className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
             isInputFocused ? 'opacity-100' : 'opacity-0'
           }`}
