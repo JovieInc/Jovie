@@ -49,6 +49,7 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **No direct Neon branch management** from agents; always go through CI workflows.
 - **No direct pushes** to `main`.
 - **HARD GUARDRAIL – Drizzle migrations are immutable:** Treat everything under `drizzle/migrations` as append-only. Do **not** edit, delete, reorder, squash, or regenerate existing migration files for any reason; only add new migrations. If a past migration appears incorrect, stop and escalate to a human instead of attempting an automated fix.
+- **HARD GUARDRAIL – Never suppress Biome errors:** Do **not** use `biome-ignore` comments to suppress lint or format errors. Always address the root cause by fixing the code to comply with Biome rules. If a rule seems incorrect, discuss with the team before suppressing. Proper fixes include: using semantic HTML elements, adding proper ARIA roles, refactoring for accessibility, or restructuring code to follow best practices.
 - New features ship **behind Statsig flags/experiments** and with **Statsig events** (or equivalent Statsig metrics) for primary actions.
 
 ## 8. Engineering Guardrails & Architecture
