@@ -56,7 +56,7 @@ export function CreatorProfileTableRow({
   return (
     <tr
       className={cn(
-        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 focus:outline-none',
+        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
         isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
       )}
       onClick={() => onRowClick(profile.id)}
