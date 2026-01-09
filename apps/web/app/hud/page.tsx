@@ -28,20 +28,15 @@ function formatRunway(runwayMonths: number | null): string {
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
-async function getHudAbsoluteUrl(
-  kioskToken: string | null
-): Promise<string> {
+async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
   const headerStore = await headers();
 
-  const host =
-    headerStore.get('x-forwarded-host') ?? headerStore.get('host');
+  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host');
   const protoHeader = headerStore.get('x-forwarded-proto');
 
   // Validate and normalize protocol - http or https only
   const proto =
-    protoHeader === 'http' || protoHeader === 'https'
-      ? protoHeader
-      : 'https';
+    protoHeader === 'http' || protoHeader === 'https' ? protoHeader : 'https';
 
   // Validate host header to prevent injection attacks
   const isValidHost = (hostValue: string | null): boolean => {
@@ -87,8 +82,7 @@ export default async function HudPage({
   searchParams: SearchParams;
 }) {
   const kioskTokenRaw = searchParams.kiosk;
-  const kioskToken =
-    typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
+  const kioskToken = typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
 
   const auth = await authorizeHud(kioskToken);
 
@@ -243,9 +237,7 @@ export default async function HudPage({
                       <div className='mt-3 text-xl text-white/70'>
                         DB latency{' '}
                         {metrics.operations.dbLatencyMs != null
-                          ? `${metrics.operations.dbLatencyMs.toFixed(
-                              0
-                            )}ms`
+                          ? `${metrics.operations.dbLatencyMs.toFixed(0)}ms`
                           : '—'}
                       </div>
                     </div>
@@ -255,17 +247,12 @@ export default async function HudPage({
                         Reliability
                       </div>
                       <div className='mt-3 text-4xl font-semibold tracking-tight'>
-                        {metrics.reliability.errorRatePercent.toFixed(
-                          2
-                        )}
-                        %
+                        {metrics.reliability.errorRatePercent.toFixed(2)}%
                       </div>
                       <div className='mt-3 text-xl text-white/70'>
                         p95{' '}
                         {metrics.reliability.p95LatencyMs != null
-                          ? `${metrics.reliability.p95LatencyMs.toFixed(
-                              0
-                            )}ms`
+                          ? `${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
                           : '—'}
                       </div>
                     </div>
@@ -299,35 +286,30 @@ export default async function HudPage({
 
                 {metrics.deployments.recent.length > 0 ? (
                   <div className='mt-5 grid gap-4'>
-                    {metrics.deployments.recent
-                      .slice(0, 5)
-                      .map(run => (
-                        <div
-                          key={run.id}
-                          className='flex items-center justify-between gap-6'
-                        >
-                          <div className='text-xl font-semibold tracking-tight'>
-                            #{run.runNumber}
-                            <span className='ml-3 text-white/60 font-normal'>
-                              {run.branch ?? '—'}
-                            </span>
-                          </div>
-                          <div className='text-white/60 text-sm'>
-                            {new Date(run.createdAtIso).toLocaleString(
-                              'en-US',
-                              {
-                                month: 'short',
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              }
-                            )}
-                            <span className='ml-3 text-white/80 font-semibold'>
-                              {run.status}
-                            </span>
-                          </div>
+                    {metrics.deployments.recent.slice(0, 5).map(run => (
+                      <div
+                        key={run.id}
+                        className='flex items-center justify-between gap-6'
+                      >
+                        <div className='text-xl font-semibold tracking-tight'>
+                          #{run.runNumber}
+                          <span className='ml-3 text-white/60 font-normal'>
+                            {run.branch ?? '—'}
+                          </span>
                         </div>
-                      ))}
+                        <div className='text-white/60 text-sm'>
+                          {new Date(run.createdAtIso).toLocaleString('en-US', {
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          <span className='ml-3 text-white/80 font-semibold'>
+                            {run.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className='mt-4 text-xl text-white/60'>—</div>
@@ -349,9 +331,7 @@ export default async function HudPage({
 
               <HudStatusPill
                 label={
-                  metrics.overview.defaultStatus === 'alive'
-                    ? 'Alive'
-                    : 'Dead'
+                  metrics.overview.defaultStatus === 'alive' ? 'Alive' : 'Dead'
                 }
                 tone={defaultTone}
               />
