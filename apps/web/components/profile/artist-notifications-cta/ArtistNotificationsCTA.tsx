@@ -147,7 +147,7 @@ export function ArtistNotificationsCTA({
                   onClick={() => handleChannelChange('email')}
                   disabled={isSubmitting}
                 >
-                  <Mail className='w-4 h-4' aria-hidden='true' />
+                  <Phone className='w-4 h-4' aria-hidden='true' />
                 </button>
               )
             ) : (
@@ -158,7 +158,7 @@ export function ArtistNotificationsCTA({
                 onClick={() => handleChannelChange('sms')}
                 disabled={isSubmitting}
               >
-                <Phone className='w-4 h-4' aria-hidden='true' />
+                <Mail className='w-4 h-4' aria-hidden='true' />
               </button>
             )}
 
