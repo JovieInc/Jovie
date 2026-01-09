@@ -87,13 +87,13 @@ export function CountrySelector({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='h-12 pl-4 pr-3 flex items-center gap-1.5 bg-transparent text-[15px] text-foreground hover:bg-surface-2 transition-colors focus:outline-none'
+          className='h-12 pl-4 pr-3 flex items-center gap-1.5 bg-transparent text-[15px] text-primary-token hover:bg-surface-2 transition-colors focus:outline-none'
           style={{ fontSynthesisWeight: 'none' }}
           aria-label='Select country code'
         >
           <span>{country.flag}</span>
           <span>{country.dialCode}</span>
-          <ChevronDown className='w-3.5 h-3.5 text-muted-foreground' />
+          <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -112,16 +112,16 @@ export function CountrySelector({
               }}
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
                 country.code === option.code
-                  ? 'bg-surface-2 text-foreground'
-                  : 'text-foreground hover:bg-surface-1'
+                  ? 'bg-surface-2 text-primary-token'
+                  : 'text-primary-token hover:bg-surface-1'
               }`}
               style={{ fontSynthesisWeight: 'none' }}
             >
               <span className='text-base'>{option.flag}</span>
               <span className='flex-1 text-left'>{option.label}</span>
-              <span className='text-muted-foreground'>{option.dialCode}</span>
+              <span className='text-tertiary-token'>{option.dialCode}</span>
               {country.code === option.code && (
-                <Check className='w-4 h-4 text-foreground' />
+                <Check className='w-4 h-4 text-primary-token' />
               )}
             </button>
           ))}
