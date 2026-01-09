@@ -389,6 +389,7 @@ jobs:
         if: steps.final-status.outputs.final_passed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           # Configure git
           git config user.name "github-actions[bot]"
@@ -412,7 +413,7 @@ jobs:
           Co-authored-by: Claude <claude@anthropic.com>"
           
           # Push to PR branch
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git push origin "HEAD:$PR_HEAD_REF"
           
           echo "✅ Changes committed and pushed"
 
