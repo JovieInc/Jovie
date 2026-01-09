@@ -28,7 +28,7 @@ export function AudienceCreatedAtCell({
       )}
     >
       <div className='flex items-center justify-between gap-2'>
-        <span>{formatLongDate(lastSeenAt)}</span>
+        <span className='line-clamp-1'>{formatLongDate(lastSeenAt)}</span>
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
         {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}

@@ -74,7 +74,7 @@ export const Sidebar = React.forwardRef<
       >
         <div
           className={cn(
-            'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-linear',
+            'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-out',
             'group-data-[collapsible=offcanvas]:w-0',
             'group-data-[side=right]:rotate-180',
             variant === 'floating'

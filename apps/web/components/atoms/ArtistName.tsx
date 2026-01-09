@@ -56,7 +56,7 @@ export function ArtistName({
         {name}
       </span>
       {isVerified && (
-        <span className='relative -top-[0.65em] -left-[0.5em]'>
+        <span className='relative -top-[0.5em] -left-[0.25em]'>
           <VerifiedBadge
             size={badgeSizes[size]}
             className='text-indigo-600 dark:text-indigo-400'
