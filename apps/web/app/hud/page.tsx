@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Image from 'next/image';
 import { QRCode } from '@/components/atoms/QRCode';
+import { publicEnv } from '@/lib/env-public';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { HudAutoRefreshClient } from './HudAutoRefreshClient';
@@ -52,22 +53,16 @@ async function getHudAbsoluteUrl(
 
   // In production, host should be available from reverse proxy
   if (!host || !isValidHost(host)) {
-    // Only allow http in development
-    const isDev = process.env.NODE_ENV === 'development';
-    const base = isDev
-      ? 'http://localhost:3000'
-      : 'https://app.jovie.com';
+    // Use validated env for fallback URL (includes protocol)
+    const base = publicEnv.NEXT_PUBLIC_APP_URL;
     if (!host) {
-      console.warn(
-        '[HUD] Missing host header, using fallback:',
-        base
-      );
+      console.warn('[HUD] Missing host header, using fallback:', base);
     } else {
       console.warn(
         '[HUD] Invalid host header detected:',
         host,
         '- using fallback:',
-        base,
+        base
       );
     }
     const url = new URL('/hud', base);
