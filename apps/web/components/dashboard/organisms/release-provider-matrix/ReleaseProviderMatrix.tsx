@@ -165,7 +165,7 @@ export function ReleaseProviderMatrix({
                     className={cn(
                       'sticky top-0 z-20 bg-base backdrop-blur-md',
                       headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                   >
                     <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
