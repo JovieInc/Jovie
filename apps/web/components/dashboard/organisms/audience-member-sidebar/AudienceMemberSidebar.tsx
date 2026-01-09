@@ -42,14 +42,14 @@ export function AudienceMemberSidebar({
       className='bg-sidebar-surface border-sidebar-border'
     >
       <div
-        className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'
+        className='flex h-12 items-center justify-between px-4 shrink-0'
         data-testid='audience-member-sidebar'
       >
         <h2 className='text-[13px] font-medium text-primary-token'>Contact</h2>
         <DashboardHeaderActionButton
           ariaLabel='Close contact sidebar'
           onClick={onClose}
-          icon={<X className='h-4 w-4' aria-hidden='true' />}
+          icon={<X aria-hidden='true' />}
         />
       </div>
 
