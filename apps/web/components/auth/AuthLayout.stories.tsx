@@ -65,7 +65,9 @@ export const Waitlist: Story = {
         <div className='space-y-2'>
           {
             // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-            <label className='text-sm font-medium text-primary-token'>Email</label>
+            <label className='text-sm font-medium text-primary-token'>
+              Email
+            </label>
           }
           <input
             type='email'
