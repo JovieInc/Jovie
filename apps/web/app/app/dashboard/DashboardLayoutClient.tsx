@@ -313,7 +313,11 @@ function DashboardLayoutInner({
       >
         <main
           id='main-content'
-          className='flex-1 min-h-0 overflow-hidden'
+          className={
+            isContactTableRoute
+              ? 'flex-1 min-h-0 overflow-hidden'
+              : 'flex-1 min-h-0 overflow-hidden p-1'
+          }
         >
           {isContactTableRoute ? (
             <>
