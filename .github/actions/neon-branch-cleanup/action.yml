@@ -15,7 +15,7 @@ inputs:
   protected_branches:
     description: 'Comma-separated list of branch names to never delete'
     required: false
-    default: 'main,production,br-main,br-production'
+    default: 'main,production,development,br-main,br-production'
   cleanup_threshold:
     description: 'Start cleanup when this many branches exist (should be less than limit)'
     required: false
@@ -110,11 +110,12 @@ runs:
             continue
           fi
 
-          # SAFETY: Only delete branches that match GitHub PR naming pattern
-          # Pattern: pr-<number>-<sanitized-branch-name> or preview-pr-<number>
+          # SAFETY: Only delete branches that match ephemeral naming patterns
+          # Patterns: pr-<number>-<number>, preview-pr-<number>, main-<number>-<number>, e2e-full-<number>[-<suffix>]
           # This protects manually-created branches (e.g., 'dev', 'staging', 'tim-dev')
-          if ! [[ "$branch_name" =~ ^(pr-[0-9]+-|preview-pr-[0-9]+) ]]; then
-            echo "Skipping non-ephemeral branch (no PR pattern): $branch_name"
+          EPHEMERAL_RE='^(pr-[0-9]+-[0-9]+|preview-pr-[0-9]+|main-[0-9]+-[0-9]+|e2e-full-[0-9]+(-[A-Za-z0-9._-]+)?)$'
+          if ! [[ "$branch_name" =~ $EPHEMERAL_RE ]]; then
+            echo "Skipping non-ephemeral branch (no pattern match): $branch_name"
             continue
           fi
 

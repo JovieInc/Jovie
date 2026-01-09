@@ -12,6 +12,7 @@ import React, {
 } from 'react';
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
+import { DashboardThemeToggleButton } from '@/components/dashboard/atoms/DashboardThemeToggleButton';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
 import {
   PREVIEW_PANEL_WIDTH,
@@ -329,7 +330,12 @@ function DashboardLayoutInner({
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
                   showDivider={true}
-                  action={<>{ContactToggleButton}</>}
+                  action={
+                    <>
+                      {ContactToggleButton}
+                      <DashboardThemeToggleButton />
+                    </>
+                  }
                 />
                 <div className='flex-1 min-h-0 overflow-hidden'>
                   <div
@@ -358,7 +364,12 @@ function DashboardLayoutInner({
                   breadcrumbs={crumbs}
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
-                  action={<>{showPreview ? <PreviewToggleButton /> : null}</>}
+                  action={
+                    <>
+                      <DashboardThemeToggleButton />
+                      {showPreview ? <PreviewToggleButton /> : null}
+                    </>
+                  }
                 />
                 <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
                   <div
