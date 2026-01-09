@@ -123,7 +123,9 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
             primaryText={pill.label}
             suffix='+'
             tone='faded'
-            onClick={() => onPlatformSelect(buildPrefillUrl(pill.id))}
+            onClick={() =>
+              onPlatformSelect(buildPrefillUrl(pill.id))
+            }
             className='whitespace-nowrap shrink-0'
           />
         ))}

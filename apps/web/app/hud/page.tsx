@@ -1,7 +1,6 @@
 import { headers } from 'next/headers';
 import Image from 'next/image';
 import { QRCode } from '@/components/atoms/QRCode';
-import { env } from '@/lib/env';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { HudAutoRefreshClient } from './HudAutoRefreshClient';
@@ -28,31 +27,41 @@ function formatRunway(runwayMonths: number | null): string {
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
-async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
+async function getHudAbsoluteUrl(
+  kioskToken: string | null
+): Promise<string> {
   const headerStore = await headers();
 
-  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host');
+  const host =
+    headerStore.get('x-forwarded-host') ?? headerStore.get('host');
   const protoHeader = headerStore.get('x-forwarded-proto');
 
-  // Validate and normalize protocol - only allow http or https, default to https
+  // Validate and normalize protocol - http or https only
   const proto =
-    protoHeader === 'http' || protoHeader === 'https' ? protoHeader : 'https';
+    protoHeader === 'http' || protoHeader === 'https'
+      ? protoHeader
+      : 'https';
 
   // Validate host header to prevent injection attacks
   const isValidHost = (hostValue: string | null): boolean => {
     if (!hostValue) return false;
-    // Allow alphanumerics, dots, hyphens, and optional port (colon + digits)
-    // This regex prevents suspicious characters that could be used for header injection
+    // Allow alphanumerics, dots, hyphens, and optional port
+    // This regex prevents suspicious characters for header injection
     return /^[a-zA-Z0-9.-]+(:\d+)?$/.test(hostValue);
   };
 
-  // In production, host should always be available from reverse proxy
+  // In production, host should be available from reverse proxy
   if (!host || !isValidHost(host)) {
     // Only allow http in development
-    const isDev = env.NODE_ENV === 'development';
-    const base = isDev ? 'http://localhost:3000' : 'https://app.jovie.com';
+    const isDev = process.env.NODE_ENV === 'development';
+    const base = isDev
+      ? 'http://localhost:3000'
+      : 'https://app.jovie.com';
     if (!host) {
-      console.warn('[HUD] Missing host header, using fallback:', base);
+      console.warn(
+        '[HUD] Missing host header, using fallback:',
+        base
+      );
     } else {
       console.warn(
         '[HUD] Invalid host header detected:',
@@ -83,7 +92,8 @@ export default async function HudPage({
   searchParams: SearchParams;
 }) {
   const kioskTokenRaw = searchParams.kiosk;
-  const kioskToken = typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
+  const kioskToken =
+    typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
 
   const auth = await authorizeHud(kioskToken);
 
@@ -238,7 +248,9 @@ export default async function HudPage({
                       <div className='mt-3 text-xl text-white/70'>
                         DB latency{' '}
                         {metrics.operations.dbLatencyMs != null
-                          ? `${metrics.operations.dbLatencyMs.toFixed(0)}ms`
+                          ? `${metrics.operations.dbLatencyMs.toFixed(
+                              0
+                            )}ms`
                           : '—'}
                       </div>
                     </div>
@@ -248,12 +260,17 @@ export default async function HudPage({
                         Reliability
                       </div>
                       <div className='mt-3 text-4xl font-semibold tracking-tight'>
-                        {metrics.reliability.errorRatePercent.toFixed(2)}%
+                        {metrics.reliability.errorRatePercent.toFixed(
+                          2
+                        )}
+                        %
                       </div>
                       <div className='mt-3 text-xl text-white/70'>
                         p95{' '}
                         {metrics.reliability.p95LatencyMs != null
-                          ? `${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
+                          ? `${metrics.reliability.p95LatencyMs.toFixed(
+                              0
+                            )}ms`
                           : '—'}
                       </div>
                     </div>
@@ -287,30 +304,35 @@ export default async function HudPage({
 
                 {metrics.deployments.recent.length > 0 ? (
                   <div className='mt-5 grid gap-4'>
-                    {metrics.deployments.recent.slice(0, 5).map(run => (
-                      <div
-                        key={run.id}
-                        className='flex items-center justify-between gap-6'
-                      >
-                        <div className='text-xl font-semibold tracking-tight'>
-                          #{run.runNumber}
-                          <span className='ml-3 text-white/60 font-normal'>
-                            {run.branch ?? '—'}
-                          </span>
+                    {metrics.deployments.recent
+                      .slice(0, 5)
+                      .map(run => (
+                        <div
+                          key={run.id}
+                          className='flex items-center justify-between gap-6'
+                        >
+                          <div className='text-xl font-semibold tracking-tight'>
+                            #{run.runNumber}
+                            <span className='ml-3 text-white/60 font-normal'>
+                              {run.branch ?? '—'}
+                            </span>
+                          </div>
+                          <div className='text-white/60 text-sm'>
+                            {new Date(run.createdAtIso).toLocaleString(
+                              'en-US',
+                              {
+                                month: 'short',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              }
+                            )}
+                            <span className='ml-3 text-white/80 font-semibold'>
+                              {run.status}
+                            </span>
+                          </div>
                         </div>
-                        <div className='text-white/60 text-sm'>
-                          {new Date(run.createdAtIso).toLocaleString('en-US', {
-                            month: 'short',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                          <span className='ml-3 text-white/80 font-semibold'>
-                            {run.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 ) : (
                   <div className='mt-4 text-xl text-white/60'>—</div>
@@ -332,7 +354,9 @@ export default async function HudPage({
 
               <HudStatusPill
                 label={
-                  metrics.overview.defaultStatus === 'alive' ? 'Alive' : 'Dead'
+                  metrics.overview.defaultStatus === 'alive'
+                    ? 'Alive'
+                    : 'Dead'
                 }
                 tone={defaultTone}
               />
