@@ -236,6 +236,30 @@ export function useProfileNotificationsController({
         return;
       }
 
+      // Store previous state for rollback on error
+      const previousChannels = { ...subscribedChannels };
+      const previousDetails = { ...subscriptionDetails };
+      const previousState = state;
+
+      // Optimistic update: immediately update UI
+      setSubscribedChannels(prev => {
+        const next = { ...prev, [targetChannel]: false };
+        const stillSubscribed = Object.values(next).some(Boolean);
+
+        if (!stillSubscribed) {
+          setState('editing');
+        }
+
+        return next;
+      });
+
+      setSubscriptionDetails(prev => {
+        const next = { ...prev };
+        delete next[targetChannel];
+        return next;
+      });
+
+      setIsNotificationMenuOpen(false);
       setChannelBusy(prev => ({ ...prev, [targetChannel]: true }));
 
       try {
@@ -259,27 +283,13 @@ export function useProfileNotificationsController({
           source: 'profile_inline',
         });
 
-        setSubscribedChannels(prev => {
-          const next = { ...prev, [targetChannel]: false };
-          const stillSubscribed = Object.values(next).some(Boolean);
-
-          if (!stillSubscribed) {
-            setState('editing');
-          }
-
-          return next;
-        });
-
-        setSubscriptionDetails(prev => {
-          const next = { ...prev };
-          delete next[targetChannel];
-          return next;
-        });
-
-        setIsNotificationMenuOpen(false);
-
         onSuccess(getNotificationUnsubscribeSuccessMessage(targetChannel));
       } catch (error) {
+        // Rollback optimistic update on error
+        setSubscribedChannels(previousChannels);
+        setSubscriptionDetails(previousDetails);
+        setState(previousState);
+
         const message =
           error instanceof Error
             ? error.message
@@ -303,6 +313,8 @@ export function useProfileNotificationsController({
       channelBusy,
       onError,
       onSuccess,
+      state,
+      subscribedChannels,
       subscriptionDetails,
     ]
   );
