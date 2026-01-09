@@ -182,8 +182,12 @@ export default async function RootLayout({
         crossOrigin=''
       />
       {/* Clerk Auth - authentication */}
-      <link rel='dns-prefetch' href='https://clerk.jovie.co' />
-      <link rel='preconnect' href='https://clerk.jovie.co' crossOrigin='' />
+      <link rel='dns-prefetch' href='https://clerk.meetjovie.com' />
+      <link
+        rel='preconnect'
+        href='https://clerk.meetjovie.com'
+        crossOrigin=''
+      />
       <link rel='dns-prefetch' href='https://img.clerk.com' />
       <link rel='preconnect' href='https://img.clerk.com' crossOrigin='' />
       {/* Unsplash - fallback images */}
