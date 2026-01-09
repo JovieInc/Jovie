@@ -17,17 +17,17 @@ const SampleForm = () => (
     <div className='space-y-2'>
       {
         // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-        <label className='text-sm font-medium text-white'>Email</label>
+        <label className='text-sm font-medium text-primary-token'>Email</label>
       }
       <input
         type='email'
         placeholder='you@example.com'
-        className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
+        className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
       />
     </div>
     <button
       type='button'
-      className='w-full py-2 bg-white text-black rounded-md font-medium'
+      className='w-full py-2 bg-btn-primary text-btn-primary-foreground rounded-[--radius-xl] font-medium'
     >
       Continue
     </button>
@@ -65,30 +65,32 @@ export const Waitlist: Story = {
         <div className='space-y-2'>
           {
             // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-            <label className='text-sm font-medium text-white'>Email</label>
+            <label className='text-sm font-medium text-primary-token'>
+              Email
+            </label>
           }
           <input
             type='email'
             placeholder='you@example.com'
-            className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
+            className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
           />
         </div>
         <div className='space-y-2'>
           {
             // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-            <label className='text-sm font-medium text-white'>
+            <label className='text-sm font-medium text-primary-token'>
               Desired Handle
             </label>
           }
           <input
             type='text'
             placeholder='@yourhandle'
-            className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
+            className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
           />
         </div>
         <button
           type='button'
-          className='w-full py-2 bg-white text-black rounded-md font-medium'
+          className='w-full py-2 bg-btn-primary text-btn-primary-foreground rounded-[--radius-xl] font-medium'
         >
           Join Waitlist
         </button>

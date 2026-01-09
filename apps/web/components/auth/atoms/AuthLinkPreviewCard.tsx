@@ -19,7 +19,7 @@ export function AuthLinkPreviewCard({
   return (
     <div
       className={cn(
-        'w-full rounded-lg border border-subtle bg-surface-0 px-4 py-3',
+        'w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-3',
         className
       )}
     >

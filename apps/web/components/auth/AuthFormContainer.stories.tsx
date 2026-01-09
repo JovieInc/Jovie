@@ -17,28 +17,30 @@ const SampleForm = () => (
     <div className='space-y-2'>
       {
         // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-        <label className='text-sm font-medium'>Email</label>
+        <label className='text-sm font-medium text-primary-token'>Email</label>
       }
       <input
         type='email'
         placeholder='you@example.com'
-        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800'
+        className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
       />
     </div>
     <div className='space-y-2'>
       {
         // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-        <label className='text-sm font-medium'>Password</label>
+        <label className='text-sm font-medium text-primary-token'>
+          Password
+        </label>
       }
       <input
         type='password'
         placeholder='••••••••'
-        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800'
+        className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
       />
     </div>
     <button
       type='button'
-      className='w-full py-2 bg-black text-white dark:bg-white dark:text-black rounded-md font-medium'
+      className='w-full py-2 bg-btn-primary text-btn-primary-foreground rounded-[--radius-xl] font-medium'
     >
       Sign In
     </button>
@@ -52,7 +54,7 @@ export const SignIn: Story = {
   },
   decorators: [
     Story => (
-      <div className='min-h-screen bg-white dark:bg-gray-900'>
+      <div className='min-h-screen bg-base'>
         <Story />
       </div>
     ),
@@ -66,7 +68,7 @@ export const SignUp: Story = {
   },
   decorators: [
     Story => (
-      <div className='min-h-screen bg-white dark:bg-gray-900'>
+      <div className='min-h-screen bg-base'>
         <Story />
       </div>
     ),

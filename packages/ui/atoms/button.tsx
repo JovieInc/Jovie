@@ -22,13 +22,13 @@ const buttonVariants = cva(
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         // Link variant
         link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
-        // Frosted glass variants (glassmorphism)
+        // Frosted glass variants (glassmorphism) - using design tokens
         frosted:
-          'backdrop-blur-sm bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 border border-gray-200/30 dark:border-white/10',
+          'backdrop-blur-sm bg-surface-0/60 dark:bg-surface-1/30 hover:bg-surface-1/80 dark:hover:bg-surface-2/40 border border-subtle',
         'frosted-ghost':
-          'backdrop-blur-sm bg-white/30 dark:bg-white/5 hover:bg-white/50 dark:hover:bg-white/10 border border-gray-200/30 dark:border-white/10',
+          'backdrop-blur-sm bg-surface-0/30 dark:bg-surface-1/10 hover:bg-surface-1/50 dark:hover:bg-surface-2/20 border border-subtle',
         'frosted-outline':
-          'backdrop-blur-sm bg-transparent border border-gray-200/30 dark:border-white/10 hover:bg-white/20 dark:hover:bg-white/5',
+          'backdrop-blur-sm bg-transparent border border-subtle hover:bg-surface-1/20 dark:hover:bg-surface-2/10',
       },
       size: {
         default: 'h-10 px-4 py-2',
