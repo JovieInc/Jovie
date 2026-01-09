@@ -44,8 +44,8 @@ describe('QuickAddSuggestions', () => {
         />
       );
 
-      // Should render container with aria-label
-      const container = screen.getByLabelText('Quick link suggestions');
+      // Should render container with data-testid
+      const container = screen.getByTestId('quick-add-suggestions');
       expect(container).toBeInTheDocument();
 
       // Each suggestion pill should be rendered with its label
@@ -77,7 +77,7 @@ describe('QuickAddSuggestions', () => {
         />
       );
 
-      const container = screen.getByLabelText('Quick link suggestions');
+      const container = screen.getByTestId('quick-add-suggestions');
       expect(container).toHaveClass('custom-class');
     });
   });
@@ -303,9 +303,7 @@ describe('QuickAddSuggestions', () => {
         />
       );
 
-      expect(
-        screen.getByLabelText('Quick link suggestions')
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('quick-add-suggestions')).toBeInTheDocument();
     });
 
     it('should handle unknown platform IDs in existingPlatforms gracefully', () => {

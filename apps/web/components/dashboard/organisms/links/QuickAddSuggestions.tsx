@@ -105,7 +105,10 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
   }
 
   return (
-    <div className={`relative ${className ?? ''}`}>
+    <div
+      className={`relative ${className ?? ''}`}
+      data-testid='quick-add-suggestions'
+    >
       {/* Left fade gradient */}
       <div className='pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-linear-to-r from-(--color-bg-surface-0) to-transparent' />
 
