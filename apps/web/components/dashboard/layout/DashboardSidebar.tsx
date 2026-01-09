@@ -87,7 +87,7 @@ export function DashboardSidebar({
               )}
             >
               <div className='flex items-center justify-center'>
-                <BrandLogo size={16} tone='auto' className='h-5 w-5' />
+                <BrandLogo size={20} className='h-5 w-5' />
               </div>
               <span className='sr-only group-data-[collapsible=icon]:hidden'>
                 Dashboard

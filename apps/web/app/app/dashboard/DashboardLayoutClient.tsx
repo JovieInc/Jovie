@@ -316,7 +316,7 @@ function DashboardLayoutInner({
           className={
             isContactTableRoute
               ? 'flex-1 min-h-0 overflow-hidden'
-              : 'flex-1 min-h-0 overflow-hidden p-1'
+              : 'flex-1 min-h-0 overflow-hidden p-1 sm:p-4'
           }
         >
           {isContactTableRoute ? (
@@ -339,8 +339,8 @@ function DashboardLayoutInner({
                   useFullWidth
                     ? isAudienceRoute
                       ? 'w-full h-full min-h-0'
-                      : 'w-full h-full min-h-0 p-1'
-                    : 'container mx-auto max-w-7xl p-1'
+                      : 'w-full h-full min-h-0 p-1 sm:p-2'
+                    : 'container mx-auto max-w-7xl p-1 sm:p-2'
                 }
               >
                 <div
