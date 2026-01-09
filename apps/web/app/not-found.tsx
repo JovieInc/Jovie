@@ -24,7 +24,7 @@ export default function NotFound() {
             </div>
 
             <h1 className='text-2xl md:text-3xl font-medium text-gray-900 dark:text-white tracking-tight mb-3'>
-              This page is missing.
+              Page Not Found
             </h1>
             <p className='text-base text-gray-600 dark:text-gray-300 leading-relaxed mb-8'>
               The link you followed may be broken, or the page may have moved.

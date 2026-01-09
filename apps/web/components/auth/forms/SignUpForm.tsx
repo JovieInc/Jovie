@@ -101,9 +101,9 @@ export function SignUpForm() {
         <CardContent className='space-y-3 p-0'>
           <div className='animate-pulse space-y-4'>
             <div className='h-6 w-48 mx-auto bg-subtle rounded' />
-            <div className='h-12 w-full bg-subtle rounded-xl' />
-            <div className='h-12 w-full bg-subtle rounded-xl' />
-            <div className='h-12 w-full bg-subtle rounded-xl' />
+            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
+            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
+            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
           </div>
         </CardContent>
       </Card>

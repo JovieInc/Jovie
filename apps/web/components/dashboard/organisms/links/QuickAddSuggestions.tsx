@@ -105,7 +105,8 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
   }
 
   return (
-    <div
+    <section
+      aria-label='Quick link suggestions'
       className={`relative ${className ?? ''}`}
       data-testid='quick-add-suggestions'
     >
@@ -130,7 +131,7 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
 
       {/* Right fade gradient */}
       <div className='pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-linear-to-l from-(--color-bg-surface-0) to-transparent' />
-    </div>
+    </section>
   );
 });
 

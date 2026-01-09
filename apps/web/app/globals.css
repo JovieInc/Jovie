@@ -557,6 +557,23 @@ body {
   }
 }
 
+/* Success color utilities - mapped to design tokens */
+@utility border-success {
+  border-color: var(--color-success);
+}
+
+@utility bg-success {
+  background-color: var(--color-success);
+}
+
+@utility bg-success-subtle {
+  background-color: var(--color-success-subtle);
+}
+
+@utility text-success {
+  color: var(--color-success);
+}
+
 /* Interactive state utilities */
 @utility interactive-hover {
   background-color: rgb(var(--interactive-hover));

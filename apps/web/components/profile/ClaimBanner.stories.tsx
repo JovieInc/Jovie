@@ -37,7 +37,7 @@ export const LongName: Story = {
 
 export const InProfileContext: Story = {
   render: () => (
-    <div className='min-h-screen bg-white dark:bg-black'>
+    <div className='min-h-screen bg-base text-primary-token'>
       <ClaimBanner
         claimToken='demo-token'
         profileHandle='artistname'

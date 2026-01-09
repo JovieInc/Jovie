@@ -72,8 +72,8 @@ export function ProfileShell({
 
         {showGradientBlurs && (
           <>
-            <div className='absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-linear-to-r from-primary/10 to-secondary/10 blur-3xl opacity-50' />
-            <div className='absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-linear-to-r from-secondary/10 to-accent/10 blur-3xl opacity-50' />
+            <div className='absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-surface-2 blur-3xl opacity-40' />
+            <div className='absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-surface-3 blur-3xl opacity-35' />
           </>
         )}
 
@@ -132,9 +132,9 @@ export function ProfileShell({
                                 />
                               ))
                             : !hasContacts && (
-                                <div className='flex items-center space-x-2 rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-muted-foreground'>
+                                <div className='flex items-center space-x-2 rounded-lg border border-dashed border-subtle bg-surface-1 px-3 py-2 text-secondary-token'>
                                   <svg
-                                    className='h-4 w-4 text-muted-foreground'
+                                    className='h-4 w-4 text-secondary-token'
                                     fill='none'
                                     stroke='currentColor'
                                     viewBox='0 0 24 24'
