@@ -97,6 +97,8 @@ export function SettingsProfileSection({
                     type='text'
                     name='username'
                     id='username'
+                    data-1p-ignore
+                    autoComplete='off'
                     value={formData.username}
                     onChange={e => {
                       const nextValue = e.target.value;

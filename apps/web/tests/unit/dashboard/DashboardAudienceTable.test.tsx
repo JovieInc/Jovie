@@ -134,7 +134,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
 
   it('shows empty state when no rows provided', () => {
     render(<DashboardAudienceTable {...defaultProps} rows={[]} />);
-    expect(screen.getByText('No audience yet')).toBeInTheDocument();
+    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
   describe('with large dataset (500+ rows)', () => {
