@@ -128,7 +128,7 @@ export function CreatorProfileTableRow({
           </div>
         </div>
       </td>
-      <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
+      <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
         {profile.createdAt
           ? new Intl.DateTimeFormat('en-US', {
               year: 'numeric',
@@ -137,7 +137,7 @@ export function CreatorProfileTableRow({
             }).format(profile.createdAt)
           : '—'}
       </td>
-      <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
+      <td className='px-4 py-3 align-middle text-xs whitespace-nowrap hidden md:table-cell'>
         <Badge size='sm' variant={profile.isClaimed ? 'success' : 'secondary'}>
           {profile.isClaimed ? (
             <>

@@ -55,7 +55,7 @@ export function DashboardSidebar({
       collapsible='icon'
       className={cn(
         '[--sidebar-width:236px]',
-        '[--sidebar-width-icon:56px]',
+        '[--sidebar-width-icon:0px]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
         className
       )}
@@ -87,7 +87,7 @@ export function DashboardSidebar({
               )}
             >
               <div className='flex items-center justify-center'>
-                <BrandLogo size={20} tone='auto' className='h-7 w-7' />
+                <BrandLogo size={16} tone='auto' className='h-5 w-5' />
               </div>
               <span className='sr-only group-data-[collapsible=icon]:hidden'>
                 Dashboard
