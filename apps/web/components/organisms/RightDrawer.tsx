@@ -32,8 +32,8 @@ export function RightDrawer({
         'bg-(--color-bg-surface-2) border-l border-subtle shadow-xl',
         'transition-[transform,opacity] duration-300 ease-out',
         isOpen
-          ? 'translate-x-0 opacity-100'
-          : 'translate-x-full opacity-0 pointer-events-none',
+          ? 'translate-x-0 opacity-100 visible'
+          : 'translate-x-full opacity-0 pointer-events-none invisible',
         className
       )}
       style={{ width }}
