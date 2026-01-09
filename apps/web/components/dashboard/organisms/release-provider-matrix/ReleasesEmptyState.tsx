@@ -336,7 +336,7 @@ export function ReleasesEmptyState({
             </div>
 
             {showResults && (
-              <div className='absolute z-50 w-full mt-2 rounded-xl border border-subtle bg-surface-1 shadow-lg overflow-hidden'>
+              <div className='absolute z-100 w-full mt-2 rounded-xl border border-subtle bg-surface-1 shadow-lg overflow-hidden'>
                 {state === 'loading' && results.length === 0 && (
                   <div className='p-3 space-y-2'>
                     {[...Array(3)].map((_, i) => (
