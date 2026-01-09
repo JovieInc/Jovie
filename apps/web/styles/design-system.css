@@ -138,15 +138,11 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
-  --color-bg-base: oklch(6.5% 0.005 240);
-  --color-bg-surface-0: oklch(3.5% 0.003 240);
+  --color-bg-base: oklch(3.5% 0 0);
+  --color-bg-surface-0: oklch(3.5% 0 0);
   --color-bg-surface-1: oklch(6.5% 0.005 240);
-  --color-bg-surface-2: oklch(
-    19% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-bg-surface-3: oklch(
-    22% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-bg-surface-2: oklch(10% 0.005 240);
+  --color-bg-surface-3: oklch(14% 0.005 240);
 
   /* Text hierarchy - inverted for dark mode */
   --color-text-primary-token: oklch(96% 0 0);
@@ -535,7 +531,7 @@
 }
 
 :root.dark {
-  --sidebar-background: 23 24 26;
+  --sidebar-background: 9 9 9;
   --sidebar-foreground: 244 244 245;
   --sidebar-primary: 244 244 245;
   --sidebar-primary-foreground: 12 12 12;
@@ -545,7 +541,7 @@
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 23 24 26;
+  --sidebar-surface: 9 9 9;
   --sidebar-surface-hover: 32 33 37;
   --sidebar-input-background: 32 33 37;
   --sidebar-input-border: 255 255 255 / 0.08;

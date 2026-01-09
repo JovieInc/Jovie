@@ -25,7 +25,7 @@ export function RightDrawer({
       aria-label={ariaLabel}
       className={cn(
         'fixed top-0 right-0 z-40 h-svh flex flex-col',
-        'bg-surface-1 border-l border-subtle shadow-xl',
+        'bg-(--color-bg-surface-2) border-l border-subtle shadow-xl',
         'transition-[transform,opacity] duration-300 ease-out',
         isOpen
           ? 'translate-x-0 opacity-100'
