@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Image from 'next/image';
 import { QRCode } from '@/components/atoms/QRCode';
+import { publicEnv } from '@/lib/env-public';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { HudAutoRefreshClient } from './HudAutoRefreshClient';
@@ -31,9 +32,42 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
   const headerStore = await headers();
 
   const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host');
-  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
+  const protoHeader = headerStore.get('x-forwarded-proto');
 
-  const base = host ? `${proto}://${host}` : 'http://localhost:3000';
+  // Validate and normalize protocol - http or https only
+  const proto =
+    protoHeader === 'http' || protoHeader === 'https' ? protoHeader : 'https';
+
+  // Validate host header to prevent injection attacks
+  const isValidHost = (hostValue: string | null): boolean => {
+    if (!hostValue) return false;
+    // Allow alphanumerics, dots, hyphens, and optional port
+    // This regex prevents suspicious characters for header injection
+    return /^[a-zA-Z0-9.-]+(:\d+)?$/.test(hostValue);
+  };
+
+  // In production, host should be available from reverse proxy
+  if (!host || !isValidHost(host)) {
+    // Use validated env for fallback URL (includes protocol)
+    const base = publicEnv.NEXT_PUBLIC_APP_URL;
+    if (!host) {
+      console.warn('[HUD] Missing host header, using fallback:', base);
+    } else {
+      console.warn(
+        '[HUD] Invalid host header detected:',
+        host,
+        '- using fallback:',
+        base
+      );
+    }
+    const url = new URL('/hud', base);
+    if (kioskToken) {
+      url.searchParams.set('kiosk', kioskToken);
+    }
+    return url.toString();
+  }
+
+  const base = `${proto}://${host}`;
   const url = new URL('/hud', base);
   if (kioskToken) {
     url.searchParams.set('kiosk', kioskToken);

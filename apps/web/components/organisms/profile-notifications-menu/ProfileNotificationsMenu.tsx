@@ -160,7 +160,7 @@ export function ProfileNotificationsMenu({
           }
         }}
       >
-        <AlertDialogContent className='max-w-md'>
+        <AlertDialogContent className='max-w-md rounded-2xl'>
           <AlertDialogHeader className='gap-2'>
             <AlertDialogTitle className='text-base font-semibold text-primary-token'>
               {confirmChannel

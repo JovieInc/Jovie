@@ -1,0 +1,33 @@
+# Claude CI Configuration
+# This file configures Claude's behavior in CI environments
+
+# Tools that Claude is allowed to use in CI
+# By default, Claude has restricted access in CI for safety
+# Explicitly allow tools that are safe and useful for PR reviews
+allowed_tools:
+  # Linting and formatting tools
+  - biome      # Biome linter and formatter
+  - lint       # Generic linting
+  - format     # Code formatting
+
+  # Build and type checking
+  - typecheck  # TypeScript type checking
+  - build      # Build commands
+
+  # Testing
+  - test       # Running tests
+
+  # Git operations (read-only)
+  - git-diff   # View changes
+  - git-log    # View commit history
+  - git-show   # View specific commits
+
+# Default: false - Claude waits for approval before running tools in CI
+# Set to true to allow Claude to run approved tools automatically
+auto_run_approved_tools: true
+
+# Maximum number of tool calls Claude can make in a single CI run
+max_tool_calls: 50
+
+# Timeout for each tool execution (in seconds)
+tool_timeout: 300
