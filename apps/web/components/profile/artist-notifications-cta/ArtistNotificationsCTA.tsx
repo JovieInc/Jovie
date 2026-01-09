@@ -2,7 +2,7 @@
 
 import { Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CountrySelector } from '@/components/profile/notifications';
 import { CTAButton } from '@/components/ui/CTAButton';
 import type { ArtistNotificationsCTAProps } from './types';
@@ -37,7 +37,9 @@ export function ArtistNotificationsCTA({
   } = useSubscriptionForm({ artist });
 
   const inputId = useId();
+  const disclaimerId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   useEffect(() => {
     const maxNationalDigits = getMaxNationalDigits(country.dialCode);
@@ -169,6 +171,7 @@ export function ArtistNotificationsCTA({
               <input
                 ref={inputRef}
                 id={inputId}
+                aria-describedby={disclaimerId}
                 type={channel === 'sms' ? 'tel' : 'email'}
                 inputMode={channel === 'sms' ? 'numeric' : 'email'}
                 className='w-full h-12 px-4 bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground placeholder:opacity-80 border-none focus:outline-none focus:ring-0'
@@ -187,7 +190,11 @@ export function ArtistNotificationsCTA({
                     handleEmailChange(event.target.value);
                   }
                 }}
-                onBlur={handleFieldBlur}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => {
+                  setIsInputFocused(false);
+                  handleFieldBlur();
+                }}
                 onKeyDown={handleKeyDown}
                 disabled={isSubmitting}
                 autoComplete={channel === 'sms' ? 'tel-national' : 'email'}
@@ -209,8 +216,12 @@ export function ArtistNotificationsCTA({
         </button>
 
         <p
-          className='text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80'
+          id={disclaimerId}
+          className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
+            isInputFocused ? 'opacity-100' : 'opacity-0'
+          }`}
           style={{ fontSynthesisWeight: 'none' }}
+          aria-hidden={!isInputFocused}
         >
           No spam. Opt-out anytime.
         </p>
