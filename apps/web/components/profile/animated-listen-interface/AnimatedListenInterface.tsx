@@ -72,7 +72,7 @@ export function AnimatedListenInterface({
               >
                 {/* Shimmer effect overlay */}
                 <motion.div
-                  className='absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent'
+                  className='absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent dark:via-white/10'
                   animate={
                     prefersReducedMotion
                       ? { opacity: selectedDSP === dsp.key ? 0.2 : 0 }
