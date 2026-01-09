@@ -2,7 +2,7 @@
  * Release Smart Link Landing Page (/r/[slug])
  *
  * Public-facing page that shows release artwork, title, and streaming platform buttons.
- * When a `?provider=` query param is present, redirects directly to that provider.
+ * When a `?dsp=` query param is present, redirects directly to that provider.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ provider?: string }>;
+  searchParams: Promise<{ dsp?: string }>;
 }
 
 /**
@@ -135,7 +135,7 @@ export default async function ReleaseSmartLinkPage({
   searchParams,
 }: PageProps) {
   const { slug } = await params;
-  const { provider: providerParam } = await searchParams;
+  const { dsp } = await searchParams;
 
   if (!slug) {
     notFound();
@@ -157,9 +157,9 @@ export default async function ReleaseSmartLinkPage({
 
   const { release, providerLinks: links, creator } = data;
 
-  // If provider is specified, redirect immediately
-  if (providerParam) {
-    const providerKey = providerParam as ProviderKey;
+  // If dsp is specified, redirect immediately
+  if (dsp) {
+    const providerKey = dsp as ProviderKey;
 
     // Validate provider
     if (!PROVIDER_CONFIG[providerKey]) {
