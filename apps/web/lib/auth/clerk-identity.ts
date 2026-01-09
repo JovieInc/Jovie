@@ -1,3 +1,5 @@
+import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
+
 export interface ClerkEmailAddress {
   emailAddress?: string | null;
 }
@@ -86,7 +88,9 @@ export function resolveClerkIdentity(
               ? 'email_local_part'
               : null;
 
-  const avatarUrl = user?.imageUrl ?? null;
+  // Upgrade OAuth provider avatar URLs to high resolution
+  // Google OAuth returns 96x96 by default, we upgrade to 512x512
+  const avatarUrl = upgradeOAuthAvatarUrl(user?.imageUrl);
 
   return {
     email,

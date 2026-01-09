@@ -1,9 +1,10 @@
 'use client';
 
 import { useClerk, useUser } from '@clerk/nextjs';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { useBillingStatus } from '@/hooks/useBillingStatus';
+import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
 import { useUserMenuActions } from '../useUserMenuActions';
 import type { UserDisplayInfo } from './types';
@@ -64,8 +65,11 @@ export function useUserButton({
     }
   }, [billingStatus.error, showToast]);
 
-  // User display info
-  const userImageUrl = user?.imageUrl;
+  // User display info - upgrade OAuth avatar to high resolution
+  const userImageUrl = useMemo(
+    () => upgradeOAuthAvatarUrl(user?.imageUrl) ?? undefined,
+    [user?.imageUrl]
+  );
   const contactEmail =
     user?.primaryEmailAddress?.emailAddress ||
     user?.emailAddresses?.[0]?.emailAddress;
