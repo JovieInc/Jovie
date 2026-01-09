@@ -86,7 +86,10 @@ export function AdminCreatorsTableHeader({
           </div>
         </th>
         <th
-          className={cn(headerCellClass, 'cursor-pointer select-none')}
+          className={cn(
+            headerCellClass,
+            'cursor-pointer select-none hidden md:table-cell'
+          )}
           style={{ top: stickyTopPx }}
         >
           <SortableHeaderButton
@@ -96,7 +99,10 @@ export function AdminCreatorsTableHeader({
           />
         </th>
         <th
-          className={cn(headerCellClass, 'cursor-pointer select-none')}
+          className={cn(
+            headerCellClass,
+            'cursor-pointer select-none hidden md:table-cell'
+          )}
           style={{ top: stickyTopPx }}
         >
           <SortableHeaderButton
