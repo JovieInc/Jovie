@@ -1,10 +1,11 @@
 'use client';
 
 import { Badge, Checkbox } from '@jovie/ui';
-import { Check, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import Link from 'next/link';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
+import { VerificationStatusToggle } from '@/components/admin/VerificationStatusToggle';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 
@@ -149,17 +150,17 @@ export function CreatorProfileTableRow({
           )}
         </Badge>
       </td>
-      <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
-        <Badge size='sm' variant={profile.isVerified ? 'primary' : 'secondary'}>
-          {profile.isVerified ? (
-            <>
-              <Check className='h-3 w-3' aria-hidden='true' />
-              <span>Verified</span>
-            </>
-          ) : (
-            <span>Not verified</span>
-          )}
-        </Badge>
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
+      <td
+        className='px-4 py-3 align-middle text-xs whitespace-nowrap'
+        onClick={e => e.stopPropagation()}
+      >
+        <VerificationStatusToggle
+          isVerified={profile.isVerified}
+          status={verificationStatus}
+          onToggle={onToggleVerification}
+        />
       </td>
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
