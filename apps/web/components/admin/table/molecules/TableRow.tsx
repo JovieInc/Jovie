@@ -23,9 +23,9 @@ export function TableRow({
         // Base styles
         'group transition-colors',
         // Hover state
-        'hover:bg-surface-1',
+        'hover:bg-surface-2',
         // Selected state
-        selected && 'bg-surface-1/50',
+        selected && 'bg-surface-2/50',
         // Clickable cursor
         onClick && 'cursor-pointer',
         // Remove focus outline for clickable rows

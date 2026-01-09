@@ -27,7 +27,7 @@ export function TableCell({
     <Component
       className={cn(
         // Base styles
-        'px-4 py-3 border-b border-subtle truncate text-[13px]',
+        'px-4 py-3 border-b border-subtle truncate text-[13px] text-secondary-token',
         // Width
         width,
         // Alignment
