@@ -50,7 +50,7 @@ export function AudienceMemberRow({
       data-index={dataIndex}
       ref={measureRef}
       className={cn(
-        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2',
+        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2 focus:outline-none',
         isSelected && 'bg-surface-2'
       )}
       style={

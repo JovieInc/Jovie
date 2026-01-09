@@ -28,6 +28,8 @@ export function TableRow({
         selected && 'bg-surface-1/50',
         // Clickable cursor
         onClick && 'cursor-pointer',
+        // Remove focus outline for clickable rows
+        onClick && 'focus:outline-none',
         // Virtual positioning
         isVirtual && 'absolute left-0 right-0',
         // Custom classes

@@ -56,7 +56,7 @@ export function CreatorProfileTableRow({
   return (
     <tr
       className={cn(
-        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
+        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 focus:outline-none',
         isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
       )}
       onClick={() => onRowClick(profile.id)}
@@ -112,14 +112,14 @@ export function CreatorProfileTableRow({
           />
           <div className='min-w-0'>
             {displayName ? (
-              <div className='truncate font-medium text-primary-token'>
+              <div className='truncate font-medium text-primary-token line-clamp-1'>
                 {displayName}
               </div>
             ) : null}
             <Link
               href={`/${profile.username}`}
               className={cn(
-                'truncate text-secondary-token transition-colors hover:text-primary-token',
+                'truncate text-secondary-token transition-colors hover:text-primary-token line-clamp-1',
                 displayName ? 'text-xs' : 'font-medium text-primary-token'
               )}
               onClick={event => event.stopPropagation()}

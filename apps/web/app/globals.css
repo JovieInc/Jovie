@@ -610,11 +610,11 @@ body {
 @layer base {
   /* Enhanced Linear-style dashboard tokens (light) */
   :root {
-    --color-bg-base: #ffffff;
+    --color-bg-base: #f6f7f8;
     /* app background */
     --color-bg-surface-0: #fafbfc;
     /* elevated backgrounds */
-    --color-bg-surface-1: #f6f7f8;
+    --color-bg-surface-1: #ffffff;
     /* cards/panels */
     --color-bg-surface-2: #eef0f2;
     /* interactive/hover */

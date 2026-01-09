@@ -71,8 +71,8 @@ export function ReleaseProviderMatrix({
       {/* Main content area */}
       <div className='flex h-full min-h-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
-        <div className='shrink-0 border-b border-subtle bg-base'>
-          <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6'>
+        <div className='shrink-0 border-b border-subtle'>
+          <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6'>
             <div className='flex items-center gap-3'>
               <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
                 Releases

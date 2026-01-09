@@ -517,8 +517,8 @@
    ============================================ */
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base (oklch(96% ...) ≈ rgb(244,244,245)) */
-  --sidebar-background: 244 244 245; /* Darker sidebar */
+  /* Maps to --color-bg-base (#f6f7f8 = rgb(246,247,248)) */
+  --sidebar-background: 246 247 248; /* Darker sidebar */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;

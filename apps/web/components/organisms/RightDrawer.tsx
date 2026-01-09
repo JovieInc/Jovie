@@ -10,6 +10,7 @@ export interface RightDrawerProps {
   children: React.ReactNode;
   className?: string;
   ariaLabel?: string;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLElement>) => void;
 }
 
 export function RightDrawer({
@@ -18,11 +19,14 @@ export function RightDrawer({
   children,
   className,
   ariaLabel,
+  onKeyDown,
 }: RightDrawerProps) {
   return (
     <aside
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
+      tabIndex={isOpen ? -1 : undefined}
+      onKeyDown={onKeyDown}
       className={cn(
         'fixed top-0 right-0 z-40 h-svh flex flex-col',
         'bg-(--color-bg-surface-2) border-l border-subtle shadow-xl',
