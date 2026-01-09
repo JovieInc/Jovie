@@ -176,7 +176,7 @@ export function EmptyState({
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
       className={cn(
-        'flex flex-col items-center justify-center px-4 py-12 text-center',
+        'flex flex-col items-center justify-center px-4 py-12 text-center min-h-[400px]',
         className
       )}
     >

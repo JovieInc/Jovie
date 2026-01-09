@@ -22,6 +22,8 @@ export function TableRow({
       className={cn(
         // Base styles
         'group transition-colors',
+        // Fixed height to prevent layout shift
+        'h-[60px]',
         // Hover state
         'hover:bg-surface-2',
         // Selected state
@@ -40,6 +42,7 @@ export function TableRow({
         isVirtual
           ? {
               transform: `translateY(${virtualRow.start}px)`,
+              height: '60px',
             }
           : undefined
       }

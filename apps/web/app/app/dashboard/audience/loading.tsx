@@ -32,7 +32,8 @@ export default function Loading() {
                   {Array.from({ length: 10 }).map((_, rowIndex) => (
                     <li
                       key={`row-${rowIndex}`}
-                      className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3 last:border-b-0'
+                      className='grid grid-cols-7 gap-4 border-b border-subtle px-4 last:border-b-0'
+                      style={{ height: '60px' }}
                       aria-hidden='true'
                     >
                       {Array.from({ length: 7 }).map((__, colIndex) => (

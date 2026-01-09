@@ -22,7 +22,7 @@ export function TableEmptyState({
   const content = (
     <div
       className={cn(
-        'flex flex-col items-center justify-center py-16 px-4 text-center',
+        'flex flex-col items-center justify-center py-16 px-4 text-center min-h-[400px]',
         className
       )}
     >

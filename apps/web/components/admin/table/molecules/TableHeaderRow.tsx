@@ -13,7 +13,7 @@ export function TableHeaderRow({
 }: TableHeaderRowProps) {
   return (
     <tr
-      className={cn(className)}
+      className={cn('h-12', className)}
       style={stickyOffset > 0 ? { top: `${stickyOffset}px` } : undefined}
     >
       {children}

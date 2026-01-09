@@ -53,7 +53,7 @@ export function AdminTableShell({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-subtle bg-surface-1',
+        'flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-subtle bg-surface-1 contain-layout',
         className
       )}
     >
