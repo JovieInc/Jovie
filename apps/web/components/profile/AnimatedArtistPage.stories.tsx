@@ -204,8 +204,8 @@ export const InteractiveDemo: Story = {
             onClick={() => setMode('profile')}
             className={`px-3 py-1 rounded text-sm ${
               mode === 'profile'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 border'
+                ? 'bg-btn-primary text-btn-primary-foreground'
+                : 'bg-surface-0 text-secondary-token border border-subtle'
             }`}
           >
             Profile
@@ -215,8 +215,8 @@ export const InteractiveDemo: Story = {
             onClick={() => setMode('listen')}
             className={`px-3 py-1 rounded text-sm ${
               mode === 'listen'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 border'
+                ? 'bg-btn-primary text-btn-primary-foreground'
+                : 'bg-surface-0 text-secondary-token border border-subtle'
             }`}
           >
             Listen
@@ -226,8 +226,8 @@ export const InteractiveDemo: Story = {
             onClick={() => setMode('tip')}
             className={`px-3 py-1 rounded text-sm ${
               mode === 'tip'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 border'
+                ? 'bg-btn-primary text-btn-primary-foreground'
+                : 'bg-surface-0 text-secondary-token border border-subtle'
             }`}
           >
             Tip

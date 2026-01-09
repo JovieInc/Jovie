@@ -52,14 +52,11 @@ export function ClaimBanner({
   return (
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for banner accessibility
     <header
-      className='relative w-full overflow-hidden bg-linear-to-r from-indigo-700 via-purple-700 to-fuchsia-600 text-white shadow-[0_8px_30px_rgba(0,0,0,0.28)]'
+      className='relative w-full overflow-hidden bg-base text-primary-token border-b border-subtle'
       aria-label='Claim profile banner'
       data-testid='claim-banner'
     >
-      <div
-        className='absolute inset-0 bg-gradient-radial from-white/12 via-white/6 to-transparent opacity-70'
-        aria-hidden
-      />
+      <div className='absolute inset-0 bg-surface-1 opacity-60' aria-hidden />
       <div className='relative max-w-4xl mx-auto px-4 py-2 sm:py-3'>
         <div className='flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3'>
           {/* Banner text */}
@@ -79,7 +76,7 @@ export function ClaimBanner({
           {/* CTA Button */}
           <Link
             href={getClaimUrl()}
-            className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-slate-900 font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-white/70 hover:bg-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-700'
+            className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
             data-testid='claim-banner-cta'
             aria-label={`Claim profile for ${name}`}
           >
