@@ -20,6 +20,7 @@ import {
   siSpotify,
   siTelegram,
   siThreads,
+  siTidal,
   siTiktok,
   siTumblr,
   siTwitch,
@@ -73,6 +74,7 @@ const platformMap: Record<string, SimpleIcon> = {
   viber: siViber,
   rumble: siRumble,
   twitch: siTwitch,
+  tidal: siTidal,
 };
 
 export function getPlatformIcon(platform: string): SimpleIcon | undefined {
