@@ -188,7 +188,7 @@ export const AvatarUploadable = React.memo(
       <div
         ref={mergedRef}
         className={cn(
-          'relative group outline-none',
+          'relative group/avatar outline-none',
           isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
           className
         )}
@@ -209,7 +209,7 @@ export const AvatarUploadable = React.memo(
           className={cn(
             'transition-all duration-200 ease-out',
             isInteractive &&
-              'group-hover:brightness-95 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-(--color-bg-base)',
+              'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
             isDragOver && 'scale-105',
             isUploading && 'opacity-80'
           )}

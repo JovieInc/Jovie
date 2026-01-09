@@ -80,7 +80,7 @@ export function AudienceRowActionsMenu({
           type='button'
           size='icon'
           variant='ghost'
-          className='h-8 w-8 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
+          className='h-8 w-8 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
         >
           <MoreHorizontal className='h-4 w-4' />
         </Button>

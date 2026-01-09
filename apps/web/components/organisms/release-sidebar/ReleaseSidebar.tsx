@@ -8,15 +8,15 @@
  */
 
 import { Button } from '@jovie/ui';
-
-import { cn } from '@/lib/utils';
-
+import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
+
+const RELEASE_SIDEBAR_WIDTH = 320;
 
 export function ReleaseSidebar({
   release,
@@ -60,82 +60,78 @@ export function ReleaseSidebar({
   });
 
   return (
-    <aside
-      aria-label='Release details'
-      aria-hidden={!isOpen}
-      data-testid='release-sidebar'
-      className={cn(
-        'relative flex h-full min-h-screen flex-col bg-surface-0 text-sidebar-foreground border-l border-subtle transition-[width,opacity,transform] duration-200 ease-out overflow-hidden',
-        'w-0 opacity-0 translate-x-4 pointer-events-none',
-        isOpen &&
-          'pointer-events-auto w-full opacity-100 translate-x-0 md:w-[300px] lg:w-[320px]'
-      )}
+    <RightDrawer
+      isOpen={isOpen}
+      width={RELEASE_SIDEBAR_WIDTH}
+      ariaLabel='Release details'
       onKeyDown={handleKeyDown}
     >
-      <ReleaseSidebarHeader
-        release={release}
-        hasRelease={hasRelease}
-        onClose={onClose}
-        onRefresh={onRefresh}
-        onCopySmartLink={handleCopySmartLink}
-      />
+      <div data-testid='release-sidebar' className='flex h-full flex-col'>
+        <ReleaseSidebarHeader
+          release={release}
+          hasRelease={hasRelease}
+          onClose={onClose}
+          onRefresh={onRefresh}
+          onCopySmartLink={handleCopySmartLink}
+        />
 
-      <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
-        {!release ? (
-          <p className='text-xs text-sidebar-muted'>
-            Select a release in the table to view its details.
-          </p>
-        ) : (
-          <>
-            <ReleaseArtwork
-              artworkUrl={release.artworkUrl}
-              title={release.title}
-              releaseDate={release.releaseDate}
-              canUploadArtwork={canUploadArtwork}
-              onArtworkUpload={
-                canUploadArtwork ? handleArtworkUpload : undefined
-              }
-            />
+        <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
+          {!release ? (
+            <p className='text-xs text-sidebar-muted'>
+              Select a release in the table to view its details.
+            </p>
+          ) : (
+            <>
+              <ReleaseArtwork
+                artworkUrl={release.artworkUrl}
+                title={release.title}
+                releaseDate={release.releaseDate}
+                canUploadArtwork={canUploadArtwork}
+                onArtworkUpload={
+                  canUploadArtwork ? handleArtworkUpload : undefined
+                }
+              />
 
-            <ReleaseFields
-              title={release.title}
-              releaseDate={release.releaseDate}
-              smartLinkPath={release.smartLinkPath}
-              isEditable={isEditable}
-              onTitleChange={handleTitleChange}
-            />
+              <ReleaseFields
+                title={release.title}
+                releaseDate={release.releaseDate}
+                smartLinkPath={release.smartLinkPath}
+                isEditable={isEditable}
+                onTitleChange={handleTitleChange}
+              />
 
-            <ReleaseDspLinks
-              release={release}
-              providerConfig={providerConfig}
-              isEditable={isEditable}
-              isAddingLink={isAddingLink}
-              newLinkUrl={newLinkUrl}
-              selectedProvider={selectedProvider}
-              onSetIsAddingLink={setIsAddingLink}
-              onSetNewLinkUrl={setNewLinkUrl}
-              onSetSelectedProvider={setSelectedProvider}
-              onAddLink={handleAddLink}
-              onRemoveLink={handleRemoveLink}
-              onNewLinkKeyDown={handleNewLinkKeyDown}
-            />
+              <ReleaseDspLinks
+                release={release}
+                providerConfig={providerConfig}
+                isEditable={isEditable}
+                isAddingLink={isAddingLink}
+                newLinkUrl={newLinkUrl}
+                selectedProvider={selectedProvider}
+                onSetIsAddingLink={setIsAddingLink}
+                onSetNewLinkUrl={setNewLinkUrl}
+                onSetSelectedProvider={setSelectedProvider}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                onNewLinkKeyDown={handleNewLinkKeyDown}
+              />
 
-            {isEditable && onSave && release && (
-              <div className='pt-2 flex justify-end'>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='primary'
-                  onClick={() => onSave(release)}
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Saving...' : 'Save changes'}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
+              {isEditable && onSave && release && (
+                <div className='pt-2 flex justify-end'>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='primary'
+                    onClick={() => onSave(release)}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Saving...' : 'Save changes'}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </aside>
+    </RightDrawer>
   );
 }

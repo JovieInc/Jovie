@@ -3,13 +3,15 @@
  *
  * ❌ DO NOT CHANGE:
  * - Import order (tailwindcss must be first)
- * - Theme path: "../styles/theme.css" (NOT "./theme.css")
+ * - Design system path: "../styles/design-system.css" (single source of truth for design tokens)
+ * - Theme path: "../styles/theme.css" (feature accents and animations only)
  * - Import syntax
  *
  * ⚠️  CHANGING THESE WILL BREAK ALL STYLING
  */
 
 @import "tailwindcss";
+@import "../styles/design-system.css";
 @import "../styles/theme.css";
 /* @import "tw-animate-css"; */
 
@@ -608,92 +610,8 @@ body {
 }
 
 @layer base {
-  /* Enhanced Linear-style dashboard tokens (light) */
-  :root {
-    --color-bg-base: #ffffff;
-    /* app background */
-    --color-bg-surface-0: #fafbfc;
-    /* elevated backgrounds */
-    --color-bg-surface-1: #f6f7f8;
-    /* cards/panels */
-    --color-bg-surface-2: #eef0f2;
-    /* interactive/hover */
-    --color-bg-surface-3: #e5e7eb;
-    /* pressed/active */
-    --color-border-subtle: #e5e7eb;
-    --color-border-default: #d1d5db;
-    --color-text-primary-token: #0c0c0c;
-    --color-text-secondary-token: #3f3f46;
-    --color-text-tertiary-token: #52525b;
-    /* Meets WCAG AA 4.5:1 minimum */
-    --color-accent: #7c3aed;
-    /* accent */
-    --color-accent-foreground: #fff;
-    /* accent text */
-    --color-btn-primary-bg: #000;
-    /* primary button background */
-    --color-btn-primary-fg: #fff;
-    /* primary button text */
-
-    /* Loading/skeleton colors */
-    --color-skeleton-base: #f3f4f6;
-    --color-skeleton-shimmer: #ffffff;
-
-    --shadow-sm:
-      0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-    --shadow-md:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-    --shadow-lg:
-      0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-
-    /* Focus ring RGB triplet used by `@utility focus-ring-themed` */
-    --focus-ring: 124 58 237;
-    /* approx. #7c3aed */
-  }
-
-  /* Dark mode overrides — ensure this block comes AFTER light tokens */
-  :root.dark {
-    /* Enhanced Linear-style dashboard tokens (dark) */
-    --color-bg-base: #0f0f12;
-    /* deepest app background */
-    --color-bg-surface-0: #141419;
-    /* elevated backgrounds (sidebars) */
-    --color-bg-surface-1: #18181f;
-    /* cards/panels */
-    --color-bg-surface-2: #1e1e27;
-    /* interactive/hover */
-    --color-bg-surface-3: #242430;
-    /* pressed/active */
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    /* subtle borders */
-    --color-border-default: rgba(255, 255, 255, 0.1);
-    /* default borders */
-    --color-border-strong: rgba(255, 255, 255, 0.18);
-
-    --color-text-primary-token: #f4f4f5;
-    --color-text-secondary-token: #d4d4d8;
-    --color-text-tertiary-token: #a1a1aa;
-    --color-text-disabled-token: #6f6f78;
-    /* Improved contrast from #737373 */
-    --color-accent: #7c3aed;
-    /* accent */
-    --color-accent-foreground: #fff;
-    /* accent text */
-    --color-btn-primary-bg: #fff;
-    /* primary button background */
-    --color-btn-primary-fg: #000;
-    /* primary button text */
-
-    /* Loading/skeleton colors for dark mode */
-    --color-skeleton-base: #1a1a1a;
-    --color-skeleton-shimmer: #2a2a2a;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
-
-    --focus-ring: 109 119 230 / 0.55;
-  }
+  /* All design tokens now defined in design-system.css (single source of truth) */
+  /* This layer only contains base HTML styling */
 
   body {
     background-color: var(--color-bg-base);
