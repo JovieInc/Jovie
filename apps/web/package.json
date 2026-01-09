@@ -25,6 +25,7 @@
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
+    "test:lighthouse:pr": "BASE_URL=${BASE_URL:-http://localhost:3000} lhci autorun --config=.lighthouserc.pr.json --collect.url=$BASE_URL/ --collect.url=$BASE_URL/tim",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
