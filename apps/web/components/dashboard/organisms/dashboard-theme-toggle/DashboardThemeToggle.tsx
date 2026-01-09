@@ -51,8 +51,8 @@ export function DashboardThemeToggle({
     ) : (
       <div className='flex items-center space-x-3'>
         <span className='text-sm text-secondary-token'>Light</span>
-        <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
-          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out'></span>
+        <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-out'>
+          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out'></span>
         </div>
         <span className='text-sm text-secondary-token'>Dark</span>
       </div>
@@ -143,7 +143,7 @@ export function DashboardThemeToggle({
           disabled={isUpdating}
           onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
           className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed',
+            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed',
             isDark ? 'bg-accent' : 'bg-surface-hover-token',
             'p-0.5'
           )}
@@ -158,7 +158,7 @@ export function DashboardThemeToggle({
           <span
             aria-hidden='true'
             className={cn(
-              'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out items-center justify-center',
+              'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out items-center justify-center',
               isDark ? 'translate-x-5' : 'translate-x-0',
               isUpdating && 'animate-pulse motion-reduce:animate-none'
             )}

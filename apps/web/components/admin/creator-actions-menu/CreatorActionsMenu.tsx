@@ -70,7 +70,7 @@ export function CreatorActionsMenu({
   }, [profile.claimToken]);
 
   const stateClass = cn(
-    'transition duration-200 ease-in-out transform',
+    'transition duration-200 ease-out transform',
     isSuccess &&
       'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
     isError &&
