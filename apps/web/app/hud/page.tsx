@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Image from 'next/image';
 import { QRCode } from '@/components/atoms/QRCode';
+import { env } from '@/lib/env';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { HudAutoRefreshClient } from './HudAutoRefreshClient';
@@ -48,7 +49,7 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
   // In production, host should always be available from reverse proxy
   if (!host || !isValidHost(host)) {
     // Only allow http in development
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = env.NODE_ENV === 'development';
     const base = isDev ? 'http://localhost:3000' : 'https://app.jovie.com';
     if (!host) {
       console.warn('[HUD] Missing host header, using fallback:', base);
