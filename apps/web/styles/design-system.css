@@ -517,19 +517,19 @@
    ============================================ */
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base (#f6f7f8 = rgb(246,247,248)) */
-  --sidebar-background: 246 247 248; /* Darker sidebar */
+  /* Maps to --color-bg-base: oklch(96% 0.015 240) = #f3f4f6 = rgb(243,244,246) */
+  --sidebar-background: 243 244 246; /* Matches page bg exactly */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
-  --sidebar-accent: 245 246 248;
+  --sidebar-accent: 240 241 243; /* Slightly darker for hover */
   --sidebar-accent-foreground: 12 12 12;
   --sidebar-border: 229 231 235;
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 107 114 128;
   --sidebar-muted-foreground: 113 113 122;
-  --sidebar-surface: 244 244 245; /* Matches base */
-  --sidebar-surface-hover: 245 246 248;
+  --sidebar-surface: 243 244 246; /* Matches base */
+  --sidebar-surface-hover: 240 241 243;
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 231 235;
 }
