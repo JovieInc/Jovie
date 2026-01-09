@@ -26,7 +26,7 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      className={cn('sticky top-0 z-20 bg-[var(--color-bg-base)]', className)}
+      className={cn('z-20 border-b border-subtle', className)}
     >
       <div className='relative flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
