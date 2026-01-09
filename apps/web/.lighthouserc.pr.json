@@ -1,80 +1,77 @@
 {
-    "ci": {
-        "collect": {
-            "numberOfRuns": 1,
-            "url": [
-                "http://localhost:3000/",
-                "http://localhost:3000/tim"
+  "ci": {
+    "collect": {
+      "numberOfRuns": 1,
+      "url": ["http://localhost:3000/", "http://localhost:3000/tim"]
+    },
+    "assert": {
+      "preset": "lighthouse:no-pwa",
+      "assertions": {
+        "interactive": [
+          "warn",
+          {
+            "maxNumericValue": 2500
+          }
+        ],
+        "first-contentful-paint": [
+          "warn",
+          {
+            "maxNumericValue": 3000
+          }
+        ],
+        "largest-contentful-paint": [
+          "warn",
+          {
+            "maxNumericValue": 3500
+          }
+        ],
+        "cumulative-layout-shift": [
+          "warn",
+          {
+            "maxNumericValue": 0.1
+          }
+        ],
+        "total-blocking-time": [
+          "warn",
+          {
+            "maxNumericValue": 800
+          }
+        ],
+        "speed-index": [
+          "warn",
+          {
+            "maxNumericValue": 4000
+          }
+        ]
+      },
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": ".*",
+          "assertions": {
+            "categories:performance": [
+              "warn",
+              {
+                "minScore": 0.7
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 0.9
+              }
+            ],
+            "categories:best-practices": [
+              "warn",
+              {
+                "minScore": 0.85
+              }
             ]
-        },
-        "assert": {
-            "preset": "lighthouse:no-pwa",
-            "assertions": {
-                "interactive": [
-                    "warn",
-                    {
-                        "maxNumericValue": 2500
-                    }
-                ],
-                "first-contentful-paint": [
-                    "warn",
-                    {
-                        "maxNumericValue": 3000
-                    }
-                ],
-                "largest-contentful-paint": [
-                    "warn",
-                    {
-                        "maxNumericValue": 3500
-                    }
-                ],
-                "cumulative-layout-shift": [
-                    "warn",
-                    {
-                        "maxNumericValue": 0.1
-                    }
-                ],
-                "total-blocking-time": [
-                    "warn",
-                    {
-                        "maxNumericValue": 800
-                    }
-                ],
-                "speed-index": [
-                    "warn",
-                    {
-                        "maxNumericValue": 4000
-                    }
-                ]
-            },
-            "assertMatrix": [
-                {
-                    "matchingUrlPattern": ".*",
-                    "assertions": {
-                        "categories:performance": [
-                            "warn",
-                            {
-                                "minScore": 0.7
-                            }
-                        ],
-                        "categories:accessibility": [
-                            "error",
-                            {
-                                "minScore": 0.9
-                            }
-                        ],
-                        "categories:best-practices": [
-                            "warn",
-                            {
-                                "minScore": 0.85
-                            }
-                        ]
-                    }
-                }
-            ]
-        },
-        "upload": {
-            "target": "temporary-public-storage"
+          }
         }
+      ]
+    },
+    "upload": {
+      "target": "temporary-public-storage"
     }
+  }
 }
