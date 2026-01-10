@@ -44,7 +44,7 @@ export function useTableKeyboardNav({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!enabled) return;
+      if (!enabled || rowCount === 0) return;
 
       switch (e.key) {
         case 'ArrowDown':

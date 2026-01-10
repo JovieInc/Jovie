@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface SortableHeaderButtonProps {
@@ -15,6 +16,8 @@ export function SortableHeaderButton({
   onClick,
   className,
 }: SortableHeaderButtonProps) {
+  const SortIcon = direction === 'asc' ? ArrowUp : direction === 'desc' ? ArrowDown : ArrowUpDown;
+
   return (
     <button
       type='button'
@@ -25,17 +28,15 @@ export function SortableHeaderButton({
       )}
     >
       {label}
-      <span
+      <SortIcon
         className={cn(
-          'text-[10px] transition-opacity',
+          'h-3 w-3 transition-opacity',
           direction
             ? 'opacity-100 text-primary-token'
             : 'opacity-50 text-secondary-token'
         )}
         aria-hidden='true'
-      >
-        {direction ? (direction === 'asc' ? '▴' : '▾') : '⇅'}
-      </span>
+      />
     </button>
   );
 }

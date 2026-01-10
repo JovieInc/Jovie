@@ -27,9 +27,10 @@ export function TablePaginationFooter({
 }: TablePaginationFooterProps) {
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
+  const effectiveTotalPages = Math.max(1, totalPages);
 
   const canGoPrevious = currentPage > 1;
-  const canGoNext = currentPage < totalPages;
+  const canGoNext = currentPage < effectiveTotalPages;
 
   return (
     <div
@@ -64,7 +65,7 @@ export function TablePaginationFooter({
         </Button>
 
         <span className='text-sm text-primary-token px-2'>
-          Page {currentPage} of {totalPages}
+          Page {currentPage} of {effectiveTotalPages}
         </span>
 
         <Button
