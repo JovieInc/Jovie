@@ -21,6 +21,7 @@ export interface AuthRouteConfig {
   drawerWidth: number | null;
   drawerContent: ReactNode;
   headerAction: ReactNode;
+  isTableRoute: boolean;
 }
 
 /**
@@ -100,14 +101,20 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   // Determine UI flags based on section and pathname
   const showMobileTabs = section === 'dashboard';
 
-  // Check if we're on a page that should show the contact drawer
-  const isContactTable =
-    pathname.includes('/creators') || pathname.includes('/audience');
-  const showDrawer = isContactTable;
+  // Table routes that need different overflow behavior
+  const isTableRoute =
+    pathname.includes('/creators') ||
+    pathname.includes('/audience') ||
+    pathname.includes('/users') ||
+    pathname.includes('/waitlist') ||
+    pathname.includes('/releases');
+
+  // Drawer is now controlled by individual pages, not auto-shown
+  const showDrawer = false;
 
   // Drawer configuration
   const drawerWidth = showDrawer ? 360 : null;
-  const drawerContent = null; // TODO: Will be populated based on route in Phase 2
+  const drawerContent = null; // Controlled by individual pages
 
   // Header action (TODO: Add theme toggle for admin, contact toggle for tables)
   const headerAction = null; // TODO: Will be populated in Phase 2
@@ -121,5 +128,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     drawerWidth,
     drawerContent,
     headerAction,
+    isTableRoute,
   };
 }
