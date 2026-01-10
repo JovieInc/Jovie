@@ -9,6 +9,7 @@ import {
   type SpotifyAlbum,
   type SpotifyAlbumFull,
 } from '@/lib/spotify';
+import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
@@ -29,10 +30,12 @@ export interface SpotifyImportResult {
 export interface SpotifyImportOptions {
   /** Include album types. Defaults to ['album', 'single', 'compilation'] */
   includeGroups?: ('album' | 'single' | 'compilation' | 'appears_on')[];
-  /** Import tracks for each release. Defaults to false for faster import */
+  /** Import tracks for each release. Defaults to true to enable ISRC discovery */
   includeTracks?: boolean;
   /** Market for availability. Defaults to 'US' */
   market?: string;
+  /** Discover cross-platform links after import. Defaults to true */
+  discoverLinks?: boolean;
 }
 
 /**
@@ -45,7 +48,8 @@ export async function importReleasesFromSpotify(
 ): Promise<SpotifyImportResult> {
   const {
     includeGroups = ['album', 'single', 'compilation'],
-    includeTracks = false,
+    includeTracks = true, // Default to true for ISRC discovery
+    discoverLinks = true,
     market = 'US',
   } = options;
 
@@ -98,7 +102,28 @@ export async function importReleasesFromSpotify(
       }
     }
 
-    // 4. Fetch the final state
+    // 4. Discover cross-platform links
+    if (discoverLinks && includeTracks) {
+      // Get the imported releases to discover links
+      const importedReleases = await getReleasesForProfile(creatorProfileId);
+
+      for (const release of importedReleases) {
+        try {
+          // Get existing provider IDs to skip
+          const existingProviders = release.providerLinks.map(l => l.providerId);
+
+          await discoverLinksForRelease(release.id, existingProviders, {
+            skipExisting: true,
+            storefront: market.toLowerCase(),
+          });
+        } catch (error) {
+          // Don't fail the whole import if discovery fails
+          console.debug(`Discovery failed for ${release.title}:`, error);
+        }
+      }
+    }
+
+    // 5. Fetch the final state
     result.releases = await getReleasesForProfile(creatorProfileId);
     result.success = result.failed === 0;
 
