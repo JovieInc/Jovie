@@ -275,7 +275,12 @@ function extractHandleFromSocialUrl(url: string): string | null {
     const hostname = parsed.hostname.toLowerCase();
 
     // YouTube: handle @username or /channel/ID or /c/name
-    const youtubeHosts = ['youtube.com', 'www.youtube.com', 'youtu.be', 'www.youtu.be'];
+    const youtubeHosts = [
+      'youtube.com',
+      'www.youtube.com',
+      'youtu.be',
+      'www.youtu.be',
+    ];
     if (youtubeHosts.includes(hostname)) {
       if (handle.startsWith('@')) {
         handle = handle.slice(1);
