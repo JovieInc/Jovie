@@ -58,8 +58,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
   const isDashboard = section === 'dashboard';
   const isAdmin = section === 'admin';
 
-  // Dashboard-specific data (only needed for dashboard section)
-  const dashboardData = isDashboard ? useDashboardData() : null;
+  // Dashboard-specific data (needed for both dashboard and admin sections)
+  const dashboardData = isDashboard || isAdmin ? useDashboardData() : null;
   const username = dashboardData
     ? (dashboardData.selectedProfile?.usernameNormalized ??
       dashboardData.selectedProfile?.username)
@@ -101,32 +101,11 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                 Back
               </span>
             </Link>
-          ) : isAdmin ? (
-            // Admin: Logo with "Admin Console" label
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild size='lg' className='gap-3'>
-                  <Link href='/app/admin' className='flex items-center gap-3'>
-                    <div className='flex aspect-square size-9 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground'>
-                      <BrandLogo size={18} tone='auto' className='size-4' />
-                    </div>
-                    <div className='grid flex-1 text-left leading-tight'>
-                      <span className='truncate text-sm font-semibold'>
-                        Jovie
-                      </span>
-                      <span className='truncate text-xs text-sidebar-muted'>
-                        Admin Console
-                      </span>
-                    </div>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
           ) : (
-            // Dashboard: Just logo
+            // Dashboard & Admin: Just logo
             <Link
-              href='/app/dashboard'
-              aria-label='Go to dashboard'
+              href={isAdmin ? '/app/admin' : '/app/dashboard'}
+              aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
               className={cn(
                 'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                 'group-data-[collapsible=icon]:justify-center'
@@ -136,13 +115,13 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                 <BrandLogo size={16} tone='auto' className='h-5 w-5' />
               </div>
               <span className='sr-only group-data-[collapsible=icon]:hidden'>
-                Dashboard
+                {isAdmin ? 'Admin' : 'Dashboard'}
               </span>
             </Link>
           )}
 
-          {/* Collapse trigger - only show for dashboard/settings */}
-          {!isAdmin && (
+          {/* Collapse trigger - show for dashboard/admin, not settings */}
+          {!isInSettings && (
             <div className='group/shortcut ml-auto flex items-center gap-2'>
               <SidebarShortcutHint className='hidden opacity-0 transition-opacity duration-200 lg:inline-flex group-hover/shortcut:opacity-100' />
               <SidebarTrigger
@@ -156,8 +135,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
           )}
         </div>
 
-        {/* Mobile profile card - only for dashboard */}
-        {isDashboard && !isInSettings && (
+        {/* Mobile profile card - for dashboard and admin */}
+        {(isDashboard || isAdmin) && (
           <div className='px-2 pb-3 pt-2 lg:hidden'>
             <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
               <OptimizedAvatar
@@ -210,8 +189,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
       <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
-            {/* Dashboard uses DashboardNav, others will be custom */}
-            {isDashboard ? (
+            {/* Dashboard and Admin use DashboardNav, Settings uses custom */}
+            {isDashboard || isAdmin ? (
               <DashboardNav />
             ) : (
               <nav
@@ -249,8 +228,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer - only for dashboard (branding + user button) */}
-      {isDashboard && !isInSettings && (
+      {/* Footer - for dashboard and admin (branding + user button) */}
+      {(isDashboard || isAdmin) && (
         <SidebarFooter className='mt-auto'>
           <SidebarSeparator className='mx-0' />
           <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
