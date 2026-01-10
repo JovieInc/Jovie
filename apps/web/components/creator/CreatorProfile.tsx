@@ -43,8 +43,7 @@ export function CreatorProfile({ username }: { username: string }) {
             src={creator.avatarUrl}
             alt={creator.displayName || creator.username}
             name={creator.displayName || creator.username}
-            size='display-md'
-            className='h-24 w-24'
+            size='2xl'
             verified={creator.isVerified ?? undefined}
           />
         </div>
