@@ -22,7 +22,7 @@ export interface ContactSidebarProps {
   onClose?: () => void;
   onRefresh?: () => void;
   onContactChange?: (contact: Contact) => void;
-  onSave?: (contact: Contact) => void | Promise<void>;
+  onSave?: (contact: Contact) => void | Promise<void> | Promise<boolean>;
   isSaving?: boolean;
   /**
    * Optional avatar upload handler. When provided and mode === 'admin',

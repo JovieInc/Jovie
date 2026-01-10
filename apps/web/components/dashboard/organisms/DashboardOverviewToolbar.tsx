@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 
 export interface DashboardOverviewToolbarProps {
   range: '7d' | '30d' | '90d';
@@ -53,20 +54,7 @@ export function DashboardOverviewToolbar({
         onClick={onRefresh}
         className='inline-flex h-7 items-center justify-center rounded-full border border-subtle bg-surface-1/40 px-2.5 text-xs font-semibold text-primary-token ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base dark:ring-white/10'
       >
-        <svg
-          className='h-3.5 w-3.5'
-          fill='none'
-          stroke='currentColor'
-          viewBox='0 0 24 24'
-          aria-hidden='true'
-        >
-          <path
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth='2'
-            d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
-          />
-        </svg>
+        <Icon name='RefreshCw' className='h-3.5 w-3.5' />
       </button>
 
       {rangeLabel ? (
