@@ -136,11 +136,11 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
-  --color-bg-base: oklch(3.5% 0 0); /* #090909 - sidebar & page bg */
-  --color-bg-surface-0: oklch(3.5% 0 0); /* Same as base */
-  --color-bg-surface-1: oklch(6.5% 0.005 240); /* #101011 - main content */
-  --color-bg-surface-2: oklch(9.5% 0.005 240); /* #17181a - contact sidebar */
-  --color-bg-surface-3: oklch(14% 0.005 240); /* Modals, tooltips */
+  --color-bg-base: oklch(0.035 0 0); /* #090909 - sidebar & page bg */
+  --color-bg-surface-0: oklch(0.035 0 0); /* Same as base */
+  --color-bg-surface-1: oklch(0.064 0.005 240); /* #101011 - main content */
+  --color-bg-surface-2: oklch(0.095 0.005 240); /* #17181a - contact sidebar */
+  --color-bg-surface-3: oklch(0.14 0.005 240); /* Modals, tooltips */
 
   /* Text hierarchy - inverted for dark mode */
   --color-text-primary-token: oklch(96% 0 0);
