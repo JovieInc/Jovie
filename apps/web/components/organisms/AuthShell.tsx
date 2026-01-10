@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
+import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 import { UnifiedDrawer } from '@/components/organisms/UnifiedDrawer';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
@@ -51,7 +52,11 @@ export function AuthShell({
                 <DashboardHeader
                   breadcrumbs={breadcrumbs}
                   action={headerAction}
-                  // mobileTabs will be added to DashboardHeader in Phase 2
+                  mobileTabs={
+                    showMobileTabs ? (
+                      <DashboardMobileTabs className='static border-0' />
+                    ) : undefined
+                  }
                 />
                 <div className='flex-1 min-h-0 overflow-hidden'>{children}</div>
               </div>
