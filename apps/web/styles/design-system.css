@@ -507,8 +507,8 @@
    ============================================ */
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base: oklch(99% 0 0) = #fcfcfc = rgb(252,252,252) */
-  --sidebar-background: 252 252 252; /* Matches page bg exactly (pure neutral) */
+  /* Maps to --color-bg-base: #f6f6f6 = rgb(246,246,246) */
+  --sidebar-background: 246 246 246; /* Matches base */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
@@ -518,7 +518,7 @@
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 115 115 115; /* Neutral muted */
   --sidebar-muted-foreground: 140 140 140; /* Neutral muted text */
-  --sidebar-surface: 252 252 252; /* Matches base */
+  --sidebar-surface: 246 246 246; /* Matches base */
   --sidebar-surface-hover: 237 237 237; /* Neutral hover */
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 229 229;
