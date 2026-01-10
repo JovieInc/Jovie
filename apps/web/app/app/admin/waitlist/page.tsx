@@ -3,6 +3,11 @@ import type { Metadata } from 'next';
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
 import { WaitlistTable } from '@/components/admin/waitlist-table';
 import {
+  PageContent,
+  PageHeader,
+  PageShell,
+} from '@/components/organisms/PageShell';
+import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
@@ -43,31 +48,22 @@ export default async function AdminWaitlistPage({
   ]);
 
   return (
-    <div className='flex h-full min-h-0 flex-col'>
-      {/* Scrollable container for entire page content */}
-      <div className='flex-1 min-h-0 overflow-auto -mx-4 sm:-mx-6 lg:-mx-8'>
-        <div className='px-4 sm:px-6 lg:px-8'>
-          {/* Header - scrolls out of view */}
-          <header className='py-4 sm:py-6'>
-            <h1 className='sr-only'>Waitlist</h1>
-          </header>
-
-          {/* Metrics cards - scroll out of view */}
-          <section className='pb-4 sm:pb-6'>
-            <WaitlistMetrics metrics={metrics} />
-          </section>
-        </div>
-
-        {/* Table section with sticky header */}
-        <section className='px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6'>
+    <PageShell>
+      <PageHeader
+        title='Waitlist'
+        description={`${total} total ${total === 1 ? 'entry' : 'entries'}`}
+      />
+      <PageContent>
+        <div className='space-y-6'>
+          <WaitlistMetrics metrics={metrics} />
           <WaitlistTable
             entries={entries}
             page={currentPage}
             pageSize={resolvedPageSize}
             total={total}
           />
-        </section>
-      </div>
-    </div>
+        </div>
+      </PageContent>
+    </PageShell>
   );
 }

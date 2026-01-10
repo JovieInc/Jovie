@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 
 import { AdminUsersTable } from '@/components/admin/admin-users-table';
+import {
+  PageContent,
+  PageHeader,
+  PageShell,
+} from '@/components/organisms/PageShell';
 import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
 
 interface AdminUsersPageProps {
@@ -52,12 +57,12 @@ export default async function AdminUsersPage({
   });
 
   return (
-    <div className='flex h-full min-h-0 flex-col gap-8'>
-      <header>
-        <h1 className='sr-only'>Users</h1>
-      </header>
-
-      <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8'>
+    <PageShell>
+      <PageHeader
+        title='Users'
+        description={`${total} total ${total === 1 ? 'user' : 'users'}`}
+      />
+      <PageContent noPadding>
         <AdminUsersTable
           users={users}
           page={page}
@@ -66,7 +71,7 @@ export default async function AdminUsersPage({
           search={search}
           sort={sort}
         />
-      </section>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }
