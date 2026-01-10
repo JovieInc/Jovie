@@ -5,7 +5,7 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type CreatorContact,
@@ -154,6 +154,7 @@ export async function getProfileWithUser(
 
 /**
  * Get social links for a profile.
+ * Only returns active links (not rejected or inactive).
  *
  * @param profileId - The profile ID
  * @returns Array of social links
@@ -176,7 +177,13 @@ export async function getProfileSocialLinks(
       updatedAt: socialLinks.updatedAt,
     })
     .from(socialLinks)
-    .where(eq(socialLinks.creatorProfileId, profileId))
+    .where(
+      and(
+        eq(socialLinks.creatorProfileId, profileId),
+        eq(socialLinks.isActive, true),
+        ne(socialLinks.state, 'rejected')
+      )
+    )
     .orderBy(socialLinks.sortOrder)
     .limit(MAX_SOCIAL_LINKS);
 
