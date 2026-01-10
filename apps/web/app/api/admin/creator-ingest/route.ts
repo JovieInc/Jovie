@@ -218,7 +218,7 @@ function extractHandleFromSocialUrl(url: string): string | null {
     const hostname = parsed.hostname.toLowerCase();
 
     // YouTube: handle @username or /channel/ID or /c/name
-    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+    if (hostname === 'youtube.com' || hostname === 'www.youtube.com' || hostname === 'youtu.be' || hostname === 'www.youtu.be') {
       if (handle.startsWith('@')) {
         handle = handle.slice(1);
       } else if (
@@ -230,35 +230,35 @@ function extractHandleFromSocialUrl(url: string): string | null {
     }
 
     // TikTok: handle @username
-    if (hostname.includes('tiktok.com')) {
+    if (hostname === 'tiktok.com' || hostname === 'www.tiktok.com') {
       if (handle.startsWith('@')) {
         handle = handle.slice(1);
       }
     }
 
     // LinkedIn: /in/username or /company/name
-    if (hostname.includes('linkedin.com')) {
+    if (hostname === 'linkedin.com' || hostname === 'www.linkedin.com') {
       if ((handle === 'in' || handle === 'company') && segments[1]) {
         handle = segments[1];
       }
     }
 
     // Reddit: /user/username or /u/username
-    if (hostname.includes('reddit.com')) {
+    if (hostname === 'reddit.com' || hostname === 'www.reddit.com') {
       if ((handle === 'user' || handle === 'u') && segments[1]) {
         handle = segments[1];
       }
     }
 
     // Discord: /invite/code
-    if (hostname.includes('discord.gg') || hostname.includes('discord.com')) {
+    if (hostname === 'discord.gg' || hostname === 'www.discord.gg' || hostname === 'discord.com' || hostname === 'www.discord.com') {
       if (handle === 'invite' && segments[1]) {
         handle = segments[1];
       }
     }
 
     // Spotify: /artist/ID or /user/username
-    if (hostname.includes('spotify.com')) {
+    if (hostname === 'spotify.com' || hostname === 'www.spotify.com') {
       if (
         (handle === 'artist' || handle === 'user' || handle === 'playlist') &&
         segments[1]
