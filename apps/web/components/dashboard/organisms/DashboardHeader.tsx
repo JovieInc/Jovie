@@ -10,6 +10,7 @@ export interface DashboardHeaderProps {
   action?: ReactNode;
   showDivider?: boolean;
   className?: string;
+  mobileTabs?: ReactNode;
 }
 
 export function DashboardHeader({
@@ -19,6 +20,7 @@ export function DashboardHeader({
   action,
   showDivider = false,
   className,
+  mobileTabs,
 }: DashboardHeaderProps) {
   const currentLabel =
     breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : '';
