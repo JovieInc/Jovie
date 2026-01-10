@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AdminCreatorProfilesWithSidebar } from '@/components/admin/admin-creator-profiles';
+import { PageShell } from '@/components/organisms/PageShell';
 import {
   type AdminCreatorProfilesSort,
   getAdminCreatorProfiles,
@@ -59,7 +60,7 @@ export default async function AdminCreatorsPage({
   });
 
   return (
-    <div className='h-full min-h-0'>
+    <PageShell>
       <AdminCreatorProfilesWithSidebar
         profiles={profiles}
         page={currentPage}
@@ -69,6 +70,6 @@ export default async function AdminCreatorsPage({
         sort={sort}
         basePath='/app/admin/creators'
       />
-    </div>
+    </PageShell>
   );
 }

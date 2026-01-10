@@ -1,37 +1,54 @@
 import { MetadataRoute } from 'next';
-import { MARKETING_URL } from '@/constants/app';
+import { headers } from 'next/headers';
+import { MARKETING_URL, PROFILE_URL } from '@/constants/app';
+import { PROFILE_HOSTNAME } from '@/constants/domains';
 
 // Multi-domain robots.txt configuration
-// This serves from the marketing domain (meetjovie.com)
-// Profile domain (jov.ie) will have its own robots.txt if needed
+// Serves different robots.txt based on the requesting domain:
+// - jov.ie: Allow profile indexing
+// - meetjovie.com: Marketing + app with restricted paths
 
-export default function robots(): MetadataRoute.Robots {
-  // Define common rules once to avoid duplication
-  const commonRules = {
-    allow: ['/', '/blog', '/blog/', '/legal/privacy', '/legal/terms'],
-    disallow: [
-      '/investors',
-      '/api/',
-      '/dashboard/',
-      '/admin/',
-      '/_next/',
-      '/private/',
-      '/auth/',
-      '/out/',
-      '/*.json',
-      '/*.xml',
-    ],
-    crawlDelay: 1,
-  };
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
 
-  // Array of user agents to apply the same rules to
-  const userAgents = ['*', 'Googlebot', 'Bingbot', 'Slurp'];
+  const isProfileDomain =
+    host === PROFILE_HOSTNAME || host === `www.${PROFILE_HOSTNAME}`;
 
+  if (isProfileDomain) {
+    // jov.ie robots - allow profile indexing
+    return {
+      rules: [
+        {
+          userAgent: '*',
+          allow: '/',
+          disallow: ['/api/', '/out/'],
+        },
+      ],
+      sitemap: `${PROFILE_URL}/sitemap.xml`,
+      host: PROFILE_URL,
+    };
+  }
+
+  // meetjovie.com robots - marketing + app
   return {
-    rules: userAgents.map(userAgent => ({
-      userAgent,
-      ...commonRules,
-    })),
+    rules: [
+      {
+        userAgent: '*',
+        allow: ['/', '/blog', '/blog/', '/legal/privacy', '/legal/terms'],
+        disallow: [
+          '/api/',
+          '/app/',
+          '/dashboard/',
+          '/admin/',
+          '/_next/',
+          '/private/',
+          '/auth/',
+          '/out/',
+          '/investors',
+        ],
+      },
+    ],
     sitemap: `${MARKETING_URL}/sitemap.xml`,
     host: MARKETING_URL,
   };

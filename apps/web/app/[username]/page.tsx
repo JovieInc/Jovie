@@ -10,6 +10,7 @@ import {
   AUDIENCE_IDENTIFIED_COOKIE,
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   PAGE_SUBTITLES,
+  PROFILE_URL,
 } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
@@ -320,13 +321,19 @@ export async function generateMetadata({ params }: Props) {
     ? `${profile.bio.slice(0, 160)}${profile.bio.length > 160 ? '...' : ''}`
     : `Check out ${profile.display_name || profile.username}'s artist profile on Jovie.`;
 
+  const profileUrl = `${PROFILE_URL}/${profile.username}`;
+
   return {
     title,
     description,
-    // OpenGraph with optimized image
+    metadataBase: new URL(PROFILE_URL),
+    alternates: {
+      canonical: profileUrl,
+    },
     openGraph: {
       title,
       description,
+      url: profileUrl,
       images: profile.avatar_url
         ? [
             {

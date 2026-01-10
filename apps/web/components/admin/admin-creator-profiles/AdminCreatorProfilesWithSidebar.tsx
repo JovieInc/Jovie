@@ -24,6 +24,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
+import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 import { CONTACT_PANEL_WIDTH } from './utils';
 
@@ -166,6 +167,12 @@ export function AdminCreatorProfilesWithSidebar({
   });
 
   const { handleAvatarUpload } = useAvatarUpload();
+
+  const { isSaving, saveContact } = useContactSave({
+    onSaveSuccess: updatedContact => {
+      setDraftContact(updatedContact);
+    },
+  });
 
   const handleRowClick = useCallback(
     (id: string) => {
@@ -396,6 +403,8 @@ export function AdminCreatorProfilesWithSidebar({
               }
             }}
             onContactChange={handleContactChange}
+            onSave={saveContact}
+            isSaving={isSaving}
             onAvatarUpload={handleAvatarUpload}
           />
         </div>

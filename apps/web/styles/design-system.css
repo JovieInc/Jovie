@@ -51,8 +51,10 @@
 
 :root {
   /* Light mode surfaces - neutral grays without color tint */
-  --color-bg-base: oklch(96% 0 0); /* #f4f4f4 - Sidebar bg (neutral gray) */
-  --color-bg-surface-0: oklch(96% 0 0); /* Same as base */
+  --color-bg-base: oklch(
+    99% 0 0
+  ); /* #fcfcfc - Matches page bg (pure neutral) */
+  --color-bg-surface-0: oklch(99% 0 0); /* Same as base */
   --color-bg-surface-1: oklch(
     99% 0 0
   ); /* #fcfcfc - Main content (pure neutral) */
@@ -511,8 +513,8 @@
    ============================================ */
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base: oklch(96% 0 0) = #f5f5f5 = rgb(245,245,245) */
-  --sidebar-background: 245 245 245; /* Matches page bg exactly (neutral gray) */
+  /* Maps to --color-bg-base: oklch(99% 0 0) = #fcfcfc = rgb(252,252,252) */
+  --sidebar-background: 252 252 252; /* Matches page bg exactly (pure neutral) */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
@@ -522,20 +524,16 @@
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 115 115 115; /* Neutral muted */
   --sidebar-muted-foreground: 140 140 140; /* Neutral muted text */
-  --sidebar-surface: 245 245 245; /* Matches base */
+  --sidebar-surface: 252 252 252; /* Matches base */
   --sidebar-surface-hover: 237 237 237; /* Neutral hover */
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 229 229;
 }
 
 :root.dark {
-<<<<<<< HEAD
-  --sidebar-background: 9 9 9;
-=======
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Maps to --color-bg-base (oklch(3.5% 0 0) = #090909 = rgb(9,9,9)) */
   --sidebar-background: 9 9 9; /* Matches base */
->>>>>>> b1b2828c5 (feat(ui): standardize dashboard layout styling and visual hierarchy)
   --sidebar-foreground: 244 244 245;
   --sidebar-primary: 244 244 245;
   --sidebar-primary-foreground: 12 12 12;
@@ -545,11 +543,7 @@
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-<<<<<<< HEAD
-  --sidebar-surface: 9 9 9;
-=======
   --sidebar-surface: 9 9 9; /* Matches base */
->>>>>>> b1b2828c5 (feat(ui): standardize dashboard layout styling and visual hierarchy)
   --sidebar-surface-hover: 32 33 37;
   --sidebar-input-background: 32 33 37;
   --sidebar-input-border: 255 255 255 / 0.08;

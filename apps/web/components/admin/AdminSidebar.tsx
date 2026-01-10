@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
@@ -44,6 +44,7 @@ interface AdminSidebarProps {
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname();
   const [hash, setHash] = useState<string>('');
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     // Track hash so items like /admin#usage don't double-highlight
@@ -101,9 +102,28 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                       href={item.href}
                       aria-current={isActive ? 'page' : undefined}
                       className='flex w-full min-w-0 items-center gap-3'
+                      onClick={() => {
+                        startTransition(() => {
+                          // Navigation happens automatically via Next.js
+                        });
+                      }}
                     >
-                      <item.icon className='size-4' />
-                      <span className={cn('truncate')}>{item.label}</span>
+                      <item.icon
+                        className={cn(
+                          'size-4',
+                          isPending &&
+                            'opacity-50 transition-opacity duration-200'
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'truncate',
+                          isPending &&
+                            'opacity-50 transition-opacity duration-200'
+                        )}
+                      >
+                        {item.label}
+                      </span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
