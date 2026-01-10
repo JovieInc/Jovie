@@ -1,0 +1,470 @@
+# CodeRabbit Autofix Workflow
+#
+# PURPOSE: Automatically fix PRs blocked by CodeRabbit review feedback.
+# This workflow eliminates human intervention for routine CodeRabbit feedback
+# while maintaining safety, correctness, and merge determinism.
+#
+# TRIGGER: Only activates when ALL conditions are met:
+# - Event: pull_request_review → submitted
+# - Reviewer is CodeRabbit (coderabbitai[bot])
+# - Review state is blocking (changes_requested)
+# - PR is not draft
+# - This PR head SHA has not exhausted retries (max 2 attempts)
+#
+# SAFETY:
+# - Uses least-privilege credentials (GitHub App token for write access)
+# - Does NOT execute untrusted PR code
+# - Does NOT expose secrets to the agent
+# - Implements per-SHA retry guard to prevent infinite loops
+#
+# ESCALATION: If automation fails after 2 attempts, labels PR 'needs-human'
+
+name: CodeRabbit Autofix
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+# Minimal permissions - expanded only where needed
+permissions:
+  contents: read
+  pull-requests: read
+
+# Prevent concurrent runs on the same PR to avoid race conditions
+concurrency:
+  group: coderabbit-autofix-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================================
+  # GUARD JOB: Validate all trigger conditions before proceeding
+  # This job implements all the strict trigger conditions as explicit guards
+  # ============================================================================
+  guard:
+    name: Trigger Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      attempt_number: ${{ steps.check.outputs.attempt_number }}
+      review_body: ${{ steps.fetch-review.outputs.review_body }}
+      inline_comments: ${{ steps.fetch-review.outputs.inline_comments }}
+    steps:
+      # GUARD 1: Verify reviewer is CodeRabbit bot
+      - name: Check reviewer is CodeRabbit
+        id: check-reviewer
+        run: |
+          REVIEWER="${{ github.event.review.user.login }}"
+          echo "Reviewer: $REVIEWER"
+          
+          if [[ "$REVIEWER" != "coderabbitai[bot]" ]]; then
+            echo "❌ Reviewer is not CodeRabbit (got: $REVIEWER)"
+            echo "is_coderabbit=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Reviewer is CodeRabbit"
+            echo "is_coderabbit=true" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 2: Verify review state is blocking (changes_requested)
+      - name: Check review state is blocking
+        id: check-state
+        run: |
+          STATE="${{ github.event.review.state }}"
+          echo "Review state: $STATE"
+          
+          if [[ "$STATE" != "changes_requested" ]]; then
+            echo "❌ Review state is not blocking (got: $STATE)"
+            echo "is_blocking=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Review state is blocking"
+            echo "is_blocking=true" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 3: Verify PR is not a draft
+      - name: Check PR is not draft
+        id: check-draft
+        run: |
+          IS_DRAFT="${{ github.event.pull_request.draft }}"
+          echo "Is draft: $IS_DRAFT"
+          
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "❌ PR is a draft"
+            echo "is_ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ PR is not a draft"
+            echo "is_ready=true" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 4: Check retry count via label marker
+      # Uses a label format: coderabbit-autofix-attempt-{sha}-{n}
+      # This prevents infinite loops and ensures max 2 attempts per SHA
+      - name: Check retry guard
+        id: check-retry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          
+          echo "PR: #$PR_NUMBER, HEAD SHA: $SHORT_SHA"
+          
+          # Fetch existing labels
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name')
+          
+          # Check for existing attempt markers for this SHA
+          ATTEMPT_1_LABEL="coderabbit-autofix-attempt-${SHORT_SHA}-1"
+          ATTEMPT_2_LABEL="coderabbit-autofix-attempt-${SHORT_SHA}-2"
+          
+          HAS_ATTEMPT_1=$(echo "$LABELS" | grep -c "^${ATTEMPT_1_LABEL}$" || true)
+          HAS_ATTEMPT_2=$(echo "$LABELS" | grep -c "^${ATTEMPT_2_LABEL}$" || true)
+          
+          if [[ "$HAS_ATTEMPT_2" -gt 0 ]]; then
+            echo "❌ SHA $SHORT_SHA has exhausted retries (2/2 attempts used)"
+            echo "retries_available=false" >> $GITHUB_OUTPUT
+            echo "attempt_number=0" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_ATTEMPT_1" -gt 0 ]]; then
+            echo "⚠️ SHA $SHORT_SHA on attempt 2/2 (final retry)"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=2" >> $GITHUB_OUTPUT
+          else
+            echo "✅ SHA $SHORT_SHA on attempt 1/2"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=1" >> $GITHUB_OUTPUT
+          fi
+
+      # Aggregate all guards into final decision
+      - name: Evaluate all guards
+        id: check
+        run: |
+          IS_CODERABBIT="${{ steps.check-reviewer.outputs.is_coderabbit }}"
+          IS_BLOCKING="${{ steps.check-state.outputs.is_blocking }}"
+          IS_READY="${{ steps.check-draft.outputs.is_ready }}"
+          RETRIES_AVAILABLE="${{ steps.check-retry.outputs.retries_available }}"
+          ATTEMPT="${{ steps.check-retry.outputs.attempt_number }}"
+          
+          echo "=== Guard Summary ==="
+          echo "Is CodeRabbit: $IS_CODERABBIT"
+          echo "Is Blocking: $IS_BLOCKING"
+          echo "Is Ready (not draft): $IS_READY"
+          echo "Retries Available: $RETRIES_AVAILABLE"
+          echo "Attempt Number: $ATTEMPT"
+          
+          if [[ "$IS_CODERABBIT" == "true" && "$IS_BLOCKING" == "true" && "$IS_READY" == "true" && "$RETRIES_AVAILABLE" == "true" ]]; then
+            echo "✅ All guards passed - proceeding with autofix"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ One or more guards failed - skipping autofix"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "attempt_number=$ATTEMPT" >> $GITHUB_OUTPUT
+
+      # Fetch the full review details (body + inline comments)
+      - name: Fetch CodeRabbit review details
+        id: fetch-review
+        if: steps.check.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REVIEW_ID="${{ github.event.review.id }}"
+          
+          echo "Fetching review $REVIEW_ID for PR #$PR_NUMBER"
+          
+          # Fetch review body
+          REVIEW_BODY=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID --jq '.body // ""')
+          
+          # Fetch inline comments for this review
+          INLINE_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID/comments --jq '[.[] | {path: .path, line: .line, body: .body}]')
+          
+          # Store as outputs (base64 encode to handle multiline/special chars)
+          echo "review_body=$(echo "$REVIEW_BODY" | base64 -w0)" >> $GITHUB_OUTPUT
+          echo "inline_comments=$(echo "$INLINE_COMMENTS" | base64 -w0)" >> $GITHUB_OUTPUT
+          
+          echo "✅ Fetched review body and $(echo "$INLINE_COMMENTS" | jq 'length') inline comments"
+
+  # ============================================================================
+  # AUTOFIX JOB: Apply fixes using Claude agent
+  # This job runs the AI agent to fix the issues identified by CodeRabbit
+  # ============================================================================
+  autofix:
+    name: Apply Fixes
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Elevated permissions for this job only
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          # Use GitHub App token if available for write access
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mark attempt in progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+          
+          LABEL="coderabbit-autofix-attempt-${SHORT_SHA}-${ATTEMPT}"
+          
+          echo "Adding attempt marker label: $LABEL"
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=$LABEL" || true
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Prepare agent instructions
+        id: prepare-instructions
+        run: |
+          # Decode review data
+          REVIEW_BODY=$(echo "${{ needs.guard.outputs.review_body }}" | base64 -d)
+          INLINE_COMMENTS=$(echo "${{ needs.guard.outputs.inline_comments }}" | base64 -d)
+          
+          # Generate structured instruction file for the agent
+          cat > /tmp/coderabbit-fix-instructions.md << 'INSTRUCTIONS_EOF'
+          # CodeRabbit Autofix Instructions
+          
+          You are fixing issues identified by CodeRabbit code review.
+          
+          ## CRITICAL CONSTRAINTS
+          
+          1. **Minimal diff**: Make the smallest possible changes to fix the issues
+          2. **Only modify referenced files**: Only touch files explicitly mentioned by CodeRabbit
+          3. **Preserve formatting**: Do not reformat or restructure unrelated code
+          4. **No speculation**: Do not add features, refactor, or "improve" beyond the fix
+          5. **No dead code**: Do not introduce unused imports, variables, or functions
+          6. **No lint silencing**: Never use comments to silence lint/type errors incorrectly
+          
+          ## REVIEW SUMMARY
+          
+          INSTRUCTIONS_EOF
+          
+          echo "$REVIEW_BODY" >> /tmp/coderabbit-fix-instructions.md
+          
+          echo "" >> /tmp/coderabbit-fix-instructions.md
+          echo "## INLINE COMMENTS (file-specific issues)" >> /tmp/coderabbit-fix-instructions.md
+          echo "" >> /tmp/coderabbit-fix-instructions.md
+          
+          # Format inline comments as a readable list
+          echo "$INLINE_COMMENTS" | jq -r '.[] | "### \(.path):\(.line)\n\(.body)\n"' >> /tmp/coderabbit-fix-instructions.md
+          
+          echo "" >> /tmp/coderabbit-fix-instructions.md
+          echo "## TASK" >> /tmp/coderabbit-fix-instructions.md
+          echo "" >> /tmp/coderabbit-fix-instructions.md
+          echo "Fix ONLY the issues described above. Do not make any other changes." >> /tmp/coderabbit-fix-instructions.md
+          
+          # Output the instructions file path
+          echo "instructions_file=/tmp/coderabbit-fix-instructions.md" >> $GITHUB_OUTPUT
+          
+          # Debug: show what we're asking the agent to do
+          echo "=== Agent Instructions ==="
+          cat /tmp/coderabbit-fix-instructions.md
+
+      - name: Run Claude agent to fix issues
+        id: claude-fix
+        uses: anthropics/claude-code-action@7145c3e0510bcdbdd29f67cc4a8c1958f1acfa2f # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Read the file at /tmp/coderabbit-fix-instructions.md and apply the fixes described.
+            
+            After making changes, run these validation commands:
+            1. pnpm biome check . --write (auto-fix formatting)
+            2. pnpm biome check . (verify no remaining issues)
+            3. pnpm turbo typecheck --filter=@jovie/web (verify types)
+            
+            If validation fails, analyze the errors and fix them.
+            Do NOT commit the changes - just make the fixes.
+
+      - name: Run validation (Biome + TypeScript)
+        id: validate
+        run: |
+          set +e
+          
+          echo "=== Running Biome auto-fix ==="
+          pnpm biome check . --write 2>&1 | tee /tmp/biome-write.log
+          
+          echo "=== Running Biome check ==="
+          pnpm biome check . 2>&1 | tee /tmp/biome-check.log
+          BIOME_EXIT=$?
+          
+          echo "=== Running TypeScript typecheck ==="
+          pnpm turbo typecheck --filter=@jovie/web 2>&1 | tee /tmp/typecheck.log
+          TYPECHECK_EXIT=$?
+          
+          if [[ $BIOME_EXIT -eq 0 && $TYPECHECK_EXIT -eq 0 ]]; then
+            echo "✅ Validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Validation failed"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+            
+            # Capture error output for retry
+            {
+              echo "## Biome Check Output"
+              cat /tmp/biome-check.log
+              echo ""
+              echo "## TypeScript Check Output"
+              cat /tmp/typecheck.log
+            } > /tmp/validation-errors.log
+            
+            echo "validation_errors=$(cat /tmp/validation-errors.log | base64 -w0)" >> $GITHUB_OUTPUT
+          fi
+
+      # RETRY: If validation fails, re-invoke agent with error context (only once)
+      - name: Retry with error context
+        id: retry
+        if: steps.validate.outputs.validation_passed == 'false' && needs.guard.outputs.attempt_number == '1'
+        uses: anthropics/claude-code-action@7145c3e0510bcdbdd29f67cc4a8c1958f1acfa2f # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            The previous fix attempt failed validation. Here are the errors:
+            
+            ```
+            $(echo "${{ steps.validate.outputs.validation_errors }}" | base64 -d)
+            ```
+            
+            Fix these validation errors. Remember:
+            - Make minimal changes
+            - Do not silence errors with comments
+            - Run `pnpm biome check . --write` followed by `pnpm biome check .`
+            - Run `pnpm turbo typecheck --filter=@jovie/web`
+
+      - name: Re-validate after retry
+        id: revalidate
+        if: steps.retry.outcome == 'success'
+        run: |
+          set +e
+          
+          echo "=== Re-running Biome auto-fix ==="
+          pnpm biome check . --write 2>&1 | tee /tmp/biome-write-2.log
+          
+          echo "=== Re-running Biome check ==="
+          pnpm biome check . 2>&1 | tee /tmp/biome-check-2.log
+          BIOME_EXIT=$?
+          
+          echo "=== Re-running TypeScript typecheck ==="
+          pnpm turbo typecheck --filter=@jovie/web 2>&1 | tee /tmp/typecheck-2.log
+          TYPECHECK_EXIT=$?
+          
+          if [[ $BIOME_EXIT -eq 0 && $TYPECHECK_EXIT -eq 0 ]]; then
+            echo "✅ Retry validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Retry validation failed"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Determine final validation status
+      - name: Determine final status
+        id: final-status
+        run: |
+          FIRST_PASS="${{ steps.validate.outputs.validation_passed }}"
+          RETRY_PASS="${{ steps.revalidate.outputs.validation_passed }}"
+          
+          if [[ "$FIRST_PASS" == "true" || "$RETRY_PASS" == "true" ]]; then
+            echo "final_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "final_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # COMMIT & PUSH: Only if validation passed
+      - name: Commit and push fixes
+        if: steps.final-status.outputs.final_passed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check for changes
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Stage all changes
+          git add -A
+          
+          # Commit with descriptive message
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+          git commit -m "fix: apply CodeRabbit review fixes (autofix attempt $ATTEMPT)
+
+          Automated fixes applied by coderabbit-autofix workflow.
+          
+          Co-authored-by: Claude <claude@anthropic.com>"
+          
+          # Push to PR branch
+          git push origin "HEAD:$PR_HEAD_REF"
+          
+          echo "✅ Changes committed and pushed"
+
+      # ESCALATE: Label PR needs-human if automation fails
+      - name: Escalate to human
+        if: steps.final-status.outputs.final_passed == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          echo "❌ Autofix failed after maximum attempts - escalating to human"
+          
+          # Add needs-human label
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=needs-human" || true
+          
+          # Post comment explaining the failure
+          gh pr comment $PR_NUMBER --body "## ⚠️ CodeRabbit Autofix Failed
+          
+          The automated fix workflow was unable to resolve the CodeRabbit review feedback after 2 attempts.
+          
+          **What happened:**
+          - CodeRabbit requested changes
+          - The autofix workflow attempted to apply fixes
+          - Validation (Biome + TypeScript) failed after fixes
+          
+          **Next steps:**
+          A human developer needs to manually address the CodeRabbit feedback.
+          
+          The \`needs-human\` label has been added to this PR."
+          
+          echo "⚠️ PR labeled needs-human and comment posted"
+
+      - name: Clean up old attempt labels
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          
+          # Get all labels
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name')
+          
+          # Remove attempt labels for OLD SHAs (not current)
+          echo "$LABELS" | grep "^coderabbit-autofix-attempt-" | while read -r label; do
+            if [[ ! "$label" =~ $SHORT_SHA ]]; then
+              echo "Removing stale label: $label"
+              gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels/$label --method DELETE || true
+            fi
+          done
