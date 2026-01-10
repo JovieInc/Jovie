@@ -17,6 +17,7 @@ export interface AuthShellProps {
   showMobileTabs?: boolean;
   drawerContent?: ReactNode;
   drawerWidth?: number;
+  isTableRoute?: boolean;
   children: ReactNode;
 }
 
@@ -38,6 +39,7 @@ export function AuthShell({
   showMobileTabs = false,
   drawerContent,
   drawerWidth,
+  isTableRoute = false,
   children,
 }: AuthShellProps) {
   return (
@@ -58,7 +60,15 @@ export function AuthShell({
                     ) : undefined
                   }
                 />
-                <div className='flex-1 min-h-0 overflow-hidden'>{children}</div>
+                {isTableRoute ? (
+                  <div className='flex-1 min-h-0 overflow-hidden'>
+                    {children}
+                  </div>
+                ) : (
+                  <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
+                    {children}
+                  </div>
+                )}
               </div>
             </div>
           </main>
