@@ -12,11 +12,13 @@ import type { ExtractedLink, ExtractionResult } from '../../types';
 export function createExtractionResult(
   links: ExtractedLink[],
   displayName: string | null,
-  avatarUrl: string | null
+  avatarUrl: string | null,
+  hasPaidTier?: boolean | null
 ): ExtractionResult {
   return {
     links,
     displayName,
     avatarUrl,
+    hasPaidTier: hasPaidTier ?? null,
   };
 }

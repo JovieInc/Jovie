@@ -58,10 +58,59 @@ const SKIP_HOSTS = new Set([
 const LINKTREE_HANDLE_REGEX =
   /^[a-z0-9][a-z0-9_]{0,28}[a-z0-9]$|^[a-z0-9]{1,2}$/;
 
+/**
+ * Patterns that indicate free tier Linktree branding.
+ * Paid tier profiles have this branding removed.
+ */
+const LINKTREE_BRANDING_PATTERNS = [
+  // Text branding patterns
+  /made\s+with\s+linktree/i,
+  /create\s+your\s+(own\s+)?linktree/i,
+  /get\s+your\s+(own\s+)?linktree/i,
+  /join\s+linktree/i,
+  /powered\s+by\s+linktree/i,
+  // Footer link to Linktree home
+  /href\s*=\s*["']https?:\/\/(www\.)?linktr\.ee\/?["']/i,
+  // Linktree logo SVG patterns (aria-label or alt text)
+  /aria-label\s*=\s*["']linktree\s*(logo)?["']/i,
+  /alt\s*=\s*["']linktree\s*(logo)?["']/i,
+];
+
 // Regex to extract href attributes
 const HREF_REGEX = /href\s*=\s*["']([^"'#]+)["']/gi;
 
 type StructuredLink = { url?: string | null; title?: string | null };
+
+/**
+ * Detect if a Linktree profile is on a paid tier by checking for branding.
+ * Free tier profiles display "Made with Linktree" or similar branding.
+ * Paid tier profiles have this removed.
+ *
+ * @param html - The HTML content of the Linktree page
+ * @returns true if paid tier (no branding), false if free tier (has branding), null if uncertain
+ */
+export function detectLinktreePaidTier(html: string): boolean | null {
+  // Check the footer section specifically (last ~5000 chars) for efficiency
+  // Branding is typically at the bottom of the page
+  const footerSection = html.slice(-5000);
+
+  for (const pattern of LINKTREE_BRANDING_PATTERNS) {
+    if (pattern.test(footerSection) || pattern.test(html)) {
+      // Found branding = free tier
+      return false;
+    }
+  }
+
+  // No branding found = likely paid tier
+  // But we only confidently say "paid" if we found links (indicating a real profile)
+  // This prevents false positives on error pages or empty profiles
+  if (html.includes('href=')) {
+    return true;
+  }
+
+  // Can't determine
+  return null;
+}
 
 // ============================================================================
 // Public API
@@ -340,7 +389,10 @@ export function extractLinktree(html: string): ExtractionResult {
     sanitizeAvatar(extractMetaContent(html, 'twitter:image')) ??
     null;
 
-  return createExtractionResult(links, displayName, avatarUrl);
+  // Detect paid tier by checking for branding
+  const hasPaidTier = detectLinktreePaidTier(html);
+
+  return createExtractionResult(links, displayName, avatarUrl, hasPaidTier);
 }
 
 function extractStructuredLinks(
