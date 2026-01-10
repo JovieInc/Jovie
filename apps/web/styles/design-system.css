@@ -52,16 +52,16 @@
 :root {
   /* Light mode surfaces - neutral grays without color tint */
   --color-bg-base: oklch(
-    96.5% 0 0
+    0.965 0 0
   ); /* #f6f6f6 - Sidebar & page bg (pure neutral) */
-  --color-bg-surface-0: oklch(96.5% 0 0); /* Same as base */
+  --color-bg-surface-0: oklch(0.965 0 0); /* Same as base */
   --color-bg-surface-1: oklch(
-    99% 0 0
+    0.99 0 0
   ); /* #fcfcfc - Main content (pure neutral) */
   --color-bg-surface-2: oklch(
-    100% 0 0
+    1 0 0
   ); /* #ffffff - Contact sidebar/drawer (lightest neutral) */
-  --color-bg-surface-3: oklch(90% 0 0); /* #e6e6e6 - Modals (darkest neutral) */
+  --color-bg-surface-3: oklch(0.9 0 0); /* #e6e6e6 - Modals (darkest neutral) */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
