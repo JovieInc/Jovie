@@ -118,20 +118,17 @@ test.describe('Link Creation & Display @smoke', () => {
             /^https?:\/\//
           );
 
-          // External links should open in new tab (optional but recommended)
-          if (target) {
-            expect(target, `Link ${i + 1} target should be _blank`).toBe(
-              '_blank'
-            );
-          }
+          // External links must open in new tab for UX (keeps user on profile)
+          expect(
+            target,
+            `Link ${i + 1}: External links must open in a new tab (target="_blank")`
+          ).toBe('_blank');
 
-          // External links should have security attributes (optional but recommended)
-          if (rel) {
-            expect(
-              rel,
-              `Link ${i + 1} should have noopener for security`
-            ).toContain('noopener');
-          }
+          // External links must have noopener for security (prevents reverse tabnabbing)
+          expect(
+            rel,
+            `Link ${i + 1}: External links must include rel="noopener" for security`
+          ).toContain('noopener');
 
           console.log(`  ✓ Link ${i + 1}: ${href?.substring(0, 50)}...`);
         }
