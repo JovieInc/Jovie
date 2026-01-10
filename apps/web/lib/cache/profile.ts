@@ -8,6 +8,7 @@ import {
   createProfileTag,
   createSocialLinksTag,
 } from './tags';
+import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 
 /**
  * Centralized cache invalidation for creator profiles.
@@ -26,6 +27,8 @@ export async function invalidateProfileCache(
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
     revalidatePath(`/${usernameNormalized}`);
+    // Invalidate Redis edge cache
+    await invalidateProfileEdgeCache(usernameNormalized);
   }
 
   if (usernameNormalized) {
@@ -37,6 +40,8 @@ export async function invalidateProfileCache(
   if (oldUsernameNormalized && oldUsernameNormalized !== usernameNormalized) {
     revalidateTag(createProfileTag(oldUsernameNormalized), 'max');
     revalidatePath(`/${oldUsernameNormalized}`);
+    // Invalidate Redis edge cache for old username
+    await invalidateProfileEdgeCache(oldUsernameNormalized);
   }
 
   // Invalidate dashboard pages that display profile data
