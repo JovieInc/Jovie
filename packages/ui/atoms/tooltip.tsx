@@ -85,9 +85,9 @@ const TooltipContent = React.forwardRef<
         className={cn(
           // Base layout + spacing
           'z-50 inline-flex select-none items-center gap-2 rounded-[8px] px-3 py-2 text-[13px] font-medium leading-tight',
-          // Ephemeral surface: translucent, blurred, subtle border
-          'max-w-xs border border-black/10 bg-black/90 text-white backdrop-blur-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.35)]',
-          'dark:border-white/10 dark:bg-black/90 dark:text-white',
+          // Ephemeral surface: subtle border and shadow
+          'max-w-xs border border-black/10 bg-black text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)]',
+          'dark:border-white/10 dark:bg-black dark:text-white',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-120 data-[state=closed]:ease-in',
@@ -114,7 +114,7 @@ const TooltipContent = React.forwardRef<
         {showArrow && (
           <TooltipPrimitive.Arrow
             className={cn(
-              'fill-black/90 dark:fill-black/90',
+              'fill-black dark:fill-black',
               'drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)]'
             )}
             data-testid='tooltip-arrow'
