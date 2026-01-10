@@ -54,7 +54,7 @@ export const LinkCategoryGrid = React.memo(function LinkCategoryGrid<
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={modifiers}>
       <div
-        className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${className ?? ''}`}
+        className={`mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${className ?? ''}`}
       >
         {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
           const items = sortedGroups[section];

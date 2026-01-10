@@ -87,8 +87,8 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         return { base: color, hover: hexToRgba('#ef4444', 0.65) };
       }
 
-      const baseAlpha = tone === 'faded' ? 0.35 : 0.55;
-      const hoverAlpha = tone === 'faded' ? 0.55 : 0.75;
+      const baseAlpha = tone === 'faded' ? 0.45 : 0.65;
+      const hoverAlpha = tone === 'faded' ? 0.65 : 0.85;
       return {
         base: hexToRgba(brandHex, baseAlpha),
         hover: hexToRgba(brandHex, hoverAlpha),
