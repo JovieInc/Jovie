@@ -138,7 +138,7 @@ function generateInitials(name?: string): string {
  * - Accessibility support with proper ARIA attributes
  * - Dark mode support
  */
-const BORDER_RING = 'ring-1 ring-[color:var(--color-border-subtle)]';
+const BORDER_RING = '';
 
 const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   {
