@@ -189,7 +189,7 @@ export function UserButton({
         {/* Primary actions group */}
         <DropdownMenuItem
           onSelect={handleSettings}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
+          className='group flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <Icon
             name='Settings'
@@ -202,7 +202,7 @@ export function UserButton({
         {billingStatus.loading ? (
           <DropdownMenuItem
             disabled
-            className='cursor-default focus-visible:bg-transparent px-2.5 py-2 text-[13px] h-9'
+            className='cursor-default focus-visible:bg-transparent px-2 py-1.5 text-xs h-8'
           >
             <div className='flex w-full items-center gap-2.5'>
               <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
@@ -213,7 +213,7 @@ export function UserButton({
           <DropdownMenuItem
             onSelect={handleManageBilling}
             disabled={loading.manageBilling}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
+            className='group flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
               name='CreditCard'
@@ -227,7 +227,7 @@ export function UserButton({
           <DropdownMenuItem
             onSelect={handleUpgrade}
             disabled={loading.upgrade}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
+            className='group flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
               name='Sparkles'
@@ -244,7 +244,7 @@ export function UserButton({
           onSelect={() => {
             setIsFeedbackOpen(true);
           }}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
+          className='group flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <Icon
             name='MessageSquare'
@@ -259,7 +259,7 @@ export function UserButton({
         <DropdownMenuItem
           onSelect={handleSignOut}
           disabled={loading.signOut}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60'
+          className='group flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60'
         >
           <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>
