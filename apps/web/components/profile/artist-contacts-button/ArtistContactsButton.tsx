@@ -1,5 +1,6 @@
 'use client';
 
+import { FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { track } from '@/lib/analytics';
-import { ChannelIcon, ContactGlyph } from './ContactIcons';
+import { ChannelIcon } from './ContactIcons';
 import type { ArtistContactsButtonProps } from './types';
 import { useArtistContacts } from './useArtistContacts';
 
@@ -49,7 +50,7 @@ export function ArtistContactsButton({
           performAction(channel, available[0]);
         }}
       >
-        <ContactGlyph />
+        <FileText className='h-4 w-4' aria-hidden='true' />
       </CircleIconButton>
     );
   }
@@ -76,7 +77,7 @@ export function ArtistContactsButton({
           data-testid='contacts-trigger'
           className='hover:scale-105'
         >
-          <ContactGlyph />
+          <FileText className='h-4 w-4' aria-hidden='true' />
         </CircleIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent

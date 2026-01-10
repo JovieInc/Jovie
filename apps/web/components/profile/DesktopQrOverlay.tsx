@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Smartphone, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { QRCode } from '@/components/atoms/QRCode';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
@@ -183,8 +184,7 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
       )}
 
       {mode === 'icon' && (
-        <motion.button
-          type='button'
+        <motion.div
           key='reopen'
           initial={
             prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 12 }
@@ -195,13 +195,19 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
               ? { duration: 0 }
               : { duration: 0.2, ease: 'easeOut' }
           }
-          onClick={reopen}
-          aria-label='View on mobile'
-          className='group fixed bottom-4 right-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-0 backdrop-blur-sm text-primary-token ring-1 ring-(--color-border-subtle) shadow-sm hover:bg-surface-1 hover:shadow-md active:scale-95 transition-all duration-150 ease-out focus-ring-themed focus-visible:ring-offset-(--color-bg-base) touch-manipulation select-none [-webkit-tap-highlight-color:transparent] cursor-pointer'
+          className='fixed bottom-4 right-4 z-50'
         >
-          <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
-          <Smartphone className='relative h-5 w-5' />
-        </motion.button>
+          <CircleIconButton
+            size='md'
+            variant='surface'
+            onClick={reopen}
+            ariaLabel='View on mobile'
+            className='group backdrop-blur-sm'
+          >
+            <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
+            <Smartphone className='relative h-5 w-5' aria-hidden='true' />
+          </CircleIconButton>
+        </motion.div>
       )}
     </>
   );

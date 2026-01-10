@@ -1,4 +1,5 @@
 'use client';
+import { ArrowLeft } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,24 +150,14 @@ export function ProfileNavButton({
       className={cn('backdrop-blur-md', className)}
     >
       <Link href={`/${artistHandle}`} data-testid='back-button'>
-        <svg
+        <ArrowLeft
           className={cn(
-            'text-secondary-token',
+            'h-4 w-4 text-secondary-token',
             'transition-all duration-300 ease-out',
             'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
           )}
-          fill='none'
-          stroke='currentColor'
-          viewBox='0 0 24 24'
           aria-hidden='true'
-        >
-          <path
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth={2}
-            d='M10 19l-7-7m0 0l7-7m-7 7h18'
-          />
-        </svg>
+        />
       </Link>
     </CircleIconButton>
   );
