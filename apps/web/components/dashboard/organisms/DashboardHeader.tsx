@@ -58,6 +58,10 @@ export function DashboardHeader({
           <div className='ml-auto flex items-center gap-2'>{action}</div>
         ) : null}
       </div>
+      {/* Mobile tabs - rendered in header area as per user decision */}
+      {mobileTabs && (
+        <div className='lg:hidden border-t border-subtle'>{mobileTabs}</div>
+      )}
     </header>
   );
 }
