@@ -298,7 +298,7 @@ function DashboardLayoutInner({
       <SkipToContent />
       <DashboardSidebar />
       <SidebarInset
-        className='flex flex-1 flex-col overflow-hidden bg-[var(--color-bg-base)] transition-[margin-right] duration-300 ease-out'
+        className='flex flex-1 flex-col overflow-hidden bg-base transition-[margin-right] duration-300 ease-out'
         style={{
           marginRight: isContactTableRoute
             ? (tableMeta.rightPanelWidth ?? 0)
