@@ -149,7 +149,11 @@ test.describe('Profile smoke tests @smoke', () => {
       await waitForHydration(page);
 
       // Ensure profile view is loaded - check for Listen or Subscribe button
-      const primaryCTA = page.locator('a[href*="/listen"], button:has-text("Subscribe"), a:has-text("Listen now")').first();
+      const primaryCTA = page
+        .locator(
+          'a[href*="/listen"], button:has-text("Subscribe"), a:has-text("Listen now")'
+        )
+        .first();
       await expect(primaryCTA).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
@@ -219,7 +223,11 @@ test.describe('Profile smoke tests @smoke', () => {
       await waitForHydration(page);
 
       // Ensure profile view is loaded - check for Tip or primary CTA button
-      const primaryCTA = page.locator('a[href*="/tip"], a[href*="/listen"], button:has-text("Subscribe")').first();
+      const primaryCTA = page
+        .locator(
+          'a[href*="/tip"], a[href*="/listen"], button:has-text("Subscribe")'
+        )
+        .first();
       await expect(primaryCTA).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
@@ -454,8 +462,8 @@ test.describe('Profile feature smoke tests @smoke', () => {
       // Check for social links (including Spotify and other platforms)
       const socialLinks = page.locator(
         '[data-testid="social-links"] a, ' +
-        'a[href*="instagram"], a[href*="twitter"], a[href*="facebook"], ' +
-        'a[href*="tiktok"], a[href*="spotify"]'
+          'a[href*="instagram"], a[href*="twitter"], a[href*="facebook"], ' +
+          'a[href*="tiktok"], a[href*="spotify"]'
       );
       const socialCount = await socialLinks.count();
 

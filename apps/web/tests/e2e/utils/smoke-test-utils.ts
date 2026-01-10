@@ -608,7 +608,8 @@ export const SMOKE_SELECTORS = {
   PROFILE_AVATAR: '[data-testid="profile-avatar"]',
   LISTEN_BUTTON: '[data-testid="listen-button"]',
   TIP_BUTTON: '[data-testid="tip-button"]',
-  BACK_BUTTON: '[data-testid="back-button"], button[aria-label="Back to profile"], button:has-text("Back")',
+  BACK_BUTTON:
+    '[data-testid="back-button"], button[aria-label="Back to profile"], button:has-text("Back")',
   // Page structure
   MAIN_CONTENT: 'main, [role="main"], body',
   PAGE_HEADING: 'h1',
