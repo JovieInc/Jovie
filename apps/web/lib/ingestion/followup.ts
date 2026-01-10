@@ -5,8 +5,11 @@ import {
   detectPlatform,
 } from '@/lib/utils/platform-detection';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
+import { isFeatureFmUrl, validateFeatureFmUrl } from './strategies/featurefm';
 import { validateLayloUrl } from './strategies/laylo';
+import { isLinkfireUrl, validateLinkfireUrl } from './strategies/linkfire';
 import { validateLinktreeUrl } from './strategies/linktree';
+import { isToneDenUrl, validateToneDenUrl } from './strategies/toneden';
 import { isYouTubeChannelUrl } from './strategies/youtube';
 import type { ExtractionResult } from './types';
 
@@ -17,7 +20,10 @@ type SupportedRecursiveJobType =
   | 'import_linktree'
   | 'import_laylo'
   | 'import_youtube'
-  | 'import_beacons';
+  | 'import_beacons'
+  | 'import_linkfire'
+  | 'import_featurefm'
+  | 'import_toneden';
 
 /**
  * Maximum depth allowed for each job type.
@@ -27,6 +33,9 @@ const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
   import_laylo: 3,
   import_youtube: 1,
   import_beacons: 3,
+  import_linkfire: 2,
+  import_featurefm: 2,
+  import_toneden: 2,
 };
 
 /**
@@ -162,6 +171,45 @@ export async function enqueueFollowupIngestionJobs(params: {
         jobType: 'import_laylo',
         creatorProfileId,
         sourceUrl: validatedLaylo,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    // Linkfire
+    const validatedLinkfire = validateLinkfireUrl(url);
+    if (validatedLinkfire && isLinkfireUrl(validatedLinkfire)) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_linkfire',
+        creatorProfileId,
+        sourceUrl: validatedLinkfire,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    // Feature.fm
+    const validatedFeaturefm = validateFeatureFmUrl(url);
+    if (validatedFeaturefm && isFeatureFmUrl(validatedFeaturefm)) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_featurefm',
+        creatorProfileId,
+        sourceUrl: validatedFeaturefm,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    // ToneDen
+    const validatedToneden = validateToneDenUrl(url);
+    if (validatedToneden && isToneDenUrl(validatedToneden)) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_toneden',
+        creatorProfileId,
+        sourceUrl: validatedToneden,
         depth: nextDepth,
       });
     }

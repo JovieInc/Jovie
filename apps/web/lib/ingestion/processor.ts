@@ -17,13 +17,16 @@ import type { ingestionJobs } from '@/lib/db/schema';
 // Re-export followup functions
 export { enqueueFollowupIngestionJobs } from './followup';
 export { beaconsJobConfig, processBeaconsJob } from './jobs/beacons';
+export { featurefmJobConfig, processFeaturefmJob } from './jobs/featurefm';
 export {
   deriveLayloHandle,
   layloJobConfig,
   processLayloJob,
 } from './jobs/laylo';
+export { linkfireJobConfig, processLinkfireJob } from './jobs/linkfire';
 // Re-export job processors (direct imports to avoid barrel export issues)
 export { linktreeJobConfig, processLinktreeJob } from './jobs/linktree';
+export { processTonedenJob, tonedenJobConfig } from './jobs/toneden';
 // Re-export types
 export type {
   BaseJobPayload,
@@ -65,6 +68,9 @@ export async function processJob(
   const { processLayloJob } = await import('./jobs/laylo');
   const { processYouTubeJob } = await import('./jobs/youtube');
   const { processBeaconsJob } = await import('./jobs/beacons');
+  const { processLinkfireJob } = await import('./jobs/linkfire');
+  const { processFeaturefmJob } = await import('./jobs/featurefm');
+  const { processTonedenJob } = await import('./jobs/toneden');
 
   switch (job.jobType) {
     case 'import_linktree':
@@ -75,6 +81,12 @@ export async function processJob(
       return processYouTubeJob(tx, job.payload);
     case 'import_beacons':
       return processBeaconsJob(tx, job.payload);
+    case 'import_linkfire':
+      return processLinkfireJob(tx, job.payload);
+    case 'import_featurefm':
+      return processFeaturefmJob(tx, job.payload);
+    case 'import_toneden':
+      return processTonedenJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }

@@ -31,6 +31,14 @@ export {
   normalizeHandle as normalizeBeaconsHandle,
   validateBeaconsUrl,
 } from './beacons';
+// Feature.fm strategy (music smart links)
+export {
+  extractFeatureFm,
+  extractFeatureFmId,
+  fetchFeatureFmDocument,
+  isFeatureFmUrl,
+  validateFeatureFmUrl,
+} from './featurefm';
 // Laylo strategy
 export {
   extractLaylo,
@@ -40,6 +48,14 @@ export {
   normalizeLayloHandle,
   validateLayloUrl,
 } from './laylo';
+// Linkfire strategy (music smart links)
+export {
+  extractLinkfire,
+  extractLinkfireId,
+  fetchLinkfireDocument,
+  isLinkfireUrl,
+  validateLinkfireUrl,
+} from './linkfire';
 // Linktree strategy
 export {
   extractLinktree,
@@ -50,6 +66,14 @@ export {
   normalizeHandle as normalizeLinktreeHandle,
   validateLinktreeUrl,
 } from './linktree';
+// ToneDen strategy (music smart links)
+export {
+  extractToneDen,
+  extractToneDenId,
+  fetchToneDenDocument,
+  isToneDenUrl,
+  validateToneDenUrl,
+} from './toneden';
 // YouTube strategy
 export {
   extractYouTube,
@@ -64,8 +88,11 @@ export {
 // ============================================================================
 
 import { isBeaconsUrl } from './beacons';
+import { isFeatureFmUrl } from './featurefm';
 import { isLayloUrl } from './laylo';
+import { isLinkfireUrl } from './linkfire';
 import { isLinktreeUrl } from './linktree';
+import { isToneDenUrl } from './toneden';
 import { isYouTubeChannelUrl } from './youtube';
 
 export type IngestionPlatform =
@@ -73,6 +100,9 @@ export type IngestionPlatform =
   | 'beacons'
   | 'laylo'
   | 'youtube'
+  | 'linkfire'
+  | 'featurefm'
+  | 'toneden'
   | 'unknown';
 
 /**
@@ -94,6 +124,15 @@ export function detectIngestionPlatform(url: string): IngestionPlatform {
   }
   if (isYouTubeChannelUrl(url)) {
     return 'youtube';
+  }
+  if (isLinkfireUrl(url)) {
+    return 'linkfire';
+  }
+  if (isFeatureFmUrl(url)) {
+    return 'featurefm';
+  }
+  if (isToneDenUrl(url)) {
+    return 'toneden';
   }
   return 'unknown';
 }

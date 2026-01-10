@@ -47,3 +47,39 @@ export const beaconsPayloadSchema = z.object({
 });
 
 export type BeaconsPayload = z.infer<typeof beaconsPayloadSchema>;
+
+/**
+ * Payload schema for Linkfire import jobs.
+ */
+export const linkfirePayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(2).default(0),
+});
+
+export type LinkfirePayload = z.infer<typeof linkfirePayloadSchema>;
+
+/**
+ * Payload schema for Feature.fm import jobs.
+ */
+export const featurefmPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(2).default(0),
+});
+
+export type FeaturefmPayload = z.infer<typeof featurefmPayloadSchema>;
+
+/**
+ * Payload schema for ToneDen import jobs.
+ */
+export const tonedenPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(2).default(0),
+});
+
+export type TonedenPayload = z.infer<typeof tonedenPayloadSchema>;
