@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import {
-  adminNavigation,
   primaryNavigation,
   secondaryNavigation,
   settingsNavigation,
@@ -51,12 +50,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const navigation = useMemo(() => {
     switch (section) {
       case 'admin':
-        // Admin shows all nav: primary + secondary + admin
-        return [
-          ...primaryNavigation,
-          ...secondaryNavigation,
-          ...adminNavigation,
-        ];
+        // Admin shows primary + secondary (DashboardNav handles admin group separately)
+        return [...primaryNavigation, ...secondaryNavigation];
       case 'settings':
         return settingsNavigation;
       case 'dashboard':
