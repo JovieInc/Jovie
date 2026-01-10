@@ -14,9 +14,6 @@ interface UseArtistContactsOptions {
   onNavigate?: (url: string) => void;
 }
 
-const TRIGGER_CLASS =
-  'group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base) cursor-pointer ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token hover:bg-surface-1';
-
 export function useArtistContacts({
   contacts,
   artistHandle,
@@ -87,7 +84,6 @@ export function useArtistContacts({
     setOpen,
     available,
     singleContact,
-    triggerClass: TRIGGER_CLASS,
     performAction,
     onIconClick,
     primaryChannel,

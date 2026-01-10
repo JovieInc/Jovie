@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { useArtistTheme } from './ArtistThemeProvider';
 
 export function ArtistThemeToggle() {
@@ -19,16 +20,15 @@ export function ArtistThemeToggle() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          variant='ghost'
-          size='sm'
+        <CircleIconButton
+          size='xs'
+          variant='secondary'
           onClick={handleToggle}
-          className='h-8 w-8 px-0 rounded-full bg-surface-1 hover:bg-surface-2 transition-colors'
+          ariaLabel={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} mode`}
         >
-          <span className='sr-only'>Toggle theme</span>
           {resolvedTheme === 'light' ? (
             <svg
-              className='h-5 w-5 text-secondary-token'
+              className='text-secondary-token'
               fill='none'
               stroke='currentColor'
               viewBox='0 0 24 24'
@@ -44,7 +44,7 @@ export function ArtistThemeToggle() {
             </svg>
           ) : (
             <svg
-              className='h-5 w-5 text-secondary-token'
+              className='text-secondary-token'
               fill='none'
               stroke='currentColor'
               viewBox='0 0 24 24'
@@ -59,7 +59,7 @@ export function ArtistThemeToggle() {
               />
             </svg>
           )}
-        </Button>
+        </CircleIconButton>
       </TooltipTrigger>
       <TooltipContent side='right'>
         {`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} mode`}

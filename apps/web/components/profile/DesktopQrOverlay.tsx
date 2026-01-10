@@ -197,10 +197,10 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
           }
           onClick={reopen}
           aria-label='View on mobile'
-          className='group fixed bottom-4 right-4 z-50 p-2 rounded-full bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-md hover:shadow-lg transition'
+          className='group fixed bottom-4 right-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-0 backdrop-blur-sm text-primary-token ring-1 ring-(--color-border-subtle) shadow-sm hover:bg-surface-1 hover:shadow-md active:scale-95 transition-all duration-150 ease-out focus-ring-themed focus-visible:ring-offset-(--color-bg-base) touch-manipulation select-none [-webkit-tap-highlight-color:transparent] cursor-pointer'
         >
           <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
-          <Smartphone className='relative h-5 w-5 text-primary-token' />
+          <Smartphone className='relative h-5 w-5' />
         </motion.button>
       )}
     </>

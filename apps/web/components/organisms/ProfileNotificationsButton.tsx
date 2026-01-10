@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 
 type ProfileNotificationsButtonProps = {
@@ -22,11 +22,11 @@ export function ProfileNotificationsButton({
   const isEditing = notificationsState === 'editing';
 
   return (
-    <HeaderIconButton
+    <CircleIconButton
       ref={buttonRef}
       size='xs'
-      variant='ghost'
-      className='relative border border-border bg-card/80 text-foreground shadow-sm backdrop-blur'
+      variant='frosted'
+      className='relative'
       aria-expanded={ariaExpanded}
       ariaLabel={
         hasActiveSubscriptions
@@ -37,7 +37,7 @@ export function ProfileNotificationsButton({
       onClick={onClick}
     >
       <svg
-        className='h-4 w-4 text-foreground'
+        className='text-primary-token'
         fill='none'
         stroke='currentColor'
         viewBox='0 0 24 24'
@@ -56,6 +56,6 @@ export function ProfileNotificationsButton({
           className='absolute -right-1 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary'
         />
       ) : null}
-    </HeaderIconButton>
+    </CircleIconButton>
   );
 }

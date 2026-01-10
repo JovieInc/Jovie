@@ -6,6 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { track } from '@/lib/analytics';
 import { ChannelIcon, ContactGlyph } from './ContactIcons';
 import type { ArtistContactsButtonProps } from './types';
@@ -22,7 +23,6 @@ export function ArtistContactsButton({
     setOpen,
     available,
     singleContact,
-    triggerClass,
     performAction,
     onIconClick,
     primaryChannel,
@@ -37,19 +37,20 @@ export function ArtistContactsButton({
   if (singleContact) {
     const channel = available[0].channels[0];
     return (
-      <button
-        type='button'
-        className={triggerClass}
-        aria-label='Contacts'
+      <CircleIconButton
+        size='xs'
+        variant='surface'
+        ariaLabel='Contacts'
         data-contact-encoded={channel.encoded}
         data-testid='contacts-trigger'
+        className='hover:scale-105'
         onClick={() => {
           onIconClick();
           performAction(channel, available[0]);
         }}
       >
         <ContactGlyph />
-      </button>
+      </CircleIconButton>
     );
   }
 
@@ -68,14 +69,15 @@ export function ArtistContactsButton({
       }}
     >
       <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          className={triggerClass}
-          aria-label='Contacts'
+        <CircleIconButton
+          size='xs'
+          variant='surface'
+          ariaLabel='Contacts'
           data-testid='contacts-trigger'
+          className='hover:scale-105'
         >
           <ContactGlyph />
-        </button>
+        </CircleIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
