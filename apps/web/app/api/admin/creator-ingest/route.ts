@@ -1,9 +1,9 @@
 import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
-import { and, eq, max, sql } from 'drizzle-orm';
+import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
-import { creatorProfileLinks, creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
@@ -35,9 +35,9 @@ import {
   normalizeHandle,
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
+import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { normalizeUrl } from '@/lib/utils/platform-detection/normalizer';
-import { logger } from '@/lib/utils/logger';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
 
 // Default claim token expiration: 30 days
@@ -85,13 +85,13 @@ async function addSocialLinkIdempotent(
 ): Promise<boolean> {
   // Check if link already exists
   const [existingLink] = await tx
-    .select({ id: creatorProfileLinks.id })
-    .from(creatorProfileLinks)
+    .select({ id: socialLinks.id })
+    .from(socialLinks)
     .where(
       and(
-        eq(creatorProfileLinks.creatorProfileId, creatorProfileId),
-        eq(creatorProfileLinks.platform, platform),
-        eq(creatorProfileLinks.url, url)
+        eq(socialLinks.creatorProfileId, creatorProfileId),
+        eq(socialLinks.platform, platform),
+        eq(socialLinks.url, url)
       )
     )
     .limit(1);
@@ -103,9 +103,9 @@ async function addSocialLinkIdempotent(
 
   // Compute next displayOrder (max + 1, or 0 if no links exist)
   const [result] = await tx
-    .select({ maxOrder: max(creatorProfileLinks.displayOrder) })
-    .from(creatorProfileLinks)
-    .where(eq(creatorProfileLinks.creatorProfileId, creatorProfileId));
+    .select({ maxOrder: max(socialLinks.sortOrder) })
+    .from(socialLinks)
+    .where(eq(socialLinks.creatorProfileId, creatorProfileId));
 
   const nextDisplayOrder =
     result?.maxOrder !== null && result?.maxOrder !== undefined
@@ -113,13 +113,13 @@ async function addSocialLinkIdempotent(
       : 0;
 
   // Insert the new link
-  await tx.insert(creatorProfileLinks).values({
+  await tx.insert(socialLinks).values({
     creatorProfileId,
-    type: 'social',
     platform,
+    platformType: platform,
     url,
-    title,
-    displayOrder: nextDisplayOrder,
+    displayText: title,
+    sortOrder: nextDisplayOrder,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -275,7 +275,12 @@ function extractHandleFromSocialUrl(url: string): string | null {
     const hostname = parsed.hostname.toLowerCase();
 
     // YouTube: handle @username or /channel/ID or /c/name
-    if (hostname === 'youtube.com' || hostname === 'www.youtube.com' || hostname === 'youtu.be' || hostname === 'www.youtu.be') {
+    if (
+      hostname === 'youtube.com' ||
+      hostname === 'www.youtube.com' ||
+      hostname === 'youtu.be' ||
+      hostname === 'www.youtu.be'
+    ) {
       if (handle.startsWith('@')) {
         handle = handle.slice(1);
       } else if (
@@ -308,7 +313,12 @@ function extractHandleFromSocialUrl(url: string): string | null {
     }
 
     // Discord: /invite/code
-    if (hostname === 'discord.gg' || hostname === 'www.discord.gg' || hostname === 'discord.com' || hostname === 'www.discord.com') {
+    if (
+      hostname === 'discord.gg' ||
+      hostname === 'www.discord.gg' ||
+      hostname === 'discord.com' ||
+      hostname === 'www.discord.com'
+    ) {
       if (handle === 'invite' && segments[1]) {
         handle = segments[1];
       }
