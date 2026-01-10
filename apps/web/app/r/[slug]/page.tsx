@@ -8,7 +8,6 @@
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
-import { trackServerEvent } from '@/lib/server-analytics';
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -20,6 +19,7 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
 
 export const dynamic = 'force-dynamic';

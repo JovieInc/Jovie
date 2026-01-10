@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { trackServerEvent } from '@/lib/server-analytics';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import {
@@ -25,6 +24,7 @@ import {
 } from '@/lib/discography/spotify-import';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {

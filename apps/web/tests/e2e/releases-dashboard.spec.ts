@@ -46,9 +46,15 @@ test.describe('Releases dashboard', () => {
     await expect(matrix).toBeVisible({ timeout: 15000 });
 
     // Verify table headers exist
-    await expect(page.getByRole('columnheader', { name: /release/i })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: /released/i })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: /smart link/i })).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: /release/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: /released/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: /smart link/i })
+    ).toBeVisible();
   });
 
   test('opens edit sidebar when clicking edit button @nightly', async ({
@@ -86,7 +92,9 @@ test.describe('Releases dashboard', () => {
     await expect(matrix).toBeVisible({ timeout: 15000 });
 
     // Get a provider-specific copy button URL
-    const providerButton = page.locator('[data-testid^="provider-copy-"][data-testid$="-spotify"]').first();
+    const providerButton = page
+      .locator('[data-testid^="provider-copy-"][data-testid$="-spotify"]')
+      .first();
     const providerUrl = await providerButton.getAttribute('data-url');
 
     if (providerUrl) {
@@ -112,7 +120,7 @@ test.describe('Releases dashboard', () => {
     await expect(matrix).toBeVisible({ timeout: 15000 });
 
     // If user has releases, Spotify is connected and sync button should be visible
-    const hasReleases = await page.locator('tbody tr').count() > 0;
+    const hasReleases = (await page.locator('tbody tr').count()) > 0;
 
     if (hasReleases) {
       const syncButton = page.getByTestId('sync-spotify-button');
