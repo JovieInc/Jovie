@@ -463,8 +463,8 @@ export async function POST(request: Request) {
 
       const usernameNormalized = handle;
 
-      return await withSystemIngestionSession(async tx => {
-        // Race-safe duplicate check within transaction
+      // TRANSACTION 1: Check for existing profile and allocate handle (DB-only)
+      const existingCheck = await withSystemIngestionSession(async tx => {
         const [existing] = await tx
           .select({
             id: creatorProfiles.id,
@@ -489,84 +489,107 @@ export async function POST(request: Request) {
             : existing.usernameNormalized
           : usernameNormalized;
 
-        if (!finalHandle) {
-          return NextResponse.json(
-            {
-              error: 'Unable to allocate unique username',
-              details: 'All fallback username attempts exhausted.',
-            },
-            { status: 409, headers: NO_STORE_HEADERS }
-          );
-        }
-
-        if (existing && existing.isClaimed) {
-          return NextResponse.json(
-            {
-              error: 'Profile already claimed',
-              details: 'Cannot overwrite a claimed profile.',
-            },
-            { status: 409, headers: NO_STORE_HEADERS }
-          );
-        }
-
-        // Fetch and extract profile data
-        let extraction:
-          | ReturnType<typeof extractLinktree>
-          | ReturnType<typeof extractLaylo>;
-        try {
-          if (isLayloProfile) {
-            const { profile: layloProfile, user } =
-              await fetchLayloProfile(handle);
-            extraction = extractLaylo(layloProfile, user);
-          } else {
-            const html = await fetchLinktreeDocument(validatedUrl);
-            extraction = extractLinktree(html);
-          }
-        } catch (fetchError) {
-          const errorMessage =
-            fetchError instanceof Error
-              ? fetchError.message
-              : 'Failed to fetch profile';
-
-          logger.error('Profile fetch failed', {
-            url: validatedUrl,
-            error: errorMessage,
-            platform: isLayloProfile ? 'laylo' : 'linktree',
-          });
-
-          return NextResponse.json(
-            { error: 'Failed to fetch profile', details: errorMessage },
-            { status: 502, headers: NO_STORE_HEADERS }
-          );
-        }
-
-        const displayName = extraction.displayName?.trim() || handle;
-        const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
-
-        const hostedAvatarUrlFromProfile = externalAvatarUrl
-          ? await copyAvatarToBlob(externalAvatarUrl, handle)
-          : null;
-
-        const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
-          ? null
-          : await maybeCopyIngestionAvatarFromLinks({
-              handle,
-              links: extraction.links
-                .map(link => link.url)
-                .filter((url): url is string => typeof url === 'string'),
-            });
-
-        const hostedAvatarUrl =
-          hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
-
-        const extractionWithHostedAvatar = {
-          ...extraction,
-          avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
-        };
-
+        // Mark as processing if re-ingesting
         if (isReingest && existing) {
           await IngestionStatusManager.markProcessing(tx, existing.id);
+        }
 
+        return { existing, isReingest, finalHandle };
+      });
+
+      // Handle error cases from first transaction
+      if (!existingCheck.finalHandle) {
+        return NextResponse.json(
+          {
+            error: 'Unable to allocate unique username',
+            details: 'All fallback username attempts exhausted.',
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (existingCheck.existing && existingCheck.existing.isClaimed) {
+        return NextResponse.json(
+          {
+            error: 'Profile already claimed',
+            details: 'Cannot overwrite a claimed profile.',
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // EXTERNAL WORK (outside transaction): Fetch profile and copy avatar
+      let extraction:
+        | ReturnType<typeof extractLinktree>
+        | ReturnType<typeof extractLaylo>;
+      try {
+        if (isLayloProfile) {
+          const { profile: layloProfile, user } =
+            await fetchLayloProfile(handle);
+          extraction = extractLaylo(layloProfile, user);
+        } else {
+          const html = await fetchLinktreeDocument(validatedUrl);
+          extraction = extractLinktree(html);
+        }
+      } catch (fetchError) {
+        const errorMessage =
+          fetchError instanceof Error
+            ? fetchError.message
+            : 'Failed to fetch profile';
+
+        logger.error('Profile fetch failed', {
+          url: validatedUrl,
+          error: errorMessage,
+          platform: isLayloProfile ? 'laylo' : 'linktree',
+        });
+
+        // Mark as failed if re-ingesting
+        if (existingCheck.isReingest && existingCheck.existing) {
+          await withSystemIngestionSession(async tx => {
+            await IngestionStatusManager.markIdleOrFailed(
+              tx,
+              existingCheck.existing!.id,
+              errorMessage
+            );
+          });
+        }
+
+        return NextResponse.json(
+          { error: 'Failed to fetch profile', details: errorMessage },
+          { status: 502, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const displayName = extraction.displayName?.trim() || handle;
+      const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
+
+      // Copy avatar (external I/O, outside transaction)
+      const hostedAvatarUrlFromProfile = externalAvatarUrl
+        ? await copyAvatarToBlob(externalAvatarUrl, handle)
+        : null;
+
+      const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
+        ? null
+        : await maybeCopyIngestionAvatarFromLinks({
+            handle,
+            links: extraction.links
+              .map(link => link.url)
+              .filter((url): url is string => typeof url === 'string'),
+          });
+
+      const hostedAvatarUrl =
+        hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
+
+      const extractionWithHostedAvatar = {
+        ...extraction,
+        avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
+      };
+
+      // TRANSACTION 2: Insert/update profile and merge links (DB-only)
+      if (existingCheck.isReingest && existingCheck.existing) {
+        const existing = existingCheck.existing;
+
+        return await withSystemIngestionSession(async tx => {
           let mergeError: string | null = null;
           try {
             await normalizeAndMergeExtraction(
@@ -603,6 +626,26 @@ export async function POST(request: Request) {
             mergeError
           );
 
+          // Calculate fit score
+          try {
+            if (typeof extraction.hasPaidTier === 'boolean') {
+              await updatePaidTierScore(
+                tx,
+                existing.id,
+                extraction.hasPaidTier
+              );
+            }
+            await calculateAndStoreFitScore(tx, existing.id);
+          } catch (fitScoreError) {
+            logger.warn('Fit score calculation failed on reingest', {
+              profileId: existing.id,
+              error:
+                fitScoreError instanceof Error
+                  ? fitScoreError.message
+                  : 'Unknown error',
+            });
+          }
+
           return NextResponse.json(
             {
               ok: !mergeError,
@@ -622,8 +665,13 @@ export async function POST(request: Request) {
               headers: { 'Cache-Control': 'no-store' },
             }
           );
-        }
+        });
+      }
 
+      // New profile creation
+      const finalHandle = existingCheck.finalHandle;
+
+      return await withSystemIngestionSession(async tx => {
         // Generate claim token at creation time
         const claimToken = randomUUID();
         const claimTokenExpiresAt = new Date();
