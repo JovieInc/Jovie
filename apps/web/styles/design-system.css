@@ -50,20 +50,16 @@
 */
 
 :root {
-  /* Light mode surfaces - progressively darker */
-  --color-bg-base: oklch(99% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-0: oklch(
-    97.5% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  /* Light mode surfaces - neutral grays without color tint */
+  --color-bg-base: oklch(96% 0 0); /* #f4f4f4 - Sidebar bg (neutral gray) */
+  --color-bg-surface-0: oklch(96% 0 0); /* Same as base */
   --color-bg-surface-1: oklch(
-    96% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+    99% 0 0
+  ); /* #fcfcfc - Main content (pure neutral) */
   --color-bg-surface-2: oklch(
-    93% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-bg-surface-3: oklch(
-    90% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+    93% 0 0
+  ); /* #ededed - Contact sidebar (darker neutral) */
+  --color-bg-surface-3: oklch(90% 0 0); /* #e6e6e6 - Modals (darkest neutral) */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -138,15 +134,11 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
-  --color-bg-base: oklch(6.5% 0.005 240);
-  --color-bg-surface-0: oklch(3.5% 0.003 240);
-  --color-bg-surface-1: oklch(6.5% 0.005 240);
-  --color-bg-surface-2: oklch(
-    19% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-bg-surface-3: oklch(
-    22% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-bg-base: oklch(3.5% 0 0); /* #090909 - sidebar & page bg */
+  --color-bg-surface-0: oklch(3.5% 0 0); /* Same as base */
+  --color-bg-surface-1: oklch(6.5% 0.005 240); /* #101011 - main content */
+  --color-bg-surface-2: oklch(9.5% 0.005 240); /* #17181a - contact sidebar */
+  --color-bg-surface-3: oklch(14% 0.005 240); /* Modals, tooltips */
 
   /* Text hierarchy - inverted for dark mode */
   --color-text-primary-token: oklch(96% 0 0);
@@ -518,24 +510,32 @@
    SIDEBAR TOKENS (RGB triplets for alpha)
    ============================================ */
 :root {
-  --sidebar-background: 255 255 255;
+  /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
+  /* Maps to --color-bg-base: oklch(96% 0 0) = #f5f5f5 = rgb(245,245,245) */
+  --sidebar-background: 245 245 245; /* Matches page bg exactly (neutral gray) */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
-  --sidebar-accent: 245 246 248;
+  --sidebar-accent: 237 237 237; /* Slightly darker neutral for hover */
   --sidebar-accent-foreground: 12 12 12;
-  --sidebar-border: 229 231 235;
+  --sidebar-border: 229 229 229; /* Neutral border */
   --sidebar-ring: 124 58 237;
-  --sidebar-muted: 107 114 128;
-  --sidebar-muted-foreground: 113 113 122;
-  --sidebar-surface: 250 251 252;
-  --sidebar-surface-hover: 245 246 248;
+  --sidebar-muted: 115 115 115; /* Neutral muted */
+  --sidebar-muted-foreground: 140 140 140; /* Neutral muted text */
+  --sidebar-surface: 245 245 245; /* Matches base */
+  --sidebar-surface-hover: 237 237 237; /* Neutral hover */
   --sidebar-input-background: 255 255 255;
-  --sidebar-input-border: 229 231 235;
+  --sidebar-input-border: 229 229 229;
 }
 
 :root.dark {
-  --sidebar-background: 23 24 26;
+<<<<<<< HEAD
+  --sidebar-background: 9 9 9;
+=======
+  /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
+  /* Maps to --color-bg-base (oklch(3.5% 0 0) = #090909 = rgb(9,9,9)) */
+  --sidebar-background: 9 9 9; /* Matches base */
+>>>>>>> b1b2828c5 (feat(ui): standardize dashboard layout styling and visual hierarchy)
   --sidebar-foreground: 244 244 245;
   --sidebar-primary: 244 244 245;
   --sidebar-primary-foreground: 12 12 12;
@@ -545,7 +545,11 @@
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 23 24 26;
+<<<<<<< HEAD
+  --sidebar-surface: 9 9 9;
+=======
+  --sidebar-surface: 9 9 9; /* Matches base */
+>>>>>>> b1b2828c5 (feat(ui): standardize dashboard layout styling and visual hierarchy)
   --sidebar-surface-hover: 32 33 37;
   --sidebar-input-background: 32 33 37;
   --sidebar-input-border: 255 255 255 / 0.08;

@@ -90,7 +90,7 @@ export function DefaultStatusBanner({
           </div>
           <div className='min-w-0 space-y-1'>
             <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token sm:tracking-[0.2em]'>
-              Paul Graham default status
+              Company Health
             </p>
             <p
               className={`text-xl font-semibold sm:text-2xl ${statusTone} break-words`}

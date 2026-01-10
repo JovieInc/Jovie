@@ -58,6 +58,7 @@ storybook-static/
 
 # Claude Code local settings
 .claude/
+!.claude/
 !.claude/config.yaml
 .claude_settings.json
 apps/should-i-make/node_modules

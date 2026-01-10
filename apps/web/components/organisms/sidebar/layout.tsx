@@ -97,7 +97,7 @@ export const SidebarContent = React.forwardRef<
       ref={ref}
       data-sidebar='content'
       className={cn(
-        'flex min-h-0 flex-1 flex-col gap-2 overflow-auto overflow-x-hidden group-data-[collapsible=icon]:overflow-hidden',
+        'flex min-h-0 flex-1 flex-col gap-2 overflow-auto px-0.5 group-data-[collapsible=icon]:overflow-hidden',
         className
       )}
       {...props}

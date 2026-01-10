@@ -35,7 +35,7 @@ export function AvatarUploadOverlay({
       className={cn(
         'absolute inset-0 flex items-center justify-center rounded-full',
         'bg-surface-3/80 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] backdrop-blur',
-        'opacity-0 transition-opacity duration-200 group-hover:opacity-100'
+        'opacity-0 transition-opacity duration-200 group-hover/avatar:opacity-100'
       )}
       aria-hidden='true'
       data-testid='avatar-uploadable-hover-overlay'

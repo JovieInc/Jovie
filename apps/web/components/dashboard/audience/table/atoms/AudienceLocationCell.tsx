@@ -25,7 +25,7 @@ export function AudienceLocationCell({
           className='h-4 w-4 text-tertiary-token'
           aria-hidden='true'
         />
-        <span>{locationLabel || 'Unknown'}</span>
+        <span className='line-clamp-1'>{locationLabel || 'Unknown'}</span>
       </div>
     </td>
   );

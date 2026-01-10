@@ -12,7 +12,6 @@ import React, {
 } from 'react';
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
-import { DashboardThemeToggleButton } from '@/components/dashboard/atoms/DashboardThemeToggleButton';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
 import {
   PREVIEW_PANEL_WIDTH,
@@ -313,76 +312,64 @@ function DashboardLayoutInner({
       >
         <main
           id='main-content'
-          className={
-            isContactTableRoute
-              ? 'flex-1 min-h-0 overflow-hidden'
-              : 'flex-1 min-h-0 overflow-hidden p-1'
-          }
+          className='flex-1 min-h-0 overflow-hidden bg-base'
         >
           {isContactTableRoute ? (
-            <>
-              <DashboardHeader
-                breadcrumbs={crumbs}
-                leading={MobileMenuButton}
-                sidebarTrigger={SidebarExpandButton}
-                className='border-sidebar-border bg-sidebar-surface'
-                showDivider={true}
-                action={
-                  <>
-                    {ContactToggleButton}
-                    <DashboardThemeToggleButton />
-                  </>
-                }
-              />
-              <div
-                className={
-                  useFullWidth
-                    ? isAudienceRoute
-                      ? 'w-full h-full min-h-0'
-                      : 'w-full h-full min-h-0 p-1'
-                    : 'container mx-auto max-w-7xl p-1'
-                }
-              >
-                <div
-                  className={
-                    showMobileTabs
-                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                      : undefined
-                  }
-                >
-                  {children}
+            <div
+              className={cn(
+                'p-1',
+                useFullWidth
+                  ? 'w-full h-full min-h-0'
+                  : 'container mx-auto max-w-7xl h-full'
+              )}
+            >
+              <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
+                <DashboardHeader
+                  breadcrumbs={crumbs}
+                  leading={MobileMenuButton}
+                  sidebarTrigger={SidebarExpandButton}
+                  showDivider={true}
+                  action={<>{ContactToggleButton}</>}
+                />
+                <div className='flex-1 min-h-0 overflow-hidden'>
+                  <div
+                    className={
+                      showMobileTabs
+                        ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                        : undefined
+                    }
+                  >
+                    {children}
+                  </div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
-            <div className='flex h-full min-h-0 flex-col bg-base'>
-              <DashboardHeader
-                breadcrumbs={crumbs}
-                leading={MobileMenuButton}
-                sidebarTrigger={SidebarExpandButton}
-                action={
-                  <>
-                    <DashboardThemeToggleButton />
-                    {showPreview ? <PreviewToggleButton /> : null}
-                  </>
-                }
-              />
-              <div
-                className={cn(
-                  'flex-1 min-h-0 overflow-y-auto',
-                  useFullWidth
-                    ? 'px-4 sm:px-6 py-2'
-                    : 'container mx-auto max-w-7xl p-2'
-                )}
-              >
-                <div
-                  className={
-                    showMobileTabs
-                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                      : undefined
-                  }
-                >
-                  {children}
+            <div
+              className={cn(
+                'p-1',
+                useFullWidth
+                  ? 'w-full h-full min-h-0'
+                  : 'container mx-auto max-w-7xl h-full'
+              )}
+            >
+              <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
+                <DashboardHeader
+                  breadcrumbs={crumbs}
+                  leading={MobileMenuButton}
+                  sidebarTrigger={SidebarExpandButton}
+                  action={<>{showPreview ? <PreviewToggleButton /> : null}</>}
+                />
+                <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
+                  <div
+                    className={
+                      showMobileTabs
+                        ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                        : undefined
+                    }
+                  >
+                    {children}
+                  </div>
                 </div>
               </div>
             </div>

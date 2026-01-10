@@ -34,9 +34,13 @@ export function AudienceUserCell({
         className
       )}
     >
-      <div className='font-semibold'>{displayName || 'Visitor'}</div>
+      <div className='font-semibold line-clamp-1'>
+        {displayName || 'Visitor'}
+      </div>
       {secondaryLabel && (
-        <div className='text-xs text-secondary-token'>{secondaryLabel}</div>
+        <div className='text-xs text-secondary-token line-clamp-1'>
+          {secondaryLabel}
+        </div>
       )}
     </td>
   );

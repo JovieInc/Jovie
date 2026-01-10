@@ -23,11 +23,13 @@ export function TableRow({
         // Base styles
         'group transition-colors',
         // Hover state
-        'hover:bg-surface-1',
+        'hover:bg-surface-2',
         // Selected state
-        selected && 'bg-surface-1/50',
+        selected && 'bg-surface-2/50',
         // Clickable cursor
         onClick && 'cursor-pointer',
+        // Remove focus outline for clickable rows
+        onClick && 'focus:outline-none',
         // Virtual positioning
         isVirtual && 'absolute left-0 right-0',
         // Custom classes

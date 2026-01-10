@@ -26,7 +26,9 @@ export function AudienceCountryCell({
           className='h-4 w-4 text-tertiary-token'
           aria-hidden='true'
         />
-        <span>{geoCountry ? formatCountryLabel(geoCountry) : 'Unknown'}</span>
+        <span className='line-clamp-1'>
+          {geoCountry ? formatCountryLabel(geoCountry) : 'Unknown'}
+        </span>
       </div>
     </td>
   );
