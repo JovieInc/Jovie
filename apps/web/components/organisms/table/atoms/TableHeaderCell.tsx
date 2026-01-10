@@ -8,6 +8,7 @@ export interface TableHeaderCellProps extends Omit<TableCellProps, 'as'> {
   onSort?: () => void;
   sticky?: boolean;
   stickyTop?: number; // Offset in pixels for sticky positioning
+  sortLabel?: string; // Required when sortable=true and children is not a string
 }
 
 export function TableHeaderCell({
@@ -21,6 +22,7 @@ export function TableHeaderCell({
   onSort,
   sticky = true,
   stickyTop = 0,
+  sortLabel,
 }: TableHeaderCellProps) {
   const alignmentClasses = {
     left: 'text-left',
@@ -31,7 +33,7 @@ export function TableHeaderCell({
   const content =
     sortable && onSort ? (
       <SortableHeaderButton
-        label={typeof children === 'string' ? children : String(children)}
+        label={sortLabel ?? (typeof children === 'string' ? children : '')}
         direction={
           sortDirection === 'asc'
             ? 'asc'

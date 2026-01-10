@@ -16,7 +16,7 @@ type TableMeta = {
 
 type TableMetaContextValue = {
   tableMeta: TableMeta;
-  setTableMeta: (meta: TableMeta) => void;
+  setTableMeta: (meta: TableMeta | ((prev: TableMeta) => TableMeta)) => void;
 };
 
 const TableMetaContext = createContext<TableMetaContextValue | null>(null);
