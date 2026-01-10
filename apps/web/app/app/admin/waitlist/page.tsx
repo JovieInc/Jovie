@@ -53,16 +53,14 @@ export default async function AdminWaitlistPage({
         title='Waitlist'
         description={`${total} total ${total === 1 ? 'entry' : 'entries'}`}
       />
-      <PageContent>
-        <div className='space-y-6'>
-          <WaitlistMetrics metrics={metrics} />
-          <WaitlistTable
-            entries={entries}
-            page={currentPage}
-            pageSize={resolvedPageSize}
-            total={total}
-          />
-        </div>
+      <PageContent noPadding>
+        <WaitlistMetrics metrics={metrics} />
+        <WaitlistTable
+          entries={entries}
+          page={currentPage}
+          pageSize={resolvedPageSize}
+          total={total}
+        />
       </PageContent>
     </PageShell>
   );
