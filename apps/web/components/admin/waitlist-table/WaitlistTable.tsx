@@ -80,7 +80,7 @@ export function WaitlistTable({
   });
 
   return (
-    <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
+    <div className='overflow-hidden'>
       {/* Custom toolbar - sticky at top */}
       <div className='sticky top-0 z-30 flex h-12 sm:h-14 w-full items-center gap-3 px-3 sm:px-4 bg-surface-1/80 backdrop-blur border-b border-subtle'>
         <div className='text-xs text-secondary-token'>
