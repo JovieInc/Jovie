@@ -8,6 +8,8 @@ This document defines the standardized layout patterns for all dashboard and adm
 2. **Accessibility**: Proper semantic HTML and ARIA attributes
 3. **Responsiveness**: Mobile-first design with progressive enhancement
 4. **Performance**: Zero layout shift (CLS < 0.1)
+5. **No Cards Inside Containers**: Use borders to divide sections, not nested card components
+6. **Surface Hierarchy**: Base level (sidebar) → Surface-1 (main content) → Surface-2 (aside panels)
 
 ## Standard Page Structure
 
@@ -39,9 +41,10 @@ export default function MyTablePage() {
 ```
 
 **Key Measurements**:
-- Outer padding: `p-6` (from PageShell)
+- Outer padding: `p-1` (4px - tight spacing around container)
 - Container: `rounded-lg` (8px radius)
-- Header height: `h-14` (56px fixed)
+- Container background: `bg-surface-1` (raised surface above base)
+- Header height: `h-14` (56px fixed) - **INSIDE rounded container**
 - Header padding: `px-4 sm:px-6`
 - Content area: `flex-1 min-h-0` (fills remaining space)
 
@@ -159,10 +162,10 @@ flex-1 min-h-0 overflow-auto p-6
 
 ### Spacing
 
-- **Outer padding**: 24px (`p-6`)
+- **Outer padding**: 4px (`p-1`) - UPDATED: tight spacing around rounded container
 - **Header horizontal**: 16px/24px (`px-4 sm:px-6`)
 - **Content padding**: 24px (`p-6`) unless `noPadding`
-- **Gap between sections**: 24px (`space-y-6`)
+- **Section dividers**: Use `border-b border-subtle` instead of spacing
 
 ### Responsive Breakpoints
 
@@ -172,11 +175,60 @@ flex-1 min-h-0 overflow-auto p-6
 
 ### Colors (Design Tokens)
 
-- **Background**: `bg-surface-1`
-- **Border**: `border-subtle`
-- **Text primary**: `text-primary-token`
-- **Text secondary**: `text-secondary-token`
-- **Text tertiary**: `text-tertiary-token`
+**Surface Hierarchy** (from base to elevated):
+- **Base Level**: Main application background and left sidebar (no explicit class or use page background)
+- **Surface-1 (Raised)**: `bg-surface-1` - Main rounded corner containers, tables, primary content
+- **Surface-2 (More Raised)**: `bg-surface-2` - Aside panels (contact sidebar, detail drawers)
+- **Border**: `border-subtle` - Consistent borders for all dividers
+- **Text Hierarchy**:
+  - **Primary**: `text-primary-token` - Headings, important labels
+  - **Secondary**: `text-secondary-token` - Body text, descriptions
+  - **Tertiary**: `text-tertiary-token` - Hints, metadata
+
+**Important**: Do NOT use card components (with rounded corners and borders) inside surface-1 containers. Use flat sections divided by `border-b border-subtle` instead.
+
+## No-Cards-Inside-Containers Principle
+
+All content inside the main rounded corner container (surface-1) should be flat without nested cards. Use borders to divide sections.
+
+### ❌ Wrong: Nested Cards
+```tsx
+<PageShell>
+  <PageHeader title="Metrics" />
+  <PageContent>
+    <div className="space-y-6">
+      <div className="rounded-lg border border-subtle bg-surface-1 p-4">
+        <h3>Metric 1</h3>
+      </div>
+      <div className="rounded-lg border border-subtle bg-surface-1 p-4">
+        <h3>Metric 2</h3>
+      </div>
+    </div>
+  </PageContent>
+</PageShell>
+```
+
+### ✅ Correct: Flat Sections with Borders
+```tsx
+<PageShell>
+  <PageHeader title="Metrics" />
+  <PageContent noPadding>
+    <div className="grid grid-cols-3 border-b border-subtle">
+      <div className="border-r border-subtle px-4 py-3">
+        <h3>Metric 1</h3>
+      </div>
+      <div className="border-r border-subtle px-4 py-3">
+        <h3>Metric 2</h3>
+      </div>
+      <div className="px-4 py-3">
+        <h3>Metric 3</h3>
+      </div>
+    </div>
+  </PageContent>
+</PageShell>
+```
+
+**Why**: The rounded container itself provides visual elevation. Adding cards inside creates unnecessary visual weight and inconsistent hierarchy.
 
 ## Tables
 
