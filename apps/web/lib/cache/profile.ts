@@ -1,14 +1,13 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
-
+import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import {
   CACHE_TAGS,
   createAvatarTag,
   createProfileTag,
   createSocialLinksTag,
 } from './tags';
-import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 
 /**
  * Centralized cache invalidation for creator profiles.

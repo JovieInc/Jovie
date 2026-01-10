@@ -142,7 +142,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             >
               <div
                 className='shrink-0'
-                // SVG logos are trusted internal constants from DSP_CONFIGS, not user content
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG logos are trusted internal constants from DSP_CONFIGS, not user content
                 dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
               />
               <span>

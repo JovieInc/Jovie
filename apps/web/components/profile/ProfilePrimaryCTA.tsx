@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
-import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import { CTAButton } from '@/components/ui/CTAButton';
+import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import {
   type ProfileNextAction,
   resolveProfileNextAction,
