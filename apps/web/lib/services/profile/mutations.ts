@@ -222,16 +222,16 @@ export async function flushAllPendingViews(): Promise<number> {
   try {
     // Scan for all view count keys
     const keys: string[] = [];
-    let cursor = 0;
+    let cursor: string | number = 0;
 
     do {
-      const result = await redis.scan(cursor, {
+      const result: [string | number, string[]] = await redis.scan(cursor, {
         match: `${VIEW_COUNT_KEY_PREFIX}*`,
         count: 100,
       });
       cursor = result[0];
       keys.push(...result[1]);
-    } while (cursor !== 0);
+    } while (cursor !== 0 && cursor !== '0');
 
     // Flush each profile's views
     for (const key of keys) {
