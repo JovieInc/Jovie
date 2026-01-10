@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfileLinks, creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
@@ -35,6 +35,8 @@ import {
   normalizeHandle,
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
+import { detectPlatform } from '@/lib/utils/platform-detection';
+import { normalizeUrl } from '@/lib/utils/platform-detection/normalizer';
 import { logger } from '@/lib/utils/logger';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
 
@@ -194,13 +196,111 @@ async function copyAvatarToBlob(
 }
 
 /**
- * Admin endpoint to ingest a Linktree profile.
+ * Extract username/handle from a social platform URL.
+ * Returns null if unable to extract a valid handle.
+ */
+function extractHandleFromSocialUrl(url: string): string | null {
+  try {
+    const parsed = new URL(normalizeUrl(url));
+    const pathname = parsed.pathname;
+
+    // Remove leading/trailing slashes and get path segments
+    const segments = pathname.split('/').filter(Boolean);
+
+    if (segments.length === 0) {
+      return null;
+    }
+
+    // Get the first meaningful segment (usually the username)
+    let handle = segments[0];
+
+    // Special cases for different platforms
+    const hostname = parsed.hostname.toLowerCase();
+
+    // YouTube: handle @username or /channel/ID or /c/name
+    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+      if (handle.startsWith('@')) {
+        handle = handle.slice(1);
+      } else if (
+        (handle === 'channel' || handle === 'c' || handle === 'user') &&
+        segments[1]
+      ) {
+        handle = segments[1];
+      }
+    }
+
+    // TikTok: handle @username
+    if (hostname.includes('tiktok.com')) {
+      if (handle.startsWith('@')) {
+        handle = handle.slice(1);
+      }
+    }
+
+    // LinkedIn: /in/username or /company/name
+    if (hostname.includes('linkedin.com')) {
+      if ((handle === 'in' || handle === 'company') && segments[1]) {
+        handle = segments[1];
+      }
+    }
+
+    // Reddit: /user/username or /u/username
+    if (hostname.includes('reddit.com')) {
+      if ((handle === 'user' || handle === 'u') && segments[1]) {
+        handle = segments[1];
+      }
+    }
+
+    // Discord: /invite/code
+    if (hostname.includes('discord.gg') || hostname.includes('discord.com')) {
+      if (handle === 'invite' && segments[1]) {
+        handle = segments[1];
+      }
+    }
+
+    // Spotify: /artist/ID or /user/username
+    if (hostname.includes('spotify.com')) {
+      if (
+        (handle === 'artist' || handle === 'user' || handle === 'playlist') &&
+        segments[1]
+      ) {
+        handle = segments[1];
+      }
+    }
+
+    // Clean up the handle
+    handle = handle
+      .replace(/^@/, '') // Remove @ prefix
+      .replace(/[?#].*$/, '') // Remove query strings/fragments
+      .toLowerCase();
+
+    // Validate handle format
+    if (!handle || handle.length > 50) {
+      return null;
+    }
+
+    // Only allow alphanumeric, underscores, hyphens, and periods
+    if (!/^[a-z0-9._-]+$/.test(handle)) {
+      return null;
+    }
+
+    return handle;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin endpoint to ingest a creator profile from any social platform URL.
+ *
+ * Supported platforms:
+ * - Full extraction (avatar, name, links): Linktree, Laylo
+ * - Basic extraction (username only): Instagram, TikTok, Twitter/X, YouTube,
+ *   Facebook, Spotify, and 40+ more platforms
  *
  * Hardening:
- * - Strict URL validation (HTTPS only, valid Linktree hosts)
+ * - Strict URL validation (HTTPS only)
  * - Handle normalization and validation
  * - Transaction-wrapped with race-safe duplicate check
- * - Idempotency key support
  * - Claim token generated at creation time
  * - Error persistence for admin visibility
  */
@@ -237,176 +337,295 @@ export async function POST(request: Request) {
       );
     }
 
-    // Determine ingestion strategy (Laylo or Linktree)
-    const isLayloProfile = isLayloUrl(parsed.data.url);
-    const validatedUrl = isLayloProfile
-      ? validateLayloUrl(parsed.data.url)
-      : validateLinktreeUrl(parsed.data.url);
+    const inputUrl = parsed.data.url;
 
-    if (!validatedUrl) {
-      return NextResponse.json(
-        {
-          error: 'Invalid profile URL',
-          details: isLayloProfile
-            ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
-            : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    // Detect platform from URL
+    const detected = detectPlatform(inputUrl);
+    const platformId = detected.platform.id;
+    const normalizedUrl = detected.normalizedUrl;
 
-    // Extract and validate handle
-    const rawHandle = isLayloProfile
-      ? extractLayloHandle(validatedUrl)
-      : extractLinktreeHandle(validatedUrl);
+    // Check if this is a full-extraction platform (Linktree/Laylo)
+    const isLayloProfile = isLayloUrl(inputUrl);
+    const linktreeValidatedUrl = validateLinktreeUrl(inputUrl);
+    const isLinktreeProfile = linktreeValidatedUrl !== null;
 
-    if (!rawHandle) {
-      return NextResponse.json(
-        { error: 'Unable to parse profile handle from URL.' },
-        { status: 422, headers: NO_STORE_HEADERS }
-      );
-    }
+    // For full-extraction platforms, use existing logic
+    if (isLinktreeProfile || isLayloProfile) {
+      const validatedUrl = isLayloProfile
+        ? validateLayloUrl(inputUrl)
+        : linktreeValidatedUrl;
 
-    // Normalize handle for storage
-    const handle = isLayloProfile
-      ? normalizeLayloHandle(rawHandle)
-      : normalizeHandle(rawHandle);
-
-    if (!isValidHandle(handle)) {
-      return NextResponse.json(
-        {
-          error: 'Invalid handle format',
-          details:
-            'Handle must be 1-30 characters, alphanumeric and underscores only',
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const usernameNormalized = handle;
-
-    return await withSystemIngestionSession(async tx => {
-      // Race-safe duplicate check within transaction; update unclaimed or allocate alt handle if claimed
-      const [existing] = await tx
-        .select({
-          id: creatorProfiles.id,
-          isClaimed: creatorProfiles.isClaimed,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-          avatarUrl: creatorProfiles.avatarUrl,
-          displayName: creatorProfiles.displayName,
-          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-          displayNameLocked: creatorProfiles.displayNameLocked,
-          claimToken: creatorProfiles.claimToken,
-          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
-        })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-        .limit(1);
-
-      const isReingest = !!existing && !existing.isClaimed;
-
-      const finalHandle = existing
-        ? existing.isClaimed
-          ? await findAvailableHandle(tx, usernameNormalized)
-          : existing.usernameNormalized
-        : usernameNormalized;
-
-      if (!finalHandle) {
+      if (!validatedUrl) {
         return NextResponse.json(
           {
-            error: 'Unable to allocate unique username',
-            details: 'All fallback username attempts exhausted.',
+            error: 'Invalid profile URL',
+            details: isLayloProfile
+              ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
+              : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
           },
-          { status: 409, headers: NO_STORE_HEADERS }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
-      if (existing && existing.isClaimed) {
+      // Extract and validate handle
+      const rawHandle = isLayloProfile
+        ? extractLayloHandle(validatedUrl)
+        : extractLinktreeHandle(validatedUrl);
+
+      if (!rawHandle) {
         return NextResponse.json(
-          {
-            error: 'Profile already claimed',
-            details: 'Cannot overwrite a claimed profile.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
+          { error: 'Unable to parse profile handle from URL.' },
+          { status: 422, headers: NO_STORE_HEADERS }
         );
       }
 
-      // Fetch and extract profile data
-      let extraction:
-        | ReturnType<typeof extractLinktree>
-        | ReturnType<typeof extractLaylo>;
-      try {
-        if (isLayloProfile) {
-          const { profile: layloProfile, user } =
-            await fetchLayloProfile(handle);
-          extraction = extractLaylo(layloProfile, user);
-        } else {
-          const html = await fetchLinktreeDocument(validatedUrl);
-          extraction = extractLinktree(html);
+      // Normalize handle for storage
+      const handle = isLayloProfile
+        ? normalizeLayloHandle(rawHandle)
+        : normalizeHandle(rawHandle);
+
+      if (!isValidHandle(handle)) {
+        return NextResponse.json(
+          {
+            error: 'Invalid handle format',
+            details:
+              'Handle must be 1-30 characters, alphanumeric and underscores only',
+          },
+          { status: 422, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const usernameNormalized = handle;
+
+      return await withSystemIngestionSession(async tx => {
+        // Race-safe duplicate check within transaction
+        const [existing] = await tx
+          .select({
+            id: creatorProfiles.id,
+            isClaimed: creatorProfiles.isClaimed,
+            usernameNormalized: creatorProfiles.usernameNormalized,
+            avatarUrl: creatorProfiles.avatarUrl,
+            displayName: creatorProfiles.displayName,
+            avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+            displayNameLocked: creatorProfiles.displayNameLocked,
+            claimToken: creatorProfiles.claimToken,
+            claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+          })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+          .limit(1);
+
+        const isReingest = !!existing && !existing.isClaimed;
+
+        const finalHandle = existing
+          ? existing.isClaimed
+            ? await findAvailableHandle(tx, usernameNormalized)
+            : existing.usernameNormalized
+          : usernameNormalized;
+
+        if (!finalHandle) {
+          return NextResponse.json(
+            {
+              error: 'Unable to allocate unique username',
+              details: 'All fallback username attempts exhausted.',
+            },
+            { status: 409, headers: NO_STORE_HEADERS }
+          );
         }
-      } catch (fetchError) {
-        const errorMessage =
-          fetchError instanceof Error
-            ? fetchError.message
-            : 'Failed to fetch profile';
 
-        logger.error('Profile fetch failed', {
-          url: validatedUrl,
-          error: errorMessage,
-          platform: isLayloProfile ? 'laylo' : 'linktree',
-        });
+        if (existing && existing.isClaimed) {
+          return NextResponse.json(
+            {
+              error: 'Profile already claimed',
+              details: 'Cannot overwrite a claimed profile.',
+            },
+            { status: 409, headers: NO_STORE_HEADERS }
+          );
+        }
 
-        return NextResponse.json(
-          { error: 'Failed to fetch profile', details: errorMessage },
-          { status: 502, headers: NO_STORE_HEADERS }
-        );
-      }
+        // Fetch and extract profile data
+        let extraction:
+          | ReturnType<typeof extractLinktree>
+          | ReturnType<typeof extractLaylo>;
+        try {
+          if (isLayloProfile) {
+            const { profile: layloProfile, user } =
+              await fetchLayloProfile(handle);
+            extraction = extractLaylo(layloProfile, user);
+          } else {
+            const html = await fetchLinktreeDocument(validatedUrl);
+            extraction = extractLinktree(html);
+          }
+        } catch (fetchError) {
+          const errorMessage =
+            fetchError instanceof Error
+              ? fetchError.message
+              : 'Failed to fetch profile';
 
-      const displayName = extraction.displayName?.trim() || handle;
-      const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
-
-      const hostedAvatarUrlFromProfile = externalAvatarUrl
-        ? await copyAvatarToBlob(externalAvatarUrl, handle)
-        : null;
-
-      const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
-        ? null
-        : await maybeCopyIngestionAvatarFromLinks({
-            handle,
-            links: extraction.links
-              .map(link => link.url)
-              .filter((url): url is string => typeof url === 'string'),
+          logger.error('Profile fetch failed', {
+            url: validatedUrl,
+            error: errorMessage,
+            platform: isLayloProfile ? 'laylo' : 'linktree',
           });
 
-      const hostedAvatarUrl =
-        hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
+          return NextResponse.json(
+            { error: 'Failed to fetch profile', details: errorMessage },
+            { status: 502, headers: NO_STORE_HEADERS }
+          );
+        }
 
-      const extractionWithHostedAvatar = {
-        ...extraction,
-        avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
-      };
+        const displayName = extraction.displayName?.trim() || handle;
+        const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
 
-      if (isReingest && existing) {
-        await IngestionStatusManager.markProcessing(tx, existing.id);
+        const hostedAvatarUrlFromProfile = externalAvatarUrl
+          ? await copyAvatarToBlob(externalAvatarUrl, handle)
+          : null;
 
+        const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
+          ? null
+          : await maybeCopyIngestionAvatarFromLinks({
+              handle,
+              links: extraction.links
+                .map(link => link.url)
+                .filter((url): url is string => typeof url === 'string'),
+            });
+
+        const hostedAvatarUrl =
+          hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
+
+        const extractionWithHostedAvatar = {
+          ...extraction,
+          avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
+        };
+
+        if (isReingest && existing) {
+          await IngestionStatusManager.markProcessing(tx, existing.id);
+
+          let mergeError: string | null = null;
+          try {
+            await normalizeAndMergeExtraction(
+              tx,
+              {
+                id: existing.id,
+                usernameNormalized: existing.usernameNormalized,
+                avatarUrl: existing.avatarUrl ?? null,
+                displayName: existing.displayName ?? displayName,
+                avatarLockedByUser: existing.avatarLockedByUser ?? false,
+                displayNameLocked: existing.displayNameLocked ?? false,
+              },
+              extractionWithHostedAvatar
+            );
+
+            await enqueueFollowupIngestionJobs({
+              tx,
+              creatorProfileId: existing.id,
+              currentDepth: 0,
+              extraction: extractionWithHostedAvatar,
+            });
+          } catch (error) {
+            mergeError =
+              error instanceof Error ? error.message : 'Link extraction failed';
+            logger.error('Link merge failed', {
+              profileId: existing.id,
+              error: mergeError,
+            });
+          }
+
+          await IngestionStatusManager.markIdleOrFailed(
+            tx,
+            existing.id,
+            mergeError
+          );
+
+          return NextResponse.json(
+            {
+              ok: !mergeError,
+              profile: {
+                id: existing.id,
+                username: existing.usernameNormalized,
+                usernameNormalized: existing.usernameNormalized,
+                claimToken: existing.claimToken,
+              },
+              links: extraction.links.length,
+              warning: mergeError
+                ? `Profile updated but link extraction had issues: ${mergeError}`
+                : undefined,
+            },
+            {
+              status: mergeError ? 207 : 200,
+              headers: { 'Cache-Control': 'no-store' },
+            }
+          );
+        }
+
+        // Generate claim token at creation time
+        const claimToken = randomUUID();
+        const claimTokenExpiresAt = new Date();
+        claimTokenExpiresAt.setDate(
+          claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
+        );
+
+        // Insert profile with claim token
+        const [created] = await tx
+          .insert(creatorProfiles)
+          .values({
+            creatorType: 'creator',
+            username: finalHandle,
+            usernameNormalized: finalHandle,
+            displayName,
+            avatarUrl: hostedAvatarUrl,
+            isPublic: true,
+            isVerified: false,
+            isFeatured: false,
+            marketingOptOut: false,
+            isClaimed: false,
+            claimToken,
+            claimTokenExpiresAt,
+            settings: {},
+            theme: {},
+            ingestionStatus: 'processing',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning({
+            id: creatorProfiles.id,
+            username: creatorProfiles.username,
+            usernameNormalized: creatorProfiles.usernameNormalized,
+            displayName: creatorProfiles.displayName,
+            avatarUrl: creatorProfiles.avatarUrl,
+            claimToken: creatorProfiles.claimToken,
+            isClaimed: creatorProfiles.isClaimed,
+            claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+            avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+            displayNameLocked: creatorProfiles.displayNameLocked,
+          });
+
+        if (!created) {
+          return NextResponse.json(
+            { error: 'Failed to create creator profile' },
+            { status: 500, headers: NO_STORE_HEADERS }
+          );
+        }
+
+        // Merge extracted links
         let mergeError: string | null = null;
         try {
           await normalizeAndMergeExtraction(
             tx,
             {
-              id: existing.id,
-              usernameNormalized: existing.usernameNormalized,
-              avatarUrl: existing.avatarUrl ?? null,
-              displayName: existing.displayName ?? displayName,
-              avatarLockedByUser: existing.avatarLockedByUser ?? false,
-              displayNameLocked: existing.displayNameLocked ?? false,
+              id: created.id,
+              usernameNormalized: created.usernameNormalized,
+              avatarUrl: created.avatarUrl ?? null,
+              displayName: created.displayName ?? displayName,
+              avatarLockedByUser: created.avatarLockedByUser ?? false,
+              displayNameLocked: created.displayNameLocked ?? false,
             },
             extractionWithHostedAvatar
           );
 
           await enqueueFollowupIngestionJobs({
             tx,
-            creatorProfileId: existing.id,
+            creatorProfileId: created.id,
             currentDepth: 0,
             extraction: extractionWithHostedAvatar,
           });
@@ -414,55 +633,168 @@ export async function POST(request: Request) {
           mergeError =
             error instanceof Error ? error.message : 'Link extraction failed';
           logger.error('Link merge failed', {
-            profileId: existing.id,
+            profileId: created.id,
             error: mergeError,
           });
         }
 
         await IngestionStatusManager.markIdleOrFailed(
           tx,
-          existing.id,
+          created.id,
           mergeError
         );
 
+        logger.info('Creator profile ingested', {
+          profileId: created.id,
+          handle: created.username,
+          linksExtracted: extraction.links.length,
+          hadError: !!mergeError,
+        });
+
         return NextResponse.json(
           {
-            ok: !mergeError,
+            ok: true,
             profile: {
-              id: existing.id,
-              username: existing.usernameNormalized,
-              usernameNormalized: existing.usernameNormalized,
-              claimToken: existing.claimToken,
+              id: created.id,
+              username: created.username,
+              usernameNormalized: created.usernameNormalized,
+              claimToken: created.claimToken,
             },
             links: extraction.links.length,
             warning: mergeError
-              ? `Profile updated but link extraction had issues: ${mergeError}`
+              ? `Profile created but link extraction had issues: ${mergeError}`
               : undefined,
           },
-          {
-            status: mergeError ? 207 : 200,
-            headers: { 'Cache-Control': 'no-store' },
-          }
+          { status: 200, headers: { 'Cache-Control': 'no-store' } }
         );
+      });
+    }
+
+    // For other social platforms, create a minimal profile with the URL as a link
+    const handle = extractHandleFromSocialUrl(inputUrl);
+
+    if (!handle) {
+      return NextResponse.json(
+        {
+          error: 'Unable to extract username from URL',
+          details: `Could not parse a valid username from the ${detected.platform.name} URL. Please ensure the URL points to a valid profile.`,
+        },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Validate handle format
+    const normalizedHandle = normalizeHandle(handle);
+    if (!isValidHandle(normalizedHandle)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid username format',
+          details:
+            'Username must be 1-30 characters, alphanumeric and underscores only',
+        },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return await withSystemIngestionSession(async tx => {
+      // Check for existing profile
+      const [existing] = await tx
+        .select({
+          id: creatorProfiles.id,
+          isClaimed: creatorProfiles.isClaimed,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.usernameNormalized, normalizedHandle))
+        .limit(1);
+
+      // If profile exists and is claimed, allocate alternative handle
+      let finalHandle = normalizedHandle;
+      if (existing?.isClaimed) {
+        const altHandle = await findAvailableHandle(tx, normalizedHandle);
+        if (!altHandle) {
+          return NextResponse.json(
+            {
+              error: 'Unable to allocate unique username',
+              details: 'All fallback username attempts exhausted.',
+            },
+            { status: 409, headers: NO_STORE_HEADERS }
+          );
+        }
+        finalHandle = altHandle;
+      } else if (existing && !existing.isClaimed) {
+        // Profile exists but unclaimed - add the link to existing profile
+        try {
+          // Add the social link to existing profile
+          await tx.insert(creatorProfileLinks).values({
+            creatorProfileId: existing.id,
+            type: 'social',
+            platform: platformId,
+            url: normalizedUrl,
+            title: detected.platform.name,
+            displayOrder: 0,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          logger.info('Added link to existing unclaimed profile', {
+            profileId: existing.id,
+            platform: platformId,
+            url: normalizedUrl,
+          });
+
+          return NextResponse.json(
+            {
+              ok: true,
+              profile: {
+                id: existing.id,
+                username: existing.usernameNormalized,
+                usernameNormalized: existing.usernameNormalized,
+              },
+              links: 1,
+              note: 'Added link to existing unclaimed profile',
+            },
+            { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          );
+        } catch (linkError) {
+          logger.warn('Failed to add link to existing profile', {
+            profileId: existing.id,
+            error: linkError,
+          });
+          // Continue to return success since profile exists
+          return NextResponse.json(
+            {
+              ok: true,
+              profile: {
+                id: existing.id,
+                username: existing.usernameNormalized,
+                usernameNormalized: existing.usernameNormalized,
+              },
+              links: 0,
+              warning: 'Profile exists but failed to add link',
+            },
+            { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
       }
 
-      // Generate claim token at creation time (not on read)
+      // Generate claim token
       const claimToken = randomUUID();
       const claimTokenExpiresAt = new Date();
       claimTokenExpiresAt.setDate(
         claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
       );
 
-      // Insert profile with claim token
+      // Create new profile
       const [created] = await tx
         .insert(creatorProfiles)
         .values({
-          // userId intentionally omitted to avoid inserting empty-string UUID
           creatorType: 'creator',
           username: finalHandle,
           usernameNormalized: finalHandle,
-          displayName,
-          avatarUrl: hostedAvatarUrl,
+          displayName: handle, // Use original handle casing as display name
+          avatarUrl: null,
           isPublic: true,
           isVerified: false,
           isFeatured: false,
@@ -472,7 +804,7 @@ export async function POST(request: Request) {
           claimTokenExpiresAt,
           settings: {},
           theme: {},
-          ingestionStatus: 'processing',
+          ingestionStatus: 'idle',
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -480,13 +812,7 @@ export async function POST(request: Request) {
           id: creatorProfiles.id,
           username: creatorProfiles.username,
           usernameNormalized: creatorProfiles.usernameNormalized,
-          displayName: creatorProfiles.displayName,
-          avatarUrl: creatorProfiles.avatarUrl,
           claimToken: creatorProfiles.claimToken,
-          isClaimed: creatorProfiles.isClaimed,
-          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
-          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-          displayNameLocked: creatorProfiles.displayNameLocked,
         });
 
       if (!created) {
@@ -496,45 +822,31 @@ export async function POST(request: Request) {
         );
       }
 
-      // Merge extracted links
-      let mergeError: string | null = null;
+      // Add the social link
       try {
-        await normalizeAndMergeExtraction(
-          tx,
-          {
-            id: created.id,
-            usernameNormalized: created.usernameNormalized,
-            avatarUrl: created.avatarUrl ?? null,
-            displayName: created.displayName ?? displayName,
-            avatarLockedByUser: created.avatarLockedByUser ?? false,
-            displayNameLocked: created.displayNameLocked ?? false,
-          },
-          extractionWithHostedAvatar
-        );
-
-        await enqueueFollowupIngestionJobs({
-          tx,
+        await tx.insert(creatorProfileLinks).values({
           creatorProfileId: created.id,
-          currentDepth: 0,
-          extraction: extractionWithHostedAvatar,
+          type: 'social',
+          platform: platformId,
+          url: normalizedUrl,
+          title: detected.platform.name,
+          displayOrder: 0,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
-      } catch (error) {
-        mergeError =
-          error instanceof Error ? error.message : 'Link extraction failed';
-        logger.error('Link merge failed', {
+      } catch (linkError) {
+        logger.warn('Failed to add link to new profile', {
           profileId: created.id,
-          error: mergeError,
+          error: linkError,
         });
       }
 
-      // Update ingestion status (success or failure)
-      await IngestionStatusManager.markIdleOrFailed(tx, created.id, mergeError);
-
-      logger.info('Creator profile ingested', {
+      logger.info('Creator profile created from social URL', {
         profileId: created.id,
         handle: created.username,
-        linksExtracted: extraction.links.length,
-        hadError: !!mergeError,
+        platform: platformId,
+        sourceUrl: normalizedUrl,
       });
 
       return NextResponse.json(
@@ -546,10 +858,8 @@ export async function POST(request: Request) {
             usernameNormalized: created.usernameNormalized,
             claimToken: created.claimToken,
           },
-          links: extraction.links.length,
-          warning: mergeError
-            ? `Profile created but link extraction had issues: ${mergeError}`
-            : undefined,
+          links: 1,
+          platform: detected.platform.name,
         },
         { status: 200, headers: { 'Cache-Control': 'no-store' } }
       );
@@ -577,7 +887,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to ingest Linktree profile', details: errorMessage },
+      { error: 'Failed to ingest profile', details: errorMessage },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

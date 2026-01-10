@@ -3,8 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { PLATFORM_OPTIONS, PLATFORM_PREFIX } from './constants';
-import type { IngestPlatform, UseIngestProfileReturn } from './types';
+import { detectPlatform } from '@/lib/utils/platform-detection';
+import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
+import type { UseIngestProfileReturn } from './types';
 
 interface UseIngestProfileOptions {
   onIngestPending?: (profile: { id: string; username: string }) => void;
@@ -17,27 +18,40 @@ export function useIngestProfile({
   const notifications = useNotifications();
 
   const [open, setOpen] = useState(false);
-  const [username, setUsername] = useState('');
-  const [urlOverride, setUrlOverride] = useState<string | null>(null);
-  const [selectedPlatform, setSelectedPlatform] =
-    useState<IngestPlatform>('linktree');
+  const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const currentPlatform = PLATFORM_OPTIONS.find(p => p.id === selectedPlatform);
+  // Detect platform from URL in real-time
+  const detectedPlatform: PlatformInfo | null = useMemo(() => {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
 
-  const effectiveUrl = useMemo(() => {
-    if (urlOverride) return urlOverride.trim();
-    const prefix = PLATFORM_PREFIX[selectedPlatform];
-    const trimmed = username.trim().replace(/^@/, '');
-    return trimmed ? `${prefix}${trimmed}` : '';
-  }, [selectedPlatform, urlOverride, username]);
+    // Only detect if it looks like a URL
+    if (
+      !trimmed.startsWith('http://') &&
+      !trimmed.startsWith('https://') &&
+      !trimmed.includes('.')
+    ) {
+      return null;
+    }
+
+    try {
+      const detected = detectPlatform(trimmed);
+      // Don't show "website" as detected - that's the fallback
+      if (detected.platform.id === 'website') return null;
+      return detected.platform;
+    } catch {
+      return null;
+    }
+  }, [url]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!effectiveUrl) {
-      notifications.error('Please enter a handle');
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      notifications.error('Please enter a URL');
       return;
     }
 
@@ -47,7 +61,7 @@ export function useIngestProfile({
       const response = await fetch('/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: effectiveUrl }),
+        body: JSON.stringify({ url: trimmedUrl }),
       });
 
       const result = (await response.json()) as {
@@ -81,9 +95,7 @@ export function useIngestProfile({
       }
 
       setIsSuccess(true);
-
-      setUsername('');
-      setUrlOverride(null);
+      setUrl('');
 
       router.refresh();
 
@@ -105,16 +117,11 @@ export function useIngestProfile({
   return {
     open,
     setOpen,
-    username,
-    setUsername,
-    urlOverride,
-    setUrlOverride,
-    selectedPlatform,
-    setSelectedPlatform,
+    url,
+    setUrl,
     isLoading,
     isSuccess,
-    currentPlatform,
-    effectiveUrl,
+    detectedPlatform,
     handleSubmit,
   };
 }
