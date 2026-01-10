@@ -47,7 +47,7 @@ export function AuthShellWrapper({
       headerAction={config.headerAction}
       showMobileTabs={config.showMobileTabs}
       drawerContent={config.drawerContent}
-      drawerWidth={config.drawerWidth}
+      drawerWidth={config.drawerWidth ?? undefined}
     >
       {children}
     </AuthShell>

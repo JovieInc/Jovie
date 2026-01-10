@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { resolveUserState } from '@/lib/auth/gate';
 import { MyStatsig } from '../my-statsig';
 import {
@@ -10,7 +11,6 @@ import {
   setSidebarCollapsed,
 } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
-import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 
 /**
  * Get user ID for the app shell.
@@ -62,12 +62,9 @@ export default async function AppShellLayout({
       <MyStatsig userId={userId}>
         <ImpersonationBannerWrapper />
         <DashboardDataProvider value={dashboardData}>
-          <DashboardLayoutClient
-            dashboardData={dashboardData}
-            persistSidebarCollapsed={setSidebarCollapsed}
-          >
+          <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>
             {children}
-          </DashboardLayoutClient>
+          </AuthShellWrapper>
         </DashboardDataProvider>
       </MyStatsig>
     );
