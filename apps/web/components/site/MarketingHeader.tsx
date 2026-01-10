@@ -35,7 +35,7 @@ export function MarketingHeader({
       }
     };
 
-    // Initialize on mount
+    // Initialize on mount and pathname changes
     updateScrollState();
 
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -44,9 +44,10 @@ export function MarketingHeader({
       window.removeEventListener('scroll', onScroll);
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
     };
-  }, [scrollThresholdPx]);
+  }, [scrollThresholdPx, pathname]);
 
   const showSolid = pathname !== '/' || isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';
@@ -64,7 +65,7 @@ export function MarketingHeader({
         'transition-colors duration-300 border-b',
         showSolid
           ? 'bg-[#08090a] border-subtle backdrop-blur'
-          : 'bg-transparent! border-transparent!'
+          : '!bg-transparent !border-transparent'
       )}
     />
   );

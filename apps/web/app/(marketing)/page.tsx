@@ -120,8 +120,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// Helper to safely serialize JSON-LD with XSS protection
+const jsonLd = (value: unknown) =>
+  JSON.stringify(value).replace(/</g, '\\u003c');
+
 // Pre-serialized JSON-LD structured data for static generation
-const WEBSITE_SCHEMA = JSON.stringify({
+const WEBSITE_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: APP_NAME,
@@ -151,7 +155,7 @@ const WEBSITE_SCHEMA = JSON.stringify({
   },
 });
 
-const SOFTWARE_SCHEMA = JSON.stringify({
+const SOFTWARE_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: APP_NAME,
@@ -180,7 +184,7 @@ const SOFTWARE_SCHEMA = JSON.stringify({
   },
 });
 
-const ORGANIZATION_SCHEMA = JSON.stringify({
+const ORGANIZATION_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: APP_NAME,
