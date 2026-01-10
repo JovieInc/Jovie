@@ -50,7 +50,7 @@ export function AuthShell({
         <SidebarInset style={{ marginRight: drawerWidth || 0 }}>
           <div className='mt-2 mb-2 mr-2 ml-0 h-full'>
             <main className='flex-1 min-h-0 overflow-hidden border border-subtle rounded-md h-full'>
-              <div className='rounded-lg bg-surface-0 h-full overflow-hidden flex flex-col'>
+              <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>
                 <DashboardHeader
                   breadcrumbs={breadcrumbs}
                   action={headerAction}
