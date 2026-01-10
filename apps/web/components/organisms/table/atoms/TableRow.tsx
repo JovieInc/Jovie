@@ -1,0 +1,88 @@
+import { cn } from '@/lib/utils';
+
+export interface TableRowProps {
+  children: React.ReactNode;
+  selected?: boolean;
+  onClick?: () => void;
+  virtualRow?: { start: number }; // For virtualization positioning
+  className?: string;
+  // Keyboard navigation props
+  keyboardFocused?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  rowIndex?: number;
+}
+
+/**
+ * Enhanced table row component with keyboard navigation support
+ *
+ * Features:
+ * - Fixed 60px height to prevent layout shift
+ * - Keyboard focus ring when focused via keyboard
+ * - Virtual positioning for large datasets
+ * - Accessible ARIA attributes
+ *
+ * @example
+ * ```tsx
+ * <TableRow
+ *   selected={isSelected}
+ *   keyboardFocused={focusedIndex === rowIndex}
+ *   onKeyDown={handleKeyDown}
+ *   rowIndex={index}
+ *   onClick={() => handleRowClick(row)}
+ * >
+ *   <TableCell>Content</TableCell>
+ * </TableRow>
+ * ```
+ */
+export function TableRow({
+  children,
+  selected = false,
+  onClick,
+  virtualRow,
+  className,
+  keyboardFocused = false,
+  onKeyDown,
+  rowIndex,
+}: TableRowProps) {
+  const isVirtual = virtualRow !== undefined;
+
+  return (
+    <tr
+      data-row-index={rowIndex}
+      className={cn(
+        // Base styles
+        'group transition-colors',
+        // Fixed height to prevent layout shift
+        'h-[60px]',
+        // Hover state
+        'hover:bg-surface-2',
+        // Selected state
+        selected && 'bg-surface-2/50',
+        // Keyboard focus state
+        keyboardFocused && 'ring-2 ring-inset ring-accent',
+        // Clickable cursor
+        onClick && 'cursor-pointer',
+        // Remove focus outline for clickable rows
+        onClick && 'focus:outline-none',
+        // Virtual positioning
+        isVirtual && 'absolute left-0 right-0',
+        // Custom classes
+        className
+      )}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      tabIndex={keyboardFocused ? 0 : -1}
+      aria-selected={selected}
+      style={
+        isVirtual
+          ? {
+              transform: `translateY(${virtualRow.start}px)`,
+              height: '60px',
+            }
+          : undefined
+      }
+    >
+      {children}
+    </tr>
+  );
+}
