@@ -1,5 +1,3 @@
-'use client';
-
 import { ArrowRight } from 'lucide-react';
 import { LinearButton } from '@/components/atoms/LinearButton';
 import { Container } from '@/components/site/Container';
