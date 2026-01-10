@@ -159,7 +159,7 @@ export function ProfileNavButton({
         className
       )}
     >
-      <Link href={`/${artistHandle}`}>
+      <Link href={`/${artistHandle}`} data-testid='back-button'>
         <svg
           className={cn(
             'h-4 w-4 text-secondary-token',

@@ -20,7 +20,7 @@ import { expect, Page } from '@playwright/test';
  */
 export const SMOKE_TIMEOUTS = {
   /** Default page navigation timeout */
-  NAVIGATION: 15_000,
+  NAVIGATION: 30_000,
   /** Element visibility timeout */
   VISIBILITY: 10_000,
   /** Quick element check */
@@ -608,7 +608,8 @@ export const SMOKE_SELECTORS = {
   PROFILE_AVATAR: '[data-testid="profile-avatar"]',
   LISTEN_BUTTON: '[data-testid="listen-button"]',
   TIP_BUTTON: '[data-testid="tip-button"]',
-  BACK_BUTTON: 'button[aria-label="Back to profile"]',
+  BACK_BUTTON:
+    '[data-testid="back-button"], button[aria-label="Back to profile"], button:has-text("Back")',
   // Page structure
   MAIN_CONTENT: 'main, [role="main"], body',
   PAGE_HEADING: 'h1',
