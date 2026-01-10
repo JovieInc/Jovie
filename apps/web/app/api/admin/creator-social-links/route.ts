@@ -6,11 +6,10 @@ import { invalidateSocialLinksCache } from '@/lib/cache';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * Schema for updating social links via admin
@@ -165,55 +164,58 @@ export async function PUT(request: NextRequest) {
     const existingIds = new Set(existingLinks.map(l => l.id));
     const incomingIds = new Set(links.filter(l => l.id).map(l => l.id!));
 
-    // Delete links that are no longer present
-    const idsToDelete = [...existingIds].filter(id => !incomingIds.has(id));
-    if (idsToDelete.length > 0) {
-      await db.delete(socialLinks).where(inArray(socialLinks.id, idsToDelete));
-    }
+    // Wrap delete and upsert operations in a transaction for atomicity
+    await db.transaction(async (tx) => {
+      // Delete links that are no longer present
+      const idsToDelete = [...existingIds].filter(id => !incomingIds.has(id));
+      if (idsToDelete.length > 0) {
+        await tx.delete(socialLinks).where(inArray(socialLinks.id, idsToDelete));
+      }
 
-    // Upsert links
-    const now = new Date();
-    for (let i = 0; i < links.length; i++) {
-      const link = links[i];
-      if (!link) continue;
+      // Upsert links
+      const now = new Date();
+      for (let i = 0; i < links.length; i++) {
+        const link = links[i];
+        if (!link) continue;
 
-      const detected = detectPlatform(link.url);
-      const platform = detected.platform.id;
-      const platformType = link.platformType || detected.platform.category;
-      const normalizedUrl = detected.normalizedUrl || link.url;
+        const detected = detectPlatform(link.url);
+        const platform = detected.platform.id;
+        const platformType = link.platformType || detected.platform.category;
+        const normalizedUrl = detected.normalizedUrl || link.url;
 
-      if (link.id && existingIds.has(link.id)) {
-        // Update existing link
-        await db
-          .update(socialLinks)
-          .set({
+        if (link.id && existingIds.has(link.id)) {
+          // Update existing link
+          await tx
+            .update(socialLinks)
+            .set({
+              url: normalizedUrl,
+              platform,
+              platformType,
+              displayText: link.label || null,
+              sortOrder: i,
+              updatedAt: now,
+            })
+            .where(eq(socialLinks.id, link.id));
+        } else {
+          // Insert new link
+          await tx.insert(socialLinks).values({
+            creatorProfileId: profileId,
             url: normalizedUrl,
             platform,
             platformType,
             displayText: link.label || null,
             sortOrder: i,
+            state: 'active',
+            isActive: true,
+            sourceType: 'admin',
+            confidence: '1.00',
+            version: 1,
+            createdAt: now,
             updatedAt: now,
-          })
-          .where(eq(socialLinks.id, link.id));
-      } else {
-        // Insert new link
-        await db.insert(socialLinks).values({
-          creatorProfileId: profileId,
-          url: normalizedUrl,
-          platform,
-          platformType,
-          displayText: link.label || null,
-          sortOrder: i,
-          state: 'active',
-          isActive: true,
-          sourceType: 'admin',
-          confidence: '1.00',
-          version: 1,
-          createdAt: now,
-          updatedAt: now,
-        });
+          });
+        }
       }
-    }
+    });
 
     // Invalidate cache to ensure public profile reflects changes
     await invalidateSocialLinksCache(profileId, profile.usernameNormalized);

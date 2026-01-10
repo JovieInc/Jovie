@@ -108,6 +108,7 @@ export function ExportCSVButton<T extends object>({
       // Validate data
       if (!data || data.length === 0) {
         showError('No data available to export');
+        setIsExporting(false);
         return;
       }
 

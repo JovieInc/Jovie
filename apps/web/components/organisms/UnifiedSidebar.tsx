@@ -59,7 +59,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
   const isAdmin = section === 'admin';
 
   // Dashboard-specific data (needed for both dashboard and admin sections)
-  const dashboardData = isDashboard || isAdmin ? useDashboardData() : null;
+  // Always call hook unconditionally to avoid Rules of Hooks violation
+  const dashboardData = useDashboardData();
   const username = dashboardData
     ? (dashboardData.selectedProfile?.usernameNormalized ??
       dashboardData.selectedProfile?.username)

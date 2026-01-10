@@ -30,14 +30,21 @@ export function TableRow({
         selected && 'bg-surface-2/50',
         // Clickable cursor
         onClick && 'cursor-pointer',
-        // Remove focus outline for clickable rows
-        onClick && 'focus:outline-none',
+        // Accessible focus state for clickable rows
+        onClick && 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         // Virtual positioning
         isVirtual && 'absolute left-0 right-0',
         // Custom classes
         className
       )}
       onClick={onClick}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      } : undefined}
       style={
         isVirtual
           ? {

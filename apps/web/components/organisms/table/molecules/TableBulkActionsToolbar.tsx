@@ -8,11 +8,12 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { X } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface BulkAction {
   label: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   onClick: () => void;
 }
 

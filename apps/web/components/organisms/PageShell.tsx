@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface PageShellProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   /** If true, removes the outer padding (useful when parent already has padding) */
   noPadding?: boolean;
@@ -65,12 +66,12 @@ export function PageShell({
 export interface PageHeaderProps {
   title: string;
   description?: string;
-  action?: React.ReactNode;
-  breadcrumbs?: React.ReactNode;
+  action?: ReactNode;
+  breadcrumbs?: ReactNode;
   /** Mobile sidebar trigger for dashboard pages */
-  mobileSidebarTrigger?: React.ReactNode;
+  mobileSidebarTrigger?: ReactNode;
   /** Desktop sidebar trigger for dashboard pages */
-  sidebarTrigger?: React.ReactNode;
+  sidebarTrigger?: ReactNode;
   className?: string;
 }
 
@@ -135,7 +136,7 @@ export function PageHeader({
 }
 
 export interface PageContentProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   /** If true, removes default padding */
   noPadding?: boolean;

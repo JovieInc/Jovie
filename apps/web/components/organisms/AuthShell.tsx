@@ -42,12 +42,15 @@ export function AuthShell({
   isTableRoute = false,
   children,
 }: AuthShellProps) {
+  // Compute effective drawer width (default 360px when drawer is present)
+  const effectiveDrawerWidth = drawerContent ? (drawerWidth ?? 360) : 0;
+
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <SidebarProvider>
         <UnifiedSidebar section={section} navigation={navigation} />
 
-        <SidebarInset style={{ marginRight: drawerWidth || 0 }}>
+        <SidebarInset style={{ marginRight: effectiveDrawerWidth }}>
           <div className='mt-2 mb-2 mr-2 ml-0 h-full'>
             <main className='flex-1 min-h-0 overflow-hidden border border-subtle rounded-md h-full'>
               <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>
@@ -75,7 +78,7 @@ export function AuthShell({
         </SidebarInset>
 
         {drawerContent && (
-          <UnifiedDrawer width={drawerWidth}>{drawerContent}</UnifiedDrawer>
+          <UnifiedDrawer width={effectiveDrawerWidth}>{drawerContent}</UnifiedDrawer>
         )}
       </SidebarProvider>
     </div>
