@@ -168,6 +168,61 @@ main.jov.ie  jov.ie
 
 ---
 
+### 6. **CodeRabbit Autofix** (`coderabbit-autofix.yml`)
+
+**Purpose:** Automatically fix PRs blocked by CodeRabbit review feedback
+
+**Triggers:**
+
+- `pull_request_review` with action `submitted`
+- Only when reviewer is `coderabbitai[bot]`
+- Only when review state is `changes_requested`
+- Only when PR is not a draft
+- Only when SHA has not exhausted retries (max 2)
+
+**Process:**
+
+1. **Guard Job**: Validates all trigger conditions
+   - Verifies reviewer is CodeRabbit
+   - Verifies review is blocking
+   - Verifies PR is not draft
+   - Checks retry guard (per-SHA, max 2 attempts)
+
+2. **Autofix Job** (if guards pass):
+   - Fetches review body and inline comments
+   - Generates structured agent instructions
+   - Runs Claude agent to apply fixes
+   - Runs validation (Biome + TypeScript)
+   - If validation fails: retry once with error context
+   - If validation passes: commit and push
+   - If retry fails: escalate to human
+
+**Safety Features:**
+
+- ✅ Per-SHA retry guard prevents infinite loops
+- ✅ Maximum 2 attempts per commit SHA
+- ✅ Least-privilege credentials
+- ✅ Does not execute untrusted PR code
+- ✅ Does not expose secrets to agent
+- ✅ Clear escalation path (`needs-human` label)
+
+**Agent Constraints:**
+
+- Minimal diff - only change what's necessary
+- Only modify files referenced by CodeRabbit
+- No speculative refactoring
+- No dead code introduction
+- No lint error silencing via comments
+
+**Escalation:**
+
+When automation fails after 2 attempts:
+- `needs-human` label added to PR
+- Comment posted explaining failure
+- Workflow stops cleanly
+
+---
+
 ## 🔄 **Workflow Dependencies**
 
 ### **Feature → Main Flow**
