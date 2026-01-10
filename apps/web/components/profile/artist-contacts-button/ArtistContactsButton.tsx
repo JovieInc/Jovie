@@ -6,8 +6,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { FileText } from 'lucide-react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { track } from '@/lib/analytics';
-import { ChannelIcon, ContactGlyph } from './ContactIcons';
+import { ChannelIcon } from './ContactIcons';
 import type { ArtistContactsButtonProps } from './types';
 import { useArtistContacts } from './useArtistContacts';
 
@@ -22,7 +24,6 @@ export function ArtistContactsButton({
     setOpen,
     available,
     singleContact,
-    triggerClass,
     performAction,
     onIconClick,
     primaryChannel,
@@ -37,19 +38,20 @@ export function ArtistContactsButton({
   if (singleContact) {
     const channel = available[0].channels[0];
     return (
-      <button
-        type='button'
-        className={triggerClass}
-        aria-label='Contacts'
+      <CircleIconButton
+        size='xs'
+        variant='surface'
+        ariaLabel='Contacts'
         data-contact-encoded={channel.encoded}
         data-testid='contacts-trigger'
+        className='hover:scale-105'
         onClick={() => {
           onIconClick();
           performAction(channel, available[0]);
         }}
       >
-        <ContactGlyph />
-      </button>
+        <FileText className='h-4 w-4' aria-hidden='true' />
+      </CircleIconButton>
     );
   }
 
@@ -68,14 +70,15 @@ export function ArtistContactsButton({
       }}
     >
       <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          className={triggerClass}
-          aria-label='Contacts'
+        <CircleIconButton
+          size='xs'
+          variant='surface'
+          ariaLabel='Contacts'
           data-testid='contacts-trigger'
+          className='hover:scale-105'
         >
-          <ContactGlyph />
-        </button>
+          <FileText className='h-4 w-4' aria-hidden='true' />
+        </CircleIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'

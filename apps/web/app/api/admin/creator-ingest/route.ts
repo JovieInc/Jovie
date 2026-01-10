@@ -5,6 +5,10 @@ import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import {
+  calculateAndStoreFitScore,
+  updatePaidTierScore,
+} from '@/lib/fit-scoring';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -425,6 +429,24 @@ export async function POST(request: Request) {
           mergeError
         );
 
+        // Calculate fit score for the re-ingested profile
+        try {
+          // Update paid tier score if detected
+          if (typeof extraction.hasPaidTier === 'boolean') {
+            await updatePaidTierScore(tx, existing.id, extraction.hasPaidTier);
+          }
+          // Calculate full fit score
+          await calculateAndStoreFitScore(tx, existing.id);
+        } catch (fitScoreError) {
+          logger.warn('Fit score calculation failed on reingest', {
+            profileId: existing.id,
+            error:
+              fitScoreError instanceof Error
+                ? fitScoreError.message
+                : 'Unknown error',
+          });
+        }
+
         return NextResponse.json(
           {
             ok: !mergeError,
@@ -453,6 +475,9 @@ export async function POST(request: Request) {
         claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
       );
 
+      // Determine the source platform for fit scoring
+      const sourcePlatform = isLayloProfile ? 'laylo' : 'linktree';
+
       // Insert profile with claim token
       const [created] = await tx
         .insert(creatorProfiles)
@@ -473,6 +498,7 @@ export async function POST(request: Request) {
           settings: {},
           theme: {},
           ingestionStatus: 'processing',
+          ingestionSourcePlatform: sourcePlatform,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -529,6 +555,25 @@ export async function POST(request: Request) {
 
       // Update ingestion status (success or failure)
       await IngestionStatusManager.markIdleOrFailed(tx, created.id, mergeError);
+
+      // Calculate fit score for the new profile
+      try {
+        // Update paid tier score if detected
+        if (typeof extraction.hasPaidTier === 'boolean') {
+          await updatePaidTierScore(tx, created.id, extraction.hasPaidTier);
+        }
+        // Calculate full fit score
+        await calculateAndStoreFitScore(tx, created.id);
+      } catch (fitScoreError) {
+        // Log but don't fail the ingestion
+        logger.warn('Fit score calculation failed', {
+          profileId: created.id,
+          error:
+            fitScoreError instanceof Error
+              ? fitScoreError.message
+              : 'Unknown error',
+        });
+      }
 
       logger.info('Creator profile ingested', {
         profileId: created.id,

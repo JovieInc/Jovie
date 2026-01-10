@@ -8,10 +8,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { PROFILE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 
@@ -44,23 +45,18 @@ export function ProfileNavButton({
 
   const profileUrl = `${PROFILE_URL}/${artistHandle}`;
 
-  const chromeSize = 'xs' as const;
-
   // Main profile: Jovie icon linking to homepage
   if (!showBackButton) {
     return (
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
-          <HeaderIconButton
-            size={chromeSize}
+          <CircleIconButton
+            size='xs'
+            variant='surface'
             ariaLabel='Open profile menu'
             className={cn(
-              'group relative overflow-hidden',
-              'bg-surface-0 backdrop-blur-md',
-              'ring-1 ring-(--color-border-subtle)',
-              'shadow-sm hover:shadow-md',
-              'hover:bg-surface-1',
-              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90 active:scale-[0.97]',
+              'group relative overflow-hidden backdrop-blur-md',
+              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90',
               className
             )}
           >
@@ -81,7 +77,7 @@ export function ProfileNavButton({
                 priority
               />
             </div>
-          </HeaderIconButton>
+          </CircleIconButton>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align='start' sideOffset={8}>
@@ -146,39 +142,23 @@ export function ProfileNavButton({
 
   // Sub-page: Back button - use Link for instant navigation (no spinner needed)
   return (
-    <HeaderIconButton
+    <CircleIconButton
       asChild
-      size={chromeSize}
+      size='xs'
+      variant='surface'
       ariaLabel='Back to profile'
-      className={cn(
-        'bg-surface-0 backdrop-blur-md',
-        'border border-subtle',
-        'shadow-sm hover:shadow-md',
-        'hover:bg-surface-1',
-        'transition-all duration-200',
-        className
-      )}
+      className={cn('backdrop-blur-md', className)}
     >
       <Link href={`/${artistHandle}`} data-testid='back-button'>
-        <svg
+        <ArrowLeft
           className={cn(
             'h-4 w-4 text-secondary-token',
             'transition-all duration-300 ease-out',
             'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
           )}
-          fill='none'
-          stroke='currentColor'
-          viewBox='0 0 24 24'
           aria-hidden='true'
-        >
-          <path
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth={2}
-            d='M10 19l-7-7m0 0l7-7m-7 7h18'
-          />
-        </svg>
+        />
       </Link>
-    </HeaderIconButton>
+    </CircleIconButton>
   );
 }

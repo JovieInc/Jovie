@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
@@ -26,33 +27,17 @@ export function AuthBackButton({
 }: AuthBackButtonProps) {
   const haptic = useHapticFeedback();
 
-  const baseClasses = cn(
-    // Positioning - fixed by default, inline when specified
-    inline
-      ? 'relative'
-      : [
-          'fixed z-50',
-          'top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))]',
-          'md:top-6 md:left-6',
-        ],
-    // Larger touch target on mobile (min 44x44)
-    'inline-flex items-center justify-center rounded-full',
-    'h-11 w-11 sm:h-10 sm:w-10',
-    // Visual styling
-    'text-primary-token bg-surface-0/80 backdrop-blur-sm',
-    'border border-subtle',
-    'shadow-sm',
-    // Hover and active states
-    'hover:bg-surface-1 hover:border-subtle',
-    'active:scale-95 active:bg-surface-2',
-    // Transitions
-    'transition-all duration-150 ease-out',
-    // Focus ring
-    'focus-ring-themed',
-    // Touch optimizations
-    'touch-manipulation select-none',
-    '[-webkit-tap-highlight-color:transparent]'
-  );
+  // Position classes - fixed by default, relative when inline
+  const positionClasses = inline
+    ? 'relative'
+    : cn(
+        'fixed z-50',
+        'top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))]',
+        'md:top-6 md:left-6'
+      );
+
+  // Responsive sizing - larger on mobile for better touch targets
+  const responsiveSizeClasses = 'h-11 w-11 sm:h-10 sm:w-10';
 
   const handleClick = () => {
     haptic.light();
@@ -61,25 +46,29 @@ export function AuthBackButton({
 
   if (href) {
     return (
-      <Link
-        href={href}
-        className={cn(baseClasses, className)}
-        aria-label={ariaLabel}
-        onClick={() => haptic.light()}
+      <CircleIconButton
+        asChild
+        size='md'
+        variant='frosted'
+        ariaLabel={ariaLabel}
+        className={cn(positionClasses, responsiveSizeClasses, className)}
       >
-        <ArrowLeft className='h-5 w-5' />
-      </Link>
+        <Link href={href} onClick={() => haptic.light()}>
+          <ArrowLeft />
+        </Link>
+      </CircleIconButton>
     );
   }
 
   return (
-    <button
-      type='button'
+    <CircleIconButton
+      size='md'
+      variant='frosted'
       onClick={handleClick}
-      className={cn(baseClasses, className)}
-      aria-label={ariaLabel}
+      ariaLabel={ariaLabel}
+      className={cn(positionClasses, responsiveSizeClasses, className)}
     >
-      <ArrowLeft className='h-5 w-5' />
-    </button>
+      <ArrowLeft />
+    </CircleIconButton>
   );
 }
