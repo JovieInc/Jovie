@@ -48,8 +48,8 @@ export function AuthShell({
         <UnifiedSidebar section={section} navigation={navigation} />
 
         <SidebarInset style={{ marginRight: drawerWidth || 0 }}>
-          <main className='flex-1 min-h-0 overflow-hidden border rounded-md bg-base'>
-            <div className='p-1 h-full'>
+          <div className='p-1 h-full'>
+            <main className='flex-1 min-h-0 overflow-hidden border rounded-md bg-base h-full'>
               <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>
                 <DashboardHeader
                   breadcrumbs={breadcrumbs}
@@ -70,8 +70,8 @@ export function AuthShell({
                   </div>
                 )}
               </div>
-            </div>
-          </main>
+            </main>
+          </div>
         </SidebarInset>
 
         {drawerContent && (

@@ -5,11 +5,14 @@ import { Menu, Users, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import React, {
   createContext,
-  useContext,
   useEffect,
   useState,
   useTransition,
 } from 'react';
+
+// Re-export and import useTableMeta from AuthShellWrapper for backward compatibility
+export { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
@@ -21,6 +24,7 @@ import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggle
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   SidebarInset,
   SidebarProvider,
@@ -36,6 +40,7 @@ import {
   usePreviewPanelContext,
 } from './PreviewPanelContext';
 
+// TableMeta types moved to AuthShellWrapper - kept here for reference only
 type TableMeta = {
   rowCount: number | null;
   toggle?: (() => void) | null;
@@ -48,14 +53,6 @@ type TableMetaContextValue = {
 };
 
 const TableMetaContext = createContext<TableMetaContextValue | null>(null);
-
-export function useTableMeta(): TableMetaContextValue {
-  const ctx = useContext(TableMetaContext);
-  if (!ctx) {
-    throw new Error('useTableMeta must be used within DashboardLayoutClient');
-  }
-  return ctx;
-}
 
 interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
