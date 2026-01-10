@@ -11,14 +11,8 @@ export default async function AdminActivityPage() {
   const items = await getAdminActivityFeed(50);
 
   return (
-    <div className='space-y-8'>
-      <header>
-        <h1 className='sr-only'>Activity</h1>
-        <p className='text-xs uppercase tracking-wide text-tertiary-token'>
-          Admin
-        </p>
-      </header>
-
+    <div>
+      <h1 className='sr-only'>Activity</h1>
       <ActivityTable items={items} />
     </div>
   );

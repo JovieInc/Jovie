@@ -105,7 +105,10 @@ export function DashboardAudienceTable({
 
       <div className='flex-1 min-h-0 overflow-hidden'>
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
-          <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
+          <div
+            className='flex-1 min-h-0 overflow-auto pb-14'
+            ref={tableContainerRef}
+          >
             {rows.length === 0 ? (
               <EmptyState
                 icon={emptyStateIcon}
@@ -185,37 +188,36 @@ export function DashboardAudienceTable({
             )}
           </div>
 
-          {rows.length > 0 && (
-            <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
-              <span className='tracking-wide'>{paginationLabel()}</span>
-              <div className='flex items-center gap-3'>
-                <AdminPageSizeSelect
-                  initialPageSize={pageSize}
-                  onPageSizeChange={onPageSizeChange}
-                />
-                <div className='flex gap-2'>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    disabled={page <= 1 || total === 0}
-                    className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                    onClick={() => onPageChange(Math.max(1, page - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    disabled={page >= totalPages || total === 0}
-                    className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                    onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
+          {/* Always render pagination, even when empty */}
+          <div className='fixed bottom-0 left-0 right-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/90 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+            <span className='tracking-wide'>{paginationLabel()}</span>
+            <div className='flex items-center gap-3'>
+              <AdminPageSizeSelect
+                initialPageSize={pageSize}
+                onPageSizeChange={onPageSizeChange}
+              />
+              <div className='flex gap-2'>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  disabled={page <= 1 || total === 0}
+                  className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                  onClick={() => onPageChange(Math.max(1, page - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  disabled={page >= totalPages || total === 0}
+                  className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                  onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                >
+                  Next
+                </Button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
