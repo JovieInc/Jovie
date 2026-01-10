@@ -51,7 +51,12 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const navigation = useMemo(() => {
     switch (section) {
       case 'admin':
-        return adminNavigation;
+        // Admin shows all nav: primary + secondary + admin
+        return [
+          ...primaryNavigation,
+          ...secondaryNavigation,
+          ...adminNavigation,
+        ];
       case 'settings':
         return settingsNavigation;
       case 'dashboard':
