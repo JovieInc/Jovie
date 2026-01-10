@@ -49,7 +49,7 @@ export function PageShell({
   noPadding = false,
 }: PageShellProps) {
   return (
-    <div className={cn('h-full', !noPadding && 'p-1')}>
+    <div className={cn('h-full', !noPadding && 'p-6')}>
       <div
         className={cn(
           'rounded-lg bg-surface-1 shadow-sm h-full overflow-hidden flex flex-col',
