@@ -110,7 +110,9 @@ export async function importReleasesFromSpotify(
       for (const release of importedReleases) {
         try {
           // Get existing provider IDs to skip
-          const existingProviders = release.providerLinks.map(l => l.providerId);
+          const existingProviders = release.providerLinks.map(
+            l => l.providerId
+          );
 
           await discoverLinksForRelease(release.id, existingProviders, {
             skipExisting: true,

@@ -224,7 +224,10 @@ export async function resolveProviderLinks(
     const lookupPromises: Promise<void>[] = [];
 
     // Apple Music ISRC lookup
-    if (providers.includes('apple_music') && !seenProviders.has('apple_music')) {
+    if (
+      providers.includes('apple_music') &&
+      !seenProviders.has('apple_music')
+    ) {
       lookupPromises.push(
         lookupAppleMusicByIsrc(track.isrc, { storefront, fetcher }).then(
           result => {

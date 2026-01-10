@@ -7,11 +7,8 @@
  * - Deezer (via public API)
  */
 
+import { lookupAppleMusicByIsrc, lookupDeezerByIsrc } from './provider-links';
 import { getTracksForRelease, upsertProviderLink } from './queries';
-import {
-  lookupAppleMusicByIsrc,
-  lookupDeezerByIsrc,
-} from './provider-links';
 
 export interface DiscoveryResult {
   releaseId: string;
