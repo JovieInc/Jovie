@@ -49,7 +49,7 @@ export function ContactSocialLinks({
   const hasNoLinks = contact.socialLinks.length === 0 && !isAddingLink;
 
   return (
-    <div className='space-y-2 bg-sidebar-surface p-3'>
+    <div className='space-y-2 p-3'>
       <div className='flex items-center justify-between'>
         <Label className='text-xs text-sidebar-muted'>Social links</Label>
         {isEditable && (
@@ -124,7 +124,7 @@ export function ContactSocialLinks({
                     )}
                   </div>
                 }
-                className='border-sidebar-border bg-sidebar-surface text-sidebar-foreground hover:bg-sidebar-surface-hover'
+                className='border-sidebar-border text-sidebar-foreground hover:bg-sidebar-surface-hover'
               />
             );
           })}
@@ -132,7 +132,7 @@ export function ContactSocialLinks({
       )}
 
       {isEditable && isAddingLink && (
-        <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border bg-sidebar-surface p-3'>
+        <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border p-3'>
           <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
             <Label className='text-xs text-sidebar-muted'>URL</Label>
             <Input
