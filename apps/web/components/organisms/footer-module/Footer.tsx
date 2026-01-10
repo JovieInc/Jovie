@@ -1,11 +1,21 @@
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
 import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
-import { ThemeToggle } from '@/components/site/theme-toggle';
 import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/utils';
+
+// Dynamic import to exclude ThemeToggle from bundle when not used
+const ThemeToggle = dynamic(
+  () =>
+    import('@/components/site/theme-toggle').then(mod => ({
+      default: mod.ThemeToggle,
+    })),
+  { ssr: false }
+);
+
 import {
   CONTAINER_SIZES,
   FOOTER_LINK_CLASS_NAME,
