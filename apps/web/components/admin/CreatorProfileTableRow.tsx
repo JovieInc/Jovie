@@ -67,7 +67,7 @@ export function CreatorProfileTableRow({
       }}
       aria-selected={isSelected}
     >
-      <td className='w-14 px-4 py-3 align-middle'>
+      <td className='w-14 px-4 py-3 text-center align-middle'>
         {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
@@ -112,14 +112,14 @@ export function CreatorProfileTableRow({
           />
           <div className='min-w-0'>
             {displayName ? (
-              <div className='truncate font-medium text-primary-token line-clamp-1'>
+              <div className='font-medium text-primary-token line-clamp-1 overflow-hidden text-ellipsis'>
                 {displayName}
               </div>
             ) : null}
             <Link
               href={`/${profile.username}`}
               className={cn(
-                'truncate text-secondary-token transition-colors hover:text-primary-token line-clamp-1',
+                'text-secondary-token transition-colors hover:text-primary-token line-clamp-1 overflow-hidden text-ellipsis',
                 displayName ? 'text-xs' : 'font-medium text-primary-token'
               )}
               onClick={event => event.stopPropagation()}
@@ -129,7 +129,7 @@ export function CreatorProfileTableRow({
           </div>
         </div>
       </td>
-      <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
+      <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
         {profile.createdAt
           ? new Intl.DateTimeFormat('en-US', {
               year: 'numeric',
@@ -138,7 +138,7 @@ export function CreatorProfileTableRow({
             }).format(profile.createdAt)
           : '—'}
       </td>
-      <td className='px-4 py-3 align-middle text-xs whitespace-nowrap hidden md:table-cell'>
+      <td className='px-4 py-3 text-center align-middle text-xs whitespace-nowrap hidden md:table-cell'>
         <Badge size='sm' variant={profile.isClaimed ? 'success' : 'secondary'}>
           {profile.isClaimed ? (
             <>
@@ -153,7 +153,7 @@ export function CreatorProfileTableRow({
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       <td
-        className='px-4 py-3 align-middle text-xs whitespace-nowrap'
+        className='px-4 py-3 text-center align-middle text-xs whitespace-nowrap'
         onClick={e => e.stopPropagation()}
       >
         <VerificationStatusToggle

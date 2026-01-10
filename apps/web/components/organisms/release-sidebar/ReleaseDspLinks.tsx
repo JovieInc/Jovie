@@ -73,7 +73,7 @@ export function ReleaseDspLinks({
   ) as [ProviderKey, { label: string; accent: string }][];
 
   return (
-    <div className='space-y-2 bg-sidebar-surface border border-sidebar-border p-3'>
+    <div className='space-y-2 bg-sidebar-surface p-3'>
       <div className='flex items-center justify-between'>
         <Label className='text-xs text-sidebar-muted'>DSP Links</Label>
         {isEditable && availableProviders.length > 0 && (

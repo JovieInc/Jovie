@@ -85,7 +85,7 @@ export function useWaitlistColumns({
                 href={entry.primarySocialUrlNormalized}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-accent hover:underline text-xs truncate max-w-[220px]'
+                className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-[220px]'
               >
                 {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
               </a>
@@ -104,7 +104,7 @@ export function useWaitlistColumns({
               href={entry.spotifyUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-accent hover:underline text-xs truncate max-w-[220px] block'
+              className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-[220px] block'
             >
               {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
             </a>

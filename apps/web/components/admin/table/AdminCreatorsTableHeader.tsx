@@ -57,32 +57,34 @@ export function AdminCreatorsTableHeader({
         </th>
         <th className={headerCellClass} style={{ top: stickyTopPx }}>
           <span className='sr-only'>Creator</span>
-          <div
-            className={cn(
-              'inline-flex items-center transition-all duration-150',
-              selectedCount > 0
-                ? 'opacity-100 translate-y-0'
-                : 'pointer-events-none opacity-0 -translate-y-0.5'
-            )}
-          >
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant='secondary' size='sm' className='normal-case'>
-                  Bulk actions
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='start'>
-                <DropdownMenuItem disabled>
-                  Feature selected (coming soon)
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  Unverify selected (coming soon)
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled className='text-destructive'>
-                  Delete selected (coming soon)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className='inline-flex items-center h-8'>
+            <div
+              className={cn(
+                'transition-all duration-150',
+                selectedCount > 0
+                  ? 'opacity-100 translate-y-0'
+                  : 'pointer-events-none opacity-0 -translate-y-0.5'
+              )}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant='secondary' size='sm' className='normal-case'>
+                    Bulk actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='start'>
+                  <DropdownMenuItem disabled>
+                    Feature selected (coming soon)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    Unverify selected (coming soon)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled className='text-destructive'>
+                    Delete selected (coming soon)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </th>
         <th

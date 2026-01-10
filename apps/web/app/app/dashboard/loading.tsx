@@ -1,19 +1,36 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { LogoIcon } from '@/components/atoms/LogoIcon';
+
 /**
- * Dashboard loading skeleton
- * Renders the sidebar + main area shell to prevent layout shift while data loads.
+ * Dashboard loading screen
+ * Renders a centered logo with fade-in animation to prevent layout shift while data loads.
  */
 export default function DashboardLoading() {
+  const [showDelayedMessage, setShowDelayedMessage] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowDelayedMessage(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className='w-full bg-base'>
-      <main className='container mx-auto max-w-7xl p-6 space-y-6'>
-        <div className='h-8 w-48 rounded skeleton' />
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className='h-32 rounded-xl skeleton' />
-          ))}
-        </div>
-        <div className='h-64 rounded-xl skeleton' />
-      </main>
+    <div className='fixed inset-0 flex items-center justify-center bg-base'>
+      <div className='flex flex-col items-center gap-4 animate-in fade-in duration-700 ease-out'>
+        <LogoIcon
+          size={64}
+          variant='color'
+          className='opacity-40 dark:opacity-30'
+        />
+        {showDelayedMessage && (
+          <p className='text-sm text-secondary-token animate-in fade-in duration-500 ease-out'>
+            Setting up your workspace
+          </p>
+        )}
+      </div>
     </div>
   );
 }
