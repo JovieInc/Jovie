@@ -1,12 +1,12 @@
 'use client';
 
-import { FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { FileText } from 'lucide-react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { track } from '@/lib/analytics';
 import { ChannelIcon } from './ContactIcons';

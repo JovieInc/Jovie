@@ -1,7 +1,7 @@
 'use client';
 
-import { Moon, Sun } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Moon, Sun } from 'lucide-react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { useArtistTheme } from './ArtistThemeProvider';
 

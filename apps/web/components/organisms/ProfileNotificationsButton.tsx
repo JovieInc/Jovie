@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
 import { Bell } from 'lucide-react';
+import React from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 

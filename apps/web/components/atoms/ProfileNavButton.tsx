@@ -1,5 +1,4 @@
 'use client';
-import { ArrowLeft } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +8,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
