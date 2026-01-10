@@ -47,7 +47,7 @@ export function LazyProviders({
   enableAnalytics = true,
 }: LazyProvidersProps) {
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={1200}>
       <ToastProvider>
         {children}
         {enableAnalytics ? <Analytics /> : null}
