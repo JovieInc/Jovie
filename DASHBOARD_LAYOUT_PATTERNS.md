@@ -192,6 +192,7 @@ flex-1 min-h-0 overflow-auto p-6
 All content inside the main rounded corner container (surface-1) should be flat without nested cards. Use borders to divide sections.
 
 ### ❌ Wrong: Nested Cards
+
 ```tsx
 <PageShell>
   <PageHeader title="Metrics" />
@@ -209,6 +210,7 @@ All content inside the main rounded corner container (surface-1) should be flat 
 ```
 
 ### ✅ Correct: Flat Sections with Borders
+
 ```tsx
 <PageShell>
   <PageHeader title="Metrics" />
@@ -379,6 +381,5 @@ See implementations in:
 ## Questions?
 
 For questions or clarifications, see:
-- **Plan file**: `/Users/timwhite/.claude/plans/iterative-sleeping-wall.md`
 - **Table system**: `/apps/web/components/organisms/table/`
 - **Design tokens**: `/apps/web/styles/design-system.css`
