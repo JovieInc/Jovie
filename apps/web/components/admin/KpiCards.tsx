@@ -7,7 +7,7 @@ import {
   TrendingDown,
   Users,
 } from 'lucide-react';
-import { AnalyticsCard } from '@/components/dashboard/atoms/AnalyticsCard';
+import { KpiItem } from './KpiItem';
 
 interface DataAvailability {
   isConfigured: boolean;
@@ -142,8 +142,8 @@ export function KpiCards({
   };
 
   return (
-    <div className='grid grid-cols-2 items-stretch gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6'>
-      <AnalyticsCard
+    <div className='space-y-0 divide-y divide-subtle'>
+      <KpiItem
         title='MRR'
         value={mrrLabel}
         metadata={renderStripeMetadata('Monthly recurring revenue')}
@@ -152,7 +152,7 @@ export function KpiCards({
         iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
       />
 
-      <AnalyticsCard
+      <KpiItem
         title='Balance'
         value={balanceLabel}
         metadata={renderMercuryMetadata('Mercury checking')}
@@ -161,7 +161,7 @@ export function KpiCards({
         iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
       />
 
-      <AnalyticsCard
+      <KpiItem
         title='Burn rate'
         value={burnRateLabel}
         metadata={renderMercuryMetadata('Spend in the last 30 days')}
@@ -170,7 +170,7 @@ export function KpiCards({
         iconChipClassName='bg-rose-500/10 dark:bg-rose-500/15'
       />
 
-      <AnalyticsCard
+      <KpiItem
         title='Runway'
         value={runwayLabel}
         metadata={renderRunwayMetadata()}
@@ -179,7 +179,7 @@ export function KpiCards({
         iconChipClassName='bg-amber-500/10 dark:bg-amber-500/15'
       />
 
-      <AnalyticsCard
+      <KpiItem
         title='Waitlist'
         value={waitlistLabel}
         metadata='Future customers on deck'
@@ -188,7 +188,7 @@ export function KpiCards({
         iconChipClassName='bg-indigo-500/10 dark:bg-indigo-500/15'
       />
 
-      <AnalyticsCard
+      <KpiItem
         title='Active subs'
         value={subscribersLabel}
         metadata={renderStripeMetadata('Paying customers this month')}

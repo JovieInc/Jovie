@@ -10,6 +10,7 @@ export interface DashboardHeaderProps {
   action?: ReactNode;
   showDivider?: boolean;
   className?: string;
+  mobileTabs?: ReactNode;
 }
 
 export function DashboardHeader({
@@ -19,6 +20,7 @@ export function DashboardHeader({
   action,
   showDivider = false,
   className,
+  mobileTabs,
 }: DashboardHeaderProps) {
   const currentLabel =
     breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : '';
@@ -56,6 +58,10 @@ export function DashboardHeader({
           <div className='ml-auto flex items-center gap-2'>{action}</div>
         ) : null}
       </div>
+      {/* Mobile tabs - rendered in header area as per user decision */}
+      {mobileTabs && (
+        <div className='lg:hidden border-t border-subtle'>{mobileTabs}</div>
+      )}
     </header>
   );
 }

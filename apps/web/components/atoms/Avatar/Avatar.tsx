@@ -184,24 +184,25 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
 
   if (shouldShowFallback) {
     return (
-      <div
-        ref={ref}
-        className={cn(
-          sizeClass,
-          roundedClass,
-          'relative flex items-center justify-center bg-surface-2 text-secondary-token',
-          BORDER_RING,
-          'shadow-sm transition-colors duration-200',
-          className
-        )}
-        style={style}
-        role='img'
-        aria-label={alt}
-        aria-busy='false'
-      >
-        <span className={cn('font-medium leading-none select-none', textSize)}>
-          {initials}
-        </span>
+      <div ref={ref} className={cn('relative', className)} style={style}>
+        <div
+          className={cn(
+            sizeClass,
+            roundedClass,
+            'flex items-center justify-center bg-surface-2 text-secondary-token',
+            BORDER_RING,
+            'shadow-sm transition-colors duration-200'
+          )}
+          role='img'
+          aria-label={alt}
+          aria-busy='false'
+        >
+          <span
+            className={cn('font-medium leading-none select-none', textSize)}
+          >
+            {initials}
+          </span>
+        </div>
         {verified && (
           <span className='absolute -bottom-0.5 -right-0.5'>
             <VerifiedBadge size={badgeSize} />
@@ -212,47 +213,46 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   }
 
   return (
-    <div
-      ref={ref}
-      className={cn(
-        sizeClass,
-        roundedClass,
-        'relative overflow-hidden bg-surface-1 text-primary-token',
-        BORDER_RING,
-        'shadow-sm transition-colors duration-200',
-        className
-      )}
-      style={style}
-      role='img'
-      aria-label={alt}
-      aria-busy={!isLoaded}
-    >
-      <Image
-        src={src}
-        alt=''
-        aria-hidden='true'
-        width={width}
-        height={height}
-        priority={priority}
-        quality={quality}
-        placeholder='blur'
-        blurDataURL={blurDataURL}
-        sizes={`${width}px`}
+    <div ref={ref} className={cn('relative', className)} style={style}>
+      <div
         className={cn(
-          'object-cover object-center transition-opacity duration-300 ease-out',
-          isLoaded ? 'opacity-100' : 'opacity-0'
+          sizeClass,
+          roundedClass,
+          'overflow-hidden bg-surface-1 text-primary-token',
+          BORDER_RING,
+          'shadow-sm transition-colors duration-200'
         )}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setHasError(true)}
-        style={{
-          aspectRatio: '1 / 1',
-        }}
-      />
+        role='img'
+        aria-label={alt}
+        aria-busy={!isLoaded}
+      >
+        <Image
+          src={src}
+          alt=''
+          aria-hidden='true'
+          width={width}
+          height={height}
+          priority={priority}
+          quality={quality}
+          placeholder='blur'
+          blurDataURL={blurDataURL}
+          sizes={`${width}px`}
+          className={cn(
+            'object-cover object-center transition-opacity duration-300 ease-out',
+            isLoaded ? 'opacity-100' : 'opacity-0'
+          )}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setHasError(true)}
+          style={{
+            aspectRatio: '1 / 1',
+          }}
+        />
 
-      {/* Loading shimmer effect */}
-      {!isLoaded && !hasError && (
-        <div className='absolute inset-0 skeleton' aria-hidden='true' />
-      )}
+        {/* Loading shimmer effect */}
+        {!isLoaded && !hasError && (
+          <div className='absolute inset-0 skeleton' aria-hidden='true' />
+        )}
+      </div>
 
       {verified && (
         <span className='absolute -bottom-0.5 -right-0.5'>

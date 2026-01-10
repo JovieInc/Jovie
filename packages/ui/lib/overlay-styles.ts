@@ -26,7 +26,7 @@ export const overlayClassName = `${overlayStyles.base} ${overlayStyles.animation
 export const centeredContentStyles = {
   position: 'fixed left-1/2 top-1/2 z-50 translate-x-[-50%] translate-y-[-50%]',
   layout: 'grid w-full max-w-lg gap-4',
-  surface: 'border border-subtle bg-surface-1 p-6 text-primary-token shadow-lg',
+  surface: 'border border-subtle bg-surface-2 p-6 text-primary-token shadow-lg',
   animation:
     'duration-200 ' +
     'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
