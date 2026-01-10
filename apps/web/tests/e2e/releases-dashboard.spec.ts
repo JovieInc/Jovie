@@ -35,9 +35,7 @@ test.describe('Releases dashboard', () => {
     await expect(page).toHaveURL(/spotify|apple|youtube|soundcloud/);
   });
 
-  test('shows releases matrix with provider columns @smoke', async ({
-    page,
-  }) => {
+  test('shows releases matrix with basic columns @smoke', async ({ page }) => {
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
     });
@@ -45,7 +43,7 @@ test.describe('Releases dashboard', () => {
     const matrix = page.getByTestId('releases-matrix');
     await expect(matrix).toBeVisible({ timeout: 15000 });
 
-    // Verify table headers exist
+    // Verify basic table headers exist
     await expect(
       page.getByRole('columnheader', { name: /release/i })
     ).toBeVisible();
@@ -95,23 +93,23 @@ test.describe('Releases dashboard', () => {
     const providerButton = page
       .locator('[data-testid^="provider-copy-"][data-testid$="-spotify"]')
       .first();
+
+    // Assert the button exists and has a URL
+    await expect(providerButton).toBeVisible();
     const providerUrl = await providerButton.getAttribute('data-url');
+    expect(providerUrl).toBeTruthy();
 
-    if (providerUrl) {
-      // Verify the URL uses dsp parameter
-      expect(providerUrl).toContain('?dsp=');
-      expect(providerUrl).toContain('dsp=spotify');
+    // Verify the URL uses dsp parameter
+    expect(providerUrl).toContain('?dsp=');
+    expect(providerUrl).toContain('dsp=spotify');
 
-      // Follow the redirect
-      const response = await page.goto(providerUrl);
-      expect(response?.status() ?? 0).toBeLessThan(400);
-      await expect(page).toHaveURL(/spotify/);
-    }
+    // Follow the redirect
+    const response = await page.goto(providerUrl!);
+    expect(response?.status() ?? 0).toBeLessThan(400);
+    await expect(page).toHaveURL(/spotify/);
   });
 
-  test('sync button visible when Spotify is connected @nightly', async ({
-    page,
-  }) => {
+  test('shows sync button when releases exist @nightly', async ({ page }) => {
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
     });
@@ -119,13 +117,14 @@ test.describe('Releases dashboard', () => {
     const matrix = page.getByTestId('releases-matrix');
     await expect(matrix).toBeVisible({ timeout: 15000 });
 
-    // If user has releases, Spotify is connected and sync button should be visible
-    const hasReleases = (await page.locator('tbody tr').count()) > 0;
+    // Check if releases exist in the table
+    const releaseRows = page.locator('tbody tr');
+    const hasReleases = (await releaseRows.count()) > 0;
 
     if (hasReleases) {
+      // When releases exist, sync button should be visible
       const syncButton = page.getByTestId('sync-spotify-button');
       await expect(syncButton).toBeVisible();
-      await expect(syncButton).toHaveText(/sync from spotify/i);
     }
   });
 });

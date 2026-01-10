@@ -226,7 +226,7 @@ export async function syncFromSpotify(): Promise<{
   revalidatePath('/app/dashboard/releases');
 
   if (result.success) {
-    await trackServerEvent('releases_synced', {
+    void trackServerEvent('releases_synced', {
       profileId: profile.id,
       imported: result.imported,
       source: 'spotify',
@@ -345,7 +345,7 @@ export async function connectSpotifyArtist(params: {
   );
 
   if (result.success) {
-    await trackServerEvent('releases_synced', {
+    void trackServerEvent('releases_synced', {
       profileId: profile.id,
       imported: result.imported,
       source: 'spotify',
