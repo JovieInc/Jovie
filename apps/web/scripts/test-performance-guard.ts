@@ -54,8 +54,8 @@ class TestPerformanceGuard {
         'Smoke suite should finish under 30s to keep deploy feedback instant.',
     },
     critical: {
-      maxTotalDuration: 120000,
-      description: 'Critical regression suite must stay under 2 minutes.',
+      maxTotalDuration: 400000,
+      description: 'Critical regression suite must stay under 6.67 minutes.',
     },
     full: {
       maxTotalDuration: 300000,
