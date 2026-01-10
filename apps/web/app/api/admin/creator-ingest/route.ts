@@ -73,7 +73,7 @@ async function findAvailableHandle(
 
 /**
  * Idempotently add a social link to a creator profile.
- * Checks if the link already exists, and if not, computes the next displayOrder.
+ * Checks if the link already exists, and if not, computes the next sortOrder.
  * Returns true if a new link was added, false if it already existed.
  */
 async function addSocialLinkIdempotent(
@@ -101,13 +101,13 @@ async function addSocialLinkIdempotent(
     return false;
   }
 
-  // Compute next displayOrder (max + 1, or 0 if no links exist)
+  // Compute next sortOrder (max + 1, or 0 if no links exist)
   const [result] = await tx
     .select({ maxOrder: max(socialLinks.sortOrder) })
     .from(socialLinks)
     .where(eq(socialLinks.creatorProfileId, creatorProfileId));
 
-  const nextDisplayOrder =
+  const nextSortOrder =
     result?.maxOrder !== null && result?.maxOrder !== undefined
       ? result.maxOrder + 1
       : 0;
@@ -119,7 +119,7 @@ async function addSocialLinkIdempotent(
     platformType: platform,
     url,
     displayText: title,
-    sortOrder: nextDisplayOrder,
+    sortOrder: nextSortOrder,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -275,12 +275,8 @@ function extractHandleFromSocialUrl(url: string): string | null {
     const hostname = parsed.hostname.toLowerCase();
 
     // YouTube: handle @username or /channel/ID or /c/name
-    if (
-      hostname === 'youtube.com' ||
-      hostname === 'www.youtube.com' ||
-      hostname === 'youtu.be' ||
-      hostname === 'www.youtu.be'
-    ) {
+    const youtubeHosts = ['youtube.com', 'www.youtube.com', 'youtu.be', 'www.youtu.be'];
+    if (youtubeHosts.includes(hostname)) {
       if (handle.startsWith('@')) {
         handle = handle.slice(1);
       } else if (
@@ -292,40 +288,34 @@ function extractHandleFromSocialUrl(url: string): string | null {
     }
 
     // TikTok: handle @username
-    if (hostname === 'tiktok.com' || hostname === 'www.tiktok.com') {
+    const tiktokHosts = ['tiktok.com', 'www.tiktok.com'];
+    if (tiktokHosts.includes(hostname)) {
       if (handle.startsWith('@')) {
         handle = handle.slice(1);
       }
     }
 
     // LinkedIn: /in/username or /company/name
-    if (hostname === 'linkedin.com' || hostname === 'www.linkedin.com') {
+    const linkedinHosts = ['linkedin.com', 'www.linkedin.com'];
+    if (linkedinHosts.includes(hostname)) {
       if ((handle === 'in' || handle === 'company') && segments[1]) {
         handle = segments[1];
       }
     }
 
     // Reddit: /user/username or /u/username
-    if (hostname === 'reddit.com' || hostname === 'www.reddit.com') {
+    const redditHosts = ['reddit.com', 'www.reddit.com'];
+    if (redditHosts.includes(hostname)) {
       if ((handle === 'user' || handle === 'u') && segments[1]) {
         handle = segments[1];
       }
     }
 
-    // Discord: /invite/code
-    if (
-      hostname === 'discord.gg' ||
-      hostname === 'www.discord.gg' ||
-      hostname === 'discord.com' ||
-      hostname === 'www.discord.com'
-    ) {
-      if (handle === 'invite' && segments[1]) {
-        handle = segments[1];
-      }
-    }
+    // Note: Discord invite codes are not usernames, so we don't extract them
 
     // Spotify: /artist/ID or /user/username
-    if (hostname === 'spotify.com' || hostname === 'www.spotify.com') {
+    const spotifyHosts = ['spotify.com', 'www.spotify.com'];
+    if (spotifyHosts.includes(hostname)) {
       if (
         (handle === 'artist' || handle === 'user' || handle === 'playlist') &&
         segments[1]
@@ -340,8 +330,8 @@ function extractHandleFromSocialUrl(url: string): string | null {
       .replace(/[?#].*$/, '') // Remove query strings/fragments
       .toLowerCase();
 
-    // Validate handle format
-    if (!handle || handle.length > 50) {
+    // Validate handle format (30 char limit to match downstream validation)
+    if (!handle || handle.length > 30) {
       return null;
     }
 
