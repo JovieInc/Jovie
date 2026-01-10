@@ -30,9 +30,8 @@ test.describe('Link Creation & Display @smoke', () => {
       // The test seeding adds a Spotify link for Taylor Swift profile
       // Verify it appears on the public profile
       const spotifyLink = page
-        .locator(
-          '[data-testid="social-links"] a[href*="spotify"], a[href*="spotify.com"]'
-        )
+        .locator('[data-testid="social-links"]')
+        .locator('a[href*="spotify"]')
         .first();
 
       await expect(spotifyLink).toBeVisible({ timeout: 10000 });
@@ -43,13 +42,9 @@ test.describe('Link Creation & Display @smoke', () => {
         /spotify\.com\/artist\//
       );
 
-      // Verify the link is clickable (has proper attributes)
-      const isClickable = await spotifyLink.evaluate(el => {
-        const link = el as HTMLAnchorElement;
-        return link.href && link.href.startsWith('http');
-      });
-      expect(isClickable, 'Link should be clickable with valid href').toBe(
-        true
+      // Verify the link is an external URL (starts with http/https)
+      expect(href, 'Spotify link should be an absolute external URL').toMatch(
+        /^https?:\/\//
       );
 
       const context = getContext();
@@ -99,10 +94,12 @@ test.describe('Link Creation & Display @smoke', () => {
       await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
       await waitForHydration(page);
 
-      // Find all social links on the page
-      const socialLinks = page.locator(
-        'a[href*="spotify"], a[href*="instagram"], a[href*="twitter"], a[href*="facebook"], a[href*="tiktok"]'
-      );
+      // Find all social links in the social-links container
+      const socialLinks = page
+        .locator('[data-testid="social-links"]')
+        .locator(
+          'a[href*="spotify"], a[href*="instagram"], a[href*="twitter"], a[href*="facebook"], a[href*="tiktok"]'
+        );
 
       const linkCount = await socialLinks.count();
 
