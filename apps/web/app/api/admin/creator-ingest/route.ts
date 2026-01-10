@@ -5,6 +5,10 @@ import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import {
+  calculateAndStoreFitScore,
+  updatePaidTierScore,
+} from '@/lib/fit-scoring';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -706,6 +710,22 @@ export async function POST(request: Request) {
           mergeError
         );
 
+        // Calculate fit score for the new profile
+        try {
+          if (typeof extraction.hasPaidTier === 'boolean') {
+            await updatePaidTierScore(tx, created.id, extraction.hasPaidTier);
+          }
+          await calculateAndStoreFitScore(tx, created.id);
+        } catch (fitScoreError) {
+          logger.warn('Fit score calculation failed', {
+            profileId: created.id,
+            error:
+              fitScoreError instanceof Error
+                ? fitScoreError.message
+                : 'Unknown error',
+          });
+        }
+
         logger.info('Creator profile ingested', {
           profileId: created.id,
           handle: created.username,
@@ -873,6 +893,7 @@ export async function POST(request: Request) {
           settings: {},
           theme: {},
           ingestionStatus: 'idle',
+          ingestionSourcePlatform: platformId,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -903,6 +924,19 @@ export async function POST(request: Request) {
         logger.warn('Failed to add link to new profile', {
           profileId: created.id,
           error: linkError,
+        });
+      }
+
+      // Calculate fit score for the new profile
+      try {
+        await calculateAndStoreFitScore(tx, created.id);
+      } catch (fitScoreError) {
+        logger.warn('Fit score calculation failed', {
+          profileId: created.id,
+          error:
+            fitScoreError instanceof Error
+              ? fitScoreError.message
+              : 'Unknown error',
         });
       }
 
