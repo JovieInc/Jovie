@@ -75,7 +75,7 @@ export function ContactSocialLinks({
       )}
 
       {contact.socialLinks.length > 0 && (
-        <div className='flex flex-wrap gap-2'>
+        <div className='flex flex-wrap gap-2 overflow-hidden py-1'>
           {contact.socialLinks.map((link: SocialLink, index: number) => {
             const username =
               extractUsernameFromUrl(link.url) ??
