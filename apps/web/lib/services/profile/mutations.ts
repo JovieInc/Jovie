@@ -110,18 +110,27 @@ export async function incrementProfileViews(username: string): Promise<void> {
 
       // Flush to database when threshold is reached
       if (newCount >= VIEW_FLUSH_THRESHOLD) {
-        // Reset counter first to avoid race conditions
-        await redis.set(redisKey, 0, { ex: VIEW_COUNT_TTL_SECONDS });
+        // Use GETSET for atomic read-and-reset to prevent race conditions
+        // This ensures only one concurrent request gets the accumulated count
+        const countToFlush = await redis.getset(redisKey, '0');
 
-        // Flush accumulated views to database (fire-and-forget)
-        flushViewsToDatabase(normalizedUsername, newCount).catch(error => {
-          console.error(
-            '[profile-service] Failed to flush views to database:',
-            error
-          );
-          // Put the count back in Redis if DB flush failed
-          redis?.incrby(redisKey, newCount).catch(() => {});
-        });
+        // Only flush if we successfully got a count (another request may have won the race)
+        if (countToFlush && Number(countToFlush) > 0) {
+          const flushCount = Number(countToFlush);
+
+          // Reset TTL after atomic swap
+          await redis.expire(redisKey, VIEW_COUNT_TTL_SECONDS);
+
+          // Flush accumulated views to database (fire-and-forget)
+          flushViewsToDatabase(normalizedUsername, flushCount).catch(error => {
+            console.error(
+              '[profile-service] Failed to flush views to database:',
+              error
+            );
+            // Put the count back in Redis if DB flush failed
+            redis?.incrby(redisKey, flushCount).catch(() => {});
+          });
+        }
       }
 
       return;
