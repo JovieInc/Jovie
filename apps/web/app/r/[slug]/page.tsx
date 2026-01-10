@@ -8,6 +8,7 @@
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -170,6 +171,14 @@ export default async function ReleaseSmartLinkPage({
     if (!targetUrl) {
       notFound();
     }
+
+    // Track the click (fire-and-forget, don't block redirect)
+    void trackServerEvent('smart_link_clicked', {
+      releaseId: release.id,
+      profileId,
+      provider: providerKey,
+      releaseTitle: release.title,
+    });
 
     redirect(targetUrl);
   }

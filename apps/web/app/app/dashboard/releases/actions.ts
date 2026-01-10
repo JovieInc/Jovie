@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import {
@@ -225,6 +226,12 @@ export async function syncFromSpotify(): Promise<{
   revalidatePath('/app/dashboard/releases');
 
   if (result.success) {
+    await trackServerEvent('releases_synced', {
+      profileId: profile.id,
+      imported: result.imported,
+      source: 'spotify',
+    });
+
     return {
       success: true,
       message: `Successfully synced ${result.imported} releases from Spotify.`,
@@ -338,6 +345,13 @@ export async function connectSpotifyArtist(params: {
   );
 
   if (result.success) {
+    await trackServerEvent('releases_synced', {
+      profileId: profile.id,
+      imported: result.imported,
+      source: 'spotify',
+      isInitialConnect: true,
+    });
+
     return {
       success: true,
       message: `Connected and synced ${result.imported} releases from Spotify.`,
