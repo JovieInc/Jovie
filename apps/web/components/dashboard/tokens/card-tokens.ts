@@ -184,15 +184,15 @@ export const cardTokens = {
       .replace(/\s+/g, ' ')
       .trim(),
 
-    // Elevated card - stands out from background
+    // Elevated card - stands out with stronger border instead of higher surface
     elevated: `
-      bg-[var(--color-bg-surface-2)]
+      bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-default)]
       rounded-xl
       p-6
-      shadow-[var(--shadow-md)]
+      shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
-      hover:shadow-[var(--shadow-lg)]
+      hover:shadow-[var(--shadow-md)]
     `
       .replace(/\s+/g, ' ')
       .trim(),

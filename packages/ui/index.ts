@@ -40,6 +40,24 @@ export {
 } from './atoms/card';
 // Checkbox
 export { Checkbox } from './atoms/checkbox';
+// Context Menu
+export {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuPortal,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from './atoms/context-menu';
 // Dialog
 export {
   Dialog,

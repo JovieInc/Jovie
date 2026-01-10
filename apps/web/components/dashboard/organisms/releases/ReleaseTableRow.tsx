@@ -44,7 +44,7 @@ function ProviderStatusDot({
       style={{ backgroundColor: accent }}
     >
       {status === 'manual' && (
-        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--color-warning)]' />
+        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />
       )}
     </span>
   );
@@ -236,7 +236,7 @@ export function ReleaseTableRow({
               {manualOverrideCount > 0 && (
                 <Badge
                   variant='secondary'
-                  className='shrink-0 border border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[10px] text-[var(--color-warning-foreground)]'
+                  className='shrink-0 border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
                 >
                   {manualOverrideCount} edited
                 </Badge>
@@ -362,9 +362,24 @@ export function ReleaseTableRow({
                   isSaving={isAddingUrl}
                 />
               ) : (
-                <span className='line-clamp-1 text-xs text-tertiary-token'>
-                  Not found
-                </span>
+                <button
+                  type='button'
+                  className='inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                  onClick={() =>
+                    void handleCopyWithFeedback(
+                      release.smartLinkPath,
+                      `${release.title} smart link`,
+                      `not-found-copy-${release.id}-${providerKey}`
+                    )
+                  }
+                >
+                  <Icon
+                    name='Copy'
+                    className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100'
+                    aria-hidden='true'
+                  />
+                  <span className='line-clamp-1'>Not found</span>
+                </button>
               )}
             </div>
           </td>

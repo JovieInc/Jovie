@@ -51,17 +51,11 @@
 
 :root {
   /* Light mode surfaces - neutral grays without color tint */
-  --color-bg-base: oklch(
-    99% 0 0
-  ); /* #fcfcfc - Matches page bg (pure neutral) */
-  --color-bg-surface-0: oklch(99% 0 0); /* Same as base */
-  --color-bg-surface-1: oklch(
-    99% 0 0
-  ); /* #fcfcfc - Main content (pure neutral) */
-  --color-bg-surface-2: oklch(
-    93% 0 0
-  ); /* #ededed - Contact sidebar (darker neutral) */
-  --color-bg-surface-3: oklch(90% 0 0); /* #e6e6e6 - Modals (darkest neutral) */
+  /* prettier-ignore */ --color-bg-base: #f6f6f6; /* Sidebar & page bg */
+  /* prettier-ignore */ --color-bg-surface-0: #f6f6f6; /* Same as base */
+  /* prettier-ignore */ --color-bg-surface-1: #fcfcfc; /* Main content */
+  /* prettier-ignore */ --color-bg-surface-2: #ffffff; /* Contact sidebar/drawer */
+  /* prettier-ignore */ --color-bg-surface-3: #e6e6e6; /* Modals */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -136,11 +130,11 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
-  --color-bg-base: oklch(3.5% 0 0); /* #090909 - sidebar & page bg */
-  --color-bg-surface-0: oklch(3.5% 0 0); /* Same as base */
-  --color-bg-surface-1: oklch(6.5% 0.005 240); /* #101011 - main content */
-  --color-bg-surface-2: oklch(9.5% 0.005 240); /* #17181a - contact sidebar */
-  --color-bg-surface-3: oklch(14% 0.005 240); /* Modals, tooltips */
+  /* prettier-ignore */ --color-bg-base: #090909; /* sidebar & page bg */
+  /* prettier-ignore */ --color-bg-surface-0: #090909; /* Same as base */
+  /* prettier-ignore */ --color-bg-surface-1: #101011; /* main content */
+  /* prettier-ignore */ --color-bg-surface-2: #17181a; /* contact sidebar/drawer */
+  /* prettier-ignore */ --color-bg-surface-3: #202124; /* Modals, tooltips */
 
   /* Text hierarchy - inverted for dark mode */
   --color-text-primary-token: oklch(96% 0 0);
@@ -513,8 +507,8 @@
    ============================================ */
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base: oklch(99% 0 0) = #fcfcfc = rgb(252,252,252) */
-  --sidebar-background: 252 252 252; /* Matches page bg exactly (pure neutral) */
+  /* Maps to --color-bg-base: #f6f6f6 = rgb(246,246,246) */
+  --sidebar-background: 246 246 246; /* Matches base */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
@@ -524,7 +518,7 @@
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 115 115 115; /* Neutral muted */
   --sidebar-muted-foreground: 140 140 140; /* Neutral muted text */
-  --sidebar-surface: 252 252 252; /* Matches base */
+  --sidebar-surface: 246 246 246; /* Matches base */
   --sidebar-surface-hover: 237 237 237; /* Neutral hover */
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 229 229;

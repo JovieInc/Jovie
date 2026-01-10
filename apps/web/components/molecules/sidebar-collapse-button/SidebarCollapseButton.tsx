@@ -23,7 +23,7 @@ export function SidebarCollapseButton({
   const isCollapsed = state === 'closed';
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

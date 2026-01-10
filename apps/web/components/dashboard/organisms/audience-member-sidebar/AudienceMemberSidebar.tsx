@@ -39,7 +39,6 @@ export function AudienceMemberSidebar({
       isOpen={isOpen}
       width={AUDIENCE_MEMBER_SIDEBAR_WIDTH}
       ariaLabel='Audience member details'
-      className='bg-sidebar-surface border-sidebar-border'
     >
       <div
         className='flex h-12 items-center justify-between px-4 shrink-0'

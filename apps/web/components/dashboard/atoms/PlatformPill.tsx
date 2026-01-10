@@ -167,7 +167,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
         className={cn(
-          'group relative inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border px-2.5 py-1 min-h-[32px] text-xs font-medium',
+          'group relative inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 min-h-[32px] text-xs font-medium',
           'border-[var(--pill-border)] hover:border-[var(--pill-border-hover)]',
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
@@ -197,41 +197,43 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           />
         ) : null}
 
-        <span
-          className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-          style={{ ...iconChipStyle }}
-          aria-hidden='true'
-        >
-          <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-        </span>
-
-        <div className='min-w-0 flex-1'>
-          <span className={cn(primaryText.length > 40 && 'truncate')}>
-            {primaryText}
+        <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
+          <span
+            className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
+            style={{ ...iconChipStyle }}
+            aria-hidden='true'
+          >
+            <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
           </span>
-          {hasSecondary ? (
-            <span
-              className={cn(
-                'ml-2 text-[10px] text-tertiary-token/80',
-                secondaryText && secondaryText.length > 40 && 'truncate'
-              )}
-            >
-              {secondaryText}
+
+          <div className='min-w-0 flex-1'>
+            <span className={cn(primaryText.length > 40 && 'truncate')}>
+              {primaryText}
+            </span>
+            {hasSecondary ? (
+              <span
+                className={cn(
+                  'ml-2 text-[10px] text-tertiary-token/80',
+                  secondaryText && secondaryText.length > 40 && 'truncate'
+                )}
+              >
+                {secondaryText}
+              </span>
+            ) : null}
+          </div>
+
+          {badgeText ? (
+            <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
+              {badgeText}
+            </span>
+          ) : null}
+
+          {suffix ? (
+            <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
+              {suffix}
             </span>
           ) : null}
         </div>
-
-        {badgeText ? (
-          <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
-            {badgeText}
-          </span>
-        ) : null}
-
-        {suffix ? (
-          <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
-            {suffix}
-          </span>
-        ) : null}
 
         {trailing ? (
           <div className='relative ml-1 shrink-0'>{trailing}</div>
