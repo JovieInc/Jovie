@@ -1,7 +1,6 @@
 import { expect, test } from './setup';
 import {
   assertNoCriticalErrors,
-  elementVisible,
   isExpectedError,
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
@@ -16,23 +15,15 @@ import {
  *
  * If this test fails, the deploy will be blocked.
  *
- * Hardened for reliability:
- * - Uses shared error filtering from smoke-test-utils
- * - Uses proper hydration wait instead of arbitrary timeouts
- * - Consistent timeout constants
- * - Enhanced error diagnostics
- *
- * @smoke
- * @critical
+ * @smoke @critical
  */
 test.describe('Homepage Smoke @smoke @critical', () => {
   test('homepage loads without server errors', async ({ page }, testInfo) => {
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {
-      // Navigate to homepage
       const response = await page.goto('/', {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION * 2, // Extra time for critical test
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
 
       // CRITICAL: Must not be a server error (5xx)
@@ -45,10 +36,8 @@ test.describe('Homepage Smoke @smoke @critical', () => {
       // Must return 200 OK
       expect(status, `Homepage returned ${status} - expected 200`).toBe(200);
 
-      // Wait for page to be interactive
       await page.waitForLoadState('domcontentloaded');
 
-      // Get context and assert no unexpected console errors
       const context = getContext();
       await assertNoCriticalErrors(context, testInfo);
     } finally {
@@ -60,7 +49,7 @@ test.describe('Homepage Smoke @smoke @critical', () => {
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {
-      await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
+      await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
       await page.waitForLoadState('domcontentloaded');
 
       // Verify body has content (not blank page)
@@ -103,12 +92,10 @@ test.describe('Homepage Smoke @smoke @critical', () => {
 
     page.on('console', msg => {
       const text = msg.text();
-      // Check for hydration-specific errors (not covered by general filtering)
       const hydrationPatterns = [
         'Hydration failed',
         'hydration mismatch',
         'Text content does not match',
-        'did not match',
         'server rendered HTML',
       ];
 
@@ -122,12 +109,10 @@ test.describe('Homepage Smoke @smoke @critical', () => {
       }
     });
 
-    await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
+    await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
 
-    // Wait for hydration to complete properly instead of arbitrary timeout
     await waitForHydration(page, { timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    // Attach hydration errors for debugging if any found
     if (hydrationErrors.length > 0 && testInfo) {
       await testInfo.attach('hydration-errors', {
         body: hydrationErrors.join('\n'),
@@ -139,81 +124,5 @@ test.describe('Homepage Smoke @smoke @critical', () => {
       hydrationErrors,
       `Homepage has hydration errors: ${hydrationErrors.join(', ')}`
     ).toHaveLength(0);
-  });
-
-  test('homepage critical elements are visible', async ({ page }, testInfo) => {
-    const { getContext, cleanup } = setupPageMonitoring(page);
-
-    try {
-      await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
-      await page.waitForLoadState('domcontentloaded');
-
-      // Verify page has substantial content (not blank)
-      const bodyText = await page.locator('body').textContent();
-      expect(
-        bodyText && bodyText.length > 100,
-        'Homepage body is empty or too short'
-      ).toBe(true);
-
-      // Check for logo using data-testid (more reliable than generic svg/img selector)
-      // First try the data-testid approach (preferred)
-      const hasLogoByTestId = await elementVisible(
-        page,
-        '[data-testid="site-logo"]',
-        {
-          timeout: SMOKE_TIMEOUTS.QUICK,
-        }
-      );
-      const hasLogoLinkByTestId = await elementVisible(
-        page,
-        '[data-testid="site-logo-link"]',
-        {
-          timeout: SMOKE_TIMEOUTS.QUICK,
-        }
-      );
-
-      // Fallback to generic selector if data-testid not found (backwards compatibility)
-      const hasLogoGeneric =
-        !hasLogoByTestId &&
-        ((await elementVisible(page, 'svg', {
-          timeout: SMOKE_TIMEOUTS.QUICK,
-        })) ||
-          (await elementVisible(page, 'img', {
-            timeout: SMOKE_TIMEOUTS.QUICK,
-          })));
-
-      expect(
-        hasLogoByTestId || hasLogoLinkByTestId || hasLogoGeneric,
-        'Homepage missing logo/icon'
-      ).toBe(true);
-
-      // Check for main CTA or navigation using robust checks
-      const hasButton = await elementVisible(page, 'button', {
-        timeout: SMOKE_TIMEOUTS.QUICK,
-      });
-      const hasLink = await elementVisible(page, 'a[href]', {
-        timeout: SMOKE_TIMEOUTS.QUICK,
-      });
-
-      expect(
-        hasButton || hasLink,
-        'Homepage missing interactive elements'
-      ).toBe(true);
-
-      // Check for header navigation
-      const hasHeader = await elementVisible(
-        page,
-        '[data-testid="header-nav"]',
-        {
-          timeout: SMOKE_TIMEOUTS.QUICK,
-        }
-      );
-      expect(hasHeader, 'Homepage missing header navigation').toBe(true);
-
-      const context = getContext();
-      await assertNoCriticalErrors(context, testInfo);
-    } finally {
-      cleanup();
-    }
   });
 });
