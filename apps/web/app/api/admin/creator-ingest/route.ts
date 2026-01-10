@@ -1,6 +1,6 @@
 import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, max, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
 import { creatorProfileLinks, creatorProfiles } from '@/lib/db/schema';
@@ -69,6 +69,63 @@ async function findAvailableHandle(
   }
 
   return null;
+}
+
+/**
+ * Idempotently add a social link to a creator profile.
+ * Checks if the link already exists, and if not, computes the next displayOrder.
+ * Returns true if a new link was added, false if it already existed.
+ */
+async function addSocialLinkIdempotent(
+  tx: DbType,
+  creatorProfileId: string,
+  platform: string,
+  url: string,
+  title: string
+): Promise<boolean> {
+  // Check if link already exists
+  const [existingLink] = await tx
+    .select({ id: creatorProfileLinks.id })
+    .from(creatorProfileLinks)
+    .where(
+      and(
+        eq(creatorProfileLinks.creatorProfileId, creatorProfileId),
+        eq(creatorProfileLinks.platform, platform),
+        eq(creatorProfileLinks.url, url)
+      )
+    )
+    .limit(1);
+
+  if (existingLink) {
+    // Link already exists, skip insertion
+    return false;
+  }
+
+  // Compute next displayOrder (max + 1, or 0 if no links exist)
+  const [result] = await tx
+    .select({ maxOrder: max(creatorProfileLinks.displayOrder) })
+    .from(creatorProfileLinks)
+    .where(eq(creatorProfileLinks.creatorProfileId, creatorProfileId));
+
+  const nextDisplayOrder =
+    result?.maxOrder !== null && result?.maxOrder !== undefined
+      ? result.maxOrder + 1
+      : 0;
+
+  // Insert the new link
+  await tx.insert(creatorProfileLinks).values({
+    creatorProfileId,
+    type: 'social',
+    platform,
+    url,
+    title,
+    displayOrder: nextDisplayOrder,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  return true;
 }
 
 export const runtime = 'nodejs';
@@ -725,24 +782,28 @@ export async function POST(request: Request) {
       } else if (existing && !existing.isClaimed) {
         // Profile exists but unclaimed - add the link to existing profile
         try {
-          // Add the social link to existing profile
-          await tx.insert(creatorProfileLinks).values({
-            creatorProfileId: existing.id,
-            type: 'social',
-            platform: platformId,
-            url: normalizedUrl,
-            title: detected.platform.name,
-            displayOrder: 0,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
+          // Add the social link to existing profile (idempotent)
+          const linkAdded = await addSocialLinkIdempotent(
+            tx,
+            existing.id,
+            platformId,
+            normalizedUrl,
+            detected.platform.name
+          );
 
-          logger.info('Added link to existing unclaimed profile', {
-            profileId: existing.id,
-            platform: platformId,
-            url: normalizedUrl,
-          });
+          if (linkAdded) {
+            logger.info('Added link to existing unclaimed profile', {
+              profileId: existing.id,
+              platform: platformId,
+              url: normalizedUrl,
+            });
+          } else {
+            logger.info('Link already exists on unclaimed profile', {
+              profileId: existing.id,
+              platform: platformId,
+              url: normalizedUrl,
+            });
+          }
 
           return NextResponse.json(
             {
@@ -752,8 +813,10 @@ export async function POST(request: Request) {
                 username: existing.usernameNormalized,
                 usernameNormalized: existing.usernameNormalized,
               },
-              links: 1,
-              note: 'Added link to existing unclaimed profile',
+              links: linkAdded ? 1 : 0,
+              note: linkAdded
+                ? 'Added link to existing unclaimed profile'
+                : 'Link already exists on profile',
             },
             { status: 200, headers: { 'Cache-Control': 'no-store' } }
           );
@@ -822,19 +885,15 @@ export async function POST(request: Request) {
         );
       }
 
-      // Add the social link
+      // Add the social link (idempotent, though new profile shouldn't have duplicates)
       try {
-        await tx.insert(creatorProfileLinks).values({
-          creatorProfileId: created.id,
-          type: 'social',
-          platform: platformId,
-          url: normalizedUrl,
-          title: detected.platform.name,
-          displayOrder: 0,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        await addSocialLinkIdempotent(
+          tx,
+          created.id,
+          platformId,
+          normalizedUrl,
+          detected.platform.name
+        );
       } catch (linkError) {
         logger.warn('Failed to add link to new profile', {
           profileId: created.id,
@@ -865,14 +924,14 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
-    console.error('Admin ingestion failed full error', error);
-
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
 
     logger.error('Admin ingestion failed', {
       error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
       raw: error,
+      route: 'creator-ingest',
     });
 
     // Check for unique constraint violation (race condition fallback)
