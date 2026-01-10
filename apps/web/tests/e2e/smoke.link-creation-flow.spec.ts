@@ -29,16 +29,18 @@ test.describe('Link Creation & Display @smoke', () => {
 
       // The test seeding adds a Spotify link for Taylor Swift profile
       // Verify it appears on the public profile
-      const spotifyLink = page.locator(
-        '[data-testid="social-links"] a[href*="spotify"], a[href*="spotify.com"]'
-      ).first();
+      const spotifyLink = page
+        .locator(
+          '[data-testid="social-links"] a[href*="spotify"], a[href*="spotify.com"]',
+        )
+        .first();
 
       await expect(spotifyLink).toBeVisible({ timeout: 10000 });
 
       // Verify the link has a valid Spotify URL
       const href = await spotifyLink.getAttribute('href');
       expect(href, 'Spotify link should have valid URL').toMatch(
-        /spotify\.com\/artist\//
+        /spotify\.com\/artist\//,
       );
 
       // Verify the link is clickable (has proper attributes)
@@ -46,7 +48,9 @@ test.describe('Link Creation & Display @smoke', () => {
         const link = el as HTMLAnchorElement;
         return link.href && link.href.startsWith('http');
       });
-      expect(isClickable, 'Link should be clickable with valid href').toBe(true);
+      expect(isClickable, 'Link should be clickable with valid href').toBe(
+        true,
+      );
 
       const context = getContext();
       await assertNoCriticalErrors(context, testInfo);
@@ -97,7 +101,7 @@ test.describe('Link Creation & Display @smoke', () => {
 
       // Find all social links on the page
       const socialLinks = page.locator(
-        'a[href*="spotify"], a[href*="instagram"], a[href*="twitter"], a[href*="facebook"], a[href*="tiktok"]'
+        'a[href*="spotify"], a[href*="instagram"], a[href*="twitter"], a[href*="facebook"], a[href*="tiktok"]',
       );
 
       const linkCount = await socialLinks.count();
@@ -113,16 +117,23 @@ test.describe('Link Creation & Display @smoke', () => {
           const rel = await link.getAttribute('rel');
 
           // All external links should start with http/https
-          expect(href, `Link ${i + 1} should have valid URL`).toMatch(/^https?:\/\//);
+          expect(href, `Link ${i + 1} should have valid URL`).toMatch(
+            /^https?:\/\//,
+          );
 
           // External links should open in new tab (optional but recommended)
           if (target) {
-            expect(target, `Link ${i + 1} target should be _blank`).toBe('_blank');
+            expect(target, `Link ${i + 1} target should be _blank`).toBe(
+              '_blank',
+            );
           }
 
           // External links should have security attributes (optional but recommended)
           if (rel) {
-            expect(rel, `Link ${i + 1} should have noopener for security`).toContain('noopener');
+            expect(
+              rel,
+              `Link ${i + 1} should have noopener for security`,
+            ).toContain('noopener');
           }
 
           console.log(`  ✓ Link ${i + 1}: ${href?.substring(0, 50)}...`);
