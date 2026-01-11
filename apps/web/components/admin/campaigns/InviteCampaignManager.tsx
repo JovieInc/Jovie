@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 
@@ -55,13 +55,16 @@ export function InviteCampaignManager() {
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState<SendResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchPreview = useCallback(async () => {
+    const abortController = new AbortController();
     setIsLoadingPreview(true);
     setError(null);
     try {
       const response = await fetch(
-        `/api/admin/creator-invite/bulk?threshold=${fitScoreThreshold}&limit=${limit}`
+        `/api/admin/creator-invite/bulk?threshold=${fitScoreThreshold}&limit=${limit}`,
+        { signal: abortController.signal }
       );
       const data = await response.json();
       if (!response.ok) {
@@ -69,14 +72,22 @@ export function InviteCampaignManager() {
       }
       setPreview(data);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Failed to fetch preview');
     } finally {
       setIsLoadingPreview(false);
     }
+    return () => abortController.abort();
   }, [fitScoreThreshold, limit]);
 
   useEffect(() => {
     fetchPreview();
+    // Cleanup timeout on unmount
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
   }, [fetchPreview]);
 
   const handleSendInvites = async () => {
@@ -107,7 +118,10 @@ export function InviteCampaignManager() {
 
       setSendResult(data);
       // Refresh preview after sending
-      setTimeout(fetchPreview, 1000);
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      refreshTimeoutRef.current = setTimeout(fetchPreview, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send invites');
     } finally {
@@ -202,10 +216,14 @@ export function InviteCampaignManager() {
               max={300}
               value={throttling.minDelayMs / 1000}
               onChange={e =>
-                setThrottling(t => ({
-                  ...t,
-                  minDelayMs: Number(e.target.value) * 1000,
-                }))
+                setThrottling(t => {
+                  const newMin = Number(e.target.value) * 1000;
+                  return {
+                    ...t,
+                    minDelayMs: newMin,
+                    maxDelayMs: Math.max(newMin, t.maxDelayMs),
+                  };
+                })
               }
               className='w-full'
             />
@@ -226,10 +244,14 @@ export function InviteCampaignManager() {
               max={600}
               value={throttling.maxDelayMs / 1000}
               onChange={e =>
-                setThrottling(t => ({
-                  ...t,
-                  maxDelayMs: Number(e.target.value) * 1000,
-                }))
+                setThrottling(t => {
+                  const newMax = Number(e.target.value) * 1000;
+                  return {
+                    ...t,
+                    minDelayMs: Math.min(t.minDelayMs, newMax),
+                    maxDelayMs: newMax,
+                  };
+                })
               }
               className='w-full'
             />

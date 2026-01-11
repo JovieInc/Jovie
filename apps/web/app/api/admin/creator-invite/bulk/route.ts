@@ -18,6 +18,25 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+/**
+ * Mask an email address for preview display.
+ * Preserves domain, masks local part with varying amounts based on length.
+ */
+function maskEmail(email: string | null | undefined): string | undefined {
+  if (!email) return undefined;
+
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return undefined;
+
+  // For very short local parts (1-2 chars), show first char + ***
+  if (localPart.length <= 2) {
+    return `${localPart[0]}***@${domain}`;
+  }
+
+  // For longer local parts, show first 2 chars + ***
+  return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
 const bulkInviteSchema = z.object({
   /**
    * Array of profile IDs to send invites to.
@@ -245,6 +264,7 @@ export async function POST(request: Request) {
     const result = await withSystemIngestionSession(async tx => {
       const invitePayloads: { inviteId: string; creatorProfileId: string }[] =
         [];
+      let skippedDuplicates = 0;
 
       for (const profile of profilesWithEmails) {
         // Create invite record
@@ -266,6 +286,8 @@ export async function POST(request: Request) {
             inviteId: invite.id,
             creatorProfileId: profile.id,
           });
+        } else {
+          skippedDuplicates++;
         }
       }
 
@@ -285,6 +307,7 @@ export async function POST(request: Request) {
         invitesCreated: invitePayloads.length,
         jobsEnqueued: enqueued,
         jobsSkipped: skipped,
+        skippedDuplicates,
       };
     });
 
@@ -292,6 +315,7 @@ export async function POST(request: Request) {
       invitesCreated: result.invitesCreated,
       jobsEnqueued: result.jobsEnqueued,
       jobsSkipped: result.jobsSkipped,
+      skippedDuplicates: result.skippedDuplicates,
       skippedNoEmail: profilesWithoutEmails.length,
       fitScoreThreshold,
       minDelayMs,
@@ -305,6 +329,7 @@ export async function POST(request: Request) {
         sent: result.jobsEnqueued,
         invitesCreated: result.invitesCreated,
         jobsEnqueued: result.jobsEnqueued,
+        skippedDuplicates: result.skippedDuplicates,
         skippedNoEmail: profilesWithoutEmails.length,
         throttling: {
           minDelayMs,
@@ -413,13 +438,21 @@ export async function GET(request: Request) {
             username: p.username,
             displayName: p.displayName,
             fitScore: p.fitScore,
-            email: p.contactEmail?.replace(/(.{2}).*@/, '$1***@'),
+            email: maskEmail(p.contactEmail),
           })),
         },
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
-  } catch {
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    logger.error('Failed to fetch eligible profiles for preview', {
+      error: errorMessage,
+      raw: error,
+    });
+
     return NextResponse.json(
       { error: 'Failed to fetch eligible profiles' },
       { status: 500, headers: NO_STORE_HEADERS }
