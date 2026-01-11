@@ -37,14 +37,16 @@ export function CreatorProfile({ username }: { username: string }) {
   return (
     <div className='space-y-6'>
       <div className='flex flex-col items-center space-y-4 sm:flex-row sm:space-x-6 sm:space-y-0'>
-        <Avatar
-          src={creator.avatarUrl}
-          alt={creator.displayName || creator.username}
-          name={creator.displayName || creator.username}
-          size='display-md'
-          className='h-24 w-24'
-          verified={creator.isVerified ?? undefined}
-        />
+        <div className='relative'>
+          <div className='absolute inset-0 -z-10 rounded-lg bg-surface-2/40 dark:bg-surface-2/30 blur-sm' />
+          <Avatar
+            src={creator.avatarUrl}
+            alt={creator.displayName || creator.username}
+            name={creator.displayName || creator.username}
+            size='2xl'
+            verified={creator.isVerified ?? undefined}
+          />
+        </div>
         <div className='text-center sm:text-left'>
           <h1 className='text-2xl font-bold'>
             {creator.displayName || creator.username}

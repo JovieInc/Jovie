@@ -31,7 +31,6 @@ export interface SuggestionPillConfig {
  */
 export const SUGGESTION_PILLS: SuggestionPillConfig[] = [
   { id: 'spotify-artist', label: 'Spotify Artist', simpleIconId: 'spotify' },
-  { id: 'spotify', label: 'Spotify', simpleIconId: 'spotify' },
   { id: 'apple-music', label: 'Apple Music', simpleIconId: 'applemusic' },
   {
     id: 'youtube-music',
@@ -54,7 +53,6 @@ export const SUGGESTION_PILLS: SuggestionPillConfig[] = [
  */
 export const MUSIC_FIRST_ORDER = [
   'spotify-artist',
-  'spotify',
   'apple-music',
   'youtube',
   'youtube-music',
@@ -76,7 +74,6 @@ export const SOCIAL_FIRST_ORDER = [
   'tiktok',
   'youtube',
   'twitter',
-  'spotify',
   'apple-music',
   'youtube-music',
   'venmo',
