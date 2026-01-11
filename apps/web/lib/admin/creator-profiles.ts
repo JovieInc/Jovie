@@ -40,6 +40,7 @@ export interface AdminCreatorProfileRow {
     platform: string;
     platformType: string;
     url: string;
+    displayText: string | null;
   }>;
 }
 
@@ -208,7 +209,13 @@ export async function getAdminCreatorProfiles(
     const confidenceMap = new Map<string, number>();
     const socialLinksMap = new Map<
       string,
-      Array<{ id: string; platform: string; platformType: string; url: string }>
+      Array<{
+        id: string;
+        platform: string;
+        platformType: string;
+        url: string;
+        displayText: string | null;
+      }>
     >();
 
     if (profileIds.length > 0) {
@@ -230,6 +237,7 @@ export async function getAdminCreatorProfiles(
             platform: socialLinks.platform,
             platformType: socialLinks.platformType,
             url: socialLinks.url,
+            displayText: socialLinks.displayText,
           })
           .from(socialLinks)
           .where(inArray(socialLinks.creatorProfileId, profileIds)),
@@ -258,6 +266,7 @@ export async function getAdminCreatorProfiles(
           platform: link.platform,
           platformType: link.platformType,
           url: link.url,
+          displayText: link.displayText,
         });
         socialLinksMap.set(link.creatorProfileId, existing);
       }
