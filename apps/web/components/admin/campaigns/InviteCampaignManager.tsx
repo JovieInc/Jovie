@@ -48,7 +48,8 @@ const DEFAULT_THROTTLING: ThrottlingConfig = {
 export function InviteCampaignManager() {
   const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
   const [limit, setLimit] = useState(20);
-  const [throttling, setThrottling] = useState<ThrottlingConfig>(DEFAULT_THROTTLING);
+  const [throttling, setThrottling] =
+    useState<ThrottlingConfig>(DEFAULT_THROTTLING);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -130,11 +131,15 @@ export function InviteCampaignManager() {
         <div className='grid gap-6 md:grid-cols-2'>
           {/* Fit Score Threshold */}
           <div className='space-y-2'>
-            <label className='text-sm font-medium text-primary-token'>
+            <label
+              htmlFor='fit-score-threshold'
+              className='text-sm font-medium text-primary-token'
+            >
               Minimum Fit Score
             </label>
             <div className='flex items-center gap-4'>
               <input
+                id='fit-score-threshold'
                 type='range'
                 min={0}
                 max={100}
@@ -153,10 +158,14 @@ export function InviteCampaignManager() {
 
           {/* Batch Limit */}
           <div className='space-y-2'>
-            <label className='text-sm font-medium text-primary-token'>
+            <label
+              htmlFor='batch-size'
+              className='text-sm font-medium text-primary-token'
+            >
               Batch Size
             </label>
             <Input
+              id='batch-size'
               type='number'
               min={1}
               max={100}
@@ -180,10 +189,14 @@ export function InviteCampaignManager() {
         <div className='grid gap-6 md:grid-cols-3'>
           {/* Min Delay */}
           <div className='space-y-2'>
-            <label className='text-sm font-medium text-primary-token'>
+            <label
+              htmlFor='min-delay'
+              className='text-sm font-medium text-primary-token'
+            >
               Min Delay (seconds)
             </label>
             <Input
+              id='min-delay'
               type='number'
               min={10}
               max={300}
@@ -200,10 +213,14 @@ export function InviteCampaignManager() {
 
           {/* Max Delay */}
           <div className='space-y-2'>
-            <label className='text-sm font-medium text-primary-token'>
+            <label
+              htmlFor='max-delay'
+              className='text-sm font-medium text-primary-token'
+            >
               Max Delay (seconds)
             </label>
             <Input
+              id='max-delay'
               type='number'
               min={30}
               max={600}
@@ -220,9 +237,9 @@ export function InviteCampaignManager() {
 
           {/* Rate Info */}
           <div className='space-y-2'>
-            <label className='text-sm font-medium text-primary-token'>
+            <p className='text-sm font-medium text-primary-token'>
               Effective Rate
-            </label>
+            </p>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
               <p className='text-lg font-semibold text-primary-token'>
                 ~{effectiveRatePerHour}/hour
@@ -235,10 +252,13 @@ export function InviteCampaignManager() {
         </div>
 
         <div className='mt-4 flex items-start gap-2 rounded-lg bg-amber-500/10 px-4 py-3'>
-          <Icon name='AlertTriangle' className='h-4 w-4 text-amber-600 mt-0.5' />
+          <Icon
+            name='AlertTriangle'
+            className='h-4 w-4 text-amber-600 mt-0.5'
+          />
           <p className='text-xs text-amber-700 dark:text-amber-400'>
-            Delays are randomized between min and max to appear human-like.
-            Stay under 50/hour to avoid spam filters.
+            Delays are randomized between min and max to appear human-like. Stay
+            under 50/hour to avoid spam filters.
           </p>
         </div>
       </section>
@@ -246,9 +266,7 @@ export function InviteCampaignManager() {
       {/* Preview Section */}
       <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
         <div className='flex items-center justify-between mb-4'>
-          <h2 className='text-lg font-semibold text-primary-token'>
-            Preview
-          </h2>
+          <h2 className='text-lg font-semibold text-primary-token'>Preview</h2>
           <Button
             variant='ghost'
             size='sm'
@@ -287,7 +305,9 @@ export function InviteCampaignManager() {
                 <p className='text-2xl font-bold text-green-600'>
                   {preview.sample.withEmails}
                 </p>
-                <p className='text-xs text-secondary-token'>With contact email</p>
+                <p className='text-xs text-secondary-token'>
+                  With contact email
+                </p>
               </div>
               <div className='rounded-lg bg-surface-2 px-4 py-3'>
                 <p className='text-2xl font-bold text-amber-600'>
