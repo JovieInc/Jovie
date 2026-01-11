@@ -13,6 +13,7 @@
 
 import type { DbType } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema';
+import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processBeaconsJob } from './jobs/beacons';
 import { processLayloJob } from './jobs/laylo';
 import { processLinktreeJob } from './jobs/linktree';
@@ -73,6 +74,8 @@ export async function processJob(
       return processYouTubeJob(tx, job.payload);
     case 'import_beacons':
       return processBeaconsJob(tx, job.payload);
+    case 'send_claim_invite':
+      return processSendClaimInviteJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }
