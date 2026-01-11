@@ -6,12 +6,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import {
-  getCrawlerSafeLabel,
-  isSensitiveDomain,
-} from '@/lib/utils/domain-categorizer';
+import { getCrawlerSafeLabel } from '@/lib/utils/domain-categorizer';
 import { extractDomain } from '@/lib/utils/url-parsing';
 
 interface WrappedSocialLinkProps {
