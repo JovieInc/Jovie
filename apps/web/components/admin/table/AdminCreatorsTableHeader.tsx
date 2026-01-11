@@ -25,6 +25,11 @@ export interface AdminCreatorsTableHeaderProps {
   stickyTopPx: number;
   onToggleSelectAll: () => void;
   onSortChange: (column: SortableColumnKey) => void;
+  /**
+   * Optional header actions (e.g., ingest profile button, drawer toggle).
+   * If provided, these will be displayed in the Actions column header.
+   */
+  headerActions?: React.ReactNode;
 }
 
 export function AdminCreatorsTableHeader({
@@ -35,6 +40,7 @@ export function AdminCreatorsTableHeader({
   stickyTopPx,
   onToggleSelectAll,
   onSortChange,
+  headerActions,
 }: AdminCreatorsTableHeaderProps) {
   const headerCellClass = cn(
     'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
@@ -112,9 +118,13 @@ export function AdminCreatorsTableHeader({
           className={cn(headerCellClass, 'text-right')}
           style={{ top: stickyTopPx }}
         >
-          <span className='text-xs uppercase tracking-wide text-tertiary-token'>
-            Actions
-          </span>
+          {headerActions ? (
+            <div className='flex items-center justify-end'>{headerActions}</div>
+          ) : (
+            <span className='text-xs uppercase tracking-wide text-tertiary-token'>
+              Actions
+            </span>
+          )}
         </th>
       </tr>
     </thead>

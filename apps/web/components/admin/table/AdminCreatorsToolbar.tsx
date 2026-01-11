@@ -3,7 +3,6 @@
 import { Button, Input } from '@jovie/ui';
 import Link from 'next/link';
 import { useState } from 'react';
-import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
@@ -67,10 +66,6 @@ export function AdminCreatorsToolbar({
             </Button>
           )}
         </form>
-        <div
-          className='hidden h-6 w-px bg-border sm:block'
-          aria-hidden='true'
-        />
         <ExportCSVButton<AdminCreatorProfileRow>
           getData={() => profiles}
           columns={creatorsCSVColumns}
@@ -78,7 +73,6 @@ export function AdminCreatorsToolbar({
           disabled={profiles.length === 0}
           ariaLabel='Export creator profiles to CSV file'
         />
-        <IngestProfileDropdown />
       </div>
     </div>
   );
