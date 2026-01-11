@@ -212,6 +212,16 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
     icon: 'cameo',
     color: '8A2BE2',
   }),
+  thematic: createPlatformInfo(
+    'thematic',
+    'https://app.hellothematic.com/artist/profile/...',
+    {
+      name: 'Thematic',
+      category: 'websites',
+      icon: 'link',
+      color: '6366F1',
+    }
+  ),
 };
 
 /**
@@ -276,6 +286,10 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?toneden\.io/i, platformId: 'toneden' },
   { pattern: /(?:www\.)?ffm\.to|feature\.fm/i, platformId: 'featurefm' },
   { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
+  {
+    pattern: /(?:app\.)?hellothematic\.com/i,
+    platformId: 'thematic',
+  },
 
   // Detection-only platforms
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },

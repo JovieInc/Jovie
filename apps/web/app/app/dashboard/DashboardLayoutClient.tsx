@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import React, {
   createContext,
   useEffect,
+  useMemo,
   useState,
   useTransition,
 } from 'react';
@@ -101,7 +102,7 @@ export default function DashboardLayoutClient({
     isAppDashboardRoute && !isSettingsRoute && !isAdminRoute;
 
   // Build a simple breadcrumb from the current path
-  const crumbs = (() => {
+  const crumbs = useMemo(() => {
     const parts = (pathname || '/app/dashboard').split('/').filter(Boolean);
     const dashboardIndex = parts.indexOf('dashboard');
     const adminIndex = parts.indexOf('admin');
@@ -145,7 +146,7 @@ export default function DashboardLayoutClient({
       });
     }
     return items;
-  })();
+  }, [pathname]);
 
   // For sidebar-08 pattern, we'll use the built-in state management
   const [sidebarOpen, setSidebarOpen] = useState(

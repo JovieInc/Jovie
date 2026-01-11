@@ -1,7 +1,113 @@
-import { icons, type LucideProps } from 'lucide-react';
+import {
+  Activity,
+  AlarmClock,
+  AlertCircle,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowUpRight,
+  Bell,
+  Bolt,
+  ChartBar,
+  Check,
+  CheckCircle,
+  ChevronRight,
+  Copy,
+  CreditCard,
+  Disc3,
+  Ellipsis,
+  EllipsisVertical,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  GripVertical,
+  HandCoins,
+  Link,
+  Loader2,
+  LogOut,
+  type LucideIcon,
+  type LucideProps,
+  MapPin,
+  MessageSquare,
+  Monitor,
+  MousePointerClick,
+  Music,
+  Pencil,
+  PencilLine,
+  Plus,
+  RefreshCw,
+  Rocket,
+  Search,
+  Send,
+  Settings,
+  Smartphone,
+  Sparkles,
+  Tablet,
+  Trash,
+  Trash2,
+  TrendingUp,
+  User,
+  UserPlus,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type IconName = keyof typeof icons;
+const iconRegistry = {
+  Activity,
+  AlarmClock,
+  AlertCircle,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowUpRight,
+  Bell,
+  Bolt,
+  ChartBar,
+  Check,
+  CheckCircle,
+  ChevronRight,
+  Copy,
+  CreditCard,
+  Disc3,
+  Ellipsis,
+  EllipsisVertical,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  GripVertical,
+  HandCoins,
+  Link,
+  Loader2,
+  LogOut,
+  MapPin,
+  MessageSquare,
+  Monitor,
+  MousePointerClick,
+  Music,
+  Pencil,
+  PencilLine,
+  Plus,
+  RefreshCw,
+  Rocket,
+  Search,
+  Send,
+  Settings,
+  Smartphone,
+  Sparkles,
+  Tablet,
+  Trash,
+  Trash2,
+  TrendingUp,
+  User,
+  UserPlus,
+  X,
+  XCircle,
+} satisfies Record<string, LucideIcon>;
+
+export type IconName = keyof typeof iconRegistry;
 
 // Normalize various icon naming conventions (kebab-case, underscores, "Icon" suffix)
 function resolveIconName(name: string): IconName | undefined {
@@ -13,9 +119,9 @@ function resolveIconName(name: string): IconName | undefined {
   const cleaned = name.endsWith('Icon') ? name.slice(0, -4) : name;
 
   const aliased = aliasMap[cleaned];
-  if (aliased && aliased in icons) return aliased as IconName;
+  if (aliased && aliased in iconRegistry) return aliased as IconName;
 
-  if (cleaned in icons) return cleaned as IconName;
+  if (cleaned in iconRegistry) return cleaned as IconName;
 
   const pascal = cleaned
     .split(/[^a-zA-Z0-9]/)
@@ -23,7 +129,7 @@ function resolveIconName(name: string): IconName | undefined {
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
     .join('') as IconName;
 
-  return pascal in icons ? pascal : undefined;
+  return pascal in iconRegistry ? pascal : undefined;
 }
 
 export interface IconProps extends Omit<LucideProps, 'ref'> {
@@ -59,7 +165,7 @@ export function Icon({
     );
   }
 
-  const LucideIcon = icons[iconName];
+  const LucideIcon = iconRegistry[iconName];
   return (
     <LucideIcon
       className={cn(className)}

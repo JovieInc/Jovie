@@ -26,6 +26,7 @@ export const INGESTION_MAX_DEPTH = {
   laylo: 3,
   youtube: 1,
   beacons: 3,
+  thematic: 1,
 } as const;
 
 // =============================================================================
@@ -77,6 +78,15 @@ export const beaconsPayloadSchema = createBaseIngestionPayloadSchema(
   INGESTION_MAX_DEPTH.beacons
 );
 
+/**
+ * Thematic ingestion payload schema (processor variant).
+ * Used when processing import_thematic jobs.
+ * Limited to depth 1 since Thematic doesn't have nested link trees.
+ */
+export const thematicPayloadSchema = createBaseIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.thematic
+);
+
 // =============================================================================
 // Job Payload Schemas (dedupKey required - for jobs.ts)
 // =============================================================================
@@ -125,6 +135,14 @@ export const beaconsJobPayloadSchema = createJobIngestionPayloadSchema(
   INGESTION_MAX_DEPTH.beacons
 );
 
+/**
+ * Thematic job payload schema (enqueue variant).
+ * Used when creating import_thematic jobs with deduplication.
+ */
+export const thematicJobPayloadSchema = createJobIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.thematic
+);
+
 // =============================================================================
 // Inferred Types
 // =============================================================================
@@ -136,6 +154,7 @@ export type LinktreePayload = z.infer<typeof linktreePayloadSchema>;
 export type LayloPayload = z.infer<typeof layloPayloadSchema>;
 export type YouTubePayload = z.infer<typeof youtubePayloadSchema>;
 export type BeaconsPayload = z.infer<typeof beaconsPayloadSchema>;
+export type ThematicPayload = z.infer<typeof thematicPayloadSchema>;
 
 /**
  * Inferred type for job ingestion payloads (dedupKey required).
@@ -144,3 +163,4 @@ export type LinktreeJobPayload = z.infer<typeof linktreeJobPayloadSchema>;
 export type LayloJobPayload = z.infer<typeof layloJobPayloadSchema>;
 export type YouTubeJobPayload = z.infer<typeof youtubeJobPayloadSchema>;
 export type BeaconsJobPayload = z.infer<typeof beaconsJobPayloadSchema>;
+export type ThematicJobPayload = z.infer<typeof thematicJobPayloadSchema>;

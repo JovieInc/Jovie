@@ -40,7 +40,11 @@ function normalizeEmail(email: string): string {
 }
 
 function deriveDisplayNameFromEmail(email: string): string {
-  const localPart = email.split('@')[0] ?? '';
+  if (!email.includes('@')) {
+    return '';
+  }
+
+  const localPart = email.split('@').at(0) ?? '';
   return localPart.trim().replace(/[._-]+/g, ' ');
 }
 
