@@ -7,9 +7,8 @@
  */
 
 import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react';
-import Link from 'next/link';
-
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 import type { Release } from './types';
 
@@ -30,67 +29,63 @@ export function ReleaseSidebarHeader({
 }: ReleaseSidebarHeaderProps) {
   const showActions = hasRelease && release?.smartLinkPath;
 
+  // Define actions based on pattern from ContactSidebarHeader:
+  // Primary: Close + Copy
+  // Overflow: Refresh + Open
+  const primaryActions: DrawerHeaderAction[] = [];
+  const overflowActions: DrawerHeaderAction[] = [];
+
+  // Close is always primary
+  if (onClose) {
+    primaryActions.push({
+      id: 'close',
+      label: 'Close release sidebar',
+      icon: X,
+      onClick: onClose,
+    });
+  }
+
+  if (showActions) {
+    // Copy smart link - primary action
+    primaryActions.push({
+      id: 'copy',
+      label: 'Copy smart link',
+      icon: Copy,
+      onClick: onCopySmartLink,
+    });
+
+    // Refresh - overflow action
+    overflowActions.push({
+      id: 'refresh',
+      label: 'Refresh release',
+      icon: RefreshCw,
+      onClick: () => {
+        if (onRefresh) {
+          onRefresh();
+          return;
+        }
+        window.location.reload();
+      },
+    });
+
+    // Open smart link - overflow action
+    overflowActions.push({
+      id: 'open',
+      label: 'Open smart link',
+      icon: ExternalLink,
+      href: release!.smartLinkPath,
+    });
+  }
+
   return (
     <div className='flex items-center justify-between border-b border-sidebar-border px-3 py-2'>
       <p className='text-xs text-sidebar-muted'>
         {hasRelease ? `ID: ${release?.id}` : 'No release selected'}
       </p>
-      <div className='flex items-center gap-1'>
-        {showActions && (
-          <>
-            <CircleIconButton
-              size='xs'
-              variant='ghost'
-              ariaLabel='Copy smart link'
-              onClick={onCopySmartLink}
-              className='hover:scale-105'
-            >
-              <Copy aria-hidden />
-            </CircleIconButton>
-            <CircleIconButton
-              size='xs'
-              variant='ghost'
-              ariaLabel='Refresh release'
-              onClick={() => {
-                if (onRefresh) {
-                  onRefresh();
-                  return;
-                }
-                window.location.reload();
-              }}
-              className='hover:scale-105'
-            >
-              <RefreshCw aria-hidden />
-            </CircleIconButton>
-            <CircleIconButton
-              size='xs'
-              variant='ghost'
-              ariaLabel='Open smart link'
-              asChild
-              className='hover:scale-105'
-            >
-              <Link
-                href={release!.smartLinkPath}
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <ExternalLink aria-hidden />
-              </Link>
-            </CircleIconButton>
-          </>
-        )}
-        {onClose && (
-          <CircleIconButton
-            size='xs'
-            variant='ghost'
-            ariaLabel='Close release sidebar'
-            onClick={onClose}
-            className='hover:scale-105'
-          >
-            <X aria-hidden='true' />
-          </CircleIconButton>
-        )}
-      </div>
+      <DrawerHeaderActions
+        primaryActions={primaryActions}
+        overflowActions={overflowActions}
+      />
     </div>
   );
 }
