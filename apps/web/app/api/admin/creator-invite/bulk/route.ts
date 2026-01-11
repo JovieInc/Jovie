@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -25,6 +25,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 function maskEmail(email: string | null | undefined): string | undefined {
   if (!email) return undefined;
 
+  // Validate email contains exactly one '@'
+  const atCount = (email.match(/@/g) || []).length;
+  if (atCount !== 1) return undefined;
+
   const [localPart, domain] = email.split('@');
   if (!localPart || !domain) return undefined;
 
@@ -37,47 +41,52 @@ function maskEmail(email: string | null | undefined): string | undefined {
   return `${localPart.slice(0, 2)}***@${domain}`;
 }
 
-const bulkInviteSchema = z.object({
-  /**
-   * Array of profile IDs to send invites to.
-   * If not provided, will auto-select based on fitScoreThreshold.
-   */
-  creatorProfileIds: z.array(z.string().uuid()).optional(),
+const bulkInviteSchema = z
+  .object({
+    /**
+     * Array of profile IDs to send invites to.
+     * If not provided, will auto-select based on fitScoreThreshold.
+     */
+    creatorProfileIds: z.array(z.string().uuid()).optional(),
 
-  /**
-   * Minimum fit score for auto-selection (0-100).
-   * Only used when creatorProfileIds is not provided.
-   */
-  fitScoreThreshold: z.number().min(0).max(100).optional().default(50),
+    /**
+     * Minimum fit score for auto-selection (0-100).
+     * Only used when creatorProfileIds is not provided.
+     */
+    fitScoreThreshold: z.number().min(0).max(100).optional().default(50),
 
-  /**
-   * Maximum number of invites to send in this batch.
-   */
-  limit: z.number().min(1).max(500).optional().default(50),
+    /**
+     * Maximum number of invites to send in this batch.
+     */
+    limit: z.number().min(1).max(500).optional().default(50),
 
-  /**
-   * Minimum delay between emails in milliseconds.
-   * Actual delay will be randomized between minDelayMs and maxDelayMs.
-   */
-  minDelayMs: z.number().min(1000).max(300000).optional().default(30000), // 30 sec min
+    /**
+     * Minimum delay between emails in milliseconds.
+     * Actual delay will be randomized between minDelayMs and maxDelayMs.
+     */
+    minDelayMs: z.number().min(1000).max(300000).optional().default(30000), // 30 sec min
 
-  /**
-   * Maximum delay between emails in milliseconds.
-   * Actual delay will be randomized between minDelayMs and maxDelayMs.
-   */
-  maxDelayMs: z.number().min(1000).max(600000).optional().default(120000), // 2 min max
+    /**
+     * Maximum delay between emails in milliseconds.
+     * Actual delay will be randomized between minDelayMs and maxDelayMs.
+     */
+    maxDelayMs: z.number().min(1000).max(600000).optional().default(120000), // 2 min max
 
-  /**
-   * Maximum emails per hour (rate limiting).
-   * Default is 30/hour to stay well under spam thresholds.
-   */
-  maxPerHour: z.number().min(1).max(100).optional().default(30),
+    /**
+     * Maximum emails per hour (rate limiting).
+     * Default is 30/hour to stay well under spam thresholds.
+     */
+    maxPerHour: z.number().min(1).max(100).optional().default(30),
 
-  /**
-   * If true, only return what would be sent without actually sending.
-   */
-  dryRun: z.boolean().optional().default(false),
-});
+    /**
+     * If true, only return what would be sent without actually sending.
+     */
+    dryRun: z.boolean().optional().default(false),
+  })
+  .refine(data => data.minDelayMs <= data.maxDelayMs, {
+    message: 'minDelayMs must be <= maxDelayMs',
+    path: ['minDelayMs'],
+  });
 
 /**
  * Admin endpoint to send bulk claim invites.
@@ -134,9 +143,19 @@ export async function POST(request: Request) {
       dryRun,
     } = parsed.data;
 
-    // Calculate actual limit based on maxPerHour
-    // If they want 30/hour and are sending 50, we'll still accept but warn
-    const effectiveLimit = Math.min(limit, maxPerHour * 2); // Allow up to 2 hours worth
+    // Cap batch size to 2 hours worth of emails to prevent excessively large batches
+    // that could overload the queue or exceed daily sending limits.
+    // For example: if maxPerHour=30, we cap at 60 emails per batch.
+    // This prevents a misconfigured batch from queuing hundreds of emails at once.
+    const effectiveLimit = Math.min(limit, maxPerHour * 2);
+
+    if (effectiveLimit < limit) {
+      logger.warn('Batch size capped by maxPerHour constraint', {
+        requestedLimit: limit,
+        maxPerHour,
+        effectiveLimit,
+      });
+    }
 
     // Get eligible profiles
     let eligibleProfiles: {
@@ -169,7 +188,7 @@ export async function POST(request: Request) {
           and(
             inArray(creatorProfiles.id, creatorProfileIds),
             eq(creatorProfiles.isClaimed, false),
-            sql`${creatorProfiles.claimToken} IS NOT NULL`
+            isNotNull(creatorProfiles.claimToken)
           )
         )
         .limit(effectiveLimit);
@@ -198,8 +217,8 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(creatorProfiles.isClaimed, false),
-            sql`${creatorProfiles.claimToken} IS NOT NULL`,
-            sql`${creatorProfiles.fitScore} >= ${fitScoreThreshold}`,
+            isNotNull(creatorProfiles.claimToken),
+            gte(creatorProfiles.fitScore, fitScoreThreshold),
             isNull(creatorClaimInvites.id) // No existing invites
           )
         )
@@ -397,8 +416,8 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(creatorProfiles.isClaimed, false),
-          sql`${creatorProfiles.claimToken} IS NOT NULL`,
-          sql`${creatorProfiles.fitScore} >= ${fitScoreThreshold}`,
+          isNotNull(creatorProfiles.claimToken),
+          gte(creatorProfiles.fitScore, fitScoreThreshold),
           isNull(creatorClaimInvites.id)
         )
       )
@@ -419,8 +438,8 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(creatorProfiles.isClaimed, false),
-          sql`${creatorProfiles.claimToken} IS NOT NULL`,
-          sql`${creatorProfiles.fitScore} >= ${fitScoreThreshold}`,
+          isNotNull(creatorProfiles.claimToken),
+          gte(creatorProfiles.fitScore, fitScoreThreshold),
           isNull(creatorClaimInvites.id)
         )
       );
