@@ -216,7 +216,10 @@ export default function DashboardLayoutClient({
   }
 
   return (
-    <PreviewPanelProvider enabled={resolvedPreviewEnabled}>
+    <PreviewPanelProvider
+      enabled={resolvedPreviewEnabled}
+      defaultOpen={isProfileRoute}
+    >
       {layout}
     </PreviewPanelProvider>
   );
