@@ -33,7 +33,7 @@ export function IngestProfileDropdown({
           type='button'
           size='sm'
           variant='outline'
-          className='gap-2 rounded-lg'
+          className='gap-2 rounded-lg hover:bg-base'
         >
           <Icon name='Plus' className='h-4 w-4' />
           Ingest Profile
