@@ -75,11 +75,10 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
   return (
     <Sidebar
       variant='sidebar'
-      collapsible='icon'
+      collapsible='offcanvas'
       className={cn(
         'bg-base',
         '[--sidebar-width:236px]',
-        '[--sidebar-width-icon:0px]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
       )}
     >
