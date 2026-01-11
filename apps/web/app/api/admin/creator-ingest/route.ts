@@ -39,6 +39,17 @@ import {
   normalizeHandle,
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
+import {
+  extractThematic,
+  extractThematicHandle,
+  fetchThematicDocument,
+  isThematicUrl,
+  mapThematicTypeToCreatorType,
+  normalizeThematicHandle,
+  parseThematicUrl,
+  type ThematicExtractionResult,
+  validateThematicUrl,
+} from '@/lib/ingestion/strategies/thematic';
 import { logger } from '@/lib/utils/logger';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
 
@@ -198,10 +209,20 @@ async function copyAvatarToBlob(
 }
 
 /**
- * Admin endpoint to ingest a Linktree profile.
+ * Admin endpoint to ingest creator profiles from external platforms.
+ *
+ * Supported platforms:
+ * - Linktree (https://linktr.ee/username)
+ * - Laylo (https://laylo.com/username)
+ * - Thematic (https://app.hellothematic.com/artist/profile/{id} or /creator/profile/{id})
+ *
+ * Thematic-specific features:
+ * - Distinguishes between artist and creator profile types
+ * - Captures verified status from Thematic
+ * - Profile ID indicates account age (lower = older)
  *
  * Hardening:
- * - Strict URL validation (HTTPS only, valid Linktree hosts)
+ * - Strict URL validation (HTTPS only, valid hosts per platform)
  * - Handle normalization and validation
  * - Transaction-wrapped with race-safe duplicate check
  * - Idempotency key support
@@ -241,28 +262,52 @@ export async function POST(request: Request) {
       );
     }
 
-    // Determine ingestion strategy (Laylo or Linktree)
-    const isLayloProfile = isLayloUrl(parsed.data.url);
-    const validatedUrl = isLayloProfile
-      ? validateLayloUrl(parsed.data.url)
-      : validateLinktreeUrl(parsed.data.url);
+    // Determine ingestion strategy (Thematic, Laylo, or Linktree)
+    const isThematicProfile = isThematicUrl(parsed.data.url);
+    const isLayloProfile = !isThematicProfile && isLayloUrl(parsed.data.url);
+
+    // Parse Thematic URL parts for type detection
+    const thematicUrlParts = isThematicProfile
+      ? parseThematicUrl(parsed.data.url)
+      : null;
+
+    // Validate URL based on platform
+    let validatedUrl: string | null;
+    if (isThematicProfile) {
+      validatedUrl = validateThematicUrl(parsed.data.url);
+    } else if (isLayloProfile) {
+      validatedUrl = validateLayloUrl(parsed.data.url);
+    } else {
+      validatedUrl = validateLinktreeUrl(parsed.data.url);
+    }
 
     if (!validatedUrl) {
+      let details: string;
+      if (isThematicProfile) {
+        details =
+          'URL must be a valid HTTPS Thematic profile (e.g., https://app.hellothematic.com/artist/profile/123456 or https://app.hellothematic.com/creator/profile/123456)';
+      } else if (isLayloProfile) {
+        details =
+          'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)';
+      } else {
+        details =
+          'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)';
+      }
       return NextResponse.json(
-        {
-          error: 'Invalid profile URL',
-          details: isLayloProfile
-            ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
-            : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
-        },
+        { error: 'Invalid profile URL', details },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     // Extract and validate handle
-    const rawHandle = isLayloProfile
-      ? extractLayloHandle(validatedUrl)
-      : extractLinktreeHandle(validatedUrl);
+    let rawHandle: string | null;
+    if (isThematicProfile) {
+      rawHandle = extractThematicHandle(validatedUrl);
+    } else if (isLayloProfile) {
+      rawHandle = extractLayloHandle(validatedUrl);
+    } else {
+      rawHandle = extractLinktreeHandle(validatedUrl);
+    }
 
     if (!rawHandle) {
       return NextResponse.json(
@@ -272,11 +317,17 @@ export async function POST(request: Request) {
     }
 
     // Normalize handle for storage
-    const handle = isLayloProfile
-      ? normalizeLayloHandle(rawHandle)
-      : normalizeHandle(rawHandle);
+    let handle: string;
+    if (isThematicProfile) {
+      handle = normalizeThematicHandle(rawHandle);
+    } else if (isLayloProfile) {
+      handle = normalizeLayloHandle(rawHandle);
+    } else {
+      handle = normalizeHandle(rawHandle);
+    }
 
-    if (!isValidHandle(handle)) {
+    // Thematic handles use a different format (thematic_type_id), so skip standard validation
+    if (!isThematicProfile && !isValidHandle(handle)) {
       return NextResponse.json(
         {
           error: 'Invalid handle format',
@@ -338,9 +389,16 @@ export async function POST(request: Request) {
       // Fetch and extract profile data
       let extraction:
         | ReturnType<typeof extractLinktree>
-        | ReturnType<typeof extractLaylo>;
+        | ReturnType<typeof extractLaylo>
+        | ThematicExtractionResult;
+      let thematicExtraction: ThematicExtractionResult | null = null;
+
       try {
-        if (isLayloProfile) {
+        if (isThematicProfile && thematicUrlParts) {
+          const html = await fetchThematicDocument(validatedUrl);
+          thematicExtraction = extractThematic(html, thematicUrlParts);
+          extraction = thematicExtraction;
+        } else if (isLayloProfile) {
           const { profile: layloProfile, user } =
             await fetchLayloProfile(handle);
           extraction = extractLaylo(layloProfile, user);
@@ -354,10 +412,19 @@ export async function POST(request: Request) {
             ? fetchError.message
             : 'Failed to fetch profile';
 
+        let platform: string;
+        if (isThematicProfile) {
+          platform = 'thematic';
+        } else if (isLayloProfile) {
+          platform = 'laylo';
+        } else {
+          platform = 'linktree';
+        }
+
         logger.error('Profile fetch failed', {
           url: validatedUrl,
           error: errorMessage,
-          platform: isLayloProfile ? 'laylo' : 'linktree',
+          platform,
         });
 
         return NextResponse.json(
@@ -476,14 +543,29 @@ export async function POST(request: Request) {
       );
 
       // Determine the source platform for fit scoring
-      const sourcePlatform = isLayloProfile ? 'laylo' : 'linktree';
+      let sourcePlatform: string;
+      if (isThematicProfile) {
+        sourcePlatform = 'thematic';
+      } else if (isLayloProfile) {
+        sourcePlatform = 'laylo';
+      } else {
+        sourcePlatform = 'linktree';
+      }
+
+      // Determine creator type - Thematic profiles can be artist or creator
+      const creatorType =
+        isThematicProfile && thematicExtraction
+          ? mapThematicTypeToCreatorType(thematicExtraction.thematicProfileType)
+          : 'creator';
 
       // Insert profile with claim token
+      // Note: isVerified is for Jovie's own verification process, not external platform verification
+      // Thematic's verified status is stored in the link evidence metadata
       const [created] = await tx
         .insert(creatorProfiles)
         .values({
           // userId intentionally omitted to avoid inserting empty-string UUID
-          creatorType: 'creator',
+          creatorType,
           username: finalHandle,
           usernameNormalized: finalHandle,
           displayName,
@@ -622,7 +704,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to ingest Linktree profile', details: errorMessage },
+      { error: 'Failed to ingest profile', details: errorMessage },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

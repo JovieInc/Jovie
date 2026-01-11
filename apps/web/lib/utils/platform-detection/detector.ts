@@ -165,6 +165,16 @@ export function canonicalIdentity(
       case 'linktree':
         if (parts[0]) return `linktree:${parts[0].toLowerCase()}`;
         break;
+      case 'thematic':
+        // Path format: /artist/profile/{id} or /creator/profile/{id}
+        if (
+          parts.length >= 3 &&
+          (parts[0] === 'artist' || parts[0] === 'creator') &&
+          parts[1] === 'profile'
+        ) {
+          return `thematic:${parts[0]}:${parts[2].toLowerCase()}`;
+        }
+        break;
       default:
         break;
     }
