@@ -6,7 +6,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   getCrawlerSafeLabel,
@@ -17,7 +17,7 @@ import { extractDomain } from '@/lib/utils/url-parsing';
 interface WrappedSocialLinkProps {
   href: string;
   platform: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
   className?: string;
   target?: string;
   rel?: string;
@@ -44,16 +44,25 @@ export function WrappedSocialLink({
 
   // Generate crawler-safe label
   const domain = extractDomain(href);
-  const _isSensitive = isSensitiveDomain(href); // eslint-disable-line @typescript-eslint/no-unused-vars
   const crawlerSafeLabel = getCrawlerSafeLabel(domain, platform);
 
   useEffect(() => {
+    // Reset state for new href/platform
+    setWrappedData(null);
+    setIsLoading(false);
+
     // Only wrap external links that aren't already wrapped
     if (
       !href ||
       href.startsWith('/') ||
       href.includes(window.location.hostname)
     ) {
+      // Skip wrapping: just use original href + safe label
+      setWrappedData({
+        wrappedUrl: href,
+        kind: 'normal',
+        alias: crawlerSafeLabel,
+      });
       return;
     }
 
@@ -150,7 +159,7 @@ export function WrappedSocialLink({
           <SocialIcon platform={platform} size={20} />
           <span>{wrappedData.alias}</span>
           {wrappedData.kind === 'sensitive' && (
-            <span className='text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded'>
+            <span className='text-xs rounded px-1.5 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200'>
               Verification Required
             </span>
           )}
@@ -167,7 +176,7 @@ interface WrappedDSPButtonProps {
   href: string;
   platform: string;
   className?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function WrappedDSPButton({
@@ -194,7 +203,7 @@ export function WrappedDSPButton({
 interface LegacySocialLinkProps {
   href: string;
   platform: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }
 

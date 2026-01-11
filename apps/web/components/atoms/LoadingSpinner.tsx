@@ -42,7 +42,7 @@ export function LoadingSpinner({
       data-tone={tone}
       className={cn(
         'inline-flex items-center justify-center align-middle text-current',
-        'motion-reduce:transition-none motion-reduce:animate-none',
+        'motion-reduce:transition-none',
         dimension,
         toneClass,
         className
@@ -58,6 +58,7 @@ export function LoadingSpinner({
         <span
           className={cn(
             'absolute inset-0 rounded-full border-2 border-current border-t-transparent',
+            // Inner span controls the reduced-motion spin timing (slower 1.2s vs normal 1s)
             'animate-spin motion-reduce:animate-[spin_1.2s_linear_infinite]',
             'will-change-transform'
           )}

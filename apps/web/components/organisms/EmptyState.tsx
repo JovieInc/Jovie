@@ -143,6 +143,7 @@ export function EmptyState({
           href={secondaryAction.href}
           target={secondaryAction.target}
           rel={secondaryAction.rel}
+          aria-label={secondaryAction.label}
           className={cn(
             'mt-4 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary',
             styles.secondary

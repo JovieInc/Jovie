@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { WrappedDSPButton, WrappedSocialLink } from './WrappedSocialLink';
 
 const meta: Meta<typeof WrappedSocialLink> = {
-  title: 'Atoms/WrappedSocialLink',
+  title: 'Molecules/WrappedSocialLink',
   component: WrappedSocialLink,
   tags: ['autodocs'],
   argTypes: {
@@ -19,13 +19,13 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     href: '/listen',
-    platform: 'Instagram',
+    platform: 'instagram',
   },
 };
 
 export const DSPButton: Story = {
   render: () => (
-    <WrappedDSPButton href='/music' platform='Spotify'>
+    <WrappedDSPButton href='/music' platform='spotify'>
       <span className='text-sm font-medium'>Listen on Spotify</span>
     </WrappedDSPButton>
   ),

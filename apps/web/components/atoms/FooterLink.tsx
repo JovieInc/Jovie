@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -14,10 +12,33 @@ export interface FooterLinkProps
 
 export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
   (
-    { href, tone = 'dark', className, children, external, prefetch, ...props },
+    {
+      href,
+      tone = 'dark',
+      className,
+      children,
+      external,
+      prefetch,
+      target: propsTarget,
+      rel: propsRel,
+      ...props
+    },
     ref
   ) => {
     const isExternal = external ?? /^https?:\/\//.test(href);
+
+    // Enforce security: external links must use _blank and noopener noreferrer
+    const resolvedTarget = isExternal ? '_blank' : propsTarget;
+    const resolvedRel = isExternal
+      ? Array.from(
+          new Set([
+            ...(propsRel ?? '').split(/\s+/).filter(Boolean),
+            'noopener',
+            'noreferrer',
+          ])
+        ).join(' ')
+      : propsRel;
+
     // Use semantic tokens for proper dark mode support
     const palette =
       tone === 'light'
@@ -39,8 +60,8 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
         href={href}
         prefetch={prefetch}
         className={linkClassName}
-        target={isExternal ? '_blank' : undefined}
-        rel={isExternal ? 'noopener noreferrer' : undefined}
+        target={resolvedTarget}
+        rel={resolvedRel}
         {...props}
       >
         <span className='inline-flex items-center gap-2'>{children}</span>
