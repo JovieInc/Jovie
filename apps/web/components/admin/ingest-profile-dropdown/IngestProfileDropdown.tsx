@@ -9,7 +9,6 @@ import {
   PopoverTrigger,
 } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { PLATFORM_OPTIONS } from './constants';
 import type { IngestProfileDropdownProps } from './types';
 import { useIngestProfile } from './useIngestProfile';
 
@@ -19,16 +18,11 @@ export function IngestProfileDropdown({
   const {
     open,
     setOpen,
-    username,
-    setUsername,
-    urlOverride,
-    setUrlOverride,
-    selectedPlatform,
-    setSelectedPlatform,
+    url,
+    setUrl,
     isLoading,
     isSuccess,
-    currentPlatform,
-    effectiveUrl,
+    detectedPlatform,
     handleSubmit,
   } = useIngestProfile({ onIngestPending });
 
@@ -48,7 +42,7 @@ export function IngestProfileDropdown({
                 Ingest profile
               </p>
               <p className='text-xs text-secondary-token'>
-                Import from external platform (auto-builds URL)
+                Paste any social profile URL
               </p>
             </div>
             <Badge
@@ -60,30 +54,6 @@ export function IngestProfileDropdown({
             </Badge>
           </div>
 
-          {/* Platform selector */}
-          <div className='flex gap-1'>
-            {PLATFORM_OPTIONS.map(platform => (
-              <button
-                key={platform.id}
-                type='button'
-                disabled={!platform.enabled}
-                onClick={() => setSelectedPlatform(platform.id)}
-                className={`
-                  px-3 py-1.5 text-xs font-medium rounded-full transition-colors
-                  ${
-                    selectedPlatform === platform.id
-                      ? 'bg-primary text-primary-foreground'
-                      : platform.enabled
-                        ? 'bg-surface-2 text-secondary-token hover:bg-surface-3'
-                        : 'bg-surface-2/50 text-tertiary-token cursor-not-allowed opacity-50'
-                  }
-                `}
-              >
-                {platform.label}
-              </button>
-            ))}
-          </div>
-
           <form onSubmit={handleSubmit} className='space-y-3'>
             {isSuccess && (
               <div className='rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-200'>
@@ -91,40 +61,29 @@ export function IngestProfileDropdown({
               </div>
             )}
 
-            <div className='space-y-1'>
+            <div className='space-y-2'>
               <Input
                 type='text'
-                placeholder='username'
-                value={username}
-                onChange={e => {
-                  setUsername(e.target.value);
-                  setUrlOverride(null);
-                }}
+                placeholder='https://instagram.com/username'
+                value={url}
+                onChange={e => setUrl(e.target.value)}
                 disabled={isLoading}
                 autoFocus
                 className='w-full'
               />
-              <p className='text-xs text-secondary-token'>
-                {currentPlatform?.label} URL:{' '}
-                <span className='font-sans'>{effectiveUrl || '—'}</span>
+              {detectedPlatform && (
+                <div className='flex items-center gap-2 text-xs text-secondary-token'>
+                  <div
+                    className='w-3 h-3 rounded-full'
+                    style={{ backgroundColor: `#${detectedPlatform.color}` }}
+                  />
+                  <span>Detected: {detectedPlatform.name}</span>
+                </div>
+              )}
+              <p className='text-xs text-tertiary-token'>
+                Supports Instagram, TikTok, Twitter/X, YouTube, Spotify,
+                Linktree, and 40+ more platforms
               </p>
-            </div>
-
-            <div className='space-y-1'>
-              {
-                // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with control via DOM structure
-                <label className='text-xs text-secondary-token'>
-                  Or paste full URL
-                </label>
-              }
-              <Input
-                type='url'
-                placeholder={currentPlatform?.placeholder}
-                value={urlOverride ?? ''}
-                onChange={e => setUrlOverride(e.target.value || null)}
-                disabled={isLoading}
-                className='w-full'
-              />
             </div>
 
             <div className='flex justify-end gap-2'>
@@ -141,7 +100,7 @@ export function IngestProfileDropdown({
                 type='submit'
                 size='sm'
                 variant='primary'
-                disabled={isLoading || !effectiveUrl}
+                disabled={isLoading || !url.trim()}
               >
                 {isLoading ? 'Ingesting...' : 'Ingest'}
               </Button>

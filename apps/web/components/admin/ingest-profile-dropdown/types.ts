@@ -1,16 +1,4 @@
-export type IngestPlatform =
-  | 'linktree'
-  | 'beacons'
-  | 'instagram'
-  | 'thematic_artist'
-  | 'thematic_creator';
-
-export interface PlatformOption {
-  id: IngestPlatform;
-  label: string;
-  placeholder: string;
-  enabled: boolean;
-}
+import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
 
 export interface IngestProfileDropdownProps {
   onIngestPending?: (profile: { id: string; username: string }) => void;
@@ -19,15 +7,10 @@ export interface IngestProfileDropdownProps {
 export interface UseIngestProfileReturn {
   open: boolean;
   setOpen: (open: boolean) => void;
-  username: string;
-  setUsername: (username: string) => void;
-  urlOverride: string | null;
-  setUrlOverride: (url: string | null) => void;
-  selectedPlatform: IngestPlatform;
-  setSelectedPlatform: (platform: IngestPlatform) => void;
+  url: string;
+  setUrl: (url: string) => void;
   isLoading: boolean;
   isSuccess: boolean;
-  currentPlatform: PlatformOption | undefined;
-  effectiveUrl: string;
+  detectedPlatform: PlatformInfo | null;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
 }

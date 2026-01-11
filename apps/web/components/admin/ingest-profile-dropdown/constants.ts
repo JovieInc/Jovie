@@ -1,42 +1,65 @@
-import type { IngestPlatform, PlatformOption } from './types';
+/**
+ * Platforms that support full profile extraction (avatar, name, links).
+ * These platforms have dedicated extraction strategies.
+ */
+export const FULL_EXTRACTION_PLATFORMS = ['linktree', 'laylo'] as const;
 
-export const PLATFORM_OPTIONS: PlatformOption[] = [
-  {
-    id: 'linktree',
-    label: 'Linktree',
-    placeholder: 'https://linktr.ee/username',
-    enabled: true,
-  },
-  {
-    id: 'thematic_artist',
-    label: 'Thematic Artist',
-    placeholder: 'https://app.hellothematic.com/artist/profile/123456',
-    enabled: true,
-  },
-  {
-    id: 'thematic_creator',
-    label: 'Thematic Creator',
-    placeholder: 'https://app.hellothematic.com/creator/profile/123456',
-    enabled: true,
-  },
-  {
-    id: 'beacons',
-    label: 'Beacons',
-    placeholder: 'https://beacons.ai/username',
-    enabled: false,
-  },
-  {
-    id: 'instagram',
-    label: 'Instagram',
-    placeholder: 'https://instagram.com/username',
-    enabled: false,
-  },
-];
+/**
+ * All social platforms supported for creator import.
+ * Any URL from these platforms can be used to create a creator profile.
+ */
+export const SUPPORTED_INGEST_PLATFORMS = [
+  // Link aggregators (full extraction)
+  'linktree',
+  'laylo',
+  'beacons',
+  // Social media
+  'instagram',
+  'twitter',
+  'x',
+  'tiktok',
+  'youtube',
+  'facebook',
+  'linkedin',
+  'snapchat',
+  'pinterest',
+  'reddit',
+  'threads',
+  // Creator platforms
+  'twitch',
+  'discord',
+  'patreon',
+  'onlyfans',
+  'substack',
+  'medium',
+  'github',
+  'behance',
+  'dribbble',
+  // Music platforms
+  'spotify',
+  'soundcloud',
+  'bandcamp',
+  'apple_music',
+  'youtube_music',
+  // Payment platforms
+  'venmo',
+  'paypal',
+  'cashapp',
+  'ko_fi',
+  'buymeacoffee',
+  // Messaging
+  'telegram',
+  'whatsapp',
+  // Other
+  'website',
+] as const;
 
-export const PLATFORM_PREFIX: Record<IngestPlatform, string> = {
-  linktree: 'https://linktr.ee/',
-  thematic_artist: 'https://app.hellothematic.com/artist/profile/',
-  thematic_creator: 'https://app.hellothematic.com/creator/profile/',
-  beacons: 'https://beacons.ai/',
-  instagram: 'https://instagram.com/',
-};
+export type SupportedIngestPlatform =
+  (typeof SUPPORTED_INGEST_PLATFORMS)[number];
+
+/**
+ * Check if a platform supports full profile extraction
+ */
+export function supportsFullExtraction(platformId: string): boolean {
+  return (FULL_EXTRACTION_PLATFORMS as readonly string[]).includes(platformId);
+}

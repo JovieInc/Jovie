@@ -21,6 +21,7 @@
 
 // Mutations
 export {
+  flushAllPendingViews,
   incrementProfileViews,
   publishProfile,
   updateProfileByClerkId,
@@ -37,6 +38,7 @@ export {
   getProfileWithLinks,
   getProfileWithUser,
   getTopProfilesForStaticGeneration,
+  invalidateProfileEdgeCache,
   isClaimTokenValid,
 } from './queries';
 // Types

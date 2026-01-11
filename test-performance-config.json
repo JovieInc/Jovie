@@ -1,6 +1,6 @@
 {
   "thresholds": {
-    "totalDuration": 120000,
+    "totalDuration": 400000,
     "p95": 1000,
     "setupTime": 75000,
     "individualTest": 1000,

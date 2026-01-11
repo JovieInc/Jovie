@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { cn } from '@/lib/utils';

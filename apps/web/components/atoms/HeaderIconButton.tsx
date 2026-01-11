@@ -30,8 +30,7 @@ export const HeaderIconButton = React.forwardRef<
   },
   ref
 ) {
-  const sizeClassName =
-    size === 'xs' ? 'h-8 w-8' : size === 'sm' ? 'h-9 w-9' : 'h-10 w-10';
+  const sizeClassName = size === 'xs' ? 'p-1' : size === 'sm' ? 'p-1.5' : 'p-2';
 
   return (
     <Button

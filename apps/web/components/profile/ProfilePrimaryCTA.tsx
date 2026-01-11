@@ -1,19 +1,40 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { CTAButton } from '@/components/ui/CTAButton';
+import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import {
   type ProfileNextAction,
   resolveProfileNextAction,
 } from '@/lib/profile-next-action';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+/**
+ * Read Spotify preference from client-side cookie.
+ * This avoids server-side cookie access which breaks static optimization.
+ */
+function useSpotifyPreferred(): boolean {
+  return useMemo(() => {
+    if (typeof document === 'undefined') return false;
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === AUDIENCE_SPOTIFY_PREFERRED_COOKIE) {
+        return value === '1';
+      }
+    }
+    return false;
+  }, []);
+}
+
 type ProfilePrimaryCTAProps = {
   artist: Artist;
   socialLinks: LegacySocialLink[];
-  spotifyPreferred: boolean;
+  /** @deprecated Use client-side cookie reading instead */
+  spotifyPreferred?: boolean;
   autoOpenCapture?: boolean;
   showCapture?: boolean;
 };
@@ -21,10 +42,13 @@ type ProfilePrimaryCTAProps = {
 export function ProfilePrimaryCTA({
   artist,
   socialLinks,
-  spotifyPreferred,
+  spotifyPreferred: spotifyPreferredProp,
   autoOpenCapture = true,
   showCapture = true,
 }: ProfilePrimaryCTAProps) {
+  // Read spotify preference from client-side cookie (or use prop as fallback)
+  const spotifyPreferredFromCookie = useSpotifyPreferred();
+  const spotifyPreferred = spotifyPreferredProp ?? spotifyPreferredFromCookie;
   const {
     state,
     hasStoredContacts,
