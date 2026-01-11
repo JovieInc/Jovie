@@ -17,10 +17,7 @@ export { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
-import {
-  PREVIEW_PANEL_WIDTH,
-  PreviewPanel,
-} from '@/components/dashboard/layout/PreviewPanel';
+import { PreviewPanel } from '@/components/dashboard/layout/PreviewPanel';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
@@ -219,7 +216,10 @@ export default function DashboardLayoutClient({
   }
 
   return (
-    <PreviewPanelProvider enabled={resolvedPreviewEnabled}>
+    <PreviewPanelProvider
+      enabled={resolvedPreviewEnabled}
+      defaultOpen={isProfileRoute}
+    >
       {layout}
     </PreviewPanelProvider>
   );
@@ -291,6 +291,7 @@ function DashboardLayoutInner({
   ) : null;
 
   const { state } = useSidebar();
+
   const SidebarExpandButton =
     !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
 
@@ -298,16 +299,7 @@ function DashboardLayoutInner({
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <SkipToContent />
       <DashboardSidebar />
-      <SidebarInset
-        className='flex flex-1 flex-col overflow-hidden bg-base transition-[margin-right] duration-300 ease-out'
-        style={{
-          marginRight: isContactTableRoute
-            ? (tableMeta.rightPanelWidth ?? 0)
-            : !previewOpen
-              ? 0
-              : PREVIEW_PANEL_WIDTH,
-        }}
-      >
+      <SidebarInset className='flex flex-1 flex-col overflow-hidden bg-base'>
         <main
           id='main-content'
           className='flex-1 min-h-0 overflow-hidden bg-base'
@@ -329,13 +321,14 @@ function DashboardLayoutInner({
                   showDivider={true}
                   action={<>{ContactToggleButton}</>}
                 />
-                <div className='flex-1 min-h-0 overflow-hidden'>
+                <div className='flex-1 min-h-0 overflow-hidden flex'>
                   <div
-                    className={
+                    className={cn(
+                      'flex-1 min-h-0 overflow-hidden',
                       showMobileTabs
                         ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
                         : undefined
-                    }
+                    )}
                   >
                     {children}
                   </div>
@@ -356,18 +349,22 @@ function DashboardLayoutInner({
                   breadcrumbs={crumbs}
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
-                  action={<>{showPreview ? <PreviewToggleButton /> : null}</>}
+                  action={
+                    <>{previewEnabled ? <PreviewToggleButton /> : null}</>
+                  }
                 />
-                <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
+                <div className='flex-1 min-h-0 overflow-hidden flex relative'>
                   <div
-                    className={
+                    className={cn(
+                      'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6',
                       showMobileTabs
                         ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
                         : undefined
-                    }
+                    )}
                   >
                     {children}
                   </div>
+                  {showPreview && <PreviewPanel />}
                 </div>
               </div>
             </div>
@@ -375,7 +372,6 @@ function DashboardLayoutInner({
         </main>
         {showMobileTabs ? <DashboardMobileTabs /> : null}
       </SidebarInset>
-      {showPreview && <PreviewPanel />}
     </div>
   );
 }

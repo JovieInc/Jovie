@@ -1,9 +1,15 @@
 'use client';
 
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TableEmptyState } from '@/components/admin/table';
+import { TableEmptyState, TableRow } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { WaitlistMobileCard } from '../WaitlistMobileCard';
 import type { WaitlistTableProps } from './types';
@@ -82,13 +88,28 @@ export function WaitlistTable({
   return (
     <div className='overflow-hidden'>
       {/* Custom toolbar - sticky at top */}
-      <div className='sticky top-0 z-30 flex h-12 sm:h-14 w-full items-center gap-3 px-3 sm:px-4 bg-surface-1/80 backdrop-blur border-b border-subtle'>
+      <div className='sticky top-0 z-30 flex h-12 sm:h-14 w-full items-center justify-between gap-3 px-3 sm:px-4 bg-surface-1/80 backdrop-blur border-b border-subtle'>
         <div className='text-xs text-secondary-token'>
           <span className='hidden sm:inline'>Showing </span>
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
           {total.toLocaleString()}
           <span className='hidden sm:inline'> entries</span>
         </div>
+
+        {/* Display button - top right */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant='ghost' size='sm' className='gap-2'>
+              <SlidersHorizontal className='h-4 w-4' />
+              Display
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <div className='px-2 py-1.5 text-sm text-secondary-token'>
+              Coming soon
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Desktop Table - hidden on mobile, virtualized for performance */}
@@ -130,17 +151,16 @@ export function WaitlistTable({
               rowVirtualizer.getVirtualItems().map(virtualRow => {
                 const row = rows[virtualRow.index];
                 return (
-                  <tr
+                  <TableRow
                     key={row.id}
-                    ref={rowVirtualizer.measureElement}
-                    data-index={virtualRow.index}
-                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2/50 transition-colors'
+                    rowRef={rowVirtualizer.measureElement}
+                    dataIndex={virtualRow.index}
+                    virtualRow={virtualRow}
                     style={{
                       position: 'absolute',
                       top: 0,
                       left: 0,
                       width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
                     {columns.map(column => (
@@ -151,7 +171,7 @@ export function WaitlistTable({
                         {column.cell(row, virtualRow.index)}
                       </td>
                     ))}
-                  </tr>
+                  </TableRow>
                 );
               })
             )}

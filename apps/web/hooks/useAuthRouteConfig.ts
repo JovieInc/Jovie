@@ -116,8 +116,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const drawerWidth = showDrawer ? 360 : null;
   const drawerContent = null; // Controlled by individual pages
 
-  // Header action (TODO: Add theme toggle for admin, contact toggle for tables)
-  const headerAction = null; // TODO: Will be populated in Phase 2
+  // Header action will be determined by AuthShellWrapper based on route type
+  const headerAction = null;
 
   return {
     section,

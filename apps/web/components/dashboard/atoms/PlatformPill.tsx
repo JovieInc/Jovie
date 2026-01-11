@@ -171,9 +171,9 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'border-[var(--pill-border)] hover:border-[var(--pill-border-hover)]',
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
-          'transform-gpu transition-all hover:bg-surface-2 dark:hover:bg-surface-2/60 hover:-translate-y-px hover:shadow-sm hover:shadow-black/10 dark:hover:shadow-black/40',
+          'transition-colors hover:bg-surface-2 dark:hover:bg-surface-2/60',
           isInteractive
-            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.98] active:bg-surface-2'
+            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-surface-2'
             : 'cursor-default',
           tone === 'faded' &&
             'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',

@@ -29,8 +29,13 @@ export function IngestProfileDropdown({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type='button' size='sm' variant='secondary'>
-          <Icon name='Plus' className='h-4 w-4 mr-2' />
+        <Button
+          type='button'
+          size='sm'
+          variant='outline'
+          className='gap-2 rounded-lg hover:bg-base'
+        >
+          <Icon name='Plus' className='h-4 w-4' />
           Ingest Profile
         </Button>
       </PopoverTrigger>

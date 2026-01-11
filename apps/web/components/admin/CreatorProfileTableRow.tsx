@@ -1,13 +1,35 @@
 'use client';
 
-import { Badge, Checkbox } from '@jovie/ui';
-import { Star } from 'lucide-react';
+import {
+  Checkbox,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@jovie/ui';
 import Link from 'next/link';
+import { useCallback, useState } from 'react';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
-import { VerificationStatusToggle } from '@/components/admin/VerificationStatusToggle';
+import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-menu/CreatorActionsMenuContent';
+import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
+import { TableRowActions } from '@/components/admin/table/TableRowActions';
+import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import {
+  extractUsernameFromLabel,
+  extractUsernameFromUrl,
+  formatUsername,
+} from '@/components/organisms/contact-sidebar/utils';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import {
+  geistTableMenuContentClass,
+  geistTableMenuDestructiveItemClass,
+  geistTableMenuItemClass,
+  geistTableMenuSeparatorClass,
+} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 export interface CreatorProfileTableRowProps {
   profile: AdminCreatorProfileRow;
@@ -53,26 +75,40 @@ export function CreatorProfileTableRow({
   const displayName =
     'displayName' in profile ? (profile.displayName ?? null) : null;
 
-  return (
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const handleCopyClaimLink = useCallback(async () => {
+    if (!profile.claimToken) return;
+
+    const baseUrl = getBaseUrl();
+    const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
+    const success = await copyTextToClipboard(claimUrl);
+
+    if (success) {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  }, [profile.claimToken]);
+
+  const rowContent = (
     <tr
       className={cn(
         'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-        isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
+        isChecked
+          ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+          : isSelected
+            ? 'bg-base dark:bg-surface-2'
+            : 'hover:bg-base dark:hover:bg-surface-2'
       )}
       onClick={() => onRowClick(profile.id)}
-      onContextMenu={event => {
-        event.preventDefault();
-        event.stopPropagation();
-        onContextMenu(profile.id);
-      }}
       aria-selected={isSelected}
     >
-      <td className='w-14 px-4 py-3 text-center align-middle'>
+      <td className='w-14 px-4 py-3 align-middle'>
         {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
         <div
-          className='relative flex h-7 w-7 items-center justify-center'
+          className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
         >
           <span
@@ -94,13 +130,18 @@ export function CreatorProfileTableRow({
               aria-label={`Select ${profile.username}`}
               checked={isChecked}
               onCheckedChange={() => onToggleSelect(profile.id)}
-              className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+              className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
             />
           </div>
         </div>
       </td>
       <td
-        className={cn('px-4 py-3 align-middle', isSelected && 'bg-surface-2')}
+        className={cn(
+          'px-4 py-3 align-middle',
+          isChecked
+            ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+            : isSelected && 'bg-base dark:bg-surface-2'
+        )}
       >
         <div className='flex items-center gap-3'>
           <CreatorAvatarCell
@@ -129,6 +170,34 @@ export function CreatorProfileTableRow({
           </div>
         </div>
       </td>
+      <td className='px-4 py-3 align-middle hidden lg:table-cell'>
+        <div className='flex gap-1.5 overflow-hidden'>
+          {profile.socialLinks && profile.socialLinks.length > 0 ? (
+            profile.socialLinks.slice(0, 3).map(link => {
+              const username =
+                extractUsernameFromUrl(link.url) ??
+                extractUsernameFromLabel(link.displayText ?? '') ??
+                '';
+              const displayUsername = formatUsername(username);
+
+              return (
+                <PlatformPill
+                  key={link.id}
+                  platformIcon={link.platformType}
+                  platformName={link.platform}
+                  primaryText={displayUsername || link.platformType}
+                  onClick={() => {
+                    window.open(link.url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className='shrink-0'
+                />
+              );
+            })
+          ) : (
+            <span className='text-xs text-tertiary-token'>—</span>
+          )}
+        </div>
+      </td>
       <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
         {profile.createdAt
           ? new Intl.DateTimeFormat('en-US', {
@@ -138,60 +207,109 @@ export function CreatorProfileTableRow({
             }).format(profile.createdAt)
           : '—'}
       </td>
-      <td className='px-4 py-3 text-center align-middle text-xs whitespace-nowrap hidden md:table-cell'>
-        <Badge size='sm' variant={profile.isClaimed ? 'success' : 'secondary'}>
-          {profile.isClaimed ? (
-            <>
-              <Star className='h-3 w-3 fill-current' aria-hidden='true' />
-              <span>Claimed</span>
-            </>
-          ) : (
-            <span>Unclaimed</span>
-          )}
-        </Badge>
-      </td>
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-      <td
-        className='px-4 py-3 text-center align-middle text-xs whitespace-nowrap'
-        onClick={e => e.stopPropagation()}
-      >
-        <VerificationStatusToggle
-          isVerified={profile.isVerified}
-          status={verificationStatus}
-          onToggle={onToggleVerification}
-        />
-      </td>
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       <td
         className='px-4 py-3 align-middle text-right'
         onClick={e => e.stopPropagation()}
       >
-        <div
-          className={cn(
-            'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-            isMenuOpen && 'opacity-100 pointer-events-auto'
-          )}
-        >
-          <CreatorActionsMenu
-            profile={profile}
-            isMobile={isMobile}
-            status={verificationStatus}
-            refreshIngestStatus={refreshIngestStatus}
-            open={isMenuOpen}
-            onOpenChange={onMenuOpenChange}
-            onRefreshIngest={async () => {
-              await onRefreshIngest();
-            }}
-            onToggleVerification={onToggleVerification}
-            onToggleFeatured={onToggleFeatured}
-            onToggleMarketing={onToggleMarketing}
-            onSendInvite={onSendInvite}
-            onDelete={onDelete}
-          />
+        <div className='flex items-center justify-end gap-2'>
+          {/* Icon action buttons - always visible on hover */}
+          <div
+            className={cn(
+              'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+              isMenuOpen && 'opacity-100 pointer-events-auto'
+            )}
+          >
+            <TableRowActions
+              isVerified={profile.isVerified}
+              isClaimed={profile.isClaimed}
+              verificationStatus={verificationStatus}
+              refreshIngestStatus={refreshIngestStatus}
+              onToggleVerification={onToggleVerification}
+              onRefreshIngest={onRefreshIngest}
+            />
+          </div>
+          {/* Overflow menu - always visible on hover */}
+          <div
+            className={cn(
+              'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+              isMenuOpen && 'opacity-100 pointer-events-auto'
+            )}
+          >
+            <CreatorActionsMenu
+              profile={profile}
+              isMobile={isMobile}
+              status={verificationStatus}
+              refreshIngestStatus={refreshIngestStatus}
+              open={isMenuOpen}
+              onOpenChange={onMenuOpenChange}
+              onRefreshIngest={async () => {
+                await onRefreshIngest();
+              }}
+              onToggleVerification={onToggleVerification}
+              onToggleFeatured={onToggleFeatured}
+              onToggleMarketing={onToggleMarketing}
+              onSendInvite={onSendInvite}
+              onDelete={onDelete}
+            />
+          </div>
         </div>
       </td>
     </tr>
+  );
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+      <ContextMenuContent className={geistTableMenuContentClass}>
+        <CreatorActionsMenuContent
+          profile={profile}
+          status={verificationStatus}
+          refreshIngestStatus={refreshIngestStatus}
+          onToggleVerification={onToggleVerification}
+          onToggleFeatured={onToggleFeatured}
+          onToggleMarketing={onToggleMarketing}
+          onRefreshIngest={async () => {
+            await onRefreshIngest();
+          }}
+          onSendInvite={onSendInvite}
+          onDelete={onDelete}
+          copySuccess={copySuccess}
+          onCopyClaimLink={handleCopyClaimLink}
+          renderItem={({ onClick, href, disabled, destructive, children }) => {
+            if (href) {
+              return (
+                <ContextMenuItem asChild className={geistTableMenuItemClass}>
+                  <Link
+                    href={href}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {children}
+                  </Link>
+                </ContextMenuItem>
+              );
+            }
+            return (
+              <ContextMenuItem
+                onClick={onClick}
+                disabled={disabled}
+                className={cn(
+                  geistTableMenuItemClass,
+                  destructive && geistTableMenuDestructiveItemClass
+                )}
+              >
+                {children}
+              </ContextMenuItem>
+            );
+          }}
+          renderSeparator={() => (
+            <ContextMenuSeparator className={geistTableMenuSeparatorClass} />
+          )}
+        />
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

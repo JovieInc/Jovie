@@ -28,15 +28,15 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       onKeyDown={onKeyDown}
       className={cn(
-        'absolute top-0 right-0 z-40 h-full flex flex-col',
-        'bg-surface-2 border-l border-subtle shadow-xl',
-        'transition-[transform,opacity,width] duration-300 ease-out',
+        'shrink-0 h-full flex flex-col',
+        'bg-surface-1 border-l border-subtle',
+        'transition-[width,opacity] duration-300 ease-out',
         isOpen
-          ? 'translate-x-0 opacity-100 visible'
-          : 'translate-x-full opacity-0 pointer-events-none invisible',
+          ? 'opacity-100 visible'
+          : 'opacity-0 pointer-events-none invisible w-0 border-l-0',
         className
       )}
-      style={{ width }}
+      style={{ width: isOpen ? width : 0 }}
     >
       {children}
     </aside>
