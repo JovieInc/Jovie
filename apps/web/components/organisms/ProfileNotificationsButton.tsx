@@ -1,7 +1,8 @@
 'use client';
 
+import { Bell } from 'lucide-react';
 import React from 'react';
-import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 
 type ProfileNotificationsButtonProps = {
@@ -22,11 +23,11 @@ export function ProfileNotificationsButton({
   const isEditing = notificationsState === 'editing';
 
   return (
-    <HeaderIconButton
+    <CircleIconButton
       ref={buttonRef}
       size='xs'
-      variant='ghost'
-      className='relative border border-border bg-card/80 text-foreground shadow-sm backdrop-blur'
+      variant='frosted'
+      className='relative'
       aria-expanded={ariaExpanded}
       ariaLabel={
         hasActiveSubscriptions
@@ -36,26 +37,13 @@ export function ProfileNotificationsButton({
       aria-pressed={isEditing}
       onClick={onClick}
     >
-      <svg
-        className='h-4 w-4 text-foreground'
-        fill='none'
-        stroke='currentColor'
-        viewBox='0 0 24 24'
-        aria-hidden='true'
-      >
-        <path
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          strokeWidth={2}
-          d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
-        />
-      </svg>
+      <Bell className='h-4 w-4 text-primary-token' aria-hidden='true' />
       {hasActiveSubscriptions ? (
         <span
           aria-hidden
           className='absolute -right-1 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary'
         />
       ) : null}
-    </HeaderIconButton>
+    </CircleIconButton>
   );
 }

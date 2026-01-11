@@ -50,11 +50,10 @@ export function UserButton({
   // Handle loading state
   if (!isLoaded || !user) {
     return showUserInfo ? (
-      <div className='flex w-full items-center gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2'>
-        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
+      <div className='flex w-full items-center gap-2.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5'>
+        <div className='h-6 w-6 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
         <div className='flex-1 space-y-1'>
-          <div className='h-4 w-24 rounded-sm bg-surface-2 animate-pulse motion-reduce:animate-none' />
-          <div className='h-3 w-16 rounded-sm bg-surface-2/80 animate-pulse motion-reduce:animate-none' />
+          <div className='h-3 w-20 rounded-sm bg-surface-2 animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (
@@ -67,24 +66,23 @@ export function UserButton({
     return (
       <Button
         variant='ghost'
-        size={showUserInfo ? 'default' : 'icon'}
+        size={showUserInfo ? 'sm' : 'icon'}
         className={cn(
-          'w-full justify-start gap-3 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2',
+          'w-full justify-start gap-2.5 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 px-2.5 py-1.5 h-auto',
           !showUserInfo && 'h-10 w-10 justify-center'
         )}
         onClick={() => {
           router.push('/signin');
         }}
       >
-        <Avatar
-          name='User'
-          alt='User avatar'
-          size={showUserInfo ? 'sm' : 'xs'}
-        />
+        <Avatar name='User' alt='User avatar' size='xs' />
         {showUserInfo && (
           <div className='flex flex-1 items-center justify-between'>
-            <span className='text-sm font-medium'>Sign in</span>
-            <Icon name='ChevronRight' className='h-4 w-4 text-tertiary-token' />
+            <span className='text-xs font-medium'>Sign in</span>
+            <Icon
+              name='ChevronRight'
+              className='h-3.5 w-3.5 text-tertiary-token'
+            />
           </div>
         )}
       </Button>
@@ -98,7 +96,7 @@ export function UserButton({
           <button
             type='button'
             className={cn(
-              'flex w-full items-center gap-3 rounded-md border border-sidebar-border bg-sidebar-surface px-3 py-2 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
+              'flex w-full items-center gap-2.5 rounded-md border border-sidebar-border bg-sidebar-surface px-2.5 py-1.5 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
             )}
             onClick={() => setIsMenuOpen(true)}
           >
@@ -106,17 +104,17 @@ export function UserButton({
               src={userImageUrl}
               alt={displayName || 'User avatar'}
               name={displayName || userInitials}
-              size='sm'
+              size='xs'
               className='shrink-0'
             />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2 truncate'>
-                <p className='text-sm font-medium truncate'>{displayName}</p>
+                <p className='text-xs font-medium truncate'>{displayName}</p>
               </div>
             </div>
             <Icon
               name='ChevronRight'
-              className='w-4 h-4 text-tertiary-token'
+              className='w-3.5 h-3.5 text-tertiary-token'
               aria-hidden='true'
             />
           </button>

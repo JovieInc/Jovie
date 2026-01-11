@@ -64,7 +64,56 @@ const SKIP_HOSTS = new Set([
 const BEACONS_HANDLE_REGEX =
   /^[a-z0-9][a-z0-9_.]{0,28}[a-z0-9]$|^[a-z0-9]{1,2}$/;
 
+/**
+ * Patterns that indicate free tier Beacons branding.
+ * Paid tier profiles have this branding removed.
+ */
+const BEACONS_BRANDING_PATTERNS = [
+  // Text branding patterns
+  /made\s+with\s+beacons/i,
+  /powered\s+by\s+beacons/i,
+  /create\s+your\s+(own\s+)?beacons/i,
+  /get\s+your\s+(own\s+)?beacons/i,
+  /join\s+beacons/i,
+  /try\s+beacons/i,
+  // Footer link to Beacons home
+  /href\s*=\s*["']https?:\/\/(www\.)?beacons\.ai\/?["']/i,
+  // Beacons logo patterns (aria-label or alt text)
+  /aria-label\s*=\s*["']beacons\s*(logo)?["']/i,
+  /alt\s*=\s*["']beacons\s*(logo)?["']/i,
+  // Beacons branding in class names
+  /class\s*=\s*["'][^"]*beacons[-_]?branding[^"]*["']/i,
+];
+
 type StructuredLink = { url?: string | null; title?: string | null };
+
+/**
+ * Detect if a Beacons profile is on a paid tier by checking for branding.
+ * Free tier profiles display "Made with Beacons" or similar branding.
+ * Paid tier profiles have this removed.
+ *
+ * @param html - The HTML content of the Beacons page
+ * @returns true if paid tier (no branding), false if free tier (has branding), null if uncertain
+ */
+export function detectBeaconsPaidTier(html: string): boolean | null {
+  // Check the footer section specifically (last ~5000 chars) for efficiency
+  const footerSection = html.slice(-5000);
+
+  for (const pattern of BEACONS_BRANDING_PATTERNS) {
+    if (pattern.test(footerSection) || pattern.test(html)) {
+      // Found branding = free tier
+      return false;
+    }
+  }
+
+  // No branding found = likely paid tier
+  // But only say "paid" if we found links (indicating a real profile)
+  if (html.includes('href=')) {
+    return true;
+  }
+
+  return null;
+}
 
 // ============================================================================
 // Public API
@@ -328,7 +377,10 @@ export function extractBeacons(html: string): ExtractionResult {
     }
   }
 
-  return createExtractionResult(links, displayName, avatarUrl);
+  // Detect paid tier by checking for branding
+  const hasPaidTier = detectBeaconsPaidTier(html);
+
+  return createExtractionResult(links, displayName, avatarUrl, hasPaidTier);
 }
 
 // ============================================================================

@@ -6,9 +6,10 @@
  * Header section of the contact sidebar with action buttons
  */
 
-import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { Copy, ExternalLink, IdCard, RefreshCw, X } from 'lucide-react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { Contact } from './types';
 
@@ -27,7 +28,18 @@ export function ContactSidebarHeader({
   onRefresh,
   onCopyProfileUrl,
 }: ContactSidebarHeaderProps) {
+  const notifications = useNotifications();
   const showActions = hasContact && contact?.username;
+
+  const handleCopyClerkId = async () => {
+    if (!contact?.clerkId) return;
+    try {
+      await navigator.clipboard.writeText(contact.clerkId);
+      notifications.success('Clerk ID copied');
+    } catch {
+      notifications.error('Failed to copy');
+    }
+  };
 
   // Define actions based on plan:
   // Primary: Close + Copy
@@ -79,9 +91,22 @@ export function ContactSidebarHeader({
 
   return (
     <div className='flex items-center justify-between px-3 py-2'>
-      <p className='text-xs text-sidebar-muted'>
-        {hasContact ? `ID: ${contact?.id}` : 'No contact selected'}
-      </p>
+      <div className='flex items-center gap-1'>
+        <p className='text-xs text-sidebar-muted'>
+          {hasContact ? 'Contact' : 'No contact selected'}
+        </p>
+        {hasContact && contact?.clerkId && (
+          <button
+            type='button'
+            onClick={handleCopyClerkId}
+            className='inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors'
+            aria-label='Copy Clerk ID'
+          >
+            <IdCard className='h-3 w-3' />
+            <span>Copy ID</span>
+          </button>
+        )}
+      </div>
       <DrawerHeaderActions
         primaryActions={primaryActions}
         overflowActions={overflowActions}

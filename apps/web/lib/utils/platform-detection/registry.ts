@@ -132,6 +132,7 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   beacons: createPlatformInfo('beacons', 'https://beacons.ai/username'),
   linkfire: createPlatformInfo('linkfire', 'https://lnk.to/...'),
   toneden: createPlatformInfo('toneden', 'https://toneden.io/...'),
+  featurefm: createPlatformInfo('featurefm', 'https://ffm.to/...'),
 
   // Payment/Tip Platforms
   venmo: createPlatformInfo('venmo', 'https://venmo.com/username'),
@@ -273,6 +274,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
   { pattern: /(?:www\.)?lnk\.to|linkfire\.com/i, platformId: 'linkfire' },
   { pattern: /(?:www\.)?toneden\.io/i, platformId: 'toneden' },
+  { pattern: /(?:www\.)?ffm\.to|feature\.fm/i, platformId: 'featurefm' },
   { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
 
   // Detection-only platforms

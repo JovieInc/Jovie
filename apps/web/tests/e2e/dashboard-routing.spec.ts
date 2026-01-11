@@ -71,8 +71,8 @@ test.describe('Dashboard Routing', () => {
     await page.getByText('Earnings').click();
     await expect(page).toHaveURL('/app/dashboard/earnings');
 
-    // Navigate back to overview
-    await page.getByText('Overview').click();
+    // Navigate back to dashboard
+    await page.getByText('Dashboard').click();
     await expect(page).toHaveURL('/app/dashboard');
     await expect(page.getByText('Dashboard')).toBeVisible();
   });

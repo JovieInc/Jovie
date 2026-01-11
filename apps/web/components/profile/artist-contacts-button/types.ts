@@ -12,7 +12,6 @@ export interface UseArtistContactsReturn {
   setOpen: (open: boolean) => void;
   available: PublicContact[];
   singleContact: boolean;
-  triggerClass: string;
   performAction: (
     channel: PublicContactChannel,
     contact: PublicContact

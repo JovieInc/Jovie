@@ -86,6 +86,7 @@ export function ContactSidebar({
               avatarUrl={contact.avatarUrl ?? null}
               fullName={fullName}
               username={contact.username}
+              isVerified={contact.isVerified}
               canUploadAvatar={canUploadAvatar}
               onAvatarUpload={canUploadAvatar ? handleAvatarUpload : undefined}
             />

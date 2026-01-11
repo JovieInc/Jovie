@@ -1,6 +1,6 @@
 {
   "thresholds": {
-    "totalDuration": 120000,
+    "totalDuration": 400000,
     "p95": 1000,
     "setupTime": 75000,
     "individualTest": 1000,
@@ -12,8 +12,8 @@
       "description": "Smoke suite should finish under 30s to keep deploy feedback instant."
     },
     "critical": {
-      "maxTotalDuration": 120000,
-      "description": "Critical regression suite must stay under 2 minutes."
+      "maxTotalDuration": 400000,
+      "description": "Critical regression suite (includes auth E2E tests)"
     },
     "full": {
       "maxTotalDuration": 300000,

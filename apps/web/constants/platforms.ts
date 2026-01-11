@@ -464,6 +464,13 @@ export const ALL_PLATFORMS = [
     icon: 'link',
     color: '00C7AE',
   },
+  {
+    id: 'featurefm',
+    name: 'Feature.fm',
+    category: 'link_aggregators',
+    icon: 'link',
+    color: 'FF6B35',
+  },
 
   // ========================================
   // Payment/Tip Platforms

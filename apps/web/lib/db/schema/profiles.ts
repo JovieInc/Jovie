@@ -24,6 +24,35 @@ import {
 } from './enums';
 import { waitlistEntries } from './waitlist';
 
+/**
+ * Fit score breakdown for GTM prioritization.
+ * Each field stores the points awarded for that criterion.
+ */
+export interface FitScoreBreakdown {
+  /** Uses a link-in-bio product (Linktree, Beacons, etc.) - max 15 points */
+  usesLinkInBio: number;
+  /** Paid tier on link-in-bio (no branding visible) - max 20 points */
+  paidTier: number;
+  /** Uses music-specific tools (Linkfire, Feature.fm, ToneDen, Laylo) - max 10 points */
+  usesMusicTools: number;
+  /** Has a Spotify profile linked - max 15 points */
+  hasSpotify: number;
+  /** Spotify popularity score mapped to 0-15 points */
+  spotifyPopularity: number;
+  /** Release recency: last 6mo = 10, last year = 5, older = 0 */
+  releaseRecency: number;
+  /** Target genre match (electronic/DJ) - max 5 points */
+  genreMatch: number;
+  /** Metadata about the scoring */
+  meta?: {
+    calculatedAt: string;
+    version: number;
+    musicToolsDetected?: string[];
+    matchedGenres?: string[];
+    latestReleaseDate?: string;
+  };
+}
+
 // Creator profiles table
 export const creatorProfiles = pgTable(
   'creator_profiles',
@@ -72,6 +101,16 @@ export const creatorProfiles = pgTable(
     onboardingCompletedAt: timestamp('onboarding_completed_at'),
     settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
     theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
+    // Fit scoring for GTM prioritization
+    fitScore: integer('fit_score'),
+    fitScoreBreakdown: jsonb('fit_score_breakdown').$type<FitScoreBreakdown>(),
+    fitScoreUpdatedAt: timestamp('fit_score_updated_at'),
+    // Spotify enrichment data
+    genres: text('genres').array(),
+    spotifyFollowers: integer('spotify_followers'),
+    spotifyPopularity: integer('spotify_popularity'),
+    // Ingestion source tracking for fit scoring
+    ingestionSourcePlatform: text('ingestion_source_platform'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -96,6 +135,10 @@ export const creatorProfiles = pgTable(
     )
       .on(table.userId)
       .where(drizzleSql`is_claimed = true`),
+    // Index for GTM prioritization - sort unclaimed profiles by fit score
+    fitScoreUnclaimedIndex: index('idx_creator_profiles_fit_score_unclaimed')
+      .on(table.fitScore, table.isClaimed, table.createdAt)
+      .where(drizzleSql`is_claimed = false AND fit_score IS NOT NULL`),
   })
 );
 
