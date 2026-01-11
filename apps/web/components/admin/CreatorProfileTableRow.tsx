@@ -68,12 +68,12 @@ export function CreatorProfileTableRow({
       }}
       aria-selected={isSelected}
     >
-      <td className='w-14 px-4 py-3 text-center align-middle'>
+      <td className='w-14 px-4 py-3 align-middle'>
         {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
         <div
-          className='relative flex h-7 w-7 items-center justify-center'
+          className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
         >
           <span
@@ -95,7 +95,7 @@ export function CreatorProfileTableRow({
               aria-label={`Select ${profile.username}`}
               checked={isChecked}
               onCheckedChange={() => onToggleSelect(profile.id)}
-              className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+              className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
             />
           </div>
         </div>
