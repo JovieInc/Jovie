@@ -74,13 +74,13 @@ export function AdminTableShell({
         ) : null}
 
         {children({ headerElevated, stickyTopPx })}
-
-        {footer ? (
-          <div className='sticky bottom-0 z-20 border-t border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
-            {footer}
-          </div>
-        ) : null}
       </div>
+
+      {footer ? (
+        <div className='border-t border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }
