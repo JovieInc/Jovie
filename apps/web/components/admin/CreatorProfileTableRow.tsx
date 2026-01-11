@@ -15,6 +15,7 @@ import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
 import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-menu/CreatorActionsMenuContent';
 import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
+import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   geistTableMenuContentClass,
@@ -162,6 +163,27 @@ export function CreatorProfileTableRow({
               @{profile.username}
             </Link>
           </div>
+        </div>
+      </td>
+      <td className='px-4 py-3 align-middle hidden lg:table-cell'>
+        <div className='flex flex-wrap gap-1.5 max-w-[240px] line-clamp-1'>
+          {profile.socialLinks && profile.socialLinks.length > 0 ? (
+            profile.socialLinks.slice(0, 3).map(link => (
+              <PlatformPill
+                key={link.id}
+                platformIcon={link.platformType}
+                platformName={link.platform}
+                primaryText={link.platformType}
+                tone='faded'
+                onClick={() => {
+                  window.open(link.url, '_blank', 'noopener,noreferrer');
+                }}
+                className='text-[11px]'
+              />
+            ))
+          ) : (
+            <span className='text-xs text-tertiary-token'>—</span>
+          )}
         </div>
       </td>
       <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>

@@ -88,6 +88,14 @@ export function AdminCreatorsTableHeader({
           </div>
         </th>
         <th
+          className={cn(headerCellClass, 'hidden lg:table-cell')}
+          style={{ top: stickyTopPx }}
+        >
+          <span className='text-xs uppercase tracking-wide text-tertiary-token'>
+            Social
+          </span>
+        </th>
+        <th
           className={cn(
             headerCellClass,
             'cursor-pointer select-none hidden md:table-cell'

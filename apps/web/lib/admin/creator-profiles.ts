@@ -35,6 +35,12 @@ export interface AdminCreatorProfileRow {
   confidence?: number | null;
   ingestionStatus: 'idle' | 'pending' | 'processing' | 'failed';
   lastIngestionError: string | null;
+  socialLinks?: Array<{
+    id: string;
+    platform: string;
+    platformType: string;
+    url: string;
+  }>;
 }
 
 export type AdminCreatorProfilesSort =
@@ -200,16 +206,34 @@ export async function getAdminCreatorProfiles(
 
     const profileIds = pageRows.map(row => row.id);
     const confidenceMap = new Map<string, number>();
+    const socialLinksMap = new Map<
+      string,
+      Array<{ id: string; platform: string; platformType: string; url: string }>
+    >();
 
     if (profileIds.length > 0) {
-      const confidenceRows = await db
-        .select({
-          creatorProfileId: socialLinks.creatorProfileId,
-          averageConfidence: drizzleSql`AVG(${socialLinks.confidence})`,
-        })
-        .from(socialLinks)
-        .where(inArray(socialLinks.creatorProfileId, profileIds))
-        .groupBy(socialLinks.creatorProfileId);
+      const [confidenceRows, socialLinksRows] = await Promise.all([
+        // Fetch confidence scores
+        db
+          .select({
+            creatorProfileId: socialLinks.creatorProfileId,
+            averageConfidence: drizzleSql`AVG(${socialLinks.confidence})`,
+          })
+          .from(socialLinks)
+          .where(inArray(socialLinks.creatorProfileId, profileIds))
+          .groupBy(socialLinks.creatorProfileId),
+        // Fetch social links
+        db
+          .select({
+            id: socialLinks.id,
+            creatorProfileId: socialLinks.creatorProfileId,
+            platform: socialLinks.platform,
+            platformType: socialLinks.platformType,
+            url: socialLinks.url,
+          })
+          .from(socialLinks)
+          .where(inArray(socialLinks.creatorProfileId, profileIds)),
+      ]);
 
       for (const row of confidenceRows) {
         const rawValue = row.averageConfidence;
@@ -224,6 +248,18 @@ export async function getAdminCreatorProfiles(
           const clamped = Math.min(1, Math.max(0, parsedValue));
           confidenceMap.set(row.creatorProfileId, clamped);
         }
+      }
+
+      // Group social links by creator profile ID
+      for (const link of socialLinksRows) {
+        const existing = socialLinksMap.get(link.creatorProfileId) ?? [];
+        existing.push({
+          id: link.id,
+          platform: link.platform,
+          platformType: link.platformType,
+          url: link.url,
+        });
+        socialLinksMap.set(link.creatorProfileId, existing);
       }
     }
 
@@ -248,6 +284,7 @@ export async function getAdminCreatorProfiles(
         confidence: confidenceMap.get(row.id) ?? null,
         ingestionStatus: row.ingestionStatus ?? 'idle',
         lastIngestionError: row.lastIngestionError ?? null,
+        socialLinks: socialLinksMap.get(row.id) ?? [],
       })),
       page,
       pageSize,
