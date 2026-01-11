@@ -72,10 +72,10 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
 
     const TRIGGER_ZONE = 20; // pixels from left edge
     const SIDEBAR_WIDTH = 250; // keep visible while over sidebar
-    let hideTimeout: NodeJS.Timeout;
+    let hideTimeout: ReturnType<typeof setTimeout> | undefined;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (hideTimeout) clearTimeout(hideTimeout);
+      if (hideTimeout !== undefined) clearTimeout(hideTimeout);
 
       // Show when near left edge
       if (e.clientX <= TRIGGER_ZONE) {
@@ -90,7 +90,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
     document.addEventListener('mousemove', handleMouseMove);
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      if (hideTimeout) clearTimeout(hideTimeout);
+      if (hideTimeout !== undefined) clearTimeout(hideTimeout);
     };
   }, [isCollapsed, isMobile]);
 

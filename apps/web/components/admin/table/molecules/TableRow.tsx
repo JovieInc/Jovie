@@ -3,7 +3,9 @@ import { cn } from '@/lib/utils';
 
 export interface TableRowProps {
   children: React.ReactNode;
+  /** Whether the row is in a selected state (e.g., single-row focus/navigation). Only one row can be selected at a time. */
   selected?: boolean;
+  /** Whether the row is checked (e.g., multi-select checkbox). Multiple rows can be checked simultaneously. */
   checked?: boolean;
   onClick?: () => void;
   virtualRow?: { start: number }; // For virtualization positioning

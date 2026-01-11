@@ -77,9 +77,14 @@ export function TableRowActions({
         )}
         onClick={async e => {
           e.stopPropagation();
-          await onToggleVerification();
+          try {
+            await onToggleVerification();
+          } catch {
+            // Parent should set verificationStatus='error'; avoid unhandled rejection
+          }
         }}
         disabled={isVerificationLoading}
+        aria-pressed={isVerified}
         aria-label={
           isVerified
             ? 'Verified - click to unverify'
