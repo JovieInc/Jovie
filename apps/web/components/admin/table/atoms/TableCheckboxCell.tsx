@@ -58,7 +58,6 @@ export function TableCheckboxCell({
             checked={checked}
             onCheckedChange={value => onChange(value === true)}
             aria-label={ariaLabel}
-            // @ts-expect-error - indeterminate is supported but not in types
             indeterminate={indeterminate}
           />
         </div>
