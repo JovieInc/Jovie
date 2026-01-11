@@ -493,8 +493,13 @@ describe('gate.ts', () => {
       const { getWaitlistAccess } = await import('@/lib/auth/gate');
       await getWaitlistAccess('  TEST@EXAMPLE.COM  ');
 
-      // The where clause should be called (we can't easily inspect the SQL)
+      // Verify the where clause was called with normalized email
       expect(whereMock).toHaveBeenCalled();
+      const callArgs = whereMock.mock.calls[0][0];
+      // Email should be trimmed and lowercased
+      expect(callArgs).toMatchObject({
+        email: 'test@example.com',
+      });
     });
   });
 });

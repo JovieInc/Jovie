@@ -171,7 +171,7 @@ describe('require-auth.ts', () => {
         expect(result.userId).toBe('user_abc');
       } else {
         // This branch shouldn't execute
-        expect(true).toBe(false);
+        expect.fail('Should not reach this branch');
       }
     });
 
@@ -189,7 +189,7 @@ describe('require-auth.ts', () => {
         expect(result.error).toBeDefined();
       } else {
         // This branch shouldn't execute
-        expect(true).toBe(false);
+        expect.fail('Should not reach this branch');
       }
     });
   });
