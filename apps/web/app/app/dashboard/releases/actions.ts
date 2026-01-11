@@ -24,6 +24,7 @@ import {
 } from '@/lib/discography/spotify-import';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -225,6 +226,12 @@ export async function syncFromSpotify(): Promise<{
   revalidatePath('/app/dashboard/releases');
 
   if (result.success) {
+    void trackServerEvent('releases_synced', {
+      profileId: profile.id,
+      imported: result.imported,
+      source: 'spotify',
+    });
+
     return {
       success: true,
       message: `Successfully synced ${result.imported} releases from Spotify.`,
@@ -338,6 +345,13 @@ export async function connectSpotifyArtist(params: {
   );
 
   if (result.success) {
+    void trackServerEvent('releases_synced', {
+      profileId: profile.id,
+      imported: result.imported,
+      source: 'spotify',
+      isInitialConnect: true,
+    });
+
     return {
       success: true,
       message: `Connected and synced ${result.imported} releases from Spotify.`,

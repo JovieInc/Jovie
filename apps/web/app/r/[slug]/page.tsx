@@ -19,6 +19,7 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
 
 export const dynamic = 'force-dynamic';
@@ -170,6 +171,14 @@ export default async function ReleaseSmartLinkPage({
     if (!targetUrl) {
       notFound();
     }
+
+    // Track the click (fire-and-forget, don't block redirect)
+    void trackServerEvent('smart_link_clicked', {
+      releaseId: release.id,
+      profileId,
+      provider: providerKey,
+      releaseTitle: release.title,
+    });
 
     redirect(targetUrl);
   }

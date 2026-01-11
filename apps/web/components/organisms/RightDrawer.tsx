@@ -28,9 +28,9 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       onKeyDown={onKeyDown}
       className={cn(
-        'fixed top-0 right-0 z-40 h-svh flex flex-col',
+        'absolute top-0 right-0 z-40 h-full flex flex-col',
         'bg-surface-2 border-l border-subtle shadow-xl',
-        'transition-[transform,opacity] duration-300 ease-out',
+        'transition-[transform,opacity,width] duration-300 ease-out',
         isOpen
           ? 'translate-x-0 opacity-100 visible'
           : 'translate-x-full opacity-0 pointer-events-none invisible',

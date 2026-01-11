@@ -11,10 +11,12 @@ export interface ContactSocialLink {
 
 export interface Contact {
   id: string;
+  clerkId?: string;
   firstName?: string;
   lastName?: string;
   username: string;
   displayName?: string | null;
   avatarUrl?: string | null;
+  isVerified?: boolean;
   socialLinks: ContactSocialLink[];
 }
