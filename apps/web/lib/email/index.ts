@@ -4,5 +4,5 @@
  * Central export for email functionality.
  */
 
-export * from './templates';
 export * from './jobs';
+export * from './templates';

@@ -6,14 +6,28 @@
 
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+
 import type { DbType } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
 import {
-  getClaimInviteEmail,
   type ClaimInviteTemplateData,
+  getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { logger } from '@/lib/utils/logger';
+
+/**
+ * Shared email provider instance (singleton).
+ * Avoids creating a new provider for each job.
+ */
+let emailProviderInstance: ResendEmailProvider | null = null;
+
+function getEmailProvider(): ResendEmailProvider {
+  if (!emailProviderInstance) {
+    emailProviderInstance = new ResendEmailProvider();
+  }
+  return emailProviderInstance;
+}
 
 /**
  * Payload schema for send_claim_invite jobs.
@@ -109,12 +123,13 @@ export async function processSendClaimInviteJob(
     throw new Error(`Profile not found: ${payload.creatorProfileId}`);
   }
 
+  // Profile already claimed - mark as skipped (not an error, just no longer needed)
   if (profile.isClaimed) {
     await tx
       .update(creatorClaimInvites)
       .set({
-        status: 'failed',
-        error: 'Profile already claimed',
+        status: 'sent', // Mark as sent since we're done with it (no need to retry)
+        error: 'Profile already claimed - invite not needed',
         updatedAt: new Date(),
       })
       .where(eq(creatorClaimInvites.id, invite.id));
@@ -160,8 +175,8 @@ export async function processSendClaimInviteJob(
 
   const emailContent = getClaimInviteEmail(templateData);
 
-  // Send via Resend
-  const emailProvider = new ResendEmailProvider();
+  // Send via Resend (using singleton provider)
+  const emailProvider = getEmailProvider();
   const result = await emailProvider.sendEmail({
     to: invite.email,
     subject: emailContent.subject,

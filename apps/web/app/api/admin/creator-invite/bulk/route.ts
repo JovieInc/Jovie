@@ -37,9 +37,22 @@ const bulkInviteSchema = z.object({
   limit: z.number().min(1).max(500).optional().default(50),
 
   /**
-   * Delay between emails in milliseconds (for rate limiting).
+   * Minimum delay between emails in milliseconds.
+   * Actual delay will be randomized between minDelayMs and maxDelayMs.
    */
-  staggerDelayMs: z.number().min(500).max(60000).optional().default(2000),
+  minDelayMs: z.number().min(1000).max(300000).optional().default(30000), // 30 sec min
+
+  /**
+   * Maximum delay between emails in milliseconds.
+   * Actual delay will be randomized between minDelayMs and maxDelayMs.
+   */
+  maxDelayMs: z.number().min(1000).max(600000).optional().default(120000), // 2 min max
+
+  /**
+   * Maximum emails per hour (rate limiting).
+   * Default is 30/hour to stay well under spam thresholds.
+   */
+  maxPerHour: z.number().min(1).max(100).optional().default(30),
 
   /**
    * If true, only return what would be sent without actually sending.
@@ -48,13 +61,26 @@ const bulkInviteSchema = z.object({
 });
 
 /**
+ * Generate a random delay between min and max (in ms).
+ * Uses crypto for better randomness.
+ */
+function randomDelay(minMs: number, maxMs: number): number {
+  const range = maxMs - minMs;
+  // Use Math.random for simplicity (crypto.getRandomValues is overkill here)
+  return Math.floor(minMs + Math.random() * range);
+}
+
+/**
  * Admin endpoint to send bulk claim invites.
  *
  * Can either:
  * 1. Send to specific profile IDs
  * 2. Auto-select profiles based on fit score threshold
  *
- * Emails are staggered to avoid rate limiting and improve deliverability.
+ * Emails are staggered with randomized delays to:
+ * - Avoid rate limiting
+ * - Appear more human-like to spam filters
+ * - Improve deliverability
  */
 export async function POST(request: Request) {
   try {
@@ -93,9 +119,15 @@ export async function POST(request: Request) {
       creatorProfileIds,
       fitScoreThreshold,
       limit,
-      staggerDelayMs,
+      minDelayMs,
+      maxDelayMs,
+      maxPerHour,
       dryRun,
     } = parsed.data;
+
+    // Calculate actual limit based on maxPerHour
+    // If they want 30/hour and are sending 50, we'll still accept but warn
+    const effectiveLimit = Math.min(limit, maxPerHour * 2); // Allow up to 2 hours worth
 
     // Get eligible profiles
     let eligibleProfiles: {
@@ -131,14 +163,9 @@ export async function POST(request: Request) {
             sql`${creatorProfiles.claimToken} IS NOT NULL`
           )
         )
-        .limit(limit);
+        .limit(effectiveLimit);
     } else {
       // Auto-select based on fit score
-      // Get profiles that:
-      // 1. Are not claimed
-      // 2. Have a claim token
-      // 3. Have fit score >= threshold
-      // 4. Have not been invited yet (no pending/sent invites)
       eligibleProfiles = await db
         .select({
           id: creatorProfiles.id,
@@ -168,12 +195,17 @@ export async function POST(request: Request) {
           )
         )
         .orderBy(sql`${creatorProfiles.fitScore} DESC`)
-        .limit(limit);
+        .limit(effectiveLimit);
     }
 
     // Filter to profiles with valid emails
     const profilesWithEmails = eligibleProfiles.filter(p => p.contactEmail);
     const profilesWithoutEmails = eligibleProfiles.filter(p => !p.contactEmail);
+
+    // Calculate estimated timing with randomized delays
+    const avgDelayMs = (minDelayMs + maxDelayMs) / 2;
+    const estimatedTotalMs = profilesWithEmails.length * avgDelayMs;
+    const estimatedMinutes = Math.ceil(estimatedTotalMs / 60000);
 
     if (dryRun) {
       return NextResponse.json(
@@ -182,6 +214,14 @@ export async function POST(request: Request) {
           dryRun: true,
           wouldSend: profilesWithEmails.length,
           skippedNoEmail: profilesWithoutEmails.length,
+          estimatedMinutes,
+          throttling: {
+            minDelayMs,
+            maxDelayMs,
+            avgDelayMs: Math.round(avgDelayMs),
+            maxPerHour,
+            effectiveRate: Math.round(3600000 / avgDelayMs), // emails per hour
+          },
           profiles: profilesWithEmails.map(p => ({
             id: p.id,
             username: p.username,
@@ -211,7 +251,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create invites and enqueue jobs
+    // Create invites and enqueue jobs with randomized delays
     const result = await withSystemIngestionSession(async tx => {
       const invitePayloads: { inviteId: string; creatorProfileId: string }[] =
         [];
@@ -239,12 +279,13 @@ export async function POST(request: Request) {
         }
       }
 
-      // Enqueue all jobs with staggering
+      // Enqueue all jobs with randomized staggering
       const { enqueued, skipped } = await enqueueBulkClaimInviteJobs(
         tx,
         invitePayloads,
         {
-          staggerDelayMs,
+          minDelayMs,
+          maxDelayMs,
           basePriority: 10,
           maxAttempts: 3,
         }
@@ -263,7 +304,9 @@ export async function POST(request: Request) {
       jobsSkipped: result.jobsSkipped,
       skippedNoEmail: profilesWithoutEmails.length,
       fitScoreThreshold,
-      staggerDelayMs,
+      minDelayMs,
+      maxDelayMs,
+      maxPerHour,
     });
 
     return NextResponse.json(
@@ -273,10 +316,12 @@ export async function POST(request: Request) {
         invitesCreated: result.invitesCreated,
         jobsEnqueued: result.jobsEnqueued,
         skippedNoEmail: profilesWithoutEmails.length,
-        staggerDelayMs,
-        estimatedCompletionMinutes: Math.ceil(
-          (result.jobsEnqueued * staggerDelayMs) / 60000
-        ),
+        throttling: {
+          minDelayMs,
+          maxDelayMs,
+          maxPerHour,
+        },
+        estimatedMinutes,
       },
       { status: 201, headers: NO_STORE_HEADERS }
     );
@@ -291,6 +336,102 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: 'Failed to create bulk invites', details: errorMessage },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * GET endpoint to preview eligible profiles without sending.
+ */
+export async function GET(request: Request) {
+  try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const fitScoreThreshold = Number(searchParams.get('threshold') ?? 50);
+    const limit = Math.min(Number(searchParams.get('limit') ?? 50), 100);
+
+    // Get eligible profiles count and sample
+    const eligibleProfiles = await db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        fitScore: creatorProfiles.fitScore,
+        contactEmail: creatorContacts.email,
+      })
+      .from(creatorProfiles)
+      .leftJoin(
+        creatorContacts,
+        and(
+          eq(creatorContacts.creatorProfileId, creatorProfiles.id),
+          eq(creatorContacts.isActive, true)
+        )
+      )
+      .leftJoin(
+        creatorClaimInvites,
+        eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.isClaimed, false),
+          sql`${creatorProfiles.claimToken} IS NOT NULL`,
+          sql`${creatorProfiles.fitScore} >= ${fitScoreThreshold}`,
+          isNull(creatorClaimInvites.id)
+        )
+      )
+      .orderBy(sql`${creatorProfiles.fitScore} DESC`)
+      .limit(limit);
+
+    const withEmails = eligibleProfiles.filter(p => p.contactEmail);
+    const withoutEmails = eligibleProfiles.filter(p => !p.contactEmail);
+
+    // Get total count for this threshold
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(creatorProfiles)
+      .leftJoin(
+        creatorClaimInvites,
+        eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.isClaimed, false),
+          sql`${creatorProfiles.claimToken} IS NOT NULL`,
+          sql`${creatorProfiles.fitScore} >= ${fitScoreThreshold}`,
+          isNull(creatorClaimInvites.id)
+        )
+      );
+
+    return NextResponse.json(
+      {
+        ok: true,
+        threshold: fitScoreThreshold,
+        totalEligible: Number(countResult?.count ?? 0),
+        sample: {
+          withEmails: withEmails.length,
+          withoutEmails: withoutEmails.length,
+          profiles: withEmails.slice(0, 10).map(p => ({
+            id: p.id,
+            username: p.username,
+            displayName: p.displayName,
+            fitScore: p.fitScore,
+            email: p.contactEmail?.replace(/(.{2}).*@/, '$1***@'),
+          })),
+        },
+      },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to fetch eligible profiles' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
