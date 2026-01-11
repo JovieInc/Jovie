@@ -101,34 +101,12 @@ export function AdminCreatorsTableHeader({
           />
         </th>
         <th
-          className={cn(
-            headerCellClass,
-            'cursor-pointer select-none hidden md:table-cell'
-          )}
-          style={{ top: stickyTopPx }}
-        >
-          <SortableHeaderButton
-            label={SORTABLE_COLUMNS.claimed.label}
-            direction={getSortDirection(sort, 'claimed')}
-            onClick={() => onSortChange('claimed')}
-          />
-        </th>
-        <th
-          className={cn(headerCellClass, 'cursor-pointer select-none')}
-          style={{ top: stickyTopPx }}
-        >
-          <SortableHeaderButton
-            label={SORTABLE_COLUMNS.verified.label}
-            direction={getSortDirection(sort, 'verified')}
-            onClick={() => onSortChange('verified')}
-          />
-        </th>
-        <th
           className={cn(headerCellClass, 'text-right')}
           style={{ top: stickyTopPx }}
         >
-          <span className='sr-only'>Action</span>
-          <div className='flex items-center justify-end' />
+          <span className='text-xs uppercase tracking-wide text-tertiary-token'>
+            Actions
+          </span>
         </th>
       </tr>
     </thead>

@@ -282,9 +282,7 @@ export function AdminCreatorProfilesWithSidebar({
                 <col className='w-14' />
                 <col className='w-[320px]' />
                 <col className='w-[160px]' />
-                <col className='w-[160px]' />
-                <col className='w-[160px]' />
-                <col className='w-[140px]' />
+                <col className='w-[200px]' />
               </colgroup>
               <AdminCreatorsTableHeader
                 sort={sort}

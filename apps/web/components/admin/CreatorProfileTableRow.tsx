@@ -1,11 +1,10 @@
 'use client';
 
-import { Badge, Checkbox } from '@jovie/ui';
-import { Star } from 'lucide-react';
+import { Checkbox } from '@jovie/ui';
 import Link from 'next/link';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
-import { VerificationStatusToggle } from '@/components/admin/VerificationStatusToggle';
+import { TableRowActions } from '@/components/admin/table/TableRowActions';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 
@@ -138,58 +137,53 @@ export function CreatorProfileTableRow({
             }).format(profile.createdAt)
           : '—'}
       </td>
-      <td className='px-4 py-3 text-center align-middle text-xs whitespace-nowrap hidden md:table-cell'>
-        <Badge size='sm' variant={profile.isClaimed ? 'success' : 'secondary'}>
-          {profile.isClaimed ? (
-            <>
-              <Star className='h-3 w-3 fill-current' aria-hidden='true' />
-              <span>Claimed</span>
-            </>
-          ) : (
-            <span>Unclaimed</span>
-          )}
-        </Badge>
-      </td>
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-      <td
-        className='px-4 py-3 text-center align-middle text-xs whitespace-nowrap'
-        onClick={e => e.stopPropagation()}
-      >
-        <VerificationStatusToggle
-          isVerified={profile.isVerified}
-          status={verificationStatus}
-          onToggle={onToggleVerification}
-        />
-      </td>
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       <td
         className='px-4 py-3 align-middle text-right'
         onClick={e => e.stopPropagation()}
       >
-        <div
-          className={cn(
-            'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-            isMenuOpen && 'opacity-100 pointer-events-auto'
-          )}
-        >
-          <CreatorActionsMenu
-            profile={profile}
-            isMobile={isMobile}
-            status={verificationStatus}
-            refreshIngestStatus={refreshIngestStatus}
-            open={isMenuOpen}
-            onOpenChange={onMenuOpenChange}
-            onRefreshIngest={async () => {
-              await onRefreshIngest();
-            }}
-            onToggleVerification={onToggleVerification}
-            onToggleFeatured={onToggleFeatured}
-            onToggleMarketing={onToggleMarketing}
-            onSendInvite={onSendInvite}
-            onDelete={onDelete}
-          />
+        <div className='flex items-center justify-end gap-2'>
+          {/* Icon action buttons - always visible on hover */}
+          <div
+            className={cn(
+              'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+              isMenuOpen && 'opacity-100 pointer-events-auto'
+            )}
+          >
+            <TableRowActions
+              isVerified={profile.isVerified}
+              isClaimed={profile.isClaimed}
+              verificationStatus={verificationStatus}
+              refreshIngestStatus={refreshIngestStatus}
+              onToggleVerification={onToggleVerification}
+              onRefreshIngest={onRefreshIngest}
+            />
+          </div>
+          {/* Overflow menu - always visible on hover */}
+          <div
+            className={cn(
+              'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+              isMenuOpen && 'opacity-100 pointer-events-auto'
+            )}
+          >
+            <CreatorActionsMenu
+              profile={profile}
+              isMobile={isMobile}
+              status={verificationStatus}
+              refreshIngestStatus={refreshIngestStatus}
+              open={isMenuOpen}
+              onOpenChange={onMenuOpenChange}
+              onRefreshIngest={async () => {
+                await onRefreshIngest();
+              }}
+              onToggleVerification={onToggleVerification}
+              onToggleFeatured={onToggleFeatured}
+              onToggleMarketing={onToggleMarketing}
+              onSendInvite={onSendInvite}
+              onDelete={onDelete}
+            />
+          </div>
         </div>
       </td>
     </tr>
