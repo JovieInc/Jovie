@@ -22,7 +22,9 @@ export function AdminCreatorsTableHeaderActions({
   onIngestPending,
 }: AdminCreatorsTableHeaderActionsProps) {
   const { tableMeta } = useTableMeta();
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(
+    () => (tableMeta.rightPanelWidth ?? 0) > 0
+  );
 
   // Track drawer open state based on rightPanelWidth
   useEffect(() => {

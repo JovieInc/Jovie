@@ -203,6 +203,10 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(false);
   };
 
+  const handleIngestPending = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
       setSelectedId(profilesWithActions[0]!.id);
@@ -293,7 +297,11 @@ export function AdminCreatorProfilesWithSidebar({
                 stickyTopPx={stickyTopPx}
                 onToggleSelectAll={toggleSelectAll}
                 onSortChange={handleSortChange}
-                headerActions={<AdminCreatorsTableHeaderActions />}
+                headerActions={
+                  <AdminCreatorsTableHeaderActions
+                    onIngestPending={handleIngestPending}
+                  />
+                }
               />
               <tbody>
                 {profilesWithActions.length === 0 ? (
