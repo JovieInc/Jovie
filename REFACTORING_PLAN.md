@@ -805,12 +805,160 @@ _To be filled by completing agent_
 
 ---
 
+### P4.3 - Consolidate Hooks Directory Structure
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Hooks scattered across 5+ locations (34+ imports from `@/lib/hooks`)
+- **Effort:** Medium
+- **Dependencies:** None
+
+**Problem:**
+Custom hooks are fragmented across multiple directories:
+- `/hooks` (20 hooks)
+- `/lib/hooks` (7 hooks)
+- `/components/hooks` (1 hook)
+- `/components/dashboard/hooks` (1 hook)
+- `/components/organisms/hooks` (2 hooks)
+- `/components/admin/` (2 hooks inline)
+
+This makes discovery difficult and leads to potential duplication.
+
+**Solution:**
+Consolidate all hooks into `/hooks` with subdirectories by domain:
+```
+hooks/
+├── auth/        # useSignInFlow, useSignUpFlow, useAuthFlowBase
+├── dashboard/   # useDashboardAnalytics, useContactsManager
+├── ui/          # useClipboard, useMobile, useBreakpoint
+└── admin/       # useCreatorActions, useCreatorVerification
+```
+
+**Acceptance Criteria:**
+- [ ] All hooks consolidated in `/hooks` directory
+- [ ] Subdirectories created for domain organization
+- [ ] Re-exports from old locations for backwards compatibility
+- [ ] 34+ imports updated
+- [ ] All tests pass
+
+**Completion Notes:**
+_To be filled by completing agent_
+
+---
+
+### P4.4 - Move Atoms with Business Logic to Molecules
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Fix atomic design violations where atoms contain state/effects
+- **Effort:** Medium
+- **Dependencies:** None
+
+**Problem:**
+Several "atoms" violate atomic design principles by containing `useState`, `useEffect`, and API calls. Atoms should be stateless UI primitives.
+
+**Worst offenders:**
+| File | Lines | Issue |
+|------|-------|-------|
+| `atoms/WrappedSocialLink.tsx` | 222 | API calls, useState, useEffect |
+| `atoms/ProfileNavButton.tsx` | ~150 | Complex state management |
+| `atoms/QRCode.tsx` | ~60 | Uses hooks |
+| `atoms/Toast.tsx` | ~90 | Uses hooks |
+
+**Solution:**
+Move these components to `/molecules`:
+- `WrappedSocialLink` → `molecules/WrappedSocialLink`
+- `ProfileNavButton` → `molecules/ProfileNavButton`
+- `Toast` → `molecules/Toast`
+- `QRCode` → `molecules/QRCode`
+
+**Acceptance Criteria:**
+- [ ] Components moved to molecules
+- [ ] Re-exports from atoms for backwards compatibility
+- [ ] All 25+ imports updated
+- [ ] Deprecation notices added
+- [ ] All tests pass
+
+**Completion Notes:**
+_To be filled by completing agent_
+
+---
+
+### P4.5 - Merge /ui Directory into Atomic Structure
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Eliminate `/components/ui` directory
+- **Effort:** Small
+- **Dependencies:** None
+
+**Problem:**
+The `/components/ui` directory exists alongside atoms/molecules/organisms, creating confusion about where components belong.
+
+**Current contents:**
+- `Badge.tsx`, `CTAButton.tsx`, `EmptyState.tsx`, `FooterLink.tsx`, `FrostedButton.tsx`, `LoadingSpinner.tsx`, `NavLink.tsx`
+
+**Solution:**
+Merge into atomic structure:
+- `Badge`, `LoadingSpinner` → `/atoms`
+- `CTAButton`, `FrostedButton`, `NavLink`, `FooterLink` → `/atoms` or `/molecules`
+- `EmptyState` → `/organisms`
+
+**Acceptance Criteria:**
+- [ ] All `/ui` components moved to appropriate atomic tier
+- [ ] `/ui` directory deleted
+- [ ] Imports updated
+- [ ] All tests pass
+
+**Completion Notes:**
+_To be filled by completing agent_
+
+---
+
+### P4.6 - Refactor Large API Routes
+
+- **Status:** [ ]
+- **Assigned:** _unassigned_
+- **Scope:** Split oversized API routes not yet in plan
+- **Effort:** Large
+- **Dependencies:** P1.3 (establishes pattern)
+
+**Problem:**
+Several API routes exceed 500-line threshold but aren't tracked:
+
+| Route | Lines |
+|-------|-------|
+| `api/admin/creator-ingest/route.ts` | 1040 |
+| `api/images/upload/route.ts` | 540 |
+| `api/dashboard/profile/route.ts` | 405 |
+
+**Solution:**
+Apply service extraction pattern from P1.3:
+```
+lib/services/
+├── creator-ingest/
+├── image-upload/
+└── profile/
+```
+
+**Acceptance Criteria:**
+- [ ] Each route <200 lines
+- [ ] Business logic in services
+- [ ] Services independently testable
+- [ ] API contracts unchanged
+
+**Completion Notes:**
+_To be filled by completing agent_
+
+---
+
 ## Changelog
 
 Track all refactoring completions here. Add newest entries at the top.
 
 | Date | Task | Agent/Session | PR | Notes |
 |------|------|---------------|-----|-------|
+| 2025-01-XX | - | Cascade | _pending_ | Delete dead code: organisms/ArtistCard.tsx, auth/atoms/LoadingButton.tsx |
 | 2025-01-02 | - | Cascade | _pending_ | Update WaitlistTable to re-export from modular structure (462→18 lines) |
 | 2025-01-02 | - | Cascade | _pending_ | Split UniversalLinkInput utilities into separate module (525→20 lines) |
 | 2025-01-02 | - | Cascade | _pending_ | Split AccountSettingsSection into focused modules (553→46 lines) |
