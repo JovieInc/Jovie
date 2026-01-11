@@ -21,6 +21,18 @@ export interface ClaimInviteTemplateData {
 }
 
 /**
+ * Escape HTML special characters to prevent XSS in email templates.
+ */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Build the claim URL with token
  */
 export function buildClaimUrl(username: string, claimToken: string): string {
@@ -37,7 +49,7 @@ export function buildPreviewUrl(username: string): string {
 /**
  * Generate the email subject line
  */
-export function getClaimInviteSubject(data: ClaimInviteTemplateData): string {
+export function getClaimInviteSubject(_data: ClaimInviteTemplateData): string {
   return `Your ${APP_NAME} profile is ready to claim`;
 }
 
@@ -84,10 +96,15 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
   const claimUrl = buildClaimUrl(username, claimToken);
   const previewUrl = buildPreviewUrl(username);
 
-  const avatarSection = avatarUrl
+  // Escape user-provided values to prevent XSS
+  const safeCreatorName = escapeHtml(creatorName);
+  const safeUsername = escapeHtml(username);
+  const safeAvatarUrl = avatarUrl ? escapeHtml(avatarUrl) : null;
+
+  const avatarSection = safeAvatarUrl
     ? `
       <div style="text-align: center; margin-bottom: 24px;">
-        <img src="${avatarUrl}" alt="${creatorName}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
+        <img src="${safeAvatarUrl}" alt="${safeCreatorName}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
       </div>
     `
     : '';
@@ -125,7 +142,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
           <tr>
             <td style="padding: 24px 40px;">
               <h1 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #000; text-align: center;">
-                Hey ${creatorName}
+                Hey ${safeCreatorName}
               </h1>
               <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
                 We built you a ${APP_NAME} profile. It's already set up with your links, music, and socials.
@@ -135,7 +152,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
               <div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
                 <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Your profile URL:</p>
                 <a href="${previewUrl}" style="font-size: 18px; font-weight: 600; color: #000; text-decoration: none;">
-                  ${PROFILE_URL}/${username}
+                  ${PROFILE_URL}/${safeUsername}
                 </a>
               </div>
 

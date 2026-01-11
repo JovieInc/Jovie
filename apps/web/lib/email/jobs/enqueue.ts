@@ -10,6 +10,15 @@ import { logger } from '@/lib/utils/logger';
 import type { SendClaimInvitePayload } from './send-claim-invite';
 
 /**
+ * Generate a random delay between min and max (in ms).
+ * Adds human-like variance to avoid spam filter detection.
+ */
+function randomDelay(minMs: number, maxMs: number): number {
+  const range = maxMs - minMs;
+  return Math.floor(minMs + Math.random() * range);
+}
+
+/**
  * Enqueue a send_claim_invite job for processing.
  *
  * @param tx - Database transaction
@@ -67,7 +76,12 @@ export async function enqueueClaimInviteJob(
 }
 
 /**
- * Enqueue multiple claim invite jobs in a batch.
+ * Enqueue multiple claim invite jobs in a batch with randomized delays.
+ *
+ * Uses randomized staggering between minDelayMs and maxDelayMs to:
+ * - Avoid rate limiting
+ * - Appear more human-like to spam filters
+ * - Improve deliverability
  *
  * @param tx - Database transaction
  * @param invites - Array of invite payloads
@@ -77,7 +91,11 @@ export async function enqueueBulkClaimInviteJobs(
   tx: DbType,
   invites: SendClaimInvitePayload[],
   options: {
-    /** Delay between emails in ms (for rate limiting) */
+    /** Minimum delay between emails in ms */
+    minDelayMs?: number;
+    /** Maximum delay between emails in ms */
+    maxDelayMs?: number;
+    /** @deprecated Use minDelayMs/maxDelayMs instead. Fixed delay between emails (no randomization). */
     staggerDelayMs?: number;
     /** Base priority (will increment per invite) */
     basePriority?: number;
@@ -86,17 +104,39 @@ export async function enqueueBulkClaimInviteJobs(
   } = {}
 ): Promise<{ enqueued: number; skipped: number }> {
   const {
-    staggerDelayMs = 1000, // 1 second between emails
+    minDelayMs,
+    maxDelayMs,
+    staggerDelayMs,
     basePriority = 10,
     maxAttempts = 3,
   } = options;
 
+  // Support both old fixed delay and new randomized delay
+  const useRandomDelay = minDelayMs !== undefined && maxDelayMs !== undefined;
+  const fixedDelay = staggerDelayMs ?? 30000; // 30 second default
+
+  // Capture base timestamp once for consistent staggering
+  const baseTime = Date.now();
+
   let enqueued = 0;
   let skipped = 0;
+  let cumulativeDelayMs = 0;
 
   for (let i = 0; i < invites.length; i++) {
     const invite = invites[i];
-    const runAt = new Date(Date.now() + i * staggerDelayMs);
+
+    // Calculate delay for this invite
+    let delayMs: number;
+    if (useRandomDelay) {
+      // Add random delay to cumulative total
+      delayMs = cumulativeDelayMs;
+      cumulativeDelayMs += randomDelay(minDelayMs!, maxDelayMs!);
+    } else {
+      // Use fixed delay
+      delayMs = i * fixedDelay;
+    }
+
+    const runAt = new Date(baseTime + delayMs);
     const priority = basePriority + i; // Later invites have lower priority
 
     const dedupKey = `send_claim_invite:${invite.inviteId}`;
@@ -128,7 +168,11 @@ export async function enqueueBulkClaimInviteJobs(
     total: invites.length,
     enqueued,
     skipped,
-    staggerDelayMs,
+    useRandomDelay,
+    minDelayMs: useRandomDelay ? minDelayMs : undefined,
+    maxDelayMs: useRandomDelay ? maxDelayMs : undefined,
+    fixedDelayMs: useRandomDelay ? undefined : fixedDelay,
+    totalSpreadMs: cumulativeDelayMs || (invites.length - 1) * fixedDelay,
   });
 
   return { enqueued, skipped };
