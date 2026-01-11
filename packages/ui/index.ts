@@ -39,6 +39,7 @@ export {
   cardVariants,
 } from './atoms/card';
 // Checkbox
+export type { CheckboxProps } from './atoms/checkbox';
 export { Checkbox } from './atoms/checkbox';
 // Context Menu
 export {

@@ -71,7 +71,7 @@ describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
     const { getByRole } = renderDashboardNav();
 
-    expect(getByRole('link', { name: 'Overview' })).toBeDefined();
+    expect(getByRole('link', { name: 'Dashboard' })).toBeDefined();
     expect(getByRole('link', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Contacts' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
@@ -86,7 +86,7 @@ describe('DashboardNav', () => {
   it('applies active state to current page', () => {
     const { getByRole } = renderDashboardNav();
 
-    const activeLink = getByRole('link', { name: 'Overview' });
+    const activeLink = getByRole('link', { name: 'Dashboard' });
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 

@@ -69,7 +69,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
 
     // Map path segments to readable labels
     const labelMap: Record<string, string> = {
-      dashboard: 'Overview',
+      dashboard: 'Dashboard',
       admin: 'Overview',
       settings: 'Account',
       profile: 'Profile',
