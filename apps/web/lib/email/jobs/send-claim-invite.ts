@@ -10,6 +10,10 @@ import { z } from 'zod';
 import type { DbType } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
 import {
+  type FollowUpTemplateData,
+  getFollowUpEmail,
+} from '@/lib/email/templates/claim-followup';
+import {
   type ClaimInviteTemplateData,
   getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
@@ -73,6 +77,7 @@ export async function processSendClaimInviteJob(
       email: creatorClaimInvites.email,
       status: creatorClaimInvites.status,
       creatorProfileId: creatorClaimInvites.creatorProfileId,
+      sequenceStep: creatorClaimInvites.sequenceStep,
     })
     .from(creatorClaimInvites)
     .where(eq(creatorClaimInvites.id, payload.inviteId))
@@ -104,6 +109,7 @@ export async function processSendClaimInviteJob(
       avatarUrl: creatorProfiles.avatarUrl,
       isClaimed: creatorProfiles.isClaimed,
       claimToken: creatorProfiles.claimToken,
+      claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
       fitScore: creatorProfiles.fitScore,
     })
     .from(creatorProfiles)
@@ -164,16 +170,41 @@ export async function processSendClaimInviteJob(
     })
     .where(eq(creatorClaimInvites.id, invite.id));
 
-  // Generate email content
-  const templateData: ClaimInviteTemplateData = {
-    creatorName: profile.displayName || profile.username,
-    username: profile.username,
-    claimToken: profile.claimToken,
-    avatarUrl: profile.avatarUrl,
-    fitScore: profile.fitScore,
-  };
+  // Generate email content based on sequence step
+  // Step 0 = initial invite, Step 1+ = follow-up emails
+  const isFollowUp = invite.sequenceStep > 0;
 
-  const emailContent = getClaimInviteEmail(templateData);
+  let emailContent: { subject: string; text: string; html: string };
+
+  if (isFollowUp) {
+    // Calculate days until expiry for follow-up messaging
+    let daysUntilExpiry: number | undefined;
+    if (profile.claimTokenExpiresAt) {
+      const msUntilExpiry = profile.claimTokenExpiresAt.getTime() - Date.now();
+      daysUntilExpiry = Math.max(
+        0,
+        Math.ceil(msUntilExpiry / (1000 * 60 * 60 * 24))
+      );
+    }
+
+    const followUpData: FollowUpTemplateData = {
+      creatorName: profile.displayName || profile.username,
+      username: profile.username,
+      claimToken: profile.claimToken,
+      sequenceStep: invite.sequenceStep,
+      daysUntilExpiry,
+    };
+    emailContent = getFollowUpEmail(followUpData);
+  } else {
+    const templateData: ClaimInviteTemplateData = {
+      creatorName: profile.displayName || profile.username,
+      username: profile.username,
+      claimToken: profile.claimToken,
+      avatarUrl: profile.avatarUrl,
+      fitScore: profile.fitScore,
+    };
+    emailContent = getClaimInviteEmail(templateData);
+  }
 
   // Send via Resend (using singleton provider)
   const emailProvider = getEmailProvider();
@@ -201,6 +232,8 @@ export async function processSendClaimInviteJob(
       inviteId: invite.id,
       email: invite.email,
       profileUsername: profile.username,
+      sequenceStep: invite.sequenceStep,
+      isFollowUp,
       resendId: result.detail,
     });
 

@@ -214,6 +214,8 @@ export const creatorClaimInvites = pgTable(
     ),
     email: text('email').notNull(),
     status: claimInviteStatusEnum('status').default('pending').notNull(),
+    /** Sequence step: 0=initial invite, 1=first follow-up, 2=second follow-up, etc. */
+    sequenceStep: integer('sequence_step').default(0).notNull(),
     sendAt: timestamp('send_at'),
     sentAt: timestamp('sent_at'),
     error: text('error'),
@@ -221,7 +223,7 @@ export const creatorClaimInvites = pgTable(
     body: text('body'),
     aiVariantId: text('ai_variant_id'),
     meta: jsonb('meta')
-      .$type<{ source?: 'admin_click' | 'bulk' | 'auto' }>()
+      .$type<{ source?: 'admin_click' | 'bulk' | 'auto' | 'followup' }>()
       .default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -232,6 +234,12 @@ export const creatorClaimInvites = pgTable(
     ).on(table.creatorProfileId),
     statusIdx: index('idx_creator_claim_invites_status').on(table.status),
     sendAtIdx: index('idx_creator_claim_invites_send_at').on(table.sendAt),
+    // Index for finding profiles that need follow-ups
+    sequenceStepSentIdx: index('idx_creator_claim_invites_sequence_sent').on(
+      table.creatorProfileId,
+      table.sequenceStep,
+      table.sentAt
+    ),
   })
 );
 

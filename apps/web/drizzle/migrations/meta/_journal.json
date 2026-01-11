@@ -288,6 +288,20 @@
       "when": 1736500000000,
       "tag": "0040_add_fit_scoring_columns",
       "breakpoints": false
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1736600000000,
+      "tag": "0041_add_ingestion_jobs_dedup_index",
+      "breakpoints": false
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1736700000000,
+      "tag": "0042_add_claim_invite_sequence_step",
+      "breakpoints": false
     }
   ]
 }

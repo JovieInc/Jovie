@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { InviteCampaignManager } from '@/components/admin/campaigns/InviteCampaignManager';
+import { CampaignTabs } from '@/components/admin/campaigns/CampaignTabs';
 import { PageShell } from '@/components/organisms/PageShell';
 
 export const metadata: Metadata = {
@@ -16,12 +16,12 @@ export default function AdminCampaignsPage() {
             Invite Campaigns
           </h1>
           <p className='mt-2 text-sm text-secondary-token'>
-            Send claim invites to unclaimed creator profiles. Emails are
-            throttled and randomized to avoid spam filters.
+            Send claim invites and follow-ups to unclaimed creator profiles.
+            Emails are throttled and randomized to avoid spam filters.
           </p>
         </div>
 
-        <InviteCampaignManager />
+        <CampaignTabs />
       </div>
     </PageShell>
   );
