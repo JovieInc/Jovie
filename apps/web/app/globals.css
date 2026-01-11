@@ -587,7 +587,7 @@ body {
 
 @utility focus-ring-themed {
   @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-  --tw-ring-color: rgb(var(--focus-ring));
+  --tw-ring-color: rgb(var(--color-focus-ring));
 }
 
 /* Menu animations */

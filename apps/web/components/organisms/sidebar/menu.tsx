@@ -113,7 +113,6 @@ export const SidebarMenuButton = React.forwardRef<
           side='right'
           align='center'
           hidden={isMobile}
-          showArrow={false}
           {...tooltip}
         />
       </Tooltip>

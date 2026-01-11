@@ -9,7 +9,7 @@
 import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
 
-import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 
 import type { Release } from './types';
 
@@ -38,16 +38,18 @@ export function ReleaseSidebarHeader({
       <div className='flex items-center gap-1'>
         {showActions && (
           <>
-            <HeaderIconButton
+            <CircleIconButton
               size='xs'
+              variant='ghost'
               ariaLabel='Copy smart link'
               onClick={onCopySmartLink}
-              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+              className='hover:scale-105'
             >
-              <Copy className='h-4 w-4' aria-hidden />
-            </HeaderIconButton>
-            <HeaderIconButton
+              <Copy aria-hidden />
+            </CircleIconButton>
+            <CircleIconButton
               size='xs'
+              variant='ghost'
               ariaLabel='Refresh release'
               onClick={() => {
                 if (onRefresh) {
@@ -56,35 +58,37 @@ export function ReleaseSidebarHeader({
                 }
                 window.location.reload();
               }}
-              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+              className='hover:scale-105'
             >
-              <RefreshCw className='h-4 w-4' aria-hidden />
-            </HeaderIconButton>
-            <HeaderIconButton
+              <RefreshCw aria-hidden />
+            </CircleIconButton>
+            <CircleIconButton
               size='xs'
+              variant='ghost'
               ariaLabel='Open smart link'
               asChild
-              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+              className='hover:scale-105'
             >
               <Link
                 href={release!.smartLinkPath}
                 target='_blank'
                 rel='noopener noreferrer'
               >
-                <ExternalLink className='h-4 w-4' aria-hidden />
+                <ExternalLink aria-hidden />
               </Link>
-            </HeaderIconButton>
+            </CircleIconButton>
           </>
         )}
         {onClose && (
-          <HeaderIconButton
+          <CircleIconButton
             size='xs'
+            variant='ghost'
             ariaLabel='Close release sidebar'
             onClick={onClose}
-            className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+            className='hover:scale-105'
           >
-            <X className='h-4 w-4' aria-hidden='true' />
-          </HeaderIconButton>
+            <X aria-hidden='true' />
+          </CircleIconButton>
         )}
       </div>
     </div>

@@ -106,6 +106,7 @@ export function convertDbLinksToLinkItems(
       sourcePlatform: detected.sourcePlatform ?? null,
       sourceType: detected.sourceType ?? null,
       evidence: detected.evidence ?? null,
+      version: link.version ?? 1,
     };
 
     return item;

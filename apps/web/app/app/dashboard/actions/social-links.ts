@@ -98,6 +98,7 @@ export async function getProfileSocialLinks(
         sourcePlatform: socialLinks.sourcePlatform,
         sourceType: socialLinks.sourceType,
         evidence: socialLinks.evidence,
+        version: socialLinks.version,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -140,6 +141,7 @@ export async function getProfileSocialLinks(
             sources?: string[];
             signals?: string[];
           } | null,
+          version: r.version ?? 1,
         };
       })
       .filter((link): link is NonNullable<typeof link> => Boolean(link));
