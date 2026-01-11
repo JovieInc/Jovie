@@ -56,9 +56,11 @@ export function CreatorProfileTableRow({
     <tr
       className={cn(
         'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-        isSelected
-          ? 'bg-base dark:bg-surface-2'
-          : 'hover:bg-base dark:hover:bg-surface-2'
+        isChecked
+          ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+          : isSelected
+            ? 'bg-base dark:bg-surface-2'
+            : 'hover:bg-base dark:hover:bg-surface-2'
       )}
       onClick={() => onRowClick(profile.id)}
       onContextMenu={event => {
@@ -103,7 +105,9 @@ export function CreatorProfileTableRow({
       <td
         className={cn(
           'px-4 py-3 align-middle',
-          isSelected && 'bg-base dark:bg-surface-2'
+          isChecked
+            ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+            : isSelected && 'bg-base dark:bg-surface-2'
         )}
       >
         <div className='flex items-center gap-3'>
