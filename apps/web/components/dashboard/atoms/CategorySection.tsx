@@ -32,15 +32,38 @@ export function CategorySection({
           {title}
         </h3>
       </div>
-      <div
-        className={cn(
-          variant === 'flat'
-            ? 'mt-2 flex items-start gap-1.5 overflow-x-auto'
-            : 'mt-2 flex items-start gap-2 overflow-x-auto',
-          gridClassName
-        )}
-      >
-        {children}
+      <div className='relative'>
+        {/* Left fade gradient */}
+        <div
+          className={cn(
+            'pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-linear-to-r to-transparent',
+            variant === 'flat'
+              ? 'from-(--color-bg-surface-0)'
+              : 'from-(--color-bg-surface-1)'
+          )}
+        />
+
+        {/* Scrollable container */}
+        <div
+          className={cn(
+            variant === 'flat'
+              ? 'mt-2 flex items-start gap-1.5 overflow-x-auto scrollbar-none py-1'
+              : 'mt-2 flex items-start gap-2 overflow-x-auto scrollbar-none py-1',
+            gridClassName
+          )}
+        >
+          {children}
+        </div>
+
+        {/* Right fade gradient */}
+        <div
+          className={cn(
+            'pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-linear-to-l to-transparent',
+            variant === 'flat'
+              ? 'from-(--color-bg-surface-0)'
+              : 'from-(--color-bg-surface-1)'
+          )}
+        />
       </div>
     </section>
   );
