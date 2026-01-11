@@ -29,7 +29,7 @@ export function RightDrawer({
       onKeyDown={onKeyDown}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-2 border-l border-subtle',
+        'bg-surface-1 border-l border-subtle',
         'transition-[width,opacity] duration-300 ease-out',
         isOpen
           ? 'opacity-100 visible'
