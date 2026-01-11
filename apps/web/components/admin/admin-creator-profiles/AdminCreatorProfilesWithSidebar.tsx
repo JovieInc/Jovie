@@ -202,10 +202,6 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(false);
   };
 
-  const handleIngestPending = useCallback(() => {
-    router.refresh();
-  }, [router]);
-
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
       setSelectedId(profilesWithActions[0]!.id);
