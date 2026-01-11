@@ -15,6 +15,7 @@ import {
   type SupportedImageMimeType,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
+import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { extractMetaContent, fetchDocument } from './strategies/base';
 import {
@@ -556,4 +557,64 @@ export async function maybeSetProfileAvatarFromLinks(params: {
   }
 
   return null;
+}
+
+/**
+ * Copy an external avatar URL directly to Jovie's blob storage.
+ *
+ * This is useful during ingestion when we already have an extracted avatar URL
+ * and want to re-host it on Jovie's storage instead of storing the external URL.
+ *
+ * @param params.externalUrl - The external HTTPS URL to copy
+ * @param params.handle - The profile handle (used for storage path)
+ * @param params.sourcePlatform - The source platform for logging/tracking
+ * @returns The Jovie blob URL or null if copying failed
+ */
+export async function copyExternalAvatarToStorage(params: {
+  externalUrl: string;
+  handle: string;
+  sourcePlatform?: string;
+}): Promise<string | null> {
+  const { externalUrl, handle, sourcePlatform = 'ingestion' } = params;
+
+  const sanitized = sanitizeHttpsUrl(externalUrl);
+  if (!sanitized) return null;
+
+  const safeHandle = handle.trim().toLowerCase();
+  if (!safeHandle) return null;
+
+  try {
+    const downloaded = await downloadImage(sanitized);
+
+    const optimized = await withTimeout(
+      optimizeToAvatarAvif(downloaded.buffer),
+      PROCESSING_TIMEOUT_MS
+    );
+
+    const seoFileName = buildSeoFilename({
+      originalFilename: downloaded.filename,
+      photoId: randomUUID(),
+      userLabel: safeHandle,
+    });
+
+    const blobPath = `avatars/ingestion/${safeHandle}/${seoFileName}.avif`;
+
+    const blobUrl = await withTimeout(
+      uploadBufferToBlob({
+        path: blobPath,
+        buffer: optimized.data,
+        contentType: AVIF_MIME_TYPE,
+      }),
+      PROCESSING_TIMEOUT_MS
+    );
+
+    return blobUrl;
+  } catch (error) {
+    // Log but don't throw - avatar copying is best-effort
+    logger.warn('copyExternalAvatarToStorage failed', {
+      sourcePlatform,
+      error,
+    });
+    return null;
+  }
 }

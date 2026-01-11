@@ -66,6 +66,7 @@ export interface UpdateLinkData {
 
 /**
  * List of Digital Streaming Platform (DSP) identifiers.
+ * Includes 'youtube' since artists commonly use it for music content.
  */
 export const DSP_PLATFORMS = [
   'amazon-music',
@@ -81,6 +82,7 @@ export const DSP_PLATFORMS = [
   'tencent-music',
   'tencent_music',
   'tidal',
+  'youtube',
   'youtube-music',
   'youtube_music',
 ] as const;
