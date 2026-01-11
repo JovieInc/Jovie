@@ -232,6 +232,10 @@ export const creatorClaimInvites = pgTable(
     ).on(table.creatorProfileId),
     statusIdx: index('idx_creator_claim_invites_status').on(table.status),
     sendAtIdx: index('idx_creator_claim_invites_send_at').on(table.sendAt),
+    // Unique constraint to prevent duplicate invites for same profile + email
+    uniqueProfileEmail: uniqueIndex(
+      'idx_creator_claim_invites_profile_email_unique'
+    ).on(table.creatorProfileId, table.email),
   })
 );
 
