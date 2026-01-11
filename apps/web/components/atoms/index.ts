@@ -8,6 +8,7 @@ export * from './AvatarUploadAnnouncer';
 export * from './AvatarUploadOverlay';
 export * from './BackgroundPattern';
 export * from './BrandLogo';
+export * from './CircleIconButton';
 export * from './Copyright';
 export * from './Divider';
 export * from './DropdownMenu';

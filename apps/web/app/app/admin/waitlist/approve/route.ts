@@ -5,7 +5,9 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { sendNotification } from '@/lib/notifications/service';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
+import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
 export const runtime = 'nodejs';
 
@@ -134,6 +136,8 @@ export async function POST(request: Request) {
         return {
           outcome: 'approved' as const,
           profileId: profile.id,
+          email: entry.email,
+          fullName: entry.fullName,
         };
       },
       { isolationLevel: 'serializable' }
@@ -155,6 +159,25 @@ export async function POST(request: Request) {
         { status: 409, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Send welcome email after successful approval
+    const { message, target } = buildWaitlistInviteEmail({
+      email: result.email,
+      fullName: result.fullName,
+      dedupKey: `waitlist_welcome:${result.profileId}`,
+    });
+
+    // Fire-and-forget: don't block the response on email delivery
+    sendNotification(message, target).catch(error => {
+      captureCriticalError(
+        'Failed to send waitlist welcome email',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          profileId: result.profileId,
+          email: result.email,
+        }
+      );
+    });
 
     return NextResponse.json(
       {

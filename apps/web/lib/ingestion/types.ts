@@ -22,6 +22,12 @@ export interface ExtractionResult {
   links: ExtractedLink[];
   displayName?: string | null;
   avatarUrl?: string | null;
+  /**
+   * Whether the link-in-bio appears to be on a paid tier.
+   * Detected by absence of platform branding (e.g., "Made with Linktree").
+   * null = not detected, true = paid tier, false = free tier with branding
+   */
+  hasPaidTier?: boolean | null;
 }
 
 export interface NormalizedLinkCandidate extends ExtractedLink {

@@ -281,6 +281,13 @@
       "when": 1736400000000,
       "tag": "0039_add_waitlist_entry_to_profiles",
       "breakpoints": false
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1736500000000,
+      "tag": "0040_add_fit_scoring_columns",
+      "breakpoints": false
     }
   ]
 }

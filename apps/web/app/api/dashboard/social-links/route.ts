@@ -584,6 +584,218 @@ export async function PUT(req: Request) {
   }
 }
 
+/**
+ * PATCH handler for accepting/dismissing link suggestions.
+ *
+ * Updates a link's state to 'active' (accept) or 'rejected' (dismiss).
+ * Returns the full link object for accept operations so the client
+ * can add it to the active links list.
+ */
+export async function PATCH(req: Request) {
+  try {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      // Apply rate limiting
+      const { allowed, headers: rateLimitHeaders } =
+        await checkRateLimit(clerkUserId);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded. Please try again later.' },
+          { status: 429, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      const parsedBody = await parseJsonBody<unknown>(req, {
+        route: 'PATCH /api/dashboard/social-links',
+        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+      });
+      if (!parsedBody.ok) {
+        return parsedBody.response;
+      }
+      const rawBody = parsedBody.data;
+      if (rawBody == null || typeof rawBody !== 'object') {
+        return NextResponse.json(
+          { error: 'Invalid request body' },
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      const parsed = updateLinkStateSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: 'Invalid request body' },
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      const { profileId, linkId, action, expectedVersion } = parsed.data;
+
+      if (!profileId || !linkId || !action) {
+        return NextResponse.json(
+          { error: 'Profile ID, Link ID, and action are required' },
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Verify the profile belongs to the authenticated user
+      const [profile] = await tx
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(
+          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+        )
+        .limit(1);
+
+      if (!profile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Get the full link to verify it exists and return it for accept
+      const [link] = await tx
+        .select({
+          id: socialLinks.id,
+          creatorProfileId: socialLinks.creatorProfileId,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          sortOrder: socialLinks.sortOrder,
+          displayText: socialLinks.displayText,
+          state: socialLinks.state,
+          confidence: socialLinks.confidence,
+          sourcePlatform: socialLinks.sourcePlatform,
+          sourceType: socialLinks.sourceType,
+          evidence: socialLinks.evidence,
+          version: socialLinks.version,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.id, linkId),
+            eq(socialLinks.creatorProfileId, profileId)
+          )
+        )
+        .limit(1);
+
+      if (!link) {
+        return NextResponse.json(
+          { error: 'Link not found' },
+          { status: 404, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Check optimistic locking if expectedVersion is provided
+      if (expectedVersion !== undefined) {
+        const currentVersion = link.version ?? 1;
+        if (currentVersion !== expectedVersion) {
+          const response = {
+            error: 'Conflict: Link has been modified by another request',
+            code: 'VERSION_CONFLICT',
+            currentVersion,
+            expectedVersion,
+          };
+          return NextResponse.json(response, {
+            status: 409,
+            headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          });
+        }
+      }
+
+      const newVersion = (link.version ?? 1) + 1;
+
+      if (action === 'accept') {
+        // Activate the link
+        await tx
+          .update(socialLinks)
+          .set({
+            state: 'active',
+            isActive: true,
+            version: newVersion,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
+
+        // Invalidate caches
+        await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
+
+        // Parse confidence for response
+        const parsedConfidence =
+          typeof link.confidence === 'number'
+            ? link.confidence
+            : Number.parseFloat(String(link.confidence ?? '0'));
+
+        // Return full link object for client to add to active links
+        return NextResponse.json(
+          {
+            ok: true,
+            version: newVersion,
+            link: {
+              id: link.id,
+              platform: link.platform,
+              platformType: link.platformType,
+              url: link.url,
+              sortOrder: link.sortOrder,
+              isActive: true,
+              displayText: link.displayText,
+              state: 'active',
+              confidence: Number.isFinite(parsedConfidence)
+                ? parsedConfidence
+                : 0,
+              sourcePlatform: link.sourcePlatform,
+              sourceType: link.sourceType ?? 'ingested',
+              evidence: link.evidence,
+              version: newVersion,
+            },
+          },
+          { status: 200, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      } else if (action === 'dismiss') {
+        // Reject the link
+        await tx
+          .update(socialLinks)
+          .set({
+            state: 'rejected',
+            isActive: false,
+            version: newVersion,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
+
+        // Invalidate caches
+        await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
+
+        return NextResponse.json(
+          { ok: true, version: newVersion },
+          { status: 200, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Invalid action
+      return NextResponse.json(
+        { error: 'Invalid action. Must be "accept" or "dismiss".' },
+        { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+      );
+    });
+  } catch (error) {
+    console.error('Error updating link state:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
