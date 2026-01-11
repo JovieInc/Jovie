@@ -902,7 +902,7 @@ jobs:
 
   ci-test-performance:
     name: Test Performance Budgets
-    needs: [ci-typecheck, ci-biome]
+    needs: [ci-typecheck]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
