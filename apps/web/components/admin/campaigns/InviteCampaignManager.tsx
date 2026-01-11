@@ -57,33 +57,43 @@ export function InviteCampaignManager() {
   const [error, setError] = useState<string | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchPreview = useCallback(async () => {
-    const abortController = new AbortController();
-    setIsLoadingPreview(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `/api/admin/creator-invite/bulk?threshold=${fitScoreThreshold}&limit=${limit}`,
-        { signal: abortController.signal }
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch preview');
+  const fetchPreview = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsLoadingPreview(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `/api/admin/creator-invite/bulk?threshold=${fitScoreThreshold}&limit=${limit}`,
+          { signal }
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch preview');
+        }
+        setPreview(data);
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch preview'
+        );
+      } finally {
+        setIsLoadingPreview(false);
       }
-      setPreview(data);
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setError(err instanceof Error ? err.message : 'Failed to fetch preview');
-    } finally {
-      setIsLoadingPreview(false);
-    }
-    return () => abortController.abort();
-  }, [fitScoreThreshold, limit]);
+    },
+    [fitScoreThreshold, limit]
+  );
+
+  const handleRefreshClick = useCallback(() => {
+    fetchPreview();
+  }, [fetchPreview]);
 
   useEffect(() => {
-    fetchPreview();
-    // Cleanup timeout on unmount
+    const abortController = new AbortController();
+    fetchPreview(abortController.signal);
+
+    // Cleanup: abort fetch and clear timeout on unmount or dependency change
     return () => {
+      abortController.abort();
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
@@ -292,7 +302,7 @@ export function InviteCampaignManager() {
           <Button
             variant='ghost'
             size='sm'
-            onClick={fetchPreview}
+            onClick={handleRefreshClick}
             disabled={isLoadingPreview}
           >
             {isLoadingPreview ? (
