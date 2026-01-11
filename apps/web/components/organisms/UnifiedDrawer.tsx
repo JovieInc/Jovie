@@ -29,7 +29,7 @@ export function UnifiedDrawer({
   return (
     <aside
       className={cn(
-        'fixed top-0 right-0 h-full bg-surface-2 border-l border-subtle z-40',
+        'fixed top-0 right-0 h-full bg-surface-1 border-l border-subtle z-40',
         'transition-transform duration-300 ease-out',
         isOpen ? 'translate-x-0' : 'translate-x-full'
       )}
