@@ -69,7 +69,7 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
     <nav
       aria-label='Dashboard tabs'
       className={cn(
-        'fixed inset-x-0 bottom-0 z-30 border-t border-subtle bg-bg-base/95 backdrop-blur supports-backdrop-filter:bg-bg-base/80 lg:hidden',
+        'sticky bottom-0 z-30 border-t border-subtle bg-bg-base/95 backdrop-blur supports-backdrop-filter:bg-bg-base/80 lg:hidden',
         className
       )}
     >

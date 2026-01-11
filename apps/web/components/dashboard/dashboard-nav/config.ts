@@ -113,7 +113,7 @@ export const settingsNavigation: NavItem[] = [
 
 export const adminNavigation: NavItem[] = [
   {
-    name: 'Overview',
+    name: 'Dashboard',
     href: '/app/admin',
     id: 'admin_overview',
     icon: ShieldCheck,

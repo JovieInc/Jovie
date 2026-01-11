@@ -53,17 +53,16 @@ export function ContactSocialLinks({
       <div className='flex items-center justify-between'>
         <Label className='text-xs text-sidebar-muted'>Social links</Label>
         {isEditable && (
-          <Button
+          <button
             type='button'
-            size='icon'
-            variant='ghost'
+            className='p-1 rounded hover:bg-sidebar-accent transition-colors'
             aria-label='Add social link'
             onClick={() => {
               onSetIsAddingLink(true);
             }}
           >
             <Plus className='h-4 w-4' />
-          </Button>
+          </button>
         )}
       </div>
 
