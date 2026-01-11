@@ -9,13 +9,23 @@
  * - Creator: https://app.hellothematic.com/creator/profile/{id}
  *
  * Profile IDs are numeric and incremental, providing account age context.
+ *
+ * Note: Thematic blocks server-side requests with 403. This strategy uses
+ * Browserless as a fallback for bot-protected pages. Set BROWSERLESS_API_KEY
+ * environment variable to enable browser-based fetching.
  */
 
+import { logger } from '@/lib/utils/logger';
 import {
   canonicalIdentity,
   detectPlatform,
   normalizeUrl,
 } from '@/lib/utils/platform-detection';
+import {
+  fetchWithBrowserless,
+  isBrowserlessConfigured,
+  shouldFallbackToBrowserless,
+} from '../browserless';
 import type { ExtractionResult } from '../types';
 import {
   createExtractionResult,
@@ -173,8 +183,59 @@ export function normalizeThematicHandle(handle: string): string {
 // ============================================================================
 
 /**
+ * Try a simple HTTP fetch first (free and fast).
+ * This will likely fail with 403 for Thematic, but we try anyway.
+ */
+async function trySimpleFetch(
+  url: string,
+  timeoutMs: number
+): Promise<string | null> {
+  const options: FetchOptions = {
+    timeoutMs,
+    maxRetries: 1, // Don't retry on 403
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    headers: {
+      Accept:
+        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+      // Try adding a referer to look more like a browser
+      Referer: 'https://www.google.com/',
+    },
+    allowedHosts: THEMATIC_CONFIG.validHosts,
+  };
+
+  try {
+    const result = await fetchDocument(url, options);
+    return result.html;
+  } catch (error) {
+    // Check if this is a bot-blocking error
+    if (shouldFallbackToBrowserless(error)) {
+      logger.info('Simple fetch blocked, will try Browserless', {
+        url,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+    // Re-throw other errors
+    throw error;
+  }
+}
+
+/**
  * Fetches the HTML content of a Thematic profile.
- * Includes timeout, retries, and proper error handling.
+ *
+ * Strategy:
+ * 1. Try simple HTTP fetch first (free, fast)
+ * 2. If blocked (403), fall back to Browserless (costs money but works)
+ *
+ * Browserless is optimized for speed to minimize costs:
+ * - Blocks images/fonts/CSS
+ * - Uses small viewport
+ * - Exits immediately after extraction
+ * - Targets <15s execution (one 30s billing block)
  */
 export async function fetchThematicDocument(
   sourceUrl: string,
@@ -185,23 +246,49 @@ export async function fetchThematicDocument(
     throw new ExtractionError('Invalid Thematic URL', 'INVALID_URL');
   }
 
-  const options: FetchOptions = {
-    timeoutMs,
-    maxRetries: 2,
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    headers: {
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
-    allowedHosts: THEMATIC_CONFIG.validHosts,
-  };
+  // Try simple fetch first (free)
+  const simpleResult = await trySimpleFetch(validatedUrl, timeoutMs);
+  if (simpleResult) {
+    logger.info('Thematic profile fetched via simple HTTP', { url: validatedUrl });
+    return simpleResult;
+  }
 
-  const result = await fetchDocument(validatedUrl, options);
-  return result.html;
+  // Fall back to Browserless if configured
+  if (!isBrowserlessConfigured()) {
+    throw new ExtractionError(
+      'Thematic blocks server requests. Set BROWSERLESS_API_KEY to enable browser-based fetching.',
+      'FETCH_FAILED'
+    );
+  }
+
+  logger.info('Fetching Thematic profile via Browserless', { url: validatedUrl });
+
+  try {
+    const browserResult = await fetchWithBrowserless({
+      url: validatedUrl,
+      pageLoadTimeout: 10000,
+      operationTimeout: 15000,
+      blockResources: true,
+      // Wait for profile content to load
+      waitForSelector: 'main, [data-testid="profile"], .profile, #profile',
+    });
+
+    logger.info('Thematic profile fetched via Browserless', {
+      url: validatedUrl,
+      durationMs: browserResult.durationMs,
+    });
+
+    return browserResult.html;
+  } catch (error) {
+    logger.error('Browserless fetch failed for Thematic', {
+      url: validatedUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new ExtractionError(
+      `Failed to fetch Thematic profile: ${error instanceof Error ? error.message : String(error)}`,
+      'FETCH_FAILED'
+    );
+  }
 }
 
 // ============================================================================
