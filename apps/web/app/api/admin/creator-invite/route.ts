@@ -4,8 +4,10 @@ import { z } from 'zod';
 
 import { db } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
+import { enqueueClaimInviteJob } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -15,13 +17,15 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const createInviteSchema = z.object({
   creatorProfileId: z.string().uuid(),
   email: z.string().email(),
+  /** If true, immediately enqueue the email for sending. Default: true */
+  sendImmediately: z.boolean().optional().default(true),
 });
 
 /**
  * Admin endpoint to create a claim invite for a creator profile.
  *
- * This creates a pending invite record that can be processed by
- * a background worker to send the actual email.
+ * Creates a pending invite record and optionally enqueues it for
+ * immediate email delivery via the background job queue.
  */
 export async function POST(request: Request) {
   try {
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { creatorProfileId, email } = parsed.data;
+    const { creatorProfileId, email, sendImmediately } = parsed.data;
 
     // Verify the creator profile exists and is not claimed
     const [profile] = await db
@@ -92,52 +96,68 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create the invite record
-    const [invite] = await db
-      .insert(creatorClaimInvites)
-      .values({
-        creatorProfileId,
-        email: email.toLowerCase().trim(),
-        status: 'pending',
-        meta: { source: 'admin_click' },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning({
-        id: creatorClaimInvites.id,
-        email: creatorClaimInvites.email,
-        status: creatorClaimInvites.status,
-        createdAt: creatorClaimInvites.createdAt,
-      });
+    // Create the invite record and optionally enqueue for sending
+    const result = await withSystemIngestionSession(async tx => {
+      // Create the invite record
+      const [invite] = await tx
+        .insert(creatorClaimInvites)
+        .values({
+          creatorProfileId,
+          email: email.toLowerCase().trim(),
+          status: 'pending',
+          meta: { source: 'admin_click' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning({
+          id: creatorClaimInvites.id,
+          email: creatorClaimInvites.email,
+          status: creatorClaimInvites.status,
+          createdAt: creatorClaimInvites.createdAt,
+        });
 
-    if (!invite) {
-      return NextResponse.json(
-        { error: 'Failed to create invite' },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
-    }
+      if (!invite) {
+        throw new Error('Failed to create invite');
+      }
+
+      let jobId: string | null = null;
+
+      // Enqueue the email job if requested
+      if (sendImmediately) {
+        jobId = await enqueueClaimInviteJob(tx, {
+          inviteId: invite.id,
+          creatorProfileId,
+        });
+      }
+
+      return { invite, jobId };
+    });
 
     logger.info('Creator claim invite created', {
-      inviteId: invite.id,
+      inviteId: result.invite.id,
       profileId: creatorProfileId,
       profileUsername: profile.username,
-      email: invite.email,
+      email: result.invite.email,
+      jobEnqueued: !!result.jobId,
+      jobId: result.jobId,
     });
 
     return NextResponse.json(
       {
         ok: true,
         invite: {
-          id: invite.id,
-          email: invite.email,
-          status: invite.status,
-          createdAt: invite.createdAt,
+          id: result.invite.id,
+          email: result.invite.email,
+          status: result.invite.status,
+          createdAt: result.invite.createdAt,
         },
         profile: {
           id: profile.id,
           username: profile.username,
           displayName: profile.displayName,
         },
+        jobEnqueued: !!result.jobId,
+        jobId: result.jobId,
       },
       { status: 201, headers: NO_STORE_HEADERS }
     );

@@ -65,6 +65,9 @@ export async function processJob(
   const { processLayloJob } = await import('./jobs/laylo');
   const { processYouTubeJob } = await import('./jobs/youtube');
   const { processBeaconsJob } = await import('./jobs/beacons');
+  const { processSendClaimInviteJob } = await import(
+    '@/lib/email/jobs/send-claim-invite'
+  );
 
   switch (job.jobType) {
     case 'import_linktree':
@@ -75,6 +78,8 @@ export async function processJob(
       return processYouTubeJob(tx, job.payload);
     case 'import_beacons':
       return processBeaconsJob(tx, job.payload);
+    case 'send_claim_invite':
+      return processSendClaimInviteJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }
