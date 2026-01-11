@@ -1,12 +1,29 @@
 'use client';
 
-import { Checkbox } from '@jovie/ui';
+import {
+  Checkbox,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@jovie/ui';
 import Link from 'next/link';
+import { useCallback, useState } from 'react';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
+import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-menu/CreatorActionsMenuContent';
+import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import {
+  geistTableMenuContentClass,
+  geistTableMenuDestructiveItemClass,
+  geistTableMenuItemClass,
+  geistTableMenuSeparatorClass,
+} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 export interface CreatorProfileTableRowProps {
   profile: AdminCreatorProfileRow;
@@ -52,7 +69,22 @@ export function CreatorProfileTableRow({
   const displayName =
     'displayName' in profile ? (profile.displayName ?? null) : null;
 
-  return (
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const handleCopyClaimLink = useCallback(async () => {
+    if (!profile.claimToken) return;
+
+    const baseUrl = getBaseUrl();
+    const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
+    const success = await copyTextToClipboard(claimUrl);
+
+    if (success) {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  }, [profile.claimToken]);
+
+  const rowContent = (
     <tr
       className={cn(
         'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
@@ -63,11 +95,6 @@ export function CreatorProfileTableRow({
             : 'hover:bg-base dark:hover:bg-surface-2'
       )}
       onClick={() => onRowClick(profile.id)}
-      onContextMenu={event => {
-        event.preventDefault();
-        event.stopPropagation();
-        onContextMenu(profile.id);
-      }}
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
@@ -196,5 +223,59 @@ export function CreatorProfileTableRow({
         </div>
       </td>
     </tr>
+  );
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+      <ContextMenuContent className={geistTableMenuContentClass}>
+        <CreatorActionsMenuContent
+          profile={profile}
+          status={verificationStatus}
+          refreshIngestStatus={refreshIngestStatus}
+          onToggleVerification={onToggleVerification}
+          onToggleFeatured={onToggleFeatured}
+          onToggleMarketing={onToggleMarketing}
+          onRefreshIngest={async () => {
+            await onRefreshIngest();
+          }}
+          onSendInvite={onSendInvite}
+          onDelete={onDelete}
+          copySuccess={copySuccess}
+          onCopyClaimLink={handleCopyClaimLink}
+          renderItem={({ onClick, href, disabled, destructive, children }) => {
+            if (href) {
+              return (
+                <ContextMenuItem asChild className={geistTableMenuItemClass}>
+                  <Link
+                    href={href}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {children}
+                  </Link>
+                </ContextMenuItem>
+              );
+            }
+            return (
+              <ContextMenuItem
+                onClick={onClick}
+                disabled={disabled}
+                className={cn(
+                  geistTableMenuItemClass,
+                  destructive && geistTableMenuDestructiveItemClass
+                )}
+              >
+                {children}
+              </ContextMenuItem>
+            );
+          }}
+          renderSeparator={() => (
+            <ContextMenuSeparator className={geistTableMenuSeparatorClass} />
+          )}
+        />
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
