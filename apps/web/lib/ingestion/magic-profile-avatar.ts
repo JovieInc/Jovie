@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import type { OutputInfo } from 'sharp';
 import type { DbType } from '@/lib/db';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
@@ -610,10 +611,10 @@ export async function copyExternalAvatarToStorage(params: {
     return blobUrl;
   } catch (error) {
     // Log but don't throw - avatar copying is best-effort
-    console.warn(
-      `[copyExternalAvatarToStorage] Failed to copy avatar from ${sourcePlatform}:`,
-      error instanceof Error ? error.message : String(error)
-    );
+    logger.warn('copyExternalAvatarToStorage failed', {
+      sourcePlatform,
+      error,
+    });
     return null;
   }
 }
