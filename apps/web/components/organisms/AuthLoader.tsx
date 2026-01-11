@@ -22,11 +22,14 @@ export function AuthLoader() {
     <div className='flex h-full w-full items-center justify-center'>
       <div className='flex flex-col items-center gap-3'>
         <BrandLogo size={40} className='animate-pulse' />
-        {showMessage && (
-          <p className='text-xs text-secondary-token animate-in fade-in'>
-            Loading...
-          </p>
-        )}
+        <p
+          className={`text-xs text-secondary-token transition-opacity duration-300 ${
+            showMessage ? 'opacity-100' : 'opacity-0'
+          }`}
+          aria-hidden={!showMessage}
+        >
+          Loading...
+        </p>
       </div>
     </div>
   );
