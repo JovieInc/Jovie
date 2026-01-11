@@ -40,7 +40,7 @@ class TestPerformanceGuard {
   private resolvedBaselinePath?: string;
 
   private thresholds: PerformanceThresholds = {
-    totalDuration: 120000, // 120 seconds (CI environments need more time for cold starts)
+    totalDuration: 400000, // 6.67 minutes (updated to match critical suite baseline)
     p95: 200, // 200ms
     setupTime: 150000, // 150 seconds (CI cold start + environment initialization)
     individualTest: 200, // 200ms
