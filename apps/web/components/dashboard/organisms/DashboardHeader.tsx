@@ -34,8 +34,20 @@ export function DashboardHeader({
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
-          <div className='hidden lg:flex items-center'>{sidebarTrigger}</div>
-        ) : null}
+          <div
+            className='hidden lg:flex items-center'
+            data-testid='sidebar-trigger-wrapper'
+          >
+            {sidebarTrigger}
+          </div>
+        ) : (
+          <div
+            className='hidden lg:flex items-center'
+            data-testid='sidebar-trigger-empty'
+          >
+            {/* DEBUG: Trigger is null */}
+          </div>
+        )}
         {/* Conditional vertical separator between sidebar trigger and actions */}
         {showDivider && sidebarTrigger && action ? (
           <div className='hidden lg:flex items-center'>
