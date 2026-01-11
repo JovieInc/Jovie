@@ -297,12 +297,19 @@ function DashboardLayoutInner({
       'state:',
       state,
       'show button:',
-      !isMobile && state === 'closed'
+      !isMobile && state === 'closed',
+      'window.innerWidth:',
+      window.innerWidth
     );
   }
 
   const SidebarExpandButton =
     !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+
+  // Force render for debugging
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('[DashboardLayout] SidebarExpandButton:', SidebarExpandButton);
+  }
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
@@ -330,6 +337,14 @@ function DashboardLayoutInner({
                   showDivider={true}
                   action={<>{ContactToggleButton}</>}
                 />
+                {typeof window !== 'undefined' &&
+                  process.env.NODE_ENV === 'development' && (
+                    <div className='absolute top-14 left-4 z-50 bg-black/90 text-white text-xs p-2 rounded'>
+                      Debug: SidebarTrigger=
+                      {SidebarExpandButton ? 'YES' : 'NULL'}, Action=
+                      {ContactToggleButton ? 'YES' : 'NULL'}
+                    </div>
+                  )}
                 <div className='flex-1 min-h-0 overflow-hidden flex'>
                   <div
                     className={cn(
