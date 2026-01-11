@@ -11,7 +11,6 @@ import {
 } from '@/components/admin/creator-sort-config';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
-import { AdminCreatorsTableHeaderActions } from '@/components/admin/table/AdminCreatorsTableHeaderActions';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
@@ -297,11 +296,6 @@ export function AdminCreatorProfilesWithSidebar({
                 stickyTopPx={stickyTopPx}
                 onToggleSelectAll={toggleSelectAll}
                 onSortChange={handleSortChange}
-                headerActions={
-                  <AdminCreatorsTableHeaderActions
-                    onIngestPending={handleIngestPending}
-                  />
-                }
               />
               <tbody>
                 {profilesWithActions.length === 0 ? (
