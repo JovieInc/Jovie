@@ -1,17 +1,11 @@
 import { unstable_cache, unstable_noStore } from 'next/cache';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import {
-  AUDIENCE_IDENTIFIED_COOKIE,
-  AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
-  PAGE_SUBTITLES,
-  PROFILE_URL,
-} from '@/constants/app';
+import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
   getCreatorProfileWithLinks,
@@ -28,6 +22,9 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
+
+// Feature flag check timeout (ms) - don't block render for slow flag checks
+const FLAG_CHECK_TIMEOUT_MS = 100;
 
 // Note: runtime = 'edge' removed for cacheComponents compatibility
 // Edge runtime is incompatible with Cache Components
@@ -171,6 +168,29 @@ interface Props {
   };
 }
 
+/**
+ * Non-blocking feature flag check with timeout.
+ * Returns false if the check takes too long, avoiding render delays.
+ */
+async function checkFeatureFlagWithTimeout(
+  clerkId: string | null
+): Promise<boolean> {
+  if (!clerkId) return false;
+
+  try {
+    const result = await Promise.race([
+      checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, { userID: clerkId }),
+      new Promise<false>(resolve =>
+        setTimeout(() => resolve(false), FLAG_CHECK_TIMEOUT_MS)
+      ),
+    ]);
+    return result;
+  } catch {
+    // Fail open - don't block render for flag check failures
+    return false;
+  }
+}
+
 export default async function ArtistPage({ params, searchParams }: Props) {
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
@@ -181,11 +201,9 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     unstable_noStore();
   }
 
-  const cookieStore = await cookies();
-  const isIdentified =
-    cookieStore.get(AUDIENCE_IDENTIFIED_COOKIE)?.value === '1';
-  const spotifyPreferred =
-    cookieStore.get(AUDIENCE_SPOTIFY_PREFERRED_COOKIE)?.value === '1';
+  // NOTE: Cookie access removed from server component to enable static optimization.
+  // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
+  // via the StaticArtistPage component which reads cookies on hydration.
 
   const normalizedUsername = username.toLowerCase();
   const { profile, links, contacts, status, creatorIsPro, creatorClerkId } =
@@ -221,16 +239,10 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  const dynamicOverrideEnabled = creatorClerkId
-    ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
-        userID: creatorClerkId,
-      })
-    : false;
-
+  // Non-blocking feature flag check with timeout
+  const dynamicOverrideEnabled =
+    await checkFeatureFlagWithTimeout(creatorClerkId);
   const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
-
-  const primaryAction = dynamicEnabled && isIdentified ? 'listen' : 'subscribe';
-  const effectiveSpotifyPreferred = dynamicEnabled ? spotifyPreferred : false;
 
   // Social links loaded together with profile in a single cached helper
   const socialLinks = links;
@@ -240,8 +252,8 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   );
 
   // Determine subtitle based on mode
-  const getSubtitle = (mode: string) => {
-    switch (mode) {
+  const getSubtitle = (currentMode: string) => {
+    switch (currentMode) {
       case 'listen':
         return PAGE_SUBTITLES.listen;
       case 'tip':
@@ -260,6 +272,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   // Determine if we should show the claim banner
   // Show only when a claim token is present in the URL and matches the profile's token
+  // NOTE: This is async but only runs for unclaimed profiles with a claim token (rare path)
   let showClaimBanner = false;
   if (typeof claimTokenParam === 'string' && claimTokenParam.length > 0) {
     const claimToken = claimTokenParam;
@@ -288,8 +301,6 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         subtitle={getSubtitle(mode)}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
-        primaryAction={primaryAction}
-        spotifyPreferred={effectiveSpotifyPreferred}
         enableDynamicEngagement={dynamicEnabled}
       />
       <DesktopQrOverlayClient handle={artist.handle} />

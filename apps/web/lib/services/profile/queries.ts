@@ -14,6 +14,7 @@ import {
   socialLinks,
   users,
 } from '@/lib/db/schema';
+import { redis } from '@/lib/redis';
 import type {
   ProfileData,
   ProfileSocialLink,
@@ -25,6 +26,10 @@ import type {
 // Bounded data retrieval limits to prevent OOM on profiles with many links
 const MAX_SOCIAL_LINKS = 100;
 const MAX_CONTACTS = 50;
+
+// Redis edge cache settings
+const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
+const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
 
 /**
  * Get a profile by its ID.
@@ -262,29 +267,205 @@ export async function getProfileContacts(
 }
 
 /**
- * Get a profile with all related data (links, contacts, user).
+ * Get a profile with all related data (links, contacts, user) in a single query.
  * This is the main query for public profile pages.
  *
+ * Optimized:
+ * - Uses Redis edge cache (5 min TTL) to avoid Neon round-trips
+ * - Parallel database queries when cache misses
+ * - Falls back gracefully if Redis is unavailable
+ *
  * @param username - The username to look up
+ * @param options - Query options
  * @returns Full profile with links and contacts, or null if not found
  */
 export async function getProfileWithLinks(
-  username: string
+  username: string,
+  options?: { skipCache?: boolean }
 ): Promise<ProfileWithLinks | null> {
-  const profile = await getProfileWithUser(username);
-  if (!profile) return null;
+  const normalizedUsername = username.toLowerCase();
+  const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${normalizedUsername}`;
 
-  // Fetch links and contacts in parallel
-  const [links, contacts] = await Promise.all([
-    getProfileSocialLinks(profile.id),
-    getProfileContacts(profile.id),
+  // Try Redis cache first (unless explicitly skipped)
+  if (redis && !options?.skipCache) {
+    try {
+      const cached = await redis.get<ProfileWithLinks>(cacheKey);
+      if (cached) {
+        // Revive Date objects from JSON
+        return reviveProfileDates(cached);
+      }
+    } catch (error) {
+      console.warn('[profile-service] Redis cache read failed:', error);
+      // Fall through to database query
+    }
+  }
+
+  // Cache miss - query database with parallel fetches
+  const result = await fetchProfileFromDatabase(normalizedUsername);
+
+  // Cache the result in Redis (fire-and-forget)
+  if (redis && result) {
+    redis
+      .set(cacheKey, result, { ex: PROFILE_CACHE_TTL_SECONDS })
+      .catch(error => {
+        console.warn('[profile-service] Redis cache write failed:', error);
+      });
+  }
+
+  return result;
+}
+
+/**
+ * Revive Date objects from JSON-serialized profile data.
+ */
+function reviveProfileDates(profile: ProfileWithLinks): ProfileWithLinks {
+  return {
+    ...profile,
+    createdAt: new Date(profile.createdAt),
+    updatedAt: new Date(profile.updatedAt),
+    socialLinks: profile.socialLinks.map(link => ({
+      ...link,
+      createdAt: new Date(link.createdAt),
+      updatedAt: new Date(link.updatedAt),
+    })),
+    contacts: profile.contacts.map(contact => ({
+      ...contact,
+      createdAt: new Date(contact.createdAt),
+      updatedAt: new Date(contact.updatedAt),
+    })),
+  };
+}
+
+/**
+ * Fetch profile data from the database with parallel queries.
+ */
+async function fetchProfileFromDatabase(
+  normalizedUsername: string
+): Promise<ProfileWithLinks | null> {
+  // Single query that fetches profile, user, links, and contacts together
+  // Using Promise.all at the database driver level for true parallelism
+  const [profileResult, linksResult, contactsResult] = await Promise.all([
+    // Profile with user data
+    db
+      .select({
+        id: creatorProfiles.id,
+        userId: creatorProfiles.userId,
+        userIsPro: users.isPro,
+        userClerkId: users.clerkId,
+        creatorType: creatorProfiles.creatorType,
+        username: creatorProfiles.username,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+        displayName: creatorProfiles.displayName,
+        bio: creatorProfiles.bio,
+        avatarUrl: creatorProfiles.avatarUrl,
+        spotifyUrl: creatorProfiles.spotifyUrl,
+        appleMusicUrl: creatorProfiles.appleMusicUrl,
+        youtubeUrl: creatorProfiles.youtubeUrl,
+        spotifyId: creatorProfiles.spotifyId,
+        isPublic: creatorProfiles.isPublic,
+        isVerified: creatorProfiles.isVerified,
+        isClaimed: creatorProfiles.isClaimed,
+        isFeatured: creatorProfiles.isFeatured,
+        marketingOptOut: creatorProfiles.marketingOptOut,
+        settings: creatorProfiles.settings,
+        theme: creatorProfiles.theme,
+        profileViews: creatorProfiles.profileViews,
+        createdAt: creatorProfiles.createdAt,
+        updatedAt: creatorProfiles.updatedAt,
+      })
+      .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+      .limit(1),
+
+    // Social links - executed in parallel with profile query
+    db
+      .select({
+        id: socialLinks.id,
+        creatorProfileId: socialLinks.creatorProfileId,
+        platform: socialLinks.platform,
+        platformType: socialLinks.platformType,
+        url: socialLinks.url,
+        displayText: socialLinks.displayText,
+        clicks: socialLinks.clicks,
+        isActive: socialLinks.isActive,
+        sortOrder: socialLinks.sortOrder,
+        createdAt: socialLinks.createdAt,
+        updatedAt: socialLinks.updatedAt,
+      })
+      .from(socialLinks)
+      .innerJoin(
+        creatorProfiles,
+        eq(socialLinks.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.usernameNormalized, normalizedUsername),
+          eq(socialLinks.isActive, true),
+          ne(socialLinks.state, 'rejected')
+        )
+      )
+      .orderBy(socialLinks.sortOrder)
+      .limit(MAX_SOCIAL_LINKS),
+
+    // Contacts - executed in parallel with profile query
+    db
+      .select({
+        id: creatorContacts.id,
+        creatorProfileId: creatorContacts.creatorProfileId,
+        role: creatorContacts.role,
+        customLabel: creatorContacts.customLabel,
+        personName: creatorContacts.personName,
+        companyName: creatorContacts.companyName,
+        territories: creatorContacts.territories,
+        email: creatorContacts.email,
+        phone: creatorContacts.phone,
+        preferredChannel: creatorContacts.preferredChannel,
+        isActive: creatorContacts.isActive,
+        sortOrder: creatorContacts.sortOrder,
+        createdAt: creatorContacts.createdAt,
+        updatedAt: creatorContacts.updatedAt,
+      })
+      .from(creatorContacts)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorContacts.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.usernameNormalized, normalizedUsername),
+          eq(creatorContacts.isActive, true)
+        )
+      )
+      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
+      .limit(MAX_CONTACTS),
   ]);
+
+  const profile = profileResult[0];
+  if (!profile) return null;
 
   return {
     ...profile,
-    socialLinks: links,
-    contacts,
+    socialLinks: linksResult,
+    contacts: contactsResult,
   };
+}
+
+/**
+ * Invalidate the Redis cache for a profile.
+ * Call this after profile updates.
+ */
+export async function invalidateProfileEdgeCache(
+  usernameNormalized: string
+): Promise<void> {
+  if (!redis) return;
+
+  const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${usernameNormalized.toLowerCase()}`;
+  try {
+    await redis.del(cacheKey);
+  } catch (error) {
+    console.warn('[profile-service] Failed to invalidate edge cache:', error);
+  }
 }
 
 /**

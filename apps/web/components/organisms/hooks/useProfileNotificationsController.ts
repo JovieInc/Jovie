@@ -25,6 +25,16 @@ type ControllerParams = {
 };
 
 const STORAGE_KEY = 'jovie:notification-contacts';
+const STATUS_CACHE_KEY = 'jovie:notification-status-cache';
+// Cache notification status for 5 minutes to reduce API calls on hydration
+const STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface StatusCache {
+  artistId: string;
+  channels: NotificationSubscriptionState;
+  details: NotificationContactValues;
+  timestamp: number;
+}
 
 function readStoredContacts(): NotificationContactValues | null {
   if (typeof window === 'undefined') return null;
@@ -36,6 +46,51 @@ function readStoredContacts(): NotificationContactValues | null {
     return hasStoredContact ? parsed : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Read cached notification status if valid (not expired and same artist).
+ * This avoids making an API call on every page load for returning visitors.
+ */
+function readCachedStatus(artistId: string): StatusCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = window.localStorage.getItem(STATUS_CACHE_KEY);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached) as StatusCache;
+
+    // Check if cache is for the same artist and not expired
+    const isValid =
+      parsed.artistId === artistId &&
+      Date.now() - parsed.timestamp < STATUS_CACHE_TTL_MS;
+
+    return isValid ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cache notification status to avoid repeated API calls.
+ */
+function writeCachedStatus(
+  artistId: string,
+  channels: NotificationSubscriptionState,
+  details: NotificationContactValues
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const cache: StatusCache = {
+      artistId,
+      channels,
+      details,
+      timestamp: Date.now(),
+    };
+    window.localStorage.setItem(STATUS_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore storage errors
   }
 }
 
@@ -162,6 +217,21 @@ export function useProfileNotificationsController({
       }
 
       setSubscriptionDetails(prev => ({ ...prev, ...parsed }));
+
+      // Check if we have a valid cached status (avoids API call on every page load)
+      const cachedStatus = readCachedStatus(artistId);
+      if (cachedStatus) {
+        setSubscribedChannels(cachedStatus.channels);
+        const hasAny = Object.values(cachedStatus.channels).some(Boolean);
+        if (hasAny) {
+          setSubscriptionDetails(cachedStatus.details);
+          setState('success');
+        }
+        setHydrationStatus('done');
+        return;
+      }
+
+      // No cache - fetch from API
       setHydrationStatus('checking');
 
       void (async () => {
@@ -179,6 +249,9 @@ export function useProfileNotificationsController({
             setSubscriptionDetails(data.details ?? {});
             setState('success');
           }
+
+          // Cache the result to avoid future API calls
+          writeCachedStatus(artistId, data.channels, data.details ?? {});
         } catch (error) {
           console.error(
             'Unable to hydrate notification subscription state',

@@ -40,11 +40,20 @@ export function useProfileShell({
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const mode = searchParams?.get('mode') ?? 'profile';
-  const forceNotifications = searchParams?.get('preview') === '1';
+
+  // Memoize extracted search params to avoid downstream re-renders
+  // when unrelated URL parameters change
+  const { mode, source, forceNotifications } = useMemo(
+    () => ({
+      mode: searchParams?.get('mode') ?? 'profile',
+      source: searchParams?.get('source') ?? null,
+      forceNotifications: searchParams?.get('preview') === '1',
+    }),
+    [searchParams]
+  );
+
   const notificationsEnabled =
     forceNotificationsEnabled || true || forceNotifications;
-  const source = searchParams?.get('source');
 
   useTipPageTracking({
     artistHandle: artist.handle,
