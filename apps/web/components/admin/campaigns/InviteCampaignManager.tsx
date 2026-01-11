@@ -147,7 +147,7 @@ export function InviteCampaignManager() {
               </span>
             </div>
             <p className='text-xs text-secondary-token'>
-              Only invite profiles with fit score >= {fitScoreThreshold}
+              Only invite profiles with fit score {'>='} {fitScoreThreshold}
             </p>
           </div>
 
@@ -280,7 +280,7 @@ export function InviteCampaignManager() {
                   {preview.totalEligible}
                 </p>
                 <p className='text-xs text-secondary-token'>
-                  Total eligible (score >= {preview.threshold})
+                  Total eligible (score {'>='} {preview.threshold})
                 </p>
               </div>
               <div className='rounded-lg bg-surface-2 px-4 py-3'>
