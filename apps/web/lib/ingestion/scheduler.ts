@@ -1,7 +1,7 @@
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { type DbType, ingestionJobs } from '@/lib/db';
-import { logger } from '@/lib/utils/logger';
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
+import { logger } from '@/lib/utils/logger';
 import {
   beaconsPayloadSchema,
   layloPayloadSchema,
