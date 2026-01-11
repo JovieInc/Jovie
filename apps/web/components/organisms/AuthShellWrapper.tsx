@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState } from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { AuthShell } from './AuthShell';
 
@@ -62,6 +63,9 @@ export function AuthShellWrapper({
     pathname?.startsWith('/app/dashboard/profile') ?? false;
   const previewEnabled = config.section === 'dashboard' && isProfileRoute;
 
+  // Determine header action based on route type
+  const headerAction = config.isTableRoute ? <DrawerToggleButton /> : null;
+
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
       <PreviewPanelProvider enabled={previewEnabled}>
@@ -69,7 +73,7 @@ export function AuthShellWrapper({
           section={config.section}
           navigation={config.navigation}
           breadcrumbs={config.breadcrumbs}
-          headerAction={config.headerAction}
+          headerAction={headerAction}
           showMobileTabs={config.showMobileTabs}
           drawerContent={config.drawerContent}
           drawerWidth={config.drawerWidth ?? undefined}
