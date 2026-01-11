@@ -13,6 +13,10 @@
 
 import type { DbType } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema';
+import { processBeaconsJob } from './jobs/beacons';
+import { processLayloJob } from './jobs/laylo';
+import { processLinktreeJob } from './jobs/linktree';
+import { processYouTubeJob } from './jobs/youtube';
 
 // Re-export followup functions
 export { enqueueFollowupIngestionJobs } from './followup';
@@ -60,12 +64,6 @@ export async function processJob(
   tx: DbType,
   job: typeof ingestionJobs.$inferSelect
 ) {
-  // Import dynamically to avoid circular dependencies
-  const { processLinktreeJob } = await import('./jobs/linktree');
-  const { processLayloJob } = await import('./jobs/laylo');
-  const { processYouTubeJob } = await import('./jobs/youtube');
-  const { processBeaconsJob } = await import('./jobs/beacons');
-
   switch (job.jobType) {
     case 'import_linktree':
       return processLinktreeJob(tx, job.payload);
