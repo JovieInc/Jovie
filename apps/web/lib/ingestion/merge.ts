@@ -6,6 +6,7 @@ import {
   detectPlatform,
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
+import { copyExternalAvatarToStorage } from './magic-profile-avatar';
 import { applyProfileEnrichment } from './profile';
 import type { ExtractionResult } from './types';
 
@@ -237,6 +238,22 @@ export async function normalizeAndMergeExtraction(
     }
   }
 
+  // Copy external avatar to Jovie storage before applying enrichment
+  // This ensures we don't store third-party URLs in the database
+  let hostedAvatarUrl: string | null = null;
+  if (
+    extraction.avatarUrl &&
+    !profile.avatarUrl &&
+    !profile.avatarLockedByUser &&
+    profile.usernameNormalized
+  ) {
+    hostedAvatarUrl = await copyExternalAvatarToStorage({
+      externalUrl: extraction.avatarUrl,
+      handle: profile.usernameNormalized,
+      sourcePlatform: 'ingestion',
+    });
+  }
+
   // Apply basic enrichment for display name and avatar (phase 3 rules: respect locks)
   await applyProfileEnrichment(tx, {
     profileId: profile.id,
@@ -245,7 +262,9 @@ export async function normalizeAndMergeExtraction(
     currentDisplayName: profile.displayName,
     currentAvatarUrl: profile.avatarUrl,
     extractedDisplayName: extraction.displayName ?? null,
-    extractedAvatarUrl: extraction.avatarUrl ?? null,
+    // Use the Jovie-hosted URL if available, otherwise fall back to external URL
+    // (applyProfileEnrichment will skip if current avatar exists or is locked)
+    extractedAvatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
   });
 
   return { inserted, updated };
