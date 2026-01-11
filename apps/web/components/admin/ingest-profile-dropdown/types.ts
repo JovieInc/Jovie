@@ -1,4 +1,9 @@
-export type IngestPlatform = 'linktree' | 'beacons' | 'instagram';
+export type IngestPlatform =
+  | 'linktree'
+  | 'beacons'
+  | 'instagram'
+  | 'thematic_artist'
+  | 'thematic_creator';
 
 export interface PlatformOption {
   id: IngestPlatform;

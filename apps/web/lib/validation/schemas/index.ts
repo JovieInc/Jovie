@@ -238,6 +238,10 @@ export {
   linktreeJobPayloadSchema,
   // Base payload schemas (dedupKey optional - for processor.ts)
   linktreePayloadSchema,
+  type ThematicJobPayload,
+  type ThematicPayload,
+  thematicJobPayloadSchema,
+  thematicPayloadSchema,
   type YouTubeJobPayload,
   type YouTubePayload,
   youtubeJobPayloadSchema,
