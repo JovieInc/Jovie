@@ -115,27 +115,81 @@ export async function calculateMissingFitScores(
   db: DbType,
   limit = 100
 ): Promise<number> {
-  // Find profiles without fit scores
   const profiles = await db
-    .select({ id: creatorProfiles.id })
+    .select({
+      id: creatorProfiles.id,
+      spotifyId: creatorProfiles.spotifyId,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
+      genres: creatorProfiles.genres,
+      ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
+      socialLinkPlatforms: sql<string[]>`
+        coalesce(
+          array_agg(distinct ${socialLinks.platform})
+            filter (where ${socialLinks.platform} is not null),
+          '{}'
+        )
+      `,
+      latestReleaseDate: sql<Date | null>`
+        max(${discogReleases.releaseDate})
+      `,
+    })
     .from(creatorProfiles)
+    .leftJoin(
+      socialLinks,
+      and(
+        eq(socialLinks.creatorProfileId, creatorProfiles.id),
+        eq(socialLinks.state, 'active')
+      )
+    )
+    .leftJoin(
+      discogReleases,
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfiles.id),
+        isNotNull(discogReleases.releaseDate)
+      )
+    )
     .where(
       and(
         isNull(creatorProfiles.fitScore),
         eq(creatorProfiles.isClaimed, false)
       )
     )
+    .groupBy(creatorProfiles.id)
     .limit(limit);
 
-  let count = 0;
-  for (const profile of profiles) {
-    const result = await calculateAndStoreFitScore(db, profile.id);
-    if (result) {
-      count++;
-    }
+  if (profiles.length === 0) {
+    return 0;
   }
 
-  return count;
+  const results = await Promise.all(
+    profiles.map(async profile => {
+      const input: FitScoreInput = {
+        ingestionSourcePlatform: profile.ingestionSourcePlatform,
+        hasPaidTier: false,
+        socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
+        hasSpotifyId: !!profile.spotifyId,
+        spotifyPopularity: profile.spotifyPopularity,
+        genres: profile.genres,
+        latestReleaseDate: profile.latestReleaseDate ?? null,
+      };
+
+      const { score, breakdown } = calculateFitScore(input);
+
+      await db
+        .update(creatorProfiles)
+        .set({
+          fitScore: score,
+          fitScoreBreakdown: breakdown,
+          fitScoreUpdatedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+
+      return true;
+    })
+  );
+
+  return results.filter(Boolean).length;
 }
 
 /**
