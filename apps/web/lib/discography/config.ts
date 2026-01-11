@@ -12,6 +12,7 @@ export const PROVIDER_CONFIG: Record<
   tidal: { label: 'Tidal', accent: '#000000' },
   amazon_music: { label: 'Amazon Music', accent: '#146EB4' },
   bandcamp: { label: 'Bandcamp', accent: '#629AA0' },
+  beatport: { label: 'Beatport', accent: '#A3E422' },
 };
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [

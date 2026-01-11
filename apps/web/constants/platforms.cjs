@@ -25,6 +25,7 @@ const SOCIAL_PLATFORMS = [
   'deezer',
   'amazon_music',
   'pandora',
+  'beatport',
 
   // Social Media Platforms
   'instagram',

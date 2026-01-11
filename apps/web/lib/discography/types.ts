@@ -6,7 +6,8 @@ export type ProviderKey =
   | 'deezer'
   | 'tidal'
   | 'amazon_music'
-  | 'bandcamp';
+  | 'bandcamp'
+  | 'beatport';
 
 export type ProviderSource = 'ingested' | 'manual';
 
