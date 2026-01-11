@@ -71,7 +71,9 @@ export function TableRowActions({
         variant='ghost'
         className={cn(
           'h-8 w-8 rounded-full transition-colors hover:bg-surface-2 disabled:opacity-50',
-          isVerified ? 'text-blue-500' : 'text-tertiary-token/40'
+          isVerified
+            ? 'text-blue-500 [&_svg]:fill-blue-500 [&_svg]:stroke-white'
+            : 'text-tertiary-token/40'
         )}
         onClick={async e => {
           e.stopPropagation();
@@ -90,11 +92,7 @@ export function TableRowActions({
         }
       >
         <BadgeCheck
-          className={cn(
-            'h-4 w-4',
-            isVerificationLoading && 'animate-pulse',
-            isVerified && 'fill-current'
-          )}
+          className={cn('h-4 w-4', isVerificationLoading && 'animate-pulse')}
         />
       </Button>
     </div>
