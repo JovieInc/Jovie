@@ -31,7 +31,7 @@ export function TableRowActions({
         type='button'
         size='icon'
         variant='ghost'
-        className='h-8 w-8 rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token disabled:opacity-50'
+        className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token disabled:opacity-50'
         onClick={async e => {
           e.stopPropagation();
           await onRefreshIngest();
@@ -51,7 +51,7 @@ export function TableRowActions({
         size='icon'
         variant='ghost'
         className={cn(
-          'h-8 w-8 rounded-full transition-colors cursor-default',
+          'h-8 w-8 rounded-md transition-colors cursor-default',
           isClaimed
             ? 'text-yellow-500 hover:bg-surface-2'
             : 'text-tertiary-token/40 hover:bg-transparent'
@@ -70,7 +70,7 @@ export function TableRowActions({
         size='icon'
         variant='ghost'
         className={cn(
-          'h-8 w-8 rounded-full transition-colors hover:bg-surface-2 disabled:opacity-50',
+          'h-8 w-8 rounded-md transition-colors hover:bg-surface-2 disabled:opacity-50',
           isVerified
             ? 'text-blue-500 [&_svg]:fill-blue-500 [&_svg]:stroke-white'
             : 'text-tertiary-token/40'
