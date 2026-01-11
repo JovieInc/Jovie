@@ -1,12 +1,23 @@
 // Atomic Design - Atoms
 // Basic building blocks that can't be broken down further
 
+/**
+ * @deprecated WrappedSocialLink moved to molecules (has useState, useEffect, API calls).
+ * Import from @/components/molecules/WrappedSocialLink instead.
+ */
+export {
+  LegacySocialLink,
+  WrappedDSPButton,
+  WrappedSocialLink,
+} from '@/components/molecules/WrappedSocialLink';
 export * from './AmountSelector';
 export * from './ArtistAvatar';
 export * from './ArtistName';
 export * from './AvatarUploadAnnouncer';
 export * from './AvatarUploadOverlay';
 export * from './BackgroundPattern';
+// Migrated from /ui
+export * from './Badge';
 export * from './BrandLogo';
 export * from './CircleIconButton';
 export * from './Copyright';
@@ -14,6 +25,8 @@ export * from './Divider';
 export * from './DropdownMenu';
 export * from './DSPButton';
 export * from './ErrorBoundary';
+export * from './FooterLink';
+export * from './FrostedButton';
 export * from './GradientText';
 export * from './HeaderIconButton';
 export * from './HeaderText';
@@ -24,10 +37,12 @@ export * from './JovieIcon';
 export * from './JovieLogo';
 export * from './Label';
 export * from './LinearButton';
+export * from './LoadingSpinner';
 export * from './Logo';
 export * from './LogoIcon';
 export * from './LogoLink';
 export * from './LogoLoader';
+export * from './NavLink';
 export * from './OptimizedImage';
 export * from './PlaceholderImage';
 export * from './Popover';
@@ -48,4 +63,3 @@ export * from './Textarea';
 export * from './Toast';
 export * from './Tooltip';
 export * from './VerifiedBadge';
-export * from './WrappedSocialLink';
