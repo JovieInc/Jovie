@@ -8,7 +8,6 @@ import { eq } from 'drizzle-orm';
 import type { OutputInfo } from 'sharp';
 import type { DbType } from '@/lib/db';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema';
-import { logger } from '@/lib/utils/logger';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
@@ -16,6 +15,7 @@ import {
   type SupportedImageMimeType,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
+import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { extractMetaContent, fetchDocument } from './strategies/base';
 import {
