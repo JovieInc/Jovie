@@ -54,7 +54,7 @@ export function DashboardSidebar({
       variant='sidebar'
       collapsible='icon'
       className={cn(
-        '[--sidebar-width:236px]',
+        '[--sidebar-width:244px]',
         '[--sidebar-width-icon:0px]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
         className
