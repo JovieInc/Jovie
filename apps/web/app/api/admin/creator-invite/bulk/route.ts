@@ -61,16 +61,6 @@ const bulkInviteSchema = z.object({
 });
 
 /**
- * Generate a random delay between min and max (in ms).
- * Uses crypto for better randomness.
- */
-function randomDelay(minMs: number, maxMs: number): number {
-  const range = maxMs - minMs;
-  // Use Math.random for simplicity (crypto.getRandomValues is overkill here)
-  return Math.floor(minMs + Math.random() * range);
-}
-
-/**
  * Admin endpoint to send bulk claim invites.
  *
  * Can either:
@@ -429,7 +419,7 @@ export async function GET(request: Request) {
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch eligible profiles' },
       { status: 500, headers: NO_STORE_HEADERS }
