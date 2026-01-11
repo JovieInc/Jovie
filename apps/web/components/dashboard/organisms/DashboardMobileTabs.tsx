@@ -24,7 +24,7 @@ type DashboardMobileTab = {
 const DASHBOARD_TABS: DashboardMobileTab[] = [
   {
     id: 'overview',
-    label: 'Overview',
+    label: 'Dashboard',
     href: '/app/dashboard',
     icon: Home,
   },

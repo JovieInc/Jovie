@@ -17,7 +17,7 @@ import type { NavItem } from './types';
 
 export const primaryNavigation: NavItem[] = [
   {
-    name: 'Overview',
+    name: 'Dashboard',
     href: '/app/dashboard',
     id: 'overview',
     icon: Home,
