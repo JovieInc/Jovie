@@ -296,8 +296,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
 
       {/* Floating sidebar - shows on hover when collapsed */}
       {isCollapsed && !isMobile && isFloatingVisible && (
-        <div className='fixed inset-y-0 left-0 z-50 w-[236px] animate-in slide-in-from-left duration-200'>
-          <div className='h-full bg-base border-r border-subtle shadow-2xl flex flex-col'>
+        <div className='fixed inset-y-0 left-0 z-50 w-[236px] p-3 animate-in slide-in-from-left duration-200'>
+          <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>
             {/* Header */}
             <div className='relative pb-0 p-2'>
               <div className='flex items-center gap-2 py-1'>
