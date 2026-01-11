@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { AdminCreatorProfilesWithSidebar } from '@/components/admin/admin-creator-profiles';
+import { AdminCreatorsPageWrapper } from '@/components/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   type AdminCreatorProfilesSort,
@@ -61,7 +61,7 @@ export default async function AdminCreatorsPage({
 
   return (
     <PageShell>
-      <AdminCreatorProfilesWithSidebar
+      <AdminCreatorsPageWrapper
         profiles={profiles}
         page={currentPage}
         pageSize={resolvedPageSize}
