@@ -21,21 +21,38 @@ const Checkbox = React.forwardRef<
   CheckboxProps
 >(({ className, indeterminate, ...props }, ref) => {
   const internalRef = React.useRef<HTMLButtonElement>(null);
-  const resolvedRef =
-    (ref as React.RefObject<HTMLButtonElement>) || internalRef;
+
+  // Merge refs to support both callback refs and object refs
+  const mergedRef = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      // Update internal ref
+      (
+        internalRef as React.MutableRefObject<HTMLButtonElement | null>
+      ).current = node;
+
+      // Forward to external ref (supports both callback and object refs)
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref) {
+        (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
+          node;
+      }
+    },
+    [ref]
+  );
 
   React.useEffect(() => {
-    if (resolvedRef.current) {
-      const element = resolvedRef.current as HTMLButtonElement & {
+    if (internalRef.current) {
+      const element = internalRef.current as HTMLButtonElement & {
         indeterminate?: boolean;
       };
       element.indeterminate = indeterminate ?? false;
     }
-  }, [indeterminate, resolvedRef]);
+  }, [indeterminate]);
 
   return (
     <CheckboxPrimitive.Root
-      ref={resolvedRef}
+      ref={mergedRef}
       className={cn(
         'peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
