@@ -49,10 +49,7 @@ export default async function AdminWaitlistPage({
 
   return (
     <PageShell>
-      <PageHeader
-        title='Waitlist'
-        description={`${total} total ${total === 1 ? 'entry' : 'entries'}`}
-      />
+      <PageHeader title='Waitlist' />
       <PageContent noPadding>
         <WaitlistMetrics metrics={metrics} />
         <WaitlistTable
