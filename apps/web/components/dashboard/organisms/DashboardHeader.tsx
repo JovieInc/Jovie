@@ -35,14 +35,16 @@ export function DashboardHeader({
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
           <div
-            className='hidden lg:flex items-center'
+            className='hidden lg:flex items-center bg-red-500/10 border border-red-500'
             data-testid='sidebar-trigger-wrapper'
           >
-            {sidebarTrigger}
+            <div className='bg-blue-500/10 border border-blue-500'>
+              {sidebarTrigger}
+            </div>
           </div>
         ) : (
           <div
-            className='hidden lg:flex items-center'
+            className='hidden lg:flex items-center bg-yellow-500/10 border border-yellow-500'
             data-testid='sidebar-trigger-empty'
           >
             {/* DEBUG: Trigger is null */}
@@ -67,7 +69,11 @@ export function DashboardHeader({
           </span>
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-2'>{action}</div>
+          <div className='ml-auto flex items-center gap-2 bg-green-500/10 border border-green-500'>
+            <div className='bg-purple-500/10 border border-purple-500'>
+              {action}
+            </div>
+          </div>
         ) : null}
       </div>
       {/* Mobile tabs - rendered in header area as per user decision */}
