@@ -29,7 +29,6 @@ function renderContent(
   artist: Artist,
   socialLinks: LegacySocialLink[],
   primaryAction: PrimaryAction,
-  spotifyPreferred: boolean,
   enableDynamicEngagement: boolean
 ) {
   const mapSocialPlatformToDSPKey = (platform: string): string | null => {
@@ -155,19 +154,17 @@ function renderContent(
       );
 
     default: // 'profile' mode
+      // spotifyPreferred is now read client-side in ProfilePrimaryCTA
       return (
         <div className='space-y-4'>
-          <ProfilePrimaryCTA
-            artist={artist}
-            socialLinks={socialLinks}
-            spotifyPreferred={spotifyPreferred}
-          />
+          <ProfilePrimaryCTA artist={artist} socialLinks={socialLinks} />
         </div>
       );
   }
 }
 
 // Static version without animations for immediate rendering
+// NOTE: spotifyPreferred is now read client-side via cookie in ProfilePrimaryCTA
 export function StaticArtistPage({
   mode,
   artist,
@@ -179,7 +176,6 @@ export function StaticArtistPage({
   showFooter = true,
   autoOpenCapture,
   primaryAction = 'subscribe',
-  spotifyPreferred = false,
   enableDynamicEngagement = false,
 }: StaticArtistPageProps) {
   const isPublicProfileMode = mode === 'profile';
@@ -205,7 +201,6 @@ export function StaticArtistPage({
               <ProfilePrimaryCTA
                 artist={artist}
                 socialLinks={socialLinks}
-                spotifyPreferred={spotifyPreferred}
                 autoOpenCapture={resolvedAutoOpenCapture}
                 showCapture
               />
@@ -216,7 +211,6 @@ export function StaticArtistPage({
               artist,
               socialLinks,
               primaryAction,
-              spotifyPreferred,
               enableDynamicEngagement
             )
           )}

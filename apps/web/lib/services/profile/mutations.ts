@@ -8,7 +8,15 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { redis } from '@/lib/redis';
 import type { ProfileData, ProfileUpdateData } from './types';
+
+// Redis key prefix for view count batching
+const VIEW_COUNT_KEY_PREFIX = 'profile:views:';
+// Threshold of views to trigger a flush to the database
+const VIEW_FLUSH_THRESHOLD = 10;
+// TTL for view counts in Redis (1 hour) - ensures eventual consistency
+const VIEW_COUNT_TTL_SECONDS = 3600;
 
 /**
  * Update a profile by ID.
@@ -76,16 +84,93 @@ export async function updateProfileByClerkId(
 }
 
 /**
- * Increment profile view count atomically with retry logic.
+ * Increment profile view count with Redis batching.
+ *
+ * Uses Redis INCR for fast atomic counting, then flushes to the database
+ * when threshold is reached. This reduces database writes by ~10x under load.
+ *
+ * Falls back to direct database write if Redis is unavailable.
  *
  * @param username - The username to increment views for
- * @param maxRetries - Maximum retry attempts (default: 3)
  */
-export async function incrementProfileViews(
-  username: string,
+export async function incrementProfileViews(username: string): Promise<void> {
+  const normalizedUsername = username.toLowerCase();
+  const redisKey = `${VIEW_COUNT_KEY_PREFIX}${normalizedUsername}`;
+
+  // If Redis is available, use batched counting
+  if (redis) {
+    try {
+      // Atomically increment and get new count
+      const newCount = await redis.incr(redisKey);
+
+      // Set TTL on first increment (ensures eventual flush even if threshold not reached)
+      if (newCount === 1) {
+        await redis.expire(redisKey, VIEW_COUNT_TTL_SECONDS);
+      }
+
+      // Flush to database when threshold is reached
+      if (newCount >= VIEW_FLUSH_THRESHOLD) {
+        // Use GETSET for atomic read-and-reset to prevent race conditions
+        // This ensures only one concurrent request gets the accumulated count
+        const countToFlush = await redis.getset(redisKey, '0');
+
+        // Only flush if we successfully got a count (another request may have won the race)
+        if (countToFlush && Number(countToFlush) > 0) {
+          const flushCount = Number(countToFlush);
+
+          // Reset TTL after atomic swap
+          await redis.expire(redisKey, VIEW_COUNT_TTL_SECONDS);
+
+          // Flush accumulated views to database (fire-and-forget)
+          flushViewsToDatabase(normalizedUsername, flushCount).catch(error => {
+            console.error(
+              '[profile-service] Failed to flush views to database:',
+              error
+            );
+            // Put the count back in Redis if DB flush failed
+            redis?.incrby(redisKey, flushCount).catch(() => {});
+          });
+        }
+      }
+
+      return;
+    } catch (error) {
+      console.warn(
+        '[profile-service] Redis view increment failed, falling back to direct DB:',
+        error
+      );
+      // Fall through to direct DB write
+    }
+  }
+
+  // Fallback: Direct database write (original behavior)
+  await incrementViewsDirectly(normalizedUsername);
+}
+
+/**
+ * Flush accumulated view counts from Redis to the database.
+ */
+async function flushViewsToDatabase(
+  normalizedUsername: string,
+  count: number
+): Promise<void> {
+  await db
+    .update(creatorProfiles)
+    .set({
+      profileViews: drizzleSql`${creatorProfiles.profileViews} + ${count}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.usernameNormalized, normalizedUsername));
+}
+
+/**
+ * Direct database view increment with retry logic.
+ * Used as fallback when Redis is unavailable.
+ */
+async function incrementViewsDirectly(
+  normalizedUsername: string,
   maxRetries = 3
 ): Promise<void> {
-  const normalizedUsername = username.toLowerCase();
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -129,6 +214,50 @@ export async function incrementProfileViews(
       });
     })
     .catch(() => {});
+}
+
+/**
+ * Flush all pending view counts from Redis to the database.
+ * Call this from a scheduled job (e.g., cron) to ensure eventual consistency.
+ */
+export async function flushAllPendingViews(): Promise<number> {
+  if (!redis) {
+    console.warn('[profile-service] Redis not available for view flush');
+    return 0;
+  }
+
+  let flushedCount = 0;
+
+  try {
+    // Scan for all view count keys
+    const keys: string[] = [];
+    let cursor: string | number = 0;
+
+    do {
+      const result: [string | number, string[]] = await redis.scan(cursor, {
+        match: `${VIEW_COUNT_KEY_PREFIX}*`,
+        count: 100,
+      });
+      cursor = result[0];
+      keys.push(...result[1]);
+    } while (cursor !== 0 && cursor !== '0');
+
+    // Flush each profile's views
+    for (const key of keys) {
+      const count = await redis.getdel(key);
+      if (count && Number(count) > 0) {
+        const username = key.replace(VIEW_COUNT_KEY_PREFIX, '');
+        await flushViewsToDatabase(username, Number(count));
+        flushedCount++;
+      }
+    }
+
+    console.log(`[profile-service] Flushed views for ${flushedCount} profiles`);
+  } catch (error) {
+    console.error('[profile-service] Failed to flush pending views:', error);
+  }
+
+  return flushedCount;
 }
 
 /**

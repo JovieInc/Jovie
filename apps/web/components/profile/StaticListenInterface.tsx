@@ -1,9 +1,6 @@
 'use client';
 
-import DOMPurify from 'isomorphic-dompurify';
-import { useRouter } from 'next/navigation';
-import React, { useEffect, useMemo, useState } from 'react';
-// Lazy import deep links to avoid loading heavy code upfront
+import React, { useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   LISTEN_COOKIE,
@@ -19,6 +16,14 @@ interface StaticListenInterfaceProps {
   enableDynamicEngagement?: boolean;
 }
 
+/**
+ * StaticListenInterface - DSP button list for the listen page.
+ *
+ * Performance optimizations:
+ * - Removed DOMPurify (~70KB) - SVG logos are trusted internal constants from DSP_CONFIGS
+ * - Removed backspace keyboard listener - non-standard UX and adds event overhead
+ * - Lazy loads deep-links module only on click
+ */
 export const StaticListenInterface = React.memo(function StaticListenInterface({
   artist,
   handle,
@@ -30,43 +35,11 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   );
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
   const availableDSPs = dsps;
 
-  // Sanitize SVG logos to prevent XSS
-  const sanitizedLogos = useMemo(() => {
-    const logos: Record<string, string> = {};
-    for (const dsp of availableDSPs) {
-      logos[dsp.key] = DOMPurify.sanitize(dsp.config.logoSvg, {
-        USE_PROFILES: { svg: true },
-      });
-    }
-    return logos;
-  }, [availableDSPs]);
-
-  // Handle backspace key to go back
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Backspace') {
-        // Only trigger if not in an input field
-        const target = event.target as HTMLElement;
-        if (
-          target &&
-          (target.tagName === 'INPUT' ||
-            target.tagName === 'TEXTAREA' ||
-            target.isContentEditable)
-        ) {
-          return;
-        }
-        event.preventDefault();
-        router.push(`/${handle}`);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handle, router]);
+  // NOTE: SVG logos from DSP_CONFIGS are trusted internal constants (not user content).
+  // No sanitization needed - this removes the ~70KB isomorphic-dompurify dependency.
 
   const handleDSPClick = async (dsp: AvailableDSP) => {
     if (isLoading) return;
@@ -169,8 +142,8 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             >
               <div
                 className='shrink-0'
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG sanitized with DOMPurify
-                dangerouslySetInnerHTML={{ __html: sanitizedLogos[dsp.key] }}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG logos are trusted internal constants from DSP_CONFIGS, not user content
+                dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
               />
               <span>
                 {selectedDSP === dsp.key ? 'Opening...' : `Open in ${dsp.name}`}

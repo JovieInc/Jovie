@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
-
+import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import {
   CACHE_TAGS,
   createAvatarTag,
@@ -26,6 +26,8 @@ export async function invalidateProfileCache(
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
     revalidatePath(`/${usernameNormalized}`);
+    // Invalidate Redis edge cache
+    await invalidateProfileEdgeCache(usernameNormalized);
   }
 
   if (usernameNormalized) {
@@ -37,6 +39,8 @@ export async function invalidateProfileCache(
   if (oldUsernameNormalized && oldUsernameNormalized !== usernameNormalized) {
     revalidateTag(createProfileTag(oldUsernameNormalized), 'max');
     revalidatePath(`/${oldUsernameNormalized}`);
+    // Invalidate Redis edge cache for old username
+    await invalidateProfileEdgeCache(oldUsernameNormalized);
   }
 
   // Invalidate dashboard pages that display profile data
