@@ -12,7 +12,6 @@ import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminT
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -38,7 +37,6 @@ export function useAdminCreatorProfiles({
   basePath = '/app/admin/creators',
 }: Omit<AdminCreatorProfilesWithSidebarProps, 'mode'>) {
   const router = useRouter();
-  const { showToast } = useToast();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -200,7 +198,6 @@ export function useAdminCreatorProfiles({
 
   return {
     router,
-    showToast,
     profilesWithActions,
     verificationStatuses,
     toggleVerification,

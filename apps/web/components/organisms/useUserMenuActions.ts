@@ -1,7 +1,7 @@
 import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { toast } from 'sonner';
 import type { BillingStatus } from '@/hooks/useBillingStatus';
 import { track } from '@/lib/analytics';
 
@@ -47,7 +47,6 @@ export function useUserMenuActions({
   signOut,
 }: UseUserMenuActionsParams) {
   const router = useRouter();
-  const { showToast } = useToast();
   const [loading, setLoading] = useState<Omit<UserMenuLoadingState, 'any'>>({
     manageBilling: false,
     signOut: false,
@@ -78,10 +77,7 @@ export function useUserMenuActions({
       await signOut({ redirectUrl: '/' });
     } catch (error) {
       console.error('Sign out error:', error);
-      showToast({
-        type: 'error',
-        message: "We couldn't sign you out. Please try again in a few seconds.",
-      });
+      toast.error("Couldn't sign you out. Please try again.");
       setLoading(prev => ({ ...prev, signOut: false }));
     }
   };
@@ -143,10 +139,7 @@ export function useUserMenuActions({
         reason: message,
       });
 
-      showToast({
-        type: 'error',
-        message:
-          "We couldn't start your upgrade just now. Please try again in a moment.",
+      toast.error("Couldn't start your upgrade. Please try again.", {
         duration: 6000,
       });
     } finally {
@@ -166,12 +159,10 @@ export function useUserMenuActions({
           plan: billingStatus.plan ?? 'unknown',
         });
 
-        showToast({
-          type: 'warning',
-          message:
-            'We are still setting up your billing profile. Try again in a moment or start an upgrade to create it instantly.',
-          duration: 6000,
-        });
+        toast.warning(
+          'Still setting up your billing profile. Try again or start an upgrade.',
+          { duration: 6000 }
+        );
         return;
       }
 
@@ -213,12 +204,10 @@ export function useUserMenuActions({
         reason: message,
       });
 
-      showToast({
-        type: 'error',
-        message:
-          "We couldn't open your billing portal just now. We're taking you to pricing so you can manage your plan there.",
-        duration: 6000,
-      });
+      toast.error(
+        "Couldn't open billing portal. Taking you to pricing instead.",
+        { duration: 6000 }
+      );
 
       router.push('/pricing');
     } finally {

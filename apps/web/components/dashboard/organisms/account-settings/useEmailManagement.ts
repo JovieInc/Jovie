@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { toast } from 'sonner';
 import type {
   ClerkEmailAddressResource,
   ClerkUserResource,
@@ -30,8 +30,6 @@ export interface UseEmailManagementReturn {
 export function useEmailManagement(
   user: ClerkUserResource
 ): UseEmailManagementReturn {
-  const { showToast } = useToast();
-
   const [newEmail, setNewEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [pendingEmail, setPendingEmail] =
@@ -76,10 +74,7 @@ export function useEmailManagement(
       setPendingEmail(createdEmail);
       await createdEmail.prepareVerification({ strategy: 'email_code' });
       setEmailStatus('code');
-      showToast({
-        type: 'success',
-        message: `Verification code sent to ${newEmail}`,
-      });
+      toast.success(`Verification code sent to ${newEmail}`);
     } catch (error) {
       const message = extractErrorMessage(error);
       setEmailStatus('idle');
@@ -112,10 +107,7 @@ export function useEmailManagement(
       await user.reload();
       resetEmailForm();
       setSyncingEmailId(null);
-      showToast({
-        type: 'success',
-        message: 'Primary email updated successfully.',
-      });
+      toast.success('Primary email updated');
     } catch (error) {
       const message = extractErrorMessage(error);
       setEmailStatus('code');
@@ -131,13 +123,10 @@ export function useEmailManagement(
       await user.update({ primaryEmailAddressId: email.id });
       await syncEmailToDatabase(email.emailAddress);
       await user.reload();
-      showToast({
-        type: 'success',
-        message: 'Primary email updated.',
-      });
+      toast.success('Primary email updated');
     } catch (error) {
       const message = extractErrorMessage(error);
-      showToast({ type: 'error', message });
+      toast.error(message);
     } finally {
       setSyncingEmailId(null);
     }
@@ -148,10 +137,10 @@ export function useEmailManagement(
     try {
       await email.destroy();
       await user.reload();
-      showToast({ type: 'success', message: 'Email removed.' });
+      toast.success('Email removed');
     } catch (error) {
       const message = extractErrorMessage(error);
-      showToast({ type: 'error', message });
+      toast.error(message);
     } finally {
       setSyncingEmailId(null);
     }

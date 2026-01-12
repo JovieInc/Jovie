@@ -3,6 +3,7 @@
 import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -141,9 +142,11 @@ export function DashboardAnalyticsCards({
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
+      toast.success('Copied to clipboard', { duration: 2000 });
       setTimeout(() => setCopied(false), 1500);
     } catch (e) {
       console.error('Copy failed', e);
+      toast.error('Failed to copy');
     }
   };
 

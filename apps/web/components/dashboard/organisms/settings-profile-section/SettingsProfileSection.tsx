@@ -1,9 +1,9 @@
 'use client';
 
+import { toast } from 'sonner';
 import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_URL } from '@/constants/app';
 import {
@@ -18,7 +18,6 @@ export function SettingsProfileSection({
   onArtistUpdate,
   onRefresh,
 }: SettingsProfileSectionProps) {
-  const { showToast } = useToast();
   const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
   const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
 
@@ -66,7 +65,7 @@ export function SettingsProfileSection({
                 showHoverOverlay
                 onUpload={handleAvatarUpload}
                 onSuccess={handleAvatarUpdate}
-                onError={message => showToast({ type: 'error', message })}
+                onError={message => toast.error(message)}
                 maxFileSize={maxAvatarSize}
                 acceptedTypes={acceptedAvatarTypes}
                 className='mx-auto animate-in fade-in duration-300'

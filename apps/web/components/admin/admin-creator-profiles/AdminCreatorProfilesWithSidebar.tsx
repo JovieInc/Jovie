@@ -19,8 +19,8 @@ import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { toast } from 'sonner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -76,7 +76,6 @@ export function AdminCreatorProfilesWithSidebar({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
-  const { showToast } = useToast();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -339,10 +338,7 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle verification',
                               result.error
                             );
-                            showToast({
-                              type: 'error',
-                              message: `Failed to update verification status${result.error ? `: ${result.error}` : ''}`,
-                            });
+                            toast.error(`Failed to update verification status${result.error ? `: ${result.error}` : ''}`);
                           }
                         }}
                         onToggleFeatured={async () => {
@@ -355,10 +351,7 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle featured',
                               result.error
                             );
-                            showToast({
-                              type: 'error',
-                              message: `Failed to update featured status${result.error ? `: ${result.error}` : ''}`,
-                            });
+                            toast.error(`Failed to update featured status${result.error ? `: ${result.error}` : ''}`);
                           }
                         }}
                         onToggleMarketing={async () => {
@@ -371,10 +364,7 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle marketing',
                               result.error
                             );
-                            showToast({
-                              type: 'error',
-                              message: `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`,
-                            });
+                            toast.error(`Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`);
                           }
                         }}
                         onSendInvite={
@@ -442,10 +432,7 @@ export function AdminCreatorProfilesWithSidebar({
         onOpenChange={setInviteDialogOpen}
         onSuccess={() => {
           setProfileToInvite(null);
-          showToast({
-            type: 'success',
-            message: 'Invite created successfully',
-          });
+          toast.success('Invite created successfully');
         }}
       />
     </div>

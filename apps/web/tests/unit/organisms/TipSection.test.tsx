@@ -3,20 +3,18 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TipSection } from '@/components/organisms/TipSection';
 
-// Mock the ToastContainer module
-const mockShowToast = vi.fn();
-vi.mock('@/components/molecules/ToastContainer', () => {
-  return {
-    useToast: () => ({
-      showToast: mockShowToast,
-      hideToast: vi.fn(),
-      clearToasts: vi.fn(),
-    }),
-    ToastProvider: ({ children }: { children: React.ReactNode }) => (
-      <>{children}</>
-    ),
-  };
-});
+// Mock Sonner toast
+const mockToast = {
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+  loading: vi.fn(),
+  dismiss: vi.fn(),
+};
+vi.mock('sonner', () => ({
+  toast: mockToast,
+}));
 
 // Mock the ToastProvider from providers
 vi.mock('@/components/providers/ToastProvider', () => ({
@@ -54,11 +52,9 @@ describe('TipSection', () => {
     });
 
     // Verify toast was shown with success message
-    expect(mockShowToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Thanks for the $2 tip 🎉',
-        type: 'success',
-      })
+    expect(mockToast.success).toHaveBeenCalledWith(
+      'Thanks for the $2 tip!',
+      expect.objectContaining({ duration: 5000 })
     );
   });
 
@@ -83,11 +79,9 @@ describe('TipSection', () => {
     });
 
     // Verify toast was shown with error message
-    expect(mockShowToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Payment failed. Please try again.',
-        type: 'error',
-      })
+    expect(mockToast.error).toHaveBeenCalledWith(
+      'Payment failed. Please try again.',
+      expect.objectContaining({ duration: 7000 })
     );
   });
 

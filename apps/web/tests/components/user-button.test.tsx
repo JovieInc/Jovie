@@ -22,15 +22,16 @@ vi.mock('@clerk/nextjs', () => ({
   useClerk: vi.fn(),
 }));
 
-const showToastMock = vi.fn();
-
-vi.mock('@/components/molecules/ToastContainer', () => ({
-  __esModule: true,
-  useToast: () => ({
-    showToast: showToastMock,
-    hideToast: vi.fn(),
-    clearToasts: vi.fn(),
-  }),
+// Mock Sonner toast
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+    loading: vi.fn(),
+    dismiss: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -91,7 +92,6 @@ describe('UserButton billing actions', () => {
     } as any);
 
     mockUseBillingStatus.mockReset();
-    showToastMock.mockReset();
 
     Object.defineProperty(window, 'location', {
       value: { href: '' },

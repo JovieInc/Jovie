@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { toast } from 'sonner';
 import type { IngestRefreshStatus } from './types';
 
 interface UseIngestRefreshOptions {
@@ -23,7 +23,6 @@ export function useIngestRefresh({
   onRefreshComplete,
 }: UseIngestRefreshOptions): UseIngestRefreshReturn {
   const router = useRouter();
-  const { showToast } = useToast();
   const [ingestRefreshStatuses, setIngestRefreshStatuses] = useState<
     Record<string, IngestRefreshStatus>
   >({});
@@ -52,10 +51,7 @@ export function useIngestRefresh({
         }
 
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'success' }));
-        showToast({
-          type: 'success',
-          message: 'Ingestion refresh queued',
-        });
+        toast.success('Ingestion refresh queued');
         router.refresh();
 
         if (selectedId === profileId && onRefreshComplete) {
@@ -63,17 +59,14 @@ export function useIngestRefresh({
         }
       } catch (error) {
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
-        showToast({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Refresh failed',
-        });
+        toast.error(error instanceof Error ? error.message : 'Refresh failed');
       } finally {
         window.setTimeout(() => {
           setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'idle' }));
         }, 2200);
       }
     },
-    [onRefreshComplete, router, selectedId, showToast]
+    [onRefreshComplete, router, selectedId]
   );
 
   return {
