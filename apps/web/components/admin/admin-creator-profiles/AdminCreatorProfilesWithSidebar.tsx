@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
@@ -22,6 +21,7 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';

@@ -1,11 +1,11 @@
 'use client';
 
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   CopyToClipboardButton as CopyToClipboardButtonMolecule,
   type CopyToClipboardButtonProps as CopyToClipboardButtonMoleculeProps,
 } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { track } from '@/lib/analytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 /**
  * @deprecated This component is a wrapper that adds business logic (analytics tracking).

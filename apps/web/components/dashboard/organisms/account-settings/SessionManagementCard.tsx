@@ -10,9 +10,8 @@
 import { Button } from '@jovie/ui';
 import { WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNotifications } from '@/lib/hooks/useNotifications';
-
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 
 import { DashboardCard } from '../../atoms/DashboardCard';

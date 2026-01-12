@@ -55,7 +55,13 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <>
       {children}
       <Toaster
-        theme={resolvedTheme === 'dark' ? 'dark' : resolvedTheme === 'light' ? 'light' : 'system'}
+        theme={
+          resolvedTheme === 'dark'
+            ? 'dark'
+            : resolvedTheme === 'light'
+              ? 'light'
+              : 'system'
+        }
         position='bottom-right'
         // Expand stacked notifications on hover
         expand

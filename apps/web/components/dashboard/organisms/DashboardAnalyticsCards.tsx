@@ -3,11 +3,11 @@
 import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 

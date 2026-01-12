@@ -2,9 +2,9 @@
 
 import { Star } from 'lucide-react';
 import { useState } from 'react';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
