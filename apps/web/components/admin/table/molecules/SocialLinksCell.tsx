@@ -81,6 +81,7 @@ export function SocialLinksCell({
         const username =
           extractUsernameFromUrl(link.url) ??
           extractUsernameFromLabel(link.displayText ?? '') ??
+          link.displayText ?? // Add fallback to raw displayText
           '';
         const displayUsername = formatUsername(username);
 
@@ -98,13 +99,18 @@ export function SocialLinksCell({
           ? toTitleCase(link.platformType)
           : toTitleCase(link.platform);
 
-        // For Spotify (and other music platforms), use displayText if available (contains artist name)
-        // Otherwise fall back to username or platform name
-        const isSpotify = platformIcon === 'spotify';
+        // Distinguish between music platforms (show artist name) and social platforms (show username)
+        const isMusicPlatform = [
+          'spotify',
+          'apple_music',
+          'soundcloud',
+          'tidal',
+        ].includes(platformIcon);
+
         const primaryText =
-          isSpotify && link.displayText
-            ? link.displayText
-            : displayUsername || platformName;
+          isMusicPlatform && link.displayText
+            ? link.displayText // Artist name for music platforms
+            : displayUsername || platformName; // Username for social platforms
 
         return (
           <PlatformPill

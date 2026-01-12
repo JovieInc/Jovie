@@ -11,6 +11,7 @@ import {
 import Image from 'next/image';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -399,16 +400,42 @@ export function ReleaseTableRow({
 
       {/* Actions cell */}
       <td className='px-4 py-4 align-middle text-right sm:px-6'>
-        <Button
-          variant='ghost'
-          size='sm'
-          className='gap-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100'
-          data-testid={`edit-links-${release.id}`}
-          onClick={() => onEdit(release)}
-        >
-          <Icon name='PencilLine' className='h-3.5 w-3.5' aria-hidden='true' />
-          <span>Edit</span>
-        </Button>
+        <div className='flex justify-end'>
+          <TableActionMenu
+            items={[
+              {
+                id: 'edit',
+                label: 'Edit links',
+                icon: () => <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+                onClick: () => onEdit(release),
+              },
+              {
+                id: 'copy-smart-link',
+                label: 'Copy smart link',
+                icon: () => <Icon name='Copy' className='h-3.5 w-3.5' />,
+                onClick: () => {
+                  void handleCopyWithFeedback(
+                    release.smartLinkPath,
+                    `${release.title} smart link`,
+                    `action-copy-${release.id}`
+                  );
+                },
+              },
+              { id: 'separator-1' },
+              {
+                id: 'delete',
+                label: 'Delete release',
+                icon: () => <Icon name='Trash2' className='h-3.5 w-3.5' />,
+                variant: 'destructive' as const,
+                onClick: () => {
+                  // TODO: Implement delete confirmation dialog
+                  console.log('Delete release:', release.id);
+                },
+                disabled: true,
+              },
+            ]}
+          />
+        </div>
       </td>
     </tr>
   );

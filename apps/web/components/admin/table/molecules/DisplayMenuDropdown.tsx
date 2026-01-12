@@ -10,9 +10,11 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Switch,
 } from '@jovie/ui';
 import { LayoutGrid, LayoutList, Settings2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 export type ViewMode = 'list' | 'board' | 'timeline';
 export type Density = 'compact' | 'normal' | 'comfortable';
@@ -134,7 +136,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-1.5 text-sm text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+      className='inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-1.5 text-sm text-secondary-token transition-colors hover:bg-base hover:text-primary-token'
     >
       <Settings2 className='h-4 w-4' />
       Display
@@ -151,30 +153,44 @@ export function DisplayMenuDropdown({
         {hasViewModeOptions && (
           <>
             <DropdownMenuLabel>View mode</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <DropdownMenuRadioGroup
-                value={viewMode}
-                onValueChange={value => onViewModeChange?.(value as ViewMode)}
-              >
-                {availableViewModes.map(mode => (
-                  <DropdownMenuRadioItem
+            <div className='space-y-2 px-2 py-1'>
+              {availableViewModes.map(mode => {
+                const isActive = viewMode === mode;
+                const isDisabled = mode === 'timeline';
+
+                return (
+                  <button
                     key={mode}
-                    value={mode}
-                    disabled={mode === 'timeline'} // Timeline is placeholder
-                  >
-                    <span className='mr-2 flex h-4 w-4 items-center justify-center'>
-                      {viewModeIcons[mode]}
-                    </span>
-                    {viewModeLabels[mode]}
-                    {mode === 'timeline' && (
-                      <span className='ml-2 text-xs text-tertiary-token'>
-                        (Coming soon)
-                      </span>
+                    type='button'
+                    onClick={() => !isDisabled && onViewModeChange?.(mode)}
+                    disabled={isDisabled}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors',
+                      isActive
+                        ? 'bg-surface-2 text-primary-token'
+                        : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
+                      isDisabled && 'opacity-50 cursor-not-allowed'
                     )}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
+                  >
+                    <div className='flex items-center gap-2'>
+                      {viewModeIcons[mode]}
+                      <span>{viewModeLabels[mode]}</span>
+                      {isDisabled && (
+                        <span className='text-xs text-tertiary-token'>
+                          (Coming soon)
+                        </span>
+                      )}
+                    </div>
+                    <Switch
+                      checked={isActive}
+                      disabled={isDisabled}
+                      className='pointer-events-none'
+                      aria-hidden='true'
+                    />
+                  </button>
+                );
+              })}
+            </div>
             <DropdownMenuSeparator />
           </>
         )}

@@ -31,14 +31,15 @@ export function RightDrawer({
         'shrink-0 h-full flex flex-col',
         'bg-surface-1 border-l border-subtle',
         'transition-[width,opacity] duration-300 ease-out',
+        'overflow-hidden',
         isOpen
           ? 'opacity-100 visible'
           : 'opacity-0 pointer-events-none invisible w-0 border-l-0',
         className
       )}
-      style={{ width: isOpen ? width : 0 }}
+      style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
     >
-      {children}
+      <div className='h-full overflow-y-auto overflow-x-hidden'>{children}</div>
     </aside>
   );
 }

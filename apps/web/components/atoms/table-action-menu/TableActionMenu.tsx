@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import * as React from 'react';
 import {
   geistTableMenuContentClass,
@@ -26,7 +26,7 @@ import { isSeparatorItem } from './utils';
 export function TableActionMenu({
   items,
   trigger = 'button',
-  triggerIcon: TriggerIcon = MoreHorizontal,
+  triggerIcon: TriggerIcon = MoreVertical,
   align = 'end',
   open,
   onOpenChange,
@@ -108,7 +108,7 @@ export function TableActionMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          className='ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
           aria-label='More actions'
           onClick={e => e.stopPropagation()}
         >

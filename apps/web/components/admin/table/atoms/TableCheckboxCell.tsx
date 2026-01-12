@@ -125,7 +125,7 @@ export function TableCheckboxCell<TData = unknown>(
           checked={normalizedState === 'checked'}
           indeterminate={normalizedState === 'indeterminate'}
           onCheckedChange={onToggleSelectAll}
-          className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+          className='border-2 border-tertiary-token/50 data-[state=checked]:border-primary/70 data-[state=checked]:bg-primary/70 data-[state=checked]:text-primary-foreground'
         />
       </div>
     );
@@ -160,7 +160,7 @@ export function TableCheckboxCell<TData = unknown>(
             aria-label={`Select row ${rowNumber}`}
             checked={isChecked}
             onCheckedChange={onToggleSelect}
-            className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+            className='border-2 border-tertiary-token/50 data-[state=checked]:border-primary/70 data-[state=checked]:bg-primary/70 data-[state=checked]:text-primary-foreground'
           />
         </div>
       </div>

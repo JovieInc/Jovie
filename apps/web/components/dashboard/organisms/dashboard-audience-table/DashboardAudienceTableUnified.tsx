@@ -323,7 +323,7 @@ export function DashboardAudienceTableUnified({
                 }
                 getRowId={row => row.id}
                 enableVirtualization={true}
-                rowHeight={52}
+                rowHeight={44}
                 minWidth='960px'
                 className='text-[13px]'
                 getRowClassName={getRowClassName}
