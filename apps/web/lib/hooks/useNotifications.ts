@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { toast, type ExternalToast } from 'sonner';
+import { type ExternalToast, toast } from 'sonner';
 
 /**
  * Standard toast messages for consistent UX across the application
@@ -231,10 +231,7 @@ export function useNotifications() {
 
   // Promise toast - shows loading → success/error
   const promiseToast = useCallback(
-    <T>(
-      promise: Promise<T>,
-      options?: PromiseToastOptions<T>
-    ): Promise<T> => {
+    <T>(promise: Promise<T>, options?: PromiseToastOptions<T>): Promise<T> => {
       toast.promise(promise, {
         loading: options?.loading ?? TOAST_MESSAGES.PROCESSING,
         success: options?.success ?? TOAST_MESSAGES.SAVE_SUCCESS,

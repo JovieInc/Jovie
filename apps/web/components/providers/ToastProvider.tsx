@@ -57,7 +57,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
       {children}
       <Toaster
         theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
-        position="bottom-right"
+        position='bottom-right'
         // Rich hover expansion for better UX
         expand={false}
         richColors

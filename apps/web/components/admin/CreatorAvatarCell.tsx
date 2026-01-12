@@ -79,7 +79,9 @@ export function CreatorAvatarCell({
           uploadable
           onUpload={handleUpload}
           onError={message => {
-            toast.error(message || 'Failed to upload avatar. Please try again.');
+            toast.error(
+              message || 'Failed to upload avatar. Please try again.'
+            );
           }}
           maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
           acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}

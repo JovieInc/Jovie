@@ -9,6 +9,7 @@ import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
@@ -29,7 +30,6 @@ import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { toast } from 'sonner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
@@ -330,9 +330,13 @@ export function AdminCreatorProfilesUnified({
         onClick: async () => {
           const result = await toggleFeatured(profile.id, !profile.isFeatured);
           if (!result.success) {
-            toast.error(`Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`);
+            toast.error(
+              `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`
+            );
           } else {
-            toast.success(`Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`);
+            toast.success(
+              `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`
+            );
           }
         },
       });
@@ -539,9 +543,13 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      toast.error(`Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`);
+      toast.error(
+        `Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`
+      );
     } else {
-      toast.success(`Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`);
+      toast.success(
+        `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
+      );
     }
   }, [profilesWithActions, selectedIds, toggleVerification]);
 
@@ -554,9 +562,13 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      toast.error(`Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`);
+      toast.error(
+        `Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`
+      );
     } else {
-      toast.success(`Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`);
+      toast.success(
+        `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
+      );
     }
   }, [profilesWithActions, selectedIds, toggleVerification]);
 
@@ -569,9 +581,13 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      toast.error(`Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`);
+      toast.error(
+        `Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`
+      );
     } else {
-      toast.success(`Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`);
+      toast.success(
+        `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
+      );
     }
   }, [profilesWithActions, selectedIds, toggleFeatured]);
 
@@ -591,9 +607,13 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      toast.error(`Failed to delete ${failedCount} creator${failedCount > 1 ? 's' : ''}`);
+      toast.error(
+        `Failed to delete ${failedCount} creator${failedCount > 1 ? 's' : ''}`
+      );
     } else {
-      toast.success(`Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`);
+      toast.success(
+        `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
+      );
       // Clear selection after successful deletion
       toggleSelectAll();
       router.refresh();
