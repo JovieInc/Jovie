@@ -2,52 +2,104 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+/**
+ * Configuration options for the useTableGrouping hook
+ * @typeParam T - The type of data rows being grouped
+ */
 interface UseTableGroupingOptions<T> {
   /**
-   * Data rows to group
+   * Array of data rows to group
    */
   data: T[];
 
   /**
-   * Function to get the group key from a row
+   * Function to extract the group key from each row.
+   * Used to determine which group a row belongs to.
+   * @param row - The data row
+   * @returns Group key as a string (e.g., 'new', 'invited', 'claimed')
+   * @example
+   * getGroupKey: (entry) => entry.status
    */
   getGroupKey: (row: T) => string;
 
   /**
-   * Function to get the group label from a key
+   * Function to convert group key into a human-readable label.
+   * @param key - The group key
+   * @returns Display label for the group (e.g., 'New Applications')
+   * @example
+   * getGroupLabel: (key) => key.charAt(0).toUpperCase() + key.slice(1)
    */
   getGroupLabel: (key: string) => string;
 
   /**
-   * Whether grouping is enabled
+   * Whether grouping is enabled. If false, returns empty grouped data.
    */
   enabled: boolean;
 }
 
+/**
+ * Data structure representing a group of rows
+ * @typeParam T - The type of data rows in the group
+ */
 interface GroupedData<T> {
+  /** Unique identifier for this group */
   key: string;
+  /** Human-readable display label */
   label: string;
+  /** Array of rows belonging to this group */
   rows: T[];
+  /** Number of rows in this group */
   count: number;
 }
 
 /**
  * useTableGrouping - Hook for grouping table rows with sticky headers
  *
- * Features:
- * - Groups rows by a field
- * - Provides grouped data structure
- * - Handles sticky header behavior with Intersection Observer
- * - Smart disappearing: current header fades when next reaches top
+ * **Algorithm**: Uses a reduce operation to group rows by their group key in O(n) time,
+ * where n is the number of rows. Groups maintain insertion order of first appearance.
  *
- * Example:
+ * **Sticky Header Behavior**: Uses IntersectionObserver to track when group headers reach
+ * the top of their scroll container. When a header becomes "stuck" at the top
+ * (isIntersecting && boundingClientRect.top <= 0), we update visibleGroupIndex to track
+ * which group is currently visible. This enables smart header transitions where the current
+ * sticky header can fade out when the next group's header approaches.
+ *
+ * **Performance**: The grouping operation runs on every render when data changes. For large
+ * datasets (1000+ rows), consider memoizing the data array or using useMemo for the grouped result.
+ *
+ * Features:
+ * - Groups rows by a field in O(n) time
+ * - Provides structured grouped data with counts
+ * - Handles sticky header behavior with Intersection Observer
+ * - Smart header transitions: current header fades when next reaches top
+ * - Automatic cleanup of observers on unmount
+ *
+ * @typeParam T - The type of data rows being grouped
+ * @param options - Configuration options for grouping
+ * @returns Object containing grouped data, visibility state, and observer registration function
+ *
+ * @example
  * ```tsx
- * const { groupedData, observeGroupHeader } = useTableGrouping({
+ * const { groupedData, observeGroupHeader, visibleGroupIndex } = useTableGrouping({
  *   data: entries,
  *   getGroupKey: (entry) => entry.status,
  *   getGroupLabel: (key) => key.charAt(0).toUpperCase() + key.slice(1),
  *   enabled: groupingEnabled,
  * });
+ *
+ * // Render grouped data
+ * {groupedData.map((group, groupIndex) => (
+ *   <div key={group.key}>
+ *     <div
+ *       ref={(el) => observeGroupHeader(group.key, el)}
+ *       data-group-key={group.key}
+ *       className={visibleGroupIndex === groupIndex ? 'fade-out' : ''}
+ *     >
+ *       {group.label} ({group.count})
+ *     </div>
+ *     {group.rows.map(row => <Row key={row.id} data={row} />)}
+ *   </div>
+ * ))}
  * ```
  */
 export function useTableGrouping<T>({
@@ -60,15 +112,21 @@ export function useTableGrouping<T>({
   const observerRef = useRef<IntersectionObserver | null>(null);
   const headerRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-  // Group the data
+  // Group the data using reduce operation
+  // Algorithm: O(n) time complexity where n = number of rows
+  // 1. Reduce data array into a Record<groupKey, T[]>
+  // 2. Convert Record to array of GroupedData objects
+  // 3. Preserve insertion order (first appearance of each group key)
   const groupedData: GroupedData<T>[] = enabled
     ? Object.entries(
         data.reduce(
           (groups, row) => {
             const key = getGroupKey(row);
+            // Initialize empty array for new group keys
             if (!groups[key]) {
               groups[key] = [];
             }
+            // Add row to its group
             groups[key].push(row);
             return groups;
           },
