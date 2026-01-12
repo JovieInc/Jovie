@@ -2,7 +2,7 @@
 
 import { Star } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
@@ -25,6 +25,7 @@ export function CreatorAvatarCell({
   verified = false,
   isFeatured = false,
 }: CreatorAvatarCellProps) {
+  const notifications = useNotifications();
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null
   );
@@ -55,10 +56,9 @@ export function CreatorAvatarCell({
     try {
       await updateCreatorAvatarAsAdmin(profileId, url);
       setPreviewUrl(url);
-      toast.success('Avatar updated');
+      notifications.success('Avatar updated');
     } catch (error) {
       console.error('Failed to update creator avatar as admin', error);
-      toast.error('Failed to update avatar. Please try again.');
       // Re-throw so AvatarUploadable can show error state
       throw error instanceof Error
         ? error
@@ -79,7 +79,7 @@ export function CreatorAvatarCell({
           uploadable
           onUpload={handleUpload}
           onError={message => {
-            toast.error(
+            notifications.error(
               message || 'Failed to upload avatar. Please try again.'
             );
           }}

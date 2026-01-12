@@ -1,6 +1,6 @@
 'use client';
 
-import { toast } from 'sonner';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   CopyToClipboardButton as CopyToClipboardButtonMolecule,
   type CopyToClipboardButtonProps as CopyToClipboardButtonMoleculeProps,
@@ -18,15 +18,17 @@ export type CopyToClipboardButtonProps = Omit<
 >;
 
 export function CopyToClipboardButton(props: CopyToClipboardButtonProps) {
+  const notifications = useNotifications();
+
   return (
     <CopyToClipboardButtonMolecule
       {...props}
       onCopySuccess={() => {
-        toast.success('Copied to clipboard', { duration: 2000 });
+        notifications.success('Copied to clipboard', { duration: 2000 });
         track('profile_copy_url_click', { status: 'success' });
       }}
       onCopyError={() => {
-        toast.error('Failed to copy');
+        notifications.error('Failed to copy');
         track('profile_copy_url_click', { status: 'error' });
       }}
     />

@@ -758,7 +758,6 @@ export function AdminCreatorProfilesUnified({
         onOpenChange={setInviteDialogOpen}
         onSuccess={() => {
           setProfileToInvite(null);
-          toast.success('Invite created successfully');
         }}
       />
     </div>

@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
 import { toast } from 'sonner';

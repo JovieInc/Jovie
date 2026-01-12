@@ -10,7 +10,7 @@
 import { Button } from '@jovie/ui';
 import { WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ export function SessionManagementCard({
   user,
   activeSessionId,
 }: SessionManagementCardProps) {
+  const notifications = useNotifications();
   const [sessions, setSessions] = useState<ClerkSessionResource[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -69,10 +70,10 @@ export function SessionManagementCard({
     try {
       await session.revoke();
       setSessions(prev => prev.filter(item => item.id !== session.id));
-      toast.success('Session ended');
+      notifications.success('Session ended');
     } catch (error) {
       const message = extractErrorMessage(error);
-      toast.error(message);
+      notifications.error(message);
     } finally {
       setEndingSessionId(null);
     }

@@ -1,7 +1,9 @@
+'use client';
+
 import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { BillingStatus } from '@/hooks/useBillingStatus';
 import { track } from '@/lib/analytics';
 
@@ -46,6 +48,7 @@ export function useUserMenuActions({
   redirectToUrl,
   signOut,
 }: UseUserMenuActionsParams) {
+  const notifications = useNotifications();
   const router = useRouter();
   const [loading, setLoading] = useState<Omit<UserMenuLoadingState, 'any'>>({
     manageBilling: false,
@@ -77,7 +80,7 @@ export function useUserMenuActions({
       await signOut({ redirectUrl: '/' });
     } catch (error) {
       console.error('Sign out error:', error);
-      toast.error("Couldn't sign you out. Please try again.");
+      notifications.error("Couldn't sign you out. Please try again.");
       setLoading(prev => ({ ...prev, signOut: false }));
     }
   };
@@ -139,7 +142,7 @@ export function useUserMenuActions({
         reason: message,
       });
 
-      toast.error("Couldn't start your upgrade. Please try again.", {
+      notifications.error("Couldn't start your upgrade. Please try again.", {
         duration: 6000,
       });
     } finally {
@@ -159,7 +162,7 @@ export function useUserMenuActions({
           plan: billingStatus.plan ?? 'unknown',
         });
 
-        toast.warning(
+        notifications.warning(
           'Still setting up your billing profile. Try again or start an upgrade.',
           { duration: 6000 }
         );
@@ -204,7 +207,7 @@ export function useUserMenuActions({
         reason: message,
       });
 
-      toast.error(
+      notifications.error(
         "Couldn't open billing portal. Taking you to pricing instead.",
         { duration: 6000 }
       );

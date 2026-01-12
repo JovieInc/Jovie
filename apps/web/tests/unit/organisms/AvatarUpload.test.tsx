@@ -3,17 +3,22 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 import { fastRender } from '@/tests/utils/fast-render';
 
-// Mock Sonner toast
-const mockToast = {
+// Mock Sonner toast with vi.hoisted for proper setup
+const mockToast = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   warning: vi.fn(),
   info: vi.fn(),
   loading: vi.fn(),
   dismiss: vi.fn(),
-};
+  message: vi.fn(),
+  promise: vi.fn(),
+  custom: vi.fn(),
+}));
+
 vi.mock('sonner', () => ({
   toast: mockToast,
+  Toaster: () => null,
 }));
 
 // Mock analytics

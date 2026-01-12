@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
@@ -76,6 +76,7 @@ export function AdminCreatorProfilesWithSidebar({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
+  const notifications = useNotifications();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -338,7 +339,7 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle verification',
                               result.error
                             );
-                            toast.error(
+                            notifications.error(
                               `Failed to update verification status${result.error ? `: ${result.error}` : ''}`
                             );
                           }
@@ -353,7 +354,7 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle featured',
                               result.error
                             );
-                            toast.error(
+                            notifications.error(
                               `Failed to update featured status${result.error ? `: ${result.error}` : ''}`
                             );
                           }
@@ -368,7 +369,7 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle marketing',
                               result.error
                             );
-                            toast.error(
+                            notifications.error(
                               `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`
                             );
                           }
@@ -438,7 +439,7 @@ export function AdminCreatorProfilesWithSidebar({
         onOpenChange={setInviteDialogOpen}
         onSuccess={() => {
           setProfileToInvite(null);
-          toast.success('Invite created successfully');
+          notifications.success('Invite created successfully');
         }}
       />
     </div>

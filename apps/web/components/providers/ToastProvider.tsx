@@ -12,13 +12,12 @@ interface ToastProviderProps {
  * ToastProvider - World-class toast notification system powered by Sonner
  *
  * Features:
- * - Theme-aware (light/dark mode support)
+ * - Theme-aware (light/dark/system mode support)
  * - Rich toast types: success, error, info, warning, loading, promise
  * - Action buttons and custom actions
- * - Swipe to dismiss
  * - Stacked notifications with expand on hover
- * - Accessible with ARIA live regions
- * - Keyboard navigation support
+ * - Accessible with ARIA live regions and focus-visible keyboard navigation
+ * - Close button on all toasts
  *
  * Usage:
  * ```tsx
@@ -56,17 +55,15 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <>
       {children}
       <Toaster
-        theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+        theme={resolvedTheme === 'dark' ? 'dark' : resolvedTheme === 'light' ? 'light' : 'system'}
         position='bottom-right'
-        // Rich hover expansion for better UX
-        expand={false}
+        // Expand stacked notifications on hover
+        expand
         richColors
         // Close button on every toast for accessibility
         closeButton
         // Gap between toasts
         gap={8}
-        // Default duration (4s for most, errors stay longer)
-        duration={4000}
         // Visual offset from edges
         offset={16}
         // Maximum visible toasts (stacked)
@@ -85,11 +82,11 @@ export function ToastProvider({ children }: ToastProviderProps) {
             title: 'text-primary-token font-medium',
             description: 'text-secondary-token text-sm',
             actionButton:
-              'bg-accent text-white font-medium hover:opacity-90 transition-opacity',
+              'bg-accent text-white font-medium hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
-              'bg-surface-1 text-secondary-token font-medium hover:bg-surface-2 transition-colors',
+              'bg-surface-1 text-secondary-token font-medium hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             closeButton:
-              'bg-surface-1 border-subtle text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors',
+              'bg-surface-1 border-subtle text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             // Type-specific styles
             success:
               'border-emerald-500/30 dark:border-emerald-400/30 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-400',

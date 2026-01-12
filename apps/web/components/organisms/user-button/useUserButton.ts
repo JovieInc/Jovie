@@ -52,7 +52,7 @@ export function useUserButton({
     if (billingStatus.error && !billingErrorNotifiedRef.current) {
       toast.error(
         "Couldn't confirm your plan. Billing actions may be unavailable.",
-        { duration: 6000 }
+        { duration: 6000, id: 'billing-status-error' }
       );
       billingErrorNotifiedRef.current = true;
     }

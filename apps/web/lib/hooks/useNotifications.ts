@@ -62,11 +62,10 @@ export const TOAST_DURATIONS = {
 } as const;
 
 /**
- * Options for toast notifications
+ * Options for toast notifications (extends Sonner's ExternalToast)
  */
 export interface ToastOptions extends ExternalToast {
-  /** Custom duration in milliseconds */
-  duration?: number;
+  // All options inherited from ExternalToast
 }
 
 /**
@@ -198,13 +197,14 @@ export function useNotifications() {
       onUndo: () => void,
       options?: ActionToastOptions
     ): string | number => {
+      const { actionLabel, ...toastOptions } = options ?? {};
       return toast(message, {
         duration: TOAST_DURATIONS.ACTION,
         action: {
-          label: options?.actionLabel ?? 'Undo',
+          label: actionLabel ?? 'Undo',
           onClick: onUndo,
         },
-        ...options,
+        ...toastOptions,
       });
     },
     []
@@ -217,13 +217,14 @@ export function useNotifications() {
       onRetry: () => void,
       options?: ActionToastOptions
     ): string | number => {
+      const { actionLabel, ...toastOptions } = options ?? {};
       return toast.error(message, {
         duration: TOAST_DURATIONS.ACTION,
         action: {
-          label: options?.actionLabel ?? 'Retry',
+          label: actionLabel ?? 'Retry',
           onClick: onRetry,
         },
-        ...options,
+        ...toastOptions,
       });
     },
     []
@@ -332,27 +333,33 @@ export function useNotifications() {
       if (typeof err === 'string') {
         message = err;
       } else if (err instanceof Error) {
-        // Don't show technical errors to users
+        // Don't show technical errors to users - check error.name instead of message
+        const technicalErrorNames = new Set([
+          'TypeError',
+          'ReferenceError',
+          'SyntaxError',
+        ]);
         const isTechnicalError =
-          err.message.includes('TypeError') ||
-          err.message.includes('ReferenceError') ||
-          err.message.includes('SyntaxError') ||
-          err.message.includes('at ') ||
-          err.message.length > 100;
+          technicalErrorNames.has(err.name) ||
+          (err.message && err.message.includes('at ')) ||
+          (err.message && err.message.length > 100);
 
-        if (!isTechnicalError) {
+        if (!isTechnicalError && err.message) {
           message = err.message;
         }
 
-        // Map common error patterns
-        if (err.message.toLowerCase().includes('network')) {
-          message = TOAST_MESSAGES.NETWORK_ERROR;
-        } else if (err.message.toLowerCase().includes('rate limit')) {
-          message = TOAST_MESSAGES.RATE_LIMIT;
-        } else if (err.message.toLowerCase().includes('permission')) {
-          message = TOAST_MESSAGES.PERMISSION_ERROR;
-        } else if (err.message.toLowerCase().includes('session')) {
-          message = TOAST_MESSAGES.SESSION_EXPIRED;
+        // Map common error patterns (safely check message exists)
+        if (err.message) {
+          const lowerMessage = err.message.toLowerCase();
+          if (lowerMessage.includes('network')) {
+            message = TOAST_MESSAGES.NETWORK_ERROR;
+          } else if (lowerMessage.includes('rate limit')) {
+            message = TOAST_MESSAGES.RATE_LIMIT;
+          } else if (lowerMessage.includes('permission')) {
+            message = TOAST_MESSAGES.PERMISSION_ERROR;
+          } else if (lowerMessage.includes('session')) {
+            message = TOAST_MESSAGES.SESSION_EXPIRED;
+          }
         }
       }
 
