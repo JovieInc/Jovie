@@ -63,7 +63,7 @@ jobs:
 
       - name: Find or create tracking issue
         id: find-issue
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             const { data: issues } = await github.rest.issues.listForRepo({
@@ -93,7 +93,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create or update tracking issue
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count }}
           ISSUE_EXISTS: ${{ steps.find-issue.outputs.issue_exists }}
@@ -144,7 +144,7 @@ jobs:
 
       - name: Alert on high flakiness
         if: steps.analyze.outputs.flaky_count > 5 || steps.analyze.outputs.retry_rate > 20
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             core.warning(`⚠️ HIGH TEST FLAKINESS DETECTED: ${process.env.FLAKY_COUNT} flaky tests with ${process.env.RETRY_RATE}% retry rate`);

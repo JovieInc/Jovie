@@ -1,6 +1,7 @@
 'use client';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import React from 'react';
 import { typography } from '../table.styles';
 
 interface DateCellProps {
@@ -30,6 +31,8 @@ interface DateCellProps {
 /**
  * DateCell - Formatted date display with tooltip
  *
+ * Memoized for performance in virtualized tables to prevent unnecessary re-renders.
+ *
  * Features:
  * - User-friendly relative/absolute dates
  * - Full timestamp on hover
@@ -42,7 +45,7 @@ interface DateCellProps {
  * <DateCell date={profile.createdAt} />
  * ```
  */
-export function DateCell({
+export const DateCell = React.memo(function DateCell({
   date,
   formatOptions = {
     year: 'numeric',
@@ -84,4 +87,4 @@ export function DateCell({
       </TooltipContent>
     </Tooltip>
   );
-}
+});
