@@ -493,17 +493,38 @@ export function AdminCreatorProfilesUnified({
         size: 280,
       }),
 
-      // Social Links column
+      // Social Media Links column
       columnHelper.accessor('socialLinks', {
         id: 'social',
-        header: 'Links',
+        header: 'Social',
         cell: ({ row }) => {
           const profile = row.original;
           return (
-            <SocialLinksCell links={profile.socialLinks ?? null} maxLinks={3} />
+            <SocialLinksCell
+              links={profile.socialLinks ?? null}
+              filterPlatformType='social_media'
+              maxLinks={3}
+            />
           );
         },
-        size: 320,
+        size: 220,
+      }),
+
+      // Music Streaming Links column
+      columnHelper.accessor('socialLinks', {
+        id: 'music',
+        header: 'Music',
+        cell: ({ row }) => {
+          const profile = row.original;
+          return (
+            <SocialLinksCell
+              links={profile.socialLinks ?? null}
+              filterPlatformType='music_streaming'
+              maxLinks={3}
+            />
+          );
+        },
+        size: 220,
       }),
 
       // Created Date column

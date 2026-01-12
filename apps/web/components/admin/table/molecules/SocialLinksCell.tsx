@@ -41,6 +41,12 @@ interface SocialLinksCellProps {
   maxLinks?: number;
 
   /**
+   * Filter to show only specific platform types
+   * @example 'music_streaming' | 'social_media'
+   */
+  filterPlatformType?: string | string[];
+
+  /**
    * Additional CSS classes
    */
   className?: string;
@@ -69,15 +75,31 @@ interface SocialLinksCellProps {
 export const SocialLinksCell = React.memo(function SocialLinksCell({
   links,
   maxLinks = 3,
+  filterPlatformType,
   className,
 }: SocialLinksCellProps) {
   if (!links || links.length === 0) {
     return <span className={typography.cellTertiary}>—</span>;
   }
 
+  // Filter by platform type if specified
+  let filteredLinks = links;
+  if (filterPlatformType) {
+    const types = Array.isArray(filterPlatformType)
+      ? filterPlatformType
+      : [filterPlatformType];
+    filteredLinks = links.filter(link =>
+      types.includes(link.platform.toLowerCase())
+    );
+  }
+
+  if (filteredLinks.length === 0) {
+    return <span className={typography.cellTertiary}>—</span>;
+  }
+
   // Use collapsed mode (circles) when there are 2+ links
-  const useCollapsedMode = links.length >= 2;
-  const visibleLinks = links.slice(0, maxLinks);
+  const useCollapsedMode = filteredLinks.length >= 2;
+  const visibleLinks = filteredLinks.slice(0, maxLinks);
 
   return (
     <div className='flex items-center overflow-hidden'>
