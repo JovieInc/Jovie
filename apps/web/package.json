@@ -177,7 +177,7 @@
     "@playwright/test": "^1.55.0",
     "@storybook/addon-a11y": "^10.1.11",
     "@storybook/addon-docs": "^10.1.11",
-    "@storybook/addon-vitest": "^10.1.4",
+    "@storybook/addon-vitest": "^10.1.11",
     "@storybook/nextjs-vite": "^10.1.4",
     "@storybook/test-runner": "^0.24.2",
     "@tailwindcss/forms": "^0.5.9",
