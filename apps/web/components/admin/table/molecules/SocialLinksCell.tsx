@@ -82,15 +82,17 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
     return <span className={typography.cellTertiary}>—</span>;
   }
 
-  // Filter by platform type if specified
+  // Filter by platform category if specified
   let filteredLinks = links;
   if (filterPlatformType) {
     const types = Array.isArray(filterPlatformType)
-      ? filterPlatformType
-      : [filterPlatformType];
-    filteredLinks = links.filter(link =>
-      types.includes(link.platform.toLowerCase())
-    );
+      ? filterPlatformType.map(t => t.toLowerCase())
+      : [filterPlatformType.toLowerCase()];
+    filteredLinks = links.filter(link => {
+      const platformLower = link.platform.toLowerCase();
+      // Match against the platform category (social_media, music_streaming, etc.)
+      return types.includes(platformLower);
+    });
   }
 
   if (filteredLinks.length === 0) {

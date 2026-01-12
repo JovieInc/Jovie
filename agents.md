@@ -83,6 +83,12 @@ export CLAUDE_HOOKS_DISABLED=1
 - **No direct pushes** to `main`.
 - **HARD GUARDRAIL – Drizzle migrations are immutable:** Treat everything under `drizzle/migrations` as append-only. Do **not** edit, delete, reorder, squash, or regenerate existing migration files for any reason; only add new migrations. If a past migration appears incorrect, stop and escalate to a human instead of attempting an automated fix.
 - **HARD GUARDRAIL – Never suppress Biome errors:** Do **not** use `biome-ignore` comments to suppress lint or format errors. Always address the root cause by fixing the code to comply with Biome rules. If a rule seems incorrect, discuss with the team before suppressing. Proper fixes include: using semantic HTML elements, adding proper ARIA roles, refactoring for accessibility, or restructuring code to follow best practices.
+- **HARD GUARDRAIL – CI ownership (you touch it, you fix it):** If you work on a branch, you are responsible for making CI pass — even if errors existed before you started. This is non-negotiable.
+  - **Before starting work:** Run `pnpm typecheck && pnpm lint` to see current state
+  - **If pre-existing errors exist:** Fix them as part of your work, or explicitly flag to the user that the branch has pre-existing failures you cannot resolve
+  - **Before committing:** Always verify `pnpm typecheck && pnpm lint` passes
+  - **Never say "not my code":** PRs that fail CI block the entire team. If you touched the branch, you own making it green.
+  - **Scope creep is acceptable for CI:** Fixing unrelated type/lint errors to unblock CI is always in-scope, even if "outside your task"
 - New features ship **behind Statsig flags/experiments** and with **Statsig events** (or equivalent Statsig metrics) for primary actions.
 
 ## 8. Engineering Guardrails & Architecture
