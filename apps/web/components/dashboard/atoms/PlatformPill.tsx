@@ -26,6 +26,8 @@ export interface PlatformPillProps {
   trailing?: React.ReactNode;
   onClick?: () => void;
   shimmerOnMount?: boolean;
+  /** Compact mode shows only icon in a circle */
+  compact?: boolean;
   className?: string;
   testId?: string;
 }
@@ -44,6 +46,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       trailing,
       onClick,
       shimmerOnMount = false,
+      compact = false,
       className,
       testId,
     },
@@ -102,6 +105,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       const cssVars: React.CSSProperties = {
         '--pill-border': borderColors.base,
         '--pill-border-hover': borderColors.hover,
+        '--pill-bg-hover': hexToRgba(brandHex, 0.08),
       } as React.CSSProperties;
 
       if (!isTikTok || state === 'ready' || state === 'error') {
@@ -119,6 +123,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     }, [
       borderColors.base,
       borderColors.hover,
+      brandHex,
       isTikTok,
       state,
       tikTokGradient,
@@ -166,14 +171,20 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         tabIndex={isInteractive ? 0 : undefined}
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
+        title={compact ? `${platformName}: ${primaryText}` : undefined}
         className={cn(
-          'group relative inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 min-h-[32px] text-xs font-medium',
+          'group relative inline-flex items-center rounded-full border text-xs font-medium',
           'border-[var(--pill-border)] hover:border-[var(--pill-border-hover)]',
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
-          'transition-colors hover:bg-surface-2 dark:hover:bg-surface-2/60',
+          'transition-all duration-200',
+          compact
+            ? 'size-8 justify-center p-0'
+            : 'max-w-full gap-1.5 px-2.5 py-1 min-h-[32px]',
+          isInteractive &&
+            'hover:bg-[var(--pill-bg-hover)] dark:hover:bg-[var(--pill-bg-hover)]',
           isInteractive
-            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-surface-2'
+            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-[var(--pill-bg-hover)]'
             : 'cursor-default',
           tone === 'faded' &&
             'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',
@@ -183,7 +194,13 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         )}
         style={wrapperStyle}
         data-testid={testId}
-        aria-label={isInteractive ? `Select ${platformName}` : undefined}
+        aria-label={
+          isInteractive
+            ? compact
+              ? `${platformName}: ${primaryText}`
+              : `Select ${platformName}`
+            : undefined
+        }
       >
         {showShimmer ? (
           <span
@@ -197,45 +214,57 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           />
         ) : null}
 
-        <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
+        {compact ? (
+          /* Compact mode: icon only */
           <span
-            className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-            style={{ ...iconChipStyle }}
+            className='flex items-center justify-center'
+            style={{ color: iconFg }}
             aria-hidden='true'
           >
-            <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+            <SocialIcon platform={platformIcon} className='h-4 w-4' />
           </span>
-
-          <div className='min-w-0 flex-1'>
-            <span className={cn(primaryText.length > 40 && 'truncate')}>
-              {primaryText}
+        ) : (
+          /* Full mode: icon + text + badges */
+          <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
+            <span
+              className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
+              style={{ ...iconChipStyle }}
+              aria-hidden='true'
+            >
+              <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
             </span>
-            {hasSecondary ? (
-              <span
-                className={cn(
-                  'ml-2 text-[10px] text-tertiary-token/80',
-                  secondaryText && secondaryText.length > 40 && 'truncate'
-                )}
-              >
-                {secondaryText}
+
+            <div className='min-w-0 flex-1'>
+              <span className={cn(primaryText.length > 40 && 'truncate')}>
+                {primaryText}
+              </span>
+              {hasSecondary ? (
+                <span
+                  className={cn(
+                    'ml-2 text-[10px] text-tertiary-token/80',
+                    secondaryText && secondaryText.length > 40 && 'truncate'
+                  )}
+                >
+                  {secondaryText}
+                </span>
+              ) : null}
+            </div>
+
+            {badgeText ? (
+              <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
+                {badgeText}
+              </span>
+            ) : null}
+
+            {suffix ? (
+              <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
+                {suffix}
               </span>
             ) : null}
           </div>
+        )}
 
-          {badgeText ? (
-            <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
-              {badgeText}
-            </span>
-          ) : null}
-
-          {suffix ? (
-            <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
-              {suffix}
-            </span>
-          ) : null}
-        </div>
-
-        {trailing ? (
+        {!compact && trailing ? (
           <div className='relative ml-1 shrink-0'>{trailing}</div>
         ) : null}
       </div>

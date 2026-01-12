@@ -95,7 +95,7 @@ export function TableContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className='w-48'>
+      <ContextMenuContent className='w-48 text-xs'>
         {items.map((item, index) => {
           if (isSeparator(item)) {
             return <ContextMenuSeparator key={`separator-${index}`} />;
@@ -109,12 +109,12 @@ export function TableContextMenu({
                 disabled={item.disabled}
                 className={
                   item.destructive
-                    ? 'text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400'
-                    : undefined
+                    ? 'text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 text-xs'
+                    : 'text-xs'
                 }
               >
                 {item.icon && (
-                  <span className='mr-2 h-4 w-4 flex items-center justify-center'>
+                  <span className='mr-2 h-3.5 w-3.5 flex items-center justify-center'>
                     {item.icon}
                   </span>
                 )}
@@ -126,15 +126,15 @@ export function TableContextMenu({
           if (isSubmenu(item)) {
             return (
               <ContextMenuSub key={item.id}>
-                <ContextMenuSubTrigger>
+                <ContextMenuSubTrigger className='text-xs'>
                   {item.icon && (
-                    <span className='mr-2 h-4 w-4 flex items-center justify-center'>
+                    <span className='mr-2 h-3.5 w-3.5 flex items-center justify-center'>
                       {item.icon}
                     </span>
                   )}
                   {item.label}
                 </ContextMenuSubTrigger>
-                <ContextMenuSubContent>
+                <ContextMenuSubContent className='text-xs'>
                   {item.actions.map(action => (
                     <ContextMenuItem
                       key={action.id}
@@ -142,12 +142,12 @@ export function TableContextMenu({
                       disabled={action.disabled}
                       className={
                         action.destructive
-                          ? 'text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400'
-                          : undefined
+                          ? 'text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 text-xs'
+                          : 'text-xs'
                       }
                     >
                       {action.icon && (
-                        <span className='mr-2 h-4 w-4 flex items-center justify-center'>
+                        <span className='mr-2 h-3.5 w-3.5 flex items-center justify-center'>
                           {action.icon}
                         </span>
                       )}

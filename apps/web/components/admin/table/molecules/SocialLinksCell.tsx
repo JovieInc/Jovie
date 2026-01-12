@@ -70,12 +70,15 @@ export function SocialLinksCell({
           '';
         const displayUsername = formatUsername(username);
 
+        // Use lowercase platform for icon matching (spotify, instagram, etc.)
+        const platformIcon = link.platform.toLowerCase();
+
         return (
           <PlatformPill
             key={link.id}
-            platformIcon={link.platformType}
+            platformIcon={platformIcon}
             platformName={link.platform}
-            primaryText={displayUsername || link.platformType}
+            primaryText={displayUsername || link.platform}
             onClick={() => {
               window.open(link.url, '_blank', 'noopener,noreferrer');
             }}

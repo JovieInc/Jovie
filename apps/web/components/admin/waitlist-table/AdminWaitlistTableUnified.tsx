@@ -8,7 +8,15 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ClipboardList, ExternalLink, Mail, User } from 'lucide-react';
+import {
+  ClipboardList,
+  ExternalLink,
+  Mail,
+  ShoppingBag,
+  Ticket,
+  TrendingUp,
+  User,
+} from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
@@ -60,13 +68,13 @@ export function AdminWaitlistTableUnified({
         {
           id: 'copy-email',
           label: 'Copy Email',
-          icon: <Mail className='h-4 w-4' />,
+          icon: <Mail className='h-3.5 w-3.5' />,
           onClick: () => copyToClipboard(entry.email, 'email'),
         },
         {
           id: 'copy-name',
           label: 'Copy Name',
-          icon: <User className='h-4 w-4' />,
+          icon: <User className='h-3.5 w-3.5' />,
           onClick: () => copyToClipboard(entry.fullName, 'name'),
         },
         {
@@ -75,7 +83,7 @@ export function AdminWaitlistTableUnified({
         {
           id: 'open-social',
           label: 'Open Primary Social',
-          icon: <ExternalLink className='h-4 w-4' />,
+          icon: <ExternalLink className='h-3.5 w-3.5' />,
           onClick: () => {
             window.open(entry.primarySocialUrlNormalized, '_blank');
           },
@@ -85,7 +93,7 @@ export function AdminWaitlistTableUnified({
               {
                 id: 'open-spotify' as const,
                 label: 'Open Spotify',
-                icon: <ExternalLink className='h-4 w-4' />,
+                icon: <ExternalLink className='h-3.5 w-3.5' />,
                 onClick: () => {
                   window.open(entry.spotifyUrlNormalized!, '_blank');
                 },
@@ -98,7 +106,7 @@ export function AdminWaitlistTableUnified({
         {
           id: 'approve',
           label: isApproved ? 'Approved' : 'Approve',
-          icon: <ClipboardList className='h-4 w-4' />,
+          icon: <ClipboardList className='h-3.5 w-3.5' />,
           onClick: () => {
             if (!isApproved) {
               void approveEntry(entry.id);
@@ -148,8 +156,20 @@ export function AdminWaitlistTableUnified({
           const primaryGoalLabel = value
             ? (PRIMARY_GOAL_LABELS[value] ?? value)
             : null;
+
+          // Icon mapping for primary goals
+          const GoalIcon =
+            value === 'streams'
+              ? TrendingUp
+              : value === 'merch'
+                ? ShoppingBag
+                : value === 'tickets'
+                  ? Ticket
+                  : null;
+
           return primaryGoalLabel ? (
-            <Badge size='sm' variant='secondary'>
+            <Badge size='sm' variant='secondary' className='gap-1'>
+              {GoalIcon && <GoalIcon className='h-3 w-3' />}
               {primaryGoalLabel}
             </Badge>
           ) : (
@@ -181,7 +201,7 @@ export function AdminWaitlistTableUnified({
             <PlatformPill
               platformIcon={entry.primarySocialPlatform.toLowerCase()}
               platformName={platformLabel}
-              primaryText={username}
+              primaryText={`@${username}`}
               onClick={() =>
                 window.open(entry.primarySocialUrlNormalized, '_blank')
               }
@@ -209,7 +229,7 @@ export function AdminWaitlistTableUnified({
             <PlatformPill
               platformIcon='spotify'
               platformName='Spotify'
-              primaryText={artistName}
+              primaryText={`@${artistName}`}
               onClick={() => window.open(value, '_blank')}
             />
           );
@@ -268,18 +288,7 @@ export function AdminWaitlistTableUnified({
         id: 'created',
         header: 'Created',
         cell: ({ getValue }) => {
-          return (
-            <DateCell
-              date={getValue()}
-              formatOptions={{
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }}
-            />
-          );
+          return <DateCell date={getValue()} />;
         },
         size: 160,
       }),
@@ -287,7 +296,7 @@ export function AdminWaitlistTableUnified({
       // Actions column
       columnHelper.display({
         id: 'actions',
-        header: 'Actions',
+        header: '',
         cell: ({ row }) => {
           const entry = row.original;
           const isApproved =
