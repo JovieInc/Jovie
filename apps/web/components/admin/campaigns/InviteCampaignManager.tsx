@@ -359,13 +359,13 @@ export function InviteCampaignManager() {
                   <table className='w-full text-sm'>
                     <thead className='bg-surface-2'>
                       <tr>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-secondary-token'>
+                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                           Username
                         </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-secondary-token'>
+                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                           Fit Score
                         </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-secondary-token'>
+                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                           Email
                         </th>
                       </tr>
