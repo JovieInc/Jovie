@@ -7,6 +7,7 @@ import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
+import { parsePaginationParams } from '@/lib/utils/pagination-parser';
 
 export const metadata: Metadata = {
   title: 'Waitlist | Admin',
@@ -22,18 +23,7 @@ interface AdminWaitlistPageProps {
 export default async function AdminWaitlistPage({
   searchParams,
 }: AdminWaitlistPageProps) {
-  const pageParam = searchParams?.page
-    ? Number.parseInt(searchParams.page, 10)
-    : 1;
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
-
-  const pageSizeParam = searchParams?.pageSize
-    ? Number.parseInt(searchParams.pageSize, 10)
-    : 20;
-  const pageSize =
-    Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 100
-      ? pageSizeParam
-      : 20;
+  const { page, pageSize } = parsePaginationParams(searchParams);
 
   const [
     { entries, page: currentPage, pageSize: resolvedPageSize, total },

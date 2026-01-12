@@ -5,6 +5,7 @@ import {
   type AdminCreatorProfilesSort,
   getAdminCreatorProfiles,
 } from '@/lib/admin/creator-profiles';
+import { parsePaginationParams } from '@/lib/utils/pagination-parser';
 
 interface AdminCreatorsPageProps {
   searchParams?: {
@@ -22,19 +23,8 @@ export const metadata: Metadata = {
 export default async function AdminCreatorsPage({
   searchParams,
 }: AdminCreatorsPageProps) {
-  const pageParam = searchParams?.page
-    ? Number.parseInt(searchParams.page, 10)
-    : 1;
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const { page, pageSize } = parsePaginationParams(searchParams);
   const search = searchParams?.q ?? '';
-
-  const pageSizeParam = searchParams?.pageSize
-    ? Number.parseInt(searchParams.pageSize, 10)
-    : 20;
-  const pageSize =
-    Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 100
-      ? pageSizeParam
-      : 20;
 
   const sortParam = searchParams?.sort;
   const sort: AdminCreatorProfilesSort =

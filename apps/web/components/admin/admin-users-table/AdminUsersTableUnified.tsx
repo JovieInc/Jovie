@@ -2,17 +2,19 @@
 
 import { Badge, Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Copy, Mail, Users } from 'lucide-react';
+import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { ActionsCell } from '@/components/admin/table/atoms/ActionsCell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
-import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+} from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
-import { UserActionsMenu } from '@/components/admin/UserActionsMenu';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
@@ -26,8 +28,12 @@ const columnHelper = createColumnHelper<AdminUserRow>();
 export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const { users, page, pageSize, total, search, sort } = props;
 
-  const { router, openMenuUserId, setOpenMenuUserId, pagination } =
-    useAdminUsersTable(props);
+  const {
+    router,
+    openMenuUserId: _openMenuUserId,
+    setOpenMenuUserId: _setOpenMenuUserId,
+    pagination,
+  } = useAdminUsersTable(props);
 
   const {
     totalPages,
@@ -40,6 +46,64 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     clearHref,
     buildHref,
   } = pagination;
+
+  // Context menu items for right-click AND actions button
+  const getContextMenuItems = useCallback(
+    (user: AdminUserRow): ContextMenuItemType[] => {
+      const items: ContextMenuItemType[] = [];
+
+      // Copy Clerk user ID
+      items.push({
+        id: 'copy-clerk-id',
+        label: 'Copy Clerk user ID',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: () => {
+          navigator.clipboard.writeText(user.clerkId);
+        },
+      });
+
+      // Copy email
+      items.push({
+        id: 'copy-email',
+        label: 'Copy email',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: () => {
+          if (user.email) {
+            navigator.clipboard.writeText(user.email);
+          }
+        },
+        disabled: !user.email,
+      });
+
+      // Copy User ID
+      items.push({
+        id: 'copy-user-id',
+        label: 'Copy User ID',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: () => {
+          navigator.clipboard.writeText(user.id);
+        },
+      });
+
+      // Open in Clerk (if has Clerk ID)
+      const hasClerkConsoleUrl = user.clerkId.length > 0;
+      if (hasClerkConsoleUrl) {
+        const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(user.clerkId)}`;
+        items.push({ type: 'separator' as const });
+        items.push({
+          id: 'open-in-clerk',
+          label: 'Open in Clerk',
+          icon: <ExternalLink className='h-3.5 w-3.5' />,
+          onClick: () => {
+            window.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
+          },
+        });
+      }
+
+      return items;
+    },
+    []
+  );
 
   // Define columns using TanStack Table
   const columns = useMemo<ColumnDef<AdminUserRow, any>[]>(
@@ -115,71 +179,31 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         size: 120,
       }),
 
-      // Actions column
+      // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
         header: '',
         cell: ({ row }) => {
           const user = row.original;
-          const isMenuOpen = openMenuUserId === user.id;
+          const contextMenuItems = getContextMenuItems(user);
+          const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
           return (
-            <ActionsCell
-              menu={
-                <UserActionsMenu
-                  user={user}
-                  open={isMenuOpen}
-                  onOpenChange={open =>
-                    setOpenMenuUserId(open ? user.id : null)
-                  }
-                />
-              }
-              isMenuOpen={isMenuOpen}
-            />
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={actionMenuItems} align='end' />
+            </div>
           );
         },
-        size: 72,
+        size: 48,
       }),
     ],
-    [openMenuUserId, setOpenMenuUserId]
+    [getContextMenuItems]
   );
 
   // Get row className
   const getRowClassName = useCallback(() => {
     return 'group hover:bg-base dark:hover:bg-surface-2';
   }, []);
-
-  // Context menu items for right-click
-  const getContextMenuItems = useCallback(
-    (user: AdminUserRow): ContextMenuItemType[] => {
-      return [
-        {
-          id: 'copy-email',
-          label: 'Copy Email',
-          icon: <Mail className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(user.email || '');
-          },
-        },
-        {
-          id: 'copy-id',
-          label: 'Copy User ID',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(user.id);
-          },
-        },
-        {
-          id: 'copy-clerk-id',
-          label: 'Copy Clerk ID',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(user.clerkId);
-          },
-        },
-      ];
-    },
-    []
-  );
 
   return (
     <AdminTableShell
