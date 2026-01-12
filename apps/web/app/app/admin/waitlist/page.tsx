@@ -2,11 +2,7 @@ import type { Metadata } from 'next';
 
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
 import { AdminWaitlistTableWithViews } from '@/components/admin/waitlist-table/AdminWaitlistTableWithViews';
-import {
-  PageContent,
-  PageHeader,
-  PageShell,
-} from '@/components/organisms/PageShell';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
@@ -49,7 +45,6 @@ export default async function AdminWaitlistPage({
 
   return (
     <PageShell>
-      <PageHeader title='Waitlist' />
       <PageContent noPadding>
         <WaitlistMetrics metrics={metrics} />
         <AdminWaitlistTableWithViews
