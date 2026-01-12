@@ -456,6 +456,112 @@ export function AdminCreatorProfilesUnified({
     ]
   );
 
+  // Bulk action handlers
+  const handleBulkVerify = useCallback(async () => {
+    const selectedProfiles = profilesWithActions.filter(p =>
+      selectedIds.has(p.id)
+    );
+    const results = await Promise.all(
+      selectedProfiles.map(p => toggleVerification(p.id, true))
+    );
+    const failedCount = results.filter(r => !r.success).length;
+    if (failedCount > 0) {
+      showToast({
+        type: 'error',
+        message: `Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+      });
+    } else {
+      showToast({
+        type: 'success',
+        message: `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+      });
+    }
+  }, [profilesWithActions, selectedIds, toggleVerification, showToast]);
+
+  const handleBulkUnverify = useCallback(async () => {
+    const selectedProfiles = profilesWithActions.filter(p =>
+      selectedIds.has(p.id)
+    );
+    const results = await Promise.all(
+      selectedProfiles.map(p => toggleVerification(p.id, false))
+    );
+    const failedCount = results.filter(r => !r.success).length;
+    if (failedCount > 0) {
+      showToast({
+        type: 'error',
+        message: `Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+      });
+    } else {
+      showToast({
+        type: 'success',
+        message: `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+      });
+    }
+  }, [profilesWithActions, selectedIds, toggleVerification, showToast]);
+
+  const handleBulkFeature = useCallback(async () => {
+    const selectedProfiles = profilesWithActions.filter(p =>
+      selectedIds.has(p.id)
+    );
+    const results = await Promise.all(
+      selectedProfiles.map(p => toggleFeatured(p.id, true))
+    );
+    const failedCount = results.filter(r => !r.success).length;
+    if (failedCount > 0) {
+      showToast({
+        type: 'error',
+        message: `Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+      });
+    } else {
+      showToast({
+        type: 'success',
+        message: `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+      });
+    }
+  }, [profilesWithActions, selectedIds, toggleFeatured, showToast]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const selectedProfiles = profilesWithActions.filter(p =>
+      selectedIds.has(p.id)
+    );
+    if (selectedProfiles.length === 0) return;
+
+    const confirmed = confirm(
+      `Are you sure you want to delete ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const results = await Promise.all(
+      selectedProfiles.map(p => deleteCreatorOrUser(p.id))
+    );
+    const failedCount = results.filter(r => !r.success).length;
+    if (failedCount > 0) {
+      showToast({
+        type: 'error',
+        message: `Failed to delete ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+      });
+    } else {
+      showToast({
+        type: 'success',
+        message: `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+      });
+      // Clear selection after successful deletion
+      toggleSelectAll();
+      router.refresh();
+    }
+  }, [
+    profilesWithActions,
+    selectedIds,
+    deleteCreatorOrUser,
+    showToast,
+    toggleSelectAll,
+    router,
+  ]);
+
+  const handleClearSelection = useCallback(() => {
+    toggleSelectAll();
+  }, [toggleSelectAll]);
+
   // Get row className based on selection state
   const getRowClassName = useCallback(
     (profile: AdminCreatorProfileRow) => {
@@ -493,6 +599,12 @@ export function AdminCreatorProfilesUnified({
               total={total}
               clearHref={clearHref}
               profiles={profilesWithActions}
+              selectedIds={selectedIds}
+              onBulkVerify={handleBulkVerify}
+              onBulkUnverify={handleBulkUnverify}
+              onBulkFeature={handleBulkFeature}
+              onBulkDelete={handleBulkDelete}
+              onClearSelection={handleClearSelection}
             />
           }
           footer={
