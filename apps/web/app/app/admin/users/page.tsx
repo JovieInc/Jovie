@@ -1,11 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
-import {
-  PageContent,
-  PageHeader,
-  PageShell,
-} from '@/components/organisms/PageShell';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
 
 interface AdminUsersPageProps {
@@ -58,10 +54,6 @@ export default async function AdminUsersPage({
 
   return (
     <PageShell>
-      <PageHeader
-        title='Users'
-        description={`${total} total ${total === 1 ? 'user' : 'users'}`}
-      />
       <PageContent noPadding>
         <AdminUsersTableUnified
           users={users}
