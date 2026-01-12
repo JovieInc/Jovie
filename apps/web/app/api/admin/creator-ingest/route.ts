@@ -322,14 +322,19 @@ function extractHandleFromSocialUrl(url: string): string | null {
 
     // Note: Discord invite codes are not usernames, so we don't extract them
 
-    // Spotify: /artist/ID or /user/username
-    const spotifyHosts = ['spotify.com', 'www.spotify.com'];
+    // Spotify: /artist/ID or /user/username or /playlist/ID
+    // Artist IDs are not usernames - these need special handling
+    const spotifyHosts = ['spotify.com', 'www.spotify.com', 'open.spotify.com'];
     if (spotifyHosts.includes(hostname)) {
-      if (
-        (handle === 'artist' || handle === 'user' || handle === 'playlist') &&
-        segments[1]
-      ) {
+      if (handle === 'artist' && segments[1]) {
+        // Store the full artist ID in the handle with prefix
+        // We'll fetch the actual name via API and use it as displayName
+        handle = `spotifyartist-${segments[1]}`;
+      } else if (handle === 'user' && segments[1]) {
         handle = segments[1];
+      } else if (handle === 'playlist' && segments[1]) {
+        // Playlists aren't creator profiles
+        return null;
       }
     }
 
@@ -826,6 +831,30 @@ export async function POST(request: Request) {
       );
     }
 
+    // For Spotify artists, fetch the artist name from the API
+    let spotifyArtistName: string | null = null;
+    const isSpotifyArtist =
+      handle.startsWith('artist-') && platformId === 'spotify';
+    if (isSpotifyArtist) {
+      try {
+        const { getSpotifyArtist } = await import('@/lib/spotify');
+        const artistId = handle.replace('artist-', '');
+        const artist = await getSpotifyArtist(artistId);
+        if (artist?.name) {
+          spotifyArtistName = artist.name;
+          logger.info('Fetched Spotify artist name', {
+            artistId,
+            name: artist.name,
+          });
+        }
+      } catch (error) {
+        logger.warn('Failed to fetch Spotify artist name', {
+          handle,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
     return await withSystemIngestionSession(async tx => {
       // Check for existing profile
       const [existing] = await tx
@@ -854,6 +883,15 @@ export async function POST(request: Request) {
         finalHandle = altHandle;
       } else if (existing && !existing.isClaimed) {
         // Profile exists but unclaimed - add the link to existing profile
+        // For Spotify, use artist name; for other music platforms, leave empty
+        const isMusicPlatform = [
+          'spotify',
+          'apple_music',
+          'soundcloud',
+          'tidal',
+        ].includes(platformId);
+        const linkDisplayText =
+          spotifyArtistName || (isMusicPlatform ? '' : detected.platform.name);
         try {
           // Add the social link to existing profile (idempotent)
           const linkAdded = await addSocialLinkIdempotent(
@@ -861,7 +899,7 @@ export async function POST(request: Request) {
             existing.id,
             platformId,
             normalizedUrl,
-            detected.platform.name
+            linkDisplayText
           );
 
           if (linkAdded) {
@@ -922,6 +960,11 @@ export async function POST(request: Request) {
         claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
       );
 
+      // For Spotify artist IDs, use the fetched artist name if available
+      const displayName =
+        spotifyArtistName ||
+        (isSpotifyArtist ? detected.platform.name : handle);
+
       // Create new profile
       const [created] = await tx
         .insert(creatorProfiles)
@@ -929,7 +972,7 @@ export async function POST(request: Request) {
           creatorType: 'creator',
           username: finalHandle,
           usernameNormalized: finalHandle,
-          displayName: handle, // Use original handle casing as display name
+          displayName: displayName, // Use original handle casing as display name
           avatarUrl: null,
           isPublic: true,
           isVerified: false,
@@ -960,13 +1003,22 @@ export async function POST(request: Request) {
       }
 
       // Add the social link (idempotent, though new profile shouldn't have duplicates)
+      // For Spotify, use the fetched artist name; for other music platforms, leave empty
+      const isMusicPlatform = [
+        'spotify',
+        'apple_music',
+        'soundcloud',
+        'tidal',
+      ].includes(platformId);
+      const linkDisplayText =
+        spotifyArtistName || (isMusicPlatform ? '' : detected.platform.name);
       try {
         await addSocialLinkIdempotent(
           tx,
           created.id,
           platformId,
           normalizedUrl,
-          detected.platform.name
+          linkDisplayText
         );
       } catch (linkError) {
         logger.warn('Failed to add link to new profile', {

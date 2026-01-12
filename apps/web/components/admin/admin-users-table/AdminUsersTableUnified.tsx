@@ -104,7 +104,10 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
             </Badge>
           ) : (
             <Badge size='sm' variant='success'>
-              Active
+              <span className='flex items-center gap-1.5'>
+                <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />
+                Active
+              </span>
             </Badge>
           );
         },
