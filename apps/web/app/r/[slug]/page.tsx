@@ -68,60 +68,58 @@ function parseSmartLinkSlug(slug: string): {
  * Wrapped with React.cache() to deduplicate calls between generateMetadata and page render.
  * Uses Promise.all() to parallelize independent queries.
  */
-const getReleaseData = cache(
-  async (releaseSlug: string, profileId: string) => {
-    // Fetch release and creator in parallel (both only need profileId)
-    const [releaseResult, creatorResult] = await Promise.all([
-      db
-        .select()
-        .from(discogReleases)
-        .where(
-          and(
-            eq(discogReleases.creatorProfileId, profileId),
-            eq(discogReleases.slug, releaseSlug)
-          )
-        )
-        .limit(1),
-      db
-        .select({
-          displayName: creatorProfiles.displayName,
-          username: creatorProfiles.username,
-          avatarUrl: creatorProfiles.avatarUrl,
-        })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, profileId))
-        .limit(1),
-    ]);
-
-    const [release] = releaseResult;
-    const [creator] = creatorResult;
-
-    if (!release) {
-      return null;
-    }
-
-    // Fetch provider links (requires release.id from first query)
-    const links = await db
+const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
+  // Fetch release and creator in parallel (both only need profileId)
+  const [releaseResult, creatorResult] = await Promise.all([
+    db
       .select()
-      .from(providerLinks)
+      .from(discogReleases)
       .where(
         and(
-          eq(providerLinks.ownerType, 'release'),
-          eq(providerLinks.releaseId, release.id)
+          eq(discogReleases.creatorProfileId, profileId),
+          eq(discogReleases.slug, releaseSlug)
         )
-      );
+      )
+      .limit(1),
+    db
+      .select({
+        displayName: creatorProfiles.displayName,
+        username: creatorProfiles.username,
+        avatarUrl: creatorProfiles.avatarUrl,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1),
+  ]);
 
-    return {
-      release,
-      providerLinks: links,
-      creator: creator ?? {
-        displayName: null,
-        username: UNKNOWN_ARTIST,
-        avatarUrl: null,
-      },
-    };
+  const [release] = releaseResult;
+  const [creator] = creatorResult;
+
+  if (!release) {
+    return null;
   }
-);
+
+  // Fetch provider links (requires release.id from first query)
+  const links = await db
+    .select()
+    .from(providerLinks)
+    .where(
+      and(
+        eq(providerLinks.ownerType, 'release'),
+        eq(providerLinks.releaseId, release.id)
+      )
+    );
+
+  return {
+    release,
+    providerLinks: links,
+    creator: creator ?? {
+      displayName: null,
+      username: UNKNOWN_ARTIST,
+      avatarUrl: null,
+    },
+  };
+});
 
 /**
  * Pick the best provider URL based on priority
