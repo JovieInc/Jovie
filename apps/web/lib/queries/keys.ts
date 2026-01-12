@@ -56,7 +56,11 @@ export const queryKeys = {
   creators: {
     all: ['creators'] as const,
     list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.creators.all, 'list', filters] as const,
+      [
+        ...queryKeys.creators.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
     detail: (id: string) => [...queryKeys.creators.all, 'detail', id] as const,
     featured: () => [...queryKeys.creators.all, 'featured'] as const,
   },

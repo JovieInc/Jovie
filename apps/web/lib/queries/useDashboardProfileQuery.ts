@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STANDARD_CACHE } from './cache-strategies';
+import { createMutationFn, createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
 export interface DashboardProfile {
@@ -12,15 +13,10 @@ export interface DashboardProfile {
   updatedAt: string;
 }
 
-async function fetchDashboardProfile(): Promise<DashboardProfile> {
-  const response = await fetch('/api/dashboard/profile');
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch profile');
-  }
-
-  return response.json() as Promise<DashboardProfile>;
-}
+// Use shared fetch utilities for consistent timeout and error handling
+const fetchDashboardProfile = createQueryFn<DashboardProfile>(
+  '/api/dashboard/profile'
+);
 
 interface UpdateProfileInput {
   displayName?: string;
@@ -28,21 +24,11 @@ interface UpdateProfileInput {
   avatarUrl?: string;
 }
 
-async function updateDashboardProfile(
-  input: UpdateProfileInput
-): Promise<DashboardProfile> {
-  const response = await fetch('/api/dashboard/profile', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to update profile');
-  }
-
-  return response.json() as Promise<DashboardProfile>;
-}
+// Use shared mutation helper for consistent error handling
+const updateDashboardProfile = createMutationFn<
+  UpdateProfileInput,
+  DashboardProfile
+>('/api/dashboard/profile', 'PATCH');
 
 /**
  * Query hook for fetching the current user's dashboard profile.

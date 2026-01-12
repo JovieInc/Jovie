@@ -53,8 +53,21 @@ export async function fetchWithTimeout<T>(
       );
     }
 
-    return (await response.json()) as T;
+    // Parse JSON with error handling for malformed responses
+    let data: T;
+    try {
+      data = (await response.json()) as T;
+    } catch (parseError) {
+      if (parseError instanceof SyntaxError) {
+        throw new FetchError('Invalid JSON response', 502, response);
+      }
+      throw parseError;
+    }
+    return data;
   } catch (error) {
+    if (error instanceof FetchError) {
+      throw error;
+    }
     if (error instanceof Error && error.name === 'AbortError') {
       throw new FetchError('Request timeout', 408);
     }
