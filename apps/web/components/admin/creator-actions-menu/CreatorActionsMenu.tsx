@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Mail,
   MailX,
-  MoreHorizontal,
   MoreVertical,
   RefreshCw,
   Send,
@@ -89,7 +88,7 @@ export function CreatorActionsMenu({
               className='h-8 w-8 rounded-md border border-subtle bg-transparent text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
               disabled={isLoading}
             >
-              <MoreHorizontal className='h-4 w-4' />
+              <MoreVertical className='h-4 w-4' />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent

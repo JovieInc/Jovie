@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -155,7 +155,7 @@ export function ResponsiveActionsCell({
               className='inline-flex items-center justify-center rounded-md p-2 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
               aria-label='More actions'
             >
-              <MoreHorizontal className='h-4 w-4' />
+              <MoreVertical className='h-4 w-4' />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' className='w-48'>
