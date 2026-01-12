@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import { AdminCreatorsPageWrapper } from '@/components/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
-import { PageShell } from '@/components/organisms/PageShell';
 import {
   type AdminCreatorProfilesSort,
   getAdminCreatorProfiles,
@@ -60,16 +59,14 @@ export default async function AdminCreatorsPage({
   });
 
   return (
-    <PageShell>
-      <AdminCreatorsPageWrapper
-        profiles={profiles}
-        page={currentPage}
-        pageSize={resolvedPageSize}
-        total={total}
-        search={search}
-        sort={sort}
-        basePath='/app/admin/creators'
-      />
-    </PageShell>
+    <AdminCreatorsPageWrapper
+      profiles={profiles}
+      page={currentPage}
+      pageSize={resolvedPageSize}
+      total={total}
+      search={search}
+      sort={sort}
+      basePath='/app/admin/creators'
+    />
   );
 }

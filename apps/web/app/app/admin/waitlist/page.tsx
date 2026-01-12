@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
-import { WaitlistTable } from '@/components/admin/waitlist-table';
+import { AdminWaitlistTableWithViews } from '@/components/admin/waitlist-table/AdminWaitlistTableWithViews';
 import {
   PageContent,
   PageHeader,
@@ -52,7 +52,7 @@ export default async function AdminWaitlistPage({
       <PageHeader title='Waitlist' />
       <PageContent noPadding>
         <WaitlistMetrics metrics={metrics} />
-        <WaitlistTable
+        <AdminWaitlistTableWithViews
           entries={entries}
           page={currentPage}
           pageSize={resolvedPageSize}

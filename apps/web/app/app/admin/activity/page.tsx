@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { ActivityTable } from '@/components/admin/ActivityTable';
+import { ActivityTableUnified } from '@/components/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export default async function AdminActivityPage() {
   return (
     <div>
       <h1 className='sr-only'>Activity</h1>
-      <ActivityTable items={items} />
+      <ActivityTableUnified items={items} />
     </div>
   );
 }

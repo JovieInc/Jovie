@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { AdminUsersTable } from '@/components/admin/admin-users-table';
+import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
 import {
   PageContent,
   PageHeader,
@@ -63,7 +63,7 @@ export default async function AdminUsersPage({
         description={`${total} total ${total === 1 ? 'user' : 'users'}`}
       />
       <PageContent noPadding>
-        <AdminUsersTable
+        <AdminUsersTableUnified
           users={users}
           page={page}
           pageSize={pageSize}
