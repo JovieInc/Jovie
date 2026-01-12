@@ -70,7 +70,7 @@ export function AdminCreatorsToolbar({
                   size='sm'
                   variant='ghost'
                   onClick={onBulkUnverify}
-                  className='gap-2'
+                  className='gap-2.5'
                 >
                   <XCircle className='h-4 w-4' />
                   Unverify
@@ -80,7 +80,7 @@ export function AdminCreatorsToolbar({
                   size='sm'
                   variant='ghost'
                   onClick={onBulkVerify}
-                  className='gap-2'
+                  className='gap-2.5'
                 >
                   <CheckCircle className='h-4 w-4' />
                   Verify
@@ -90,7 +90,7 @@ export function AdminCreatorsToolbar({
                 size='sm'
                 variant='ghost'
                 onClick={onBulkFeature}
-                className='gap-2'
+                className='gap-2.5'
               >
                 <Star className='h-4 w-4' />
                 Feature
@@ -99,7 +99,7 @@ export function AdminCreatorsToolbar({
                 size='sm'
                 variant='ghost'
                 onClick={onBulkDelete}
-                className='gap-2 text-destructive hover:text-destructive'
+                className='gap-2.5 text-destructive hover:text-destructive'
               >
                 <Trash2 className='h-4 w-4' />
                 Delete
