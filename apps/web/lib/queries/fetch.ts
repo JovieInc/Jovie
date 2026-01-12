@@ -160,9 +160,12 @@ export function createQueryFn<T>(
 export function createMutationFn<TInput, TOutput>(
   url: string,
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'POST',
-  options?: Omit<FetchOptions, 'method' | 'body'>
+  options?: Omit<FetchOptions, 'method' | 'body' | 'signal'>
 ) {
-  return async (input: TInput): Promise<TOutput> => {
+  return async (
+    input: TInput,
+    context?: { signal?: AbortSignal }
+  ): Promise<TOutput> => {
     return fetchWithTimeout<TOutput>(url, {
       ...options,
       method,
@@ -171,6 +174,7 @@ export function createMutationFn<TInput, TOutput>(
         ...options?.headers,
       },
       body: JSON.stringify(input),
+      signal: context?.signal,
     });
   };
 }
