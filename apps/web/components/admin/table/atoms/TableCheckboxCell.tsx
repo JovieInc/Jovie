@@ -81,7 +81,9 @@ export function TableCheckboxCell<TData = unknown>(
           >
             <Checkbox
               checked={checked}
-              onCheckedChange={value => onChange(value === true)}
+              onCheckedChange={(value: boolean | 'indeterminate') =>
+                onChange(value === true)
+              }
               aria-label={ariaLabel}
               indeterminate={indeterminate}
             />

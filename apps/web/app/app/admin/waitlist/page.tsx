@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { SearchParams } from 'nuqs/server';
 
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
 import { AdminWaitlistTableWithViews } from '@/components/admin/waitlist-table/AdminWaitlistTableWithViews';
@@ -7,23 +8,21 @@ import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
-import { parsePaginationParams } from '@/lib/utils/pagination-parser';
+import { adminWaitlistSearchParams } from '@/lib/nuqs';
 
 export const metadata: Metadata = {
   title: 'Waitlist | Admin',
 };
 
 interface AdminWaitlistPageProps {
-  searchParams?: {
-    page?: string;
-    pageSize?: string;
-  };
+  searchParams: Promise<SearchParams>;
 }
 
 export default async function AdminWaitlistPage({
   searchParams,
 }: AdminWaitlistPageProps) {
-  const { page, pageSize } = parsePaginationParams(searchParams);
+  const { page, pageSize } =
+    await adminWaitlistSearchParams.parse(searchParams);
 
   const [
     { entries, page: currentPage, pageSize: resolvedPageSize, total },

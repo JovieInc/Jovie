@@ -8,6 +8,7 @@ import React, { useEffect } from 'react';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
+import { NuqsProvider } from './NuqsProvider';
 import { QueryProvider } from './QueryProvider';
 import type { StatsigProvidersProps } from './StatsigProviders';
 
@@ -156,26 +157,28 @@ function ClientProvidersInnerBase({
 
   return (
     <React.StrictMode>
-      <QueryProvider>
-        <ThemeProvider
-          attribute='class'
-          defaultTheme={initialThemeMode}
-          enableSystem={true}
-          disableTransitionOnChange
-          storageKey='jovie-theme'
-        >
-          <ThemeKeyboardShortcut />
-          {enableStatsig ? (
-            <StatsigProviders userId={userId}>
-              <LazyProviders enableAnalytics={enableStatsig}>
-                {children}
-              </LazyProviders>
-            </StatsigProviders>
-          ) : (
-            <LazyProviders enableAnalytics={false}>{children}</LazyProviders>
-          )}
-        </ThemeProvider>
-      </QueryProvider>
+      <NuqsProvider>
+        <QueryProvider>
+          <ThemeProvider
+            attribute='class'
+            defaultTheme={initialThemeMode}
+            enableSystem={true}
+            disableTransitionOnChange
+            storageKey='jovie-theme'
+          >
+            <ThemeKeyboardShortcut />
+            {enableStatsig ? (
+              <StatsigProviders userId={userId}>
+                <LazyProviders enableAnalytics={enableStatsig}>
+                  {children}
+                </LazyProviders>
+              </StatsigProviders>
+            ) : (
+              <LazyProviders enableAnalytics={false}>{children}</LazyProviders>
+            )}
+          </ThemeProvider>
+        </QueryProvider>
+      </NuqsProvider>
     </React.StrictMode>
   );
 }

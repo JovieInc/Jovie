@@ -194,7 +194,9 @@ export function InviteCampaignManager() {
               min={1}
               max={100}
               value={limit}
-              onChange={e => setLimit(Number(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setLimit(Number(e.target.value))
+              }
               className='w-full'
             />
             <p className='text-xs text-secondary-token'>
@@ -225,7 +227,7 @@ export function InviteCampaignManager() {
               min={10}
               max={300}
               value={throttling.minDelayMs / 1000}
-              onChange={e =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setThrottling(t => {
                   const newMin = Number(e.target.value) * 1000;
                   return {
@@ -253,7 +255,7 @@ export function InviteCampaignManager() {
               min={30}
               max={600}
               value={throttling.maxDelayMs / 1000}
-              onChange={e =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setThrottling(t => {
                   const newMax = Number(e.target.value) * 1000;
                   return {

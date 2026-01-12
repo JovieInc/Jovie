@@ -71,7 +71,9 @@ export function IngestProfileDropdown({
                 type='text'
                 placeholder='https://instagram.com/username'
                 value={url}
-                onChange={e => setUrl(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setUrl(e.target.value)
+                }
                 disabled={isLoading}
                 autoFocus
                 className='w-full'

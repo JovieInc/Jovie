@@ -134,7 +134,9 @@ export function AdminCreatorsToolbar({
                 name='q'
                 placeholder='Search by handle'
                 value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setSearchTerm(event.target.value)
+                }
                 className='w-[240px]'
               />
               <input type='hidden' name='page' value='1' />

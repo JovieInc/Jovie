@@ -220,7 +220,7 @@ export function DisplayMenuDropdown({
                 <DropdownMenuCheckboxItem
                   key={column.id}
                   checked={columnVisibility?.[column.id] ?? true}
-                  onCheckedChange={checked =>
+                  onCheckedChange={(checked: boolean) =>
                     onColumnVisibilityChange?.(column.id, checked)
                   }
                 >
@@ -239,7 +239,9 @@ export function DisplayMenuDropdown({
             <DropdownMenuGroup>
               <DropdownMenuRadioGroup
                 value={density}
-                onValueChange={value => onDensityChange?.(value as Density)}
+                onValueChange={(value: string) =>
+                  onDensityChange?.(value as Density)
+                }
               >
                 <DropdownMenuRadioItem value='compact'>
                   Compact

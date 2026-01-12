@@ -1,17 +1,13 @@
 import type { Metadata } from 'next';
+import type { SearchParams } from 'nuqs/server';
 
 import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
-import { parsePaginationParams } from '@/lib/utils/pagination-parser';
+import { getAdminUsers } from '@/lib/admin/users';
+import { adminUsersSearchParams } from '@/lib/nuqs';
 
 interface AdminUsersPageProps {
-  searchParams?: {
-    page?: string;
-    q?: string;
-    sort?: string;
-    pageSize?: string;
-  };
+  searchParams: Promise<SearchParams>;
 }
 
 export const metadata: Metadata = {
@@ -21,24 +17,13 @@ export const metadata: Metadata = {
 export default async function AdminUsersPage({
   searchParams,
 }: AdminUsersPageProps) {
-  const { page, pageSize } = parsePaginationParams(searchParams);
-  const search = searchParams?.q ?? '';
-
-  const sortParam = searchParams?.sort;
-  const sort: AdminUsersSort =
-    sortParam === 'created_asc' ||
-    sortParam === 'created_desc' ||
-    sortParam === 'name_asc' ||
-    sortParam === 'name_desc' ||
-    sortParam === 'email_asc' ||
-    sortParam === 'email_desc'
-      ? sortParam
-      : 'created_desc';
+  const { page, pageSize, sort, q } =
+    await adminUsersSearchParams.parse(searchParams);
 
   const { users, total } = await getAdminUsers({
     page,
     pageSize,
-    search,
+    search: q ?? '',
     sort,
   });
 
@@ -50,7 +35,7 @@ export default async function AdminUsersPage({
           page={page}
           pageSize={pageSize}
           total={total}
-          search={search}
+          search={q ?? ''}
           sort={sort}
         />
       </PageContent>
