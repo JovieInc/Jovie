@@ -118,7 +118,7 @@ export const presets = {
   stickyGroupHeader: cn(
     'sticky top-0',
     zIndex.groupHeader,
-    'bg-surface-1',
+    'bg-surface-2',
     borders.groupHeader
   ),
   tableRow: cn(
