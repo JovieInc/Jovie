@@ -224,14 +224,14 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           /* Compact mode: icon only, expands on hover */
           <>
             <span
-              className='flex items-center justify-center'
+              className='flex items-center justify-center transition-opacity duration-200 group-hover/pill:opacity-0'
               style={{ color: iconFg }}
               aria-hidden='true'
             >
               <SocialIcon platform={platformIcon} className='h-4 w-4' />
             </span>
             {/* Hover expansion: show text */}
-            <span className='pointer-events-none absolute left-full ml-2 hidden group-hover/pill:inline-flex items-center gap-1.5 rounded-full border border-[var(--pill-border)] bg-surface-1 dark:bg-surface-1/60 px-2 py-0.5 text-xs font-medium text-secondary-token whitespace-nowrap shadow-lg z-10'>
+            <span className='pointer-events-none absolute inset-0 flex items-center gap-1.5 rounded-full border border-[var(--pill-border)] bg-surface-1 dark:bg-surface-1/60 px-2 py-0.5 text-xs font-medium text-secondary-token whitespace-nowrap shadow-lg opacity-0 group-hover/pill:opacity-100 transition-opacity duration-200'>
               <span
                 className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5'
                 style={{ ...iconChipStyle }}

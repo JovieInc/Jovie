@@ -71,9 +71,9 @@ export function TableBulkActionsToolbar({
         variant='ghost'
         size='sm'
         onClick={onClearSelection}
-        className='ml-auto'
+        className='ml-auto flex items-center gap-1.5'
       >
-        <X className='h-4 w-4 mr-1' />
+        <X className='h-4 w-4' />
         Clear
       </Button>
     </div>
