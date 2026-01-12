@@ -1,0 +1,58 @@
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from './keys';
+
+export interface BillingStatusData {
+  isPro: boolean;
+  plan: string | null;
+  hasStripeCustomer: boolean;
+}
+
+interface BillingStatusResponse {
+  isPro?: boolean;
+  plan?: string | null;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+}
+
+async function fetchBillingStatus(): Promise<BillingStatusData> {
+  const response = await fetch('/api/billing/status');
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch billing status');
+  }
+
+  const payload = (await response.json()) as BillingStatusResponse;
+
+  return {
+    isPro: Boolean(payload?.isPro),
+    plan: payload?.plan ?? null,
+    hasStripeCustomer: Boolean(payload?.stripeCustomerId),
+  };
+}
+
+/**
+ * Query hook for fetching user billing status.
+ *
+ * Replaces the manual useBillingStatus hook with TanStack Query benefits:
+ * - Automatic caching (5 min stale time)
+ * - Background refetching
+ * - Deduplication of concurrent requests
+ * - Optimistic UI support via queryClient
+ *
+ * @example
+ * function BillingBadge() {
+ *   const { data, isLoading, error } = useBillingStatusQuery();
+ *
+ *   if (isLoading) return <Spinner />;
+ *   if (error) return <ErrorMessage />;
+ *
+ *   return data?.isPro ? <ProBadge /> : null;
+ * }
+ */
+export function useBillingStatusQuery() {
+  return useQuery({
+    queryKey: queryKeys.billing.status(),
+    queryFn: fetchBillingStatus,
+    staleTime: 5 * 60 * 1000, // 5 minutes - matches original hook behavior
+  });
+}
