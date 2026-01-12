@@ -10,8 +10,8 @@ export function VerifiedBadge({
   className = '',
 }: VerifiedBadgeProps) {
   const sizeClasses: Record<typeof size, string> = {
-    sm: 'h-3.5 w-3.5',
-    md: 'h-4 w-4',
+    sm: 'h-4 w-4',
+    md: 'h-4.5 w-4.5',
     lg: 'h-5 w-5',
   } as const;
 
@@ -23,10 +23,11 @@ export function VerifiedBadge({
       aria-label='Verified Jovie Profile'
     >
       <BadgeCheck
-        className={`${sizeClasses[size]} translate-y-[1px]`}
+        className={`${sizeClasses[size]}`}
         aria-hidden='true'
         fill='currentColor'
-        strokeWidth={1.5}
+        stroke='currentColor'
+        strokeWidth={1.75}
       />
     </span>
   );

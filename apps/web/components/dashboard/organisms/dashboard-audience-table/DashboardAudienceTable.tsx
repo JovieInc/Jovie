@@ -189,7 +189,7 @@ export function DashboardAudienceTable({
           </div>
 
           {/* Always render pagination, even when empty */}
-          <div className='fixed bottom-0 left-0 right-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/90 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+          <div className='sticky bottom-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/90 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
             <span className='tracking-wide'>{paginationLabel()}</span>
             <div className='flex items-center gap-3'>
               <AdminPageSizeSelect

@@ -6,6 +6,10 @@ import { createContext, useContext, useState } from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
+import {
+  HeaderActionsProvider,
+  useOptionalHeaderActions,
+} from '@/contexts/HeaderActionsContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { AuthShell } from './AuthShell';
 
@@ -37,21 +41,12 @@ export interface AuthShellWrapperProps {
 }
 
 /**
- * AuthShellWrapper - Client wrapper using routing hook to render AuthShell
- *
- * This component:
- * 1. Uses useAuthRouteConfig hook to get all routing-based configuration
- * 2. Provides PreviewPanelProvider and TableMetaContext
- * 3. Renders AuthShell with configuration from the hook
- *
- * Separates routing concerns (hook) from layout (AuthShell).
+ * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
-export function AuthShellWrapper({
-  persistSidebarCollapsed,
-  children,
-}: AuthShellWrapperProps) {
+function AuthShellWrapperInner({ children }: { children: ReactNode }) {
   const config = useAuthRouteConfig();
   const pathname = usePathname();
+  const headerActionsContext = useOptionalHeaderActions();
 
   // TableMeta state for audience/creators tables
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -64,12 +59,15 @@ export function AuthShellWrapper({
     pathname?.startsWith('/app/dashboard/profile') ?? false;
   const previewEnabled = config.section === 'dashboard' && isProfileRoute;
 
-  // Determine header action based on route type
-  const headerAction = config.isTableRoute ? (
-    <DrawerToggleButton />
-  ) : isProfileRoute ? (
-    <PreviewToggleButton />
-  ) : null;
+  // Determine header action: use custom actions from context if available,
+  // otherwise fall back to default based on route type
+  const headerAction =
+    headerActionsContext?.headerActions ??
+    (config.isTableRoute ? (
+      <DrawerToggleButton />
+    ) : isProfileRoute ? (
+      <PreviewToggleButton />
+    ) : null);
 
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
@@ -88,5 +86,27 @@ export function AuthShellWrapper({
         </AuthShell>
       </PreviewPanelProvider>
     </TableMetaContext.Provider>
+  );
+}
+
+/**
+ * AuthShellWrapper - Client wrapper using routing hook to render AuthShell
+ *
+ * This component:
+ * 1. Uses useAuthRouteConfig hook to get all routing-based configuration
+ * 2. Provides HeaderActionsProvider, PreviewPanelProvider and TableMetaContext
+ * 3. Renders AuthShell with configuration from the hook
+ * 4. Allows pages to override header actions via HeaderActionsContext
+ *
+ * Separates routing concerns (hook) from layout (AuthShell).
+ */
+export function AuthShellWrapper({
+  persistSidebarCollapsed,
+  children,
+}: AuthShellWrapperProps) {
+  return (
+    <HeaderActionsProvider>
+      <AuthShellWrapperInner>{children}</AuthShellWrapperInner>
+    </HeaderActionsProvider>
   );
 }

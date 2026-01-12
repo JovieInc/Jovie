@@ -224,7 +224,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         </SidebarHeader>
 
         {/* Navigation Content */}
-        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>
           <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
             <SidebarGroupContent className='flex-1'>
               {/* Dashboard and Admin use DashboardNav, Settings uses custom */}

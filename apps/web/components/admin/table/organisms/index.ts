@@ -1,6 +1,2 @@
-export {
-  type Column,
-  type PaginationConfig,
-  Table,
-  type TableProps,
-} from './Table';
+export type { UnifiedTableProps } from './UnifiedTable';
+export { UnifiedTable } from './UnifiedTable';

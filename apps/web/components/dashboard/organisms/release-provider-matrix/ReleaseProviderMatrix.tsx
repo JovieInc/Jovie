@@ -98,21 +98,24 @@ export function ReleaseProviderMatrix({
               )}
               {isConnected && (
                 <Button
-                  variant='secondary'
+                  variant='outline'
                   size='sm'
                   disabled={isSyncing}
                   onClick={handleSync}
                   data-testid='sync-spotify-button'
+                  className='gap-2 rounded-lg border-subtle hover:bg-base'
+                  aria-label='Sync releases from Spotify'
+                  aria-busy={isSyncing}
                 >
                   <Icon
                     name={isSyncing ? 'Loader2' : 'RefreshCw'}
                     className={cn(
-                      'mr-2 h-4 w-4',
+                      'h-4 w-4',
                       isSyncing && 'animate-spin motion-reduce:animate-none'
                     )}
                     aria-hidden='true'
                   />
-                  {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+                  <span>{isSyncing ? 'Syncing...' : 'Sync from Spotify'}</span>
                 </Button>
               )}
             </div>
@@ -258,6 +261,7 @@ export function ReleaseProviderMatrix({
                         onEdit={openEditor}
                         onAddUrl={handleAddUrl}
                         isAddingUrl={isSaving}
+                        artistName={artistName}
                       />
                     ))}
                   </tbody>

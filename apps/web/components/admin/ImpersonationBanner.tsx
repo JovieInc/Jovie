@@ -119,7 +119,7 @@ export function ImpersonationBanner({
   // Minimized view
   if (minimized) {
     return (
-      <div className={`fixed bottom-4 right-4 z-[9999] ${className}`}>
+      <div className={`fixed bottom-4 right-4 z-9999 ${className}`}>
         <Button
           variant='primary'
           size='sm'
