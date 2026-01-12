@@ -168,6 +168,61 @@ export CLAUDE_HOOKS_DISABLED=1
 - **Billing:** Stripe (`stripe` on server, `@stripe/stripe-js` on client); no Clerk Billing.
 - **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
 - **Icons:** Use **Lucide React only** (`lucide-react`). Do not use Heroicons, Simple Icons (except for brand logos via `SocialIcon`), or other icon libraries. Import icons directly (e.g., `import { Check, X } from 'lucide-react'`) and use the `<Icon name="..." />` wrapper component for dynamic icon names.
+- **URL State:** Use **nuqs** (`nuqs`) for type-safe URL search params state management. See section 8.4 for detailed usage.
+
+### 8.4 URL State Management (nuqs)
+
+Use `nuqs` for all URL search params state management. This provides type-safe, reactive URL state with automatic serialization.
+
+**When to use nuqs:**
+- Pagination (page, pageSize)
+- Sorting (sort field, direction)
+- Filtering and search queries
+- Tab/view selection that should be shareable via URL
+- Any state that should persist across page refreshes or be shareable
+
+**When NOT to use nuqs:**
+- One-time reads on page load (e.g., redirect URLs)
+- Form state that doesn't belong in the URL
+- Temporary UI state (modals open/close without URL persistence)
+
+**Server Component Usage:**
+```typescript
+import type { SearchParams } from 'nuqs/server';
+import { adminCreatorsSearchParams } from '@/lib/nuqs';
+
+export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const { page, pageSize, sort, q } = await adminCreatorsSearchParams.parse(searchParams);
+  // Use type-safe params
+}
+```
+
+**Client Component Usage:**
+```typescript
+'use client';
+import { useTableParams } from '@/lib/nuqs';
+
+function DataTable() {
+  const [{ page, sort, direction }, { setPage, toggleSort }] = useTableParams({
+    defaultPageSize: 20,
+    defaultSort: 'createdAt',
+    defaultDirection: 'desc',
+  });
+  // Reactive URL state with type-safe updates
+}
+```
+
+**Key files:**
+- `lib/nuqs/search-params.ts` - Server-side parsers and cache definitions
+- `lib/nuqs/hooks.ts` - Client-side hooks (usePaginationParams, useSortParams, useTableParams)
+- `lib/nuqs/index.ts` - Re-exports for convenience
+- `components/providers/NuqsProvider.tsx` - NuqsAdapter wrapper (included in ClientProviders)
+
+**Anti-patterns to avoid:**
+- ❌ Manual URLSearchParams manipulation with `useRouter().push()`
+- ❌ Using `useSearchParams()` directly for state that changes frequently
+- ❌ Duplicating param parsing logic across components
+- ❌ String-based param parsing without type validation
 
 ## 9. Runtime, Auth, Database & RLS
 

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { parseAsInteger, parseAsStringLiteral, useQueryStates } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/atoms/DashboardErrorFallback';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -51,57 +51,22 @@ export interface DashboardAudienceClientProps {
 }
 
 /**
- * Clamps an integer value between min and max boundaries.
- * Truncates decimals and handles non-finite values by returning min.
- *
- * @param value - The number to clamp
- * @param min - Minimum allowed value
- * @param max - Maximum allowed value
- * @returns Clamped integer value
- *
- * @example
- * clampInt(5, 1, 10) // => 5
- * clampInt(15, 1, 10) // => 10
- * clampInt(-5, 1, 10) // => 1
- * clampInt(5.7, 1, 10) // => 5 (truncated)
- * clampInt(NaN, 1, 10) // => 1 (fallback to min)
+ * nuqs parsers for audience table URL params.
+ * These are defined inline to match the component's specific needs.
  */
-function clampInt(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(max, Math.max(min, Math.trunc(value)));
-}
-
-/**
- * Creates a new URLSearchParams with updated values.
- * Removes parameters with null/undefined/empty string values.
- *
- * **Implementation note**: We create a copy rather than mutating the original
- * to maintain functional purity and avoid unexpected side effects when the
- * same searchParams are used in multiple places.
- *
- * @param current - Current URLSearchParams to clone
- * @param next - Record of parameter updates (null/undefined/empty removes param)
- * @returns New URLSearchParams with updates applied
- *
- * @example
- * const params = new URLSearchParams('page=1&sort=name');
- * const updated = setSearchParams(params, { page: 2, filter: null });
- * // Result: page=2&sort=name (filter removed, page updated)
- */
-function setSearchParams(
-  current: URLSearchParams,
-  next: Record<string, string | number | null | undefined>
-): URLSearchParams {
-  const copy = new URLSearchParams(current);
-  Object.entries(next).forEach(([key, value]) => {
-    if (value === null || value === undefined || value === '') {
-      copy.delete(key);
-      return;
-    }
-    copy.set(key, String(value));
-  });
-  return copy;
-}
+const audienceUrlParsers = {
+  page: parseAsInteger.withDefault(1),
+  pageSize: parseAsInteger.withDefault(20),
+  sort: parseAsStringLiteral([
+    'lastSeen',
+    'visits',
+    'intent',
+    'type',
+    'engagement',
+    'createdAt',
+  ] as const).withDefault('lastSeen'),
+  direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
+};
 
 export function DashboardAudienceClient({
   mode,
@@ -113,45 +78,40 @@ export function DashboardAudienceClient({
   direction,
   profileUrl,
 }: DashboardAudienceClientProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
+    shallow: false,
+    history: 'push',
+  });
 
   const handlePageChange = React.useCallback(
     (nextPage: number) => {
-      const clamped = clampInt(nextPage, 1, 9999);
-      const next = setSearchParams(searchParams, { page: clamped });
-      router.push(`${pathname}?${next.toString()}`);
+      const clampedPage = Math.max(1, Math.min(9999, Math.floor(nextPage)));
+      setUrlParams({ page: clampedPage });
     },
-    [pathname, router, searchParams]
+    [setUrlParams]
   );
 
   const handlePageSizeChange = React.useCallback(
     (nextPageSize: number) => {
-      const clamped = clampInt(nextPageSize, 1, 100);
-      const next = setSearchParams(searchParams, {
-        pageSize: clamped,
-        page: 1,
-      });
-      router.push(`${pathname}?${next.toString()}`);
+      const clampedSize = Math.max(1, Math.min(100, Math.floor(nextPageSize)));
+      setUrlParams({ pageSize: clampedSize, page: 1 });
     },
-    [pathname, router, searchParams]
+    [setUrlParams]
   );
 
   const handleSortChange = React.useCallback(
     (nextSort: string) => {
-      const isSame = sort === nextSort;
+      const isSameSort = sort === nextSort;
       const nextDirection: 'asc' | 'desc' =
-        isSame && direction === 'asc' ? 'desc' : 'asc';
+        isSameSort && direction === 'asc' ? 'desc' : 'asc';
 
-      const next = setSearchParams(searchParams, {
-        sort: nextSort,
+      setUrlParams({
+        sort: nextSort as (typeof audienceUrlParsers.sort)['defaultValue'],
         direction: nextDirection,
         page: 1,
       });
-      router.push(`${pathname}?${next.toString()}`);
     },
-    [direction, pathname, router, searchParams, sort]
+    [sort, direction, setUrlParams]
   );
 
   return (

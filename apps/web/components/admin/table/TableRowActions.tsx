@@ -32,7 +32,7 @@ export function TableRowActions({
         size='icon'
         variant='ghost'
         className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token disabled:opacity-50'
-        onClick={async e => {
+        onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
           await onRefreshIngest();
         }}
@@ -59,7 +59,7 @@ export function TableRowActions({
         disabled
         aria-label={isClaimed ? 'Claimed' : 'Not claimed'}
         title={isClaimed ? 'Claimed' : 'Not claimed'}
-        onClick={e => e.stopPropagation()}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         <Star className={cn('h-4 w-4', isClaimed && 'fill-current')} />
       </Button>
@@ -75,7 +75,7 @@ export function TableRowActions({
             ? 'text-blue-500 [&_svg]:fill-blue-500 [&_svg]:stroke-white'
             : 'text-tertiary-token/40'
         )}
-        onClick={async e => {
+        onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
           try {
             await onToggleVerification();

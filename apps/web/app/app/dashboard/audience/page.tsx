@@ -1,18 +1,17 @@
 import { redirect } from 'next/navigation';
+import type { SearchParams } from 'nuqs/server';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
 import { APP_URL } from '@/constants/app';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { audienceSearchParams } from '@/lib/nuqs';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
-import {
-  getAudienceServerData,
-  getAudienceUrlSearchParams,
-} from './audience-data';
+import { getAudienceServerData } from './audience-data';
 
 export default async function AudiencePage({
-  searchParams = {},
+  searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { userId } = await getCachedAuth();
 
@@ -39,10 +38,18 @@ export default async function AudiencePage({
         ? `${APP_URL.replace(/\/+$/, '')}/${artist.handle.replace(/^\/+/, '')}`
         : undefined;
 
+    // Parse search params using nuqs for type-safe URL state
+    const parsedParams = await audienceSearchParams.parse(searchParams);
+
     const audienceData = await getAudienceServerData({
       userId,
       selectedProfileId: artist?.id ?? null,
-      searchParams: getAudienceUrlSearchParams(searchParams),
+      searchParams: {
+        page: String(parsedParams.page),
+        pageSize: String(parsedParams.pageSize),
+        sort: parsedParams.sort,
+        direction: parsedParams.direction,
+      },
     });
 
     return (
