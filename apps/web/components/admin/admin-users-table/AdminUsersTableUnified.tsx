@@ -9,12 +9,15 @@ import { toast } from 'sonner';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
+import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
+import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
 } from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
+import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
@@ -49,6 +52,23 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     clearHref,
     buildHref,
   } = pagination;
+
+  // Row selection
+  const rowIds = useMemo(() => users.map(user => user.id), [users]);
+
+  const {
+    selectedIds,
+    selectedCount,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+  } = useRowSelection(rowIds);
+
+  // TanStack Table row selection state
+  const rowSelection = useMemo(() => {
+    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+  }, [selectedIds]);
 
   // Context menu items for right-click AND actions button
   const getContextMenuItems = useCallback(
@@ -111,9 +131,65 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     []
   );
 
+  // Bulk actions
+  const bulkActions = useMemo(() => {
+    const selectedUsers = users.filter(u => selectedIds.has(u.id));
+
+    return [
+      {
+        label: 'Copy Clerk IDs',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const ids = selectedUsers.map(u => u.clerkId).join('\n');
+          navigator.clipboard.writeText(ids);
+          clearSelection();
+        },
+      },
+      {
+        label: 'Copy Emails',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const emails = selectedUsers
+            .map(u => u.email)
+            .filter(Boolean)
+            .join('\n');
+          navigator.clipboard.writeText(emails);
+          clearSelection();
+        },
+      },
+    ];
+  }, [users, selectedIds, clearSelection]);
+
   // Define columns using TanStack Table
   const columns = useMemo<ColumnDef<AdminUserRow, any>[]>(
     () => [
+      // Checkbox column with row numbers
+      columnHelper.display({
+        id: 'select',
+        header: ({ table }) => (
+          <TableCheckboxCell
+            table={table}
+            headerCheckboxState={headerCheckboxState}
+            onToggleSelectAll={toggleSelectAll}
+          />
+        ),
+        cell: ({ row }) => {
+          const user = row.original;
+          const isChecked = selectedIds.has(user.id);
+          const rowNumber = (page - 1) * pageSize + row.index + 1;
+
+          return (
+            <TableCheckboxCell
+              row={row}
+              rowNumber={rowNumber}
+              isChecked={isChecked}
+              onToggleSelect={() => toggleSelect(user.id)}
+            />
+          );
+        },
+        size: 56,
+      }),
+
       // Name column
       columnHelper.accessor('name', {
         id: 'name',
@@ -197,7 +273,15 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         size: 48,
       }),
     ],
-    [getContextMenuItems]
+    [
+      getContextMenuItems,
+      headerCheckboxState,
+      toggleSelectAll,
+      selectedIds,
+      page,
+      pageSize,
+      toggleSelect,
+    ]
   );
 
   // Get row className
@@ -209,46 +293,60 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <AdminTableShell
         toolbar={
-          <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
-            <div className='text-xs text-secondary-token'>
-              <span className='hidden sm:inline'>Showing </span>
-              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-              {total.toLocaleString()}
-              <span className='hidden sm:inline'> users</span>
-            </div>
-            <div className='flex items-center gap-2'>
-              <form
-                action='/app/admin/users'
-                method='get'
-                className='relative isolate flex items-center gap-2'
-              >
-                <input type='hidden' name='sort' value={sort} />
-                <input type='hidden' name='pageSize' value={String(pageSize)} />
-                <Input
-                  name='q'
-                  defaultValue={search}
-                  placeholder='Search by email or name'
-                  className='w-[240px]'
-                />
-                <input type='hidden' name='page' value='1' />
-                <Button type='submit' size='sm' variant='secondary'>
-                  Search
-                </Button>
-                {search ? (
-                  <Button asChild size='sm' variant='ghost'>
-                    <Link href={clearHref}>Clear</Link>
+          <>
+            {/* Bulk actions toolbar (shows when rows selected) */}
+            <TableBulkActionsToolbar
+              selectedCount={selectedCount}
+              onClearSelection={clearSelection}
+              actions={bulkActions}
+            />
+
+            {/* Main toolbar (always visible) */}
+            <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
+              <div className='text-xs text-secondary-token'>
+                <span className='hidden sm:inline'>Showing </span>
+                {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()}
+                <span className='hidden sm:inline'> users</span>
+              </div>
+              <div className='flex items-center gap-2'>
+                <form
+                  action='/app/admin/users'
+                  method='get'
+                  className='relative isolate flex items-center gap-2'
+                >
+                  <input type='hidden' name='sort' value={sort} />
+                  <input
+                    type='hidden'
+                    name='pageSize'
+                    value={String(pageSize)}
+                  />
+                  <Input
+                    name='q'
+                    defaultValue={search}
+                    placeholder='Search by email or name'
+                    className='w-[240px]'
+                  />
+                  <input type='hidden' name='page' value='1' />
+                  <Button type='submit' size='sm' variant='secondary'>
+                    Search
                   </Button>
-                ) : null}
-              </form>
-              <ExportCSVButton<AdminUserRow>
-                getData={() => users}
-                columns={usersCSVColumns}
-                filename={USERS_CSV_FILENAME_PREFIX}
-                disabled={users.length === 0}
-                ariaLabel='Export users to CSV file'
-              />
+                  {search ? (
+                    <Button asChild size='sm' variant='ghost'>
+                      <Link href={clearHref}>Clear</Link>
+                    </Button>
+                  ) : null}
+                </form>
+                <ExportCSVButton<AdminUserRow>
+                  getData={() => users}
+                  columns={usersCSVColumns}
+                  filename={USERS_CSV_FILENAME_PREFIX}
+                  disabled={users.length === 0}
+                  ariaLabel='Export users to CSV file'
+                />
+              </div>
             </div>
-          </div>
+          </>
         }
         footer={
           <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs text-secondary-token'>
@@ -288,6 +386,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           <UnifiedTable
             data={users}
             columns={columns}
+            rowSelection={rowSelection}
             isLoading={false}
             emptyState={
               <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>

@@ -19,14 +19,16 @@ export function AudienceRowSelectionCell({
   className,
 }: AudienceRowSelectionCellProps) {
   return (
-    <td className={cn('w-14 px-4 py-3 align-middle sm:px-6', className)}>
+    <div
+      className={cn(
+        'relative flex h-7 w-7 items-center justify-center',
+        className
+      )}
+    >
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
-      <div
-        className='relative flex h-7 w-7 items-center justify-center'
-        onClick={event => event.stopPropagation()}
-      >
+      <div className='contents' onClick={event => event.stopPropagation()}>
         <span
           className={cn(
             'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
@@ -49,6 +51,6 @@ export function AudienceRowSelectionCell({
           />
         </div>
       </div>
-    </td>
+    </div>
   );
 }
