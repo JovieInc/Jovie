@@ -26,8 +26,12 @@ export interface PlatformPillProps {
   trailing?: React.ReactNode;
   onClick?: () => void;
   shimmerOnMount?: boolean;
-  /** Compact mode shows only icon in a circle */
+  /** Collapsed mode shows only icon, expands on hover to show text */
+  collapsed?: boolean;
+  /** @deprecated Use collapsed instead */
   compact?: boolean;
+  /** Enable avatar-style stacking with negative margin overlap */
+  stackable?: boolean;
   className?: string;
   testId?: string;
 }
@@ -46,12 +50,16 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       trailing,
       onClick,
       shimmerOnMount = false,
-      compact = false,
+      collapsed: collapsedProp,
+      compact: compactProp,
+      stackable = false,
       className,
       testId,
     },
     ref
   ) {
+    // Support both collapsed and compact (backwards compatibility)
+    const collapsed = collapsedProp ?? compactProp ?? false;
     const isInteractive = Boolean(onClick);
 
     const [showShimmer, setShowShimmer] = React.useState<boolean>(false);
@@ -172,7 +180,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
         title={
-          compact
+          collapsed
             ? platformName === primaryText
               ? primaryText
               : `${platformName}: ${primaryText}`
@@ -184,9 +192,15 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
           'transition-all duration-200',
-          compact
-            ? 'h-7 w-7 justify-center p-0 group-hover/pill:w-auto group-hover/pill:px-2 group-hover/pill:gap-1.5'
-            : 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
+          // Collapsed: starts as icon circle, expands on hover
+          collapsed &&
+            'h-7 w-7 justify-center p-0 group-hover/pill:w-auto group-hover/pill:px-2 group-hover/pill:gap-1.5',
+          // Expanded: full width with padding
+          !collapsed && 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
+          // Stackable: negative margin for avatar-style overlap
+          stackable && '-ml-2 first:ml-0',
+          // Hover brings pill to front when stacked
+          stackable && 'hover:z-10',
           isInteractive &&
             'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
           isInteractive
@@ -202,7 +216,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         data-testid={testId}
         aria-label={
           isInteractive
-            ? compact
+            ? collapsed
               ? `${platformName}: ${primaryText}`
               : `Select ${platformName}`
             : undefined
@@ -220,63 +234,58 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           />
         ) : null}
 
-        {compact ? (
-          /* Compact mode: icon only, expands on hover */
-          <>
-            <span
-              className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-              style={{ ...iconChipStyle }}
-              aria-hidden='true'
-            >
-              <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-            </span>
-            {/* Hover expansion: show text */}
-            <span className='max-w-0 overflow-hidden opacity-0 whitespace-nowrap transition-all duration-200 group-hover/pill:max-w-xs group-hover/pill:opacity-100 group-hover/pill:ml-1'>
+        {/* Icon - always visible */}
+        <span
+          className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
+          style={{ ...iconChipStyle }}
+          aria-hidden='true'
+        >
+          <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+        </span>
+
+        {/* Content - visible in expanded mode, or on hover in collapsed mode */}
+        <div
+          className={cn(
+            'flex items-center overflow-hidden',
+            // Collapsed: hidden by default, shows on hover with smooth expansion
+            collapsed &&
+              'max-w-0 opacity-0 whitespace-nowrap transition-all duration-200',
+            collapsed &&
+              'group-hover/pill:max-w-max group-hover/pill:opacity-100 group-hover/pill:ml-1',
+            // Expanded: always visible with full layout
+            !collapsed && 'gap-1.5 flex-1 min-w-0'
+          )}
+        >
+          <div className='min-w-0 flex-1'>
+            <span className={cn(primaryText.length > 40 && 'truncate')}>
               {primaryText}
             </span>
-          </>
-        ) : (
-          /* Full mode: icon + text + badges */
-          <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
-            <span
-              className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-              style={{ ...iconChipStyle }}
-              aria-hidden='true'
-            >
-              <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-            </span>
-
-            <div className='min-w-0 flex-1'>
-              <span className={cn(primaryText.length > 40 && 'truncate')}>
-                {primaryText}
-              </span>
-              {hasSecondary ? (
-                <span
-                  className={cn(
-                    'ml-2 text-[10px] text-tertiary-token/80',
-                    secondaryText && secondaryText.length > 40 && 'truncate'
-                  )}
-                >
-                  {secondaryText}
-                </span>
-              ) : null}
-            </div>
-
-            {badgeText ? (
-              <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
-                {badgeText}
-              </span>
-            ) : null}
-
-            {suffix ? (
-              <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
-                {suffix}
+            {hasSecondary && !collapsed ? (
+              <span
+                className={cn(
+                  'ml-2 text-[10px] text-tertiary-token/80',
+                  secondaryText && secondaryText.length > 40 && 'truncate'
+                )}
+              >
+                {secondaryText}
               </span>
             ) : null}
           </div>
-        )}
 
-        {!compact && trailing ? (
+          {badgeText && !collapsed ? (
+            <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
+              {badgeText}
+            </span>
+          ) : null}
+
+          {suffix && !collapsed ? (
+            <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
+              {suffix}
+            </span>
+          ) : null}
+        </div>
+
+        {trailing && !collapsed ? (
           <div className='relative ml-1 shrink-0'>{trailing}</div>
         ) : null}
       </div>

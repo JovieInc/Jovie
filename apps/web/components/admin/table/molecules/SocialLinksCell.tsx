@@ -75,11 +75,11 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
     return <span className={typography.cellTertiary}>—</span>;
   }
 
-  // Use compact mode (circles) when there are 2+ links
-  const useCompactMode = links.length >= 2;
+  // Use collapsed mode (circles) when there are 2+ links
+  const useCollapsedMode = links.length >= 2;
 
   return (
-    <div className='flex gap-1.5 overflow-hidden'>
+    <div className='flex items-center overflow-hidden'>
       {links.slice(0, maxLinks).map(link => {
         const username =
           extractUsernameFromUrl(link.url) ??
@@ -121,11 +121,11 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
             platformIcon={platformIcon}
             platformName={platformName}
             primaryText={primaryText}
-            compact={useCompactMode}
+            collapsed={useCollapsedMode}
+            stackable={useCollapsedMode}
             onClick={() => {
               window.open(link.url, '_blank', 'noopener,noreferrer');
             }}
-            className='shrink-0'
           />
         );
       })}
