@@ -5,11 +5,11 @@
  * When a `?dsp=` query param is present, redirects directly to that provider.
  */
 
-import { cache } from 'react';
-
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { cache } from 'react';
+
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -27,6 +27,11 @@ import { ReleaseLandingPage } from './ReleaseLandingPage';
 // Use ISR with 5-minute revalidation for smart link pages
 // This allows caching while still picking up provider link changes reasonably fast
 export const revalidate = 300;
+
+/**
+ * Fallback username when creator profile is not found
+ */
+const UNKNOWN_ARTIST = 'Unknown Artist';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -111,7 +116,7 @@ const getReleaseData = cache(
       providerLinks: links,
       creator: creator ?? {
         displayName: null,
-        username: 'Unknown Artist',
+        username: UNKNOWN_ARTIST,
         avatarUrl: null,
       },
     };
