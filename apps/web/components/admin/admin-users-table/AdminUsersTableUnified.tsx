@@ -157,7 +157,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           label: 'Copy Email',
           icon: <Mail className='h-3.5 w-3.5' />,
           onClick: () => {
-            navigator.clipboard.writeText(user.email);
+            navigator.clipboard.writeText(user.email || '');
           },
         },
         {
