@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { cn } from '@/lib/utils';
 import type { AudienceMemberType } from '@/types';
 
@@ -11,7 +12,10 @@ export interface AudienceUserCellProps {
   className?: string;
 }
 
-export function AudienceUserCell({
+/**
+ * Memoized for performance in virtualized tables to prevent unnecessary re-renders.
+ */
+export const AudienceUserCell = React.memo(function AudienceUserCell({
   displayName,
   type,
   email,
@@ -44,4 +48,4 @@ export function AudienceUserCell({
       )}
     </td>
   );
-}
+});
