@@ -33,7 +33,7 @@ export function AdminPageSizeSelect({
           <span>Rows per page</span>
           <Select
             value={pageSizeValue}
-            onValueChange={nextValue => {
+            onValueChange={(nextValue: string) => {
               setPageSizeValue(nextValue);
               const parsed = Number.parseInt(nextValue, 10);
               if (Number.isFinite(parsed) && parsed > 0) {
