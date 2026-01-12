@@ -1,10 +1,10 @@
 'use server';
 
 import { clerkClient } from '@clerk/nextjs/server';
-import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Clerk metadata fields that Jovie mirrors from the database.
@@ -69,14 +69,11 @@ export async function syncClerkMetadata(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed to sync metadata for ${clerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync' },
-      extra: { clerkUserId, data },
+    await captureError('Failed to sync Clerk metadata', error, {
+      component: 'clerk-sync',
+      clerkUserId,
+      data,
     });
 
     return { success: false, error: errorMessage };
@@ -169,14 +166,11 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed full sync for ${clerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync', operation: 'full-sync' },
-      extra: { clerkUserId },
+    await captureError('Failed to perform full Clerk metadata sync', error, {
+      component: 'clerk-sync',
+      operation: 'full-sync',
+      clerkUserId,
     });
 
     return { success: false, error: errorMessage };
@@ -260,14 +254,11 @@ export async function handleClerkUserDeleted(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed to handle user deletion for ${clerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync', operation: 'user-deletion' },
-      extra: { clerkUserId },
+    await captureError('Failed to handle Clerk user deletion', error, {
+      component: 'clerk-sync',
+      operation: 'user-deletion',
+      clerkUserId,
     });
 
     return { success: false, error: errorMessage };
@@ -341,14 +332,12 @@ export async function syncAdminRoleChange(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed to sync admin role for ${targetClerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync', operation: 'admin-role-change' },
-      extra: { targetClerkUserId, isAdmin },
+    await captureError('Failed to sync admin role change to Clerk', error, {
+      component: 'clerk-sync',
+      operation: 'admin-role-change',
+      targetClerkUserId,
+      isAdmin,
     });
 
     return { success: false, error: errorMessage };
