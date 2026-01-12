@@ -65,8 +65,13 @@ export function AdminWaitlistTableUnified({
 
   // Row selection
   const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
-  const { selectedIds, headerCheckboxState, toggleSelect, toggleSelectAll } =
-    useRowSelection(rowIds);
+  const {
+    selectedIds,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    setSelection,
+  } = useRowSelection(rowIds);
 
   // Row selection state for TanStack Table
   const rowSelection = useMemo(() => {
@@ -80,21 +85,18 @@ export function AdminWaitlistTableUnified({
           ? updaterOrValue(rowSelection)
           : updaterOrValue;
 
-      // Update our custom row selection state
+      // Convert TanStack RowSelectionState (object) to Set of selected IDs
       const newSelectedIds = new Set(
         Object.entries(newSelection)
           .filter(([, selected]) => selected)
           .map(([id]) => id)
       );
 
-      // Toggle all if different count
-      if (newSelectedIds.size === entries.length) {
-        toggleSelectAll();
-      } else if (newSelectedIds.size === 0 && selectedIds.size > 0) {
-        toggleSelectAll();
-      }
+      // Directly update selection state with new Set
+      // This handles individual row selections efficiently in a single update
+      setSelection(newSelectedIds);
     },
-    [rowSelection, entries.length, selectedIds.size, toggleSelectAll]
+    [rowSelection, setSelection]
   );
 
   // Helper to copy to clipboard
