@@ -15,6 +15,13 @@ export interface WaitlistTableProps {
   pageSize: number;
   total: number;
   groupingEnabled?: boolean;
+  // Optional external selection state (for bulk actions in parent)
+  externalSelection?: {
+    selectedIds: Set<string>;
+    headerCheckboxState: boolean | 'indeterminate';
+    toggleSelect: (id: string) => void;
+    toggleSelectAll: () => void;
+  };
 }
 
 export type ApproveStatus = 'idle' | 'loading' | 'success' | 'error';

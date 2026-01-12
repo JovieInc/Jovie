@@ -48,6 +48,7 @@ export function AdminWaitlistTableUnified({
   pageSize,
   total,
   groupingEnabled = false,
+  externalSelection,
 }: WaitlistTableProps) {
   const { approveEntry } = useApproveEntry({
     onRowUpdate: () => {
@@ -55,15 +56,26 @@ export function AdminWaitlistTableUnified({
     },
   });
 
-  // Row selection
+  // Row selection - use external selection if provided, otherwise use internal
   const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
+  const internalSelection = useRowSelection(rowIds);
+
+  // Use external selection if provided, otherwise use internal
   const {
     selectedIds,
     headerCheckboxState,
     toggleSelect,
     toggleSelectAll,
     setSelection,
-  } = useRowSelection(rowIds);
+  } = externalSelection
+    ? {
+        selectedIds: externalSelection.selectedIds,
+        headerCheckboxState: externalSelection.headerCheckboxState,
+        toggleSelect: externalSelection.toggleSelect,
+        toggleSelectAll: externalSelection.toggleSelectAll,
+        setSelection: internalSelection.setSelection, // Keep internal for compatibility
+      }
+    : internalSelection;
 
   // Row selection state for TanStack Table
   const rowSelection = useMemo(() => {

@@ -1,15 +1,18 @@
 'use client';
 
+import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import {
   DisplayMenuDropdown,
   type ViewMode,
 } from '@/components/admin/table/molecules/DisplayMenuDropdown';
+import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
 import {
   KanbanBoard,
   type KanbanColumn,
 } from '@/components/admin/table/organisms/KanbanBoard';
+import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -83,6 +86,43 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     },
   });
 
+  // Row selection
+  const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
+  const {
+    selectedIds,
+    selectedCount,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+  } = useRowSelection(rowIds);
+
+  // Bulk actions
+  const bulkActions = useMemo(() => {
+    const selectedEntries = entries.filter(e => selectedIds.has(e.id));
+
+    return [
+      {
+        label: 'Copy Emails',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const emails = selectedEntries.map(e => e.email).join('\n');
+          navigator.clipboard.writeText(emails);
+          clearSelection();
+        },
+      },
+      {
+        label: 'Copy Names',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const names = selectedEntries.map(e => e.fullName).join('\n');
+          navigator.clipboard.writeText(names);
+          clearSelection();
+        },
+      },
+    ];
+  }, [entries, selectedIds, clearSelection]);
+
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {
     const newEntries = entries.filter(e => e.status === 'new');
@@ -139,24 +179,36 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <AdminTableShell
         toolbar={
-          <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
-            <div className='text-xs text-secondary-token'>
-              <span className='hidden sm:inline'>Showing </span>
-              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-              {total.toLocaleString()}
-              <span className='hidden sm:inline'> entries</span>
-            </div>
-            <div className='flex items-center gap-2'>
-              <DisplayMenuDropdown
-                viewMode={viewMode}
-                availableViewModes={['list', 'board']}
-                onViewModeChange={setViewMode}
-                groupingEnabled={groupingEnabled}
-                onGroupingToggle={setGroupingEnabled}
-                groupingLabel='Group by status'
+          <>
+            {/* Bulk actions toolbar (shows when rows selected) */}
+            {viewMode === 'list' && (
+              <TableBulkActionsToolbar
+                selectedCount={selectedCount}
+                onClearSelection={clearSelection}
+                actions={bulkActions}
               />
+            )}
+
+            {/* Main toolbar (always visible) */}
+            <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
+              <div className='text-xs text-secondary-token'>
+                <span className='hidden sm:inline'>Showing </span>
+                {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()}
+                <span className='hidden sm:inline'> entries</span>
+              </div>
+              <div className='flex items-center gap-2'>
+                <DisplayMenuDropdown
+                  viewMode={viewMode}
+                  availableViewModes={['list', 'board']}
+                  onViewModeChange={setViewMode}
+                  groupingEnabled={groupingEnabled}
+                  onGroupingToggle={setGroupingEnabled}
+                  groupingLabel='Group by status'
+                />
+              </div>
             </div>
-          </div>
+          </>
         }
         footer={
           viewMode === 'list' ? (
@@ -176,6 +228,12 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             <AdminWaitlistTableUnified
               {...props}
               groupingEnabled={groupingEnabled}
+              externalSelection={{
+                selectedIds,
+                headerCheckboxState,
+                toggleSelect,
+                toggleSelectAll,
+              }}
             />
           ) : (
             <KanbanBoard
