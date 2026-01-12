@@ -1,10 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache } from '@/lib/cache';
-import { creatorProfiles, profilePhotos, users } from '@/lib/db';
+import { creatorProfiles, eq, profilePhotos, users } from '@/lib/db';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -391,7 +390,6 @@ export async function POST(request: NextRequest) {
           clerkId: users.clerkId,
         })
         .from(users)
-        // @ts-ignore drizzle version mismatch in tests/runtime
         .where(eq(users.clerkId, userIdFromSession))
         .limit(1);
 
@@ -422,7 +420,6 @@ export async function POST(request: NextRequest) {
             status: 'processing',
             updatedAt: new Date(),
           })
-          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         // Process image with timeout protection (single canonical AVIF)
@@ -473,14 +470,12 @@ export async function POST(request: NextRequest) {
             processedAt: new Date(),
             updatedAt: new Date(),
           })
-          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         // Get the user's profile username for cache invalidation
         const [profile] = await tx
           .select({ usernameNormalized: creatorProfiles.usernameNormalized })
           .from(creatorProfiles)
-          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(creatorProfiles.userId, dbUser.id))
           .limit(1);
 

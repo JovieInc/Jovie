@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/images/status/[id]/route';
 
 // Hoisted mocks so they can be shared between vi.mock and tests
-const { auth } = vi.hoisted(() => ({
+const { auth, mockEq, mockAnd } = vi.hoisted(() => ({
   auth: vi.fn(),
+  mockEq: vi.fn(),
+  mockAnd: vi.fn(),
 }));
 
 const { db } = vi.hoisted(() => {
@@ -29,6 +31,8 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/lib/db', () => ({
   db,
+  eq: mockEq,
+  and: mockAnd,
   profilePhotos: {
     id: 'id',
     userId: 'user_id',
@@ -37,11 +41,6 @@ vi.mock('@/lib/db', () => ({
     id: 'id',
     clerkId: 'clerk_id',
   },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
 }));
 
 // Valid UUID v4 for tests
