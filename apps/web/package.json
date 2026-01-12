@@ -118,7 +118,6 @@
     "@statsig/web-analytics": "^3.31.0",
     "@stripe/stripe-js": "^7.8.0",
     "@tanstack/react-query": "^5.90.16",
-    "@tanstack/react-query-devtools": "^5.91.2",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.13",
     "@types/ws": "^8.18.1",
@@ -217,6 +216,7 @@
     "tsx": "^4.20.5",
     "typescript": "^5",
     "uuid": "^13.0.0",
+    "@tanstack/react-query-devtools": "^5.91.2",
     "vitest": "^3.2.4"
   }
 }

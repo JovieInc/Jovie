@@ -65,20 +65,27 @@ export const STABLE_CACHE: Partial<UseQueryOptions> = {
 /**
  * Static reference data that rarely changes.
  * Use for: categories, platform lists, static content
+ *
+ * Note: gcTime is set to 1 hour to avoid holding stale data in memory
+ * for long-running sessions. For true reference data that should persist
+ * longer (e.g., 24 hours), override gcTime in the specific query.
  */
 export const STATIC_CACHE: Partial<UseQueryOptions> = {
   staleTime: 1 * HOUR,
-  gcTime: 24 * HOUR,
+  gcTime: 1 * HOUR,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
 };
 
 /**
- * Infinite/paginated data strategy.
- * Use for: infinite scroll lists, paginated tables
+ * Cache strategy for paginated and infinite scroll queries.
+ * Use for: useInfiniteQuery, paginated tables, cursor-based lists
+ *
+ * Avoids refetching entire datasets on mount/focus which would
+ * reset scroll position and cause jarring UX.
  */
-export const INFINITE_CACHE: Partial<UseQueryOptions> = {
+export const PAGINATED_CACHE: Partial<UseQueryOptions> = {
   staleTime: 5 * MINUTE,
   gcTime: 30 * MINUTE,
   refetchOnMount: false, // Don't refetch entire list on mount

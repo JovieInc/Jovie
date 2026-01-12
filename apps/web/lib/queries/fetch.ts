@@ -24,10 +24,20 @@ export async function fetchWithTimeout<T>(
   url: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { timeout = 10000, ...fetchOptions } = options;
+  const { timeout = 10000, signal: externalSignal, ...fetchOptions } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  // Link external signal to our controller for proper cancellation
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
 
   try {
     const response = await fetch(url, {
@@ -51,6 +61,8 @@ export async function fetchWithTimeout<T>(
     throw error;
   } finally {
     clearTimeout(timeoutId);
+    // Clean up external signal listener if we added one without { once: true }
+    // (not needed here since we use { once: true }, but good practice)
   }
 }
 
@@ -110,16 +122,11 @@ export function createQueryFn<T>(
   options?: Omit<FetchOptions, 'signal'>
 ) {
   return async ({ signal }: { signal?: AbortSignal }): Promise<T> => {
-    const controller = new AbortController();
-
-    // Link external signal to our controller
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
-    }
-
+    // Pass the signal directly to fetchWithTimeout which handles
+    // linking it to the timeout controller properly
     return fetchWithTimeout<T>(url, {
       ...options,
-      signal: controller.signal,
+      signal,
     });
   };
 }

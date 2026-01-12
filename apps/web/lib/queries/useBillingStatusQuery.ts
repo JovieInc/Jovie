@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { STANDARD_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 export interface BillingStatusData {
@@ -53,6 +54,7 @@ export function useBillingStatusQuery() {
   return useQuery({
     queryKey: queryKeys.billing.status(),
     queryFn: fetchBillingStatus,
-    staleTime: 5 * 60 * 1000, // 5 minutes - matches original hook behavior
+    // Use STANDARD_CACHE preset (5 min stale time) for consistent caching behavior
+    ...STANDARD_CACHE,
   });
 }

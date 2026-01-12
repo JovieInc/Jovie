@@ -6,8 +6,26 @@ import {
   type QueryClientConfig,
   QueryClientProvider,
 } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import dynamic from 'next/dynamic';
 import { type ReactNode, useState } from 'react';
+
+// Lazy load devtools only in development to avoid production bundle bloat
+const ReactQueryDevtools = dynamic(
+  () =>
+    import('@tanstack/react-query-devtools').then(mod => ({
+      default: mod.ReactQueryDevtools,
+    })),
+  { ssr: false }
+);
+
+function DevToolsLoader() {
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+  return (
+    <ReactQueryDevtools initialIsOpen={false} buttonPosition='bottom-left' />
+  );
+}
 
 /**
  * Client-side QueryClient configuration.
@@ -50,8 +68,14 @@ const createQueryClientConfig = (): QueryClientConfig => ({
       refetchOnReconnect: 'always',
     },
     mutations: {
-      // Retry mutations once on transient failures
-      retry: 1,
+      // Disable automatic retries for mutations by default.
+      // Mutations are often non-idempotent (e.g., creating records, charging payments)
+      // and automatic retries can cause duplicate side effects.
+      // Opt-in to retries per-mutation where the operation is safe/idempotent:
+      //   useMutation({ mutationFn, retry: 3 })
+      // Or use queryClient.setMutationDefaults for specific mutation keys.
+      retry: 0,
+      // Delay available for mutations that opt-in to retries
       retryDelay: 1000,
     },
   },
@@ -98,12 +122,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools
-          initialIsOpen={false}
-          buttonPosition='bottom-left'
-        />
-      )}
+      <DevToolsLoader />
     </QueryClientProvider>
   );
 }

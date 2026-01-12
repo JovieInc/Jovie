@@ -37,11 +37,19 @@ export const queryKeys = {
   dashboard: {
     all: ['dashboard'] as const,
     analytics: (period?: string) =>
-      [...queryKeys.dashboard.all, 'analytics', period] as const,
+      [
+        ...queryKeys.dashboard.all,
+        'analytics',
+        ...(period === undefined ? [] : [period]),
+      ] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
     socialLinks: () => [...queryKeys.dashboard.all, 'social-links'] as const,
     activityFeed: (page?: number) =>
-      [...queryKeys.dashboard.all, 'activity-feed', page] as const,
+      [
+        ...queryKeys.dashboard.all,
+        'activity-feed',
+        ...(page === undefined ? [] : [page]),
+      ] as const,
   },
 
   // Creator profiles (admin)

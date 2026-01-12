@@ -42,7 +42,7 @@
 // Cache strategy presets
 export {
   FREQUENT_CACHE,
-  INFINITE_CACHE,
+  PAGINATED_CACHE,
   REALTIME_CACHE,
   STABLE_CACHE,
   STANDARD_CACHE,

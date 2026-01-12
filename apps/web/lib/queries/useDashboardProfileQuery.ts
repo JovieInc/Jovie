@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { STANDARD_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 export interface DashboardProfile {
@@ -59,12 +60,17 @@ export function useDashboardProfileQuery() {
   return useQuery({
     queryKey: queryKeys.user.profile(),
     queryFn: fetchDashboardProfile,
+    // Use STANDARD_CACHE preset (5 min stale time) to prevent frequent refetches
+    ...STANDARD_CACHE,
   });
 }
 
 /**
  * Mutation hook for updating the current user's dashboard profile.
- * Automatically invalidates the profile query on success.
+ *
+ * On success, directly updates the cached profile data via setQueryData
+ * (no refetch/invalidation). This provides instant cache consistency
+ * and relies on the mutation returning the full updated entity.
  *
  * @example
  * function ProfileForm() {
