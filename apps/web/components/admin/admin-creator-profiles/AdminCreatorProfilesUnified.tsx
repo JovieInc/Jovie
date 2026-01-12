@@ -313,7 +313,7 @@ export function AdminCreatorProfilesUnified({
             />
           );
         },
-        size: 320, // w-[320px]
+        size: 280,
       }),
 
       // Social Links column
@@ -326,7 +326,7 @@ export function AdminCreatorProfilesUnified({
             <SocialLinksCell links={profile.socialLinks ?? null} maxLinks={3} />
           );
         },
-        size: 160, // w-[160px]
+        size: 320,
       }),
 
       // Created Date column
@@ -337,7 +337,7 @@ export function AdminCreatorProfilesUnified({
           const profile = row.original;
           return <DateCell date={profile.createdAt} />;
         },
-        size: 200, // w-[200px]
+        size: 180,
       }),
 
       // Actions column
@@ -435,6 +435,7 @@ export function AdminCreatorProfilesUnified({
             />
           );
         },
+        size: 124,
       }),
     ],
     [

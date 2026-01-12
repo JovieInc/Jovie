@@ -43,10 +43,12 @@ export function QRCode({
   className,
 }: QRCodeProps) {
   const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const qrUrl = useMemo(() => getQrCodeUrl(data, size), [data, size]);
 
-  // Reset error state when props change
+  // Reset error and loading state when props change
   useEffect(() => {
+    setIsLoading(true);
     setHasError(false);
   }, [data, size]);
 
@@ -67,15 +69,30 @@ export function QRCode({
   }
 
   return (
-    <Image
-      src={qrUrl}
-      alt={label}
-      width={size}
-      height={size}
-      className={cn(className)}
-      style={{ width: size, height: size }}
-      unoptimized // QR codes are dynamically generated
-      onError={() => setHasError(true)}
-    />
+    <div className='relative' style={{ width: size, height: size }}>
+      {/* Loading skeleton */}
+      {isLoading && (
+        <div
+          className='absolute inset-0 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse motion-reduce:animate-none'
+          aria-hidden='true'
+        />
+      )}
+
+      {/* QR Code Image */}
+      <Image
+        src={qrUrl}
+        alt={label}
+        width={size}
+        height={size}
+        className={cn(className)}
+        style={{ width: size, height: size }}
+        unoptimized // QR codes are dynamically generated
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setHasError(true);
+        }}
+      />
+    </div>
   );
 }

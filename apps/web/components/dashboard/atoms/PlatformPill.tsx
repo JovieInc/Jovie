@@ -179,8 +179,8 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'text-secondary-token hover:text-primary-token',
           'transition-all duration-200',
           compact
-            ? 'size-8 justify-center p-0'
-            : 'max-w-full gap-1.5 px-2.5 py-1 min-h-[32px]',
+            ? 'size-7 justify-center p-0'
+            : 'max-w-full gap-1.5 px-2 py-0.5 min-h-[28px]',
           isInteractive &&
             'hover:bg-[var(--pill-bg-hover)] dark:hover:bg-[var(--pill-bg-hover)]',
           isInteractive
@@ -215,14 +215,26 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         ) : null}
 
         {compact ? (
-          /* Compact mode: icon only */
-          <span
-            className='flex items-center justify-center'
-            style={{ color: iconFg }}
-            aria-hidden='true'
-          >
-            <SocialIcon platform={platformIcon} className='h-4 w-4' />
-          </span>
+          /* Compact mode: icon only, expands on hover */
+          <>
+            <span
+              className='flex items-center justify-center'
+              style={{ color: iconFg }}
+              aria-hidden='true'
+            >
+              <SocialIcon platform={platformIcon} className='h-4 w-4' />
+            </span>
+            {/* Hover expansion: show text */}
+            <span className='absolute left-full ml-2 hidden group-hover:inline-flex items-center gap-1.5 rounded-full border border-[var(--pill-border)] bg-surface-1 dark:bg-surface-1/60 px-2 py-0.5 text-xs font-medium text-secondary-token whitespace-nowrap shadow-lg z-10'>
+              <span
+                className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5'
+                style={{ ...iconChipStyle }}
+              >
+                <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+              </span>
+              {primaryText}
+            </span>
+          </>
         ) : (
           /* Full mode: icon + text + badges */
           <div className='flex items-center gap-1.5 overflow-hidden flex-1'>

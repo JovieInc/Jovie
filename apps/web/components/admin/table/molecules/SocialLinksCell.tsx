@@ -8,6 +8,17 @@ import {
 } from '@/components/organisms/contact-sidebar/utils';
 import { typography } from '../table.styles';
 
+/**
+ * Convert platform name to title case
+ * Examples: "instagram" -> "Instagram", "apple_music" -> "Apple Music"
+ */
+function toTitleCase(str: string): string {
+  return str
+    .split(/[_\s-]+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 interface SocialLink {
   id: string;
   url: string;
@@ -61,6 +72,9 @@ export function SocialLinksCell({
     return <span className={typography.cellTertiary}>—</span>;
   }
 
+  // Use compact mode (circles) when there are 2+ links
+  const useCompactMode = links.length >= 2;
+
   return (
     <div className='flex gap-1.5 overflow-hidden'>
       {links.slice(0, maxLinks).map(link => {
@@ -70,15 +84,35 @@ export function SocialLinksCell({
           '';
         const displayUsername = formatUsername(username);
 
-        // Use lowercase platform for icon matching (spotify, instagram, etc.)
-        const platformIcon = link.platform.toLowerCase();
+        // Handle generic platform types like "music_streaming" by using platformType instead
+        const platformLower = link.platform.toLowerCase();
+        const isGenericType =
+          platformLower === 'music_streaming' ||
+          platformLower === 'social_media';
+
+        // Use platformType if platform is generic, otherwise use platform
+        const platformIcon = isGenericType
+          ? link.platformType.toLowerCase()
+          : platformLower;
+        const platformName = isGenericType
+          ? toTitleCase(link.platformType)
+          : toTitleCase(link.platform);
+
+        // For Spotify (and other music platforms), use displayText if available (contains artist name)
+        // Otherwise fall back to username or platform name
+        const isSpotify = platformIcon === 'spotify';
+        const primaryText =
+          isSpotify && link.displayText
+            ? link.displayText
+            : displayUsername || platformName;
 
         return (
           <PlatformPill
             key={link.id}
             platformIcon={platformIcon}
-            platformName={link.platform}
-            primaryText={displayUsername || link.platform}
+            platformName={platformName}
+            primaryText={primaryText}
+            compact={useCompactMode}
             onClick={() => {
               window.open(link.url, '_blank', 'noopener,noreferrer');
             }}

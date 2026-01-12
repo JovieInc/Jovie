@@ -218,7 +218,8 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
         className={cn(
           sizeClass,
           roundedClass,
-          'overflow-hidden bg-surface-1 text-primary-token',
+          'overflow-hidden text-primary-token',
+          isLoaded && 'bg-surface-1',
           BORDER_RING,
           'shadow-sm transition-colors duration-200'
         )}
@@ -250,7 +251,10 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
 
         {/* Loading shimmer effect */}
         {!isLoaded && !hasError && (
-          <div className='absolute inset-0 skeleton' aria-hidden='true' />
+          <div
+            className={cn('absolute inset-0 skeleton', roundedClass)}
+            aria-hidden='true'
+          />
         )}
       </div>
 
