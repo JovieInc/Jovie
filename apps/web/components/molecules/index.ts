@@ -1,12 +1,12 @@
 // Atomic Design - Molecules
 // Simple combinations of atoms functioning together
 
+// Migrated from /ui to ../ui/CTAButton.tsx
+export { CTAButton, type CTAButtonProps } from '../ui/CTAButton';
 export * from './ArtistCard';
 export * from './ArtistInfo';
 export * from './AuthActions';
 export * from './CookieActions';
-// Migrated from /ui
-export * from './CTAButton';
 export * from './DSPButtonGroup';
 export * from './FeatureCard';
 export * from './FrostedContainer';

@@ -1,28 +1,33 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
-import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { ActionsCell } from '@/components/admin/table/atoms/ActionsCell';
 import { AvatarCell } from '@/components/admin/table/atoms/AvatarCell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { SocialLinksCell } from '@/components/admin/table/molecules/SocialLinksCell';
-import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+} from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
-import { TableRowActions } from '@/components/admin/table/TableRowActions';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -86,7 +91,7 @@ export function AdminCreatorProfilesUnified({
   const { showToast } = useToast();
   const {
     profiles,
-    statuses: verificationStatuses,
+    statuses: _verificationStatuses,
     toggleVerification,
   } = useCreatorVerification(initialProfiles);
 
@@ -98,7 +103,7 @@ export function AdminCreatorProfilesUnified({
   } = useCreatorActions(profiles);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [openMenuProfileId, setOpenMenuProfileId] = useState<string | null>(
+  const [_openMenuProfileId, _setOpenMenuProfileId] = useState<string | null>(
     null
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -109,7 +114,7 @@ export function AdminCreatorProfilesUnified({
     [tableMetaCtx]
   );
 
-  const isMobile = useMediaQuery('(max-width: 767px)');
+  const _isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<
     (typeof profilesWithActions)[number] | null
@@ -242,7 +247,11 @@ export function AdminCreatorProfilesUnified({
   }, [selectedIds]);
 
   const handleRowSelectionChange = useCallback(
-    (updaterOrValue: any) => {
+    (
+      updaterOrValue:
+        | RowSelectionState
+        | ((old: RowSelectionState) => RowSelectionState)
+    ) => {
       const newSelection =
         typeof updaterOrValue === 'function'
           ? updaterOrValue(rowSelection)
@@ -263,6 +272,172 @@ export function AdminCreatorProfilesUnified({
       }
     },
     [rowSelection, filteredProfiles.length, selectedIds.size, toggleSelectAll]
+  );
+
+  // Context menu items for right-click AND actions button
+  const getContextMenuItems = useCallback(
+    (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
+      const items: ContextMenuItemType[] = [];
+
+      // Refresh ingest (if available)
+      const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
+      if (refreshIngestStatus !== undefined) {
+        items.push({
+          id: 'refresh-ingest',
+          label: 'Refresh ingest',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => refreshIngest(profile.id),
+          disabled: refreshIngestStatus === 'loading',
+        });
+        items.push({ type: 'separator' as const });
+      }
+
+      // Verify/Unverify
+      items.push(
+        profile.isVerified
+          ? {
+              id: 'unverify',
+              label: 'Unverify creator',
+              icon: <XCircle className='h-3.5 w-3.5' />,
+              onClick: async () => {
+                const result = await toggleVerification(profile.id, false);
+                if (!result.success) {
+                  showToast({
+                    type: 'error',
+                    message: 'Failed to unverify creator',
+                  });
+                } else {
+                  showToast({ type: 'success', message: 'Creator unverified' });
+                }
+              },
+            }
+          : {
+              id: 'verify',
+              label: 'Verify creator',
+              icon: <CheckCircle className='h-3.5 w-3.5' />,
+              onClick: async () => {
+                const result = await toggleVerification(profile.id, true);
+                if (!result.success) {
+                  showToast({
+                    type: 'error',
+                    message: 'Failed to verify creator',
+                  });
+                } else {
+                  showToast({ type: 'success', message: 'Creator verified' });
+                }
+              },
+            }
+      );
+
+      // Feature/Unfeature
+      items.push({
+        id: 'feature',
+        label: profile.isFeatured ? 'Unfeature' : 'Feature',
+        icon: <Star className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const result = await toggleFeatured(profile.id, !profile.isFeatured);
+          if (!result.success) {
+            showToast({
+              type: 'error',
+              message: `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`,
+            });
+          } else {
+            showToast({
+              type: 'success',
+              message: `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`,
+            });
+          }
+        },
+      });
+
+      items.push({ type: 'separator' as const });
+
+      // Marketing emails toggle
+      items.push({
+        id: 'marketing',
+        label: profile.marketingOptOut
+          ? 'Enable marketing emails'
+          : 'Disable marketing emails',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const result = await toggleMarketing(
+            profile.id,
+            !profile.marketingOptOut
+          );
+          if (!result.success) {
+            showToast({ type: 'error', message: 'Failed to toggle marketing' });
+          }
+        },
+      });
+
+      // View profile
+      items.push({
+        id: 'view-profile',
+        label: 'View profile',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: () => {
+          window.open(`/${profile.username}`, '_blank');
+        },
+      });
+
+      // Copy claim link & Send invite (if unclaimed and has claim token)
+      if (!profile.isClaimed && profile.claimToken) {
+        items.push({ type: 'separator' as const });
+        items.push({
+          id: 'copy-claim-link',
+          label: 'Copy claim link',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            const baseUrl =
+              typeof window !== 'undefined'
+                ? window.location.origin
+                : 'https://jovie.app';
+            const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
+            navigator.clipboard.writeText(claimUrl);
+            showToast({
+              type: 'success',
+              message: 'Claim link copied to clipboard',
+            });
+          },
+        });
+
+        items.push({
+          id: 'send-invite',
+          label: 'Send invite',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            setProfileToInvite(profile);
+            setInviteDialogOpen(true);
+          },
+        });
+      }
+
+      items.push({ type: 'separator' as const });
+
+      // Delete
+      items.push({
+        id: 'delete',
+        label: profile.isClaimed ? 'Delete user' : 'Delete creator',
+        icon: <Trash2 className='h-3.5 w-3.5' />,
+        destructive: true,
+        onClick: () => {
+          setProfileToDelete(profile);
+          setDeleteDialogOpen(true);
+        },
+      });
+
+      return items;
+    },
+    [
+      ingestRefreshStatuses,
+      refreshIngest,
+      toggleVerification,
+      toggleFeatured,
+      toggleMarketing,
+      showToast,
+      setProfileToInvite,
+      setProfileToDelete,
+    ]
   );
 
   // Define columns using TanStack Table
@@ -342,102 +517,22 @@ export function AdminCreatorProfilesUnified({
         size: 180,
       }),
 
-      // Actions column
+      // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
         header: '',
         cell: ({ row }) => {
           const profile = row.original;
-          const verificationStatus = verificationStatuses[profile.id] ?? 'idle';
-          const refreshIngestStatus =
-            ingestRefreshStatuses[profile.id] ?? 'idle';
-          const isMenuOpen = openMenuProfileId === profile.id;
+          const contextMenuItems = getContextMenuItems(profile);
+          const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
           return (
-            <ActionsCell
-              actions={
-                <TableRowActions
-                  isVerified={profile.isVerified}
-                  isClaimed={profile.isClaimed}
-                  verificationStatus={verificationStatus}
-                  refreshIngestStatus={refreshIngestStatus}
-                  onToggleVerification={async () => {
-                    const result = await toggleVerification(
-                      profile.id,
-                      !profile.isVerified
-                    );
-                    if (!result.success) {
-                      console.error(
-                        'Failed to toggle verification',
-                        result.error
-                      );
-                    }
-                  }}
-                  onRefreshIngest={() => refreshIngest(profile.id)}
-                />
-              }
-              menu={
-                <CreatorActionsMenu
-                  profile={profile}
-                  isMobile={isMobile}
-                  status={verificationStatus}
-                  refreshIngestStatus={refreshIngestStatus}
-                  open={isMenuOpen}
-                  onOpenChange={open =>
-                    setOpenMenuProfileId(open ? profile.id : null)
-                  }
-                  onRefreshIngest={async () => {
-                    await refreshIngest(profile.id);
-                  }}
-                  onToggleVerification={async () => {
-                    const result = await toggleVerification(
-                      profile.id,
-                      !profile.isVerified
-                    );
-                    if (!result.success) {
-                      console.error(
-                        'Failed to toggle verification',
-                        result.error
-                      );
-                    }
-                  }}
-                  onToggleFeatured={async () => {
-                    const result = await toggleFeatured(
-                      profile.id,
-                      !profile.isFeatured
-                    );
-                    if (!result.success) {
-                      console.error('Failed to toggle featured', result.error);
-                    }
-                  }}
-                  onToggleMarketing={async () => {
-                    const result = await toggleMarketing(
-                      profile.id,
-                      !profile.marketingOptOut
-                    );
-                    if (!result.success) {
-                      console.error('Failed to toggle marketing', result.error);
-                    }
-                  }}
-                  onSendInvite={
-                    !profile.isClaimed && profile.claimToken
-                      ? () => {
-                          setProfileToInvite(profile);
-                          setInviteDialogOpen(true);
-                        }
-                      : undefined
-                  }
-                  onDelete={() => {
-                    setProfileToDelete(profile);
-                    setDeleteDialogOpen(true);
-                  }}
-                />
-              }
-              isMenuOpen={isMenuOpen}
-            />
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={actionMenuItems} align='end' />
+            </div>
           );
         },
-        size: 124,
+        size: 48,
       }),
     ],
     [
@@ -447,14 +542,7 @@ export function AdminCreatorProfilesUnified({
       page,
       pageSize,
       toggleSelect,
-      verificationStatuses,
-      ingestRefreshStatuses,
-      openMenuProfileId,
-      isMobile,
-      toggleVerification,
-      refreshIngest,
-      toggleFeatured,
-      toggleMarketing,
+      getContextMenuItems,
     ]
   );
 
@@ -580,112 +668,6 @@ export function AdminCreatorProfilesUnified({
       );
     },
     [selectedIds, selectedId]
-  );
-
-  // Context menu items for right-click
-  const getContextMenuItems = useCallback(
-    (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
-      return [
-        {
-          id: 'copy-username',
-          label: 'Copy Username',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(profile.username);
-            showToast({
-              type: 'success',
-              message: 'Username copied to clipboard',
-            });
-          },
-        },
-        {
-          id: 'copy-id',
-          label: 'Copy Profile ID',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(profile.id);
-            showToast({
-              type: 'success',
-              message: 'Profile ID copied to clipboard',
-            });
-          },
-        },
-        { type: 'separator' as const },
-        profile.isVerified
-          ? {
-              id: 'unverify',
-              label: 'Unverify',
-              icon: <XCircle className='h-3.5 w-3.5' />,
-              onClick: async () => {
-                const result = await toggleVerification(profile.id, false);
-                if (!result.success) {
-                  showToast({
-                    type: 'error',
-                    message: 'Failed to unverify creator',
-                  });
-                } else {
-                  showToast({
-                    type: 'success',
-                    message: 'Creator unverified',
-                  });
-                }
-              },
-            }
-          : {
-              id: 'verify',
-              label: 'Verify',
-              icon: <CheckCircle className='h-3.5 w-3.5' />,
-              onClick: async () => {
-                const result = await toggleVerification(profile.id, true);
-                if (!result.success) {
-                  showToast({
-                    type: 'error',
-                    message: 'Failed to verify creator',
-                  });
-                } else {
-                  showToast({
-                    type: 'success',
-                    message: 'Creator verified',
-                  });
-                }
-              },
-            },
-        {
-          id: 'feature',
-          label: profile.isFeatured ? 'Unfeature' : 'Feature',
-          icon: <Star className='h-3.5 w-3.5' />,
-          onClick: async () => {
-            const result = await toggleFeatured(
-              profile.id,
-              !profile.isFeatured
-            );
-            if (!result.success) {
-              showToast({
-                type: 'error',
-                message: `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`,
-              });
-            } else {
-              showToast({
-                type: 'success',
-                message: `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`,
-              });
-            }
-          },
-        },
-        { type: 'separator' as const },
-        {
-          id: 'delete',
-          label: 'Delete',
-          icon: <Trash2 className='h-3.5 w-3.5' />,
-          destructive: true,
-          onClick: () => {
-            setProfileToDelete(profile);
-            setDeleteDialogOpen(true);
-          },
-        },
-      ];
-    },
-    [toggleVerification, toggleFeatured, showToast]
   );
 
   return (

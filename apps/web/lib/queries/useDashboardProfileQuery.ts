@@ -54,9 +54,10 @@ export function useDashboardProfileQuery() {
 /**
  * Mutation hook for updating the current user's dashboard profile.
  *
- * On success, directly updates the cached profile data via setQueryData
- * (no refetch/invalidation). This provides instant cache consistency
- * and relies on the mutation returning the full updated entity.
+ * Features optimistic updates for instant UI feedback:
+ * - `onMutate`: Immediately updates cache with expected values
+ * - `onError`: Rolls back to previous state if mutation fails
+ * - `onSettled`: Ensures cache is in sync after mutation completes
  *
  * @example
  * function ProfileForm() {
@@ -77,9 +78,43 @@ export function useUpdateDashboardProfileMutation() {
 
   return useMutation({
     mutationFn: updateDashboardProfile,
-    onSuccess: updatedProfile => {
-      // Update the cache with the new profile data
-      queryClient.setQueryData(queryKeys.user.profile(), updatedProfile);
+
+    // Optimistic update: apply changes immediately before server responds
+    onMutate: async (newData: UpdateProfileInput) => {
+      // Cancel any outgoing refetches to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: queryKeys.user.profile() });
+
+      // Snapshot the previous value for rollback
+      const previousProfile = queryClient.getQueryData<DashboardProfile>(
+        queryKeys.user.profile()
+      );
+
+      // Optimistically update the cache
+      if (previousProfile) {
+        queryClient.setQueryData<DashboardProfile>(queryKeys.user.profile(), {
+          ...previousProfile,
+          ...newData,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Return context with snapshot for rollback
+      return { previousProfile };
+    },
+
+    // Rollback on error
+    onError: (_error, _newData, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(
+          queryKeys.user.profile(),
+          context.previousProfile
+        );
+      }
+    },
+
+    // Always refetch after error or success to ensure server state
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
     },
   });
 }

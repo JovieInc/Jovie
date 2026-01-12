@@ -2,6 +2,7 @@
 
 import { Star } from 'lucide-react';
 import Link from 'next/link';
+import React from 'react';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { cn } from '../table.styles';
 
@@ -45,6 +46,8 @@ interface AvatarCellProps {
 /**
  * AvatarCell - Avatar with badges for verified and featured status
  *
+ * Memoized for performance in virtualized tables to prevent unnecessary re-renders.
+ *
  * Features:
  * - Avatar image or fallback initials
  * - Verification badge (blue checkmark)
@@ -65,7 +68,7 @@ interface AvatarCellProps {
  * />
  * ```
  */
-export function AvatarCell({
+export const AvatarCell = React.memo(function AvatarCell({
   profileId,
   username,
   avatarUrl,
@@ -117,4 +120,4 @@ export function AvatarCell({
       </div>
     </div>
   );
-}
+});

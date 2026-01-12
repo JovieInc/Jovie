@@ -1,7 +1,6 @@
 /**
  * @deprecated Import from atomic directories instead:
- * - Badge, FooterLink, FrostedButton, LoadingSpinner, NavLink → @/components/atoms
- * - CTAButton → @/components/molecules
+ * - Badge, FooterLink, FrostedButton, LoadingSpinner, NavLink, CTAButton → @/components/atoms
  * - EmptyState → @/components/organisms
  */
 
@@ -23,10 +22,10 @@ export {
 } from '@/components/atoms/LoadingSpinner';
 export { NavLink, type NavLinkProps } from '@/components/atoms/NavLink';
 export {
-  CTAButton,
-  type CTAButtonProps,
-} from '@/components/molecules/CTAButton';
-export {
   EmptyState,
   type EmptyStateProps,
 } from '@/components/organisms/EmptyState';
+export {
+  CTAButton,
+  type CTAButtonProps,
+} from './CTAButton';

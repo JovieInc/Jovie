@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { STANDARD_CACHE } from './cache-strategies';
+import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
 export interface BillingStatusData {
@@ -15,14 +16,18 @@ interface BillingStatusResponse {
   stripeSubscriptionId?: string | null;
 }
 
-async function fetchBillingStatus(): Promise<BillingStatusData> {
-  const response = await fetch('/api/billing/status');
+// Create the base fetch function using createQueryFn for consistent error handling
+const fetchBillingStatusRaw = createQueryFn<BillingStatusResponse>(
+  '/api/billing/status'
+);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch billing status');
-  }
-
-  const payload = (await response.json()) as BillingStatusResponse;
+// Transform raw response to normalized data
+async function fetchBillingStatus({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<BillingStatusData> {
+  const payload = await fetchBillingStatusRaw({ signal });
 
   return {
     isPro: Boolean(payload?.isPro),
