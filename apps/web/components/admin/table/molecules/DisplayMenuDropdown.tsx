@@ -15,7 +15,7 @@ import { LayoutGrid, LayoutList, Settings2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export type ViewMode = 'list' | 'board' | 'timeline';
+export type ViewMode = 'list' | 'board';
 export type Density = 'compact' | 'normal' | 'comfortable';
 
 export interface ColumnVisibility {
@@ -77,7 +77,7 @@ export interface DisplayMenuDropdownProps {
  * DisplayMenuDropdown - Table display settings dropdown
  *
  * Provides a dropdown menu for controlling table display settings:
- * - View mode (List / Board / Timeline)
+ * - View mode (List / Board)
  * - Column visibility toggles
  * - Density control (compact / normal / comfortable)
  * - Grouping toggle

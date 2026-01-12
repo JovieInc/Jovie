@@ -166,11 +166,38 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   );
 
   const handleItemMove = useCallback(
-    (itemId: string, fromColumnId: string, toColumnId: string) => {
-      // TODO: Implement status update mutation
-      console.log('Move item:', { itemId, fromColumnId, toColumnId });
-      // Would call something like:
-      // await updateWaitlistStatus(itemId, toColumnId as WaitlistStatus);
+    async (itemId: string, fromColumnId: string, toColumnId: string) => {
+      try {
+        const response = await fetch('/app/admin/waitlist/update-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            entryId: itemId,
+            status: toColumnId,
+          }),
+        });
+
+        const payload = (await response.json().catch(() => null)) as {
+          success?: boolean;
+          status?: string;
+          error?: string;
+        } | null;
+
+        if (!response.ok || !payload?.success) {
+          console.error('Failed to update waitlist status:', payload?.error);
+          // TODO: Show error toast to user
+          return;
+        }
+
+        // The UI will update optimistically via the KanbanBoard component
+        // No need to manually update state here
+      } catch (error) {
+        console.error('Failed to update waitlist status:', error);
+        // TODO: Show error toast to user
+      }
     },
     []
   );

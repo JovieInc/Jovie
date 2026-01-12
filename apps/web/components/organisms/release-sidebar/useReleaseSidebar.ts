@@ -16,6 +16,8 @@ export interface UseReleaseSidebarReturn {
   isEditable: boolean;
   hasRelease: boolean;
   canUploadArtwork: boolean;
+  isAddingDspLink: boolean;
+  isRemovingDspLink: string | null;
   handleFieldChange: (updater: (current: Release) => Release) => void;
   handleArtworkUpload: (file: File) => Promise<string>;
   handleCopySmartLink: () => Promise<void>;
@@ -47,6 +49,10 @@ export function useReleaseSidebar({
   const [isAddingLink, setIsAddingLink] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<ProviderKey | null>(
+    null
+  );
+  const [isAddingDspLink, setIsAddingDspLink] = useState(false);
+  const [isRemovingDspLink, setIsRemovingDspLink] = useState<string | null>(
     null
   );
 
@@ -101,6 +107,7 @@ export function useReleaseSidebar({
     const trimmedUrl = newLinkUrl.trim();
     if (!isValidUrl(trimmedUrl)) return;
 
+    setIsAddingDspLink(true);
     try {
       await onAddDspLink(release.id, selectedProvider, trimmedUrl);
       track('release_dsp_link_added', {
@@ -112,12 +119,15 @@ export function useReleaseSidebar({
       setSelectedProvider(null);
     } catch (error) {
       console.error('Failed to add DSP link', error);
+    } finally {
+      setIsAddingDspLink(false);
     }
   }, [release, onAddDspLink, newLinkUrl, selectedProvider]);
 
   const handleRemoveLink = useCallback(
     async (provider: ProviderKey) => {
       if (!release || !onRemoveDspLink) return;
+      setIsRemovingDspLink(provider);
       try {
         await onRemoveDspLink(release.id, provider);
         track('release_dsp_link_removed', {
@@ -126,6 +136,8 @@ export function useReleaseSidebar({
         });
       } catch (error) {
         console.error('Failed to remove DSP link', error);
+      } finally {
+        setIsRemovingDspLink(null);
       }
     },
     [release, onRemoveDspLink]
@@ -170,6 +182,8 @@ export function useReleaseSidebar({
     isEditable,
     hasRelease,
     canUploadArtwork,
+    isAddingDspLink,
+    isRemovingDspLink,
     handleFieldChange,
     handleArtworkUpload,
     handleCopySmartLink,

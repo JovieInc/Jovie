@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-type ViewMode = 'list' | 'board' | 'timeline';
+type ViewMode = 'list' | 'board';
 
 interface UseViewModeOptions {
   /**
