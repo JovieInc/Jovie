@@ -399,55 +399,55 @@ export function AdminCreatorProfilesWithSidebar({
         </QueryErrorBoundary>
       </div>
       <RightDrawer
-          isOpen={sidebarOpen && Boolean(effectiveContact)}
-          width={CONTACT_PANEL_WIDTH}
-          ariaLabel='Contact details'
-          className='hidden md:flex bg-surface-0 border-subtle'
-        >
-          <div className='flex-1 min-h-0 overflow-auto'>
-            <ContactSidebar
-              contact={effectiveContact}
-              mode={mode}
-              isOpen={sidebarOpen && Boolean(effectiveContact)}
-              onClose={handleSidebarClose}
-              onRefresh={() => {
-                router.refresh();
-                if (selectedId) {
-                  void hydrateContactSocialLinks(selectedId);
-                }
-              }}
-              onContactChange={handleContactChange}
-              onSave={saveContact}
-              isSaving={isSaving}
-              onAvatarUpload={handleAvatarUpload}
-            />
-          </div>
-        </RightDrawer>
-        <DeleteCreatorDialog
-          profile={profileToDelete}
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          onConfirm={async () => {
-            if (!profileToDelete) return { success: false };
-            const result = await deleteCreatorOrUser(profileToDelete.id);
-            if (result.success) {
-              setProfileToDelete(null);
-            }
-            return result;
-          }}
-        />
-        <SendInviteDialog
-          profile={profileToInvite}
-          open={inviteDialogOpen}
-          onOpenChange={setInviteDialogOpen}
-          onSuccess={() => {
-            setProfileToInvite(null);
-            showToast({
-              type: 'success',
-              message: 'Invite created successfully',
-            });
-          }}
-        />
-      </div>
+        isOpen={sidebarOpen && Boolean(effectiveContact)}
+        width={CONTACT_PANEL_WIDTH}
+        ariaLabel='Contact details'
+        className='hidden md:flex bg-surface-0 border-subtle'
+      >
+        <div className='flex-1 min-h-0 overflow-auto'>
+          <ContactSidebar
+            contact={effectiveContact}
+            mode={mode}
+            isOpen={sidebarOpen && Boolean(effectiveContact)}
+            onClose={handleSidebarClose}
+            onRefresh={() => {
+              router.refresh();
+              if (selectedId) {
+                void hydrateContactSocialLinks(selectedId);
+              }
+            }}
+            onContactChange={handleContactChange}
+            onSave={saveContact}
+            isSaving={isSaving}
+            onAvatarUpload={handleAvatarUpload}
+          />
+        </div>
+      </RightDrawer>
+      <DeleteCreatorDialog
+        profile={profileToDelete}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={async () => {
+          if (!profileToDelete) return { success: false };
+          const result = await deleteCreatorOrUser(profileToDelete.id);
+          if (result.success) {
+            setProfileToDelete(null);
+          }
+          return result;
+        }}
+      />
+      <SendInviteDialog
+        profile={profileToInvite}
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        onSuccess={() => {
+          setProfileToInvite(null);
+          showToast({
+            type: 'success',
+            message: 'Invite created successfully',
+          });
+        }}
+      />
+    </div>
   );
 }
