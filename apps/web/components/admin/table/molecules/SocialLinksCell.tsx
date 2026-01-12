@@ -41,6 +41,12 @@ interface SocialLinksCellProps {
   maxLinks?: number;
 
   /**
+   * Filter to show only specific platform types
+   * @example 'music_streaming' | 'social_media'
+   */
+  filterPlatformType?: string | string[];
+
+  /**
    * Additional CSS classes
    */
   className?: string;
@@ -69,18 +75,38 @@ interface SocialLinksCellProps {
 export const SocialLinksCell = React.memo(function SocialLinksCell({
   links,
   maxLinks = 3,
+  filterPlatformType,
   className,
 }: SocialLinksCellProps) {
   if (!links || links.length === 0) {
     return <span className={typography.cellTertiary}>—</span>;
   }
 
-  // Use compact mode (circles) when there are 2+ links
-  const useCompactMode = links.length >= 2;
+  // Filter by platform category if specified
+  let filteredLinks = links;
+  if (filterPlatformType) {
+    const types = Array.isArray(filterPlatformType)
+      ? filterPlatformType.map(t => t.toLowerCase())
+      : [filterPlatformType.toLowerCase()];
+    filteredLinks = links.filter(link => {
+      const platformLower = link.platform.toLowerCase();
+      // Match against the platform category (social_media, music_streaming, etc.)
+      return types.includes(platformLower);
+    });
+  }
+
+  if (filteredLinks.length === 0) {
+    return <span className={typography.cellTertiary}>—</span>;
+  }
+
+  // Use collapsed mode (circles) when there are 2+ links
+  const useCollapsedMode = filteredLinks.length >= 2;
+  const visibleLinks = filteredLinks.slice(0, maxLinks);
 
   return (
-    <div className='flex gap-1.5 overflow-hidden'>
-      {links.slice(0, maxLinks).map(link => {
+    <div className='flex items-center overflow-hidden'>
+      {visibleLinks.map((link, index) => {
+        const isLast = index === visibleLinks.length - 1;
         const username =
           extractUsernameFromUrl(link.url) ??
           extractUsernameFromLabel(link.displayText ?? '') ??
@@ -121,11 +147,12 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
             platformIcon={platformIcon}
             platformName={platformName}
             primaryText={primaryText}
-            compact={useCompactMode}
+            collapsed={useCollapsedMode}
+            stackable={useCollapsedMode}
+            defaultExpanded={isLast && useCollapsedMode}
             onClick={() => {
               window.open(link.url, '_blank', 'noopener,noreferrer');
             }}
-            className='shrink-0'
           />
         );
       })}

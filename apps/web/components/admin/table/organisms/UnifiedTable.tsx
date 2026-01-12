@@ -295,23 +295,68 @@ export function UnifiedTable<TData>({
           {/* Header */}
           <thead>
             <tr>
-              {table.getHeaderGroups()[0]?.headers.map(header => (
-                <th
-                  key={header.id}
-                  className={cn(presets.stickyHeader, presets.tableHeader)}
-                  style={{
-                    width:
-                      header.getSize() !== 150 ? header.getSize() : undefined,
-                  }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </th>
-              ))}
+              {table.getHeaderGroups()[0]?.headers.map(header => {
+                const canSort = header.column.getCanSort();
+                const sortDirection = header.column.getIsSorted();
+
+                return (
+                  <th
+                    key={header.id}
+                    className={cn(presets.stickyHeader)}
+                    style={{
+                      width:
+                        header.getSize() !== 150 ? header.getSize() : undefined,
+                    }}
+                  >
+                    {header.isPlaceholder ? null : canSort ? (
+                      <button
+                        type='button'
+                        onClick={header.column.getToggleSortingHandler()}
+                        className={cn(
+                          'flex items-center gap-2 px-6 py-3 text-left w-full',
+                          'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
+                          'hover:bg-surface-2/50 transition-colors rounded-md',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                        )}
+                      >
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                        {sortDirection && (
+                          <svg
+                            width='12'
+                            height='12'
+                            viewBox='0 0 12 12'
+                            fill='none'
+                            className='shrink-0'
+                            style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
+                            aria-hidden='true'
+                          >
+                            <title>
+                              {sortDirection === 'asc'
+                                ? 'Sorted ascending'
+                                : 'Sorted descending'}
+                            </title>
+                            {sortDirection === 'asc' ? (
+                              <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
+                            ) : (
+                              <path d='M6 9L3 5H9L6 9Z' fill='currentColor' />
+                            )}
+                          </svg>
+                        )}
+                      </button>
+                    ) : (
+                      <div className={cn(presets.tableHeader)}>
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
@@ -344,23 +389,68 @@ export function UnifiedTable<TData>({
         <thead>
           {table.getHeaderGroups().map(headerGroup => (
             <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th
-                  key={header.id}
-                  className={cn(presets.stickyHeader, presets.tableHeader)}
-                  style={{
-                    width:
-                      header.getSize() !== 150 ? header.getSize() : undefined,
-                  }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </th>
-              ))}
+              {headerGroup.headers.map(header => {
+                const canSort = header.column.getCanSort();
+                const sortDirection = header.column.getIsSorted();
+
+                return (
+                  <th
+                    key={header.id}
+                    className={cn(presets.stickyHeader)}
+                    style={{
+                      width:
+                        header.getSize() !== 150 ? header.getSize() : undefined,
+                    }}
+                  >
+                    {header.isPlaceholder ? null : canSort ? (
+                      <button
+                        type='button'
+                        onClick={header.column.getToggleSortingHandler()}
+                        className={cn(
+                          'flex items-center gap-2 px-6 py-3 text-left w-full',
+                          'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
+                          'hover:bg-surface-2/50 transition-colors rounded-md',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                        )}
+                      >
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                        {sortDirection && (
+                          <svg
+                            width='12'
+                            height='12'
+                            viewBox='0 0 12 12'
+                            fill='none'
+                            className='shrink-0'
+                            style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
+                            aria-hidden='true'
+                          >
+                            <title>
+                              {sortDirection === 'asc'
+                                ? 'Sorted ascending'
+                                : 'Sorted descending'}
+                            </title>
+                            {sortDirection === 'asc' ? (
+                              <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
+                            ) : (
+                              <path d='M6 9L3 5H9L6 9Z' fill='currentColor' />
+                            )}
+                          </svg>
+                        )}
+                      </button>
+                    ) : (
+                      <div className={cn(presets.tableHeader)}>
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           ))}
         </thead>

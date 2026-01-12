@@ -26,8 +26,14 @@ export interface PlatformPillProps {
   trailing?: React.ReactNode;
   onClick?: () => void;
   shimmerOnMount?: boolean;
-  /** Compact mode shows only icon in a circle */
+  /** Collapsed mode shows only icon, expands on hover to show text */
+  collapsed?: boolean;
+  /** @deprecated Use collapsed instead */
   compact?: boolean;
+  /** Enable avatar-style stacking with negative margin overlap */
+  stackable?: boolean;
+  /** When stacked, expand this pill by default (for highest z-index item) */
+  defaultExpanded?: boolean;
   className?: string;
   testId?: string;
 }
@@ -46,12 +52,17 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       trailing,
       onClick,
       shimmerOnMount = false,
-      compact = false,
+      collapsed: collapsedProp,
+      compact: compactProp,
+      stackable = false,
+      defaultExpanded = false,
       className,
       testId,
     },
     ref
   ) {
+    // Support both collapsed and compact (backwards compatibility)
+    const collapsed = collapsedProp ?? compactProp ?? false;
     const isInteractive = Boolean(onClick);
 
     const [showShimmer, setShowShimmer] = React.useState<boolean>(false);
@@ -172,7 +183,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
         title={
-          compact
+          collapsed
             ? platformName === primaryText
               ? primaryText
               : `${platformName}: ${primaryText}`
@@ -184,9 +195,17 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
           'transition-all duration-200',
-          compact
-            ? 'h-7 w-7 justify-center p-0 group-hover/pill:w-auto group-hover/pill:px-2 group-hover/pill:gap-1.5'
-            : 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
+          // Collapsed: starts as icon circle, expands on hover
+          collapsed && 'h-7 justify-center px-2',
+          collapsed && !defaultExpanded && 'w-7 p-0',
+          collapsed && defaultExpanded && 'w-auto gap-1',
+          // Expanded: full width with padding
+          !collapsed && 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
+          // Stackable: negative margin for avatar-style overlap, last item has higher z-index
+          stackable && '-ml-2 first:ml-0',
+          stackable && 'last:z-10',
+          // Hover brings pill to front when stacked
+          stackable && 'hover:z-20',
           isInteractive &&
             'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
           isInteractive
@@ -202,7 +221,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         data-testid={testId}
         aria-label={
           isInteractive
-            ? compact
+            ? collapsed
               ? `${platformName}: ${primaryText}`
               : `Select ${platformName}`
             : undefined
@@ -220,32 +239,31 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           />
         ) : null}
 
-        {compact ? (
-          /* Compact mode: icon only, expands on hover */
-          <>
-            <span
-              className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-              style={{ ...iconChipStyle }}
-              aria-hidden='true'
-            >
-              <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-            </span>
-            {/* Hover expansion: show text */}
-            <span className='max-w-0 overflow-hidden opacity-0 whitespace-nowrap transition-all duration-200 group-hover/pill:max-w-xs group-hover/pill:opacity-100 group-hover/pill:ml-1'>
-              {primaryText}
-            </span>
-          </>
-        ) : (
-          /* Full mode: icon + text + badges */
-          <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
-            <span
-              className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-              style={{ ...iconChipStyle }}
-              aria-hidden='true'
-            >
-              <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-            </span>
+        {/* Icon - always visible */}
+        <span
+          className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
+          style={{ ...iconChipStyle }}
+          aria-hidden='true'
+        >
+          <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+        </span>
 
+        {/* Content - visible in expanded mode, or on hover/defaultExpanded in collapsed mode */}
+        {collapsed ? (
+          // Collapsed mode: text hidden unless defaultExpanded or on hover
+          <span
+            className={cn(
+              'whitespace-nowrap overflow-hidden transition-all duration-200',
+              !defaultExpanded &&
+                'w-0 opacity-0 group-hover/pill:w-auto group-hover/pill:opacity-100',
+              defaultExpanded && 'w-auto opacity-100'
+            )}
+          >
+            {primaryText}
+          </span>
+        ) : (
+          // Expanded mode: full layout with all features
+          <div className='flex items-center gap-1.5 overflow-hidden flex-1 min-w-0'>
             <div className='min-w-0 flex-1'>
               <span className={cn(primaryText.length > 40 && 'truncate')}>
                 {primaryText}
@@ -276,7 +294,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           </div>
         )}
 
-        {!compact && trailing ? (
+        {trailing && !collapsed ? (
           <div className='relative ml-1 shrink-0'>{trailing}</div>
         ) : null}
       </div>

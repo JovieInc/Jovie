@@ -49,7 +49,7 @@ export function AdminCreatorsTableHeader({
 
   return (
     <thead className='text-left text-secondary-token'>
-      <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+      <tr className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
         <th
           className={cn(headerCellClass, 'w-14')}
           style={{ top: stickyTopPx }}
@@ -97,7 +97,7 @@ export function AdminCreatorsTableHeader({
           className={cn(headerCellClass, 'hidden lg:table-cell')}
           style={{ top: stickyTopPx }}
         >
-          <span className='text-xs uppercase tracking-wide text-tertiary-token'>
+          <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
             Social
           </span>
         </th>
@@ -121,7 +121,7 @@ export function AdminCreatorsTableHeader({
           {headerActions ? (
             <div className='flex items-center justify-end'>{headerActions}</div>
           ) : (
-            <span className='text-xs uppercase tracking-wide text-tertiary-token'>
+            <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
               Actions
             </span>
           )}
