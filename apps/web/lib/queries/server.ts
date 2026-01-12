@@ -78,8 +78,12 @@ export const getDehydratedState = () => dehydrate(getQueryClient());
  *
  * Convenience wrapper that handles the common pattern of:
  * 1. Get the request-scoped QueryClient
- * 2. Prefetch the query
+ * 2. Fetch the query (errors will propagate to error boundaries)
  * 3. Return dehydrated state for HydrateClient
+ *
+ * Note: This uses fetchQuery instead of prefetchQuery so errors thrown
+ * by the queryFn will propagate to React error boundaries, allowing
+ * proper error handling in the UI.
  *
  * @example
  * // In a Server Component
@@ -104,7 +108,8 @@ export async function prefetchQuery<T>(options: {
   queryFn: () => Promise<T>;
 }) {
   const queryClient = getQueryClient();
-  await queryClient.prefetchQuery(options);
+  // Use fetchQuery instead of prefetchQuery to propagate errors
+  await queryClient.fetchQuery(options);
   return getDehydratedState();
 }
 
@@ -113,6 +118,9 @@ export async function prefetchQuery<T>(options: {
  *
  * Use this when a page needs multiple data sources prefetched.
  * All queries run concurrently for optimal performance.
+ *
+ * Note: This uses fetchQuery instead of prefetchQuery so errors thrown
+ * by any queryFn will propagate to React error boundaries.
  *
  * @example
  * // In a Server Component
@@ -145,7 +153,8 @@ export async function prefetchQueries(
   }>
 ) {
   const queryClient = getQueryClient();
-  await Promise.all(queries.map(query => queryClient.prefetchQuery(query)));
+  // Use fetchQuery instead of prefetchQuery to propagate errors
+  await Promise.all(queries.map(query => queryClient.fetchQuery(query)));
   return getDehydratedState();
 }
 
