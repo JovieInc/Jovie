@@ -84,7 +84,7 @@ const TooltipContent = React.forwardRef<
         data-testid={testId}
         className={cn(
           // Base layout + spacing
-          'z-50 inline-flex select-none items-center gap-2 rounded-[8px] px-3 py-2 text-[13px] font-medium leading-tight',
+          'z-50 inline-flex select-none items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-xs font-medium leading-tight',
           // Ephemeral surface: subtle border and shadow
           'max-w-xs border border-black/10 bg-white text-gray-900 shadow-[0_12px_40px_rgba(0,0,0,0.15)]',
           'dark:border-white/10 dark:bg-black dark:text-white dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]',

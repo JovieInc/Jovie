@@ -92,8 +92,10 @@ function AddProviderUrlPopover({
             className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
             aria-hidden='true'
           />
-          <span className='group-hover/add:hidden'>Not found</span>
-          <span className='hidden group-hover/add:inline'>Click to add</span>
+          <span className='line-clamp-1 group-hover/add:hidden'>Not found</span>
+          <span className='line-clamp-1 hidden group-hover/add:inline'>
+            Click to add
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -288,7 +290,9 @@ export function ReleaseTableRow({
                 className='mr-1 h-3.5 w-3.5'
                 aria-hidden='true'
               />
-              {isCopied ? 'Copied!' : 'Copy link'}
+              <span className='line-clamp-1'>
+                {isCopied ? 'Copied!' : 'Copy link'}
+              </span>
             </Button>
           );
         })()}

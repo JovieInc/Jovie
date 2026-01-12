@@ -25,9 +25,11 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
+import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { GroupedTableBody } from '@/components/admin/table/molecules/GroupedTableBody';
 import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
+import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useTableGrouping } from '@/components/admin/table/utils/useTableGrouping';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
@@ -60,6 +62,11 @@ export function AdminWaitlistTableUnified({
       // No-op for now since we're using server-side refresh
     },
   });
+
+  // Row selection
+  const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
+  const { selectedIds, headerCheckboxState, toggleSelect, toggleSelectAll } =
+    useRowSelection(rowIds);
 
   // Helper to copy to clipboard
   const copyToClipboard = useCallback((text: string, label: string) => {
@@ -138,6 +145,33 @@ export function AdminWaitlistTableUnified({
   // Define columns using TanStack Table
   const columns = useMemo<ColumnDef<WaitlistEntryRow, any>[]>(
     () => [
+      // Checkbox column
+      columnHelper.display({
+        id: 'select',
+        header: ({ table }) => (
+          <TableCheckboxCell
+            table={table}
+            headerCheckboxState={headerCheckboxState}
+            onToggleSelectAll={toggleSelectAll}
+          />
+        ),
+        cell: ({ row }) => {
+          const entry = row.original;
+          const isChecked = selectedIds.has(entry.id);
+          const rowNumber = (page - 1) * pageSize + row.index + 1;
+
+          return (
+            <TableCheckboxCell
+              row={row}
+              rowNumber={rowNumber}
+              isChecked={isChecked}
+              onToggleSelect={() => toggleSelect(entry.id)}
+            />
+          );
+        },
+        size: 56, // 14 * 4 = 56px (w-14)
+      }),
+
       // Name column
       columnHelper.accessor('fullName', {
         id: 'name',
@@ -342,7 +376,16 @@ export function AdminWaitlistTableUnified({
         size: 120,
       }),
     ],
-    [approveStatuses, approveEntry]
+    [
+      approveStatuses,
+      approveEntry,
+      headerCheckboxState,
+      toggleSelectAll,
+      selectedIds,
+      toggleSelect,
+      page,
+      pageSize,
+    ]
   );
 
   // Initialize TanStack Table for grouping view
