@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -9,15 +9,7 @@ import {
   type RowSelectionState,
   useReactTable,
 } from '@tanstack/react-table';
-import {
-  ClipboardList,
-  ExternalLink,
-  Mail,
-  ShoppingBag,
-  Ticket,
-  TrendingUp,
-  User,
-} from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
@@ -30,15 +22,16 @@ import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useTableGrouping } from '@/components/admin/table/utils/useTableGrouping';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
-import {
-  PLATFORM_LABELS,
-  PRIMARY_GOAL_LABELS,
-  STATUS_VARIANTS,
-} from './constants';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
+import {
+  renderPrimaryGoalCell,
+  renderPrimarySocialCell,
+  renderSpotifyCell,
+  renderStatusCell,
+} from './utils/column-renderers';
+import { buildContextMenuItems } from './utils/context-menu-builders';
 
 const columnHelper = createColumnHelper<WaitlistEntryRow>();
 
@@ -118,60 +111,7 @@ export function AdminWaitlistTableUnified({
   // Create context menu items for a waitlist entry
   const createContextMenuItems = useCallback(
     (entry: WaitlistEntryRow): ContextMenuItemType[] => {
-      const isApproved =
-        entry.status === 'invited' || entry.status === 'claimed';
-
-      return [
-        {
-          id: 'copy-email',
-          label: 'Copy Email',
-          icon: <Mail className='h-3.5 w-3.5' />,
-          onClick: () => copyToClipboard(entry.email, 'email'),
-        },
-        {
-          id: 'copy-name',
-          label: 'Copy Name',
-          icon: <User className='h-3.5 w-3.5' />,
-          onClick: () => copyToClipboard(entry.fullName, 'name'),
-        },
-        {
-          type: 'separator' as const,
-        },
-        {
-          id: 'open-social',
-          label: 'Open Primary Social',
-          icon: <ExternalLink className='h-3.5 w-3.5' />,
-          onClick: () => {
-            window.open(entry.primarySocialUrlNormalized, '_blank');
-          },
-        },
-        ...(entry.spotifyUrlNormalized
-          ? [
-              {
-                id: 'open-spotify' as const,
-                label: 'Open Spotify',
-                icon: <ExternalLink className='h-3.5 w-3.5' />,
-                onClick: () => {
-                  window.open(entry.spotifyUrlNormalized!, '_blank');
-                },
-              },
-            ]
-          : []),
-        {
-          type: 'separator' as const,
-        },
-        {
-          id: 'approve',
-          label: isApproved ? 'Approved' : 'Approve',
-          icon: <ClipboardList className='h-3.5 w-3.5' />,
-          onClick: () => {
-            if (!isApproved) {
-              void approveEntry(entry.id);
-            }
-          },
-          disabled: isApproved,
-        },
-      ];
+      return buildContextMenuItems(entry, copyToClipboard, approveEntry);
     },
     [approveEntry, copyToClipboard]
   );
@@ -235,31 +175,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('primaryGoal', {
         id: 'primaryGoal',
         header: 'Primary goal',
-        cell: ({ getValue }) => {
-          const value = getValue();
-          const primaryGoalLabel = value
-            ? (PRIMARY_GOAL_LABELS[value] ?? value)
-            : null;
-
-          // Icon mapping for primary goals
-          const GoalIcon =
-            value === 'streams'
-              ? TrendingUp
-              : value === 'merch'
-                ? ShoppingBag
-                : value === 'tickets'
-                  ? Ticket
-                  : null;
-
-          return primaryGoalLabel ? (
-            <Badge size='sm' variant='secondary' className='gap-1'>
-              {GoalIcon && <GoalIcon className='h-3 w-3' />}
-              {primaryGoalLabel}
-            </Badge>
-          ) : (
-            <span className='text-tertiary-token'>—</span>
-          );
-        },
+        cell: ({ getValue }) => renderPrimaryGoalCell(getValue()),
         size: 140,
       }),
 
@@ -267,31 +183,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.display({
         id: 'primarySocial',
         header: 'Primary Social',
-        cell: ({ row }) => {
-          const entry = row.original;
-          const platformLabel =
-            PLATFORM_LABELS[entry.primarySocialPlatform] ??
-            entry.primarySocialPlatform;
-
-          // Extract username from URL for display
-          const urlWithoutProtocol = entry.primarySocialUrlNormalized.replace(
-            /^https?:\/\//,
-            ''
-          );
-          const username =
-            urlWithoutProtocol.split('/').pop() || urlWithoutProtocol;
-
-          return (
-            <PlatformPill
-              platformIcon={entry.primarySocialPlatform.toLowerCase()}
-              platformName={platformLabel}
-              primaryText={`@${username}`}
-              onClick={() =>
-                window.open(entry.primarySocialUrlNormalized, '_blank')
-              }
-            />
-          );
-        },
+        cell: ({ row }) => renderPrimarySocialCell(row.original),
         size: 280,
       }),
 
@@ -299,25 +191,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('spotifyUrlNormalized', {
         id: 'spotify',
         header: 'Spotify',
-        cell: ({ getValue }) => {
-          const value = getValue();
-          if (!value) {
-            return <span className='text-tertiary-token'>—</span>;
-          }
-
-          // Extract artist name from Spotify URL
-          const urlWithoutProtocol = value.replace(/^https?:\/\//, '');
-          const artistName = urlWithoutProtocol.split('/').pop() || 'Spotify';
-
-          return (
-            <PlatformPill
-              platformIcon='spotify'
-              platformName='Spotify'
-              primaryText={`@${artistName}`}
-              onClick={() => window.open(value, '_blank')}
-            />
-          );
-        },
+        cell: ({ getValue }) => renderSpotifyCell(getValue()),
         size: 200,
       }),
 
@@ -355,15 +229,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('status', {
         id: 'status',
         header: 'Status',
-        cell: ({ getValue }) => {
-          const status = getValue();
-          const statusVariant = STATUS_VARIANTS[status] ?? 'secondary';
-          return (
-            <Badge size='sm' variant={statusVariant}>
-              {status}
-            </Badge>
-          );
-        },
+        cell: ({ getValue }) => renderStatusCell(getValue()),
         size: 110,
       }),
 
