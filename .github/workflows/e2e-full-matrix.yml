@@ -32,7 +32,7 @@ jobs:
 
       - name: Create ephemeral Neon database branch
         id: neon-branch
-        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
