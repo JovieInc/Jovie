@@ -1,6 +1,10 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -243,7 +247,11 @@ export function AdminCreatorProfilesUnified({
   }, [selectedIds]);
 
   const handleRowSelectionChange = useCallback(
-    (updaterOrValue: any) => {
+    (
+      updaterOrValue:
+        | RowSelectionState
+        | ((old: RowSelectionState) => RowSelectionState)
+    ) => {
       const newSelection =
         typeof updaterOrValue === 'function'
           ? updaterOrValue(rowSelection)
