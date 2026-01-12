@@ -96,7 +96,7 @@ export function AudienceTableHeader({
         headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
       )}
     >
-      <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+      <tr className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
         <th className='w-14 border-b border-subtle px-4 py-3 text-left sm:px-6'>
           <Checkbox
             aria-label='Select all'
@@ -133,7 +133,7 @@ export function AudienceTableHeader({
                     onClick={() => onSortChange(sortKey as unknown as string)}
                   />
                 ) : (
-                  <span className='inline-flex items-center font-semibold'>
+                  <span className='inline-flex items-center line-clamp-1'>
                     {column.label}
                   </span>
                 )}
