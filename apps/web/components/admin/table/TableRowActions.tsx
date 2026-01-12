@@ -59,7 +59,6 @@ export function TableRowActions({
         disabled
         aria-label={isClaimed ? 'Claimed' : 'Not claimed'}
         title={isClaimed ? 'Claimed' : 'Not claimed'}
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         <Star className={cn('h-4 w-4', isClaimed && 'fill-current')} />
       </Button>

@@ -187,6 +187,7 @@ Use `nuqs` for all URL search params state management. This provides type-safe, 
 - Temporary UI state (modals open/close without URL persistence)
 
 **Server Component Usage:**
+
 ```typescript
 import type { SearchParams } from 'nuqs/server';
 import { adminCreatorsSearchParams } from '@/lib/nuqs';
@@ -198,6 +199,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 ```
 
 **Client Component Usage:**
+
 ```typescript
 'use client';
 import { useTableParams } from '@/lib/nuqs';

@@ -23,14 +23,14 @@ import {
 // ============================================================================
 
 /**
- * Parser for page number with minimum validation.
- * Defaults to 1, ensures value is always >= 1.
+ * Parser for page number.
+ * Defaults to 1. Consumers should validate bounds if needed.
  */
 export const pageParser = parseAsInteger.withDefault(1);
 
 /**
- * Parser for page size with reasonable default and max limit.
- * Defaults to 20, commonly used for table pagination.
+ * Parser for page size.
+ * Defaults to 20. Consumers should enforce max limits if needed.
  */
 export const pageSizeParser = parseAsInteger.withDefault(20);
 
@@ -118,6 +118,9 @@ export const audienceSearchParams = createSearchParamsCache({
 
 /**
  * Valid sort fields for admin creators table.
+ * Note: Admin tables use combined field+direction sort values (e.g., 'created_desc')
+ * to match existing backend/API expectations, unlike audienceSearchParams which
+ * uses separate 'sort' and 'direction' fields.
  */
 export const adminCreatorsSortFields = [
   'created_asc',

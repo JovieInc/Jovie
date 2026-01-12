@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { parseAsInteger, parseAsStringLiteral, useQueryStates } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/atoms/DashboardErrorFallback';
+import { audienceSortFields } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 
@@ -52,19 +53,12 @@ export interface DashboardAudienceClientProps {
 
 /**
  * nuqs parsers for audience table URL params.
- * These are defined inline to match the component's specific needs.
+ * Reuses audienceSortFields from the centralized lib/nuqs module to avoid drift.
  */
 const audienceUrlParsers = {
   page: parseAsInteger.withDefault(1),
   pageSize: parseAsInteger.withDefault(20),
-  sort: parseAsStringLiteral([
-    'lastSeen',
-    'visits',
-    'intent',
-    'type',
-    'engagement',
-    'createdAt',
-  ] as const).withDefault('lastSeen'),
+  sort: parseAsStringLiteral(audienceSortFields).withDefault('lastSeen'),
   direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
 };
 
@@ -78,6 +72,7 @@ export function DashboardAudienceClient({
   direction,
   profileUrl,
 }: DashboardAudienceClientProps) {
+  // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
     history: 'push',

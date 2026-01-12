@@ -255,7 +255,6 @@ export interface SearchActions {
 export interface UseSearchParamsOptions {
   paramName?: string;
   shallow?: boolean;
-  debounceMs?: number;
 }
 
 /**
