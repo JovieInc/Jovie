@@ -51,7 +51,7 @@ const MENU_ITEM_BASE =
   'relative flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-surface-2 hover:text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1) [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0';
 
 const MENU_ITEM_DESTRUCTIVE =
-  'text-destructive hover:bg-destructive/10 data-highlighted:bg-destructive/10 focus-visible:ring-destructive [&_svg]:text-destructive';
+  'text-destructive hover:text-destructive hover:bg-destructive/10 data-highlighted:text-destructive data-highlighted:bg-destructive/10 focus-visible:ring-destructive [&_svg]:text-destructive';
 
 const CHECKBOX_RADIO_BASE =
   'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-10 pr-3 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-surface-2 hover:text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1)';
