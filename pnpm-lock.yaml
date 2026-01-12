@@ -260,9 +260,6 @@ importers:
       react-dom:
         specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
-      react-error-boundary:
-        specifier: ^6.0.3
-        version: 6.0.3(react@18.3.1)
       react-hook-form:
         specifier: ^7.69.0
         version: 7.69.0(react@18.3.1)
@@ -459,6 +456,9 @@ importers:
       postcss:
         specifier: ^8
         version: 8.5.6
+      react-error-boundary:
+        specifier: ^6.0.3
+        version: 6.0.3(react@18.3.1)
       shadcn:
         specifier: ^3.6.2
         version: 3.6.2(@types/node@25.0.3)(babel-plugin-macros@3.1.0)(hono@4.11.1)(typescript@5.9.3)
