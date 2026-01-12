@@ -24,6 +24,7 @@ import {
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminUsersTableProps } from './types';
 import { useAdminUsersTable } from './useAdminUsersTable';
@@ -32,6 +33,7 @@ const columnHelper = createColumnHelper<AdminUserRow>();
 
 export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const { users, page, pageSize, total, search, sort } = props;
+  const notifications = useNotifications();
 
   const {
     router,
@@ -80,7 +82,15 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         label: 'Copy Clerk user ID',
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
-          navigator.clipboard.writeText(user.clerkId);
+          navigator.clipboard
+            .writeText(user.clerkId)
+            .then(() => {
+              notifications.success('Copied to clipboard');
+            })
+            .catch(err => {
+              console.error('Failed to copy Clerk ID:', err);
+              notifications.error('Failed to copy');
+            });
         },
       });
 
@@ -91,7 +101,15 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           if (user.email) {
-            navigator.clipboard.writeText(user.email);
+            navigator.clipboard
+              .writeText(user.email)
+              .then(() => {
+                notifications.success('Copied to clipboard');
+              })
+              .catch(err => {
+                console.error('Failed to copy email:', err);
+                notifications.error('Failed to copy');
+              });
           }
         },
         disabled: !user.email,
@@ -103,7 +121,15 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         label: 'Copy User ID',
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
-          navigator.clipboard.writeText(user.id);
+          navigator.clipboard
+            .writeText(user.id)
+            .then(() => {
+              notifications.success('Copied to clipboard');
+            })
+            .catch(err => {
+              console.error('Failed to copy User ID:', err);
+              notifications.error('Failed to copy');
+            });
         },
       });
 
@@ -124,7 +150,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
 
       return items;
     },
-    []
+    [notifications]
   );
 
   // Bulk actions
@@ -137,8 +163,16 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         icon: <Copy className='h-4 w-4' />,
         onClick: () => {
           const ids = selectedUsers.map(u => u.clerkId).join('\n');
-          navigator.clipboard.writeText(ids);
-          clearSelection();
+          navigator.clipboard
+            .writeText(ids)
+            .then(() => {
+              notifications.success('Copied to clipboard');
+              clearSelection();
+            })
+            .catch(err => {
+              console.error('Failed to copy Clerk IDs:', err);
+              notifications.error('Failed to copy');
+            });
         },
       },
       {
@@ -149,12 +183,20 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
             .map(u => u.email)
             .filter(Boolean)
             .join('\n');
-          navigator.clipboard.writeText(emails);
-          clearSelection();
+          navigator.clipboard
+            .writeText(emails)
+            .then(() => {
+              notifications.success('Copied to clipboard');
+              clearSelection();
+            })
+            .catch(err => {
+              console.error('Failed to copy emails:', err);
+              notifications.error('Failed to copy');
+            });
         },
       },
     ];
-  }, [users, selectedIds, clearSelection]);
+  }, [users, selectedIds, clearSelection, notifications]);
 
   // Define columns using TanStack Table
   const columns = useMemo<ColumnDef<AdminUserRow, any>[]>(

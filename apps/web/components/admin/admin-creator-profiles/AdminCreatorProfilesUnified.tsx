@@ -28,10 +28,10 @@ import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -88,7 +88,7 @@ export function AdminCreatorProfilesUnified({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
-  const { showToast } = useToast();
+  const notifications = useNotifications();
   const {
     profiles,
     statuses: _verificationStatuses,
@@ -302,12 +302,13 @@ export function AdminCreatorProfilesUnified({
               onClick: async () => {
                 const result = await toggleVerification(profile.id, false);
                 if (!result.success) {
-                  showToast({
-                    type: 'error',
-                    message: 'Failed to unverify creator',
+                  notifications.error('Failed to unverify creator', {
+                    id: `unverify-error-${profile.id}`,
                   });
                 } else {
-                  showToast({ type: 'success', message: 'Creator unverified' });
+                  notifications.success('Creator unverified', {
+                    id: `unverify-success-${profile.id}`,
+                  });
                 }
               },
             }
@@ -318,12 +319,13 @@ export function AdminCreatorProfilesUnified({
               onClick: async () => {
                 const result = await toggleVerification(profile.id, true);
                 if (!result.success) {
-                  showToast({
-                    type: 'error',
-                    message: 'Failed to verify creator',
+                  notifications.error('Failed to verify creator', {
+                    id: `verify-error-${profile.id}`,
                   });
                 } else {
-                  showToast({ type: 'success', message: 'Creator verified' });
+                  notifications.success('Creator verified', {
+                    id: `verify-success-${profile.id}`,
+                  });
                 }
               },
             }
@@ -337,15 +339,19 @@ export function AdminCreatorProfilesUnified({
         onClick: async () => {
           const result = await toggleFeatured(profile.id, !profile.isFeatured);
           if (!result.success) {
-            showToast({
-              type: 'error',
-              message: `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`,
-            });
+            notifications.error(
+              `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`,
+              {
+                id: `feature-error-${profile.id}`,
+              }
+            );
           } else {
-            showToast({
-              type: 'success',
-              message: `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`,
-            });
+            notifications.success(
+              `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`,
+              {
+                id: `feature-success-${profile.id}`,
+              }
+            );
           }
         },
       });
@@ -365,7 +371,16 @@ export function AdminCreatorProfilesUnified({
             !profile.marketingOptOut
           );
           if (!result.success) {
-            showToast({ type: 'error', message: 'Failed to toggle marketing' });
+            notifications.error('Failed to toggle marketing', {
+              id: `marketing-error-${profile.id}`,
+            });
+          } else {
+            notifications.success(
+              `Marketing emails ${profile.marketingOptOut ? 'enabled' : 'disabled'}`,
+              {
+                id: `marketing-success-${profile.id}`,
+              }
+            );
           }
         },
       });
@@ -393,11 +408,15 @@ export function AdminCreatorProfilesUnified({
                 ? window.location.origin
                 : 'https://jovie.app';
             const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
-            navigator.clipboard.writeText(claimUrl);
-            showToast({
-              type: 'success',
-              message: 'Claim link copied to clipboard',
-            });
+            navigator.clipboard
+              .writeText(claimUrl)
+              .then(() => {
+                notifications.success('Claim link copied to clipboard');
+              })
+              .catch(err => {
+                console.error('Failed to copy claim link:', err);
+                notifications.error('Failed to copy claim link');
+              });
           },
         });
 
@@ -434,7 +453,7 @@ export function AdminCreatorProfilesUnified({
       toggleVerification,
       toggleFeatured,
       toggleMarketing,
-      showToast,
+      notifications,
       setProfileToInvite,
       setProfileToDelete,
     ]
@@ -577,17 +596,21 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      showToast({
-        type: 'error',
-        message: `Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
-      });
+      notifications.error(
+        `Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-verify-error',
+        }
+      );
     } else {
-      showToast({
-        type: 'success',
-        message: `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
-      });
+      notifications.success(
+        `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-verify-success',
+        }
+      );
     }
-  }, [profilesWithActions, selectedIds, toggleVerification, showToast]);
+  }, [profilesWithActions, selectedIds, toggleVerification, notifications]);
 
   const handleBulkUnverify = useCallback(async () => {
     const selectedProfiles = profilesWithActions.filter(p =>
@@ -598,17 +621,21 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      showToast({
-        type: 'error',
-        message: `Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
-      });
+      notifications.error(
+        `Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-unverify-error',
+        }
+      );
     } else {
-      showToast({
-        type: 'success',
-        message: `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
-      });
+      notifications.success(
+        `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-unverify-success',
+        }
+      );
     }
-  }, [profilesWithActions, selectedIds, toggleVerification, showToast]);
+  }, [profilesWithActions, selectedIds, toggleVerification, notifications]);
 
   const handleBulkFeature = useCallback(async () => {
     const selectedProfiles = profilesWithActions.filter(p =>
@@ -619,17 +646,21 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      showToast({
-        type: 'error',
-        message: `Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
-      });
+      notifications.error(
+        `Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-feature-error',
+        }
+      );
     } else {
-      showToast({
-        type: 'success',
-        message: `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
-      });
+      notifications.success(
+        `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-feature-success',
+        }
+      );
     }
-  }, [profilesWithActions, selectedIds, toggleFeatured, showToast]);
+  }, [profilesWithActions, selectedIds, toggleFeatured, notifications]);
 
   const handleBulkDelete = useCallback(async () => {
     const selectedProfiles = profilesWithActions.filter(p =>
@@ -647,15 +678,19 @@ export function AdminCreatorProfilesUnified({
     );
     const failedCount = results.filter(r => !r.success).length;
     if (failedCount > 0) {
-      showToast({
-        type: 'error',
-        message: `Failed to delete ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
-      });
+      notifications.error(
+        `Failed to delete ${failedCount} creator${failedCount > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-delete-error',
+        }
+      );
     } else {
-      showToast({
-        type: 'success',
-        message: `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
-      });
+      notifications.success(
+        `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`,
+        {
+          id: 'bulk-delete-success',
+        }
+      );
       // Clear selection after successful deletion
       toggleSelectAll();
       router.refresh();
@@ -664,7 +699,7 @@ export function AdminCreatorProfilesUnified({
     profilesWithActions,
     selectedIds,
     deleteCreatorOrUser,
-    showToast,
+    notifications,
     toggleSelectAll,
     router,
   ]);
@@ -801,9 +836,8 @@ export function AdminCreatorProfilesUnified({
         onOpenChange={setInviteDialogOpen}
         onSuccess={() => {
           setProfileToInvite(null);
-          showToast({
-            type: 'success',
-            message: 'Invite created successfully',
+          notifications.success('Invite created successfully', {
+            id: 'send-invite-success',
           });
         }}
       />
