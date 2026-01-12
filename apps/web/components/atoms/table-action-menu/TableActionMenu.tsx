@@ -66,7 +66,11 @@ export function TableActionMenu({
   // Context menu variant
   if (trigger === 'context' && children) {
     return (
-      <CommonDropdown variant='context' items={dropdownItems}>
+      <CommonDropdown
+        variant='context'
+        items={dropdownItems}
+        contentClassName={GEIST_CONTENT_CLASS}
+      >
         {children}
       </CommonDropdown>
     );

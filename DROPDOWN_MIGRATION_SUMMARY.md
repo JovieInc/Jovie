@@ -73,12 +73,36 @@ A unified, production-ready dropdown component that consolidates all dropdown pa
 - Audience tables
 - All other tables using row action menus
 
+### TableContextMenu → TableActionMenu Passthrough
+
+**File**: `/apps/web/components/admin/table/molecules/TableContextMenu.tsx`
+
+**Before**: 168 lines with direct Radix ContextMenu primitives
+**After**: 136 lines as a thin wrapper around TableActionMenu with `trigger="context"`
+
+**Reduction**: 19% smaller
+
+**Key Achievement**: **Unified menus** - Right-click context menu and ellipsis (•••) button menu are now **literally the same menu**, just triggered differently!
+
+**How it works**:
+1. TableContextMenu converts its API format to TableActionMenuItem format
+2. Passes items to TableActionMenu with `trigger="context"`
+3. TableActionMenu uses CommonDropdown with context variant
+4. **Result**: Same menu items, same styling, same behavior - whether triggered by right-click or button click
+
+**Impact**: Every table that uses context menus now has perfect consistency with action button menus across **15+ files**:
+- Admin waitlist table
+- Admin users table
+- Admin creator profiles
+- Dashboard audience tables
+- All other tables with row context menus
+
 ### UserButton → CommonDropdown Migration
 
 **File**: `/apps/web/components/organisms/user-button/UserButton.tsx`
 
 **Before**: 275 lines with direct Radix UI primitives + 141 char className override on DropdownMenuContent
-**After**: 306 lines using CommonDropdown (31 lines added for type-safe item building)
+**After**: 347 lines using CommonDropdown (custom styling for sidebar context)
 
 **Key Changes**:
 - ✅ Eliminated direct Radix imports (DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger)
@@ -344,7 +368,8 @@ Before considering this complete, verify:
 
 ### Modified
 - `/packages/ui/index.ts` (added exports)
-- `/apps/web/components/atoms/table-action-menu/TableActionMenu.tsx` (migrated to wrapper)
+- `/apps/web/components/atoms/table-action-menu/TableActionMenu.tsx` (migrated to CommonDropdown wrapper)
+- `/apps/web/components/admin/table/molecules/TableContextMenu.tsx` (now passthrough to TableActionMenu)
 - `/apps/web/components/organisms/user-button/UserButton.tsx` (migrated to CommonDropdown)
 
 ### Reference Plan
