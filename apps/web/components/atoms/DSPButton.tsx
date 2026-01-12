@@ -66,7 +66,7 @@ export function DSPButton({
     >
       <span className='inline-flex items-center gap-2'>
         <span
-          className='flex-shrink-0'
+          className='shrink-0'
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
           dangerouslySetInnerHTML={{ __html: sanitizedLogo }}
         />

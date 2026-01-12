@@ -125,19 +125,13 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
               <div className='font-semibold text-primary-token'>
                 {getValue() ?? 'User'}
               </div>
-              <div className='text-xs text-secondary-token'>{user.clerkId}</div>
+              <div className='text-xs text-secondary-token'>
+                {user.email ?? '—'}
+              </div>
             </div>
           );
         },
-        size: 260,
-      }),
-
-      // Email column
-      columnHelper.accessor('email', {
-        id: 'email',
-        header: 'Email',
-        cell: ({ getValue }) => getValue() ?? '—',
-        size: 280,
+        size: 320,
       }),
 
       // Sign up (Created) column

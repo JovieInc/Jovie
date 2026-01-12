@@ -27,6 +27,38 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **CI/CD flow:** `.github/CI_CD_FLOW.md`
 - **Branch protection (human-owned):** `.github/BRANCH_PROTECTION.md`
 
+## 5.1 Claude Code Hooks (Automated Guardrails)
+
+Claude Code uses hooks to automatically enforce code quality and prevent common mistakes:
+
+### Active Hooks
+
+**PreToolUse Hooks** (run before file operations/bash commands):
+- **bash-safety-check.sh**: Blocks dangerous commands (force push to main, rm -rf /, publishing)
+- **file-protection-check.sh**: Enforces HARD GUARDRAILS:
+  - Prevents modification of Drizzle migrations (append-only)
+  - Blocks creation of `middleware.ts` (must use `proxy.ts`)
+  - Rejects `biome-ignore` suppressions
+
+**PostToolUse Hooks** (run after file operations):
+- **biome-formatter.sh**: Auto-formats TypeScript/JavaScript files with Biome after every edit
+
+### Hook Behavior
+
+- Hooks run automatically on every relevant tool use
+- Blocked operations display clear error messages with guidance
+- Auto-formatting happens silently after edits
+- Hooks have short timeouts (5-30s) to avoid blocking workflow
+
+### Configuration
+
+Hooks are configured in `.claude/settings.json` and implemented in `.claude/hooks/`.
+
+To temporarily disable hooks for testing:
+```bash
+export CLAUDE_HOOKS_DISABLED=1
+```
+
 ## 6. Agent-Specific Notes
 
 - **Claude (feature work, refactors)**
@@ -34,6 +66,7 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
   - Own end-to-end changes: schema → backend → UI → tests.
   - Prefer server components and feature-flagged rollouts.
   - Always use Statsig for feature gates/experiments; do not introduce any other flag or analytics SDKs.
+  - Claude Code hooks automatically enforce code quality and guardrails (see section 5.1).
 
 - **Codex (CI auto-fix, focused cleanups)**
 
@@ -124,6 +157,13 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **DB:** Neon + Drizzle (`@neondatabase/serverless`, `drizzle-orm/neon-serverless` with WebSocket support for transactions).
 - **Auth:** Clerk via `@clerk/nextjs` / `@clerk/nextjs/server`.
 - **Styling:** Tailwind CSS v4 + small helpers (e.g., `clsx`, `tailwind-merge`) where needed.
+- **Tailwind v4 Syntax (REQUIRED):** Use modern shorthand syntax:
+  - `z-100` not `z-[100]` (arbitrary z-index)
+  - `shrink-0` not `flex-shrink-0`
+  - `bg-linear-to-r` not `bg-gradient-to-r`
+  - `border-(--var-name)` not `border-[var(--var-name)]` (CSS variable references)
+  - `bg-black!` not `!bg-black` (important modifier is postfix)
+  - `hover:bg-gray-800!` not `hover:!bg-gray-800`
 - **Headless UI:** Prefer `@headlessui/react` and `@floating-ui/*` for dialogs, menus, sheets, tooltips, and popovers.
 - **Billing:** Stripe (`stripe` on server, `@stripe/stripe-js` on client); no Clerk Billing.
 - **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
