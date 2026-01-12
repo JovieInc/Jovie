@@ -52,7 +52,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           return (
             <div>
               <div className='font-semibold text-primary-token'>
-                {getValue() ?? '—'}
+                {getValue() ?? 'User'}
               </div>
               <div className='text-xs text-secondary-token'>{user.clerkId}</div>
             </div>
