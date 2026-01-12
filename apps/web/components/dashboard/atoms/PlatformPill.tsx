@@ -244,6 +244,14 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         ) : (
           /* Full mode: icon + text + badges */
           <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
+            {/* Active indicator dot */}
+            {state === 'connected' && (
+              <span
+                className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400'
+                aria-hidden='true'
+              />
+            )}
+
             <span
               className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
               style={{ ...iconChipStyle }}
