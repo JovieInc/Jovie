@@ -26,8 +26,8 @@ export function VerifiedBadge({
         className={`${sizeClasses[size]}`}
         aria-hidden='true'
         fill='currentColor'
-        stroke='currentColor'
-        strokeWidth={1.75}
+        stroke='white'
+        strokeWidth={2}
       />
     </span>
   );
