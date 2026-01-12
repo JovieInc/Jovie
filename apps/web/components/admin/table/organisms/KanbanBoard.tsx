@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
@@ -189,9 +188,6 @@ function KanbanColumn<TData>({
             {column.title}
           </h3>
         </div>
-        <Badge variant='secondary' size='sm'>
-          {column.count}
-        </Badge>
       </div>
 
       {/* Column Content */}
