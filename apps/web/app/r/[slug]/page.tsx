@@ -5,6 +5,8 @@
  * When a `?dsp=` query param is present, redirects directly to that provider.
  */
 
+import { cache } from 'react';
+
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
@@ -22,7 +24,9 @@ import type { ProviderKey } from '@/lib/discography/types';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
 
-export const dynamic = 'force-dynamic';
+// Use ISR with 5-minute revalidation for smart link pages
+// This allows caching while still picking up provider link changes reasonably fast
+export const revalidate = 300;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -55,57 +59,64 @@ function parseSmartLinkSlug(slug: string): {
 }
 
 /**
- * Fetch release data with provider links and creator info
+ * Fetch release data with provider links and creator info.
+ * Wrapped with React.cache() to deduplicate calls between generateMetadata and page render.
+ * Uses Promise.all() to parallelize independent queries.
  */
-async function getReleaseData(releaseSlug: string, profileId: string) {
-  // First fetch the release
-  const [release] = await db
-    .select()
-    .from(discogReleases)
-    .where(
-      and(
-        eq(discogReleases.creatorProfileId, profileId),
-        eq(discogReleases.slug, releaseSlug)
-      )
-    )
-    .limit(1);
+const getReleaseData = cache(
+  async (releaseSlug: string, profileId: string) => {
+    // Fetch release and creator in parallel (both only need profileId)
+    const [releaseResult, creatorResult] = await Promise.all([
+      db
+        .select()
+        .from(discogReleases)
+        .where(
+          and(
+            eq(discogReleases.creatorProfileId, profileId),
+            eq(discogReleases.slug, releaseSlug)
+          )
+        )
+        .limit(1),
+      db
+        .select({
+          displayName: creatorProfiles.displayName,
+          username: creatorProfiles.username,
+          avatarUrl: creatorProfiles.avatarUrl,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profileId))
+        .limit(1),
+    ]);
 
-  if (!release) {
-    return null;
+    const [release] = releaseResult;
+    const [creator] = creatorResult;
+
+    if (!release) {
+      return null;
+    }
+
+    // Fetch provider links (requires release.id from first query)
+    const links = await db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      );
+
+    return {
+      release,
+      providerLinks: links,
+      creator: creator ?? {
+        displayName: null,
+        username: 'Unknown Artist',
+        avatarUrl: null,
+      },
+    };
   }
-
-  // Fetch provider links
-  const links = await db
-    .select()
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.releaseId, release.id)
-      )
-    );
-
-  // Fetch creator profile for display name
-  const [creator] = await db
-    .select({
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      avatarUrl: creatorProfiles.avatarUrl,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-
-  return {
-    release,
-    providerLinks: links,
-    creator: creator ?? {
-      displayName: null,
-      username: 'Unknown Artist',
-      avatarUrl: null,
-    },
-  };
-}
+);
 
 /**
  * Pick the best provider URL based on priority
