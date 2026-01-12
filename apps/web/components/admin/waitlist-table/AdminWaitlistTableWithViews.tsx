@@ -1,13 +1,14 @@
 'use client';
 
+import { Checkbox } from '@jovie/ui';
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import {
-  DisplayMenuDropdown,
-  type ViewMode,
-} from '@/components/admin/table/molecules/DisplayMenuDropdown';
 import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
+import {
+  type ViewMode,
+  ViewModeToggle,
+} from '@/components/admin/table/molecules/ViewModeToggle';
 import {
   KanbanBoard,
   type KanbanColumn,
@@ -197,14 +198,29 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                 {total.toLocaleString()}
                 <span className='hidden sm:inline'> entries</span>
               </div>
-              <div className='flex items-center gap-2'>
-                <DisplayMenuDropdown
+              <div className='flex items-center gap-3'>
+                {/* Grouping checkbox (only visible in list view) */}
+                {viewMode === 'list' && (
+                  <button
+                    type='button'
+                    onClick={() => setGroupingEnabled(!groupingEnabled)}
+                    className='flex items-center gap-2 text-sm text-secondary-token hover:text-primary-token transition-colors cursor-pointer'
+                  >
+                    <Checkbox
+                      checked={groupingEnabled}
+                      onCheckedChange={checked =>
+                        setGroupingEnabled(checked === true)
+                      }
+                    />
+                    <span className='hidden sm:inline'>Group by status</span>
+                    <span className='sm:hidden'>Group</span>
+                  </button>
+                )}
+
+                {/* View mode toggle */}
+                <ViewModeToggle
                   viewMode={viewMode}
-                  availableViewModes={['list', 'board']}
                   onViewModeChange={setViewMode}
-                  groupingEnabled={groupingEnabled}
-                  onGroupingToggle={setGroupingEnabled}
-                  groupingLabel='Group by status'
                 />
               </div>
             </div>
