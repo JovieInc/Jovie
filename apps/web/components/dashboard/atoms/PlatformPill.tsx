@@ -180,7 +180,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         }
         className={cn(
           'group/pill relative inline-flex items-center rounded-full border text-xs font-medium',
-          'border-[var(--pill-border)] hover:border-[var(--pill-border-hover)]',
+          'border-(--pill-border) hover:border-(--pill-border-hover)',
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
           'transition-all duration-200',
@@ -188,9 +188,9 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
             ? 'size-7 justify-center p-0'
             : 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
           isInteractive &&
-            'hover:bg-[var(--pill-bg-hover)] dark:hover:bg-[var(--pill-bg-hover)]',
+            'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
           isInteractive
-            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-[var(--pill-bg-hover)]'
+            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-(--pill-bg-hover)'
             : 'cursor-default',
           tone === 'faded' &&
             'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',

@@ -61,7 +61,7 @@ export function TipSelector({
 
       <Button
         onClick={handleContinue}
-        className='w-full !bg-black !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-black dark:hover:!bg-gray-100'
+        className='w-full bg-black! text-white! hover:bg-gray-800! dark:bg-white! dark:text-black! dark:hover:bg-gray-100!'
         size='lg'
         disabled={isLoading}
         variant='ghost'
