@@ -168,6 +168,9 @@ export CLAUDE_HOOKS_DISABLED=1
 - **Billing:** Stripe (`stripe` on server, `@stripe/stripe-js` on client); no Clerk Billing.
 - **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
 - **Icons:** Use **Lucide React only** (`lucide-react`). Do not use Heroicons, Simple Icons (except for brand logos via `SocialIcon`), or other icon libraries. Import icons directly (e.g., `import { Check, X } from 'lucide-react'`) and use the `<Icon name="..." />` wrapper component for dynamic icon names.
+- **URL Query State:** Use **nuqs** (`nuqs`) for type-safe URL query state management. Prefer `useQueryState` with typed parsers over manual `useSearchParams` + `router.push` patterns. Example: `const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1))`.
+- **File Uploads:** Use the existing custom upload implementation (`useAvatarUpload`, `AvatarUploadable`) for avatar uploads. For future multi-file uploads, prefer **React Dropzone** (`react-dropzone`) over Uppy unless you need resumable uploads or cloud imports.
+- **State Management:** Use `useState` + React Context for local/shared state. Do not add Zustand, Jotai, or Redux — RSC handles server data, URL state handles shareable state, and context covers the rest.
 
 ## 9. Runtime, Auth, Database & RLS
 

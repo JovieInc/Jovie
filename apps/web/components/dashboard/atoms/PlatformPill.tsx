@@ -32,6 +32,8 @@ export interface PlatformPillProps {
   compact?: boolean;
   /** Enable avatar-style stacking with negative margin overlap */
   stackable?: boolean;
+  /** When stacked, expand this pill by default (for highest z-index item) */
+  defaultExpanded?: boolean;
   className?: string;
   testId?: string;
 }
@@ -53,6 +55,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       collapsed: collapsedProp,
       compact: compactProp,
       stackable = false,
+      defaultExpanded = false,
       className,
       testId,
     },
@@ -193,14 +196,16 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'text-secondary-token hover:text-primary-token',
           'transition-all duration-200',
           // Collapsed: starts as icon circle, expands on hover
-          collapsed &&
-            'h-7 w-7 justify-center p-0 group-hover/pill:w-auto group-hover/pill:px-2 group-hover/pill:gap-1.5',
+          collapsed && 'h-7 justify-center px-2',
+          collapsed && !defaultExpanded && 'w-7 p-0',
+          collapsed && defaultExpanded && 'w-auto gap-1',
           // Expanded: full width with padding
           !collapsed && 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
-          // Stackable: negative margin for avatar-style overlap
+          // Stackable: negative margin for avatar-style overlap, last item has higher z-index
           stackable && '-ml-2 first:ml-0',
+          stackable && 'last:z-10',
           // Hover brings pill to front when stacked
-          stackable && 'hover:z-10',
+          stackable && 'hover:z-20',
           isInteractive &&
             'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
           isInteractive
@@ -243,47 +248,51 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
         </span>
 
-        {/* Content - visible in expanded mode, or on hover in collapsed mode */}
-        <div
-          className={cn(
-            'flex items-center overflow-hidden',
-            // Collapsed: hidden by default, shows on hover with smooth expansion
-            collapsed &&
-              'max-w-0 opacity-0 whitespace-nowrap transition-all duration-200',
-            collapsed &&
-              'group-hover/pill:max-w-max group-hover/pill:opacity-100 group-hover/pill:ml-1',
-            // Expanded: always visible with full layout
-            !collapsed && 'gap-1.5 flex-1 min-w-0'
-          )}
-        >
-          <div className='min-w-0 flex-1'>
-            <span className={cn(primaryText.length > 40 && 'truncate')}>
-              {primaryText}
-            </span>
-            {hasSecondary && !collapsed ? (
-              <span
-                className={cn(
-                  'ml-2 text-[10px] text-tertiary-token/80',
-                  secondaryText && secondaryText.length > 40 && 'truncate'
-                )}
-              >
-                {secondaryText}
+        {/* Content - visible in expanded mode, or on hover/defaultExpanded in collapsed mode */}
+        {collapsed ? (
+          // Collapsed mode: text hidden unless defaultExpanded or on hover
+          <span
+            className={cn(
+              'whitespace-nowrap overflow-hidden transition-all duration-200',
+              !defaultExpanded &&
+                'w-0 opacity-0 group-hover/pill:w-auto group-hover/pill:opacity-100',
+              defaultExpanded && 'w-auto opacity-100'
+            )}
+          >
+            {primaryText}
+          </span>
+        ) : (
+          // Expanded mode: full layout with all features
+          <div className='flex items-center gap-1.5 overflow-hidden flex-1 min-w-0'>
+            <div className='min-w-0 flex-1'>
+              <span className={cn(primaryText.length > 40 && 'truncate')}>
+                {primaryText}
+              </span>
+              {hasSecondary ? (
+                <span
+                  className={cn(
+                    'ml-2 text-[10px] text-tertiary-token/80',
+                    secondaryText && secondaryText.length > 40 && 'truncate'
+                  )}
+                >
+                  {secondaryText}
+                </span>
+              ) : null}
+            </div>
+
+            {badgeText ? (
+              <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
+                {badgeText}
+              </span>
+            ) : null}
+
+            {suffix ? (
+              <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
+                {suffix}
               </span>
             ) : null}
           </div>
-
-          {badgeText && !collapsed ? (
-            <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
-              {badgeText}
-            </span>
-          ) : null}
-
-          {suffix && !collapsed ? (
-            <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
-              {suffix}
-            </span>
-          ) : null}
-        </div>
+        )}
 
         {trailing && !collapsed ? (
           <div className='relative ml-1 shrink-0'>{trailing}</div>

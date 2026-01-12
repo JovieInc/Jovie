@@ -77,10 +77,12 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
 
   // Use collapsed mode (circles) when there are 2+ links
   const useCollapsedMode = links.length >= 2;
+  const visibleLinks = links.slice(0, maxLinks);
 
   return (
     <div className='flex items-center overflow-hidden'>
-      {links.slice(0, maxLinks).map(link => {
+      {visibleLinks.map((link, index) => {
+        const isLast = index === visibleLinks.length - 1;
         const username =
           extractUsernameFromUrl(link.url) ??
           extractUsernameFromLabel(link.displayText ?? '') ??
@@ -123,6 +125,7 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
             primaryText={primaryText}
             collapsed={useCollapsedMode}
             stackable={useCollapsedMode}
+            defaultExpanded={isLast && useCollapsedMode}
             onClick={() => {
               window.open(link.url, '_blank', 'noopener,noreferrer');
             }}
