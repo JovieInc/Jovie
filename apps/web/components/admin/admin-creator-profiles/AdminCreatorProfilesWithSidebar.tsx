@@ -243,9 +243,9 @@ export function AdminCreatorProfilesWithSidebar({
   ]);
 
   return (
-    <QueryErrorBoundary fallback={TableErrorFallback}>
-      <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
-        <div className='flex-1 min-h-0 overflow-hidden'>
+    <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
+      <div className='flex-1 min-h-0 overflow-hidden'>
+        <QueryErrorBoundary fallback={TableErrorFallback}>
           <AdminTableShell
             scrollContainerProps={{
               tabIndex: 0,
@@ -339,6 +339,10 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle verification',
                               result.error
                             );
+                            showToast({
+                              type: 'error',
+                              message: `Failed to update verification status${result.error ? `: ${result.error}` : ''}`,
+                            });
                           }
                         }}
                         onToggleFeatured={async () => {
@@ -351,6 +355,10 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle featured',
                               result.error
                             );
+                            showToast({
+                              type: 'error',
+                              message: `Failed to update featured status${result.error ? `: ${result.error}` : ''}`,
+                            });
                           }
                         }}
                         onToggleMarketing={async () => {
@@ -363,6 +371,10 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle marketing',
                               result.error
                             );
+                            showToast({
+                              type: 'error',
+                              message: `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`,
+                            });
                           }
                         }}
                         onSendInvite={
@@ -384,8 +396,9 @@ export function AdminCreatorProfilesWithSidebar({
               </table>
             )}
           </AdminTableShell>
-        </div>
-        <RightDrawer
+        </QueryErrorBoundary>
+      </div>
+      <RightDrawer
           isOpen={sidebarOpen && Boolean(effectiveContact)}
           width={CONTACT_PANEL_WIDTH}
           ariaLabel='Contact details'
@@ -436,6 +449,5 @@ export function AdminCreatorProfilesWithSidebar({
           }}
         />
       </div>
-    </QueryErrorBoundary>
   );
 }

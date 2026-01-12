@@ -14,7 +14,10 @@ export function TableErrorFallback({
   resetErrorBoundary,
 }: FallbackProps) {
   return (
-    <div className='flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[400px]'>
+    <div
+      role='alert'
+      className='flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[400px]'
+    >
       <div className='w-full max-w-md space-y-4'>
         <div className='flex justify-center'>
           <div className='rounded-full bg-destructive/10 p-4'>
