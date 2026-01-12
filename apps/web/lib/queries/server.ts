@@ -73,4 +73,80 @@ export const getQueryClient = cache(() => createServerQueryClient());
  */
 export const getDehydratedState = () => dehydrate(getQueryClient());
 
+/**
+ * Prefetch a query on the server and return the dehydrated state.
+ *
+ * Convenience wrapper that handles the common pattern of:
+ * 1. Get the request-scoped QueryClient
+ * 2. Prefetch the query
+ * 3. Return dehydrated state for HydrateClient
+ *
+ * @example
+ * // In a Server Component
+ * import { prefetchQuery, HydrateClient } from '@/lib/queries/server';
+ * import { queryKeys } from '@/lib/queries';
+ *
+ * export default async function ProfilePage() {
+ *   const dehydratedState = await prefetchQuery({
+ *     queryKey: queryKeys.user.profile(),
+ *     queryFn: () => fetchProfileFromDB(),
+ *   });
+ *
+ *   return (
+ *     <HydrateClient state={dehydratedState}>
+ *       <ProfileContent />
+ *     </HydrateClient>
+ *   );
+ * }
+ */
+export async function prefetchQuery<T>(options: {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<T>;
+}) {
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery(options);
+  return getDehydratedState();
+}
+
+/**
+ * Prefetch multiple queries in parallel on the server.
+ *
+ * Use this when a page needs multiple data sources prefetched.
+ * All queries run concurrently for optimal performance.
+ *
+ * @example
+ * // In a Server Component
+ * import { prefetchQueries, HydrateClient } from '@/lib/queries/server';
+ * import { queryKeys } from '@/lib/queries';
+ *
+ * export default async function DashboardPage() {
+ *   const dehydratedState = await prefetchQueries([
+ *     {
+ *       queryKey: queryKeys.user.profile(),
+ *       queryFn: () => fetchProfileFromDB(),
+ *     },
+ *     {
+ *       queryKey: queryKeys.billing.status(),
+ *       queryFn: () => fetchBillingFromDB(),
+ *     },
+ *   ]);
+ *
+ *   return (
+ *     <HydrateClient state={dehydratedState}>
+ *       <DashboardContent />
+ *     </HydrateClient>
+ *   );
+ * }
+ */
+export async function prefetchQueries(
+  queries: Array<{
+    queryKey: readonly unknown[];
+    queryFn: () => Promise<unknown>;
+  }>
+) {
+  const queryClient = getQueryClient();
+  await Promise.all(queries.map(query => queryClient.prefetchQuery(query)));
+  return getDehydratedState();
+}
+
 export { dehydrate };
