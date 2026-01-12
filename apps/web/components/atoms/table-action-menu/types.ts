@@ -1,9 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 export interface TableActionMenuItem {
   id: string;
   label: string;
-  icon?: LucideIcon;
+  icon?: LucideIcon | ReactNode;
   onClick: () => void;
   variant?: 'default' | 'destructive';
   disabled?: boolean;

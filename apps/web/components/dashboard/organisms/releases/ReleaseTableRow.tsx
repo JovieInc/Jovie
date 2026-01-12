@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
+import { PencilLine, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -406,13 +407,13 @@ export function ReleaseTableRow({
               {
                 id: 'edit',
                 label: 'Edit links',
-                icon: () => <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+                icon: PencilLine,
                 onClick: () => onEdit(release),
               },
               {
                 id: 'copy-smart-link',
                 label: 'Copy smart link',
-                icon: () => <Icon name='Copy' className='h-3.5 w-3.5' />,
+                icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
                 onClick: () => {
                   void handleCopyWithFeedback(
                     release.smartLinkPath,
@@ -421,11 +422,15 @@ export function ReleaseTableRow({
                   );
                 },
               },
-              { id: 'separator-1' },
+              {
+                id: 'separator-1',
+                label: 'separator',
+                onClick: () => {},
+              },
               {
                 id: 'delete',
                 label: 'Delete release',
-                icon: () => <Icon name='Trash2' className='h-3.5 w-3.5' />,
+                icon: Trash2,
                 variant: 'destructive' as const,
                 onClick: () => {
                   // TODO: Implement delete confirmation dialog

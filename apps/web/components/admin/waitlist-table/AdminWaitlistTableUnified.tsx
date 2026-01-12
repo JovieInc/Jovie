@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Badge,
-  Button,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@jovie/ui';
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -27,10 +21,14 @@ import { useCallback, useMemo } from 'react';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { GroupedTableBody } from '@/components/admin/table/molecules/GroupedTableBody';
-import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+} from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useTableGrouping } from '@/components/admin/table/utils/useTableGrouping';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import {
@@ -57,7 +55,7 @@ export function AdminWaitlistTableUnified({
   total,
   groupingEnabled = false,
 }: WaitlistTableProps) {
-  const { approveStatuses, approveEntry } = useApproveEntry({
+  const { approveEntry } = useApproveEntry({
     onRowUpdate: () => {
       // No-op for now since we're using server-side refresh
     },
@@ -374,42 +372,26 @@ export function AdminWaitlistTableUnified({
         size: 160,
       }),
 
-      // Actions column
+      // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
         header: '',
         cell: ({ row }) => {
           const entry = row.original;
-          const isApproved =
-            entry.status === 'invited' || entry.status === 'claimed';
-          const approveStatus = approveStatuses[entry.id] ?? 'idle';
-          const isApproving = approveStatus === 'loading';
+          const contextMenuItems = createContextMenuItems(entry);
+          const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
           return (
-            <div className='flex items-center justify-end gap-2'>
-              <Button
-                size='sm'
-                variant='secondary'
-                disabled={isApproved || isApproving}
-                onClick={() => {
-                  void approveEntry(entry.id);
-                }}
-              >
-                {isApproved
-                  ? 'Approved'
-                  : isApproving
-                    ? 'Approving…'
-                    : 'Approve'}
-              </Button>
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={actionMenuItems} align='end' />
             </div>
           );
         },
-        size: 120,
+        size: 48,
       }),
     ],
     [
-      approveStatuses,
-      approveEntry,
+      createContextMenuItems,
       headerCheckboxState,
       toggleSelectAll,
       selectedIds,
