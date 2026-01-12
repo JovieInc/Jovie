@@ -198,7 +198,7 @@
     "@vercel/toolbar": "^0.1.41",
     "@vitejs/plugin-react": "^5.0.2",
     "@vitest/coverage-v8": "^4.0.16",
-    "autoprefixer": "^10.4.21",
+    "autoprefixer": "^10.4.23",
     "axe-core": "^4.11.0",
     "danger": "^13.0.4",
     "drizzle-kit": "^0.31.8",
