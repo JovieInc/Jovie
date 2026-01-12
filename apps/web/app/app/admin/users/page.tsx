@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
+import { parsePaginationParams } from '@/lib/utils/pagination-parser';
 
 interface AdminUsersPageProps {
   searchParams?: {
@@ -20,10 +21,7 @@ export const metadata: Metadata = {
 export default async function AdminUsersPage({
   searchParams,
 }: AdminUsersPageProps) {
-  const pageParam = searchParams?.page
-    ? Number.parseInt(searchParams.page, 10)
-    : 1;
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const { page, pageSize } = parsePaginationParams(searchParams);
   const search = searchParams?.q ?? '';
 
   const sortParam = searchParams?.sort;
@@ -36,14 +34,6 @@ export default async function AdminUsersPage({
     sortParam === 'email_desc'
       ? sortParam
       : 'created_desc';
-
-  const pageSizeParam = searchParams?.pageSize
-    ? Number.parseInt(searchParams.pageSize, 10)
-    : 20;
-  const pageSize =
-    Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 100
-      ? pageSizeParam
-      : 20;
 
   const { users, total } = await getAdminUsers({
     page,
