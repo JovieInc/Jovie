@@ -10,7 +10,9 @@ import {
   KanbanBoard,
   type KanbanColumn,
 } from '@/components/admin/table/organisms/KanbanBoard';
+import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
@@ -134,64 +136,66 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   );
 
   return (
-    <AdminTableShell
-      toolbar={
-        <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
-          <div className='text-xs text-secondary-token'>
-            <span className='hidden sm:inline'>Showing </span>
-            {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-            {total.toLocaleString()}
-            <span className='hidden sm:inline'> entries</span>
+    <QueryErrorBoundary fallback={TableErrorFallback}>
+      <AdminTableShell
+        toolbar={
+          <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
+            <div className='text-xs text-secondary-token'>
+              <span className='hidden sm:inline'>Showing </span>
+              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()}
+              <span className='hidden sm:inline'> entries</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <DisplayMenuDropdown
+                viewMode={viewMode}
+                availableViewModes={['list', 'board']}
+                onViewModeChange={setViewMode}
+                groupingEnabled={groupingEnabled}
+                onGroupingToggle={setGroupingEnabled}
+                groupingLabel='Group by status'
+              />
+            </div>
           </div>
-          <div className='flex items-center gap-2'>
-            <DisplayMenuDropdown
-              viewMode={viewMode}
-              availableViewModes={['list', 'board']}
-              onViewModeChange={setViewMode}
-              groupingEnabled={groupingEnabled}
-              onGroupingToggle={setGroupingEnabled}
-              groupingLabel='Group by status'
+        }
+        footer={
+          viewMode === 'list' ? (
+            <WaitlistTablePagination
+              page={page}
+              totalPages={totalPages}
+              canPrev={canPrev}
+              canNext={canNext}
+              prevHref={prevHref}
+              nextHref={nextHref}
             />
-          </div>
-        </div>
-      }
-      footer={
-        viewMode === 'list' ? (
-          <WaitlistTablePagination
-            page={page}
-            totalPages={totalPages}
-            canPrev={canPrev}
-            canNext={canNext}
-            prevHref={prevHref}
-            nextHref={nextHref}
-          />
-        ) : null
-      }
-    >
-      {() =>
-        viewMode === 'list' ? (
-          <AdminWaitlistTableUnified
-            {...props}
-            groupingEnabled={groupingEnabled}
-          />
-        ) : (
-          <KanbanBoard
-            columns={kanbanColumns}
-            renderCard={renderKanbanCard}
-            getItemId={entry => entry.id}
-            onItemMove={handleItemMove}
-            cardHeight={200}
-            emptyState={
-              <div className='text-center text-secondary-token'>
-                <p className='text-sm font-medium'>No waitlist entries</p>
-                <p className='text-xs text-tertiary-token mt-1'>
-                  Entries will appear here when added
-                </p>
-              </div>
-            }
-          />
-        )
-      }
-    </AdminTableShell>
+          ) : null
+        }
+      >
+        {() =>
+          viewMode === 'list' ? (
+            <AdminWaitlistTableUnified
+              {...props}
+              groupingEnabled={groupingEnabled}
+            />
+          ) : (
+            <KanbanBoard
+              columns={kanbanColumns}
+              renderCard={renderKanbanCard}
+              getItemId={entry => entry.id}
+              onItemMove={handleItemMove}
+              cardHeight={200}
+              emptyState={
+                <div className='text-center text-secondary-token'>
+                  <p className='text-sm font-medium'>No waitlist entries</p>
+                  <p className='text-xs text-tertiary-token mt-1'>
+                    Entries will appear here when added
+                  </p>
+                </div>
+              }
+            />
+          )
+        }
+      </AdminTableShell>
+    </QueryErrorBoundary>
   );
 }
