@@ -60,6 +60,8 @@ export {
 export { HydrateClient } from './HydrateClient';
 // Query key factories
 export { type QueryKeys, queryKeys } from './keys';
+// Error boundary with automatic query reset
+export { QueryErrorBoundary } from './QueryErrorBoundary';
 
 // Query hooks
 export {

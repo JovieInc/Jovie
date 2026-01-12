@@ -439,6 +439,7 @@ export function AdminWaitlistTableUnified({
   });
 
   // If grouping is enabled, render grouped table directly
+  // Note: Row selection is intentionally disabled in grouped view for UX simplicity
   if (groupingEnabled) {
     return (
       <div className='overflow-auto'>
@@ -464,10 +465,13 @@ export function AdminWaitlistTableUnified({
                 >
                   {header.isPlaceholder
                     ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
+                    : // Skip rendering checkbox header in grouped view
+                      header.id === 'select'
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                 </th>
               ))}
             </tr>
@@ -491,10 +495,13 @@ export function AdminWaitlistTableUnified({
                       key={cell.id}
                       className='border-b border-subtle px-4 py-3 text-secondary-token'
                     >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {/* Skip rendering checkbox cells in grouped view */}
+                      {cell.column.id === 'select'
+                        ? null
+                        : flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
                     </td>
                   ))}
                 </tr>

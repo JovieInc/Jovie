@@ -88,13 +88,12 @@ export const STABLE_CACHE: Partial<UseQueryOptions> = {
  * Static reference data that rarely changes.
  * Use for: categories, platform lists, static content
  *
- * Note: gcTime is set to 1 hour to avoid holding stale data in memory
- * for long-running sessions. For true reference data that should persist
- * longer (e.g., 24 hours), override gcTime in the specific query.
+ * Note: gcTime is set longer than staleTime to provide a buffer window
+ * for unmount/remount scenarios without losing cached data.
  */
 export const STATIC_CACHE: Partial<UseQueryOptions> = {
   staleTime: 1 * HOUR,
-  gcTime: 1 * HOUR,
+  gcTime: 2 * HOUR,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
