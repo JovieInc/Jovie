@@ -19,6 +19,7 @@ import { WaitlistKanbanCard } from './WaitlistKanbanCard';
 import { WaitlistTablePagination } from './WaitlistTablePagination';
 
 const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';
+const GROUPING_STORAGE_KEY = 'waitlist-grouping-enabled';
 
 /**
  * AdminWaitlistTableWithViews - Enhanced waitlist table with view mode switching
@@ -26,8 +27,9 @@ const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';
  * Features:
  * - List view (default table)
  * - Board view (Kanban grouped by status)
- * - Display menu for switching views
- * - LocalStorage persistence for view preference
+ * - Grouping mode with sticky headers (New/Invited/Claimed groups)
+ * - Display menu for switching views and toggling grouping
+ * - LocalStorage persistence for view and grouping preferences
  */
 export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   const { entries, page, pageSize, total } = props;
@@ -43,12 +45,28 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     return 'list';
   });
 
+  // Grouping state with localStorage persistence (only for list view)
+  const [groupingEnabled, setGroupingEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(GROUPING_STORAGE_KEY);
+      return stored === 'true';
+    }
+    return false;
+  });
+
   // Persist view mode to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
     }
   }, [viewMode]);
+
+  // Persist grouping preference to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(GROUPING_STORAGE_KEY, String(groupingEnabled));
+    }
+  }, [groupingEnabled]);
 
   const { totalPages, canPrev, canNext, from, to, prevHref, nextHref } =
     usePagination({
@@ -130,6 +148,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               viewMode={viewMode}
               availableViewModes={['list', 'board']}
               onViewModeChange={setViewMode}
+              groupingEnabled={groupingEnabled}
+              onGroupingToggle={setGroupingEnabled}
+              groupingLabel='Group by status'
             />
           </div>
         </div>
@@ -149,7 +170,10 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     >
       {() =>
         viewMode === 'list' ? (
-          <AdminWaitlistTableUnified {...props} />
+          <AdminWaitlistTableUnified
+            {...props}
+            groupingEnabled={groupingEnabled}
+          />
         ) : (
           <KanbanBoard
             columns={kanbanColumns}

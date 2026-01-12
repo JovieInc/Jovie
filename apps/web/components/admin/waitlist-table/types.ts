@@ -14,6 +14,7 @@ export interface WaitlistTableProps {
   page: number;
   pageSize: number;
   total: number;
+  groupingEnabled?: boolean;
 }
 
 export type ApproveStatus = 'idle' | 'loading' | 'success' | 'error';

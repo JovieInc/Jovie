@@ -7,7 +7,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
 import {
   ClipboardList,
   ExternalLink,
@@ -19,8 +25,10 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
+import { GroupedTableBody } from '@/components/admin/table/molecules/GroupedTableBody';
 import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
+import { useTableGrouping } from '@/components/admin/table/utils/useTableGrouping';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import {
@@ -33,11 +41,19 @@ import { useApproveEntry } from './useApproveEntry';
 
 const columnHelper = createColumnHelper<WaitlistEntryRow>();
 
+// Status display labels for grouping
+const STATUS_LABELS: Record<string, string> = {
+  new: 'New',
+  invited: 'Invited',
+  claimed: 'Claimed',
+};
+
 export function AdminWaitlistTableUnified({
   entries,
   page,
   pageSize,
   total,
+  groupingEnabled = false,
 }: WaitlistTableProps) {
   const { approveStatuses, approveEntry } = useApproveEntry({
     onRowUpdate: () => {
@@ -329,11 +345,96 @@ export function AdminWaitlistTableUnified({
     [approveStatuses, approveEntry]
   );
 
+  // Initialize TanStack Table for grouping view
+  const table = useReactTable({
+    data: entries,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: row => row.id,
+  });
+
   // Get row className
   const getRowClassName = useCallback(() => {
     return 'group hover:bg-base dark:hover:bg-surface-2';
   }, []);
 
+  // Grouping logic
+  const { groupedData, observeGroupHeader } = useTableGrouping({
+    data: entries,
+    getGroupKey: entry => entry.status,
+    getGroupLabel: key => STATUS_LABELS[key] || key,
+    enabled: groupingEnabled,
+  });
+
+  // If grouping is enabled, render grouped table directly
+  if (groupingEnabled) {
+    return (
+      <div className='overflow-auto'>
+        <table
+          className='w-full border-separate border-spacing-0 text-[13px]'
+          style={{ minWidth: '1100px' }}
+        >
+          <caption className='sr-only'>
+            Waitlist entries grouped by status
+          </caption>
+
+          {/* Header */}
+          <thead>
+            <tr>
+              {table.getHeaderGroups()[0]?.headers.map(header => (
+                <th
+                  key={header.id}
+                  className='sticky top-0 z-20 border-b border-subtle bg-base/95 backdrop-blur-sm px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'
+                  style={{
+                    width:
+                      header.getSize() !== 150 ? header.getSize() : undefined,
+                  }}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          {/* Grouped Body */}
+          <GroupedTableBody
+            groupedData={groupedData}
+            observeGroupHeader={observeGroupHeader}
+            columns={columns.length}
+            renderRow={(entry, index) => {
+              const row = table
+                .getRowModel()
+                .rows.find(r => r.original.id === entry.id);
+              if (!row) return null;
+
+              return (
+                <tr key={entry.id} className={getRowClassName()}>
+                  {row.getVisibleCells().map(cell => (
+                    <td
+                      key={cell.id}
+                      className='border-b border-subtle px-4 py-3 text-secondary-token'
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            }}
+          />
+        </table>
+      </div>
+    );
+  }
+
+  // Default ungrouped table view
   return (
     <UnifiedTable
       data={entries}
