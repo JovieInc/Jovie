@@ -6,6 +6,7 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  type RowSelectionState,
   useReactTable,
 } from '@tanstack/react-table';
 import {
@@ -77,7 +78,11 @@ export function AdminWaitlistTableUnified({
   }, [selectedIds]);
 
   const handleRowSelectionChange = useCallback(
-    (updaterOrValue: any) => {
+    (
+      updaterOrValue:
+        | RowSelectionState
+        | ((old: RowSelectionState) => RowSelectionState)
+    ) => {
       const newSelection =
         typeof updaterOrValue === 'function'
           ? updaterOrValue(rowSelection)
