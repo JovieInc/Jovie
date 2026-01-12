@@ -185,7 +185,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'text-secondary-token hover:text-primary-token',
           'transition-all duration-200',
           compact
-            ? 'size-7 justify-center p-0'
+            ? 'h-7 w-7 justify-center p-0 group-hover/pill:w-auto group-hover/pill:px-2 group-hover/pill:gap-1.5'
             : 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
           isInteractive &&
             'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
@@ -224,20 +224,14 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           /* Compact mode: icon only, expands on hover */
           <>
             <span
-              className='flex items-center justify-center transition-opacity duration-200 group-hover/pill:opacity-0'
-              style={{ color: iconFg }}
+              className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
+              style={{ ...iconChipStyle }}
               aria-hidden='true'
             >
-              <SocialIcon platform={platformIcon} className='h-4 w-4' />
+              <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
             </span>
             {/* Hover expansion: show text */}
-            <span className='pointer-events-none absolute inset-0 flex items-center gap-1.5 rounded-full border border-[var(--pill-border)] bg-surface-1 dark:bg-surface-1/60 px-2 py-0.5 text-xs font-medium text-secondary-token whitespace-nowrap shadow-lg opacity-0 group-hover/pill:opacity-100 transition-opacity duration-200'>
-              <span
-                className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5'
-                style={{ ...iconChipStyle }}
-              >
-                <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-              </span>
+            <span className='max-w-0 overflow-hidden opacity-0 whitespace-nowrap transition-all duration-200 group-hover/pill:max-w-xs group-hover/pill:opacity-100 group-hover/pill:ml-1'>
               {primaryText}
             </span>
           </>
