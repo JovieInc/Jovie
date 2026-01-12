@@ -68,6 +68,35 @@ export function AdminWaitlistTableUnified({
   const { selectedIds, headerCheckboxState, toggleSelect, toggleSelectAll } =
     useRowSelection(rowIds);
 
+  // Row selection state for TanStack Table
+  const rowSelection = useMemo(() => {
+    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+  }, [selectedIds]);
+
+  const handleRowSelectionChange = useCallback(
+    (updaterOrValue: any) => {
+      const newSelection =
+        typeof updaterOrValue === 'function'
+          ? updaterOrValue(rowSelection)
+          : updaterOrValue;
+
+      // Update our custom row selection state
+      const newSelectedIds = new Set(
+        Object.entries(newSelection)
+          .filter(([, selected]) => selected)
+          .map(([id]) => id)
+      );
+
+      // Toggle all if different count
+      if (newSelectedIds.size === entries.length) {
+        toggleSelectAll();
+      } else if (newSelectedIds.size === 0 && selectedIds.size > 0) {
+        toggleSelectAll();
+      }
+    },
+    [rowSelection, entries.length, selectedIds.size, toggleSelectAll]
+  );
+
   // Helper to copy to clipboard
   const copyToClipboard = useCallback((text: string, label: string) => {
     navigator.clipboard
@@ -501,6 +530,8 @@ export function AdminWaitlistTableUnified({
       rowHeight={52}
       minWidth='1100px'
       className='text-[13px]'
+      rowSelection={rowSelection}
+      onRowSelectionChange={handleRowSelectionChange}
     />
   );
 }
