@@ -12,14 +12,12 @@ export function renderPrimaryGoalCell(value: string | null) {
   const primaryGoalLabel = value ? (PRIMARY_GOAL_LABELS[value] ?? value) : null;
 
   // Icon mapping for primary goals
-  const GoalIcon =
-    value === 'streams'
-      ? TrendingUp
-      : value === 'merch'
-        ? ShoppingBag
-        : value === 'tickets'
-          ? Ticket
-          : null;
+  const GOAL_ICONS: Record<string, typeof TrendingUp> = {
+    streams: TrendingUp,
+    merch: ShoppingBag,
+    tickets: Ticket,
+  };
+  const GoalIcon = value ? (GOAL_ICONS[value] ?? null) : null;
 
   return primaryGoalLabel ? (
     <Badge size='sm' variant='secondary' className='gap-1'>
