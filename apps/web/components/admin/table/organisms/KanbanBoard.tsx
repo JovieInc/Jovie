@@ -205,9 +205,9 @@ function KanbanColumn<TData>({
       >
         {column.items.length === 0 ? (
           <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
-            <p className='text-sm text-tertiary-token'>
+            <div className='text-sm text-tertiary-token'>
               {emptyState ?? 'No items'}
-            </p>
+            </div>
           </div>
         ) : enableVirtualization ? (
           <div

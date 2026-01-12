@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -14,6 +15,7 @@ import { AvatarCell } from '@/components/admin/table/atoms/AvatarCell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { SocialLinksCell } from '@/components/admin/table/molecules/SocialLinksCell';
+import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
@@ -580,6 +582,112 @@ export function AdminCreatorProfilesUnified({
     [selectedIds, selectedId]
   );
 
+  // Context menu items for right-click
+  const getContextMenuItems = useCallback(
+    (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
+      return [
+        {
+          id: 'copy-username',
+          label: 'Copy Username',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(profile.username);
+            showToast({
+              type: 'success',
+              message: 'Username copied to clipboard',
+            });
+          },
+        },
+        {
+          id: 'copy-id',
+          label: 'Copy Profile ID',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(profile.id);
+            showToast({
+              type: 'success',
+              message: 'Profile ID copied to clipboard',
+            });
+          },
+        },
+        { type: 'separator' as const },
+        profile.isVerified
+          ? {
+              id: 'unverify',
+              label: 'Unverify',
+              icon: <XCircle className='h-3.5 w-3.5' />,
+              onClick: async () => {
+                const result = await toggleVerification(profile.id, false);
+                if (!result.success) {
+                  showToast({
+                    type: 'error',
+                    message: 'Failed to unverify creator',
+                  });
+                } else {
+                  showToast({
+                    type: 'success',
+                    message: 'Creator unverified',
+                  });
+                }
+              },
+            }
+          : {
+              id: 'verify',
+              label: 'Verify',
+              icon: <CheckCircle className='h-3.5 w-3.5' />,
+              onClick: async () => {
+                const result = await toggleVerification(profile.id, true);
+                if (!result.success) {
+                  showToast({
+                    type: 'error',
+                    message: 'Failed to verify creator',
+                  });
+                } else {
+                  showToast({
+                    type: 'success',
+                    message: 'Creator verified',
+                  });
+                }
+              },
+            },
+        {
+          id: 'feature',
+          label: profile.isFeatured ? 'Unfeature' : 'Feature',
+          icon: <Star className='h-3.5 w-3.5' />,
+          onClick: async () => {
+            const result = await toggleFeatured(
+              profile.id,
+              !profile.isFeatured
+            );
+            if (!result.success) {
+              showToast({
+                type: 'error',
+                message: `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`,
+              });
+            } else {
+              showToast({
+                type: 'success',
+                message: `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`,
+              });
+            }
+          },
+        },
+        { type: 'separator' as const },
+        {
+          id: 'delete',
+          label: 'Delete',
+          icon: <Trash2 className='h-3.5 w-3.5' />,
+          destructive: true,
+          onClick: () => {
+            setProfileToDelete(profile);
+            setDeleteDialogOpen(true);
+          },
+        },
+      ];
+    },
+    [toggleVerification, toggleFeatured, showToast]
+  );
+
   return (
     <div className='flex h-full min-h-0 flex-row items-stretch overflow-hidden'>
       <div className='flex-1 min-h-0 overflow-hidden min-w-0'>
@@ -637,6 +745,7 @@ export function AdminCreatorProfilesUnified({
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
+              getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               rowHeight={52}
               minWidth='960px'

@@ -2,7 +2,7 @@
 
 import { Badge, Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Users } from 'lucide-react';
+import { Copy, Mail, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
@@ -10,6 +10,7 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { ActionsCell } from '@/components/admin/table/atoms/ActionsCell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
+import { type ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { UserActionsMenu } from '@/components/admin/UserActionsMenu';
 import {
@@ -147,6 +148,39 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     return 'group hover:bg-base dark:hover:bg-surface-2';
   }, []);
 
+  // Context menu items for right-click
+  const getContextMenuItems = useCallback(
+    (user: AdminUserRow): ContextMenuItemType[] => {
+      return [
+        {
+          id: 'copy-email',
+          label: 'Copy Email',
+          icon: <Mail className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(user.email);
+          },
+        },
+        {
+          id: 'copy-id',
+          label: 'Copy User ID',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(user.id);
+          },
+        },
+        {
+          id: 'copy-clerk-id',
+          label: 'Copy Clerk ID',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(user.clerkId);
+          },
+        },
+      ];
+    },
+    []
+  );
+
   return (
     <AdminTableShell
       toolbar={
@@ -245,6 +279,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           }
           getRowId={row => row.id}
           getRowClassName={getRowClassName}
+          getContextMenuItems={getContextMenuItems}
           enableVirtualization={true}
           rowHeight={60}
           minWidth='960px'
