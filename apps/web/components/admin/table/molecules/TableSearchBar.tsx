@@ -44,7 +44,9 @@ export function TableSearchBar({
       <Input
         type='search'
         value={localValue}
-        onChange={e => setLocalValue(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+          setLocalValue(e.target.value)
+        }
         placeholder={placeholder}
         className='pl-9 h-9 text-sm'
       />
