@@ -3,6 +3,8 @@
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
+import { DashboardErrorFallback } from '@/components/atoms/DashboardErrorFallback';
+import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 
 const DashboardAudienceTable = dynamic(
@@ -153,20 +155,22 @@ export function DashboardAudienceClient({
   );
 
   return (
-    <div data-testid='dashboard-audience-client'>
-      <DashboardAudienceTable
-        mode={mode}
-        rows={initialRows}
-        total={total}
-        page={page}
-        pageSize={pageSize}
-        sort={sort}
-        direction={direction}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
-        onSortChange={handleSortChange}
-        profileUrl={profileUrl}
-      />
-    </div>
+    <QueryErrorBoundary fallback={DashboardErrorFallback}>
+      <div data-testid='dashboard-audience-client'>
+        <DashboardAudienceTable
+          mode={mode}
+          rows={initialRows}
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          sort={sort}
+          direction={direction}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          onSortChange={handleSortChange}
+          profileUrl={profileUrl}
+        />
+      </div>
+    </QueryErrorBoundary>
   );
 }
