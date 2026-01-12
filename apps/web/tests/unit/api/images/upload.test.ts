@@ -17,7 +17,7 @@ const {
   mockInsert: vi.fn(),
   mockUpdate: vi.fn(),
   mockSelect: vi.fn(),
-  mockEq: vi.fn(),
+  mockEq: vi.fn(() => 'eq-result'),
   sharpMock: vi.fn(),
   sharpMetadataMock: vi.fn(),
 }));
@@ -93,6 +93,7 @@ vi.mock('@/lib/db', () => {
       insert: mockInsert,
       update: mockUpdate,
     },
+    eq: mockEq,
     profilePhotos: {
       id: 'id',
       userId: 'user_id',
@@ -108,10 +109,6 @@ vi.mock('@/lib/db', () => {
     },
   };
 });
-
-vi.mock('drizzle-orm', () => ({
-  eq: mockEq,
-}));
 
 vi.mock('@/lib/cache', () => ({
   invalidateAvatarCache: vi.fn().mockResolvedValue(undefined),

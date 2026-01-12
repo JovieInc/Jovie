@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import {
   extractUsernameFromLabel,
@@ -48,6 +49,8 @@ interface SocialLinksCellProps {
 /**
  * SocialLinksCell - Display social media links as pills
  *
+ * Memoized for performance in virtualized tables to prevent unnecessary re-renders.
+ *
  * Features:
  * - Platform-branded pills with usernames
  * - Click to open in new tab
@@ -63,7 +66,7 @@ interface SocialLinksCellProps {
  * />
  * ```
  */
-export function SocialLinksCell({
+export const SocialLinksCell = React.memo(function SocialLinksCell({
   links,
   maxLinks = 3,
   className,
@@ -128,4 +131,4 @@ export function SocialLinksCell({
       })}
     </div>
   );
-}
+});
