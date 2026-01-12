@@ -172,11 +172,11 @@ export function ReleaseProviderMatrix({
                     )}
                   >
                     <tr>
-                      <th className='w-[220px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
+                      <th className='w-[220px] border-b border-subtle px-4 py-3 text-left text-xs font-medium text-tertiary-token sm:px-6'>
                         <button
                           type='button'
                           onClick={() => toggleSort('title')}
-                          className='group inline-flex items-center gap-1.5 hover:text-primary-token transition-colors'
+                          className='group -mx-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-surface-2 hover:text-primary-token'
                         >
                           Release
                           <Icon
@@ -197,11 +197,11 @@ export function ReleaseProviderMatrix({
                           />
                         </button>
                       </th>
-                      <th className='w-[120px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
+                      <th className='w-[120px] border-b border-subtle px-4 py-3 text-left text-xs font-medium text-tertiary-token sm:px-6'>
                         <button
                           type='button'
                           onClick={() => toggleSort('releaseDate')}
-                          className='group inline-flex items-center gap-1.5 hover:text-primary-token transition-colors'
+                          className='group -mx-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-surface-2 hover:text-primary-token'
                         >
                           Released
                           <Icon
@@ -222,13 +222,13 @@ export function ReleaseProviderMatrix({
                           />
                         </button>
                       </th>
-                      <th className='w-[140px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
-                        <span className='line-clamp-1'>Smart Link</span>
+                      <th className='w-[140px] border-b border-subtle px-4 py-3 text-left text-xs font-medium text-tertiary-token sm:px-6'>
+                        <span className='line-clamp-1'>Smart link</span>
                       </th>
                       {primaryProviders.map(provider => (
                         <th
                           key={provider}
-                          className='border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'
+                          className='border-b border-subtle px-4 py-3 text-left text-xs font-medium text-tertiary-token sm:px-6'
                         >
                           <div className='flex items-center gap-2'>
                             <span
@@ -245,7 +245,7 @@ export function ReleaseProviderMatrix({
                           </div>
                         </th>
                       ))}
-                      <th className='w-[100px] border-b border-subtle px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
+                      <th className='w-[100px] border-b border-subtle px-4 py-3 text-right text-xs font-medium text-tertiary-token sm:px-6'>
                         <span className='line-clamp-1'>Actions</span>
                       </th>
                     </tr>
