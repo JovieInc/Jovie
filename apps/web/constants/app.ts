@@ -33,6 +33,8 @@ export const DSPS = {
   iheartradio: 'iheartradio',
 } as const;
 export const DEFAULT_PROFILE_TAGLINE = 'Artist';
+/** Fallback username when creator profile is not found */
+export const UNKNOWN_ARTIST = 'Unknown Artist';
 export const PAGE_SUBTITLES = {
   profile: 'Artist',
   tip: 'Tip with Venmo',
