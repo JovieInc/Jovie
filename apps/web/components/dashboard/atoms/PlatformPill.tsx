@@ -171,7 +171,13 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         tabIndex={isInteractive ? 0 : undefined}
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
-        title={compact ? `${platformName}: ${primaryText}` : undefined}
+        title={
+          compact
+            ? platformName === primaryText
+              ? primaryText
+              : `${platformName}: ${primaryText}`
+            : undefined
+        }
         className={cn(
           'group relative inline-flex items-center rounded-full border text-xs font-medium',
           'border-[var(--pill-border)] hover:border-[var(--pill-border-hover)]',
@@ -180,7 +186,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           'transition-all duration-200',
           compact
             ? 'size-7 justify-center p-0'
-            : 'max-w-full gap-1.5 px-2 py-0.5 min-h-[28px]',
+            : 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
           isInteractive &&
             'hover:bg-[var(--pill-bg-hover)] dark:hover:bg-[var(--pill-bg-hover)]',
           isInteractive
@@ -225,7 +231,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
               <SocialIcon platform={platformIcon} className='h-4 w-4' />
             </span>
             {/* Hover expansion: show text */}
-            <span className='absolute left-full ml-2 hidden group-hover:inline-flex items-center gap-1.5 rounded-full border border-[var(--pill-border)] bg-surface-1 dark:bg-surface-1/60 px-2 py-0.5 text-xs font-medium text-secondary-token whitespace-nowrap shadow-lg z-10'>
+            <span className='pointer-events-none absolute left-full ml-2 hidden group-hover:inline-flex items-center gap-1.5 rounded-full border border-[var(--pill-border)] bg-surface-1 dark:bg-surface-1/60 px-2 py-0.5 text-xs font-medium text-secondary-token whitespace-nowrap shadow-lg z-10'>
               <span
                 className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5'
                 style={{ ...iconChipStyle }}
