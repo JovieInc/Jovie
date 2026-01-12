@@ -4,30 +4,56 @@ import type { ReactNode } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 
+/**
+ * A single action item in the context menu
+ */
 export interface ContextMenuAction {
+  /** Unique identifier for the action */
   id: string;
+  /** Display label for the action */
   label: string;
+  /** Optional icon element to display before the label */
   icon?: ReactNode;
+  /** Callback function to execute when the action is clicked */
   onClick: () => void;
+  /** Whether this action is destructive (e.g., delete, remove). Uses red styling. */
   destructive?: boolean;
+  /** Whether this action is disabled and cannot be clicked */
   disabled?: boolean;
 }
 
+/**
+ * A submenu containing multiple actions
+ * @deprecated Not yet fully supported - will be flattened to regular actions
+ */
 export interface ContextMenuSubmenu {
+  /** Unique identifier for the submenu */
   id: string;
+  /** Display label for the submenu */
   label: string;
+  /** Optional icon element to display before the label */
   icon?: ReactNode;
+  /** Array of actions within this submenu */
   actions: ContextMenuAction[];
 }
 
+/**
+ * Union type representing all possible context menu item types
+ */
 export type ContextMenuItemType =
   | ContextMenuAction
   | { type: 'separator' }
   | ContextMenuSubmenu;
 
+/**
+ * Props for TableContextMenu component
+ */
 export interface TableContextMenuProps {
+  /** React children to wrap with context menu functionality */
   children: ReactNode;
+  /** Array of menu items to display in the context menu */
   items: ContextMenuItemType[];
+  /** Whether the context menu is disabled */
   disabled?: boolean;
 }
 
@@ -88,7 +114,13 @@ export function convertContextMenuItems(
     }
 
     if (isSubmenu(item)) {
-      // TODO: Implement submenu support in TableActionMenuItem
+      // TODO: Implement nested submenu support in TableActionMenuItem
+      // Context: Currently TableActionMenuItem only supports flat menu structures.
+      // We need to extend TableActionMenuItem type to support nested submenus.
+      // This would require:
+      // 1. Add submenu support to TableActionMenu component
+      // 2. Update TableActionMenuItem type to include optional submenu array
+      // 3. Update menu rendering logic to handle nested menus
       // For now, flatten submenu items into regular actions with prefixed labels
       console.warn(
         `Submenu "${item.label}" is not yet supported - flattening to regular items`
