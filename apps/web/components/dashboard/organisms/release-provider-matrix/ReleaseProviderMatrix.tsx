@@ -261,6 +261,7 @@ export function ReleaseProviderMatrix({
                         onEdit={openEditor}
                         onAddUrl={handleAddUrl}
                         isAddingUrl={isSaving}
+                        artistName={artistName}
                       />
                     ))}
                   </tbody>
