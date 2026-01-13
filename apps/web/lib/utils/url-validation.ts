@@ -123,16 +123,23 @@ function isPrivateIp(ip: string): boolean {
 }
 
 /**
+ * Create validation error result.
+ * Eliminates duplication in error return statements.
+ */
+function createValidationError(error: string): UrlValidationResult {
+  return { valid: false, error };
+}
+
+/**
  * Validate a URL for use as a social link
  * Returns an error message if invalid, undefined if valid
  */
 export function validateSocialLinkUrl(url: string): UrlValidationResult {
   // Check length
   if (url.length > MAX_URL_LENGTH) {
-    return {
-      valid: false,
-      error: `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`,
-    };
+    return createValidationError(
+      `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`
+    );
   }
 
   // Parse the URL
@@ -140,46 +147,39 @@ export function validateSocialLinkUrl(url: string): UrlValidationResult {
   try {
     parsed = new URL(url);
   } catch {
-    return {
-      valid: false,
-      error: 'Invalid URL format',
-    };
+    return createValidationError('Invalid URL format');
   }
 
   const protocol = parsed.protocol.toLowerCase();
 
   // Check for dangerous protocols
   if (DANGEROUS_PROTOCOLS.includes(protocol)) {
-    return {
-      valid: false,
-      error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
-    };
+    return createValidationError(
+      `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`
+    );
   }
 
   // Only allow http and https
   if (protocol !== 'http:' && protocol !== 'https:') {
-    return {
-      valid: false,
-      error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
-    };
+    return createValidationError(
+      `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`
+    );
   }
 
   // Check for private/internal hostnames
   const hostname = parsed.hostname.toLowerCase();
   if (isPrivateHostname(hostname)) {
-    return {
-      valid: false,
-      error: 'URLs pointing to internal/private addresses are not allowed',
-    };
+    return createValidationError(
+      'URLs pointing to internal/private addresses are not allowed'
+    );
   }
 
   // Check for IP addresses that are private
   // This catches cases where someone uses an IP directly
   if (isPrivateIp(hostname)) {
-    return {
-      valid: false,
-      error: 'URLs pointing to internal/private IP addresses are not allowed',
-    };
+    return createValidationError(
+      'URLs pointing to internal/private IP addresses are not allowed'
+    );
   }
 
   // Check for common internal domains
@@ -189,10 +189,9 @@ export function validateSocialLinkUrl(url: string): UrlValidationResult {
     hostname.endsWith('.localhost') ||
     hostname.endsWith('.localdomain')
   ) {
-    return {
-      valid: false,
-      error: 'URLs pointing to internal domains are not allowed',
-    };
+    return createValidationError(
+      'URLs pointing to internal domains are not allowed'
+    );
   }
 
   // Check for metadata endpoints (cloud provider security)
@@ -201,10 +200,9 @@ export function validateSocialLinkUrl(url: string): UrlValidationResult {
     hostname === 'metadata.google.internal' ||
     hostname.includes('metadata')
   ) {
-    return {
-      valid: false,
-      error: 'URLs pointing to cloud metadata endpoints are not allowed',
-    };
+    return createValidationError(
+      'URLs pointing to cloud metadata endpoints are not allowed'
+    );
   }
 
   return { valid: true };
