@@ -9,8 +9,8 @@ import {
   vi,
 } from 'vitest';
 
-vi.mock('@/hooks/useBillingStatus', () => ({
-  useBillingStatus: vi.fn(),
+vi.mock('@/lib/queries', () => ({
+  useBillingStatusQuery: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -42,8 +42,8 @@ vi.mock('@/lib/analytics', () => ({
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
-import { useBillingStatus } from '@/hooks/useBillingStatus';
 import { track } from '@/lib/analytics';
+import { useBillingStatusQuery } from '@/lib/queries';
 
 const flushMicrotasks = async () => {
   await act(async () => {
@@ -52,7 +52,7 @@ const flushMicrotasks = async () => {
   });
 };
 
-const mockUseBillingStatus = vi.mocked(useBillingStatus);
+const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
 const mockUseUser = vi.mocked(useUser);
 const mockUseClerk = vi.mocked(useClerk);
 const mockUseRouter = vi.mocked(useRouter);
@@ -91,7 +91,7 @@ describe('UserButton billing actions', () => {
       push: pushMock,
     } as any);
 
-    mockUseBillingStatus.mockReset();
+    mockUseBillingStatusQuery.mockReset();
 
     Object.defineProperty(window, 'location', {
       value: { href: '' },
@@ -111,13 +111,11 @@ describe('UserButton billing actions', () => {
   it('offers a direct upgrade checkout when the user is not on Pro', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/test';
 
-    mockUseBillingStatus.mockReturnValue({
-      isPro: false,
-      plan: null,
-      hasStripeCustomer: false,
-      loading: false,
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
       error: null,
-    });
+    } as any);
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -166,13 +164,11 @@ describe('UserButton billing actions', () => {
   it('opens the Stripe billing portal for Pro users', async () => {
     const portalUrl = 'https://billing.stripe.com/session/test';
 
-    mockUseBillingStatus.mockReturnValue({
-      isPro: true,
-      plan: 'pro',
-      hasStripeCustomer: true,
-      loading: false,
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
       error: null,
-    });
+    } as any);
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -183,7 +179,9 @@ describe('UserButton billing actions', () => {
 
     fireEvent.click(screen.getByText('Adele Adkins'));
 
-    fireEvent.click(screen.getByText('Manage billing'));
+    // Wait for dropdown to render
+    const manageBillingButton = await screen.findByText('Manage billing');
+    fireEvent.click(manageBillingButton);
 
     await flushMicrotasks();
 

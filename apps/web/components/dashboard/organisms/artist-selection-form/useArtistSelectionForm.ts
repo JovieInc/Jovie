@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useArtistSearch } from '@/lib/hooks/useArtistSearch';
+import { useArtistSearchQuery } from '@/lib/queries';
 import type {
   ComboboxOption,
   PendingClaim,
@@ -29,7 +29,7 @@ export function useArtistSelectionForm(): UseArtistSelectionFormReturn {
     error: searchError,
     search: searchArtists,
     clear: clearResults,
-  } = useArtistSearch();
+  } = useArtistSearchQuery();
 
   const isLoading = searchState === 'loading';
 

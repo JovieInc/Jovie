@@ -5,13 +5,14 @@ import { CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import { useBillingStatus } from '@/hooks/useBillingStatus';
+import { useBillingStatusQuery } from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 export function SettingsBillingSection() {
   const router = useRouter();
-  const billingStatus = useBillingStatus();
+  const { data: billingData, isLoading: billingLoading } =
+    useBillingStatusQuery();
   const [isBillingLoading, setIsBillingLoading] = useState(false);
 
   const handleBilling = async () => {
@@ -31,11 +32,11 @@ export function SettingsBillingSection() {
         </p>
         <Button
           onClick={handleBilling}
-          loading={isBillingLoading || billingStatus.loading}
+          loading={isBillingLoading || billingLoading}
           className={SETTINGS_BUTTON_CLASS}
           variant='primary'
         >
-          {billingStatus.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
+          {billingData?.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
         </Button>
       </div>
     </DashboardCard>

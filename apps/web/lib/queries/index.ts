@@ -66,6 +66,13 @@ export { QueryErrorBoundary } from './QueryErrorBoundary';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
 export {
+  type ArtistSearchState,
+  type SpotifyArtistResult,
+  type UseArtistSearchQueryOptions,
+  type UseArtistSearchQueryReturn,
+  useArtistSearchQuery,
+} from './useArtistSearchQuery';
+export {
   type BillingStatusData,
   useBillingStatusQuery,
 } from './useBillingStatusQuery';
@@ -81,3 +88,8 @@ export {
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
 } from './useDashboardProfileQuery';
+export {
+  type SuggestionsQueryResult,
+  type UseSuggestionsQueryOptions,
+  useSuggestionsQuery,
+} from './useSuggestionsQuery';
