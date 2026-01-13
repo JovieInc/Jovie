@@ -74,8 +74,8 @@ export function calculateDelay(
   // If server provided Retry-After, respect it
   if (retryAfter !== undefined && retryAfter > 0) {
     const serverDelay = retryAfter * 1000;
-    // Cap at maxDelay
-    return Math.min(serverDelay, config.maxDelay);
+    // Cap at maxDelay and ensure non-negative
+    return Math.max(0, Math.min(serverDelay, config.maxDelay));
   }
 
   // Calculate exponential backoff
@@ -86,8 +86,8 @@ export function calculateDelay(
   const jitterRange = exponentialDelay * config.jitter;
   const jitter = Math.random() * jitterRange * 2 - jitterRange;
 
-  // Cap at maxDelay
-  return Math.min(exponentialDelay + jitter, config.maxDelay);
+  // Cap at maxDelay and ensure non-negative
+  return Math.max(0, Math.min(exponentialDelay + jitter, config.maxDelay));
 }
 
 /**
@@ -107,7 +107,8 @@ function isErrorRetryable(error: unknown, config: RetryConfig): boolean {
   }
 
   // Check for network errors
-  if (error instanceof TypeError && error.message.includes('fetch')) {
+  if (error instanceof TypeError) {
+    // Network errors from fetch are typically TypeErrors across runtimes.
     return true;
   }
 
@@ -252,6 +253,8 @@ export async function retryAsync<T>(
 // Spotify-specific Retry Configuration
 // ============================================================================
 
+const SPOTIFY_RETRYABLE_STATUSES = [429, 500, 502, 503, 504] as const;
+
 /**
  * Default retry configuration optimized for Spotify API.
  */
@@ -261,7 +264,7 @@ export const SPOTIFY_RETRY_CONFIG: Partial<RetryConfig> = {
   maxDelay: 10_000, // Cap at 10 seconds
   backoffMultiplier: 2,
   jitter: 0.2, // 20% jitter
-  retryableStatuses: [429, 500, 502, 503, 504],
+  retryableStatuses: Array.from(SPOTIFY_RETRYABLE_STATUSES),
   isRetryable: error => {
     // Retry on rate limit errors (message-based detection)
     if (error instanceof Error && error.message.includes('rate limit')) {
@@ -281,8 +284,9 @@ export const SPOTIFY_RETRY_CONFIG: Partial<RetryConfig> = {
     // Check for HTTP status codes (important: this was missing before)
     if (error instanceof Error && 'status' in error) {
       const status = (error as Error & { status: number }).status;
-      const retryableStatuses = [429, 500, 502, 503, 504];
-      return retryableStatuses.includes(status);
+      return SPOTIFY_RETRYABLE_STATUSES.includes(
+        status as (typeof SPOTIFY_RETRYABLE_STATUSES)[number]
+      );
     }
 
     return false;

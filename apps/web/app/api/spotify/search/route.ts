@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
-import { sanitizeImageUrl } from '@/lib/spotify/sanitize';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 
 // API routes should be dynamic
@@ -197,7 +196,7 @@ export async function GET(request: NextRequest) {
       id: artist.spotifyId,
       name: artist.name,
       url: buildSpotifyArtistUrl(artist.spotifyId),
-      imageUrl: sanitizeImageUrl(artist.imageUrl) ?? undefined,
+      imageUrl: artist.imageUrl ?? undefined,
       followers: artist.followerCount,
       popularity: artist.popularity,
       // Spotify doesn't expose verified status via search API

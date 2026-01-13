@@ -122,6 +122,7 @@ export class CircuitBreaker {
 
   /**
    * Check if the circuit allows execution.
+   * Note: May transition state from OPEN to HALF_OPEN if reset timeout has elapsed.
    */
   canExecute(): boolean {
     const now = Date.now();

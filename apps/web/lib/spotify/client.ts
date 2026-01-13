@@ -255,7 +255,9 @@ class SpotifyClientManager {
                 const error = spotifyApiError(errorDetails, errorCode);
                 if (retryAfter) {
                   // Type-safe way to attach retryAfter property
-                  Object.assign(error, { retryAfter: parseInt(retryAfter, 10) });
+                  Object.assign(error, {
+                    retryAfter: parseInt(retryAfter, 10),
+                  });
                 }
 
                 throw error;
