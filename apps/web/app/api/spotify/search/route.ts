@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
 import { sanitizeImageUrl } from '@/lib/spotify/sanitize';
@@ -63,13 +64,6 @@ function getClientIp(request: NextRequest): string {
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   );
-}
-
-/**
- * Build Spotify artist URL from artist ID
- */
-function buildSpotifyArtistUrl(artistId: string): string {
-  return `https://open.spotify.com/artist/${artistId}`;
 }
 
 interface RateLimitResult {

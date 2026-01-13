@@ -161,15 +161,16 @@ export async function importReleasesFromSpotify(
             result.failed++;
             const message =
               error instanceof Error ? error.message : 'Unknown error';
+            const sanitizedAlbumName = sanitizeName(album.name);
             result.errors.push(
-              `Failed to import "${sanitizeName(album.name)}": ${message}`
+              `Failed to import "${sanitizedAlbumName}": ${message}`
             );
 
             Sentry.captureException(error, {
               tags: { source: 'spotify_import' },
               extra: {
                 albumId: album.id,
-                albumName: album.name,
+                albumName: sanitizedAlbumName,
                 creatorProfileId,
               },
             });

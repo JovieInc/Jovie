@@ -166,14 +166,16 @@ export async function withRetry<T>(
   const mergedConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
   let lastError: Error | undefined;
   let totalDelay = 0;
+  let actualAttempts = 0;
 
   for (let attempt = 0; attempt <= mergedConfig.maxRetries; attempt++) {
+    actualAttempts = attempt + 1;
     try {
       const data = await fn();
       return {
         success: true,
         data,
-        attempts: attempt + 1,
+        attempts: actualAttempts,
         totalDelay,
       };
     } catch (error) {
@@ -195,7 +197,7 @@ export async function withRetry<T>(
       totalDelay += delay;
 
       console.log('[Spotify Retry] Retrying request', {
-        attempt: attempt + 1,
+        attempt: actualAttempts,
         maxRetries: mergedConfig.maxRetries,
         delay,
         error: lastError.message,
@@ -208,7 +210,7 @@ export async function withRetry<T>(
   return {
     success: false,
     error: lastError,
-    attempts: mergedConfig.maxRetries + 1,
+    attempts: actualAttempts,
     totalDelay,
   };
 }
@@ -261,7 +263,7 @@ export const SPOTIFY_RETRY_CONFIG: Partial<RetryConfig> = {
   jitter: 0.2, // 20% jitter
   retryableStatuses: [429, 500, 502, 503, 504],
   isRetryable: error => {
-    // Retry on rate limit errors
+    // Retry on rate limit errors (message-based detection)
     if (error instanceof Error && error.message.includes('rate limit')) {
       return true;
     }
@@ -274,6 +276,13 @@ export const SPOTIFY_RETRY_CONFIG: Partial<RetryConfig> = {
     // Retry on timeout
     if (error instanceof DOMException && error.name === 'AbortError') {
       return true;
+    }
+
+    // Check for HTTP status codes (important: this was missing before)
+    if (error instanceof Error && 'status' in error) {
+      const status = (error as Error & { status: number }).status;
+      const retryableStatuses = [429, 500, 502, 503, 504];
+      return retryableStatuses.includes(status);
     }
 
     return false;

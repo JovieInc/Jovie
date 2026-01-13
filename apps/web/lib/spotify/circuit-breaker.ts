@@ -166,6 +166,13 @@ export class CircuitBreaker {
 
   /**
    * Record a failed call.
+   *
+   * Note: This method is not fully concurrency-safe for multiple simultaneous calls.
+   * While JavaScript is single-threaded, async operations can interleave. In practice,
+   * this is low-risk because:
+   * - Operations are fast and circuit breaker is conservative
+   * - Worst case is slightly inaccurate failure count, which self-corrects
+   * - Circuit breaker will still prevent cascading failures
    */
   private onFailure(): void {
     this.totalFailures++;
@@ -240,15 +247,9 @@ export class CircuitBreaker {
 
   /**
    * Get the current state.
+   * Note: This is a pure getter. Auto-transition logic is handled in canExecute().
    */
   getState(): CircuitState {
-    // Check for auto-transition from OPEN to HALF_OPEN
-    if (
-      this.state === 'OPEN' &&
-      Date.now() - this.lastStateChange >= this.config.resetTimeout
-    ) {
-      this.transitionTo('HALF_OPEN');
-    }
     return this.state;
   }
 
