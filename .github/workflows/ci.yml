@@ -1256,6 +1256,14 @@ jobs:
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
 
+      - name: Run migrations for Smoke DB
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: ${{ github.ref_name }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
       - name: Cache Playwright Browsers
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:

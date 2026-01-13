@@ -13,6 +13,17 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
+const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+const baseHostname = (() => {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return '';
+  }
+})();
+const isMarketingBaseUrl =
+  baseHostname === 'meetjovie.com' || baseHostname === 'www.meetjovie.com';
+
 /**
  * Public Smoke Tests - No Authentication Required
  *
@@ -138,6 +149,11 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // PUBLIC PROFILE TESTS
   // =========================================================================
   test.describe('Public Profile', () => {
+    test.skip(
+      isMarketingBaseUrl,
+      `Public profile smoke is not supported on ${baseHostname}`
+    );
+
     test('loads and displays creator name', async ({ page }, testInfo) => {
       const { getContext, cleanup } = setupPageMonitoring(page);
 
@@ -153,8 +169,13 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
         const isTemporarilyUnavailable = pageTitle.includes(
           'temporarily unavailable'
         );
+        const isNotFound = pageTitle
+          .toLowerCase()
+          .includes('profile not found');
 
         if (status === 200 && !isTemporarilyUnavailable) {
+          expect(isNotFound, 'Expected profile to exist').toBe(false);
+
           // Verify page title contains creator name
           await expect(page).toHaveTitle(/Dua Lipa/i, {
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -226,25 +247,18 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
         const isTemporarilyUnavailable = pageTitle.includes(
           'temporarily unavailable'
         );
+        const isNotFound = pageTitle
+          .toLowerCase()
+          .includes('profile not found');
 
         if (status === 200 && !isTemporarilyUnavailable) {
-          // At least one music platform link should be visible.
-          // Avoid text filtering because the UI may render icon-only links.
-          const dspLinks = page.locator(
-            [
-              'a[href*="open.spotify.com"]',
-              'a[href*="spotify.com"]',
-              'a[href*="music.apple.com"]',
-              'a[href*="apple.com"]',
-              'a[href*="youtube.com"]',
-              'a[href*="youtu.be"]',
-              'a[href*="amazon.com"]',
-              'a[href*="tidal.com"]',
-              'a[href*="deezer.com"]',
-            ].join(', ')
+          expect(isNotFound, 'Expected profile to exist').toBe(false);
+
+          const dspButtons = page.locator(
+            'button[aria-label^="Open in"], button:has-text("Open in")'
           );
 
-          await expect(dspLinks.first()).toBeVisible({
+          await expect(dspButtons.first()).toBeVisible({
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
         } else {
