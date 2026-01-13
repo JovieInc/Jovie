@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { normalizeEmail } from '@/lib/utils/email';
 
 interface SendInviteDialogProps {
   profile: AdminCreatorProfileRow | null;
@@ -41,7 +42,7 @@ export function SendInviteDialog({
     setError(null);
     setSuccess(false);
 
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedEmail = normalizeEmail(email);
 
     if (!trimmedEmail) {
       setError('Please enter an email address');
