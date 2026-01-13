@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import {
   buildSpotifyAlbumUrl,
   generateReleaseSlug,
@@ -9,6 +10,12 @@ import {
   type SpotifyAlbum,
   type SpotifyAlbumFull,
 } from '@/lib/spotify';
+import {
+  sanitizeImageUrl,
+  sanitizeName,
+  sanitizeText,
+} from '@/lib/spotify/sanitize';
+import { spotifyArtistIdSchema } from '@/lib/validation/schemas/spotify';
 import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
@@ -17,6 +24,16 @@ import {
   upsertRelease,
   upsertTrack,
 } from './queries';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Maximum number of releases to import in a single operation */
+const MAX_RELEASES_PER_IMPORT = 200;
+
+/** Maximum number of tracks per release */
+const MAX_TRACKS_PER_RELEASE = 100;
 
 export interface SpotifyImportResult {
   success: boolean;
@@ -40,6 +57,12 @@ export interface SpotifyImportOptions {
 
 /**
  * Import all releases from a Spotify artist profile into the database
+ *
+ * Security:
+ * - Validates Spotify artist ID format
+ * - Sanitizes all imported data
+ * - Limits number of releases per import
+ * - Tracks errors with Sentry
  */
 export async function importReleasesFromSpotify(
   creatorProfileId: string,
@@ -62,92 +85,167 @@ export async function importReleasesFromSpotify(
     errors: [],
   };
 
-  try {
-    // 1. Fetch all albums from Spotify
-    const spotifyAlbums = await getSpotifyArtistAlbums(spotifyArtistId, {
-      includeGroups,
-      market,
+  // Validate Spotify artist ID before making any API calls
+  const idValidation = spotifyArtistIdSchema.safeParse(spotifyArtistId);
+  if (!idValidation.success) {
+    result.errors.push('Invalid Spotify artist ID format');
+    Sentry.captureMessage('Invalid Spotify artist ID in import', {
+      level: 'warning',
+      extra: { spotifyArtistId, creatorProfileId },
     });
-
-    if (spotifyAlbums.length === 0) {
-      result.success = true;
-      result.releases = await getReleasesForProfile(creatorProfileId);
-      return result;
-    }
-
-    // 2. Get full album details (includes tracks and UPC)
-    const albumIds = spotifyAlbums.map(a => a.id);
-    const fullAlbums = includeTracks
-      ? await getSpotifyAlbums(albumIds, market)
-      : [];
-
-    // Create a map for quick lookup
-    const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
-    for (const album of fullAlbums) {
-      fullAlbumMap.set(album.id, album);
-    }
-
-    // 3. Import each album
-    for (const album of spotifyAlbums) {
-      try {
-        const fullAlbum = fullAlbumMap.get(album.id);
-        await importSingleRelease(creatorProfileId, album, fullAlbum);
-        result.imported++;
-      } catch (error) {
-        result.failed++;
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
-        result.errors.push(`Failed to import "${album.name}": ${message}`);
-        console.error(`Failed to import album ${album.id}:`, error);
-      }
-    }
-
-    // 4. Discover cross-platform links
-    if (discoverLinks && includeTracks) {
-      // Get the imported releases to discover links
-      const importedReleases = await getReleasesForProfile(creatorProfileId);
-
-      for (const release of importedReleases) {
-        try {
-          // Get existing provider IDs to skip
-          const existingProviders = release.providerLinks.map(
-            l => l.providerId
-          );
-
-          await discoverLinksForRelease(release.id, existingProviders, {
-            skipExisting: true,
-            storefront: market.toLowerCase(),
-          });
-        } catch (error) {
-          // Don't fail the whole import if discovery fails
-          console.debug(`Discovery failed for ${release.title}:`, error);
-        }
-      }
-    }
-
-    // 5. Fetch the final state
-    result.releases = await getReleasesForProfile(creatorProfileId);
-    result.success = result.failed === 0;
-
-    return result;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    result.errors.push(`Import failed: ${message}`);
-    console.error('Spotify import failed:', error);
     return result;
   }
+
+  // Validate creator profile ID
+  if (!creatorProfileId || typeof creatorProfileId !== 'string') {
+    result.errors.push('Invalid creator profile ID');
+    return result;
+  }
+
+  return Sentry.startSpan(
+    { op: 'spotify.import', name: 'Import releases from Spotify' },
+    async span => {
+      span.setAttribute('spotify.artist_id', spotifyArtistId);
+      span.setAttribute('creator_profile_id', creatorProfileId);
+
+      try {
+        // 1. Fetch all albums from Spotify
+        const spotifyAlbums = await getSpotifyArtistAlbums(spotifyArtistId, {
+          includeGroups,
+          market,
+        });
+
+        if (spotifyAlbums.length === 0) {
+          result.success = true;
+          result.releases = await getReleasesForProfile(creatorProfileId);
+          return result;
+        }
+
+        // Safety limit: cap number of releases
+        const albumsToImport = spotifyAlbums.slice(0, MAX_RELEASES_PER_IMPORT);
+        if (spotifyAlbums.length > MAX_RELEASES_PER_IMPORT) {
+          console.warn(
+            `[Spotify Import] Truncating ${spotifyAlbums.length} releases to ${MAX_RELEASES_PER_IMPORT}`
+          );
+          Sentry.captureMessage('Spotify import truncated due to limit', {
+            level: 'info',
+            extra: {
+              totalReleases: spotifyAlbums.length,
+              limit: MAX_RELEASES_PER_IMPORT,
+              spotifyArtistId,
+            },
+          });
+        }
+
+        span.setAttribute('spotify.album_count', albumsToImport.length);
+
+        // 2. Get full album details (includes tracks and UPC)
+        const albumIds = albumsToImport.map(a => a.id);
+        const fullAlbums = includeTracks
+          ? await getSpotifyAlbums(albumIds, market)
+          : [];
+
+        // Create a map for quick lookup
+        const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
+        for (const album of fullAlbums) {
+          fullAlbumMap.set(album.id, album);
+        }
+
+        // 3. Import each album
+        for (const album of albumsToImport) {
+          try {
+            const fullAlbum = fullAlbumMap.get(album.id);
+            await importSingleRelease(creatorProfileId, album, fullAlbum);
+            result.imported++;
+          } catch (error) {
+            result.failed++;
+            const message =
+              error instanceof Error ? error.message : 'Unknown error';
+            const sanitizedAlbumName = sanitizeName(album.name);
+            result.errors.push(
+              `Failed to import "${sanitizedAlbumName}": ${message}`
+            );
+
+            Sentry.captureException(error, {
+              tags: { source: 'spotify_import' },
+              extra: {
+                albumId: album.id,
+                albumName: sanitizedAlbumName,
+                creatorProfileId,
+              },
+            });
+
+            console.error(`Failed to import album ${album.id}:`, error);
+          }
+        }
+
+        // 4. Discover cross-platform links
+        if (discoverLinks && includeTracks) {
+          // Get the imported releases to discover links
+          const importedReleases =
+            await getReleasesForProfile(creatorProfileId);
+
+          for (const release of importedReleases) {
+            try {
+              // Get existing provider IDs to skip
+              const existingProviders = release.providerLinks.map(
+                l => l.providerId
+              );
+
+              await discoverLinksForRelease(release.id, existingProviders, {
+                skipExisting: true,
+                storefront: market.toLowerCase(),
+              });
+            } catch (error) {
+              // Don't fail the whole import if discovery fails
+              console.debug(`Discovery failed for ${release.title}:`, error);
+            }
+          }
+        }
+
+        // 5. Fetch the final state
+        result.releases = await getReleasesForProfile(creatorProfileId);
+        result.success = result.failed === 0;
+
+        span.setAttribute('spotify.imported_count', result.imported);
+        span.setAttribute('spotify.failed_count', result.failed);
+
+        return result;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+        result.errors.push(`Import failed: ${message}`);
+
+        Sentry.captureException(error, {
+          tags: { source: 'spotify_import' },
+          extra: { spotifyArtistId, creatorProfileId },
+        });
+
+        console.error('Spotify import failed:', error);
+        return result;
+      }
+    }
+  );
 }
 
 /**
  * Import a single release from Spotify data
+ *
+ * Security:
+ * - Sanitizes all text fields (title, label, artist names)
+ * - Validates and sanitizes image URLs
+ * - Limits track count per release
  */
 async function importSingleRelease(
   creatorProfileId: string,
   album: SpotifyAlbum,
   fullAlbum?: SpotifyAlbumFull
 ): Promise<void> {
-  // Generate slug from title and Spotify ID
-  const slug = generateReleaseSlug(album.name, album.id);
+  // Sanitize album name before use
+  const sanitizedTitle = sanitizeName(album.name);
+
+  // Generate slug from sanitized title and Spotify ID
+  const slug = generateReleaseSlug(sanitizedTitle, album.id);
 
   // Determine release type
   // Spotify doesn't distinguish EPs, so we infer from track count
@@ -166,19 +264,30 @@ async function importSingleRelease(
     album.release_date_precision
   );
 
-  // Get best artwork
-  const artworkUrl = getBestSpotifyImage(album.images);
+  // Get best artwork and sanitize URL
+  const rawArtworkUrl = getBestSpotifyImage(album.images);
+  const artworkUrl = rawArtworkUrl ? sanitizeImageUrl(rawArtworkUrl) : null;
 
-  // Upsert the release
+  // Sanitize label if present
+  const sanitizedLabel = fullAlbum?.label
+    ? sanitizeText(fullAlbum.label, 200)
+    : null;
+
+  // Sanitize UPC (alphanumeric only, max 20 chars)
+  const sanitizedUpc = fullAlbum?.external_ids?.upc
+    ? fullAlbum.external_ids.upc.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)
+    : null;
+
+  // Upsert the release with sanitized data
   const release = await upsertRelease({
     creatorProfileId,
-    title: album.name,
+    title: sanitizedTitle,
     slug,
     releaseType,
     releaseDate,
-    label: fullAlbum?.label ?? null,
-    upc: fullAlbum?.external_ids?.upc ?? null,
-    totalTracks: album.total_tracks,
+    label: sanitizedLabel,
+    upc: sanitizedUpc,
+    totalTracks: Math.min(album.total_tracks, MAX_TRACKS_PER_RELEASE),
     isExplicit: false, // Will be updated from tracks if available
     artworkUrl,
     sourceType: 'ingested',
@@ -187,7 +296,7 @@ async function importSingleRelease(
       spotifyUri: album.uri,
       spotifyArtists: album.artists.map(a => ({
         id: a.id,
-        name: a.name,
+        name: sanitizeName(a.name),
       })),
       importedAt: new Date().toISOString(),
     },
@@ -207,24 +316,42 @@ async function importSingleRelease(
   if (fullAlbum?.tracks?.items) {
     let hasExplicit = false;
 
-    for (const track of fullAlbum.tracks.items) {
+    // Limit tracks per release for safety
+    const tracksToImport = fullAlbum.tracks.items.slice(
+      0,
+      MAX_TRACKS_PER_RELEASE
+    );
+
+    for (const track of tracksToImport) {
       if (track.explicit) {
         hasExplicit = true;
       }
 
-      const trackSlug = generateReleaseSlug(track.name, track.id);
+      // Sanitize track title
+      const sanitizedTrackTitle = sanitizeName(track.name);
+      const trackSlug = generateReleaseSlug(sanitizedTrackTitle, track.id);
+
+      // Sanitize ISRC (alphanumeric only, max 12 chars)
+      const sanitizedIsrc = track.external_ids?.isrc
+        ? track.external_ids.isrc.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)
+        : null;
+
+      // Sanitize preview URL
+      const sanitizedPreviewUrl = track.preview_url
+        ? sanitizeSpotifyPreviewUrl(track.preview_url)
+        : null;
 
       await upsertTrack({
         releaseId: release.id,
         creatorProfileId,
-        title: track.name,
+        title: sanitizedTrackTitle,
         slug: trackSlug,
-        trackNumber: track.track_number,
-        discNumber: track.disc_number,
-        durationMs: track.duration_ms,
+        trackNumber: Math.max(1, Math.min(track.track_number, 999)),
+        discNumber: Math.max(1, Math.min(track.disc_number, 99)),
+        durationMs: Math.max(0, Math.min(track.duration_ms, 60 * 60 * 1000)), // Max 1 hour
         isExplicit: track.explicit,
-        isrc: track.external_ids?.isrc ?? null,
-        previewUrl: track.preview_url,
+        isrc: sanitizedIsrc,
+        previewUrl: sanitizedPreviewUrl,
         sourceType: 'ingested',
         metadata: {
           spotifyId: track.id,
@@ -237,11 +364,32 @@ async function importSingleRelease(
     if (hasExplicit) {
       await upsertRelease({
         creatorProfileId,
-        title: album.name,
+        title: sanitizedTitle,
         slug,
         isExplicit: true,
       });
     }
+  }
+}
+
+/**
+ * Sanitize a Spotify preview URL
+ * Only allows URLs from Spotify CDN domains
+ */
+function sanitizeSpotifyPreviewUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    // Only allow Spotify CDN domains for preview URLs
+    if (
+      parsed.hostname.endsWith('.scdn.co') ||
+      parsed.hostname.endsWith('.spotifycdn.com')
+    ) {
+      parsed.protocol = 'https:';
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
