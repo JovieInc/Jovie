@@ -50,16 +50,17 @@ type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      const [row] = await db
-        .select({ profile: creatorProfiles })
+      // Get the user's profile
+      const [userProfile] = await db
+        .select({
+          profile: creatorProfiles,
+        })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      const profile = row?.profile;
-
-      if (!profile) {
+      if (!userProfile) {
         return NextResponse.json(
           { error: "We couldn't find your profile." },
           { status: 404, headers: NO_STORE_HEADERS }
@@ -67,7 +68,7 @@ export async function GET() {
       }
 
       return NextResponse.json(
-        { profile },
+        { profile: userProfile.profile },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
