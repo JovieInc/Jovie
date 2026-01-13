@@ -136,7 +136,8 @@ describe('UserButton billing actions', () => {
 
     render(<UserButton showUserInfo />);
 
-    fireEvent.click(screen.getByText('Adele Adkins'));
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+    fireEvent.pointerDown(trigger);
     await flushMicrotasks();
 
     fireEvent.click(await screen.findByText('Upgrade to Pro'));
@@ -182,7 +183,8 @@ describe('UserButton billing actions', () => {
 
     render(<UserButton showUserInfo />);
 
-    fireEvent.click(screen.getByText('Adele Adkins'));
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+    fireEvent.pointerDown(trigger);
     await flushMicrotasks();
 
     fireEvent.click(await screen.findByText('Manage billing'));
