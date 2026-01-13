@@ -5,6 +5,7 @@ import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
@@ -81,6 +82,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           navigator.clipboard.writeText(user.clerkId);
+          toast.success('Clerk ID copied', { duration: 2000 });
         },
       });
 
@@ -92,6 +94,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         onClick: () => {
           if (user.email) {
             navigator.clipboard.writeText(user.email);
+            toast.success('Email copied', { duration: 2000 });
           }
         },
         disabled: !user.email,
@@ -104,6 +107,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           navigator.clipboard.writeText(user.id);
+          toast.success('User ID copied', { duration: 2000 });
         },
       });
 

@@ -3,11 +3,10 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
-  SortableColumnKey,
+  type SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
@@ -19,9 +18,9 @@ import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -57,14 +56,6 @@ const ContactSidebar = dynamic(
   }
 );
 
-function useOptionalTableMeta() {
-  try {
-    return useTableMeta();
-  } catch {
-    return null;
-  }
-}
-
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
   page,
@@ -76,7 +67,7 @@ export function AdminCreatorProfilesWithSidebar({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
-  const { showToast } = useToast();
+  const notifications = useNotifications();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -95,12 +86,6 @@ export function AdminCreatorProfilesWithSidebar({
     null
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const tableMetaCtx = useOptionalTableMeta();
-  const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => {}),
-    [tableMetaCtx]
-  );
 
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -206,41 +191,10 @@ export function AdminCreatorProfilesWithSidebar({
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
-      setSelectedId(profilesWithActions[0]!.id);
+      setSelectedId(profilesWithActions[0]?.id);
       setDraftContact(null);
     }
   }, [sidebarOpen, selectedId, profilesWithActions, setDraftContact]);
-
-  React.useEffect(() => {
-    const toggle = () => {
-      setSidebarOpen(prev => {
-        const next = !prev;
-        if (next && !selectedId && filteredProfiles[0]) {
-          setSelectedId(filteredProfiles[0]!.id);
-          setDraftContact(null);
-        }
-        return next;
-      });
-    };
-
-    setTableMeta({
-      rowCount: filteredProfiles.length,
-      toggle,
-      rightPanelWidth:
-        sidebarOpen && Boolean(effectiveContact) ? CONTACT_PANEL_WIDTH : 0,
-    });
-
-    return () => {
-      setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
-    };
-  }, [
-    filteredProfiles,
-    selectedId,
-    setTableMeta,
-    sidebarOpen,
-    effectiveContact,
-    setDraftContact,
-  ]);
 
   return (
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
@@ -339,10 +293,9 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle verification',
                               result.error
                             );
-                            showToast({
-                              type: 'error',
-                              message: `Failed to update verification status${result.error ? `: ${result.error}` : ''}`,
-                            });
+                            notifications.error(
+                              `Failed to update verification status${result.error ? `: ${result.error}` : ''}`
+                            );
                           }
                         }}
                         onToggleFeatured={async () => {
@@ -355,10 +308,9 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle featured',
                               result.error
                             );
-                            showToast({
-                              type: 'error',
-                              message: `Failed to update featured status${result.error ? `: ${result.error}` : ''}`,
-                            });
+                            notifications.error(
+                              `Failed to update featured status${result.error ? `: ${result.error}` : ''}`
+                            );
                           }
                         }}
                         onToggleMarketing={async () => {
@@ -371,10 +323,9 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle marketing',
                               result.error
                             );
-                            showToast({
-                              type: 'error',
-                              message: `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`,
-                            });
+                            notifications.error(
+                              `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`
+                            );
                           }
                         }}
                         onSendInvite={
@@ -442,10 +393,7 @@ export function AdminCreatorProfilesWithSidebar({
         onOpenChange={setInviteDialogOpen}
         onSuccess={() => {
           setProfileToInvite(null);
-          showToast({
-            type: 'success',
-            message: 'Invite created successfully',
-          });
+          notifications.success('Invite created successfully');
         }}
       />
     </div>

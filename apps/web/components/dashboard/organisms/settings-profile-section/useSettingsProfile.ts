@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { debounce } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import type { ProfileFormData, ProfileSaveStatus } from './types';
@@ -30,8 +30,7 @@ export function useSettingsProfile({
   onArtistUpdate,
   onRefresh,
 }: UseSettingsProfileOptions): UseSettingsProfileReturn {
-  const { showToast } = useToast();
-
+  const notifications = useNotifications();
   const [formData, setFormData] = useState<ProfileFormData>({
     username: artist.handle || '',
     displayName: artist.name || '',
@@ -119,7 +118,7 @@ export function useSettingsProfile({
         }
 
         if (warning) {
-          showToast({ type: 'warning', message: warning });
+          notifications.warning(warning);
         }
       } catch (error) {
         if (onArtistUpdate) {
@@ -133,10 +132,10 @@ export function useSettingsProfile({
           error instanceof Error && error.message
             ? error.message
             : 'Failed to update profile photo';
-        showToast({ type: 'error', message });
+        notifications.error(message);
       }
     },
-    [artist, onArtistUpdate, showToast]
+    [artist, notifications, onArtistUpdate]
   );
 
   const saveProfile = useCallback(
@@ -212,10 +211,10 @@ export function useSettingsProfile({
             ? error.message
             : 'Failed to update profile';
         setProfileSaveStatus({ saving: false, success: false, error: message });
-        showToast({ type: 'error', message });
+        notifications.error(message);
       }
     },
-    [artist, onArtistUpdate, onRefresh, showToast]
+    [artist, notifications, onArtistUpdate, onRefresh]
   );
 
   useEffect(() => {

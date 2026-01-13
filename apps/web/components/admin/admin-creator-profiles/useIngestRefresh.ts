@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { IngestRefreshStatus } from './types';
 
 interface UseIngestRefreshOptions {
@@ -23,7 +23,7 @@ export function useIngestRefresh({
   onRefreshComplete,
 }: UseIngestRefreshOptions): UseIngestRefreshReturn {
   const router = useRouter();
-  const { showToast } = useToast();
+  const notifications = useNotifications();
   const [ingestRefreshStatuses, setIngestRefreshStatuses] = useState<
     Record<string, IngestRefreshStatus>
   >({});
@@ -51,11 +51,11 @@ export function useIngestRefresh({
           throw new Error(payload.error ?? 'Failed to queue ingestion');
         }
 
-        setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'success' }));
-        showToast({
-          type: 'success',
-          message: 'Ingestion refresh queued',
-        });
+        setIngestRefreshStatuses(prev => ({
+          ...prev,
+          [profileId]: 'success',
+        }));
+        notifications.success('Ingestion refresh queued');
         router.refresh();
 
         if (selectedId === profileId && onRefreshComplete) {
@@ -63,17 +63,17 @@ export function useIngestRefresh({
         }
       } catch (error) {
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
-        showToast({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Refresh failed',
-        });
+        notifications.handleError(error);
       } finally {
         window.setTimeout(() => {
-          setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'idle' }));
+          setIngestRefreshStatuses(prev => ({
+            ...prev,
+            [profileId]: 'idle',
+          }));
         }, 2200);
       }
     },
-    [onRefreshComplete, router, selectedId, showToast]
+    [notifications, onRefreshComplete, router, selectedId]
   );
 
   return {

@@ -2,31 +2,20 @@
 
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import {
   getNextSort,
-  SortableColumnKey,
+  type SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useIngestRefresh } from './useIngestRefresh';
-import { CONTACT_PANEL_WIDTH } from './utils';
-
-function useOptionalTableMeta() {
-  try {
-    return useTableMeta();
-  } catch {
-    return null;
-  }
-}
 
 export function useAdminCreatorProfiles({
   profiles: initialProfiles,
@@ -38,7 +27,6 @@ export function useAdminCreatorProfiles({
   basePath = '/app/admin/creators',
 }: Omit<AdminCreatorProfilesWithSidebarProps, 'mode'>) {
   const router = useRouter();
-  const { showToast } = useToast();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -57,12 +45,6 @@ export function useAdminCreatorProfiles({
     null
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const tableMetaCtx = useOptionalTableMeta();
-  const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => {}),
-    [tableMetaCtx]
-  );
 
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -162,45 +144,13 @@ export function useAdminCreatorProfiles({
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
-      setSelectedId(profilesWithActions[0]!.id);
+      setSelectedId(profilesWithActions[0]?.id);
       setDraftContact(null);
     }
   }, [sidebarOpen, selectedId, profilesWithActions, setDraftContact]);
 
-  React.useEffect(() => {
-    const toggle = () => {
-      setSidebarOpen(prev => {
-        const next = !prev;
-        if (next && !selectedId && filteredProfiles[0]) {
-          setSelectedId(filteredProfiles[0]!.id);
-          setDraftContact(null);
-        }
-        return next;
-      });
-    };
-
-    setTableMeta({
-      rowCount: filteredProfiles.length,
-      toggle,
-      rightPanelWidth:
-        sidebarOpen && Boolean(effectiveContact) ? CONTACT_PANEL_WIDTH : 0,
-    });
-
-    return () => {
-      setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
-    };
-  }, [
-    filteredProfiles,
-    selectedId,
-    setTableMeta,
-    sidebarOpen,
-    effectiveContact,
-    setDraftContact,
-  ]);
-
   return {
     router,
-    showToast,
     profilesWithActions,
     verificationStatuses,
     toggleVerification,

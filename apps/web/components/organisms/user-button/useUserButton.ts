@@ -2,7 +2,7 @@
 
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { toast } from 'sonner';
 import { useBillingStatus } from '@/hooks/useBillingStatus';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
@@ -34,7 +34,6 @@ export function useUserButton({
 }: UseUserButtonProps): UseUserButtonReturn {
   const { isLoaded, user } = useUser();
   const { signOut } = useClerk();
-  const { showToast } = useToast();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const billingStatus = useBillingStatus();
@@ -51,19 +50,17 @@ export function useUserButton({
 
   useEffect(() => {
     if (billingStatus.error && !billingErrorNotifiedRef.current) {
-      showToast({
-        type: 'error',
-        message:
-          "We couldn't confirm your current plan just now. Billing actions may be temporarily unavailable.",
-        duration: 6000,
-      });
+      toast.error(
+        "Couldn't confirm your plan. Billing actions may be unavailable.",
+        { duration: 6000, id: 'billing-status-error' }
+      );
       billingErrorNotifiedRef.current = true;
     }
 
     if (!billingStatus.error) {
       billingErrorNotifiedRef.current = false;
     }
-  }, [billingStatus.error, showToast]);
+  }, [billingStatus.error]);
 
   // User display info - upgrade OAuth avatar to high resolution
   const userImageUrl = useMemo(

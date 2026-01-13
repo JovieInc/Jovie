@@ -7,6 +7,7 @@ import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
@@ -23,6 +24,7 @@ export function DashboardAnalyticsCards({
   range = '7d',
   refreshSignal,
 }: DashboardAnalyticsCardsProps) {
+  const notifications = useNotifications();
   const lastRefreshSignalRef = useRef<number>(
     typeof refreshSignal === 'number' ? refreshSignal : 0
   );
@@ -60,7 +62,7 @@ export function DashboardAnalyticsCards({
     const step = (now: number) => {
       const t = Math.min(1, (now - startTime) / duration);
       // easeOutCubic
-      const eased = 1 - Math.pow(1 - t, 3);
+      const eased = 1 - (1 - t) ** 3;
       const nextValue = Math.round(
         startValue + (endValue - startValue) * eased
       );
@@ -73,7 +75,7 @@ export function DashboardAnalyticsCards({
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, displayProfileViews]);
 
   const profileViewsLabel = useMemo(() => {
     const value = displayProfileViews;
@@ -141,9 +143,11 @@ export function DashboardAnalyticsCards({
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
+      notifications.success('Copied to clipboard', { duration: 2000 });
       setTimeout(() => setCopied(false), 1500);
     } catch (e) {
       console.error('Copy failed', e);
+      notifications.error('Failed to copy');
     }
   };
 
