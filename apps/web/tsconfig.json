@@ -47,6 +47,7 @@
     "node_modules",
     "supabase/functions",
     ".next/dev/**/*",
+    ".next/types/validator.ts",
     "vitest.config.ts",
     "vitest.config.fast.ts",
     "**/*.stories.*",
