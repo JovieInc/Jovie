@@ -116,7 +116,7 @@ jobs:
             git fetch origin "${{ github.base_ref }}" --depth=1
             # Use diff-filter=d to exclude deleted files (biome can't lint deleted files)
             # Include .mts/.mjs extensions for ESM config files
-            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' | tr '\n' ' ')
+            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' | tr '\n' ' ')
             if [ -n "$CHANGED_FILES" ]; then
               echo "Linting changed files only: $CHANGED_FILES"
               pnpm biome ci --reporter=github $CHANGED_FILES
