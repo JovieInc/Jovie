@@ -16,15 +16,20 @@ export function extractDomain(url: string): string {
   }
 }
 
+/**
+ * Sensitive query parameter names that should be removed from URLs before logging.
+ * Prevents accidental exposure of authentication tokens and credentials in logs.
+ */
+const SENSITIVE_PARAMS = ['token', 'key', 'auth', 'password', 'secret'];
+
 export function sanitizeUrlForLogging(url: string): string {
   try {
     const urlObj = new URL(url);
 
-    urlObj.searchParams.delete('token');
-    urlObj.searchParams.delete('key');
-    urlObj.searchParams.delete('auth');
-    urlObj.searchParams.delete('password');
-    urlObj.searchParams.delete('secret');
+    // Remove all sensitive query parameters
+    for (const param of SENSITIVE_PARAMS) {
+      urlObj.searchParams.delete(param);
+    }
 
     return urlObj.toString();
   } catch {
