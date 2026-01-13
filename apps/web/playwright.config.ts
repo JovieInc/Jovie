@@ -11,6 +11,9 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 
+const videoMode: 'off' | 'retain-on-failure' =
+  isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
+
 const webServerCommand = process.env.DATABASE_URL
   ? 'pnpm run dev:local'
   : 'doppler run -- pnpm run dev:local';
@@ -55,7 +58,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3100',
     trace: 'on-first-retry',
-    video: 'retain-on-failure',
+    video: videoMode,
     // Faster navigation timeouts for smoke tests
     navigationTimeout: isSmokeOnly ? 15_000 : 30_000,
     actionTimeout: isSmokeOnly ? 10_000 : 15_000,
