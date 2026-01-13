@@ -14,6 +14,7 @@ import {
 
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { escapeLikePattern } from '@/lib/utils/sql';
 
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
@@ -64,14 +65,6 @@ export interface AdminCreatorProfilesResult {
   page: number;
   pageSize: number;
   total: number;
-}
-
-/**
- * Escapes SQL LIKE/ILIKE pattern special characters.
- * In PostgreSQL, % and _ are wildcards that need escaping for literal matches.
- */
-function escapeLikePattern(input: string): string {
-  return input.replace(/[%_\\]/g, char => `\\${char}`);
 }
 
 function sanitizeSearchInput(rawSearch?: string): string | undefined {

@@ -4,6 +4,7 @@ import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { escapeLikePattern } from '@/lib/utils/sql';
 
 export type AdminUserPlan = 'free' | 'pro';
 
@@ -42,14 +43,6 @@ export interface GetAdminUsersResult {
   total: number;
 }
 
-/**
- * Escapes SQL LIKE/ILIKE pattern special characters.
- * In PostgreSQL, % and _ are wildcards that need escaping for literal matches.
- */
-function escapeLikePattern(input: string): string {
-  return input.replace(/[%_\\]/g, char => `\\${char}`);
-}
-
 function sanitizeSearchInput(rawSearch?: string): string | undefined {
   if (!rawSearch) return undefined;
 
@@ -58,7 +51,6 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
 
   // Enforce a reasonable max length to avoid pathological inputs
   const limited = trimmed.slice(0, 100);
-  if (limited.length === 0) return undefined;
 
   // Escape LIKE pattern special characters for literal matching
   return escapeLikePattern(limited);

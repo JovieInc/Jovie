@@ -68,16 +68,14 @@ export {
   type BillingStatusData,
   useBillingStatusQuery,
 } from './useBillingStatusQuery';
-
-export {
-  type DashboardProfile,
-  useDashboardProfileQuery,
-  useUpdateDashboardProfileMutation,
-} from './useDashboardProfileQuery';
-
 // Admin creator mutations
 export {
   useDeleteCreatorMutation,
   useToggleFeaturedMutation,
   useToggleMarketingMutation,
 } from './useCreatorMutations';
+export {
+  type DashboardProfile,
+  useDashboardProfileQuery,
+  useUpdateDashboardProfileMutation,
+} from './useDashboardProfileQuery';
