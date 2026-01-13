@@ -489,7 +489,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          # Standardized cache key includes playwright config for better invalidation
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -520,8 +521,8 @@ jobs:
 
   ci-build:
     name: Build
-    # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect build output)
-    needs: [ci-typecheck]
+    # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
+    # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Build runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -608,8 +609,8 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests
-    # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect tests)
-    needs: [ci-typecheck]
+    # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
+    # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
     # Unit tests run on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -703,7 +704,8 @@ jobs:
 
   ci-e2e-tests:
     name: E2E Tests
-    needs: [ci-build, neon-db]
+    # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
+    needs: [ci-fast, ci-build, neon-db]
     # E2E runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -786,9 +788,10 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'playwright.config*.ts') }}
+          # Standardized cache key - chromium only for CI (Firefox runs weekly)
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
+            ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -935,8 +938,8 @@ jobs:
           TEST_PERFORMANCE_SUITE="$SUITE" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="$SUITE" --use-baseline
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    # Only needs build - no DB dependencies for fast UI-only PRs
-    needs: [ci-build]
+    # Optimized: needs ci-fast to ensure typecheck/lint passed before deploying preview
+    needs: [ci-fast, ci-build]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1257,7 +1260,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          # Standardized cache key includes playwright config for better invalidation
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1299,7 +1303,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          # Standardized cache key includes playwright config for better invalidation
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
