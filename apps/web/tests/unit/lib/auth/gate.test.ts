@@ -1,13 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockCachedAuth, mockCachedCurrentUser, mockDbSelect, mockDbInsert } =
-  vi.hoisted(() => ({
-    mockCachedAuth: vi.fn(),
-    mockCachedCurrentUser: vi.fn(),
-    mockDbSelect: vi.fn(),
-    mockDbInsert: vi.fn(),
-  }));
+const {
+  mockCachedAuth,
+  mockCachedCurrentUser,
+  mockDbSelect,
+  mockDbInsert,
+  mockEq,
+} = vi.hoisted(() => ({
+  mockCachedAuth: vi.fn(),
+  mockCachedCurrentUser: vi.fn(),
+  mockDbSelect: vi.fn(),
+  mockDbInsert: vi.fn(),
+  mockEq: vi.fn(),
+}));
+
+vi.mock('drizzle-orm', async importOriginal => {
+  const actual = await importOriginal<typeof import('drizzle-orm')>();
+  mockEq.mockImplementation((...args: any[]) => (actual as any).eq(...args));
+  return {
+    ...actual,
+    eq: ((...args: any[]) => mockEq(...args)) as unknown as typeof actual.eq,
+  };
+});
 
 // Mock cached auth functions
 vi.mock('@/lib/auth/cached', () => ({
@@ -493,13 +508,11 @@ describe('gate.ts', () => {
       const { getWaitlistAccess } = await import('@/lib/auth/gate');
       await getWaitlistAccess('  TEST@EXAMPLE.COM  ');
 
-      // Verify the where clause was called
-      expect(whereMock).toHaveBeenCalled();
-      const callArgs = whereMock.mock.calls[0][0];
-      // The where clause receives a SQL expression from eq()
-      // We verify it's a SQL object (Drizzle's eq() return type)
-      expect(callArgs).toBeDefined();
-      expect(typeof callArgs).toBe('object');
+      // Verify the normalized value is passed into Drizzle eq()
+      expect(mockEq).toHaveBeenCalled();
+      expect(mockEq.mock.calls[0]?.[1]).toBe('test@example.com');
+      // And that where() receives the exact SQL expression returned by eq()
+      expect(whereMock).toHaveBeenCalledWith(mockEq.mock.results[0]?.value);
     });
   });
 });

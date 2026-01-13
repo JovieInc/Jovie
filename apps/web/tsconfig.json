@@ -47,6 +47,7 @@
     "node_modules",
     "supabase/functions",
     ".next/dev/**/*",
+    // Next.js auto-generated validator file is noisy/unstable (unused @ts-expect-error); exclude for consistent typecheck.
     ".next/types/validator.ts",
     "vitest.config.ts",
     "vitest.config.fast.ts",
