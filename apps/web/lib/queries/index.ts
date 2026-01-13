@@ -74,3 +74,10 @@ export {
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
 } from './useDashboardProfileQuery';
+
+// Admin creator mutations
+export {
+  useDeleteCreatorMutation,
+  useToggleFeaturedMutation,
+  useToggleMarketingMutation,
+} from './useCreatorMutations';
