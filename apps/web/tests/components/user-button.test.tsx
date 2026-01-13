@@ -9,6 +9,42 @@ import {
   vi,
 } from 'vitest';
 
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  return {
+    ...actual,
+    // Radix DropdownMenu doesn't reliably open in this JSDOM setup.
+    // For these tests we render action items directly so we can exercise
+    // the billing click handlers.
+    CommonDropdown: ({ items, trigger }: { items: any[]; trigger: any }) => (
+      <div>
+        {trigger}
+        <div>
+          {items.map(item => {
+            if (item.type === 'action') {
+              return (
+                <button
+                  key={item.id}
+                  type='button'
+                  disabled={Boolean(item.disabled)}
+                  onClick={item.onClick}
+                >
+                  {item.label}
+                </button>
+              );
+            }
+            if (item.type === 'custom' && typeof item.render === 'function') {
+              return <div key={item.id}>{item.render()}</div>;
+            }
+            return null;
+          })}
+        </div>
+      </div>
+    ),
+  };
+});
+
 vi.mock('@/hooks/useBillingStatus', () => ({
   useBillingStatus: vi.fn(),
 }));
