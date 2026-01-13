@@ -59,61 +59,54 @@ export function parseDate(
 }
 
 /**
+ * Create a date formatter function with automatic null handling.
+ * Eliminates duplication in date formatting functions.
+ *
+ * @param formatter - Intl.DateTimeFormat instance
+ * @param fallback - Value to return for invalid dates (defaults to '—')
+ * @returns Formatting function with null handling
+ */
+function createDateFormatter(
+  formatter: Intl.DateTimeFormat,
+  fallback = '—'
+): (value: string | Date | null | undefined) => string {
+  return (value: string | Date | null | undefined): string => {
+    const date = parseDate(value);
+    if (!date) return fallback;
+    return formatter.format(date);
+  };
+}
+
+/**
  * Format date as short format: "Dec 29, 2024"
  * Used in: blog posts, release dates, admin tables
  */
-export function formatShortDate(
-  value: string | Date | null | undefined
-): string {
-  const date = parseDate(value);
-  if (!date) return '—';
-  return shortDateFormatter.format(date);
-}
+export const formatShortDate = createDateFormatter(shortDateFormatter);
 
 /**
  * Format date as long format: "December 29, 2024"
  * Used in: blog post pages, detailed views
  */
-export function formatLongDate(
-  value: string | Date | null | undefined
-): string {
-  const date = parseDate(value);
-  if (!date) return '—';
-  return longDateFormatter.format(date);
-}
+export const formatLongDate = createDateFormatter(longDateFormatter);
 
 /**
  * Format date without year: "Dec 29"
  * Used in: compact displays, charts
  */
-export function formatShortDateNoYear(
-  value: string | Date | null | undefined
-): string {
-  const date = parseDate(value);
-  if (!date) return '—';
-  return shortDateNoYearFormatter.format(date);
-}
+export const formatShortDateNoYear = createDateFormatter(
+  shortDateNoYearFormatter
+);
 
 /**
  * Format date with time: "Dec 29, 2024, 14:30"
  * Used in: activity logs, waitlist tables, timestamps
  */
-export function formatDateTime(
-  value: string | Date | null | undefined
-): string {
-  const date = parseDate(value);
-  if (!date) return '—';
-  return dateTimeFormatter.format(date);
-}
+export const formatDateTime = createDateFormatter(dateTimeFormatter);
 
 /**
  * Format time only: "14:30"
  */
-export function formatTime(value: string | Date | null | undefined): string {
-  const date = parseDate(value);
-  if (!date) return '—';
-  return timeFormatter.format(date);
-}
+export const formatTime = createDateFormatter(timeFormatter);
 
 /**
  * Format as ISO date string: "2024-12-29"

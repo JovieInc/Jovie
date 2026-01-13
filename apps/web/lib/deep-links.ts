@@ -24,6 +24,33 @@ export interface DeepLinkConfig {
   extractUsername?: (url: string) => string | null;
 }
 
+/**
+ * Creates a URL extractor function from a single regex pattern.
+ * Eliminates duplication across platform extraction functions.
+ */
+function createUrlExtractor(pattern: RegExp): (url: string) => string | null {
+  return (url: string) => {
+    const match = url.match(pattern);
+    return match ? match[1] : null;
+  };
+}
+
+/**
+ * Creates a URL extractor function that tries multiple regex patterns.
+ * Returns the first successful match.
+ */
+function createMultiPatternExtractor(
+  patterns: RegExp[]
+): (url: string) => string | null {
+  return (url: string) => {
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  };
+}
+
 // Social Network Deep Link Configurations
 export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
   instagram: {
@@ -33,10 +60,7 @@ export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://instagram.com/_u/{username}#Intent;package=com.instagram.android;scheme=https;end',
     universalLink: 'https://instagram.com/{username}',
     webFallback: 'https://instagram.com/{username}',
-    extractUsername: (url: string) => {
-      const match = url.match(/instagram\.com\/([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractUsername: createUrlExtractor(/instagram\.com\/([^/?#]+)/),
   },
   tiktok: {
     name: 'TikTok',
@@ -45,10 +69,7 @@ export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://www.tiktok.com/@{username}#Intent;package=com.zhiliaoapp.musically;scheme=https;end',
     universalLink: 'https://www.tiktok.com/@{username}',
     webFallback: 'https://www.tiktok.com/@{username}',
-    extractUsername: (url: string) => {
-      const match = url.match(/tiktok\.com\/@([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractUsername: createUrlExtractor(/tiktok\.com\/@([^/?#]+)/),
   },
   twitter: {
     name: 'Twitter',
@@ -57,10 +78,7 @@ export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://twitter.com/{username}#Intent;package=com.twitter.android;scheme=https;end',
     universalLink: 'https://twitter.com/{username}',
     webFallback: 'https://twitter.com/{username}',
-    extractUsername: (url: string) => {
-      const match = url.match(/twitter\.com\/([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractUsername: createUrlExtractor(/twitter\.com\/([^/?#]+)/),
   },
   youtube: {
     name: 'YouTube',
@@ -69,23 +87,12 @@ export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://www.youtube.com/@{username}#Intent;package=com.google.android.youtube;scheme=https;end',
     universalLink: 'https://www.youtube.com/@{username}',
     webFallback: 'https://www.youtube.com/@{username}',
-    extractUsername: (url: string) => {
-      // Handle both @username and channel/user formats
-      const usernameMatch = url.match(/youtube\.com\/@([^/?#]+)/);
-      if (usernameMatch) return usernameMatch[1];
-
-      const userMatch = url.match(/youtube\.com\/user\/([^/?#]+)/);
-      if (userMatch) return userMatch[1];
-
-      const channelMatch = url.match(/youtube\.com\/channel\/([^/?#]+)/);
-      if (channelMatch) return channelMatch[1];
-
-      return null;
-    },
-    extractId: (url: string) => {
-      const match = url.match(/youtube\.com\/channel\/([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractUsername: createMultiPatternExtractor([
+      /youtube\.com\/@([^/?#]+)/,
+      /youtube\.com\/user\/([^/?#]+)/,
+      /youtube\.com\/channel\/([^/?#]+)/,
+    ]),
+    extractId: createUrlExtractor(/youtube\.com\/channel\/([^/?#]+)/),
   },
   facebook: {
     name: 'Facebook',
@@ -94,10 +101,7 @@ export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://www.facebook.com/{username}#Intent;package=com.facebook.katana;scheme=https;end',
     universalLink: 'https://www.facebook.com/{username}',
     webFallback: 'https://www.facebook.com/{username}',
-    extractUsername: (url: string) => {
-      const match = url.match(/facebook\.com\/([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractUsername: createUrlExtractor(/facebook\.com\/([^/?#]+)/),
   },
 };
 
@@ -110,10 +114,7 @@ export const DSP_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://open.spotify.com/artist/{artistId}#Intent;package=com.spotify.music;scheme=https;end',
     universalLink: 'https://open.spotify.com/artist/{artistId}',
     webFallback: 'https://open.spotify.com/artist/{artistId}',
-    extractId: (url: string) => {
-      const match = url.match(/spotify\.com\/artist\/([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractId: createUrlExtractor(/spotify\.com\/artist\/([^/?#]+)/),
   },
   apple_music: {
     name: 'Apple Music',
@@ -122,12 +123,9 @@ export const DSP_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://music.apple.com/artist/{artistId}#Intent;package=com.apple.android.music;scheme=https;end',
     universalLink: 'https://music.apple.com/artist/{artistId}',
     webFallback: 'https://music.apple.com/artist/{artistId}',
-    extractId: (url: string) => {
-      const match = url.match(
-        /music\.apple\.com\/[^/]+\/artist\/[^/]+\/([^/?#]+)/
-      );
-      return match ? match[1] : null;
-    },
+    extractId: createUrlExtractor(
+      /music\.apple\.com\/[^/]+\/artist\/[^/]+\/([^/?#]+)/
+    ),
   },
   youtube: {
     name: 'YouTube Music',
@@ -136,19 +134,11 @@ export const DSP_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       'intent://music.youtube.com/channel/{channelId}#Intent;package=com.google.android.apps.youtube.music;scheme=https;end',
     universalLink: 'https://music.youtube.com/channel/{channelId}',
     webFallback: 'https://www.youtube.com/@{username}',
-    extractUsername: (url: string) => {
-      const usernameMatch = url.match(/youtube\.com\/@([^/?#]+)/);
-      if (usernameMatch) return usernameMatch[1];
-
-      const userMatch = url.match(/youtube\.com\/user\/([^/?#]+)/);
-      if (userMatch) return userMatch[1];
-
-      return null;
-    },
-    extractId: (url: string) => {
-      const match = url.match(/youtube\.com\/channel\/([^/?#]+)/);
-      return match ? match[1] : null;
-    },
+    extractUsername: createMultiPatternExtractor([
+      /youtube\.com\/@([^/?#]+)/,
+      /youtube\.com\/user\/([^/?#]+)/,
+    ]),
+    extractId: createUrlExtractor(/youtube\.com\/channel\/([^/?#]+)/),
   },
 };
 

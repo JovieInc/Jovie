@@ -6,6 +6,54 @@ import { publicEnv } from '@/lib/env-public';
 import { Artist } from '@/types/db';
 
 /**
+ * Maps image types to their descriptive text templates.
+ * Centralizes image type descriptions to eliminate duplication.
+ */
+const IMAGE_TYPE_DESCRIPTIONS: Record<
+  string,
+  { withArtist: string; generic: string }
+> = {
+  avatar: {
+    withArtist: 'Profile photo',
+    generic: 'Profile photo',
+  },
+  profile: {
+    withArtist: 'Profile photo',
+    generic: 'Profile photo',
+  },
+  cover: {
+    withArtist: 'Cover image',
+    generic: 'Cover image',
+  },
+  artwork: {
+    withArtist: 'Album artwork',
+    generic: 'Album artwork',
+  },
+  icon: {
+    withArtist: 'Icon',
+    generic: 'Icon',
+  },
+};
+
+/**
+ * Get descriptive text for an image type.
+ */
+function getImageTypeDescription(
+  type?: string,
+  artistName?: string
+): string | null {
+  if (!type || !IMAGE_TYPE_DESCRIPTIONS[type]) {
+    return null;
+  }
+
+  const desc = IMAGE_TYPE_DESCRIPTIONS[type];
+  if (artistName) {
+    return `${artistName} - ${desc.withArtist}`;
+  }
+  return desc.generic;
+}
+
+/**
  * Generate SEO-friendly alt text from various sources
  */
 export function generateSEOAltText(
@@ -26,17 +74,8 @@ export function generateSEOAltText(
 
   // Generate contextual alt text based on type and artist name
   if (artistName) {
-    switch (type) {
-      case 'avatar':
-      case 'profile':
-        return `${artistName} - Profile photo`;
-      case 'cover':
-        return `${artistName} - Cover image`;
-      case 'artwork':
-        return `${artistName} - Album artwork`;
-      default:
-        return `${artistName} - Image`;
-    }
+    const typeDesc = getImageTypeDescription(type, artistName);
+    return typeDesc || `${artistName} - Image`;
   }
 
   // Try to extract meaningful info from filename
@@ -98,19 +137,8 @@ function cleanFilename(filename: string): string {
  * Get generic alt text based on image type
  */
 function getGenericAltText(type?: string): string {
-  switch (type) {
-    case 'avatar':
-    case 'profile':
-      return 'Profile photo';
-    case 'cover':
-      return 'Cover image';
-    case 'artwork':
-      return 'Album artwork';
-    case 'icon':
-      return 'Icon';
-    default:
-      return 'Image';
-  }
+  const typeDesc = getImageTypeDescription(type);
+  return typeDesc || 'Image';
 }
 
 /**

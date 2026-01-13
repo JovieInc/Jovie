@@ -11,6 +11,193 @@ import { cn } from '@/lib/utils';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
 
+interface BuildDropdownItemsParams {
+  billingStatus: {
+    loading: boolean;
+    isPro: boolean;
+  };
+  loading: {
+    manageBilling: boolean;
+    upgrade: boolean;
+    signOut: boolean;
+  };
+  userImageUrl: string | undefined;
+  displayName: string;
+  userInitials: string;
+  formattedUsername: string | null;
+  SIDEBAR_ITEM_CLASS: string;
+  handleProfile: () => void;
+  handleSettings: () => void;
+  handleManageBilling: () => void;
+  handleUpgrade: () => void;
+  handleSignOut: () => void;
+  setIsFeedbackOpen: (open: boolean) => void;
+}
+
+function buildDropdownItems({
+  billingStatus,
+  loading,
+  userImageUrl,
+  displayName,
+  userInitials,
+  formattedUsername,
+  SIDEBAR_ITEM_CLASS,
+  handleProfile,
+  handleSettings,
+  handleManageBilling,
+  handleUpgrade,
+  handleSignOut,
+  setIsFeedbackOpen,
+}: BuildDropdownItemsParams): CommonDropdownItem[] {
+  const items: CommonDropdownItem[] = [
+    // Profile card
+    {
+      type: 'custom',
+      id: 'profile-card',
+      render: () => (
+        <button
+          type='button'
+          onClick={handleProfile}
+          className='w-full cursor-pointer rounded-lg px-2 py-2 hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
+        >
+          <div className='flex w-full items-center gap-3'>
+            <Avatar
+              src={userImageUrl}
+              alt={displayName || 'User avatar'}
+              name={displayName || userInitials}
+              size='sm'
+              className='shrink-0'
+            />
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-center gap-2'>
+                <span className='truncate text-sm font-medium text-sidebar-foreground'>
+                  {displayName}
+                </span>
+                {billingStatus.isPro && (
+                  <Badge
+                    variant='secondary'
+                    size='sm'
+                    emphasis='subtle'
+                    className='shrink-0 rounded-full px-1.5 py-0 text-[10px] font-medium'
+                  >
+                    Pro
+                  </Badge>
+                )}
+              </div>
+              {formattedUsername && (
+                <p className='truncate text-xs text-sidebar-muted mt-0.5'>
+                  {formattedUsername}
+                </p>
+              )}
+            </div>
+            <Icon
+              name='ExternalLink'
+              className='h-4 w-4 shrink-0 text-sidebar-muted'
+              aria-hidden='true'
+            />
+          </div>
+        </button>
+      ),
+    },
+    { type: 'custom', id: 'spacer-1', render: () => <div className='h-2' /> },
+    {
+      type: 'action',
+      id: 'settings',
+      label: 'Settings',
+      icon: (
+        <Icon
+          name='Settings'
+          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+        />
+      ),
+      onClick: handleSettings,
+      className: SIDEBAR_ITEM_CLASS,
+    },
+  ];
+
+  // Add billing item based on status
+  if (billingStatus.loading) {
+    items.push({
+      type: 'custom',
+      id: 'billing-loading',
+      render: () => (
+        <div className='cursor-default px-2.5 py-2 text-[13px] h-9'>
+          <div className='flex w-full items-center gap-2.5'>
+            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
+            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
+          </div>
+        </div>
+      ),
+    });
+  } else if (billingStatus.isPro) {
+    items.push({
+      type: 'action',
+      id: 'manage-billing',
+      label: loading.manageBilling ? 'Opening…' : 'Manage billing',
+      icon: (
+        <Icon
+          name='CreditCard'
+          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+        />
+      ),
+      onClick: handleManageBilling,
+      disabled: loading.manageBilling,
+      className: cn(
+        SIDEBAR_ITEM_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-70'
+      ),
+    });
+  } else {
+    items.push({
+      type: 'action',
+      id: 'upgrade',
+      label: loading.upgrade ? 'Opening…' : 'Upgrade to Pro',
+      icon: (
+        <Icon
+          name='Sparkles'
+          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+        />
+      ),
+      onClick: handleUpgrade,
+      disabled: loading.upgrade,
+      className: cn(
+        SIDEBAR_ITEM_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-70'
+      ),
+    });
+  }
+
+  // Add feedback and sign out
+  items.push(
+    {
+      type: 'action',
+      id: 'feedback',
+      label: 'Send feedback',
+      icon: (
+        <Icon
+          name='MessageSquare'
+          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+        />
+      ),
+      onClick: () => setIsFeedbackOpen(true),
+      className: SIDEBAR_ITEM_CLASS,
+    },
+    { type: 'custom', id: 'spacer-2', render: () => <div className='h-2' /> },
+    {
+      type: 'action',
+      id: 'sign-out',
+      label: loading.signOut ? 'Signing out…' : 'Sign out',
+      icon: <Icon name='LogOut' className='h-4 w-4 text-red-400' />,
+      onClick: handleSignOut,
+      disabled: loading.signOut,
+      className:
+        'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 data-[highlighted]:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60',
+    }
+  );
+
+  return items;
+}
+
 export function UserButton({
   artist,
   profileHref,
@@ -91,163 +278,20 @@ export function UserButton({
   const SIDEBAR_ITEM_CLASS =
     'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover data-[highlighted]:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40';
 
-  // Build dropdown items
-  const dropdownItems: CommonDropdownItem[] = [
-    // Profile card (custom item)
-    {
-      type: 'custom',
-      id: 'profile-card',
-      render: () => (
-        <button
-          type='button'
-          onClick={handleProfile}
-          className='w-full cursor-pointer rounded-lg px-2 py-2 hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
-        >
-          <div className='flex w-full items-center gap-3'>
-            <Avatar
-              src={userImageUrl}
-              alt={displayName || 'User avatar'}
-              name={displayName || userInitials}
-              size='sm'
-              className='shrink-0'
-            />
-            <div className='min-w-0 flex-1'>
-              <div className='flex items-center gap-2'>
-                <span className='truncate text-sm font-medium text-sidebar-foreground'>
-                  {displayName}
-                </span>
-                {billingStatus.isPro && (
-                  <Badge
-                    variant='secondary'
-                    size='sm'
-                    emphasis='subtle'
-                    className='shrink-0 rounded-full px-1.5 py-0 text-[10px] font-medium'
-                  >
-                    Pro
-                  </Badge>
-                )}
-              </div>
-              {formattedUsername && (
-                <p className='truncate text-xs text-sidebar-muted mt-0.5'>
-                  {formattedUsername}
-                </p>
-              )}
-            </div>
-            <Icon
-              name='ExternalLink'
-              className='h-4 w-4 shrink-0 text-sidebar-muted'
-              aria-hidden='true'
-            />
-          </div>
-        </button>
-      ),
-    },
-    // Spacer
-    {
-      type: 'custom',
-      id: 'spacer-1',
-      render: () => <div className='h-2' />,
-    },
-    // Settings
-    {
-      type: 'action',
-      id: 'settings',
-      label: 'Settings',
-      icon: (
-        <Icon
-          name='Settings'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
-        />
-      ),
-      onClick: handleSettings,
-      className: SIDEBAR_ITEM_CLASS,
-    },
-  ];
-
-  // Billing item (conditional)
-  if (billingStatus.loading) {
-    dropdownItems.push({
-      type: 'custom',
-      id: 'billing-loading',
-      render: () => (
-        <div className='cursor-default px-2.5 py-2 text-[13px] h-9'>
-          <div className='flex w-full items-center gap-2.5'>
-            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
-            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
-          </div>
-        </div>
-      ),
-    });
-  } else if (billingStatus.isPro) {
-    dropdownItems.push({
-      type: 'action',
-      id: 'manage-billing',
-      label: loading.manageBilling ? 'Opening…' : 'Manage billing',
-      icon: (
-        <Icon
-          name='CreditCard'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
-        />
-      ),
-      onClick: handleManageBilling,
-      disabled: loading.manageBilling,
-      className: cn(
-        SIDEBAR_ITEM_CLASS,
-        'disabled:cursor-not-allowed disabled:opacity-70'
-      ),
-    });
-  } else {
-    dropdownItems.push({
-      type: 'action',
-      id: 'upgrade',
-      label: loading.upgrade ? 'Opening…' : 'Upgrade to Pro',
-      icon: (
-        <Icon
-          name='Sparkles'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
-        />
-      ),
-      onClick: handleUpgrade,
-      disabled: loading.upgrade,
-      className: cn(
-        SIDEBAR_ITEM_CLASS,
-        'disabled:cursor-not-allowed disabled:opacity-70'
-      ),
-    });
-  }
-
-  // Feedback
-  dropdownItems.push({
-    type: 'action',
-    id: 'feedback',
-    label: 'Send feedback',
-    icon: (
-      <Icon
-        name='MessageSquare'
-        className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
-      />
-    ),
-    onClick: () => setIsFeedbackOpen(true),
-    className: SIDEBAR_ITEM_CLASS,
-  });
-
-  // Spacer before sign out
-  dropdownItems.push({
-    type: 'custom',
-    id: 'spacer-2',
-    render: () => <div className='h-2' />,
-  });
-
-  // Sign out
-  dropdownItems.push({
-    type: 'action',
-    id: 'sign-out',
-    label: loading.signOut ? 'Signing out…' : 'Sign out',
-    icon: <Icon name='LogOut' className='h-4 w-4 text-red-400' />,
-    onClick: handleSignOut,
-    disabled: loading.signOut,
-    className:
-      'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 data-[highlighted]:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60',
+  const dropdownItems = buildDropdownItems({
+    billingStatus,
+    loading,
+    userImageUrl,
+    displayName,
+    userInitials,
+    formattedUsername,
+    SIDEBAR_ITEM_CLASS,
+    handleProfile,
+    handleSettings,
+    handleManageBilling,
+    handleUpgrade,
+    handleSignOut,
+    setIsFeedbackOpen,
   });
 
   // Custom trigger
