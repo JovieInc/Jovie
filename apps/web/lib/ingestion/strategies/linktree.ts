@@ -10,6 +10,7 @@ import {
   detectPlatform,
   normalizeUrl,
 } from '@/lib/utils/platform-detection';
+import { normalizeString } from '@/lib/utils/string-utils';
 import type { ExtractionResult } from '../types';
 import {
   normalizeHandle as baseNormalizeHandle,
@@ -347,7 +348,7 @@ export function extractLinktree(html: string): ExtractionResult {
     if (!rawHref || rawHref.startsWith('#')) continue;
 
     // Normalize and trim to prevent bypass via whitespace/case
-    const normalized = rawHref.trim().toLowerCase();
+    const normalized = normalizeString(rawHref);
 
     // Block dangerous schemes (case-insensitive)
     if (normalized.startsWith('javascript:')) continue;
