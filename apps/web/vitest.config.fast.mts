@@ -41,13 +41,13 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    pool: 'threads', // Use threads instead of forks for better performance
+    // Use forks to keep memory bounded across the full suite
+    // (threads can retain memory across many test files in CI-like runs).
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        // Optimize thread pool
-        minThreads: 1,
-        maxThreads: 1,
-        useAtomics: true,
+      forks: {
+        minForks: 1,
+        maxForks: 1,
       },
     },
 
