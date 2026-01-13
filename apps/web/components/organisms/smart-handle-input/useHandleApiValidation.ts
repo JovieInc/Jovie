@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  type ClientValidationResult,
-  debounce,
-} from '@/lib/validation/client-username';
+/**
+ * Handle API Validation Hook
+ *
+ * Provides debounced handle availability checking using TanStack Pacer
+ * for world-class debouncing with proper async handling and caching.
+ *
+ * @see https://tanstack.com/pacer
+ */
+
+import type { AsyncDebouncerState } from '@tanstack/react-pacer';
+import { useAsyncDebouncer } from '@tanstack/react-pacer';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ClientValidationResult } from '@/lib/validation/client-username';
 import type { HandleValidationState } from './types';
 
 interface UseHandleApiValidationProps {
@@ -11,6 +19,9 @@ interface UseHandleApiValidationProps {
   usernameSuggestions: string[];
   showAvailability: boolean;
 }
+
+const VALIDATION_DEBOUNCE_MS = 500;
+const VALIDATION_TIMEOUT_MS = 5000;
 
 export function useHandleApiValidation({
   value,
@@ -32,116 +43,131 @@ export function useHandleApiValidation({
     handle: string;
     available: boolean;
   } | null>(null);
-  const requestIdRef = useRef(0);
 
-  const debouncedApiValidation = useMemo(
-    () =>
-      debounce(
-        async (
-          handleValue: string,
-          requestId: number,
-          abortController: AbortController
-        ) => {
-          if (!clientValidation.valid) return;
+  // TanStack Pacer async debouncer for handle validation
+  const asyncDebouncer = useAsyncDebouncer(
+    async (handleValue: string) => {
+      if (!clientValidation.valid) return;
 
-          // Check cache first
-          if (lastValidatedRef.current?.handle === handleValue) {
-            const { available } = lastValidatedRef.current;
+      // Check cache first
+      if (lastValidatedRef.current?.handle === handleValue) {
+        const { available } = lastValidatedRef.current;
 
-            setHandleValidation(prev => ({
-              ...prev,
-              available,
-              checking: false,
-              error: available ? null : 'Handle already taken',
-            }));
+        setHandleValidation(prev => ({
+          ...prev,
+          available,
+          checking: false,
+          error: available ? null : 'Handle already taken',
+        }));
 
-            return;
+        return;
+      }
+
+      // Cancel any in-flight request
+      abortControllerRef.current?.abort();
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        abortController.abort();
+      }, VALIDATION_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(
+          `/api/handle/check?handle=${encodeURIComponent(handleValue.toLowerCase())}`,
+          {
+            signal: abortController.signal,
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
           }
+        );
 
-          const timeoutId = setTimeout(() => {
-            abortController.abort();
-          }, 5000);
+        if (abortController.signal.aborted) return;
 
-          try {
-            const response = await fetch(
-              `/api/handle/check?handle=${encodeURIComponent(handleValue.toLowerCase())}`,
-              {
-                signal: abortController.signal,
-                headers: {
-                  Accept: 'application/json',
-                  'Content-Type': 'application/json',
-                },
-              }
-            );
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
 
-            if (
-              abortController.signal.aborted ||
-              requestId !== requestIdRef.current
-            )
-              return;
+        const result = await response.json();
+        const available = !!result.available;
 
-            if (!response.ok) {
-              throw new Error(
-                `HTTP ${response.status}: ${response.statusText}`
-              );
-            }
+        setHandleValidation(prev => ({
+          ...prev,
+          available,
+          checking: false,
+          error: available ? null : result.error || 'Handle already taken',
+        }));
 
-            const result = await response.json();
-            const available = !!result.available;
-
-            setHandleValidation(prev => ({
-              ...prev,
-              available,
-              checking: false,
-              error: available ? null : result.error || 'Handle already taken',
-            }));
-
-            lastValidatedRef.current = { handle: handleValue, available };
-          } catch (error) {
-            if (requestId !== requestIdRef.current) return;
-
-            if (error instanceof Error && error.name === 'AbortError') {
-              if (abortController.signal.aborted) {
-                setHandleValidation(prev => ({
-                  ...prev,
-                  available: false,
-                  checking: false,
-                  error: 'Check timed out - please try again',
-                }));
-              }
-              return;
-            }
-
-            console.error('Handle validation error:', error);
-
-            let errorMessage = 'Network error';
-            if (error instanceof TypeError && error.message.includes('fetch')) {
-              errorMessage = 'Connection failed - check your internet';
-            } else if (error instanceof Error) {
-              errorMessage = error.message.includes('HTTP')
-                ? 'Server error - please try again'
-                : 'Network error';
-            }
-
+        lastValidatedRef.current = { handle: handleValue, available };
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Check if it was a timeout
+          if (abortController.signal.aborted) {
             setHandleValidation(prev => ({
               ...prev,
               available: false,
               checking: false,
-              error: errorMessage,
+              error: 'Check timed out - please try again',
             }));
-
-            lastValidatedRef.current = {
-              handle: handleValue,
-              available: false,
-            };
-          } finally {
-            clearTimeout(timeoutId);
           }
-        },
-        500
-      ),
-    [clientValidation.valid]
+          return;
+        }
+
+        console.error('Handle validation error:', error);
+
+        let errorMessage = 'Network error';
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          errorMessage = 'Connection failed - check your internet';
+        } else if (error instanceof Error) {
+          errorMessage = error.message.includes('HTTP')
+            ? 'Server error - please try again'
+            : 'Network error';
+        }
+
+        setHandleValidation(prev => ({
+          ...prev,
+          available: false,
+          checking: false,
+          error: errorMessage,
+        }));
+
+        lastValidatedRef.current = {
+          handle: handleValue,
+          available: false,
+        };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    {
+      wait: VALIDATION_DEBOUNCE_MS,
+      onError: err => {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+        console.error('Handle validation error:', err);
+        setHandleValidation(prev => ({
+          ...prev,
+          available: false,
+          checking: false,
+          error: 'Validation failed',
+        }));
+      },
+    },
+    (state: AsyncDebouncerState<(handleValue: string) => Promise<void>>) => ({
+      isPending: state.isPending,
+      isExecuting: state.isExecuting,
+    })
   );
+
+  // Cancel function
+  const cancelValidation = useCallback(() => {
+    asyncDebouncer.cancel();
+    abortControllerRef.current?.abort();
+  }, [asyncDebouncer]);
 
   // Update validation state when handle or client validation changes
   useEffect(() => {
@@ -155,10 +181,7 @@ export function useHandleApiValidation({
     }));
 
     if (!clientValidation.valid || value.length < 3 || !showAvailability) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      requestIdRef.current += 1;
+      cancelValidation();
       setHandleValidation(prev => ({
         ...prev,
         checking: false,
@@ -167,15 +190,8 @@ export function useHandleApiValidation({
       return;
     }
 
-    const nextRequestId = requestIdRef.current + 1;
-    requestIdRef.current = nextRequestId;
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    // Cancel any previous validation
+    abortControllerRef.current?.abort();
 
     setHandleValidation(prev => ({
       ...prev,
@@ -183,13 +199,14 @@ export function useHandleApiValidation({
       error: null,
     }));
 
-    debouncedApiValidation(value, nextRequestId, abortController);
+    void asyncDebouncer.maybeExecute(value);
   }, [
     value,
     clientValidation,
     usernameSuggestions,
-    debouncedApiValidation,
+    asyncDebouncer,
     showAvailability,
+    cancelValidation,
   ]);
 
   // Cleanup on unmount
