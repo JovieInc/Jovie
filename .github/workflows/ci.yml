@@ -845,7 +845,7 @@ jobs:
           cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/auth-smoke.spec.ts') != '' }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test

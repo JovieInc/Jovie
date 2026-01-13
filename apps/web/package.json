@@ -32,7 +32,7 @@
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
     "test:e2e:golden-path": "playwright test tests/e2e/golden-path.spec.ts",
     "e2e:smoke": "SMOKE_ONLY=1 playwright test -g @smoke --reporter=line",
-    "e2e:auth-smoke": "SMOKE_ONLY=1 playwright test tests/e2e/auth-smoke.spec.ts --reporter=line",
+    "e2e:auth-smoke": "SMOKE_ONLY=1 playwright test tests/e2e/smoke-auth.spec.ts --reporter=line",
     "e2e:smoke:noauth": "playwright test -g @smoke --config=playwright.config.noauth.ts",
     "e2e:full": "playwright test",
     "e2e:visual": "playwright test tests/e2e/visual-regression.spec.ts",
