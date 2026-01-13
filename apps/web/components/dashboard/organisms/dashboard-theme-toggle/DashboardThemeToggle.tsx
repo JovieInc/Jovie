@@ -25,6 +25,37 @@ function SystemIcon({ className }: { className: string }) {
   );
 }
 
+function LoadingStateWithSystem() {
+  return (
+    <div className='space-y-3'>
+      <div className='animate-pulse motion-reduce:animate-none space-y-3'>
+        <div className='h-4 bg-surface-hover-token rounded w-24' />
+        <div className='h-8 bg-surface-hover-token rounded' />
+      </div>
+    </div>
+  );
+}
+
+function LoadingStateToggle() {
+  return (
+    <div className='flex items-center space-x-3'>
+      <span className='text-sm text-secondary-token'>Light</span>
+      <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-out'>
+        <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out' />
+      </div>
+      <span className='text-sm text-secondary-token'>Dark</span>
+    </div>
+  );
+}
+
+function getThemeIcon(value: string) {
+  if (value === 'light')
+    return <SunIcon className='h-5 w-5 text-secondary-token' />;
+  if (value === 'dark')
+    return <MoonIcon className='h-5 w-5 text-secondary-token' />;
+  return <SystemIcon className='h-5 w-5 text-secondary-token' />;
+}
+
 export function DashboardThemeToggle({
   onThemeChange,
   onThemeSave,
@@ -42,20 +73,9 @@ export function DashboardThemeToggle({
 
   if (!mounted) {
     return showSystemOption ? (
-      <div className='space-y-3'>
-        <div className='animate-pulse motion-reduce:animate-none space-y-3'>
-          <div className='h-4 bg-surface-hover-token rounded w-24'></div>
-          <div className='h-8 bg-surface-hover-token rounded'></div>
-        </div>
-      </div>
+      <LoadingStateWithSystem />
     ) : (
-      <div className='flex items-center space-x-3'>
-        <span className='text-sm text-secondary-token'>Light</span>
-        <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-out'>
-          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out'></span>
-        </div>
-        <span className='text-sm text-secondary-token'>Dark</span>
-      </div>
+      <LoadingStateToggle />
     );
   }
 
@@ -84,13 +104,7 @@ export function DashboardThemeToggle({
               )}
             >
               <span className='mb-1 flex items-center justify-center'>
-                {option.value === 'light' ? (
-                  <SunIcon className='h-5 w-5 text-secondary-token' />
-                ) : option.value === 'dark' ? (
-                  <MoonIcon className='h-5 w-5 text-secondary-token' />
-                ) : (
-                  <SystemIcon className='h-5 w-5 text-secondary-token' />
-                )}
+                {getThemeIcon(option.value)}
               </span>
               <span className='text-xs font-medium'>{option.label}</span>
               {theme === option.value && option.value === 'system' && (

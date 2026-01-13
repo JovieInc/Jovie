@@ -16,6 +16,34 @@ export interface CopyToClipboardButtonProps {
   onCopyError?: () => void;
 }
 
+function getButtonLabel(
+  isSuccess: boolean,
+  isError: boolean,
+  successLabel: string,
+  errorLabel: string,
+  idleLabel: string
+): string {
+  if (isSuccess) return successLabel;
+  if (isError) return errorLabel;
+  return idleLabel;
+}
+
+function getButtonIcon(
+  isSuccess: boolean,
+  isError: boolean,
+  iconName?: string
+): string | undefined {
+  if (isSuccess) return 'Check';
+  if (isError) return 'X';
+  return iconName;
+}
+
+function getStatusMessage(status: 'idle' | 'success' | 'error'): string {
+  if (status === 'success') return 'Profile URL copied to clipboard';
+  if (status === 'error') return 'Failed to copy profile URL';
+  return '';
+}
+
 export function CopyToClipboardButton({
   relativePath,
   idleLabel = 'Copy URL',
@@ -36,12 +64,14 @@ export function CopyToClipboardButton({
     copy(url);
   };
 
-  const currentLabel = isSuccess
-    ? successLabel
-    : isError
-      ? errorLabel
-      : idleLabel;
-  const currentIcon = isSuccess ? 'Check' : isError ? 'X' : iconName;
+  const currentLabel = getButtonLabel(
+    isSuccess,
+    isError,
+    successLabel,
+    errorLabel,
+    idleLabel
+  );
+  const currentIcon = getButtonIcon(isSuccess, isError, iconName);
 
   return (
     <div className='relative'>
@@ -66,11 +96,7 @@ export function CopyToClipboardButton({
       </Button>
       {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for screen reader announcement */}
       <span className='sr-only' aria-live='polite' role='status'>
-        {status === 'success'
-          ? 'Profile URL copied to clipboard'
-          : status === 'error'
-            ? 'Failed to copy profile URL'
-            : ''}
+        {getStatusMessage(status)}
       </span>
     </div>
   );
