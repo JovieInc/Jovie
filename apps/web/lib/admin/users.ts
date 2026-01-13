@@ -4,6 +4,7 @@ import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { escapeLikePattern } from '@/lib/utils/sql';
 
 export type AdminUserPlan = 'free' | 'pro';
 
@@ -48,9 +49,11 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   const trimmed = rawSearch.trim();
   if (trimmed.length === 0) return undefined;
 
-  // Keep this conservative: emails + names.
+  // Enforce a reasonable max length to avoid pathological inputs
   const limited = trimmed.slice(0, 100);
-  return limited.length > 0 ? limited : undefined;
+
+  // Escape LIKE pattern special characters for literal matching
+  return escapeLikePattern(limited);
 }
 
 function derivePlan(row: {
