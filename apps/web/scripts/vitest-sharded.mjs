@@ -34,4 +34,3 @@ runVitestShard('unit+components+contracts', [
   'tests/database.test.ts',
 ]);
 runVitestShard('lib', ['tests/lib', 'lib/**/*.test.ts']);
-
