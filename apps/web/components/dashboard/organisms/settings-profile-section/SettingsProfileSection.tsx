@@ -1,165 +1,165 @@
-"use client";
+'use client';
 
-import { toast } from "sonner";
-import { Input } from "@/components/atoms/Input";
-import { DashboardCard } from "@/components/dashboard/atoms/DashboardCard";
-import { SettingsStatusPill } from "@/components/dashboard/molecules/SettingsStatusPill";
-import { AvatarUploadable } from "@/components/organisms/AvatarUploadable";
-import { APP_URL } from "@/constants/app";
+import { toast } from 'sonner';
+import { Input } from '@/components/atoms/Input';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { APP_URL } from '@/constants/app';
 import {
-	AVATAR_MAX_FILE_SIZE_BYTES,
-	SUPPORTED_IMAGE_MIME_TYPES,
-} from "@/lib/images/config";
-import type { SettingsProfileSectionProps } from "./types";
-import { useSettingsProfile } from "./useSettingsProfile";
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
+import type { SettingsProfileSectionProps } from './types';
+import { useSettingsProfile } from './useSettingsProfile';
 
 export function SettingsProfileSection({
-	artist,
-	onArtistUpdate,
-	onRefresh,
+  artist,
+  onArtistUpdate,
+  onRefresh,
 }: SettingsProfileSectionProps) {
-	const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
-	const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
+  const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
+  const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
 
-	const appDomain = APP_URL.replace(/^https?:\/\//, "");
+  const appDomain = APP_URL.replace(/^https?:\/\//, '');
 
-	const {
-		formData,
-		setFormData,
-		profileSaveStatus,
-		setProfileSaveStatus,
-		handleAvatarUpload,
-		handleAvatarUpdate,
-		debouncedProfileSave,
-	} = useSettingsProfile({
-		artist,
-		onArtistUpdate,
-		onRefresh,
-	});
+  const {
+    formData,
+    setFormData,
+    profileSaveStatus,
+    setProfileSaveStatus,
+    handleAvatarUpload,
+    handleAvatarUpdate,
+    debouncedProfileSave,
+  } = useSettingsProfile({
+    artist,
+    onArtistUpdate,
+    onRefresh,
+  });
 
-	return (
-		<DashboardCard variant="settings" className="relative">
-			{profileSaveStatus.saving ? (
-				<SettingsStatusPill state="saving" className="absolute right-6 top-6" />
-			) : profileSaveStatus.success ? (
-				<SettingsStatusPill state="saved" className="absolute right-6 top-6" />
-			) : null}
-			<div className="flex flex-col gap-6">
-				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<p className="text-sm text-secondary-token">
-							Photo, name, username.
-						</p>
-					</div>
-				</div>
+  return (
+    <DashboardCard variant='settings' className='relative'>
+      {profileSaveStatus.saving ? (
+        <SettingsStatusPill state='saving' className='absolute right-6 top-6' />
+      ) : profileSaveStatus.success ? (
+        <SettingsStatusPill state='saved' className='absolute right-6 top-6' />
+      ) : null}
+      <div className='flex flex-col gap-6'>
+        <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <p className='text-sm text-secondary-token'>
+              Photo, name, username.
+            </p>
+          </div>
+        </div>
 
-				<div className="grid gap-6 lg:grid-cols-[240px,1fr]">
-					<div>
-						<div className="flex justify-center">
-							<AvatarUploadable
-								src={artist.image_url}
-								alt={artist.name || "Profile photo"}
-								name={artist.name || artist.handle}
-								size="display-xl"
-								uploadable
-								showHoverOverlay
-								onUpload={handleAvatarUpload}
-								onSuccess={handleAvatarUpdate}
-								onError={(message) => toast.error(message)}
-								maxFileSize={maxAvatarSize}
-								acceptedTypes={acceptedAvatarTypes}
-								className="mx-auto animate-in fade-in duration-300"
-							/>
-						</div>
-						<p className="text-sm text-secondary text-center mt-3">
-							Drag & drop or click to upload.
-						</p>
-					</div>
+        <div className='grid gap-6 lg:grid-cols-[240px,1fr]'>
+          <div>
+            <div className='flex justify-center'>
+              <AvatarUploadable
+                src={artist.image_url}
+                alt={artist.name || 'Profile photo'}
+                name={artist.name || artist.handle}
+                size='display-xl'
+                uploadable
+                showHoverOverlay
+                onUpload={handleAvatarUpload}
+                onSuccess={handleAvatarUpdate}
+                onError={message => toast.error(message)}
+                maxFileSize={maxAvatarSize}
+                acceptedTypes={acceptedAvatarTypes}
+                className='mx-auto animate-in fade-in duration-300'
+              />
+            </div>
+            <p className='text-sm text-secondary text-center mt-3'>
+              Drag & drop or click to upload.
+            </p>
+          </div>
 
-					<div className="space-y-6">
-						<div>
-							<label
-								htmlFor="username"
-								className="block text-xs font-medium text-primary-token mb-2"
-							>
-								Username
-							</label>
-							<div className="mb-2 text-xs text-secondary-token/70">
-								Used in your profile URL
-							</div>
-							<div className="relative">
-								<div className="flex rounded-lg shadow-sm">
-									<span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary-token text-sm select-none">
-										{appDomain}/
-									</span>
-									<Input
-										type="text"
-										name="username"
-										id="username"
-										data-1p-ignore
-										autoComplete="off"
-										value={formData.username}
-										onChange={(e) => {
-											const nextValue = e.target.value;
-											setFormData((prev) => {
-												const next = { ...prev, username: nextValue };
-												setProfileSaveStatus((s) => ({
-													...s,
-													success: null,
-													error: null,
-												}));
-												debouncedProfileSave({
-													displayName: next.displayName,
-													username: next.username,
-												});
-												return next;
-											});
-										}}
-										onBlur={() => debouncedProfileSave.flush()}
-										placeholder="yourname"
-										className="flex-1 min-w-0"
-										inputClassName="block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors"
-									/>
-								</div>
-							</div>
-						</div>
+          <div className='space-y-6'>
+            <div>
+              <label
+                htmlFor='username'
+                className='block text-xs font-medium text-primary-token mb-2'
+              >
+                Username
+              </label>
+              <div className='mb-2 text-xs text-secondary-token/70'>
+                Used in your profile URL
+              </div>
+              <div className='relative'>
+                <div className='flex rounded-lg shadow-sm'>
+                  <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary-token text-sm select-none'>
+                    {appDomain}/
+                  </span>
+                  <Input
+                    type='text'
+                    name='username'
+                    id='username'
+                    data-1p-ignore
+                    autoComplete='off'
+                    value={formData.username}
+                    onChange={e => {
+                      const nextValue = e.target.value;
+                      setFormData(prev => {
+                        const next = { ...prev, username: nextValue };
+                        setProfileSaveStatus(s => ({
+                          ...s,
+                          success: null,
+                          error: null,
+                        }));
+                        debouncedProfileSave({
+                          displayName: next.displayName,
+                          username: next.username,
+                        });
+                        return next;
+                      });
+                    }}
+                    onBlur={() => debouncedProfileSave.flush()}
+                    placeholder='yourname'
+                    className='flex-1 min-w-0'
+                    inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors'
+                  />
+                </div>
+              </div>
+            </div>
 
-						<div>
-							<label
-								htmlFor="displayName"
-								className="block text-xs font-medium text-primary-token mb-2"
-							>
-								Display Name
-							</label>
-							<Input
-								type="text"
-								name="displayName"
-								id="displayName"
-								value={formData.displayName}
-								onChange={(e) => {
-									const nextValue = e.target.value;
-									setFormData((prev) => {
-										const next = { ...prev, displayName: nextValue };
-										setProfileSaveStatus((s) => ({
-											...s,
-											success: null,
-											error: null,
-										}));
-										debouncedProfileSave({
-											displayName: next.displayName,
-											username: next.username,
-										});
-										return next;
-									});
-								}}
-								onBlur={() => debouncedProfileSave.flush()}
-								placeholder="The name your fans will see"
-								inputClassName="block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors"
-							/>
-						</div>
-					</div>
-				</div>
-			</div>
-		</DashboardCard>
-	);
+            <div>
+              <label
+                htmlFor='displayName'
+                className='block text-xs font-medium text-primary-token mb-2'
+              >
+                Display Name
+              </label>
+              <Input
+                type='text'
+                name='displayName'
+                id='displayName'
+                value={formData.displayName}
+                onChange={e => {
+                  const nextValue = e.target.value;
+                  setFormData(prev => {
+                    const next = { ...prev, displayName: nextValue };
+                    setProfileSaveStatus(s => ({
+                      ...s,
+                      success: null,
+                      error: null,
+                    }));
+                    debouncedProfileSave({
+                      displayName: next.displayName,
+                      username: next.username,
+                    });
+                    return next;
+                  });
+                }}
+                onBlur={() => debouncedProfileSave.flush()}
+                placeholder='The name your fans will see'
+                inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </DashboardCard>
+  );
 }
