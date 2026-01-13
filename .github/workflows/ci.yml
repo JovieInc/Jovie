@@ -687,6 +687,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -763,6 +765,15 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-e2e-migrate:
     name: E2E DB Migrate
@@ -1174,6 +1185,7 @@ jobs:
       - drizzle-migration-guard
       - ci-drizzle-check
       - ci-fast
+      - ci-e2e-smoke
       - ci-pr-neon-migrate
       - ci-build
       - ci-unit-tests
@@ -1191,6 +1203,7 @@ jobs:
           BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
           DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
           E2E_RUN_FULL_CI: ${{ needs.ci-e2e-migrate.outputs.run_full_ci }}
+          E2E_SMOKE_RUN_FULL_CI: ${{ needs.ci-e2e-smoke.outputs.run_full_ci }}
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
           UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
@@ -1286,6 +1299,11 @@ jobs:
                 label: 'Unit Tests',
                 jobName: 'Unit Tests',
                 runFullCi: process.env.UNIT_RUN_FULL_CI
+              },
+              {
+                label: 'E2E Smoke',
+                jobName: 'E2E Smoke (PR Fast Feedback)',
+                runFullCi: process.env.E2E_SMOKE_RUN_FULL_CI
               },
               {
                 label: 'Test Performance Budgets',
