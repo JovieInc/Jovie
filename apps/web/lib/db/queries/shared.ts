@@ -163,7 +163,7 @@ export interface UserRecord {
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;
-  userStatus: string | null;
+  userStatus: string;
   deletedAt: Date | null;
 }
 

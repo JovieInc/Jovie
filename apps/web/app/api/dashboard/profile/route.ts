@@ -50,10 +50,9 @@ type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      // Get the user's profile ID first
+      // Get the user's profile
       const [userProfile] = await db
         .select({
-          profileId: creatorProfiles.id,
           profile: creatorProfiles,
         })
         .from(creatorProfiles)
