@@ -205,3 +205,43 @@ export async function getUserByClerkId(
 
   return user ?? null;
 }
+
+/**
+ * Verify profile ownership without fetching full profile data.
+ *
+ * Lightweight ownership check that returns only the profile ID if the
+ * authenticated user owns the specified profile. Use this when you only
+ * need to verify ownership and don't need other profile fields.
+ *
+ * Security: Returns null if profile doesn't exist OR user doesn't own it.
+ *
+ * @param tx - Database transaction or connection
+ * @param profileId - Profile ID to verify
+ * @param clerkUserId - Authenticated user's Clerk ID
+ * @returns Object with profile ID if owned by user, null otherwise
+ *
+ * @example
+ * ```ts
+ * const profile = await verifyProfileOwnership(db, profileId, clerkUserId);
+ * if (!profile) {
+ *   return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+ * }
+ * // profile.id is now available for queries
+ * ```
+ */
+export async function verifyProfileOwnership(
+  tx: DbType,
+  profileId: string,
+  clerkUserId: string
+): Promise<{ id: string } | null> {
+  const [profile] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .where(
+      and(eq(users.clerkId, clerkUserId), eq(creatorProfiles.id, profileId))
+    )
+    .limit(1);
+
+  return profile ?? null;
+}
