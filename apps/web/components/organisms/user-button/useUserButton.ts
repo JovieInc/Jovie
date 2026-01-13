@@ -3,7 +3,7 @@
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useBillingStatus } from '@/hooks/useBillingStatus';
+import { useBillingStatusQuery } from '@/lib/queries';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
 import { useUserMenuActions } from '../useUserMenuActions';
@@ -15,6 +15,15 @@ export interface UseUserButtonProps {
   settingsHref?: string;
 }
 
+/** Normalized billing status shape for consumers */
+export interface BillingStatus {
+  isPro: boolean;
+  plan: string | null;
+  hasStripeCustomer: boolean;
+  loading: boolean;
+  error: string | null;
+}
+
 export interface UseUserButtonReturn {
   isLoaded: boolean;
   user: ReturnType<typeof useUser>['user'];
@@ -22,7 +31,7 @@ export interface UseUserButtonReturn {
   setIsMenuOpen: (open: boolean) => void;
   isFeedbackOpen: boolean;
   setIsFeedbackOpen: (open: boolean) => void;
-  billingStatus: ReturnType<typeof useBillingStatus>;
+  billingStatus: BillingStatus;
   userInfo: UserDisplayInfo;
   menuActions: ReturnType<typeof useUserMenuActions>;
 }
@@ -36,8 +45,21 @@ export function useUserButton({
   const { signOut } = useClerk();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const billingStatus = useBillingStatus();
+  const { data, isLoading, error } = useBillingStatusQuery();
   const billingErrorNotifiedRef = useRef(false);
+
+  // Normalize TanStack Query result to legacy shape for consumers
+  const billingStatus: BillingStatus = useMemo(
+    () => ({
+      isPro: data?.isPro ?? false,
+      plan: data?.plan ?? null,
+      hasStripeCustomer: data?.hasStripeCustomer ?? false,
+      loading: isLoading,
+      error:
+        error instanceof Error ? error.message : error ? String(error) : null,
+    }),
+    [data, isLoading, error]
+  );
 
   const redirectToUrl = (url: string) => {
     if (typeof window === 'undefined') return;

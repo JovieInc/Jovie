@@ -1,12 +1,32 @@
-import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useArtistSearch } from '@/lib/hooks/useArtistSearch';
+import { useArtistSearchQuery } from '@/lib/queries';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-describe('useArtistSearch', () => {
+// Create wrapper with QueryClient for testing
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+      },
+    },
+  });
+
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
+
+describe('useArtistSearchQuery', () => {
   beforeEach(() => {
     mockFetch.mockReset();
   });
@@ -16,7 +36,9 @@ describe('useArtistSearch', () => {
   });
 
   it('should start with idle state', () => {
-    const { result } = renderHook(() => useArtistSearch());
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
+    });
 
     expect(result.current.state).toBe('idle');
     expect(result.current.results).toEqual([]);
@@ -25,7 +47,10 @@ describe('useArtistSearch', () => {
   });
 
   it('should not search for queries shorter than minQueryLength', () => {
-    const { result } = renderHook(() => useArtistSearch({ minQueryLength: 2 }));
+    const { result } = renderHook(
+      () => useArtistSearchQuery({ minQueryLength: 2 }),
+      { wrapper: createWrapper() }
+    );
 
     act(() => {
       result.current.search('a');
@@ -35,16 +60,20 @@ describe('useArtistSearch', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('should update query immediately on search', () => {
-    const { result } = renderHook(() => useArtistSearch());
+  it('should update query immediately on search', async () => {
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
+    });
 
     act(() => {
       result.current.search('my query');
     });
 
     expect(result.current.query).toBe('my query');
-    // Should be loading for UX feedback
-    expect(result.current.state).toBe('loading');
+    // State transitions to loading when isPending is set (happens async)
+    await waitFor(() => {
+      expect(result.current.state).toBe('loading');
+    });
   });
 
   it('should return results on successful searchImmediate', async () => {
@@ -68,13 +97,18 @@ describe('useArtistSearch', () => {
       json: () => Promise.resolve(mockResults),
     });
 
-    const { result } = renderHook(() => useArtistSearch());
-
-    await act(async () => {
-      await result.current.searchImmediate('artist');
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
     });
 
-    expect(result.current.state).toBe('success');
+    act(() => {
+      result.current.searchImmediate('artist');
+    });
+
+    await waitFor(() => {
+      expect(result.current.state).toBe('success');
+    });
+
     expect(result.current.results).toHaveLength(2);
     expect(result.current.results[0].name).toBe('Artist One');
   });
@@ -85,13 +119,18 @@ describe('useArtistSearch', () => {
       json: () => Promise.resolve([]),
     });
 
-    const { result } = renderHook(() => useArtistSearch());
-
-    await act(async () => {
-      await result.current.searchImmediate('nonexistent');
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
     });
 
-    expect(result.current.state).toBe('empty');
+    act(() => {
+      result.current.searchImmediate('nonexistent');
+    });
+
+    await waitFor(() => {
+      expect(result.current.state).toBe('empty');
+    });
+
     expect(result.current.results).toEqual([]);
   });
 
@@ -102,13 +141,18 @@ describe('useArtistSearch', () => {
         Promise.resolve({ error: 'Search failed', code: 'SEARCH_FAILED' }),
     });
 
-    const { result } = renderHook(() => useArtistSearch());
-
-    await act(async () => {
-      await result.current.searchImmediate('test');
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
     });
 
-    expect(result.current.state).toBe('error');
+    act(() => {
+      result.current.searchImmediate('test');
+    });
+
+    await waitFor(() => {
+      expect(result.current.state).toBe('error');
+    });
+
     expect(result.current.error).toBe('Search failed');
   });
 
@@ -119,13 +163,18 @@ describe('useArtistSearch', () => {
         Promise.resolve({ error: 'Too many requests', code: 'RATE_LIMITED' }),
     });
 
-    const { result } = renderHook(() => useArtistSearch());
-
-    await act(async () => {
-      await result.current.searchImmediate('test');
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
     });
 
-    expect(result.current.state).toBe('error');
+    act(() => {
+      result.current.searchImmediate('test');
+    });
+
+    await waitFor(() => {
+      expect(result.current.state).toBe('error');
+    });
+
     expect(result.current.error).toContain('Too many requests');
   });
 
@@ -143,13 +192,17 @@ describe('useArtistSearch', () => {
       json: () => Promise.resolve(mockResults),
     });
 
-    const { result } = renderHook(() => useArtistSearch());
-
-    await act(async () => {
-      await result.current.searchImmediate('test');
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: createWrapper(),
     });
 
-    expect(result.current.results).toHaveLength(1);
+    act(() => {
+      result.current.searchImmediate('test');
+    });
+
+    await waitFor(() => {
+      expect(result.current.results).toHaveLength(1);
+    });
 
     act(() => {
       result.current.clear();
@@ -166,10 +219,16 @@ describe('useArtistSearch', () => {
       json: () => Promise.resolve([]),
     });
 
-    const { result } = renderHook(() => useArtistSearch({ limit: 10 }));
+    const { result } = renderHook(() => useArtistSearchQuery({ limit: 10 }), {
+      wrapper: createWrapper(),
+    });
 
-    await act(async () => {
-      await result.current.searchImmediate('test');
+    act(() => {
+      result.current.searchImmediate('test');
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
     });
 
     expect(mockFetch).toHaveBeenCalledWith(

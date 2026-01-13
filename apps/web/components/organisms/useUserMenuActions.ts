@@ -3,9 +3,9 @@
 import type { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import type { BillingStatus } from '@/hooks/useBillingStatus';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { BillingStatus } from './user-button/useUserButton';
 
 type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
 

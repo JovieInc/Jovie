@@ -98,6 +98,20 @@ export const queryKeys = {
     links: (profileId: string) =>
       [...queryKeys.profile.all, 'links', profileId] as const,
   },
+
+  // Spotify search queries
+  spotify: {
+    all: ['spotify'] as const,
+    artistSearch: (query: string, limit: number) =>
+      [...queryKeys.spotify.all, 'artist-search', { query, limit }] as const,
+  },
+
+  // Dashboard suggestions polling
+  suggestions: {
+    all: ['suggestions'] as const,
+    list: (profileId: string) =>
+      [...queryKeys.suggestions.all, 'list', profileId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

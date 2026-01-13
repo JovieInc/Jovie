@@ -7,7 +7,7 @@ import { connectSpotifyArtist } from '@/app/app/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { useArtistSearch } from '@/lib/hooks/useArtistSearch';
+import { useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 function formatFollowers(count: number): string {
@@ -46,7 +46,7 @@ export function ReleasesEmptyState({
     error: searchError,
     search,
     clear,
-  } = useArtistSearch({
+  } = useArtistSearchQuery({
     debounceMs: 300,
     limit: 5,
   });
