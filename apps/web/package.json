@@ -21,7 +21,7 @@
     "test": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.mts",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.ci.mts --reporter=verbose --coverage",
     "test:watch": "vitest --config=vitest.config.mts",
-    "test:fast": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.mts",
+    "test:fast": "NODE_OPTIONS=--max-old-space-size=4096 node scripts/vitest-sharded.mjs",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
