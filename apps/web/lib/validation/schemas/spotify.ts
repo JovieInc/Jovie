@@ -179,22 +179,38 @@ export const optionalHandleSchema = handleSchema.optional();
 // ============================================================================
 
 /**
+ * Generic validation result type.
+ */
+export interface ValidationResult<T> {
+  success: boolean;
+  error?: string;
+  data?: T;
+}
+
+/**
+ * Create a validation function from a Zod schema.
+ * Eliminates duplication by providing a generic wrapper for safeParse.
+ *
+ * @param schema - Zod schema to validate against
+ * @returns Validation function that returns a standardized result object
+ */
+function createValidator<T>(schema: z.ZodSchema<T>) {
+  return (value: unknown): ValidationResult<T> => {
+    const result = schema.safeParse(value);
+    if (result.success) {
+      return { success: true, data: result.data };
+    }
+    return { success: false, error: result.error.issues[0]?.message };
+  };
+}
+
+/**
  * Validate a Spotify artist ID.
  *
  * @param id - The ID to validate
  * @returns Object with success status and error message if invalid
  */
-export function validateSpotifyArtistId(id: unknown): {
-  success: boolean;
-  error?: string;
-  data?: string;
-} {
-  const result = spotifyArtistIdSchema.safeParse(id);
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-  return { success: false, error: result.error.issues[0]?.message };
-}
+export const validateSpotifyArtistId = createValidator(spotifyArtistIdSchema);
 
 /**
  * Validate an artist search query.
@@ -202,17 +218,9 @@ export function validateSpotifyArtistId(id: unknown): {
  * @param query - The query to validate
  * @returns Object with success status and error message if invalid
  */
-export function validateArtistSearchQuery(query: unknown): {
-  success: boolean;
-  error?: string;
-  data?: string;
-} {
-  const result = artistSearchQuerySchema.safeParse(query);
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-  return { success: false, error: result.error.issues[0]?.message };
-}
+export const validateArtistSearchQuery = createValidator(
+  artistSearchQuerySchema
+);
 
 /**
  * Validate a handle.
@@ -220,14 +228,4 @@ export function validateArtistSearchQuery(query: unknown): {
  * @param handle - The handle to validate
  * @returns Object with success status and error message if invalid
  */
-export function validateHandle(handle: unknown): {
-  success: boolean;
-  error?: string;
-  data?: string;
-} {
-  const result = handleSchema.safeParse(handle);
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-  return { success: false, error: result.error.issues[0]?.message };
-}
+export const validateHandle = createValidator(handleSchema);
