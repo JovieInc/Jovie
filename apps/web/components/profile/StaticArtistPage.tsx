@@ -33,16 +33,30 @@ function renderContent(
 ) {
   const mapSocialPlatformToDSPKey = (platform: string): string | null => {
     const normalized = platform.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (normalized.includes('spotify')) return 'spotify';
-    if (normalized.includes('applemusic') || normalized === 'itunes')
-      return 'apple_music';
-    if (normalized.includes('youtube')) return 'youtube';
-    if (normalized.includes('soundcloud')) return 'soundcloud';
-    if (normalized.includes('bandcamp')) return 'bandcamp';
-    if (normalized.includes('tidal')) return 'tidal';
-    if (normalized.includes('deezer')) return 'deezer';
-    if (normalized.includes('amazonmusic')) return 'amazon_music';
-    if (normalized.includes('pandora')) return 'pandora';
+
+    // Map of platform keywords to DSP keys
+    const platformMappings: Array<{ keywords: string[]; dspKey: string }> = [
+      { keywords: ['spotify'], dspKey: 'spotify' },
+      { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
+      { keywords: ['youtube'], dspKey: 'youtube' },
+      { keywords: ['soundcloud'], dspKey: 'soundcloud' },
+      { keywords: ['bandcamp'], dspKey: 'bandcamp' },
+      { keywords: ['tidal'], dspKey: 'tidal' },
+      { keywords: ['deezer'], dspKey: 'deezer' },
+      { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
+      { keywords: ['pandora'], dspKey: 'pandora' },
+    ];
+
+    for (const { keywords, dspKey } of platformMappings) {
+      if (
+        keywords.some(
+          keyword => normalized.includes(keyword) || normalized === keyword
+        )
+      ) {
+        return dspKey;
+      }
+    }
+
     return null;
   };
 
