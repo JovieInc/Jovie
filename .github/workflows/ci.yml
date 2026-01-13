@@ -1266,7 +1266,7 @@ jobs:
 
       - name: Run Required Smoke Tests
         run: |
-          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-required.spec.ts --project=chromium --reporter=line
+          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-auth.spec.ts tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
 
