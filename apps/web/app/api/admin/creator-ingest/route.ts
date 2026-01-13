@@ -47,6 +47,54 @@ import { creatorIngestSchema } from '@/lib/validation/schemas';
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
 
+// Music platforms that should have empty link display text by default
+const MUSIC_PLATFORMS = [
+  'spotify',
+  'apple_music',
+  'soundcloud',
+  'tidal',
+] as const;
+
+/**
+ * Determine the display text for a social link based on platform type.
+ * Music platforms get empty display text (unless a specific name is provided),
+ * while other platforms use the platform name.
+ *
+ * @param platformId - Platform identifier (e.g., 'spotify', 'instagram')
+ * @param platformName - Default platform name to use
+ * @param customName - Optional custom name (e.g., Spotify artist name)
+ * @returns Display text for the link
+ */
+function getLinkDisplayText(
+  platformId: string,
+  platformName: string,
+  customName?: string | null
+): string {
+  if (customName) return customName;
+  const isMusicPlatform = MUSIC_PLATFORMS.includes(
+    platformId as (typeof MUSIC_PLATFORMS)[number]
+  );
+  return isMusicPlatform ? '' : platformName;
+}
+
+/**
+ * Generate a claim token with expiration date.
+ * Claim tokens allow creators to claim unclaimed profiles.
+ *
+ * @returns Object with claimToken UUID and claimTokenExpiresAt date
+ */
+function generateClaimToken(): {
+  claimToken: string;
+  claimTokenExpiresAt: Date;
+} {
+  const claimToken = randomUUID();
+  const claimTokenExpiresAt = new Date();
+  claimTokenExpiresAt.setDate(
+    claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
+  );
+  return { claimToken, claimTokenExpiresAt };
+}
+
 async function findAvailableHandle(
   tx: DbType,
   baseHandle: string
@@ -748,11 +796,7 @@ export async function POST(request: Request) {
 
       return await withSystemIngestionSession(async tx => {
         // Generate claim token at creation time
-        const claimToken = randomUUID();
-        const claimTokenExpiresAt = new Date();
-        claimTokenExpiresAt.setDate(
-          claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-        );
+        const { claimToken, claimTokenExpiresAt } = generateClaimToken();
 
         // Insert profile with claim token
         const [created] = await tx
@@ -915,15 +959,11 @@ export async function POST(request: Request) {
         finalHandle = altHandle;
       } else if (existing && !existing.isClaimed) {
         // Profile exists but unclaimed - add the link to existing profile
-        // For Spotify, use artist name; for other music platforms, leave empty
-        const isMusicPlatform = [
-          'spotify',
-          'apple_music',
-          'soundcloud',
-          'tidal',
-        ].includes(platformId);
-        const linkDisplayText =
-          spotifyArtistName || (isMusicPlatform ? '' : detected.platform.name);
+        const linkDisplayText = getLinkDisplayText(
+          platformId,
+          detected.platform.name,
+          spotifyArtistName
+        );
         try {
           // Add the social link to existing profile (idempotent)
           const linkAdded = await addSocialLinkIdempotent(
@@ -986,11 +1026,7 @@ export async function POST(request: Request) {
       }
 
       // Generate claim token
-      const claimToken = randomUUID();
-      const claimTokenExpiresAt = new Date();
-      claimTokenExpiresAt.setDate(
-        claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-      );
+      const { claimToken, claimTokenExpiresAt } = generateClaimToken();
 
       // For Spotify artist IDs, use the fetched artist name if available
       const displayName =
@@ -1035,15 +1071,11 @@ export async function POST(request: Request) {
       }
 
       // Add the social link (idempotent, though new profile shouldn't have duplicates)
-      // For Spotify, use the fetched artist name; for other music platforms, leave empty
-      const isMusicPlatform = [
-        'spotify',
-        'apple_music',
-        'soundcloud',
-        'tidal',
-      ].includes(platformId);
-      const linkDisplayText =
-        spotifyArtistName || (isMusicPlatform ? '' : detected.platform.name);
+      const linkDisplayText = getLinkDisplayText(
+        platformId,
+        detected.platform.name,
+        spotifyArtistName
+      );
       try {
         await addSocialLinkIdempotent(
           tx,
