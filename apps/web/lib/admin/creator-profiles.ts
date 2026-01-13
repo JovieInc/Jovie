@@ -14,6 +14,7 @@ import {
 
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { escapeLikePattern } from '@/lib/utils/sql';
 
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
@@ -78,7 +79,10 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   // Allow basic handle-like characters and spaces; drop anything else
   const sanitized = limited.replace(/[^a-zA-Z0-9_\-\s]/g, '');
 
-  return sanitized.length > 0 ? sanitized : undefined;
+  if (sanitized.length === 0) return undefined;
+
+  // Escape LIKE pattern special characters for literal matching
+  return escapeLikePattern(sanitized);
 }
 
 export async function getAdminCreatorProfiles(

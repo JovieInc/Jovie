@@ -65,6 +65,31 @@ export const queryKeys = {
     featured: () => [...queryKeys.creators.all, 'featured'] as const,
   },
 
+  // Admin users
+  adminUsers: {
+    all: ['admin-users'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminUsers.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    detail: (id: string) =>
+      [...queryKeys.adminUsers.all, 'detail', id] as const,
+  },
+
+  // Admin waitlist
+  waitlist: {
+    all: ['waitlist'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.waitlist.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    entry: (id: string) => [...queryKeys.waitlist.all, 'entry', id] as const,
+  },
+
   // Public profile queries
   profile: {
     all: ['profile'] as const,
