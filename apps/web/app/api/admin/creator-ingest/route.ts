@@ -257,85 +257,111 @@ async function copyAvatarToBlob(
 }
 
 /**
+ * Platform-specific handle extraction strategies.
+ * Maps hostname patterns to extraction logic for different social platforms.
+ */
+const PLATFORM_EXTRACTION_STRATEGIES: Record<
+  string,
+  {
+    hosts: string[];
+    extract: (segments: string[]) => string | null;
+  }
+> = {
+  youtube: {
+    hosts: ['youtube.com', 'www.youtube.com', 'youtu.be', 'www.youtu.be'],
+    extract: (segments: string[]): string | null => {
+      let handle = segments[0];
+      // Handle @username or /channel/ID or /c/name or /user/name
+      if (handle?.startsWith('@')) {
+        return handle.slice(1);
+      }
+      if (
+        (handle === 'channel' || handle === 'c' || handle === 'user') &&
+        segments[1]
+      ) {
+        return segments[1];
+      }
+      return handle;
+    },
+  },
+  tiktok: {
+    hosts: ['tiktok.com', 'www.tiktok.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle @username format
+      return handle?.startsWith('@') ? handle.slice(1) : handle;
+    },
+  },
+  linkedin: {
+    hosts: ['linkedin.com', 'www.linkedin.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle /in/username or /company/name
+      if ((handle === 'in' || handle === 'company') && segments[1]) {
+        return segments[1];
+      }
+      return handle;
+    },
+  },
+  reddit: {
+    hosts: ['reddit.com', 'www.reddit.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle /user/username or /u/username
+      if ((handle === 'user' || handle === 'u') && segments[1]) {
+        return segments[1];
+      }
+      return handle;
+    },
+  },
+  spotify: {
+    hosts: ['spotify.com', 'www.spotify.com', 'open.spotify.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle /artist/ID or /user/username
+      if (handle === 'artist' && segments[1]) {
+        // Store the full artist ID with prefix for later API lookup
+        return `artist-${segments[1]}`;
+      }
+      if (handle === 'user' && segments[1]) {
+        return segments[1];
+      }
+      // Playlists aren't creator profiles
+      if (handle === 'playlist') {
+        return null;
+      }
+      return handle;
+    },
+  },
+};
+
+/**
  * Extract username/handle from a social platform URL.
- * Returns null if unable to extract a valid handle.
+ * Uses platform-specific strategies to handle different URL formats.
+ *
+ * @param url - Social platform profile URL
+ * @returns Extracted handle/username, or null if extraction fails
  */
 function extractHandleFromSocialUrl(url: string): string | null {
   try {
     const parsed = new URL(normalizeUrl(url));
-    const pathname = parsed.pathname;
-
-    // Remove leading/trailing slashes and get path segments
-    const segments = pathname.split('/').filter(Boolean);
+    const hostname = parsed.hostname.toLowerCase();
+    const segments = parsed.pathname.split('/').filter(Boolean);
 
     if (segments.length === 0) {
       return null;
     }
 
-    // Get the first meaningful segment (usually the username)
-    let handle = segments[0];
+    // Find matching platform strategy
+    const strategy = Object.values(PLATFORM_EXTRACTION_STRATEGIES).find(s =>
+      s.hosts.includes(hostname)
+    );
 
-    // Special cases for different platforms
-    const hostname = parsed.hostname.toLowerCase();
+    // Extract handle using platform strategy or fallback to first segment
+    let handle = strategy ? strategy.extract(segments) : segments[0];
 
-    // YouTube: handle @username or /channel/ID or /c/name
-    const youtubeHosts = [
-      'youtube.com',
-      'www.youtube.com',
-      'youtu.be',
-      'www.youtu.be',
-    ];
-    if (youtubeHosts.includes(hostname)) {
-      if (handle.startsWith('@')) {
-        handle = handle.slice(1);
-      } else if (
-        (handle === 'channel' || handle === 'c' || handle === 'user') &&
-        segments[1]
-      ) {
-        handle = segments[1];
-      }
-    }
-
-    // TikTok: handle @username
-    const tiktokHosts = ['tiktok.com', 'www.tiktok.com'];
-    if (tiktokHosts.includes(hostname)) {
-      if (handle.startsWith('@')) {
-        handle = handle.slice(1);
-      }
-    }
-
-    // LinkedIn: /in/username or /company/name
-    const linkedinHosts = ['linkedin.com', 'www.linkedin.com'];
-    if (linkedinHosts.includes(hostname)) {
-      if ((handle === 'in' || handle === 'company') && segments[1]) {
-        handle = segments[1];
-      }
-    }
-
-    // Reddit: /user/username or /u/username
-    const redditHosts = ['reddit.com', 'www.reddit.com'];
-    if (redditHosts.includes(hostname)) {
-      if ((handle === 'user' || handle === 'u') && segments[1]) {
-        handle = segments[1];
-      }
-    }
-
-    // Note: Discord invite codes are not usernames, so we don't extract them
-
-    // Spotify: /artist/ID or /user/username or /playlist/ID
-    // Artist IDs are not usernames - these need special handling
-    const spotifyHosts = ['spotify.com', 'www.spotify.com', 'open.spotify.com'];
-    if (spotifyHosts.includes(hostname)) {
-      if (handle === 'artist' && segments[1]) {
-        // Store the full artist ID in the handle with prefix
-        // We'll fetch the actual name via API and use it as displayName
-        handle = `spotifyartist-${segments[1]}`;
-      } else if (handle === 'user' && segments[1]) {
-        handle = segments[1];
-      } else if (handle === 'playlist' && segments[1]) {
-        // Playlists aren't creator profiles
-        return null;
-      }
+    if (!handle) {
+      return null;
     }
 
     // Clean up the handle
@@ -345,7 +371,7 @@ function extractHandleFromSocialUrl(url: string): string | null {
       .toLowerCase();
 
     // Validate handle format (30 char limit to match downstream validation)
-    if (!handle || handle.length > 30) {
+    if (handle.length > 30) {
       return null;
     }
 
