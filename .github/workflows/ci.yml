@@ -681,6 +681,83 @@ jobs:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
+  ci-e2e-smoke:
+    name: E2E Smoke (PR Fast Feedback)
+    needs: [ci-fast]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: false
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping E2E smoke; no E2E-relevant paths changed."
+          exit 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'apps/web/playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run E2E Smoke (Chromium)
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          CI: true
+          SMOKE_ONLY: '1'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
   ci-e2e-migrate:
     name: E2E DB Migrate
     needs: [ci-fast, ci-build, neon-db]
