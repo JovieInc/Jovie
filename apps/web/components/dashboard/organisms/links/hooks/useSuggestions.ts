@@ -171,7 +171,9 @@ export function useSuggestions<T extends SuggestedLink = SuggestedLink>({
    * Use sorted keys to ensure stable comparison regardless of array order.
    */
   const suggestedLinksSignature = useMemo(() => {
-    const keys = suggestedLinks.map(s => suggestionKey(s)).sort();
+    const keys = suggestedLinks
+      .map(s => suggestionKey(s))
+      .sort((a, b) => a.localeCompare(b));
     return keys.join('|');
   }, [suggestedLinks, suggestionKey]);
 

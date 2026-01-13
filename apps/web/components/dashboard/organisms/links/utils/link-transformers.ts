@@ -177,7 +177,7 @@ export function areSuggestionListsEqual(
         item =>
           `${item.suggestionId ?? item.normalizedUrl}:${item.platform.id}:${item.normalizedUrl}`
       )
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
 
   const aSig = serialize(a);
   const bSig = serialize(b);
