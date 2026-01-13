@@ -65,6 +65,22 @@ export function escapeCSVValue(value: unknown): string {
 }
 
 /**
+ * Capitalize the first letter of a string.
+ * Common formatter for CSV status and enum values.
+ *
+ * @param value - The value to capitalize (will be converted to string)
+ * @returns String with first letter capitalized
+ *
+ * @example
+ * capitalize('pending') // 'Pending'
+ * capitalize('active') // 'Active'
+ */
+export function capitalize(value: unknown): string {
+  const str = String(value);
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
  * Format a Date value according to the specified format.
  *
  * @param date - The Date to format

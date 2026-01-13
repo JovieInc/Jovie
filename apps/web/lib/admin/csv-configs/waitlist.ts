@@ -5,6 +5,7 @@
 
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import type { CSVColumn } from '@/lib/utils/csv';
+import { capitalize } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting waitlist entries.
@@ -55,11 +56,7 @@ export const waitlistCSVColumns: CSVColumn<WaitlistEntryRow>[] = [
   {
     header: 'Status',
     accessor: 'status',
-    formatter: value => {
-      // Capitalize first letter for better readability
-      const str = String(value);
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    },
+    formatter: capitalize,
   },
   {
     header: 'Created At',

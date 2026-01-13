@@ -5,6 +5,7 @@
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { CSVColumn } from '@/lib/utils/csv';
+import { capitalize } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting admin creator profile data.
@@ -69,11 +70,7 @@ export const creatorsCSVColumns: CSVColumn<AdminCreatorProfileRow>[] = [
   {
     header: 'Ingestion Status',
     accessor: 'ingestionStatus',
-    formatter: value => {
-      // Capitalize first letter for better readability
-      const str = String(value);
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    },
+    formatter: capitalize,
   },
   {
     header: 'Last Ingestion Error',
