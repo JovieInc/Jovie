@@ -126,6 +126,29 @@ export function transformImageUrl(
 }
 
 /**
+ * Configuration for Cloudinary transformation parameters.
+ * Maps option keys to their Cloudinary parameter prefixes.
+ */
+const CLOUDINARY_PARAM_MAP: Array<{
+  key: keyof {
+    format?: string;
+    quality?: number;
+    width?: number;
+    height?: number;
+    crop?: string;
+    gravity?: string;
+  };
+  prefix: string;
+}> = [
+  { key: 'format', prefix: 'f' },
+  { key: 'quality', prefix: 'q' },
+  { key: 'width', prefix: 'w' },
+  { key: 'height', prefix: 'h' },
+  { key: 'crop', prefix: 'c' },
+  { key: 'gravity', prefix: 'g' },
+];
+
+/**
  * Transform Cloudinary URLs with optimization parameters
  */
 function transformCloudinaryUrl(
@@ -147,32 +170,12 @@ function transformCloudinaryUrl(
 
     const transformations: string[] = [];
 
-    // Format optimization
-    if (options.format) {
-      transformations.push(`f_${options.format}`);
-    }
-
-    // Quality
-    if (options.quality) {
-      transformations.push(`q_${options.quality}`);
-    }
-
-    // Dimensions
-    if (options.width) {
-      transformations.push(`w_${options.width}`);
-    }
-    if (options.height) {
-      transformations.push(`h_${options.height}`);
-    }
-
-    // Cropping
-    if (options.crop) {
-      transformations.push(`c_${options.crop}`);
-    }
-
-    // Gravity/focal point
-    if (options.gravity) {
-      transformations.push(`g_${options.gravity}`);
+    // Build transformations from option map
+    for (const { key, prefix } of CLOUDINARY_PARAM_MAP) {
+      const value = options[key];
+      if (value !== undefined) {
+        transformations.push(`${prefix}_${value}`);
+      }
     }
 
     // Add DPR for retina displays
