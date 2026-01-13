@@ -68,7 +68,12 @@ export {
   type BillingStatusData,
   useBillingStatusQuery,
 } from './useBillingStatusQuery';
-
+// Admin creator mutations
+export {
+  useDeleteCreatorMutation,
+  useToggleFeaturedMutation,
+  useToggleMarketingMutation,
+} from './useCreatorMutations';
 export {
   type DashboardProfile,
   useDashboardProfileQuery,
