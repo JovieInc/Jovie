@@ -5,7 +5,7 @@
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { CSVColumn } from '@/lib/utils/csv';
-import { capitalize, formatYesNo } from '@/lib/utils/csv';
+import { capitalize, formatOptionalString, formatYesNo } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting admin creator profile data.
@@ -27,12 +27,12 @@ export const creatorsCSVColumns: CSVColumn<AdminCreatorProfileRow>[] = [
   {
     header: 'Display Name',
     accessor: 'displayName',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Avatar URL',
     accessor: 'avatarUrl',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Is Verified',
@@ -57,7 +57,7 @@ export const creatorsCSVColumns: CSVColumn<AdminCreatorProfileRow>[] = [
   {
     header: 'User ID',
     accessor: 'userId',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Confidence',
@@ -75,7 +75,7 @@ export const creatorsCSVColumns: CSVColumn<AdminCreatorProfileRow>[] = [
   {
     header: 'Last Ingestion Error',
     accessor: 'lastIngestionError',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Created At',
