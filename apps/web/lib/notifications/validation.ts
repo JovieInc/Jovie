@@ -1,3 +1,9 @@
+import {
+  type CountryCode,
+  isValidPhoneNumber,
+  parsePhoneNumberFromString,
+} from 'libphonenumber-js';
+
 const EMAIL_REGEX =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
@@ -18,29 +24,87 @@ export function normalizeSubscriptionEmail(
   return trimmed.toLowerCase();
 }
 
+/**
+ * Normalize and validate phone number using libphonenumber-js.
+ * Returns E.164 format (+1234567890) or null if invalid.
+ *
+ * @param raw - Raw phone input
+ * @param defaultCountry - Default country code for numbers without country code (default: US)
+ */
 export function normalizeSubscriptionPhone(
-  raw: string | null | undefined
+  raw: string | null | undefined,
+  defaultCountry: CountryCode = 'US'
 ): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
   if (trimmed.length > PHONE_MAX_LENGTH) return null;
 
-  let normalized = trimmed.replace(/(?!^\+)[^\d]/g, '');
+  try {
+    const phoneNumber = parsePhoneNumberFromString(trimmed, defaultCountry);
 
-  if (normalized.startsWith('00')) {
-    normalized = `+${normalized.slice(2)}`;
-  }
+    if (!phoneNumber) {
+      return null;
+    }
 
-  if (!normalized.startsWith('+')) {
-    normalized = `+${normalized}`;
-  }
+    if (!phoneNumber.isValid()) {
+      return null;
+    }
 
-  normalized = `+${normalized.slice(1).replace(/\D/g, '')}`;
-
-  if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
+    return phoneNumber.format('E.164');
+  } catch {
     return null;
   }
+}
 
-  return normalized;
+/**
+ * Check if a phone number is valid without normalizing.
+ *
+ * @param phone - Phone number to validate
+ * @param defaultCountry - Default country code (default: US)
+ */
+export function isValidPhone(
+  phone: string | null | undefined,
+  defaultCountry: CountryCode = 'US'
+): boolean {
+  if (!phone) return false;
+  const trimmed = phone.trim();
+  if (!trimmed) return false;
+
+  try {
+    return isValidPhoneNumber(trimmed, defaultCountry);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse phone number and return detailed info.
+ */
+export function parsePhone(
+  phone: string | null | undefined,
+  defaultCountry: CountryCode = 'US'
+) {
+  if (!phone) return null;
+  const trimmed = phone.trim();
+  if (!trimmed) return null;
+
+  try {
+    const phoneNumber = parsePhoneNumberFromString(trimmed, defaultCountry);
+    if (!phoneNumber || !phoneNumber.isValid()) {
+      return null;
+    }
+
+    return {
+      e164: phoneNumber.format('E.164'),
+      national: phoneNumber.formatNational(),
+      international: phoneNumber.formatInternational(),
+      country: phoneNumber.country,
+      countryCallingCode: phoneNumber.countryCallingCode,
+      nationalNumber: phoneNumber.nationalNumber,
+      type: phoneNumber.getType(),
+    };
+  } catch {
+    return null;
+  }
 }

@@ -137,6 +137,7 @@
     "geist": "^1.5.1",
     "import-in-the-middle": "^2.0.1",
     "isomorphic-dompurify": "2.35.0",
+    "libphonenumber-js": "^1.12.34",
     "lucide-react": "^0.562.0",
     "mdast-util-to-string": "^4.0.0",
     "next": "^16.1.1",

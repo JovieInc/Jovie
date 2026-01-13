@@ -73,6 +73,8 @@ export async function processSendClaimInviteJob(
       email: creatorClaimInvites.email,
       status: creatorClaimInvites.status,
       creatorProfileId: creatorClaimInvites.creatorProfileId,
+      expiresAt: creatorClaimInvites.expiresAt,
+      bounceCount: creatorClaimInvites.bounceCount,
     })
     .from(creatorClaimInvites)
     .where(eq(creatorClaimInvites.id, payload.inviteId))
@@ -92,6 +94,55 @@ export async function processSendClaimInviteJob(
       email: invite.email,
       status: 'skipped',
       detail: 'Already sent',
+    };
+  }
+
+  // Check if invite has expired
+  if (invite.expiresAt && new Date() > invite.expiresAt) {
+    await tx
+      .update(creatorClaimInvites)
+      .set({
+        status: 'failed',
+        error: 'Invite expired',
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorClaimInvites.id, invite.id));
+
+    logger.info('Claim invite expired, marking as failed', {
+      inviteId: invite.id,
+      expiresAt: invite.expiresAt,
+    });
+
+    return {
+      inviteId: invite.id,
+      email: invite.email,
+      status: 'skipped',
+      detail: 'Invite expired',
+    };
+  }
+
+  // Skip if too many bounces (max 3 attempts)
+  const MAX_BOUNCE_COUNT = 3;
+  if (invite.bounceCount >= MAX_BOUNCE_COUNT) {
+    await tx
+      .update(creatorClaimInvites)
+      .set({
+        status: 'failed',
+        error: `Email bounced ${invite.bounceCount} times`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorClaimInvites.id, invite.id));
+
+    logger.info('Claim invite exceeded bounce limit, marking as failed', {
+      inviteId: invite.id,
+      bounceCount: invite.bounceCount,
+    });
+
+    return {
+      inviteId: invite.id,
+      email: invite.email,
+      status: 'skipped',
+      detail: `Exceeded bounce limit (${invite.bounceCount})`,
     };
   }
 

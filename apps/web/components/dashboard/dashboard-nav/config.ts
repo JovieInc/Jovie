@@ -3,6 +3,7 @@ import {
   Bell,
   Home,
   IdCard,
+  Megaphone,
   Music,
   Paintbrush,
   PieChart,
@@ -51,6 +52,13 @@ export const primaryNavigation: NavItem[] = [
     icon: Users,
     description: 'Understand your audience demographics',
   },
+  {
+    name: 'Campaigns',
+    href: '/app/dashboard/campaigns',
+    id: 'campaigns',
+    icon: Megaphone,
+    description: 'Create and manage marketing campaigns',
+  },
 ];
 
 export const navShortcuts: Record<string, string> = {
@@ -59,7 +67,8 @@ export const navShortcuts: Record<string, string> = {
   contacts: '3',
   releases: '4',
   audience: '5',
-  earnings: '6',
+  campaigns: '6',
+  earnings: '7',
 };
 
 export const secondaryNavigation: NavItem[] = [

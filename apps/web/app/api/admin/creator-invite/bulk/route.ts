@@ -286,13 +286,25 @@ export async function POST(request: Request) {
       let skippedDuplicates = 0;
 
       for (const profile of profilesWithEmails) {
+        // Skip profiles without valid email
+        const email = profile.contactEmail?.toLowerCase().trim();
+        if (!email) {
+          skippedDuplicates++;
+          continue;
+        }
+
+        // Set expiry to 30 days from now
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+
         // Create invite record
         const [invite] = await tx
           .insert(creatorClaimInvites)
           .values({
             creatorProfileId: profile.id,
-            email: profile.contactEmail!.toLowerCase().trim(),
+            email,
             status: 'pending',
+            expiresAt,
             meta: { source: 'bulk' },
             createdAt: new Date(),
             updatedAt: new Date(),
