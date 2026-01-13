@@ -1,4 +1,5 @@
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
+import { normalizeEmail } from '@/lib/utils/email';
 
 export interface ClerkEmailAddress {
   emailAddress?: string | null;
@@ -33,10 +34,6 @@ export interface ClerkResolvedIdentity {
   displayName: string | null;
   avatarUrl: string | null;
   displayNameSource: ClerkDisplayNameSource;
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
 }
 
 function deriveDisplayNameFromEmail(email: string): string {
