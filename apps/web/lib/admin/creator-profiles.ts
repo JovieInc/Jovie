@@ -66,6 +66,14 @@ export interface AdminCreatorProfilesResult {
   total: number;
 }
 
+/**
+ * Escapes SQL LIKE/ILIKE pattern special characters.
+ * In PostgreSQL, % and _ are wildcards that need escaping for literal matches.
+ */
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, char => `\\${char}`);
+}
+
 function sanitizeSearchInput(rawSearch?: string): string | undefined {
   if (!rawSearch) return undefined;
 
@@ -78,7 +86,10 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   // Allow basic handle-like characters and spaces; drop anything else
   const sanitized = limited.replace(/[^a-zA-Z0-9_\-\s]/g, '');
 
-  return sanitized.length > 0 ? sanitized : undefined;
+  if (sanitized.length === 0) return undefined;
+
+  // Escape LIKE pattern special characters for literal matching
+  return escapeLikePattern(sanitized);
 }
 
 export async function getAdminCreatorProfiles(
