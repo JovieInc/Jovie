@@ -64,6 +64,7 @@ export { type QueryKeys, queryKeys } from './keys';
 export { QueryErrorBoundary } from './QueryErrorBoundary';
 
 // Query hooks
+export { useActivityFeedQuery } from './useActivityFeedQuery';
 export {
   type BillingStatusData,
   useBillingStatusQuery,
@@ -74,6 +75,7 @@ export {
   useToggleFeaturedMutation,
   useToggleMarketingMutation,
 } from './useCreatorMutations';
+export { useDashboardAnalyticsQuery } from './useDashboardAnalyticsQuery';
 export {
   type DashboardProfile,
   useDashboardProfileQuery,

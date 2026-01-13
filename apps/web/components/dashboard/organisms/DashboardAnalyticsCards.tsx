@@ -6,8 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
@@ -33,17 +33,21 @@ export function DashboardAnalyticsCards({
   const [displayProfileViews, setDisplayProfileViews] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const { data, error, loading, refreshing, refresh } = useDashboardAnalytics({
-    range,
-    view: 'traffic',
-  });
+  const { data, error, isLoading, isFetching, refetch } =
+    useDashboardAnalyticsQuery({
+      range,
+      view: 'traffic',
+    });
+
+  const loading = isLoading;
+  const refreshing = isFetching && !isLoading;
 
   useEffect(() => {
     if (typeof refreshSignal !== 'number') return;
     if (lastRefreshSignalRef.current === refreshSignal) return;
     lastRefreshSignalRef.current = refreshSignal;
-    void refresh();
-  }, [refresh, refreshSignal]);
+    void refetch();
+  }, [refetch, refreshSignal]);
 
   const rangeLabel = useMemo(() => {
     if (range === '7d') return 'Last 7 days';

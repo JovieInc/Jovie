@@ -29,11 +29,7 @@ export function DashboardOverviewMetricsClient({
 
       {showActivity ? (
         <section className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
-          <DashboardActivityFeed
-            profileId={profileId}
-            range={range}
-            refreshSignal={refreshSignal}
-          />
+          <DashboardActivityFeed profileId={profileId} range={range} />
         </section>
       ) : null}
     </div>

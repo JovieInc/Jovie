@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
-import { useDashboardAnalytics as useDashboardAnalyticsHook } from '@/lib/hooks/useDashboardAnalytics';
+import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { Range } from './types';
 
@@ -13,10 +13,10 @@ export interface UseDashboardAnalyticsReturn {
   rangeTabsBaseId: string;
   rangePanelId: string;
   activeRangeTabId: string;
-  data: ReturnType<typeof useDashboardAnalyticsHook>['data'];
-  error: ReturnType<typeof useDashboardAnalyticsHook>['error'];
-  loading: ReturnType<typeof useDashboardAnalyticsHook>['loading'];
-  refresh: ReturnType<typeof useDashboardAnalyticsHook>['refresh'];
+  data: ReturnType<typeof useDashboardAnalyticsQuery>['data'];
+  error: string | null;
+  loading: boolean;
+  refresh: () => Promise<void>;
   rangeLabel: string;
 }
 
@@ -33,7 +33,7 @@ export function useDashboardAnalyticsState(): UseDashboardAnalyticsReturn {
   const rangePanelId = `${rangeTabsBaseId}-panel`;
   const activeRangeTabId = `${rangeTabsBaseId}-tab-${range}`;
 
-  const { data, error, loading, refresh } = useDashboardAnalyticsHook({
+  const { data, error, isLoading, refetch } = useDashboardAnalyticsQuery({
     range,
     view: 'full',
   });
@@ -44,6 +44,11 @@ export function useDashboardAnalyticsState(): UseDashboardAnalyticsReturn {
     return 'Last 30 days';
   }, [range]);
 
+  // Wrap refetch to match old API
+  const refresh = async () => {
+    await refetch();
+  };
+
   return {
     artist,
     range,
@@ -52,8 +57,8 @@ export function useDashboardAnalyticsState(): UseDashboardAnalyticsReturn {
     rangePanelId,
     activeRangeTabId,
     data,
-    error,
-    loading,
+    error: error?.message ?? null,
+    loading: isLoading,
     refresh,
     rangeLabel,
   };
