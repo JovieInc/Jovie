@@ -71,39 +71,50 @@ const ServerEnvSchema = z.object({
   HUD_GITHUB_WORKFLOW: z.string().optional(),
 });
 
-const rawServerEnv = {
-  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-  CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
-  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
-  CLOUDINARY_UPLOAD_FOLDER: process.env.CLOUDINARY_UPLOAD_FOLDER,
-  CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET,
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
-  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
-  RESEND_REPLY_TO_EMAIL: process.env.RESEND_REPLY_TO_EMAIL,
-  DATABASE_URL: process.env.DATABASE_URL,
-  SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
-  SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-  STRIPE_TIP_WEBHOOK_SECRET: process.env.STRIPE_TIP_WEBHOOK_SECRET,
-  STRIPE_PRICE_INTRO_MONTHLY: process.env.STRIPE_PRICE_INTRO_MONTHLY,
-  STRIPE_PRICE_INTRO_YEARLY: process.env.STRIPE_PRICE_INTRO_YEARLY,
-  STRIPE_PRICE_STANDARD_MONTHLY: process.env.STRIPE_PRICE_STANDARD_MONTHLY,
-  STRIPE_PRICE_STANDARD_YEARLY: process.env.STRIPE_PRICE_STANDARD_YEARLY,
-  INGESTION_CRON_SECRET: process.env.INGESTION_CRON_SECRET,
-  STATSIG_SERVER_API_KEY: process.env.STATSIG_SERVER_API_KEY,
-  URL_ENCRYPTION_KEY: process.env.URL_ENCRYPTION_KEY,
-  CRON_SECRET: process.env.CRON_SECRET,
+/**
+ * List of environment variable keys to extract from process.env.
+ * Single source of truth for server environment configuration.
+ */
+const ENV_KEYS = [
+  'CLERK_SECRET_KEY',
+  'CLERK_WEBHOOK_SECRET',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
+  'CLOUDINARY_UPLOAD_FOLDER',
+  'CLOUDINARY_UPLOAD_PRESET',
+  'RESEND_API_KEY',
+  'RESEND_FROM_EMAIL',
+  'RESEND_REPLY_TO_EMAIL',
+  'DATABASE_URL',
+  'SPOTIFY_CLIENT_ID',
+  'SPOTIFY_CLIENT_SECRET',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_TIP_WEBHOOK_SECRET',
+  'STRIPE_PRICE_INTRO_MONTHLY',
+  'STRIPE_PRICE_INTRO_YEARLY',
+  'STRIPE_PRICE_STANDARD_MONTHLY',
+  'STRIPE_PRICE_STANDARD_YEARLY',
+  'INGESTION_CRON_SECRET',
+  'STATSIG_SERVER_API_KEY',
+  'URL_ENCRYPTION_KEY',
+  'CRON_SECRET',
+  'HUD_KIOSK_TOKEN',
+  'HUD_STARTUP_NAME',
+  'HUD_STARTUP_LOGO_URL',
+  'HUD_GITHUB_TOKEN',
+  'HUD_GITHUB_OWNER',
+  'HUD_GITHUB_REPO',
+  'HUD_GITHUB_WORKFLOW',
+] as const;
 
-  HUD_KIOSK_TOKEN: process.env.HUD_KIOSK_TOKEN,
-  HUD_STARTUP_NAME: process.env.HUD_STARTUP_NAME,
-  HUD_STARTUP_LOGO_URL: process.env.HUD_STARTUP_LOGO_URL,
-  HUD_GITHUB_TOKEN: process.env.HUD_GITHUB_TOKEN,
-  HUD_GITHUB_OWNER: process.env.HUD_GITHUB_OWNER,
-  HUD_GITHUB_REPO: process.env.HUD_GITHUB_REPO,
-  HUD_GITHUB_WORKFLOW: process.env.HUD_GITHUB_WORKFLOW,
-};
+/**
+ * Extract environment variables from process.env based on ENV_KEYS.
+ * Eliminates duplication by programmatically building the object.
+ */
+const rawServerEnv = Object.fromEntries(
+  ENV_KEYS.map(key => [key, process.env[key]])
+) as Record<keyof z.infer<typeof ServerEnvSchema>, string | undefined>;
 
 const parsed = ServerEnvSchema.safeParse(rawServerEnv);
 
@@ -114,100 +125,16 @@ if (!parsed.success && process.env.NODE_ENV === 'development') {
   );
 }
 
-// Export server-side environment variables only
-export const env = {
-  CLERK_SECRET_KEY: parsed.success
-    ? parsed.data.CLERK_SECRET_KEY
-    : process.env.CLERK_SECRET_KEY,
-  CLERK_WEBHOOK_SECRET: parsed.success
-    ? parsed.data.CLERK_WEBHOOK_SECRET
-    : process.env.CLERK_WEBHOOK_SECRET,
-  CLOUDINARY_API_KEY: parsed.success
-    ? parsed.data.CLOUDINARY_API_KEY
-    : process.env.CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET: parsed.success
-    ? parsed.data.CLOUDINARY_API_SECRET
-    : process.env.CLOUDINARY_API_SECRET,
-  CLOUDINARY_UPLOAD_FOLDER: parsed.success
-    ? parsed.data.CLOUDINARY_UPLOAD_FOLDER
-    : process.env.CLOUDINARY_UPLOAD_FOLDER,
-  CLOUDINARY_UPLOAD_PRESET: parsed.success
-    ? parsed.data.CLOUDINARY_UPLOAD_PRESET
-    : process.env.CLOUDINARY_UPLOAD_PRESET,
-  RESEND_API_KEY: parsed.success
-    ? parsed.data.RESEND_API_KEY
-    : process.env.RESEND_API_KEY,
-  RESEND_FROM_EMAIL: parsed.success
-    ? parsed.data.RESEND_FROM_EMAIL
-    : process.env.RESEND_FROM_EMAIL,
-  RESEND_REPLY_TO_EMAIL: parsed.success
-    ? parsed.data.RESEND_REPLY_TO_EMAIL
-    : process.env.RESEND_REPLY_TO_EMAIL,
-  DATABASE_URL: parsed.success
-    ? parsed.data.DATABASE_URL
-    : process.env.DATABASE_URL,
-  SPOTIFY_CLIENT_ID: parsed.success
-    ? parsed.data.SPOTIFY_CLIENT_ID
-    : process.env.SPOTIFY_CLIENT_ID,
-  SPOTIFY_CLIENT_SECRET: parsed.success
-    ? parsed.data.SPOTIFY_CLIENT_SECRET
-    : process.env.SPOTIFY_CLIENT_SECRET,
-  STRIPE_SECRET_KEY: parsed.success
-    ? parsed.data.STRIPE_SECRET_KEY
-    : process.env.STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET: parsed.success
-    ? parsed.data.STRIPE_WEBHOOK_SECRET
-    : process.env.STRIPE_WEBHOOK_SECRET,
-  STRIPE_TIP_WEBHOOK_SECRET: parsed.success
-    ? parsed.data.STRIPE_TIP_WEBHOOK_SECRET
-    : process.env.STRIPE_TIP_WEBHOOK_SECRET,
-  STRIPE_PRICE_INTRO_MONTHLY: parsed.success
-    ? parsed.data.STRIPE_PRICE_INTRO_MONTHLY
-    : process.env.STRIPE_PRICE_INTRO_MONTHLY,
-  STRIPE_PRICE_INTRO_YEARLY: parsed.success
-    ? parsed.data.STRIPE_PRICE_INTRO_YEARLY
-    : process.env.STRIPE_PRICE_INTRO_YEARLY,
-  STRIPE_PRICE_STANDARD_MONTHLY: parsed.success
-    ? parsed.data.STRIPE_PRICE_STANDARD_MONTHLY
-    : process.env.STRIPE_PRICE_STANDARD_MONTHLY,
-  STRIPE_PRICE_STANDARD_YEARLY: parsed.success
-    ? parsed.data.STRIPE_PRICE_STANDARD_YEARLY
-    : process.env.STRIPE_PRICE_STANDARD_YEARLY,
-  INGESTION_CRON_SECRET: parsed.success
-    ? parsed.data.INGESTION_CRON_SECRET
-    : process.env.INGESTION_CRON_SECRET,
-  STATSIG_SERVER_API_KEY: parsed.success
-    ? parsed.data.STATSIG_SERVER_API_KEY
-    : process.env.STATSIG_SERVER_API_KEY,
-  URL_ENCRYPTION_KEY: parsed.success
-    ? parsed.data.URL_ENCRYPTION_KEY
-    : process.env.URL_ENCRYPTION_KEY,
-  CRON_SECRET: parsed.success
-    ? parsed.data.CRON_SECRET
-    : process.env.CRON_SECRET,
-
-  HUD_KIOSK_TOKEN: parsed.success
-    ? parsed.data.HUD_KIOSK_TOKEN
-    : process.env.HUD_KIOSK_TOKEN,
-  HUD_STARTUP_NAME: parsed.success
-    ? parsed.data.HUD_STARTUP_NAME
-    : process.env.HUD_STARTUP_NAME,
-  HUD_STARTUP_LOGO_URL: parsed.success
-    ? parsed.data.HUD_STARTUP_LOGO_URL
-    : process.env.HUD_STARTUP_LOGO_URL,
-  HUD_GITHUB_TOKEN: parsed.success
-    ? parsed.data.HUD_GITHUB_TOKEN
-    : process.env.HUD_GITHUB_TOKEN,
-  HUD_GITHUB_OWNER: parsed.success
-    ? parsed.data.HUD_GITHUB_OWNER
-    : process.env.HUD_GITHUB_OWNER,
-  HUD_GITHUB_REPO: parsed.success
-    ? parsed.data.HUD_GITHUB_REPO
-    : process.env.HUD_GITHUB_REPO,
-  HUD_GITHUB_WORKFLOW: parsed.success
-    ? parsed.data.HUD_GITHUB_WORKFLOW
-    : process.env.HUD_GITHUB_WORKFLOW,
-} as const;
+/**
+ * Build environment object with fallback to process.env on validation failure.
+ * Eliminates duplication by programmatically constructing the export object.
+ */
+export const env = Object.fromEntries(
+  ENV_KEYS.map(key => [
+    key,
+    parsed.success ? parsed.data[key] : process.env[key],
+  ])
+) as Record<keyof z.infer<typeof ServerEnvSchema>, string | undefined>;
 
 // Environment validation utilities
 export interface EnvironmentValidationResult {
