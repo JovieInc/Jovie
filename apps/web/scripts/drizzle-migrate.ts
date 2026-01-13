@@ -11,6 +11,7 @@
  */
 
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
@@ -31,6 +32,11 @@ neonConfig.webSocketConstructor = ws;
 
 // Neon URL pattern for cleaning database URLs
 const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
+
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const webRootDir = path.resolve(scriptDir, '..');
+const migrationsDir = path.join(webRootDir, 'drizzle', 'migrations');
+const migrationsJournalPath = path.join(migrationsDir, 'meta', '_journal.json');
 
 type DrizzleMigrationsSchema = 'drizzle' | 'public';
 
@@ -109,15 +115,13 @@ function validateEnvironment(): { isValid: boolean; errors: string[] } {
 
 // Check if migrations directory exists and has migrations
 function checkMigrationsExist(): boolean {
-  const migrationsPath = path.join(process.cwd(), 'drizzle', 'migrations');
-  if (!existsSync(migrationsPath)) {
+  if (!existsSync(migrationsDir)) {
     return false;
   }
 
   try {
-    const metaPath = path.join(migrationsPath, 'meta', '_journal.json');
-    if (existsSync(metaPath)) {
-      const journal = JSON.parse(readFileSync(metaPath, 'utf8'));
+    if (existsSync(migrationsJournalPath)) {
+      const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8'));
       return journal.entries && journal.entries.length > 0;
     }
   } catch {
@@ -278,15 +282,7 @@ async function runMigrations() {
       existsQuery: string;
     };
 
-    const journalPath = path.join(
-      process.cwd(),
-      'drizzle',
-      'migrations',
-      'meta',
-      '_journal.json'
-    );
-
-    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+    const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
       entries?: Array<{ tag: string; when: number }>;
     };
 
@@ -412,14 +408,7 @@ async function runMigrations() {
       return;
     }
 
-    const journalPath = path.join(
-      process.cwd(),
-      'drizzle',
-      'migrations',
-      'meta',
-      '_journal.json'
-    );
-    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+    const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
       entries?: Array<{ tag: string; when: number }>;
     };
 
@@ -436,12 +425,7 @@ async function runMigrations() {
     );
 
     for (const entry of entries) {
-      const migrationPath = path.join(
-        process.cwd(),
-        'drizzle',
-        'migrations',
-        `${entry.tag}.sql`
-      );
+      const migrationPath = path.join(migrationsDir, `${entry.tag}.sql`);
 
       const sqlText = readFileSync(migrationPath, 'utf8');
       const hash = crypto.createHash('sha256').update(sqlText).digest('hex');
@@ -467,7 +451,7 @@ async function runMigrations() {
 
     const start = Date.now();
     await migrate(db, {
-      migrationsFolder: './drizzle/migrations',
+      migrationsFolder: migrationsDir,
       migrationsSchema,
       migrationsTable: '__drizzle_migrations',
     });
