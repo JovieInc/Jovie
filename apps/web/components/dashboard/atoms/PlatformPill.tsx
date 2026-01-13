@@ -92,13 +92,23 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     );
 
     const borderColors = React.useMemo(() => {
+      /**
+       * Helper to generate border colors for a specific state color.
+       * Eliminates duplication for ready/error states.
+       */
+      const createStateBorder = (colorHex: string) => {
+        const baseAlpha = tone === 'faded' ? 0.35 : 0.55;
+        return {
+          base: hexToRgba(colorHex, baseAlpha),
+          hover: hexToRgba(colorHex, 0.65),
+        };
+      };
+
       if (state === 'ready') {
-        const color = hexToRgba('#22c55e', tone === 'faded' ? 0.35 : 0.55);
-        return { base: color, hover: hexToRgba('#22c55e', 0.65) };
+        return createStateBorder('#22c55e');
       }
       if (state === 'error') {
-        const color = hexToRgba('#ef4444', tone === 'faded' ? 0.35 : 0.55);
-        return { base: color, hover: hexToRgba('#ef4444', 0.65) };
+        return createStateBorder('#ef4444');
       }
 
       const baseAlpha = tone === 'faded' ? 0.45 : 0.65;
