@@ -12,6 +12,7 @@ vi.mock('@/lib/hooks/useArtistSearch', () => ({
     searchImmediate: vi.fn(),
     clear: vi.fn(),
     query: '',
+    isPending: false,
   })),
 }));
 
@@ -52,6 +53,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: mockClear,
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -96,6 +98,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -139,6 +142,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -186,6 +190,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -222,6 +227,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -249,6 +255,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -287,6 +294,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -314,6 +322,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: '',
+        isPending: false,
       });
 
       render(
