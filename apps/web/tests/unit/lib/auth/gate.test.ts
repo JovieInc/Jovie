@@ -499,7 +499,7 @@ describe('gate.ts', () => {
       // Email should be trimmed and lowercased
       expect(callArgs).toEqual(
         expect.objectContaining({
-          params: expect.arrayContaining(['test@example.com']),
+          queryChunks: expect.arrayContaining(['test@example.com']),
         })
       );
     });

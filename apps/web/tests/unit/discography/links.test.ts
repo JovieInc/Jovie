@@ -21,7 +21,7 @@ describe('discography smart link helpers', () => {
 
   it('appends provider overrides when present', () => {
     const path = buildSmartLinkPath('release-abc--profile-123', 'spotify');
-    expect(path).toBe('/r/release-abc--profile-123?provider=spotify');
+    expect(path).toBe('/r/release-abc--profile-123?dsp=spotify');
 
     const url = buildSmartLinkUrl(
       'https://main.jov.ie',
@@ -29,7 +29,7 @@ describe('discography smart link helpers', () => {
       'soundcloud'
     );
     expect(url).toBe(
-      'https://main.jov.ie/r/release-abc--profile-123?provider=soundcloud'
+      'https://main.jov.ie/r/release-abc--profile-123?dsp=soundcloud'
     );
   });
 });

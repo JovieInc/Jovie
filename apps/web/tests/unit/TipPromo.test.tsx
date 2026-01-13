@@ -63,7 +63,7 @@ describe('TipPromo', () => {
 
     // Check CTA button styling - now uses CTAButton component classes
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
-    expect(ctaButton).toHaveClass('bg-surface-2');
+    expect(ctaButton).toHaveClass('bg-surface-1', 'hover:bg-surface-2');
   });
 
   it('contains "Tip, instantly." heading when feature flag is enabled', () => {

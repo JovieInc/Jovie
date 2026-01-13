@@ -37,6 +37,7 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
 // Track virtualized rows for testing
 let capturedVirtualItems: { index: number; start: number }[] = [];
 let capturedRowCount = 0;
+let capturedEstimatedRowHeight = 0;
 
 // Mock @tanstack/react-virtual to track virtualization behavior
 vi.mock('@tanstack/react-virtual', () => ({
@@ -48,6 +49,7 @@ vi.mock('@tanstack/react-virtual', () => ({
   }) => {
     capturedRowCount = options.count;
     const estimatedRowHeight = options.estimateSize();
+    capturedEstimatedRowHeight = estimatedRowHeight;
     const overscan = options.overscan;
 
     // Simulate viewport of 600px height (~10 visible rows at 60px each)
@@ -124,6 +126,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
   beforeEach(() => {
     capturedVirtualItems = [];
     capturedRowCount = 0;
+    capturedEstimatedRowHeight = 0;
     vi.clearAllMocks();
   });
 
@@ -220,8 +223,9 @@ describe('DashboardAudienceTable - Virtualization', () => {
       );
 
       const tbody = container.querySelector('tbody');
-      // 500 rows * 60px estimated height = 30000px
-      expect(tbody).toHaveStyle({ height: '30000px' });
+      expect(tbody).toHaveStyle({
+        height: `${largeDataset.length * capturedEstimatedRowHeight}px`,
+      });
     });
   });
 
@@ -264,14 +268,16 @@ describe('DashboardAudienceTable - Virtualization', () => {
       expect(renderedRows.length).toBeLessThan(100);
 
       // Total virtual size should reflect all rows
-      expect(tbody).toHaveStyle({ height: '60000px' }); // 1000 * 60px
+      expect(tbody).toHaveStyle({
+        height: `${veryLargeDataset.length * capturedEstimatedRowHeight}px`,
+      });
     });
   });
 
   describe('virtualization configuration', () => {
     const testDataset = generateMockAudienceMembers(100);
 
-    it('uses correct estimated row height (60px)', () => {
+    it('uses correct estimated row height (44px)', () => {
       render(
         <DashboardAudienceTable
           {...defaultProps}
@@ -280,7 +286,9 @@ describe('DashboardAudienceTable - Virtualization', () => {
         />
       );
 
-      // Check tbody height calculation: 100 rows * 60px = 6000px
+      expect(capturedEstimatedRowHeight).toBe(44);
+
+      // Check tbody height calculation based on estimated row height
       const { container } = render(
         <DashboardAudienceTable
           {...defaultProps}
@@ -290,7 +298,9 @@ describe('DashboardAudienceTable - Virtualization', () => {
       );
 
       const tbody = container.querySelector('tbody');
-      expect(tbody).toHaveStyle({ height: '6000px' });
+      expect(tbody).toHaveStyle({
+        height: `${testDataset.length * capturedEstimatedRowHeight}px`,
+      });
     });
 
     it('applies translateY transform to position rows', () => {

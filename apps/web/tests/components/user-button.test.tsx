@@ -137,8 +137,9 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     fireEvent.click(screen.getByText('Adele Adkins'));
+    await flushMicrotasks();
 
-    fireEvent.click(screen.getByText('Upgrade to Pro'));
+    fireEvent.click(await screen.findByText('Upgrade to Pro'));
 
     await flushMicrotasks();
 
@@ -182,8 +183,9 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     fireEvent.click(screen.getByText('Adele Adkins'));
+    await flushMicrotasks();
 
-    fireEvent.click(screen.getByText('Manage billing'));
+    fireEvent.click(await screen.findByText('Manage billing'));
 
     await flushMicrotasks();
 
