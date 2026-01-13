@@ -13,7 +13,7 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+const baseUrl = (process.env.BASE_URL ?? 'http://localhost:3100').trim();
 const baseHostname = (() => {
   try {
     return new URL(baseUrl).hostname;
@@ -23,6 +23,13 @@ const baseHostname = (() => {
 })();
 const isMarketingBaseUrl =
   baseHostname === 'meetjovie.com' || baseHostname === 'www.meetjovie.com';
+
+const describePublicProfile = isMarketingBaseUrl
+  ? test.describe.skip
+  : test.describe;
+const describeErrorHandling = isMarketingBaseUrl
+  ? test.describe.skip
+  : test.describe;
 
 /**
  * Public Smoke Tests - No Authentication Required
@@ -148,12 +155,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
   // PUBLIC PROFILE TESTS
   // =========================================================================
-  test.describe('Public Profile', () => {
-    test.skip(
-      isMarketingBaseUrl,
-      `Public profile smoke is not supported on ${baseHostname}`
-    );
-
+  describePublicProfile('Public Profile', () => {
     test('loads and displays creator name', async ({ page }, testInfo) => {
       const { getContext, cleanup } = setupPageMonitoring(page);
 
@@ -279,7 +281,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
   // 404 / ERROR HANDLING TESTS
   // =========================================================================
-  test.describe('Error Handling', () => {
+  describeErrorHandling('Error Handling', () => {
     test('404 for non-existent profile', async ({ page }, testInfo) => {
       const { getContext, cleanup } = setupPageMonitoring(page);
 
