@@ -148,6 +148,32 @@ export async function getUserIdFromStripeCustomer(
 }
 
 /**
+ * Check if a Stripe subscription is currently active.
+ *
+ * A subscription is considered active if its status is either:
+ * - 'active' - Subscription is active and paid
+ * - 'trialing' - Subscription is in trial period (free access)
+ *
+ * Used for determining user access and billing states.
+ *
+ * @param status - The Stripe subscription status
+ * @returns true if subscription is active or trialing, false otherwise
+ *
+ * @example
+ * ```ts
+ * const subscription: Stripe.Subscription = { status: 'active', ... };
+ * if (isActiveSubscription(subscription.status)) {
+ *   // Grant user access
+ * }
+ * ```
+ */
+export function isActiveSubscription(
+  status: Stripe.Subscription.Status
+): boolean {
+  return status === 'active' || status === 'trialing';
+}
+
+/**
  * Invalidate client-side billing cache by triggering Next.js revalidation.
  *
  * This revalidates the paths that display billing information, causing
