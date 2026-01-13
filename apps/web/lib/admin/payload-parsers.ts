@@ -33,142 +33,79 @@ async function parseRequestBody<T>(
 // TOGGLE PAYLOADS (Single boolean field)
 // ============================================================================
 
+/**
+ * Generic toggle payload parser factory.
+ * Reduces code duplication for single-field toggle operations.
+ * @internal
+ */
+function createToggleParser<TKey extends string>(
+  fieldName: TKey,
+  defaultValue = true
+) {
+  type Payload = { profileId: string } & Record<TKey, boolean>;
+
+  return async (request: NextRequest): Promise<Payload> => {
+    return parseRequestBody(
+      request,
+      // JSON parser
+      json => {
+        const payload = json as { profileId?: string } & Partial<
+          Record<TKey, boolean>
+        >;
+
+        if (!payload.profileId || typeof payload[fieldName] !== 'boolean') {
+          throw new Error(`profileId and ${fieldName} are required`);
+        }
+
+        return {
+          profileId: payload.profileId,
+          [fieldName]: payload[fieldName],
+        } as Payload;
+      },
+      // FormData parser
+      formData => {
+        const profileId = formData.get('profileId');
+        const fieldValue = formData.get(fieldName);
+
+        if (typeof profileId !== 'string' || profileId.length === 0) {
+          throw new Error('profileId is required');
+        }
+
+        const boolValue =
+          typeof fieldValue === 'string' ? fieldValue === 'true' : defaultValue;
+
+        return {
+          profileId,
+          [fieldName]: boolValue,
+        } as Payload;
+      }
+    );
+  };
+}
+
 export type ToggleMarketingPayload = {
   profileId: string;
   nextMarketingOptOut: boolean;
 };
 
-export async function parseToggleMarketingPayload(
-  request: NextRequest
-): Promise<ToggleMarketingPayload> {
-  return parseRequestBody(
-    request,
-    // JSON parser
-    json => {
-      const payload = json as {
-        profileId?: string;
-        nextMarketingOptOut?: boolean;
-      };
-
-      if (
-        !payload.profileId ||
-        typeof payload.nextMarketingOptOut !== 'boolean'
-      ) {
-        throw new Error('profileId and nextMarketingOptOut are required');
-      }
-
-      return {
-        profileId: payload.profileId,
-        nextMarketingOptOut: payload.nextMarketingOptOut,
-      };
-    },
-    // FormData parser
-    formData => {
-      const profileId = formData.get('profileId');
-      const nextMarketingOptOut = formData.get('nextMarketingOptOut');
-
-      if (typeof profileId !== 'string' || profileId.length === 0) {
-        throw new Error('profileId is required');
-      }
-
-      const marketingOptOut =
-        typeof nextMarketingOptOut === 'string'
-          ? nextMarketingOptOut === 'true'
-          : false;
-
-      return {
-        profileId,
-        nextMarketingOptOut: marketingOptOut,
-      };
-    }
-  );
-}
+export const parseToggleMarketingPayload =
+  createToggleParser<'nextMarketingOptOut'>('nextMarketingOptOut', false);
 
 export type ToggleFeaturedPayload = {
   profileId: string;
   nextFeatured: boolean;
 };
 
-export async function parseToggleFeaturedPayload(
-  request: NextRequest
-): Promise<ToggleFeaturedPayload> {
-  return parseRequestBody(
-    request,
-    // JSON parser
-    json => {
-      const payload = json as { profileId?: string; nextFeatured?: boolean };
-
-      if (!payload.profileId || typeof payload.nextFeatured !== 'boolean') {
-        throw new Error('profileId and nextFeatured are required');
-      }
-
-      return {
-        profileId: payload.profileId,
-        nextFeatured: payload.nextFeatured,
-      };
-    },
-    // FormData parser
-    formData => {
-      const profileId = formData.get('profileId');
-      const nextFeatured = formData.get('nextFeatured');
-
-      if (typeof profileId !== 'string' || profileId.length === 0) {
-        throw new Error('profileId is required');
-      }
-
-      const isFeatured =
-        typeof nextFeatured === 'string' ? nextFeatured === 'true' : true;
-
-      return {
-        profileId,
-        nextFeatured: isFeatured,
-      };
-    }
-  );
-}
+export const parseToggleFeaturedPayload =
+  createToggleParser<'nextFeatured'>('nextFeatured');
 
 export type ToggleVerifyPayload = {
   profileId: string;
   nextVerified: boolean;
 };
 
-export async function parseToggleVerifyPayload(
-  request: NextRequest
-): Promise<ToggleVerifyPayload> {
-  return parseRequestBody(
-    request,
-    // JSON parser
-    json => {
-      const payload = json as { profileId?: string; nextVerified?: boolean };
-
-      if (!payload.profileId || typeof payload.nextVerified !== 'boolean') {
-        throw new Error('profileId and nextVerified are required');
-      }
-
-      return {
-        profileId: payload.profileId,
-        nextVerified: payload.nextVerified,
-      };
-    },
-    // FormData parser
-    formData => {
-      const profileId = formData.get('profileId');
-      const nextVerified = formData.get('nextVerified');
-
-      if (typeof profileId !== 'string' || profileId.length === 0) {
-        throw new Error('profileId is required');
-      }
-
-      const isVerified =
-        typeof nextVerified === 'string' ? nextVerified === 'true' : true;
-
-      return {
-        profileId,
-        nextVerified: isVerified,
-      };
-    }
-  );
-}
+export const parseToggleVerifyPayload =
+  createToggleParser<'nextVerified'>('nextVerified');
 
 // ============================================================================
 // DELETE PAYLOAD
@@ -214,141 +151,95 @@ export async function parseDeletePayload(
 // BULK PAYLOADS (Array of profile IDs + optional boolean)
 // ============================================================================
 
+/**
+ * Generic bulk payload parser factory.
+ * Reduces code duplication for bulk operations with optional boolean field.
+ * @internal
+ */
+function createBulkParser<TKey extends string>(
+  fieldName?: TKey,
+  defaultValue = true
+) {
+  type Payload = { profileIds: string[] } & (TKey extends string
+    ? Record<TKey, boolean>
+    : object);
+
+  return async (request: NextRequest): Promise<Payload> => {
+    return parseRequestBody(
+      request,
+      // JSON parser
+      json => {
+        const payload = json as { profileIds?: unknown } & (TKey extends string
+          ? Partial<Record<TKey, boolean>>
+          : object);
+
+        if (!isStringArray(payload.profileIds)) {
+          throw new Error('profileIds is required');
+        }
+
+        if (fieldName) {
+          const fieldValue = (payload as Record<string, unknown>)[fieldName];
+          if (typeof fieldValue !== 'boolean') {
+            throw new Error(`profileIds and ${fieldName} are required`);
+          }
+          return {
+            profileIds: payload.profileIds,
+            [fieldName]: fieldValue,
+          } as Payload;
+        }
+
+        return { profileIds: payload.profileIds } as Payload;
+      },
+      // FormData parser
+      formData => {
+        const profileIdsRaw = formData.get('profileIds');
+
+        if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
+          throw new Error('profileIds is required');
+        }
+
+        const parsed = JSON.parse(profileIdsRaw) as unknown;
+        if (!isStringArray(parsed)) {
+          throw new Error('profileIds must be an array');
+        }
+
+        if (fieldName) {
+          const fieldValue = formData.get(fieldName);
+          const boolValue =
+            typeof fieldValue === 'string'
+              ? fieldValue === 'true'
+              : defaultValue;
+
+          return {
+            profileIds: parsed,
+            [fieldName]: boolValue,
+          } as Payload;
+        }
+
+        return { profileIds: parsed } as Payload;
+      }
+    );
+  };
+}
+
 export type BulkFeaturePayload = {
   profileIds: string[];
   nextFeatured: boolean;
 };
 
-export async function parseBulkFeaturePayload(
-  request: NextRequest
-): Promise<BulkFeaturePayload> {
-  return parseRequestBody(
-    request,
-    // JSON parser
-    json => {
-      const payload = json as { profileIds?: unknown; nextFeatured?: boolean };
-
-      if (
-        !isStringArray(payload.profileIds) ||
-        typeof payload.nextFeatured !== 'boolean'
-      ) {
-        throw new Error('profileIds and nextFeatured are required');
-      }
-
-      return {
-        profileIds: payload.profileIds,
-        nextFeatured: payload.nextFeatured,
-      };
-    },
-    // FormData parser
-    formData => {
-      const profileIdsRaw = formData.get('profileIds');
-      const nextFeatured = formData.get('nextFeatured');
-
-      if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-        throw new Error('profileIds is required');
-      }
-
-      const parsed = JSON.parse(profileIdsRaw) as unknown;
-      if (!isStringArray(parsed)) {
-        throw new Error('profileIds must be an array');
-      }
-
-      const isFeatured =
-        typeof nextFeatured === 'string' ? nextFeatured === 'true' : true;
-
-      return {
-        profileIds: parsed,
-        nextFeatured: isFeatured,
-      };
-    }
-  );
-}
+export const parseBulkFeaturePayload =
+  createBulkParser<'nextFeatured'>('nextFeatured');
 
 export type BulkVerifyPayload = {
   profileIds: string[];
   nextVerified: boolean;
 };
 
-export async function parseBulkVerifyPayload(
-  request: NextRequest
-): Promise<BulkVerifyPayload> {
-  return parseRequestBody(
-    request,
-    // JSON parser
-    json => {
-      const payload = json as { profileIds?: unknown; nextVerified?: boolean };
-
-      if (
-        !isStringArray(payload.profileIds) ||
-        typeof payload.nextVerified !== 'boolean'
-      ) {
-        throw new Error('profileIds and nextVerified are required');
-      }
-
-      return {
-        profileIds: payload.profileIds,
-        nextVerified: payload.nextVerified,
-      };
-    },
-    // FormData parser
-    formData => {
-      const profileIdsRaw = formData.get('profileIds');
-      const nextVerified = formData.get('nextVerified');
-
-      if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-        throw new Error('profileIds is required');
-      }
-
-      const parsed = JSON.parse(profileIdsRaw) as unknown;
-      if (!isStringArray(parsed)) {
-        throw new Error('profileIds must be an array');
-      }
-
-      const isVerified =
-        typeof nextVerified === 'string' ? nextVerified === 'true' : true;
-
-      return {
-        profileIds: parsed,
-        nextVerified: isVerified,
-      };
-    }
-  );
-}
+export const parseBulkVerifyPayload =
+  createBulkParser<'nextVerified'>('nextVerified');
 
 export type BulkRefreshPayload = {
   profileIds: string[];
 };
 
-export async function parseBulkRefreshPayload(
-  request: NextRequest
-): Promise<BulkRefreshPayload> {
-  return parseRequestBody(
-    request,
-    // JSON parser
-    json => {
-      const payload = json as { profileIds?: unknown };
-
-      if (!isStringArray(payload.profileIds)) {
-        throw new Error('profileIds is required');
-      }
-
-      return { profileIds: payload.profileIds };
-    },
-    // FormData parser
-    formData => {
-      const profileIdsRaw = formData.get('profileIds');
-
-      if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-        throw new Error('profileIds is required');
-      }
-
-      const parsed = JSON.parse(profileIdsRaw) as unknown;
-      if (!isStringArray(parsed)) {
-        throw new Error('profileIds must be an array');
-      }
-
-      return { profileIds: parsed };
-    }
-  );
-}
+export const parseBulkRefreshPayload = createBulkParser();
