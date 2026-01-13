@@ -341,7 +341,6 @@ jobs:
           exit 0
 
       - name: Resolve Neon DB URL (job-local)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve_neon
         uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
         with:
@@ -370,7 +369,6 @@ jobs:
           fi
 
       - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Run Drizzle Check
@@ -683,6 +681,77 @@ jobs:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
+  ci-e2e-migrate:
+    name: E2E DB Migrate
+    needs: [ci-fast, ci-build, neon-db]
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping E2E DB migrate as no critical paths were changed."
+          echo "To force a full CI run, add the 'testing' label to the PR."
+          exit 0
+
+      - name: Setup Node.js and pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Resolve Neon DB URL (job-local)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve_neon
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ needs.neon-db.outputs.branch_name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL for E2E
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
+          if [ -n "$CANDIDATE" ]; then
+            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+          else
+            echo "No Neon ephemeral DB URL available from neon-db job."
+          fi
+
+      - name: Fail if Neon DB URL is missing (E2E)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run E2E against staging/production DBs."
+            exit 1
+          fi
+
+      - name: Run migrations for E2E DB
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: ${{ github.ref_name }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
   ci-merge-smoke:
     name: Merge Group Smoke
     if: ${{ github.event_name == 'merge_group' }}
@@ -705,44 +774,30 @@ jobs:
   ci-e2e-tests:
     name: E2E Tests
     # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
-    needs: [ci-fast, ci-build, neon-db]
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
     # E2E runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
-      # Check if E2E-related changes require running this job
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
-      # Skip remaining steps if no relevant changes
-      - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+      - name: Set shard env
         run: |
-          echo "Skipping E2E tests as no critical paths were changed."
-          echo "To force a full CI run, add the 'testing' label to the PR."
-          exit 0
+          echo "SHARD_TOTAL=2" >> $GITHUB_ENV
+          echo "SHARD_INDEX=${{ matrix.shard }}" >> $GITHUB_ENV
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
       - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Resolve Neon DB URL (job-local)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve_neon
         uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
         with:
@@ -752,7 +807,6 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL for E2E
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           SRC=""
@@ -767,24 +821,14 @@ jobs:
           echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
 
       - name: Fail if Neon DB URL is missing (E2E)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           if [[ -z "$DATABASE_URL" ]]; then
             echo "No Neon ephemeral DATABASE_URL available. Refusing to run E2E against staging/production DBs."
             exit 1
           fi
 
-      - name: Run migrations for E2E DB
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          GIT_BRANCH: ${{ github.ref_name }}
-          ALLOW_PROD_MIGRATIONS: 'true'
-
       - name: Cache Playwright Browsers
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
@@ -794,13 +838,13 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
           pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Load quarantined E2E specs
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         id: quarantine
         run: |
           FILE="apps/web/tests/quarantine.json"
@@ -836,7 +880,7 @@ jobs:
           fi
 
       - name: E2E Smoke (PR to Preview)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         env:
           SMOKE_ONLY: '1'
         run: |
@@ -845,10 +889,10 @@ jobs:
             exit 0
           fi
           # Chrome-only for PRs - faster feedback, Firefox runs on main only
-          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
+        if: ${{ matrix.shard == 1 && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -865,32 +909,32 @@ jobs:
           cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
 
       - name: E2E Full (Main Branch)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test --reporter=line --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_quarantine == 'true' }}
+        if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
         continue-on-error: true
         run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
-        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ github.job }}-shard-${{ matrix.shard }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
           retention-days: 7
 
       - name: Upload Playwright Test Results on Failure
-        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 7
 
@@ -1032,7 +1076,7 @@ jobs:
             --collect.url="$PREVIEW_URL/tim"
 
   ci-summary:
-    name: CI Summary
+    name: PR Summary
     if: ${{ always() && github.event_name == 'pull_request' }}
     permissions:
       actions: read
@@ -1051,6 +1095,7 @@ jobs:
       - ci-build
       - ci-unit-tests
       - ci-test-performance
+      - ci-e2e-migrate
       - ci-e2e-tests
       - ci-pr-vercel-preview
       - ci-lighthouse-pr
@@ -1062,7 +1107,7 @@ jobs:
         env:
           BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
           DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
-          E2E_RUN_FULL_CI: ${{ needs.ci-e2e-tests.outputs.run_full_ci }}
+          E2E_RUN_FULL_CI: ${{ needs.ci-e2e-migrate.outputs.run_full_ci }}
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
           UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
