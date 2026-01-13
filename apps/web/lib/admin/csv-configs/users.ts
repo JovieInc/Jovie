@@ -5,7 +5,7 @@
 
 import type { AdminUserRow } from '@/lib/admin/users';
 import type { CSVColumn } from '@/lib/utils/csv';
-import { capitalize } from '@/lib/utils/csv';
+import { capitalize, formatYesNo } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting admin user data.
@@ -38,7 +38,7 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
   {
     header: 'Is Pro',
     accessor: 'isPro',
-    formatter: value => (value ? 'Yes' : 'No'),
+    formatter: formatYesNo,
   },
   {
     header: 'Stripe Customer ID',

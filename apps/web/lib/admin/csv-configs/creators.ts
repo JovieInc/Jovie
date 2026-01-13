@@ -5,7 +5,7 @@
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { CSVColumn } from '@/lib/utils/csv';
-import { capitalize } from '@/lib/utils/csv';
+import { capitalize, formatYesNo } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting admin creator profile data.
@@ -37,22 +37,22 @@ export const creatorsCSVColumns: CSVColumn<AdminCreatorProfileRow>[] = [
   {
     header: 'Is Verified',
     accessor: 'isVerified',
-    formatter: value => (value ? 'Yes' : 'No'),
+    formatter: formatYesNo,
   },
   {
     header: 'Is Featured',
     accessor: 'isFeatured',
-    formatter: value => (value ? 'Yes' : 'No'),
+    formatter: formatYesNo,
   },
   {
     header: 'Is Claimed',
     accessor: 'isClaimed',
-    formatter: value => (value ? 'Yes' : 'No'),
+    formatter: formatYesNo,
   },
   {
     header: 'Marketing Opt Out',
     accessor: 'marketingOptOut',
-    formatter: value => (value ? 'Yes' : 'No'),
+    formatter: formatYesNo,
   },
   {
     header: 'User ID',
