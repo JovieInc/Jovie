@@ -10,6 +10,7 @@ import {
   type RowSelectionState,
   type SortingState,
   useReactTable,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import React, { useCallback, useMemo, useRef } from 'react';
@@ -60,6 +61,17 @@ export interface UnifiedTableProps<TData> {
    * Sorting change handler
    */
   onSortingChange?: OnChangeFn<SortingState>;
+
+  /**
+   * Column visibility state (controlled)
+   * Use with useColumnVisibility hook for full integration
+   */
+  columnVisibility?: VisibilityState;
+
+  /**
+   * Column visibility change handler
+   */
+  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
    * Enable virtualization for large datasets
@@ -170,6 +182,8 @@ export function UnifiedTable<TData>({
   onRowSelectionChange,
   sorting,
   onSortingChange,
+  columnVisibility,
+  onColumnVisibilityChange,
   enableVirtualization,
   rowHeight = 52,
   overscan = 5,
@@ -196,9 +210,11 @@ export function UnifiedTable<TData>({
     state: {
       rowSelection,
       sorting,
+      columnVisibility,
     },
     onRowSelectionChange,
     onSortingChange,
+    onColumnVisibilityChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getRowId,

@@ -3,6 +3,7 @@
 import { Button, Input } from '@jovie/ui';
 import { CheckCircle, Star, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -27,6 +28,10 @@ export interface AdminCreatorsToolbarProps {
   onBulkFeature?: () => void;
   onBulkDelete?: () => void;
   onClearSelection?: () => void;
+  /**
+   * Optional display menu for column visibility and other display options
+   */
+  displayMenu?: ReactNode;
 }
 
 export function AdminCreatorsToolbar({
@@ -45,6 +50,7 @@ export function AdminCreatorsToolbar({
   onBulkFeature,
   onBulkDelete,
   onClearSelection,
+  displayMenu,
 }: AdminCreatorsToolbarProps) {
   const [searchTerm, setSearchTerm] = useState(search);
   const selectedCount = selectedIds.size;
@@ -154,6 +160,7 @@ export function AdminCreatorsToolbar({
               disabled={profiles.length === 0}
               ariaLabel='Export creator profiles to CSV file'
             />
+            {displayMenu}
           </div>
         </>
       )}

@@ -16,6 +16,8 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { AvatarCell } from '@/components/admin/table/atoms/AvatarCell';
 import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
+import type { ColumnConfig } from '@/components/admin/table/molecules/ColumnToggleGroup';
+import { DisplayMenuDropdown } from '@/components/admin/table/molecules/DisplayMenuDropdown';
 import { SocialLinksCell } from '@/components/admin/table/molecules/SocialLinksCell';
 import {
   type ContextMenuItemType,
@@ -24,6 +26,7 @@ import {
 import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
+import { useColumnVisibility } from '@/components/admin/table/useColumnVisibility';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
@@ -39,6 +42,31 @@ import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 import { CONTACT_PANEL_WIDTH } from './utils';
+
+/**
+ * Column configuration for the Creators table
+ *
+ * - select: Checkbox column (always visible, not in toggle list)
+ * - avatar: Creator name + avatar (required, cannot be hidden)
+ * - social: Social links (toggleable, visible by default)
+ * - dspLinks: DSP/streaming links (toggleable, hidden by default)
+ * - created: Created date (toggleable, visible by default)
+ * - verified: Verified status (toggleable, hidden by default)
+ * - claimed: Claimed status (toggleable, hidden by default)
+ * - actions: Actions column (always visible, not in toggle list)
+ */
+const CREATORS_COLUMN_CONFIG: ColumnConfig[] = [
+  { id: 'avatar', label: 'Creator', canToggle: false, defaultVisible: true },
+  {
+    id: 'social',
+    label: 'Social Links',
+    canToggle: true,
+    defaultVisible: true,
+  },
+  { id: 'created', label: 'Created', canToggle: true, defaultVisible: true },
+  { id: 'verified', label: 'Verified', canToggle: true, defaultVisible: false },
+  { id: 'claimed', label: 'Claimed', canToggle: true, defaultVisible: false },
+];
 
 const DeleteCreatorDialog = dynamic(
   () =>
@@ -165,6 +193,16 @@ export function AdminCreatorProfilesUnified({
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
     selectedId,
     onRefreshComplete: hydrateContactSocialLinks,
+  });
+
+  // Column visibility state with localStorage persistence
+  const {
+    visibility: columnVisibility,
+    tanstackVisibility,
+    toggleColumn,
+  } = useColumnVisibility({
+    columns: CREATORS_COLUMN_CONFIG,
+    storageKey: 'creators-table-columns',
   });
 
   const { handleAvatarUpload } = useAvatarUpload();
@@ -517,6 +555,50 @@ export function AdminCreatorProfilesUnified({
         size: 180,
       }),
 
+      // Verified Status column (toggleable)
+      columnHelper.accessor('isVerified', {
+        id: 'verified',
+        header: 'Verified',
+        cell: ({ row }) => {
+          const profile = row.original;
+          return (
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                profile.isVerified
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+              )}
+            >
+              {profile.isVerified ? 'Verified' : 'Not verified'}
+            </span>
+          );
+        },
+        size: 120,
+      }),
+
+      // Claimed Status column (toggleable)
+      columnHelper.accessor('isClaimed', {
+        id: 'claimed',
+        header: 'Claimed',
+        cell: ({ row }) => {
+          const profile = row.original;
+          return (
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                profile.isClaimed
+                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+              )}
+            >
+              {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
+            </span>
+          );
+        },
+        size: 120,
+      }),
+
       // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
@@ -695,6 +777,13 @@ export function AdminCreatorProfilesUnified({
               onBulkFeature={handleBulkFeature}
               onBulkDelete={handleBulkDelete}
               onClearSelection={handleClearSelection}
+              displayMenu={
+                <DisplayMenuDropdown
+                  columnConfig={CREATORS_COLUMN_CONFIG}
+                  columnVisibility={columnVisibility}
+                  onColumnVisibilityChange={toggleColumn}
+                />
+              }
             />
           }
           footer={
@@ -724,6 +813,7 @@ export function AdminCreatorProfilesUnified({
               }
               rowSelection={rowSelection}
               onRowSelectionChange={handleRowSelectionChange}
+              columnVisibility={tanstackVisibility}
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}

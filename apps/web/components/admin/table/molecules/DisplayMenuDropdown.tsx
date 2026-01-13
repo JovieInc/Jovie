@@ -15,6 +15,8 @@ import {
 import { LayoutGrid, LayoutList, Settings2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import type { ColumnConfig, ColumnVisibilityState } from './ColumnToggleGroup';
+import { ColumnToggleGroup } from './ColumnToggleGroup';
 
 export type ViewMode = 'list' | 'board' | 'timeline';
 export type Density = 'compact' | 'normal' | 'comfortable';
@@ -57,9 +59,15 @@ export interface DisplayMenuDropdownProps {
    */
   onColumnVisibilityChange?: (columnId: string, visible: boolean) => void;
   /**
-   * Available columns to toggle
+   * Available columns to toggle (legacy format - use columnConfig instead)
+   * @deprecated Use columnConfig instead for full feature support
    */
   availableColumns?: Array<{ id: string; label: string }>;
+  /**
+   * Column configuration with full toggle support (Linear.app style)
+   * When provided, uses the new pill-style toggles
+   */
+  columnConfig?: ColumnConfig[];
   /**
    * Whether grouping is enabled
    */
@@ -72,6 +80,11 @@ export interface DisplayMenuDropdownProps {
    * Label for grouping toggle (e.g., "Group by status")
    */
   groupingLabel?: string;
+  /**
+   * Use Linear.app style column toggles instead of checkboxes
+   * @default true when columnConfig is provided
+   */
+  useLinearStyleToggles?: boolean;
 }
 
 const viewModeIcons: Record<ViewMode, ReactNode> = {
@@ -123,14 +136,22 @@ export function DisplayMenuDropdown({
   columnVisibility,
   onColumnVisibilityChange,
   availableColumns = [],
+  columnConfig,
   groupingEnabled = false,
   onGroupingToggle,
   groupingLabel = 'Group rows',
+  useLinearStyleToggles,
 }: DisplayMenuDropdownProps) {
   const hasViewModeOptions = availableViewModes.length > 1 && onViewModeChange;
   const hasDensityOptions = onDensityChange;
+
+  // Determine if we should use Linear.app style toggles
+  const useLinearStyle = useLinearStyleToggles ?? columnConfig !== undefined;
+
+  // Check if we have column options (either legacy or new style)
   const hasColumnOptions =
-    availableColumns.length > 0 && onColumnVisibilityChange;
+    (columnConfig && columnConfig.length > 0 && onColumnVisibilityChange) ||
+    (availableColumns.length > 0 && onColumnVisibilityChange);
   const hasGroupingOption = onGroupingToggle;
 
   const defaultTrigger = (
@@ -214,20 +235,32 @@ export function DisplayMenuDropdown({
         {/* Column Visibility Section */}
         {hasColumnOptions && (
           <>
-            <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {availableColumns.map(column => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  checked={columnVisibility?.[column.id] ?? true}
-                  onCheckedChange={checked =>
-                    onColumnVisibilityChange?.(column.id, checked)
-                  }
-                >
-                  {column.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
+            <DropdownMenuLabel>Columns</DropdownMenuLabel>
+            {useLinearStyle && columnConfig ? (
+              // Linear.app style pill toggles
+              <div className='px-2 py-2'>
+                <ColumnToggleGroup
+                  columns={columnConfig}
+                  visibility={(columnVisibility as ColumnVisibilityState) ?? {}}
+                  onVisibilityChange={onColumnVisibilityChange!}
+                />
+              </div>
+            ) : (
+              // Legacy checkbox style
+              <DropdownMenuGroup>
+                {availableColumns.map(column => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    checked={columnVisibility?.[column.id] ?? true}
+                    onCheckedChange={checked =>
+                      onColumnVisibilityChange?.(column.id, checked)
+                    }
+                  >
+                    {column.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
+            )}
             <DropdownMenuSeparator />
           </>
         )}
