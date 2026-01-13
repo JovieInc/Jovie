@@ -9,6 +9,41 @@ import type { DetectedLink, PlatformInfo } from './types';
 import { getValidationError, validateUrl } from './validator';
 
 /**
+ * Generate title for Spotify links based on URL structure
+ */
+function getSpotifyTitle(url: string, platformName: string): string {
+  if (url.includes('/artist/')) return `${platformName} Artist`;
+  if (url.includes('/album/')) return `${platformName} Album`;
+  if (url.includes('/track/')) return `${platformName} Track`;
+  return platformName;
+}
+
+/**
+ * Generate title for social media platforms with usernames
+ */
+function getSocialMediaTitle(
+  parsedUrl: URL,
+  platform: PlatformInfo,
+  creatorName?: string
+): string {
+  const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+  const username = pathParts[0]?.replace('@', '') || '';
+
+  if (creatorName) {
+    return `${creatorName} on ${platform.name}`;
+  }
+
+  if (username) {
+    if (platform.id === 'tiktok') {
+      return `${platform.name} (@${username})`;
+    }
+    return `@${username} on ${platform.name}`;
+  }
+
+  return platform.name;
+}
+
+/**
  * Generate a suggested title for the link
  * @param url The URL to generate a title for
  * @param platform The platform info
@@ -22,51 +57,21 @@ function generateSuggestedTitle(
   try {
     const parsedUrl = new URL(url);
 
-    // Extract meaningful parts for different platforms
+    // Platform-specific title generation
     switch (platform.id) {
       case 'spotify':
-        if (url.includes('/artist/')) {
-          return `${platform.name} Artist`;
-        }
-        if (url.includes('/album/')) {
-          return `${platform.name} Album`;
-        }
-        if (url.includes('/track/')) {
-          return `${platform.name} Track`;
-        }
-        return platform.name;
+        return getSpotifyTitle(url, platform.name);
 
       case 'instagram':
       case 'twitter':
       case 'tiktok':
       case 'youtube':
       case 'facebook':
-      case 'linkedin': {
-        const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-        const username = pathParts[0]?.replace('@', '') || '';
+      case 'linkedin':
+        return getSocialMediaTitle(parsedUrl, platform, creatorName);
 
-        // If we have a creator name, use it in the title
-        if (creatorName) {
-          return `${creatorName} on ${platform.name}`;
-        }
-
-        // Fall back to username if available
-        if (username) {
-          if (platform.id === 'tiktok') {
-            return `${platform.name} (@${username})`;
-          }
-          return `@${username} on ${platform.name}`;
-        }
-
-        return platform.name;
-      }
-
-      case 'youtube-channel': {
-        if (creatorName) {
-          return `${creatorName} on YouTube`;
-        }
-        return 'YouTube Channel';
-      }
+      case 'youtube-channel':
+        return creatorName ? `${creatorName} on YouTube` : 'YouTube Channel';
 
       default:
         return platform.name;

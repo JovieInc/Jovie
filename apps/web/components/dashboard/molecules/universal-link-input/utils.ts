@@ -28,6 +28,61 @@ export function looksLikeUrlOrDomain(value: string): boolean {
   return false;
 }
 
+interface FuzzyMatchState {
+  score: number;
+  lastMatchIdx: number;
+  targetIdx: number;
+}
+
+/**
+ * Find the next match for a character in the target string.
+ * Returns updated state if found, null if not found.
+ */
+function findNextMatch(
+  char: string,
+  target: string,
+  state: FuzzyMatchState
+): FuzzyMatchState | null {
+  let { targetIdx } = state;
+
+  while (targetIdx < target.length) {
+    if (target[targetIdx] === char) {
+      const consecutive = state.lastMatchIdx === targetIdx - 1;
+      const pointsAdded = consecutive ? 3 : 1;
+
+      return {
+        score: state.score + pointsAdded,
+        lastMatchIdx: targetIdx,
+        targetIdx: targetIdx + 1,
+      };
+    }
+    targetIdx += 1;
+  }
+
+  return null;
+}
+
+/**
+ * Apply bonus scoring based on match quality.
+ */
+function applyBonusScoring(
+  baseScore: number,
+  query: string,
+  target: string
+): number {
+  let score = baseScore;
+
+  // Bonus for exact prefix match
+  if (target.startsWith(query)) {
+    score += 6;
+  }
+
+  // Penalty for longer targets (prefer "x" over "twitter")
+  score -= Math.min(target.length, 40) * 0.05;
+
+  return score;
+}
+
 /**
  * Calculate a fuzzy match score between a query and target string.
  * Returns null if no match, otherwise a score (higher is better).
@@ -37,33 +92,23 @@ export function fuzzyScore(queryRaw: string, targetRaw: string): number | null {
   const target = normalizeQuery(targetRaw);
   if (!query) return null;
 
-  let score = 0;
-  let lastMatchIdx = -1;
-  let tIdx = 0;
+  let state: FuzzyMatchState = {
+    score: 0,
+    lastMatchIdx: -1,
+    targetIdx: 0,
+  };
 
   for (let qIdx = 0; qIdx < query.length; qIdx += 1) {
     const qChar = query[qIdx];
     if (qChar === ' ') continue;
 
-    let found = false;
-    while (tIdx < target.length) {
-      if (target[tIdx] === qChar) {
-        found = true;
-        const consecutive = lastMatchIdx === tIdx - 1;
-        score += consecutive ? 3 : 1;
-        lastMatchIdx = tIdx;
-        tIdx += 1;
-        break;
-      }
-      tIdx += 1;
-    }
-    if (!found) return null;
+    const nextState = findNextMatch(qChar, target, state);
+    if (!nextState) return null;
+
+    state = nextState;
   }
 
-  if (target.startsWith(query)) score += 6;
-  // Prefer shorter targets (e.g., "x" vs "twitter") when same match strength.
-  score -= Math.min(target.length, 40) * 0.05;
-  return score;
+  return applyBonusScoring(state.score, query, target);
 }
 
 /**
