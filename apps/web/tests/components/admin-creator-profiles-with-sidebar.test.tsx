@@ -97,8 +97,9 @@ describe('AdminCreatorProfilesWithSidebar', () => {
 
     const handleText = screen.getByText('@alice');
     expect(handleText.closest('a')).toHaveAttribute('href', '/alice');
-    expect(screen.getAllByText('Claimed').length).toBeGreaterThan(0);
-    expect(screen.getByText('Not verified')).toBeInTheDocument();
+    // Claimed/verified are conveyed via aria-labels on icon buttons
+    expect(screen.getByLabelText('Claimed')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Not verified/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Showing 1[\u2013-]1 of 1 profiles/)
     ).toBeInTheDocument();
@@ -142,7 +143,7 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     );
 
     expect(screen.getByText('@bob')).toBeInTheDocument();
-    expect(screen.getByText('Unclaimed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Not claimed')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Creator actions' })
     ).toBeInTheDocument();
