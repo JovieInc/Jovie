@@ -266,6 +266,52 @@ export async function handleClerkUserDeleted(
 }
 
 /**
+ * Helper: Get user ID from Clerk ID.
+ * @internal Used by syncAdminRoleChange
+ */
+async function getUserIdByClerkId(clerkId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  return user?.id ?? null;
+}
+
+/**
+ * Helper: Log admin role change to audit log.
+ * @internal Used by syncAdminRoleChange
+ */
+async function logAdminRoleChange(
+  adminClerkUserId: string,
+  targetClerkUserId: string,
+  isAdmin: boolean,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<void> {
+  const adminUserId = await getUserIdByClerkId(adminClerkUserId);
+  const targetUserId = await getUserIdByClerkId(targetClerkUserId);
+
+  if (!adminUserId || !targetUserId) {
+    return;
+  }
+
+  await db.insert(adminAuditLog).values({
+    adminUserId,
+    targetUserId,
+    action: isAdmin ? 'admin_role_granted' : 'admin_role_revoked',
+    metadata: {
+      targetClerkUserId,
+      newRole: isAdmin ? 'admin' : 'user',
+      changedAt: new Date().toISOString(),
+    },
+    ipAddress: ipAddress ?? null,
+    userAgent: userAgent ?? null,
+  });
+}
+
+/**
  * Syncs admin role change to Clerk metadata and logs the action.
  *
  * @param targetClerkUserId - The Clerk user ID whose role is changing
@@ -297,32 +343,13 @@ export async function syncAdminRoleChange(
 
     // Log the admin action if we have admin context
     if (adminClerkUserId) {
-      const [adminUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, adminClerkUserId))
-        .limit(1);
-
-      const [targetUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, targetClerkUserId))
-        .limit(1);
-
-      if (adminUser && targetUser) {
-        await db.insert(adminAuditLog).values({
-          adminUserId: adminUser.id,
-          targetUserId: targetUser.id,
-          action: isAdmin ? 'admin_role_granted' : 'admin_role_revoked',
-          metadata: {
-            targetClerkUserId,
-            newRole: isAdmin ? 'admin' : 'user',
-            changedAt: new Date().toISOString(),
-          },
-          ipAddress: ipAddress ?? null,
-          userAgent: userAgent ?? null,
-        });
-      }
+      await logAdminRoleChange(
+        adminClerkUserId,
+        targetClerkUserId,
+        isAdmin,
+        ipAddress,
+        userAgent
+      );
     }
 
     console.info(
