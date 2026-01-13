@@ -1,8 +1,17 @@
 'use client';
 
+/**
+ * Table Search Bar Component
+ *
+ * Search input with debouncing powered by TanStack Pacer.
+ *
+ * @see https://tanstack.com/pacer
+ */
+
 import { Input } from '@jovie/ui';
+import { useDebouncer } from '@tanstack/react-pacer';
 import { Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface TableSearchBarProps {
@@ -22,21 +31,29 @@ export function TableSearchBar({
 }: TableSearchBarProps) {
   const [localValue, setLocalValue] = useState(value);
 
+  // TanStack Pacer debouncer for search
+  const debouncer = useDebouncer(
+    (newValue: string) => {
+      onChange(newValue);
+    },
+    { wait: debounceMs }
+  );
+
   // Sync external value changes to local state
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
 
-  // Debounce the onChange callback
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (localValue !== value) {
-        onChange(localValue);
+  // Handle input change with debouncing
+  const handleChange = useCallback(
+    (newValue: string) => {
+      setLocalValue(newValue);
+      if (newValue !== value) {
+        debouncer.maybeExecute(newValue);
       }
-    }, debounceMs);
-
-    return () => clearTimeout(timer);
-  }, [localValue, debounceMs, onChange, value]);
+    },
+    [value, debouncer]
+  );
 
   return (
     <div className={cn('relative flex items-center', className)}>
@@ -44,7 +61,7 @@ export function TableSearchBar({
       <Input
         type='search'
         value={localValue}
-        onChange={e => setLocalValue(e.target.value)}
+        onChange={e => handleChange(e.target.value)}
         placeholder={placeholder}
         className='pl-9 h-9 text-sm'
       />

@@ -30,7 +30,8 @@ export function SettingsProfileSection({
     setProfileSaveStatus,
     handleAvatarUpload,
     handleAvatarUpdate,
-    debouncedProfileSave,
+    saveProfile,
+    flushSave,
   } = useSettingsProfile({
     artist,
     onArtistUpdate,
@@ -108,14 +109,14 @@ export function SettingsProfileSection({
                           success: null,
                           error: null,
                         }));
-                        debouncedProfileSave({
+                        saveProfile({
                           displayName: next.displayName,
                           username: next.username,
                         });
                         return next;
                       });
                     }}
-                    onBlur={() => debouncedProfileSave.flush()}
+                    onBlur={() => flushSave()}
                     placeholder='yourname'
                     className='flex-1 min-w-0'
                     inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors'
@@ -145,14 +146,14 @@ export function SettingsProfileSection({
                       success: null,
                       error: null,
                     }));
-                    debouncedProfileSave({
+                    saveProfile({
                       displayName: next.displayName,
                       username: next.username,
                     });
                     return next;
                   });
                 }}
-                onBlur={() => debouncedProfileSave.flush()}
+                onBlur={() => flushSave()}
                 placeholder='The name your fans will see'
                 inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />

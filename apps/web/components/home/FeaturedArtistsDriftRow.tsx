@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * Featured Artists Drift Row Component
+ *
+ * Parallax row of featured creators with scroll-based animation,
+ * using TanStack Pacer for throttled scroll and resize handling.
+ *
+ * @see https://tanstack.com/pacer
+ */
+
+import { useThrottler } from '@tanstack/react-pacer';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
@@ -12,6 +22,8 @@ export interface FeaturedArtistsDriftRowProps {
 }
 
 const MAX_SHIFT_PX = 56;
+// Use 16ms throttle (~60fps) for smooth parallax animations
+const ANIMATION_THROTTLE_MS = 16;
 
 export function FeaturedArtistsDriftRow({
   creators,
@@ -20,19 +32,11 @@ export function FeaturedArtistsDriftRow({
   const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rowRef = useRef<HTMLDivElement | null>(null);
-  const rafRef = useRef<number | null>(null);
   const shiftPxRef = useRef<number>(0);
 
-  useEffect(() => {
-    if (prefersReducedMotion) {
-      shiftPxRef.current = 0;
-      if (rowRef.current) {
-        rowRef.current.style.transform = '';
-      }
-      return;
-    }
-
-    const update = () => {
+  // TanStack Pacer throttler for scroll/resize events
+  const throttler = useThrottler(
+    () => {
       const el = containerRef.current;
       if (!el) return;
 
@@ -58,29 +62,35 @@ export function FeaturedArtistsDriftRow({
           rowRef.current.style.transform = `translate3d(${-nextShift}px, 0, 0)`;
         }
       }
-    };
+    },
+    { wait: ANIMATION_THROTTLE_MS, leading: true, trailing: true }
+  );
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      shiftPxRef.current = 0;
+      if (rowRef.current) {
+        rowRef.current.style.transform = '';
+      }
+      return;
+    }
 
     const onScrollOrResize = () => {
-      if (rafRef.current != null) return;
-      rafRef.current = window.requestAnimationFrame(() => {
-        rafRef.current = null;
-        update();
-      });
+      throttler.maybeExecute();
     };
 
-    update();
+    // Initial update
+    throttler.maybeExecute();
+
     window.addEventListener('scroll', onScrollOrResize, { passive: true });
     window.addEventListener('resize', onScrollOrResize);
 
     return () => {
       window.removeEventListener('scroll', onScrollOrResize);
       window.removeEventListener('resize', onScrollOrResize);
-      if (rafRef.current != null) {
-        window.cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
+      throttler.cancel();
     };
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, throttler]);
 
   return (
     <div className='relative w-full'>
