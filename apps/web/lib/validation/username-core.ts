@@ -186,6 +186,18 @@ export interface DetailedValidationResult {
 // ============================================================================
 
 /**
+ * Create validation error result.
+ * Eliminates duplication in error return statements.
+ */
+function createValidationError(
+  errorCode: UsernameValidationErrorCode,
+  error: string,
+  suggestion?: string
+): DetailedValidationResult {
+  return { isValid: false, errorCode, error, suggestion };
+}
+
+/**
  * Validates a username against all rules.
  * This is the core validation function used by both client and server.
  *
@@ -197,11 +209,7 @@ export function validateUsernameCore(
 ): DetailedValidationResult {
   // Check if empty
   if (!username || username.trim() === '') {
-    return {
-      isValid: false,
-      errorCode: 'EMPTY',
-      error: 'Username is required',
-    };
+    return createValidationError('EMPTY', 'Username is required');
   }
 
   // Normalize username
@@ -209,65 +217,58 @@ export function validateUsernameCore(
 
   // Check length
   if (normalized.length < USERNAME_MIN_LENGTH) {
-    return {
-      isValid: false,
-      errorCode: 'TOO_SHORT',
-      error: `Handle must be at least ${USERNAME_MIN_LENGTH} characters`,
-    };
+    return createValidationError(
+      'TOO_SHORT',
+      `Handle must be at least ${USERNAME_MIN_LENGTH} characters`
+    );
   }
 
   if (normalized.length > USERNAME_MAX_LENGTH) {
-    return {
-      isValid: false,
-      errorCode: 'TOO_LONG',
-      error: `Handle must be no more than ${USERNAME_MAX_LENGTH} characters`,
-    };
+    return createValidationError(
+      'TOO_LONG',
+      `Handle must be no more than ${USERNAME_MAX_LENGTH} characters`
+    );
   }
 
   // Check pattern (alphanumeric and hyphen only)
   if (!USERNAME_PATTERN.test(normalized)) {
-    return {
-      isValid: false,
-      errorCode: 'INVALID_CHARS',
-      error: 'Handle can only contain letters, numbers, and hyphens',
-    };
+    return createValidationError(
+      'INVALID_CHARS',
+      'Handle can only contain letters, numbers, and hyphens'
+    );
   }
 
   // Check if starts with number or hyphen
   if (/^[0-9-]/.test(normalized)) {
-    return {
-      isValid: false,
-      errorCode: 'STARTS_WITH_NUMBER_OR_HYPHEN',
-      error: 'Handle must start with a letter',
-    };
+    return createValidationError(
+      'STARTS_WITH_NUMBER_OR_HYPHEN',
+      'Handle must start with a letter'
+    );
   }
 
   // Check if ends with hyphen
   if (normalized.endsWith('-')) {
-    return {
-      isValid: false,
-      errorCode: 'ENDS_WITH_HYPHEN',
-      error: 'Handle cannot end with a hyphen',
-    };
+    return createValidationError(
+      'ENDS_WITH_HYPHEN',
+      'Handle cannot end with a hyphen'
+    );
   }
 
   // Check for consecutive hyphens
   if (normalized.includes('--')) {
-    return {
-      isValid: false,
-      errorCode: 'CONSECUTIVE_HYPHENS',
-      error: 'Handle cannot contain consecutive hyphens',
-    };
+    return createValidationError(
+      'CONSECUTIVE_HYPHENS',
+      'Handle cannot contain consecutive hyphens'
+    );
   }
 
   // Check reserved words
   if (RESERVED_SET.has(normalized)) {
-    return {
-      isValid: false,
-      errorCode: 'RESERVED',
-      error: 'This handle is reserved and cannot be used',
-      suggestion: `${username}-artist`,
-    };
+    return createValidationError(
+      'RESERVED',
+      'This handle is reserved and cannot be used',
+      `${username}-artist`
+    );
   }
 
   // Check if it's a reserved pattern (e.g., starts with reserved word)
@@ -278,11 +279,10 @@ export function validateUsernameCore(
   );
 
   if (startsWithReserved) {
-    return {
-      isValid: false,
-      errorCode: 'RESERVED_PATTERN',
-      error: 'This username pattern is reserved',
-    };
+    return createValidationError(
+      'RESERVED_PATTERN',
+      'This username pattern is reserved'
+    );
   }
 
   return { isValid: true };
