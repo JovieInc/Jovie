@@ -46,7 +46,7 @@ export default defineConfig({
       threads: {
         // Optimize thread pool
         minThreads: 1,
-        maxThreads: 4,
+        maxThreads: 2,
         useAtomics: true,
       },
     },

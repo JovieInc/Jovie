@@ -497,9 +497,11 @@ describe('gate.ts', () => {
       expect(whereMock).toHaveBeenCalled();
       const callArgs = whereMock.mock.calls[0][0];
       // Email should be trimmed and lowercased
-      expect(callArgs).toMatchObject({
-        email: 'test@example.com',
-      });
+      expect(callArgs).toEqual(
+        expect.objectContaining({
+          params: expect.arrayContaining(['test@example.com']),
+        })
+      );
     });
   });
 });

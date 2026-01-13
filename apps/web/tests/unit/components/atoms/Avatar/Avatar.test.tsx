@@ -203,6 +203,20 @@ describe('Avatar Component', () => {
   });
 
   describe('Custom Props', () => {
+    function assertNonNull<T>(
+      value: T,
+      message: string
+    ): asserts value is NonNullable<T> {
+      if (value == null) throw new Error(message);
+    }
+
+    const getAvatarWrapper = (altText: string): HTMLElement => {
+      const labeledElement = screen.getByLabelText(altText);
+      const wrapper = labeledElement.parentElement;
+      assertNonNull(wrapper, 'Expected avatar wrapper element');
+      return wrapper;
+    };
+
     it('accepts custom className', () => {
       render(
         <Avatar
@@ -213,8 +227,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveClass('custom-avatar-class');
+      const wrapper = getAvatarWrapper('User avatar');
+      expect(wrapper).toHaveClass('custom-avatar-class');
     });
 
     it('accepts custom style props', () => {
@@ -229,10 +243,12 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
+      const wrapper = getAvatarWrapper('User avatar');
       // Check that style attribute exists and contains our custom styles
-      expect(container).toHaveAttribute('style');
-      const style = container.getAttribute('style');
+      expect(wrapper).toHaveAttribute('style');
+      const style = wrapper.getAttribute('style');
+      if (!style)
+        throw new Error('Expected avatar wrapper to have inline styles');
       expect(style).toContain('border');
       expect(style).toContain('opacity');
     });
