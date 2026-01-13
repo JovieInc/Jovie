@@ -16,7 +16,6 @@ import type { AdminCreatorProfilesWithSidebarProps } from "./types";
 import { useAvatarUpload } from "./useAvatarUpload";
 import { useContactHydration } from "./useContactHydration";
 import { useIngestRefresh } from "./useIngestRefresh";
-import { CONTACT_PANEL_WIDTH } from "./utils";
 
 export function useAdminCreatorProfiles({
 	profiles: initialProfiles,

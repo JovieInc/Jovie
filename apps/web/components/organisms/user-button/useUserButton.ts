@@ -1,138 +1,138 @@
-'use client';
+"use client";
 
-import { useClerk, useUser } from '@clerk/nextjs';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useBillingStatus } from '@/hooks/useBillingStatus';
-import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
-import type { Artist } from '@/types/db';
-import { useUserMenuActions } from '../useUserMenuActions';
-import type { UserDisplayInfo } from './types';
+import { useClerk, useUser } from "@clerk/nextjs";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useBillingStatus } from "@/hooks/useBillingStatus";
+import { upgradeOAuthAvatarUrl } from "@/lib/utils/avatar-url";
+import type { Artist } from "@/types/db";
+import { useUserMenuActions } from "../useUserMenuActions";
+import type { UserDisplayInfo } from "./types";
 
 export interface UseUserButtonProps {
-  artist?: Artist | null;
-  profileHref?: string;
-  settingsHref?: string;
+	artist?: Artist | null;
+	profileHref?: string;
+	settingsHref?: string;
 }
 
 export interface UseUserButtonReturn {
-  isLoaded: boolean;
-  user: ReturnType<typeof useUser>['user'];
-  isMenuOpen: boolean;
-  setIsMenuOpen: (open: boolean) => void;
-  isFeedbackOpen: boolean;
-  setIsFeedbackOpen: (open: boolean) => void;
-  billingStatus: ReturnType<typeof useBillingStatus>;
-  userInfo: UserDisplayInfo;
-  menuActions: ReturnType<typeof useUserMenuActions>;
+	isLoaded: boolean;
+	user: ReturnType<typeof useUser>["user"];
+	isMenuOpen: boolean;
+	setIsMenuOpen: (open: boolean) => void;
+	isFeedbackOpen: boolean;
+	setIsFeedbackOpen: (open: boolean) => void;
+	billingStatus: ReturnType<typeof useBillingStatus>;
+	userInfo: UserDisplayInfo;
+	menuActions: ReturnType<typeof useUserMenuActions>;
 }
 
 export function useUserButton({
-  artist,
-  profileHref,
-  settingsHref,
+	artist,
+	profileHref,
+	settingsHref,
 }: UseUserButtonProps): UseUserButtonReturn {
-  const { isLoaded, user } = useUser();
-  const { signOut } = useClerk();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const billingStatus = useBillingStatus();
-  const billingErrorNotifiedRef = useRef(false);
+	const { isLoaded, user } = useUser();
+	const { signOut } = useClerk();
+	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+	const billingStatus = useBillingStatus();
+	const billingErrorNotifiedRef = useRef(false);
 
-  const redirectToUrl = (url: string) => {
-    if (typeof window === 'undefined') return;
-    if (typeof window.location.assign === 'function') {
-      window.location.assign(url);
-      return;
-    }
-    window.location.href = url;
-  };
+	const redirectToUrl = (url: string) => {
+		if (typeof window === "undefined") return;
+		if (typeof window.location.assign === "function") {
+			window.location.assign(url);
+			return;
+		}
+		window.location.href = url;
+	};
 
-  useEffect(() => {
-    if (billingStatus.error && !billingErrorNotifiedRef.current) {
-      toast.error(
-        "Couldn't confirm your plan. Billing actions may be unavailable.",
-        { duration: 6000, id: 'billing-status-error' }
-      );
-      billingErrorNotifiedRef.current = true;
-    }
+	useEffect(() => {
+		if (billingStatus.error && !billingErrorNotifiedRef.current) {
+			toast.error(
+				"Couldn't confirm your plan. Billing actions may be unavailable.",
+				{ duration: 6000, id: "billing-status-error" },
+			);
+			billingErrorNotifiedRef.current = true;
+		}
 
-    if (!billingStatus.error) {
-      billingErrorNotifiedRef.current = false;
-    }
-  }, [billingStatus.error]);
+		if (!billingStatus.error) {
+			billingErrorNotifiedRef.current = false;
+		}
+	}, [billingStatus.error]);
 
-  // User display info - upgrade OAuth avatar to high resolution
-  const userImageUrl = useMemo(
-    () => upgradeOAuthAvatarUrl(user?.imageUrl) ?? undefined,
-    [user?.imageUrl]
-  );
-  const contactEmail =
-    user?.primaryEmailAddress?.emailAddress ||
-    user?.emailAddresses?.[0]?.emailAddress;
+	// User display info - upgrade OAuth avatar to high resolution
+	const userImageUrl = useMemo(
+		() => upgradeOAuthAvatarUrl(user?.imageUrl) ?? undefined,
+		[user?.imageUrl],
+	);
+	const contactEmail =
+		user?.primaryEmailAddress?.emailAddress ||
+		user?.emailAddresses?.[0]?.emailAddress;
 
-  const emailDerivedName = contactEmail?.split('@')[0]?.replace(/[._-]+/g, ' ');
+	const emailDerivedName = contactEmail?.split("@")[0]?.replace(/[._-]+/g, " ");
 
-  const displayName =
-    artist?.name ||
-    user?.fullName ||
-    (user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName) ||
-    user?.username ||
-    artist?.handle ||
-    emailDerivedName ||
-    'Artist';
+	const displayName =
+		artist?.name ||
+		user?.fullName ||
+		(user?.firstName && user?.lastName
+			? `${user.firstName} ${user.lastName}`
+			: user?.firstName) ||
+		user?.username ||
+		artist?.handle ||
+		emailDerivedName ||
+		"Artist";
 
-  const userInitials = displayName
-    ? displayName
-        .split(' ')
-        .map((n: string) => n[0] ?? '')
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'A';
+	const userInitials = displayName
+		? displayName
+				.split(" ")
+				.map((n: string) => n[0] ?? "")
+				.join("")
+				.toUpperCase()
+				.slice(0, 2)
+		: "A";
 
-  const profileUrl =
-    profileHref ??
-    (user?.username
-      ? `/${user.username}`
-      : artist?.handle
-        ? `/${artist.handle}`
-        : '/app/settings');
-  const settingsUrl = settingsHref ?? '/app/settings';
+	const profileUrl =
+		profileHref ??
+		(user?.username
+			? `/${user.username}`
+			: artist?.handle
+				? `/${artist.handle}`
+				: "/app/settings");
+	const settingsUrl = settingsHref ?? "/app/settings";
 
-  const jovieUsername =
-    user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
-  const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
+	const jovieUsername =
+		user?.username || artist?.handle || contactEmail?.split("@")[0] || null;
+	const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
 
-  const menuActions = useUserMenuActions({
-    billingStatus,
-    profileUrl,
-    redirectToUrl,
-    settingsUrl,
-    signOut,
-  });
+	const menuActions = useUserMenuActions({
+		billingStatus,
+		profileUrl,
+		redirectToUrl,
+		settingsUrl,
+		signOut,
+	});
 
-  const userInfo: UserDisplayInfo = {
-    userImageUrl,
-    displayName,
-    userInitials,
-    contactEmail,
-    formattedUsername,
-    profileUrl,
-    settingsUrl,
-  };
+	const userInfo: UserDisplayInfo = {
+		userImageUrl,
+		displayName,
+		userInitials,
+		contactEmail,
+		formattedUsername,
+		profileUrl,
+		settingsUrl,
+	};
 
-  return {
-    isLoaded,
-    user,
-    isMenuOpen,
-    setIsMenuOpen,
-    isFeedbackOpen,
-    setIsFeedbackOpen,
-    billingStatus,
-    userInfo,
-    menuActions,
-  };
+	return {
+		isLoaded,
+		user,
+		isMenuOpen,
+		setIsMenuOpen,
+		isFeedbackOpen,
+		setIsFeedbackOpen,
+		billingStatus,
+		userInfo,
+		menuActions,
+	};
 }
