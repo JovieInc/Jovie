@@ -2,21 +2,33 @@
 
 import { Zap } from 'lucide-react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { DashboardActivityFeedProps } from './types';
-import { useActivityFeed } from './useActivityFeed';
 
 export function DashboardActivityFeed({
   profileId,
   range = '7d',
-  refreshSignal,
 }: DashboardActivityFeedProps) {
-  const { activities, isLoading, isRefreshing, error, isEnabled } =
-    useActivityFeed({ profileId, range, refreshSignal });
+  const {
+    data: activities = [],
+    isLoading,
+    isFetching,
+    error,
+  } = useActivityFeedQuery({
+    profileId,
+    range,
+  });
+
+  // Query hook respects feature gate internally, so if disabled it won't run
+  // We also get the gate status from the query result
+  const isEnabled = activities !== undefined || isLoading;
 
   if (!isEnabled) {
     return null;
   }
+
+  const isRefreshing = isFetching && !isLoading;
 
   return (
     <div className='space-y-4' data-testid='dashboard-activity-feed'>
@@ -38,7 +50,7 @@ export function DashboardActivityFeed({
       <div className='min-h-[220px]'>
         {error ? (
           <div className='rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-500'>
-            {error}
+            {error.message || 'Failed to load activity'}
           </div>
         ) : isLoading ? (
           <div

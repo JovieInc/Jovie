@@ -36,19 +36,19 @@ export const queryKeys = {
   // Dashboard data queries
   dashboard: {
     all: ['dashboard'] as const,
-    analytics: (period?: string) =>
+    analytics: (view?: string, range?: string) =>
       [
         ...queryKeys.dashboard.all,
         'analytics',
-        ...(period === undefined ? [] : [period]),
+        ...(view === undefined ? [] : [{ view, range }]),
       ] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
     socialLinks: () => [...queryKeys.dashboard.all, 'social-links'] as const,
-    activityFeed: (page?: number) =>
+    activityFeed: (profileId?: string, range?: string) =>
       [
         ...queryKeys.dashboard.all,
         'activity-feed',
-        ...(page === undefined ? [] : [page]),
+        ...(profileId === undefined ? [] : [{ profileId, range }]),
       ] as const,
   },
 
