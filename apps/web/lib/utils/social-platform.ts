@@ -61,6 +61,37 @@ export function detectPlatformFromUrl(url: string): PlatformDetectionResult {
 }
 
 /**
+ * Platform-specific configuration for handle extraction.
+ */
+interface PlatformHandleConfig {
+  hosts: string[];
+  requiresAtSymbol: boolean;
+}
+
+/**
+ * Platform configurations for handle extraction.
+ * Centralizes host lists and extraction rules.
+ */
+const PLATFORM_CONFIGS: Record<string, PlatformHandleConfig> = {
+  instagram: {
+    hosts: ['instagram.com', 'www.instagram.com'],
+    requiresAtSymbol: false,
+  },
+  tiktok: {
+    hosts: ['tiktok.com', 'www.tiktok.com'],
+    requiresAtSymbol: false,
+  },
+  youtube: {
+    hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
+    requiresAtSymbol: true,
+  },
+  linktree: {
+    hosts: ['linktr.ee', 'www.linktr.ee'],
+    requiresAtSymbol: false,
+  },
+};
+
+/**
  * Extract username/handle from a social media URL.
  *
  * This function attempts to parse a social media URL and extract the username
@@ -88,38 +119,20 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     const url = new URL(urlRaw);
     const host = url.hostname.toLowerCase();
 
-    // Define allowed hosts for each platform (include common subdomains)
-    const INSTAGRAM_HOSTS = ['instagram.com', 'www.instagram.com'];
-    const TIKTOK_HOSTS = ['tiktok.com', 'www.tiktok.com'];
-    const YOUTUBE_HOSTS = ['youtube.com', 'www.youtube.com', 'm.youtube.com'];
-    const LINKTREE_HOSTS = ['linktr.ee', 'www.linktr.ee'];
+    // Find matching platform configuration
+    for (const config of Object.values(PLATFORM_CONFIGS)) {
+      if (config.hosts.includes(host)) {
+        const seg = url.pathname.split('/').filter(Boolean)[0];
+        if (!seg) return null;
 
-    // Instagram: instagram.com/username
-    if (INSTAGRAM_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      return seg ? seg.replace(/^@/, '') : null;
-    }
+        // YouTube requires @ symbol, others allow it optionally
+        if (config.requiresAtSymbol) {
+          return seg.startsWith('@') ? seg.slice(1) : null;
+        }
 
-    // TikTok: tiktok.com/@username
-    if (TIKTOK_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      return seg ? seg.replace(/^@/, '') : null;
-    }
-
-    // YouTube: youtube.com/@channelname
-    if (YOUTUBE_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      if (!seg) return null;
-
-      // YouTube handles must start with @
-      if (seg.startsWith('@')) return seg.slice(1);
-      return null;
-    }
-
-    // Linktree: linktr.ee/username
-    if (LINKTREE_HOSTS.includes(host)) {
-      const seg = url.pathname.split('/').filter(Boolean)[0];
-      return seg ? seg.replace(/^@/, '') : null;
+        // Strip @ symbol if present
+        return seg.replace(/^@/, '');
+      }
     }
 
     // Unsupported platform or unable to extract
