@@ -98,6 +98,24 @@ export function formatYesNo(value: unknown): string {
 }
 
 /**
+ * Format an optional value as a string, returning empty string if falsy.
+ * Common formatter for CSV nullable/optional fields.
+ *
+ * @param value - The value to format (will be converted to string if truthy)
+ * @returns String representation of value, or empty string if falsy
+ *
+ * @example
+ * formatOptionalString('hello') // 'hello'
+ * formatOptionalString(null) // ''
+ * formatOptionalString(undefined) // ''
+ * formatOptionalString('') // ''
+ * formatOptionalString(123) // '123'
+ */
+export function formatOptionalString(value: unknown): string {
+  return value ? String(value) : '';
+}
+
+/**
  * Format a Date value according to the specified format.
  *
  * @param date - The Date to format

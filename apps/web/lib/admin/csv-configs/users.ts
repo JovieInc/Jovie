@@ -5,7 +5,7 @@
 
 import type { AdminUserRow } from '@/lib/admin/users';
 import type { CSVColumn } from '@/lib/utils/csv';
-import { capitalize, formatYesNo } from '@/lib/utils/csv';
+import { capitalize, formatOptionalString, formatYesNo } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting admin user data.
@@ -23,12 +23,12 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
   {
     header: 'Name',
     accessor: 'name',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Email',
     accessor: 'email',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Plan',
@@ -43,12 +43,12 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
   {
     header: 'Stripe Customer ID',
     accessor: 'stripeCustomerId',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Stripe Subscription ID',
     accessor: 'stripeSubscriptionId',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Created At',
