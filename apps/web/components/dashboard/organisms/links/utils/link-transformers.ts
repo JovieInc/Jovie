@@ -232,6 +232,55 @@ export function convertLinksToDashboardFormat(links: LinkItem[]) {
 }
 
 /**
+ * Helper: Extract extended metadata from DetectedLink
+ * @internal Used by convertDetectedLinksToLinkItems
+ */
+function extractLinkMetadata(link: DetectedLink) {
+  const meta = link as unknown as {
+    id?: string;
+    state?: 'active' | 'suggested' | 'rejected';
+    confidence?: number | null;
+    sourcePlatform?: string | null;
+    sourceType?: 'manual' | 'admin' | 'ingested' | null;
+    evidence?: { sources?: string[]; signals?: string[] } | null;
+  };
+  return meta;
+}
+
+/**
+ * Helper: Extract visibility from DetectedLink
+ * @internal Used by convertDetectedLinksToLinkItems
+ */
+function extractLinkVisibility(link: DetectedLink): boolean {
+  const rawVisibility = (link as unknown as { isVisible?: boolean }).isVisible;
+  return rawVisibility ?? true;
+}
+
+/**
+ * Helper: Extract category from DetectedLink platform
+ * @internal Used by convertDetectedLinksToLinkItems
+ */
+function extractLinkCategory(link: DetectedLink): PlatformType {
+  const rawCategory = link.platform.category as PlatformType | undefined;
+  return rawCategory ?? 'custom';
+}
+
+/**
+ * Helper: Generate link ID from metadata
+ * @internal Used by convertDetectedLinksToLinkItems
+ */
+function generateLinkId(
+  metaId: string | undefined,
+  platformId: string,
+  category: PlatformType,
+  normalizedUrl: string,
+  originalUrl: string
+): string {
+  const idBase = normalizedUrl || originalUrl;
+  return metaId || `${platformId}::${category}::${idBase}`;
+}
+
+/**
  * Convert DetectedLink array to LinkItem array
  *
  * Used when receiving updates from GroupedLinksManager.
@@ -243,25 +292,19 @@ export function convertDetectedLinksToLinkItems(
   updated: DetectedLink[]
 ): LinkItem[] {
   return updated.map((link, index) => {
-    const meta = link as unknown as {
-      id?: string;
-      state?: 'active' | 'suggested' | 'rejected';
-      confidence?: number | null;
-      sourcePlatform?: string | null;
-      sourceType?: 'manual' | 'admin' | 'ingested' | null;
-      evidence?: { sources?: string[]; signals?: string[] } | null;
-    };
-    const rawVisibility = (link as unknown as { isVisible?: boolean })
-      .isVisible;
-    const isVisible = rawVisibility ?? true;
-    const rawCategory = link.platform.category as PlatformType | undefined;
-    const category: PlatformType = rawCategory ?? 'custom';
-
-    const idBase = link.normalizedUrl || link.originalUrl;
+    const meta = extractLinkMetadata(link);
+    const isVisible = extractLinkVisibility(link);
+    const category = extractLinkCategory(link);
     const state = meta.state ?? (isVisible ? 'active' : 'suggested');
 
     return {
-      id: meta.id || `${link.platform.id}::${category}::${idBase}`,
+      id: generateLinkId(
+        meta.id,
+        link.platform.id,
+        category,
+        link.normalizedUrl,
+        link.originalUrl
+      ),
       title: link.suggestedTitle || link.platform.name,
       url: link.normalizedUrl,
       platform: {
