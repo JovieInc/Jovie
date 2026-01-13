@@ -9,7 +9,6 @@ import {
   creatorProfiles,
   dashboardIdempotencyKeys,
   socialLinks,
-  users,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, TTL } from '@/lib/http/headers';
@@ -161,6 +160,7 @@ export async function GET(req: Request) {
         );
       }
 
+      // Fetch social links for the verified profile
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -179,22 +179,12 @@ export async function GET(req: Request) {
           version: socialLinks.version,
         })
         .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .leftJoin(
           socialLinks,
           eq(socialLinks.creatorProfileId, creatorProfiles.id)
         )
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
+        .where(eq(creatorProfiles.id, profileId))
         .orderBy(socialLinks.sortOrder);
-
-      if (rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
-      }
 
       const links = rows
         .filter(r => r.linkId !== null)
