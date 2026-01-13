@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
@@ -192,7 +193,7 @@ export async function GET(request: NextRequest) {
     const artists = await spotifyClient.searchArtists(q, limit);
 
     // Normalize response shape (data already sanitized by client)
-    const results: SpotifyArtistResult[] = artists.map(artist => ({
+    let results: SpotifyArtistResult[] = artists.map(artist => ({
       id: artist.spotifyId,
       name: artist.name,
       url: buildSpotifyArtistUrl(artist.spotifyId),
@@ -202,6 +203,42 @@ export async function GET(request: NextRequest) {
       // Spotify doesn't expose verified status via search API
       verified: undefined,
     }));
+
+    // VIP boost: Prioritize featured creators for exact name matches
+    try {
+      const vipMap = await getFeaturedCreatorsForSearch();
+      const normalizedQuery = q.toLowerCase().trim();
+      const vipArtist = vipMap.get(normalizedQuery);
+
+      if (vipArtist) {
+        // Check if VIP artist is already in results
+        const existingIndex = results.findIndex(
+          r => r.id === vipArtist.spotifyId
+        );
+
+        if (existingIndex > 0) {
+          // Move to top if already in results but not first
+          const [vipResult] = results.splice(existingIndex, 1);
+          results = [vipResult, ...results];
+        } else if (existingIndex === -1) {
+          // Add to top if not in results at all
+          const vipResult: SpotifyArtistResult = {
+            id: vipArtist.spotifyId,
+            name: vipArtist.name,
+            url: buildSpotifyArtistUrl(vipArtist.spotifyId),
+            imageUrl: vipArtist.imageUrl ?? undefined,
+            followers: vipArtist.followers,
+            popularity: vipArtist.popularity,
+            verified: undefined,
+          };
+          results = [vipResult, ...results.slice(0, limit - 1)];
+        }
+        // If existingIndex === 0, already at top, no action needed
+      }
+    } catch (vipError) {
+      // VIP lookup failure should not break search - log and continue
+      console.warn('[Spotify Search] VIP lookup failed:', vipError);
+    }
 
     // Cache the results
     searchCache.set(cacheKey, {

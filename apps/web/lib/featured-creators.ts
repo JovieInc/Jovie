@@ -11,6 +11,18 @@ export type FeaturedCreator = {
   src: string;
 };
 
+/**
+ * VIP artist data for search prioritization.
+ * Used to boost featured creators to the top of search results.
+ */
+export type VipArtist = {
+  spotifyId: string;
+  name: string;
+  imageUrl: string | null;
+  followers: number;
+  popularity: number;
+};
+
 function mulberry32(a: number) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -78,6 +90,69 @@ export const getFeaturedCreators = unstable_cache(
   ['featured-creators'],
   {
     revalidate: 60 * 60 * 24 * 7,
+    tags: ['featured-creators'],
+  }
+);
+
+/**
+ * Query featured creators for search VIP prioritization.
+ * Returns a Map of normalized display names to VIP artist data.
+ * Only includes creators with valid Spotify IDs.
+ */
+async function queryFeaturedCreatorsForSearch(): Promise<
+  Map<string, VipArtist>
+> {
+  if (!(await doesTableExist(TABLE_NAMES.creatorProfiles))) {
+    return new Map();
+  }
+
+  const data = await db
+    .select({
+      spotifyId: creatorProfiles.spotifyId,
+      displayName: creatorProfiles.displayName,
+      avatarUrl: creatorProfiles.avatarUrl,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
+    })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isFeatured, true),
+        eq(creatorProfiles.marketingOptOut, false)
+      )
+    );
+
+  const vipMap = new Map<string, VipArtist>();
+
+  for (const creator of data) {
+    // Skip creators without Spotify IDs
+    if (!creator.spotifyId || !creator.displayName) {
+      continue;
+    }
+
+    const normalizedName = creator.displayName.toLowerCase().trim();
+    vipMap.set(normalizedName, {
+      spotifyId: creator.spotifyId,
+      name: creator.displayName,
+      imageUrl: creator.avatarUrl,
+      followers: creator.spotifyFollowers ?? 0,
+      popularity: creator.spotifyPopularity ?? 0,
+    });
+  }
+
+  return vipMap;
+}
+
+/**
+ * Cached function to get VIP artists for search prioritization.
+ * Cache duration: 1 hour (shorter than featured creators since search is more dynamic)
+ */
+export const getFeaturedCreatorsForSearch = unstable_cache(
+  queryFeaturedCreatorsForSearch,
+  ['featured-creators-search'],
+  {
+    revalidate: 60 * 60, // 1 hour
     tags: ['featured-creators'],
   }
 );
