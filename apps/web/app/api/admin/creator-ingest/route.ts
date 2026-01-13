@@ -361,6 +361,91 @@ function extractHandleFromSocialUrl(url: string): string | null {
 }
 
 /**
+ * Process profile extraction: merge links, enqueue follow-up jobs, and calculate fit score.
+ *
+ * This consolidates the shared logic used in both re-ingest and new profile flows.
+ * Handles errors gracefully and ensures ingestion status is marked appropriately.
+ *
+ * @param tx - Database transaction
+ * @param profile - Profile information for merging
+ * @param extraction - Extracted profile data with links and metadata
+ * @param displayName - Display name to use if not locked
+ * @returns Object with mergeError if link processing failed
+ */
+async function processProfileExtraction(
+  tx: DbType,
+  profile: {
+    id: string;
+    usernameNormalized: string;
+    avatarUrl: string | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean;
+    displayNameLocked: boolean;
+  },
+  extraction: {
+    links: Array<{ url: string; platformId?: string; title?: string }>;
+    avatarUrl?: string | null;
+    hasPaidTier?: boolean | null;
+    displayName?: string | null;
+  },
+  displayName: string | null
+): Promise<{ mergeError: string | null }> {
+  let mergeError: string | null = null;
+
+  // Merge extracted links into profile
+  try {
+    await normalizeAndMergeExtraction(
+      tx,
+      {
+        id: profile.id,
+        usernameNormalized: profile.usernameNormalized,
+        avatarUrl: profile.avatarUrl,
+        displayName: profile.displayName ?? displayName,
+        avatarLockedByUser: profile.avatarLockedByUser,
+        displayNameLocked: profile.displayNameLocked,
+      },
+      extraction
+    );
+
+    // Enqueue follow-up ingestion jobs for discovered links
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: 0,
+      extraction,
+    });
+  } catch (error) {
+    mergeError =
+      error instanceof Error ? error.message : 'Link extraction failed';
+    logger.error('Link merge failed', {
+      profileId: profile.id,
+      error: mergeError,
+    });
+  }
+
+  // Mark ingestion as idle or failed based on merge result
+  await IngestionStatusManager.markIdleOrFailed(tx, profile.id, mergeError);
+
+  // Calculate fit score for the profile
+  try {
+    if (typeof extraction.hasPaidTier === 'boolean') {
+      await updatePaidTierScore(tx, profile.id, extraction.hasPaidTier);
+    }
+    await calculateAndStoreFitScore(tx, profile.id);
+  } catch (fitScoreError) {
+    logger.warn('Fit score calculation failed', {
+      profileId: profile.id,
+      error:
+        fitScoreError instanceof Error
+          ? fitScoreError.message
+          : 'Unknown error',
+    });
+  }
+
+  return { mergeError };
+}
+
+/**
  * Admin endpoint to ingest a creator profile from any social platform URL.
  *
  * Supported platforms:
@@ -595,61 +680,20 @@ export async function POST(request: Request) {
         const existing = existingCheck.existing;
 
         return await withSystemIngestionSession(async tx => {
-          let mergeError: string | null = null;
-          try {
-            await normalizeAndMergeExtraction(
-              tx,
-              {
-                id: existing.id,
-                usernameNormalized: existing.usernameNormalized,
-                avatarUrl: existing.avatarUrl ?? null,
-                displayName: existing.displayName ?? displayName,
-                avatarLockedByUser: existing.avatarLockedByUser ?? false,
-                displayNameLocked: existing.displayNameLocked ?? false,
-              },
-              extractionWithHostedAvatar
-            );
-
-            await enqueueFollowupIngestionJobs({
-              tx,
-              creatorProfileId: existing.id,
-              currentDepth: 0,
-              extraction: extractionWithHostedAvatar,
-            });
-          } catch (error) {
-            mergeError =
-              error instanceof Error ? error.message : 'Link extraction failed';
-            logger.error('Link merge failed', {
-              profileId: existing.id,
-              error: mergeError,
-            });
-          }
-
-          await IngestionStatusManager.markIdleOrFailed(
+          // Process extraction: merge links, enqueue jobs, calculate fit score
+          const { mergeError } = await processProfileExtraction(
             tx,
-            existing.id,
-            mergeError
+            {
+              id: existing.id,
+              usernameNormalized: existing.usernameNormalized,
+              avatarUrl: existing.avatarUrl ?? null,
+              displayName: existing.displayName,
+              avatarLockedByUser: existing.avatarLockedByUser ?? false,
+              displayNameLocked: existing.displayNameLocked ?? false,
+            },
+            extractionWithHostedAvatar,
+            displayName
           );
-
-          // Calculate fit score
-          try {
-            if (typeof extraction.hasPaidTier === 'boolean') {
-              await updatePaidTierScore(
-                tx,
-                existing.id,
-                extraction.hasPaidTier
-              );
-            }
-            await calculateAndStoreFitScore(tx, existing.id);
-          } catch (fitScoreError) {
-            logger.warn('Fit score calculation failed on reingest', {
-              profileId: existing.id,
-              error:
-                fitScoreError instanceof Error
-                  ? fitScoreError.message
-                  : 'Unknown error',
-            });
-          }
 
           return NextResponse.json(
             {
@@ -726,58 +770,20 @@ export async function POST(request: Request) {
           );
         }
 
-        // Merge extracted links
-        let mergeError: string | null = null;
-        try {
-          await normalizeAndMergeExtraction(
-            tx,
-            {
-              id: created.id,
-              usernameNormalized: created.usernameNormalized,
-              avatarUrl: created.avatarUrl ?? null,
-              displayName: created.displayName ?? displayName,
-              avatarLockedByUser: created.avatarLockedByUser ?? false,
-              displayNameLocked: created.displayNameLocked ?? false,
-            },
-            extractionWithHostedAvatar
-          );
-
-          await enqueueFollowupIngestionJobs({
-            tx,
-            creatorProfileId: created.id,
-            currentDepth: 0,
-            extraction: extractionWithHostedAvatar,
-          });
-        } catch (error) {
-          mergeError =
-            error instanceof Error ? error.message : 'Link extraction failed';
-          logger.error('Link merge failed', {
-            profileId: created.id,
-            error: mergeError,
-          });
-        }
-
-        await IngestionStatusManager.markIdleOrFailed(
+        // Process extraction: merge links, enqueue jobs, calculate fit score
+        const { mergeError } = await processProfileExtraction(
           tx,
-          created.id,
-          mergeError
+          {
+            id: created.id,
+            usernameNormalized: created.usernameNormalized,
+            avatarUrl: created.avatarUrl ?? null,
+            displayName: created.displayName,
+            avatarLockedByUser: created.avatarLockedByUser ?? false,
+            displayNameLocked: created.displayNameLocked ?? false,
+          },
+          extractionWithHostedAvatar,
+          displayName
         );
-
-        // Calculate fit score for the new profile
-        try {
-          if (typeof extraction.hasPaidTier === 'boolean') {
-            await updatePaidTierScore(tx, created.id, extraction.hasPaidTier);
-          }
-          await calculateAndStoreFitScore(tx, created.id);
-        } catch (fitScoreError) {
-          logger.warn('Fit score calculation failed', {
-            profileId: created.id,
-            error:
-              fitScoreError instanceof Error
-                ? fitScoreError.message
-                : 'Unknown error',
-          });
-        }
 
         logger.info('Creator profile ingested', {
           profileId: created.id,
