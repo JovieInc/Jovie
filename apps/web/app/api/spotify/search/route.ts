@@ -1,5 +1,9 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { buildSpotifyArtistUrl, searchSpotifyArtists } from '@/lib/spotify';
+import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
+import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
+import { sanitizeImageUrl } from '@/lib/spotify/sanitize';
+import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
@@ -22,14 +26,6 @@ export interface SpotifyArtistResult {
   followers?: number;
   popularity: number;
   verified?: boolean;
-}
-
-interface SpotifyArtistApi {
-  id: string;
-  name: string;
-  images?: Array<{ url: string; height: number; width: number }>;
-  popularity: number;
-  followers?: { total: number };
 }
 
 // Simple in-memory cache for API responses
@@ -60,11 +56,20 @@ const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX = 30; // 30 requests per minute per IP
 
 function getClientIp(request: NextRequest): string {
+  // Priority: CF > Real IP > Forwarded
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('cf-connecting-ip') ||
     request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   );
+}
+
+/**
+ * Build Spotify artist URL from artist ID
+ */
+function buildSpotifyArtistUrl(artistId: string): string {
+  return `https://open.spotify.com/artist/${artistId}`;
 }
 
 interface RateLimitResult {
@@ -101,13 +106,38 @@ function checkRateLimit(ip: string): RateLimitResult {
 /**
  * GET /api/spotify/search?q={query}&limit={limit}
  * Returns a JSON list of Spotify artists matching the query.
+ *
+ * Uses hardened Spotify client with:
+ * - Circuit breaker for fault tolerance
+ * - Retry logic with exponential backoff
+ * - Input validation with Zod
+ * - Data sanitization
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
 
-  // Validate query
+  // Check if Spotify is available
+  if (!isSpotifyAvailable()) {
+    return NextResponse.json(
+      { error: 'Spotify integration not available', code: 'UNAVAILABLE' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  // Validate query using Zod schema
+  const queryValidation = artistSearchQuerySchema.safeParse(q);
+  if (!queryValidation.success) {
+    const errorMessage =
+      queryValidation.error.issues[0]?.message || 'Invalid query';
+    return NextResponse.json(
+      { error: errorMessage, code: 'INVALID_QUERY' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  // Additional length checks for API-specific constraints
   if (!q || q.length < MIN_QUERY_LENGTH) {
     return NextResponse.json(
       { error: 'Query too short', code: 'QUERY_TOO_SHORT' },
@@ -165,22 +195,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const artists = await searchSpotifyArtists(q, limit);
+    // Use the hardened Spotify client with circuit breaker and retry
+    const artists = await spotifyClient.searchArtists(q, limit);
 
-    // Normalize response shape
-    const results: SpotifyArtistResult[] = artists.map(
-      (artist: SpotifyArtistApi) => ({
-        id: artist.id,
-        name: artist.name,
-        url: buildSpotifyArtistUrl(artist.id),
-        imageUrl: artist.images?.[0]?.url,
-        followers: artist.followers?.total,
-        popularity: artist.popularity,
-        // Spotify doesn't expose verified status via search API;
-        // omit or set undefined
-        verified: undefined,
-      })
-    );
+    // Normalize response shape (data already sanitized by client)
+    const results: SpotifyArtistResult[] = artists.map(artist => ({
+      id: artist.spotifyId,
+      name: artist.name,
+      url: buildSpotifyArtistUrl(artist.spotifyId),
+      imageUrl: sanitizeImageUrl(artist.imageUrl) ?? undefined,
+      followers: artist.followerCount,
+      popularity: artist.popularity,
+      // Spotify doesn't expose verified status via search API
+      verified: undefined,
+    }));
 
     // Cache the results
     searchCache.set(cacheKey, {
@@ -208,11 +236,33 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
+    // Handle circuit breaker open error
+    if (error instanceof CircuitOpenError) {
+      Sentry.captureException(error, {
+        tags: { source: 'spotify_search_api' },
+        extra: { query: q, limit, circuitStats: error.stats },
+      });
+      return NextResponse.json(
+        {
+          error: 'Service temporarily unavailable',
+          code: 'SERVICE_UNAVAILABLE',
+        },
+        { status: 503, headers: rateLimitHeaders }
+      );
+    }
+
+    // Log and capture other errors
+    Sentry.captureException(error, {
+      tags: { source: 'spotify_search_api' },
+      extra: { query: q, limit },
+    });
+
     console.error('[Spotify Search] Search failed:', {
       query: q,
       limit,
       error: error instanceof Error ? error.message : String(error),
     });
+
     return NextResponse.json(
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
