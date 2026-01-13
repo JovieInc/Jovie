@@ -47,6 +47,54 @@ import { creatorIngestSchema } from '@/lib/validation/schemas';
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
 
+// Music platforms that should have empty link display text by default
+const MUSIC_PLATFORMS = [
+  'spotify',
+  'apple_music',
+  'soundcloud',
+  'tidal',
+] as const;
+
+/**
+ * Determine the display text for a social link based on platform type.
+ * Music platforms get empty display text (unless a specific name is provided),
+ * while other platforms use the platform name.
+ *
+ * @param platformId - Platform identifier (e.g., 'spotify', 'instagram')
+ * @param platformName - Default platform name to use
+ * @param customName - Optional custom name (e.g., Spotify artist name)
+ * @returns Display text for the link
+ */
+function getLinkDisplayText(
+  platformId: string,
+  platformName: string,
+  customName?: string | null
+): string {
+  if (customName) return customName;
+  const isMusicPlatform = MUSIC_PLATFORMS.includes(
+    platformId as (typeof MUSIC_PLATFORMS)[number]
+  );
+  return isMusicPlatform ? '' : platformName;
+}
+
+/**
+ * Generate a claim token with expiration date.
+ * Claim tokens allow creators to claim unclaimed profiles.
+ *
+ * @returns Object with claimToken UUID and claimTokenExpiresAt date
+ */
+function generateClaimToken(): {
+  claimToken: string;
+  claimTokenExpiresAt: Date;
+} {
+  const claimToken = randomUUID();
+  const claimTokenExpiresAt = new Date();
+  claimTokenExpiresAt.setDate(
+    claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
+  );
+  return { claimToken, claimTokenExpiresAt };
+}
+
 async function findAvailableHandle(
   tx: DbType,
   baseHandle: string
@@ -257,85 +305,111 @@ async function copyAvatarToBlob(
 }
 
 /**
+ * Platform-specific handle extraction strategies.
+ * Maps hostname patterns to extraction logic for different social platforms.
+ */
+const PLATFORM_EXTRACTION_STRATEGIES: Record<
+  string,
+  {
+    hosts: string[];
+    extract: (segments: string[]) => string | null;
+  }
+> = {
+  youtube: {
+    hosts: ['youtube.com', 'www.youtube.com', 'youtu.be', 'www.youtu.be'],
+    extract: (segments: string[]): string | null => {
+      let handle = segments[0];
+      // Handle @username or /channel/ID or /c/name or /user/name
+      if (handle?.startsWith('@')) {
+        return handle.slice(1);
+      }
+      if (
+        (handle === 'channel' || handle === 'c' || handle === 'user') &&
+        segments[1]
+      ) {
+        return segments[1];
+      }
+      return handle;
+    },
+  },
+  tiktok: {
+    hosts: ['tiktok.com', 'www.tiktok.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle @username format
+      return handle?.startsWith('@') ? handle.slice(1) : handle;
+    },
+  },
+  linkedin: {
+    hosts: ['linkedin.com', 'www.linkedin.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle /in/username or /company/name
+      if ((handle === 'in' || handle === 'company') && segments[1]) {
+        return segments[1];
+      }
+      return handle;
+    },
+  },
+  reddit: {
+    hosts: ['reddit.com', 'www.reddit.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle /user/username or /u/username
+      if ((handle === 'user' || handle === 'u') && segments[1]) {
+        return segments[1];
+      }
+      return handle;
+    },
+  },
+  spotify: {
+    hosts: ['spotify.com', 'www.spotify.com', 'open.spotify.com'],
+    extract: (segments: string[]): string | null => {
+      const handle = segments[0];
+      // Handle /artist/ID or /user/username
+      if (handle === 'artist' && segments[1]) {
+        // Store the full artist ID with prefix for later API lookup
+        return `artist-${segments[1]}`;
+      }
+      if (handle === 'user' && segments[1]) {
+        return segments[1];
+      }
+      // Playlists aren't creator profiles
+      if (handle === 'playlist') {
+        return null;
+      }
+      return handle;
+    },
+  },
+};
+
+/**
  * Extract username/handle from a social platform URL.
- * Returns null if unable to extract a valid handle.
+ * Uses platform-specific strategies to handle different URL formats.
+ *
+ * @param url - Social platform profile URL
+ * @returns Extracted handle/username, or null if extraction fails
  */
 function extractHandleFromSocialUrl(url: string): string | null {
   try {
     const parsed = new URL(normalizeUrl(url));
-    const pathname = parsed.pathname;
-
-    // Remove leading/trailing slashes and get path segments
-    const segments = pathname.split('/').filter(Boolean);
+    const hostname = parsed.hostname.toLowerCase();
+    const segments = parsed.pathname.split('/').filter(Boolean);
 
     if (segments.length === 0) {
       return null;
     }
 
-    // Get the first meaningful segment (usually the username)
-    let handle = segments[0];
+    // Find matching platform strategy
+    const strategy = Object.values(PLATFORM_EXTRACTION_STRATEGIES).find(s =>
+      s.hosts.includes(hostname)
+    );
 
-    // Special cases for different platforms
-    const hostname = parsed.hostname.toLowerCase();
+    // Extract handle using platform strategy or fallback to first segment
+    let handle = strategy ? strategy.extract(segments) : segments[0];
 
-    // YouTube: handle @username or /channel/ID or /c/name
-    const youtubeHosts = [
-      'youtube.com',
-      'www.youtube.com',
-      'youtu.be',
-      'www.youtu.be',
-    ];
-    if (youtubeHosts.includes(hostname)) {
-      if (handle.startsWith('@')) {
-        handle = handle.slice(1);
-      } else if (
-        (handle === 'channel' || handle === 'c' || handle === 'user') &&
-        segments[1]
-      ) {
-        handle = segments[1];
-      }
-    }
-
-    // TikTok: handle @username
-    const tiktokHosts = ['tiktok.com', 'www.tiktok.com'];
-    if (tiktokHosts.includes(hostname)) {
-      if (handle.startsWith('@')) {
-        handle = handle.slice(1);
-      }
-    }
-
-    // LinkedIn: /in/username or /company/name
-    const linkedinHosts = ['linkedin.com', 'www.linkedin.com'];
-    if (linkedinHosts.includes(hostname)) {
-      if ((handle === 'in' || handle === 'company') && segments[1]) {
-        handle = segments[1];
-      }
-    }
-
-    // Reddit: /user/username or /u/username
-    const redditHosts = ['reddit.com', 'www.reddit.com'];
-    if (redditHosts.includes(hostname)) {
-      if ((handle === 'user' || handle === 'u') && segments[1]) {
-        handle = segments[1];
-      }
-    }
-
-    // Note: Discord invite codes are not usernames, so we don't extract them
-
-    // Spotify: /artist/ID or /user/username or /playlist/ID
-    // Artist IDs are not usernames - these need special handling
-    const spotifyHosts = ['spotify.com', 'www.spotify.com', 'open.spotify.com'];
-    if (spotifyHosts.includes(hostname)) {
-      if (handle === 'artist' && segments[1]) {
-        // Store the full artist ID in the handle with prefix
-        // We'll fetch the actual name via API and use it as displayName
-        handle = `spotifyartist-${segments[1]}`;
-      } else if (handle === 'user' && segments[1]) {
-        handle = segments[1];
-      } else if (handle === 'playlist' && segments[1]) {
-        // Playlists aren't creator profiles
-        return null;
-      }
+    if (!handle) {
+      return null;
     }
 
     // Clean up the handle
@@ -345,7 +419,7 @@ function extractHandleFromSocialUrl(url: string): string | null {
       .toLowerCase();
 
     // Validate handle format (30 char limit to match downstream validation)
-    if (!handle || handle.length > 30) {
+    if (handle.length > 30) {
       return null;
     }
 
@@ -358,6 +432,91 @@ function extractHandleFromSocialUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Process profile extraction: merge links, enqueue follow-up jobs, and calculate fit score.
+ *
+ * This consolidates the shared logic used in both re-ingest and new profile flows.
+ * Handles errors gracefully and ensures ingestion status is marked appropriately.
+ *
+ * @param tx - Database transaction
+ * @param profile - Profile information for merging
+ * @param extraction - Extracted profile data with links and metadata
+ * @param displayName - Display name to use if not locked
+ * @returns Object with mergeError if link processing failed
+ */
+async function processProfileExtraction(
+  tx: DbType,
+  profile: {
+    id: string;
+    usernameNormalized: string;
+    avatarUrl: string | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean;
+    displayNameLocked: boolean;
+  },
+  extraction: {
+    links: Array<{ url: string; platformId?: string; title?: string }>;
+    avatarUrl?: string | null;
+    hasPaidTier?: boolean | null;
+    displayName?: string | null;
+  },
+  displayName: string | null
+): Promise<{ mergeError: string | null }> {
+  let mergeError: string | null = null;
+
+  // Merge extracted links into profile
+  try {
+    await normalizeAndMergeExtraction(
+      tx,
+      {
+        id: profile.id,
+        usernameNormalized: profile.usernameNormalized,
+        avatarUrl: profile.avatarUrl,
+        displayName: profile.displayName ?? displayName,
+        avatarLockedByUser: profile.avatarLockedByUser,
+        displayNameLocked: profile.displayNameLocked,
+      },
+      extraction
+    );
+
+    // Enqueue follow-up ingestion jobs for discovered links
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: 0,
+      extraction,
+    });
+  } catch (error) {
+    mergeError =
+      error instanceof Error ? error.message : 'Link extraction failed';
+    logger.error('Link merge failed', {
+      profileId: profile.id,
+      error: mergeError,
+    });
+  }
+
+  // Mark ingestion as idle or failed based on merge result
+  await IngestionStatusManager.markIdleOrFailed(tx, profile.id, mergeError);
+
+  // Calculate fit score for the profile
+  try {
+    if (typeof extraction.hasPaidTier === 'boolean') {
+      await updatePaidTierScore(tx, profile.id, extraction.hasPaidTier);
+    }
+    await calculateAndStoreFitScore(tx, profile.id);
+  } catch (fitScoreError) {
+    logger.warn('Fit score calculation failed', {
+      profileId: profile.id,
+      error:
+        fitScoreError instanceof Error
+          ? fitScoreError.message
+          : 'Unknown error',
+    });
+  }
+
+  return { mergeError };
 }
 
 /**
@@ -595,61 +754,20 @@ export async function POST(request: Request) {
         const existing = existingCheck.existing;
 
         return await withSystemIngestionSession(async tx => {
-          let mergeError: string | null = null;
-          try {
-            await normalizeAndMergeExtraction(
-              tx,
-              {
-                id: existing.id,
-                usernameNormalized: existing.usernameNormalized,
-                avatarUrl: existing.avatarUrl ?? null,
-                displayName: existing.displayName ?? displayName,
-                avatarLockedByUser: existing.avatarLockedByUser ?? false,
-                displayNameLocked: existing.displayNameLocked ?? false,
-              },
-              extractionWithHostedAvatar
-            );
-
-            await enqueueFollowupIngestionJobs({
-              tx,
-              creatorProfileId: existing.id,
-              currentDepth: 0,
-              extraction: extractionWithHostedAvatar,
-            });
-          } catch (error) {
-            mergeError =
-              error instanceof Error ? error.message : 'Link extraction failed';
-            logger.error('Link merge failed', {
-              profileId: existing.id,
-              error: mergeError,
-            });
-          }
-
-          await IngestionStatusManager.markIdleOrFailed(
+          // Process extraction: merge links, enqueue jobs, calculate fit score
+          const { mergeError } = await processProfileExtraction(
             tx,
-            existing.id,
-            mergeError
+            {
+              id: existing.id,
+              usernameNormalized: existing.usernameNormalized,
+              avatarUrl: existing.avatarUrl ?? null,
+              displayName: existing.displayName,
+              avatarLockedByUser: existing.avatarLockedByUser ?? false,
+              displayNameLocked: existing.displayNameLocked ?? false,
+            },
+            extractionWithHostedAvatar,
+            displayName
           );
-
-          // Calculate fit score
-          try {
-            if (typeof extraction.hasPaidTier === 'boolean') {
-              await updatePaidTierScore(
-                tx,
-                existing.id,
-                extraction.hasPaidTier
-              );
-            }
-            await calculateAndStoreFitScore(tx, existing.id);
-          } catch (fitScoreError) {
-            logger.warn('Fit score calculation failed on reingest', {
-              profileId: existing.id,
-              error:
-                fitScoreError instanceof Error
-                  ? fitScoreError.message
-                  : 'Unknown error',
-            });
-          }
 
           return NextResponse.json(
             {
@@ -678,11 +796,7 @@ export async function POST(request: Request) {
 
       return await withSystemIngestionSession(async tx => {
         // Generate claim token at creation time
-        const claimToken = randomUUID();
-        const claimTokenExpiresAt = new Date();
-        claimTokenExpiresAt.setDate(
-          claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-        );
+        const { claimToken, claimTokenExpiresAt } = generateClaimToken();
 
         // Insert profile with claim token
         const [created] = await tx
@@ -726,58 +840,20 @@ export async function POST(request: Request) {
           );
         }
 
-        // Merge extracted links
-        let mergeError: string | null = null;
-        try {
-          await normalizeAndMergeExtraction(
-            tx,
-            {
-              id: created.id,
-              usernameNormalized: created.usernameNormalized,
-              avatarUrl: created.avatarUrl ?? null,
-              displayName: created.displayName ?? displayName,
-              avatarLockedByUser: created.avatarLockedByUser ?? false,
-              displayNameLocked: created.displayNameLocked ?? false,
-            },
-            extractionWithHostedAvatar
-          );
-
-          await enqueueFollowupIngestionJobs({
-            tx,
-            creatorProfileId: created.id,
-            currentDepth: 0,
-            extraction: extractionWithHostedAvatar,
-          });
-        } catch (error) {
-          mergeError =
-            error instanceof Error ? error.message : 'Link extraction failed';
-          logger.error('Link merge failed', {
-            profileId: created.id,
-            error: mergeError,
-          });
-        }
-
-        await IngestionStatusManager.markIdleOrFailed(
+        // Process extraction: merge links, enqueue jobs, calculate fit score
+        const { mergeError } = await processProfileExtraction(
           tx,
-          created.id,
-          mergeError
+          {
+            id: created.id,
+            usernameNormalized: created.usernameNormalized,
+            avatarUrl: created.avatarUrl ?? null,
+            displayName: created.displayName,
+            avatarLockedByUser: created.avatarLockedByUser ?? false,
+            displayNameLocked: created.displayNameLocked ?? false,
+          },
+          extractionWithHostedAvatar,
+          displayName
         );
-
-        // Calculate fit score for the new profile
-        try {
-          if (typeof extraction.hasPaidTier === 'boolean') {
-            await updatePaidTierScore(tx, created.id, extraction.hasPaidTier);
-          }
-          await calculateAndStoreFitScore(tx, created.id);
-        } catch (fitScoreError) {
-          logger.warn('Fit score calculation failed', {
-            profileId: created.id,
-            error:
-              fitScoreError instanceof Error
-                ? fitScoreError.message
-                : 'Unknown error',
-          });
-        }
 
         logger.info('Creator profile ingested', {
           profileId: created.id,
@@ -883,15 +959,11 @@ export async function POST(request: Request) {
         finalHandle = altHandle;
       } else if (existing && !existing.isClaimed) {
         // Profile exists but unclaimed - add the link to existing profile
-        // For Spotify, use artist name; for other music platforms, leave empty
-        const isMusicPlatform = [
-          'spotify',
-          'apple_music',
-          'soundcloud',
-          'tidal',
-        ].includes(platformId);
-        const linkDisplayText =
-          spotifyArtistName || (isMusicPlatform ? '' : detected.platform.name);
+        const linkDisplayText = getLinkDisplayText(
+          platformId,
+          detected.platform.name,
+          spotifyArtistName
+        );
         try {
           // Add the social link to existing profile (idempotent)
           const linkAdded = await addSocialLinkIdempotent(
@@ -954,11 +1026,7 @@ export async function POST(request: Request) {
       }
 
       // Generate claim token
-      const claimToken = randomUUID();
-      const claimTokenExpiresAt = new Date();
-      claimTokenExpiresAt.setDate(
-        claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-      );
+      const { claimToken, claimTokenExpiresAt } = generateClaimToken();
 
       // For Spotify artist IDs, use the fetched artist name if available
       const displayName =
@@ -1003,15 +1071,11 @@ export async function POST(request: Request) {
       }
 
       // Add the social link (idempotent, though new profile shouldn't have duplicates)
-      // For Spotify, use the fetched artist name; for other music platforms, leave empty
-      const isMusicPlatform = [
-        'spotify',
-        'apple_music',
-        'soundcloud',
-        'tidal',
-      ].includes(platformId);
-      const linkDisplayText =
-        spotifyArtistName || (isMusicPlatform ? '' : detected.platform.name);
+      const linkDisplayText = getLinkDisplayText(
+        platformId,
+        detected.platform.name,
+        spotifyArtistName
+      );
       try {
         await addSocialLinkIdempotent(
           tx,
