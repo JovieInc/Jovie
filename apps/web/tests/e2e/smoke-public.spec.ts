@@ -22,9 +22,7 @@ const baseHostname = (() => {
   }
 })();
 const isMarketingBaseUrl =
-  baseHostname === 'meetjovie.com' ||
-  baseHostname === 'www.meetjovie.com' ||
-  baseUrl.includes('meetjovie.com');
+  baseHostname === 'meetjovie.com' || baseHostname === 'www.meetjovie.com';
 
 const describePublicProfile = isMarketingBaseUrl
   ? test.describe.skip
