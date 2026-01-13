@@ -27,10 +27,18 @@ function runVitestShard(name, patterns) {
 
 // Run the suite in smaller processes to avoid heap growth/OOM.
 // Vitest accepts file patterns as positional args after options.
-runVitestShard('unit+components+contracts', [
-  'tests/unit',
-  'tests/components',
-  'tests/contracts',
-  'tests/database.test.ts',
+runVitestShard('unit-lib', ['tests/unit/lib']);
+runVitestShard('unit-api', ['tests/unit/api']);
+runVitestShard('unit-ui', [
+  'tests/unit/components',
+  'tests/unit/dashboard',
+  'tests/unit/atoms',
+  'tests/unit/links',
+  'tests/unit/discography',
+  'tests/unit/*.test.ts',
+  'tests/unit/*.test.tsx',
 ]);
+runVitestShard('components', ['tests/components']);
+runVitestShard('contracts', ['tests/contracts']);
 runVitestShard('lib', ['tests/lib', 'lib/**/*.test.ts']);
+runVitestShard('root', ['tests/database.test.ts']);
