@@ -16,7 +16,7 @@ import {
 interface DashboardFeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit?: (feedback: string) => void;
+  onSubmit?: (feedback: string) => void | Promise<void>;
 }
 
 export function DashboardFeedbackModal({

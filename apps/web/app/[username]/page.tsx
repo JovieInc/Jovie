@@ -159,13 +159,13 @@ const getProfileAndLinks = cache(
 );
 
 interface Props {
-  params: {
+  params: Promise<{
     username: string;
-  };
-  searchParams?: {
+  }>;
+  searchParams?: Promise<{
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
     claim_token?: string;
-  };
+  }>;
 }
 
 /**
