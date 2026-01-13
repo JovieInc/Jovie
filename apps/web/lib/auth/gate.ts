@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
+import { normalizeEmail } from '@/lib/utils/email';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 
 /**
@@ -482,7 +483,7 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
   status: 'new' | 'claimed' | null;
 }> {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   const [entry] = await db
     .select({
