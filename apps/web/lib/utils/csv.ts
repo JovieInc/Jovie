@@ -81,6 +81,23 @@ export function capitalize(value: unknown): string {
 }
 
 /**
+ * Format a boolean value as 'Yes' or 'No'.
+ * Common formatter for CSV boolean fields.
+ *
+ * @param value - The boolean value to format
+ * @returns 'Yes' if truthy, 'No' if falsy
+ *
+ * @example
+ * formatYesNo(true) // 'Yes'
+ * formatYesNo(false) // 'No'
+ * formatYesNo(1) // 'Yes'
+ * formatYesNo(0) // 'No'
+ */
+export function formatYesNo(value: unknown): string {
+  return value ? 'Yes' : 'No';
+}
+
+/**
  * Format a Date value according to the specified format.
  *
  * @param date - The Date to format
