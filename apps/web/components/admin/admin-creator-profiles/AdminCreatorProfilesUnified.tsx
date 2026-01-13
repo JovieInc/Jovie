@@ -380,7 +380,7 @@ export function AdminCreatorProfilesUnified({
   );
 
   // Define columns using TanStack Table
-  const columns = useMemo<ColumnDef<AdminCreatorProfileRow, unknown>[]>(
+  const columns = useMemo<ColumnDef<AdminCreatorProfileRow, any>[]>(
     () => [
       // Checkbox column
       columnHelper.display({
