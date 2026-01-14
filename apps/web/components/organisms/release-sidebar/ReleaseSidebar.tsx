@@ -9,14 +9,13 @@
 
 import { Button } from '@jovie/ui';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
-
-const RELEASE_SIDEBAR_WIDTH = 320;
 
 export function ReleaseSidebar({
   release,
@@ -64,7 +63,7 @@ export function ReleaseSidebar({
   return (
     <RightDrawer
       isOpen={isOpen}
-      width={RELEASE_SIDEBAR_WIDTH}
+      width={SIDEBAR_WIDTH}
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
     >

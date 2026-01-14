@@ -10,13 +10,11 @@ import { X } from 'lucide-react';
 import { AudienceMemberHeader } from '@/components/dashboard/atoms/AudienceMemberHeader';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { AudienceMemberActions } from './AudienceMemberActions';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
-import {
-  AUDIENCE_MEMBER_SIDEBAR_WIDTH,
-  type AudienceMemberSidebarProps,
-} from './types';
+import type { AudienceMemberSidebarProps } from './types';
 import {
   computeMemberAvatarName,
   computeMemberAvatarSrc,
@@ -37,7 +35,7 @@ export function AudienceMemberSidebar({
   return (
     <RightDrawer
       isOpen={isOpen}
-      width={AUDIENCE_MEMBER_SIDEBAR_WIDTH}
+      width={SIDEBAR_WIDTH}
       ariaLabel='Audience member details'
     >
       <div

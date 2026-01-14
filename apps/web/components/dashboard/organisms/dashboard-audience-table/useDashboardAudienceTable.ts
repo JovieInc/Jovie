@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
-import { AUDIENCE_MEMBER_SIDEBAR_WIDTH } from '@/components/dashboard/organisms/audience-member-sidebar';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type {
   AudienceRow,
@@ -94,7 +94,7 @@ export function useDashboardAudienceTable({
     setTableMeta({
       rowCount: rows.length,
       toggle: rows.length > 0 ? toggle : null,
-      rightPanelWidth: selectedMember ? AUDIENCE_MEMBER_SIDEBAR_WIDTH : 0,
+      rightPanelWidth: selectedMember ? SIDEBAR_WIDTH : 0,
     });
 
     return () => {

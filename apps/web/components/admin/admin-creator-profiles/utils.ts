@@ -1,8 +1,6 @@
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { Contact } from '@/types';
 
-export const CONTACT_PANEL_WIDTH = 320;
-
 /**
  * Maps an AdminCreatorProfileRow to a Contact object for the sidebar.
  */
