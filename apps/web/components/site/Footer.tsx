@@ -18,11 +18,7 @@ export function Footer({
   themeShortcutKey,
 }: SiteFooterProps) {
   const mappedVariant =
-    version === 1 || version === 'minimal'
-      ? 'minimal'
-      : version === 2 || version === 'regular'
-        ? 'regular'
-        : 'regular';
+    version === 1 || version === 'minimal' ? 'minimal' : 'regular';
 
   return (
     <FooterOrganism

@@ -8,6 +8,18 @@ import {
 } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+// Animation constants
+const SPRING_STIFFNESS = 500;
+const SPRING_DAMPING = 30;
+const VERTICAL_OFFSET = -8;
+const OPACITY_DURATION_MULTIPLIER_OPEN = 0.7;
+const OPACITY_DURATION_MULTIPLIER_COLLAPSED = 0.5;
+const HEIGHT_DURATION_MULTIPLIER_COLLAPSED = 0.8;
+const DELAY_MULTIPLIER_OPACITY = 1.2;
+const DELAY_SPRING_Y = 0.05;
+const DELAY_OPACITY_Y = 0.1;
+const DELAY_HEIGHT_COLLAPSED = 0.05;
+
 interface AnimatedAccordionProps {
   isOpen: boolean;
   children: React.ReactNode;
@@ -45,9 +57,11 @@ export function AnimatedAccordion({
           delay: shouldReduceMotion ? 0 : delay,
         },
         opacity: {
-          duration: shouldReduceMotion ? 0 : duration * 0.7,
+          duration: shouldReduceMotion
+            ? 0
+            : duration * OPACITY_DURATION_MULTIPLIER_OPEN,
           ease: [0.32, 0, 0.67, 1],
-          delay: shouldReduceMotion ? 0 : delay * 1.2,
+          delay: shouldReduceMotion ? 0 : delay * DELAY_MULTIPLIER_OPACITY,
         },
       },
     },
@@ -56,12 +70,16 @@ export function AnimatedAccordion({
       height: 0,
       transition: {
         height: {
-          duration: shouldReduceMotion ? 0 : duration * 0.8,
+          duration: shouldReduceMotion
+            ? 0
+            : duration * HEIGHT_DURATION_MULTIPLIER_COLLAPSED,
           ease: [0.32, 0.72, 0.32, 0.98],
-          delay: shouldReduceMotion ? 0 : 0.05,
+          delay: shouldReduceMotion ? 0 : DELAY_HEIGHT_COLLAPSED,
         },
         opacity: {
-          duration: shouldReduceMotion ? 0 : duration * 0.5,
+          duration: shouldReduceMotion
+            ? 0
+            : duration * OPACITY_DURATION_MULTIPLIER_COLLAPSED,
           ease: [0.32, 0, 0.67, 1],
         },
       },
@@ -76,28 +94,32 @@ export function AnimatedAccordion({
       transition: {
         y: {
           type: 'spring',
-          stiffness: 500,
-          damping: 30,
-          delay: shouldReduceMotion ? 0 : delay + 0.05,
+          stiffness: SPRING_STIFFNESS,
+          damping: SPRING_DAMPING,
+          delay: shouldReduceMotion ? 0 : delay + DELAY_SPRING_Y,
         },
         opacity: {
-          duration: shouldReduceMotion ? 0 : duration * 0.8,
+          duration: shouldReduceMotion
+            ? 0
+            : duration * HEIGHT_DURATION_MULTIPLIER_COLLAPSED,
           ease: [0.32, 0, 0.67, 1],
-          delay: shouldReduceMotion ? 0 : delay + 0.1,
+          delay: shouldReduceMotion ? 0 : delay + DELAY_OPACITY_Y,
         },
       },
     },
     collapsed: {
-      y: -8,
+      y: VERTICAL_OFFSET,
       opacity: 0,
       transition: {
         y: {
           type: 'spring',
-          stiffness: 500,
-          damping: 30,
+          stiffness: SPRING_STIFFNESS,
+          damping: SPRING_DAMPING,
         },
         opacity: {
-          duration: shouldReduceMotion ? 0 : duration * 0.5,
+          duration: shouldReduceMotion
+            ? 0
+            : duration * OPACITY_DURATION_MULTIPLIER_COLLAPSED,
           ease: [0.32, 0, 0.67, 1],
         },
       },

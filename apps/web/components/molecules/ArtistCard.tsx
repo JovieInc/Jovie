@@ -4,6 +4,16 @@ import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { Avatar } from '@/components/atoms/Avatar';
 
+// Animation constants for spring physics
+const CONTAINER_SPRING_STIFFNESS = 300;
+const CONTAINER_SPRING_DAMPING = 20;
+const CONTAINER_SPRING_MASS = 0.7;
+const AVATAR_SPRING_STIFFNESS = 400;
+const AVATAR_SPRING_DAMPING = 17;
+const REDUCED_MOTION_DURATION = 0.1;
+const NAME_HOVER_DURATION = 0.2;
+const NAME_HOVER_OPACITY = 0.8;
+
 export interface ArtistCardProps {
   handle: string;
   name: string;
@@ -37,12 +47,12 @@ export function ArtistCard({
     : { y: -3 };
 
   const containerTransition: MotionProps['transition'] = prefersReducedMotion
-    ? { duration: 0.1 }
+    ? { duration: REDUCED_MOTION_DURATION }
     : {
         type: 'spring',
-        stiffness: 300,
-        damping: 20,
-        mass: 0.7,
+        stiffness: CONTAINER_SPRING_STIFFNESS,
+        damping: CONTAINER_SPRING_DAMPING,
+        mass: CONTAINER_SPRING_MASS,
       };
 
   const avatarWhileHover: MotionProps['whileHover'] = prefersReducedMotion
@@ -53,8 +63,12 @@ export function ArtistCard({
       };
 
   const avatarTransition: MotionProps['transition'] = prefersReducedMotion
-    ? { duration: 0.1 }
-    : { type: 'spring', stiffness: 400, damping: 17 };
+    ? { duration: REDUCED_MOTION_DURATION }
+    : {
+        type: 'spring',
+        stiffness: AVATAR_SPRING_STIFFNESS,
+        damping: AVATAR_SPRING_DAMPING,
+      };
 
   const avatarSize = (
     {
@@ -99,9 +113,9 @@ export function ArtistCard({
                 size === 'sm' ? 'text-xs' : 'text-sm'
               }`}
               whileHover={{
-                opacity: 0.8,
+                opacity: NAME_HOVER_OPACITY,
               }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: NAME_HOVER_DURATION }}
             >
               {name}
             </motion.p>

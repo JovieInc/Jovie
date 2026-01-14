@@ -1,5 +1,5 @@
 import { ClipboardList, ExternalLink, Mail, User } from 'lucide-react';
-import type { ContextMenuItemType } from '@/components/admin/table/molecules/TableContextMenu';
+import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /**

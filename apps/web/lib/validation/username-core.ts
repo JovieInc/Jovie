@@ -329,7 +329,7 @@ export function generateUsernameSuggestions(
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/(^-)|(-$)/g, '');
 
     if (artistSlug) {
       suggestions.push(artistSlug);

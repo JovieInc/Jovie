@@ -1,3 +1,24 @@
+/**
+ * @deprecated Import from @/components/organisms/table instead
+ * Re-exports from organisms/table for backwards compatibility
+ */
+
+// Re-export from unified organisms/table location
+export {
+  ContextMenuSubmenu,
+  DisplayMenuDropdown,
+  GroupedTableBody,
+  LoadingTableBody,
+  ResponsiveActionsCell,
+  SocialLinksCell,
+  TableContextMenu,
+  TableHeaderRow,
+  type TableHeaderRowProps,
+  TablePaginationFooter,
+  type TablePaginationFooterProps,
+} from '@/components/organisms/table';
+
+// Admin-specific components (kept for now)
 export {
   ExportCSVButton,
   type ExportCSVButtonProps,
@@ -7,10 +28,5 @@ export {
   TableBulkActionsToolbar,
   type TableBulkActionsToolbarProps,
 } from './TableBulkActionsToolbar';
-export { TableHeaderRow, type TableHeaderRowProps } from './TableHeaderRow';
-export {
-  TablePaginationFooter,
-  type TablePaginationFooterProps,
-} from './TablePaginationFooter';
 export { TableRow, type TableRowProps } from './TableRow';
 export { TableSearchBar, type TableSearchBarProps } from './TableSearchBar';

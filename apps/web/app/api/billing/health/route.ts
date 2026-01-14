@@ -178,7 +178,7 @@ export async function GET() {
       );
     }
 
-    const statusCode = hasCritical ? 503 : hasWarning ? 200 : 200;
+    const statusCode = hasCritical ? 503 : 200;
 
     return NextResponse.json(result, {
       status: statusCode,

@@ -32,8 +32,7 @@ export function AdminShell({ children }: AdminShellProps) {
       let acc = '/admin';
       segments.forEach((segment, index) => {
         acc += `/${segment}`;
-        const isLast = index === segments.length - 1;
-        items.push({ label: toTitle(segment), href: isLast ? acc : acc });
+        items.push({ label: toTitle(segment), href: acc });
       });
     }
 
