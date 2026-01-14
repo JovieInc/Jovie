@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceMembers } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 import { membersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
       );
     });
   } catch (error) {
-    console.error('[Dashboard Audience] Failed to load members', error);
+    logger.error('[Dashboard Audience] Failed to load members', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

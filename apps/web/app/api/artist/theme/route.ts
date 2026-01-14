@@ -8,6 +8,7 @@ import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     });
   } catch (error) {
-    console.error('Error in theme API:', error);
+    logger.error('Error in theme API:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
