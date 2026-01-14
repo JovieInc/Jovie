@@ -5,6 +5,7 @@ import { db, eq } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 import { accountEmailSyncSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
-    console.error('Failed to sync email address:', error);
+    logger.error('Failed to sync email address:', error);
     return NextResponse.json(
       { error: 'Unable to sync email address' },
       { status: 500, headers: NO_STORE_HEADERS }
