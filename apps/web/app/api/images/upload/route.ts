@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache } from '@/lib/cache';
-import { creatorProfiles, eq, profilePhotos, users } from '@/lib/db';
+import { creatorProfiles, eq, profilePhotos } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -384,14 +385,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Look up the internal user ID (UUID) for the authenticated Clerk user
-      const [dbUser] = await tx
-        .select({
-          id: users.id,
-          clerkId: users.clerkId,
-        })
-        .from(users)
-        .where(eq(users.clerkId, userIdFromSession))
-        .limit(1);
+      const dbUser = await getUserByClerkId(tx, userIdFromSession);
 
       if (!dbUser) {
         return errorResponse(

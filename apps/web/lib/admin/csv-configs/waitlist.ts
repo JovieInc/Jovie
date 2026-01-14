@@ -40,8 +40,7 @@ export const waitlistCSVColumns: CSVColumn<WaitlistEntryRow>[] = [
   {
     header: 'Follower Count',
     accessor: 'primarySocialFollowerCount',
-    formatter: value =>
-      value !== null && value !== undefined ? String(value) : '',
+    formatter: formatOptionalString,
   },
   {
     header: 'Spotify URL',

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { and, db, eq, profilePhotos, users } from '@/lib/db';
+import { and, db, eq, profilePhotos } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 
 export const runtime = 'edge';
 
@@ -46,15 +47,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Get photo record - ensure user owns it by matching Clerk user to internal UUID
-    const [row] = await db
-      .select({ photo: profilePhotos })
-      .from(profilePhotos)
-      .innerJoin(users, eq(users.id, profilePhotos.userId))
-      .where(and(eq(profilePhotos.id, photoId), eq(users.clerkId, clerkUserId)))
-      .limit(1);
+    // Verify user exists and get their internal ID
+    const user = await getUserByClerkId(db, clerkUserId);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    const photo = row?.photo;
+    // Get photo record - ensure user owns it
+    const [photo] = await db
+      .select()
+      .from(profilePhotos)
+      .where(
+        and(eq(profilePhotos.id, photoId), eq(profilePhotos.userId, user.id))
+      )
+      .limit(1);
 
     if (!photo) {
       return NextResponse.json(

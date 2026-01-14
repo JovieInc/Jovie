@@ -1,3 +1,5 @@
+import { capitalize } from '@/lib/utils/csv';
+
 /**
  * Empty value placeholder text
  */
@@ -18,7 +20,7 @@ export function formatDeviceTypeLabel(deviceType: string): string {
   const isSimpleLowercaseWord = /^[a-z]+$/.test(normalized);
   if (!isSimpleLowercaseWord) return normalized;
 
-  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+  return capitalize(normalized);
 }
 
 /**
@@ -28,7 +30,7 @@ export function formatActionLabel(label: string): string {
   const normalized = label.trim();
   if (normalized.length === 0) return label;
 
-  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+  return capitalize(normalized);
 }
 
 /**

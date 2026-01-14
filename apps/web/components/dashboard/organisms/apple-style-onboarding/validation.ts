@@ -4,6 +4,7 @@
  * Extracts validation logic to reduce cognitive complexity.
  */
 
+import { normalizeString } from '@/lib/utils/string-utils';
 import type { HandleValidationState } from './types';
 
 export interface OnboardingFormData {
@@ -24,7 +25,7 @@ export function canSubmitOnboarding(data: OnboardingFormData): boolean {
   const { handle, handleInput, handleValidation, isSubmitting, hasError } =
     data;
 
-  const resolvedHandle = (handle || handleInput).trim().toLowerCase();
+  const resolvedHandle = normalizeString(handle || handleInput);
 
   if (!resolvedHandle) return false;
   if (isSubmitting) return false;
@@ -57,5 +58,5 @@ export function validateDisplayName(fullName: string): void {
  * @returns Normalized handle string
  */
 export function getResolvedHandle(handle: string, handleInput: string): string {
-  return (handle || handleInput).trim().toLowerCase();
+  return normalizeString(handle || handleInput);
 }

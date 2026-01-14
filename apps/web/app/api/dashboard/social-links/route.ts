@@ -4,11 +4,11 @@ import { NextResponse } from 'next/server';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateSocialLinksCache } from '@/lib/cache';
 import { db } from '@/lib/db';
+import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import {
   creatorProfiles,
   dashboardIdempotencyKeys,
   socialLinks,
-  users,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, TTL } from '@/lib/http/headers';
@@ -152,17 +152,7 @@ export async function GET(req: Request) {
       }
 
       // Verify the profile belongs to the authenticated user before checking cache
-      const [profile] = await db
-        .select({
-          id: creatorProfiles.id,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-        })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
-        .limit(1);
+      const profile = await getAuthenticatedProfile(db, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
@@ -170,6 +160,7 @@ export async function GET(req: Request) {
         );
       }
 
+      // Fetch social links for the verified profile
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -188,22 +179,12 @@ export async function GET(req: Request) {
           version: socialLinks.version,
         })
         .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .leftJoin(
           socialLinks,
           eq(socialLinks.creatorProfileId, creatorProfiles.id)
         )
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
+        .where(eq(creatorProfiles.id, profileId))
         .orderBy(socialLinks.sortOrder);
-
-      if (rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
-      }
 
       const links = rows
         .filter(r => r.linkId !== null)
@@ -350,20 +331,7 @@ export async function PUT(req: Request) {
       }
 
       // Verify the profile belongs to the authenticated user
-      const [profile] = await tx
-        .select({
-          id: creatorProfiles.id,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-          avatarUrl: creatorProfiles.avatarUrl,
-          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-          userId: creatorProfiles.userId,
-        })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
-        .limit(1);
+      const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
 
       if (!profile) {
         const response = { error: 'Profile not found' };
@@ -637,17 +605,7 @@ export async function PATCH(req: Request) {
       }
 
       // Verify the profile belongs to the authenticated user
-      const [profile] = await tx
-        .select({
-          id: creatorProfiles.id,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-        })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
-        .limit(1);
+      const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
 
       if (!profile) {
         return NextResponse.json(
@@ -842,20 +800,7 @@ export async function DELETE(req: Request) {
       }
 
       // Verify the profile belongs to the authenticated user
-      const [profile] = await tx
-        .select({
-          id: creatorProfiles.id,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-          avatarUrl: creatorProfiles.avatarUrl,
-          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-          userId: creatorProfiles.userId,
-        })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
-        .limit(1);
+      const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
 
       if (!profile) {
         return NextResponse.json(

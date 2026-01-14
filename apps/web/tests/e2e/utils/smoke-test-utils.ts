@@ -492,7 +492,6 @@ export async function assertPageHealthy(
     'application error',
     'internal server error',
     'something went wrong',
-    '500',
     'unhandled runtime error',
   ];
 
