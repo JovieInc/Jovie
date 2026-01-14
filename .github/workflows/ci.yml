@@ -218,7 +218,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,br-main'
+          protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Determine sanitized branch name
@@ -240,15 +240,16 @@ jobs:
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
-      - name: Create or reuse Neon branch
+      - name: Create or reuse Neon branch (with retry)
         id: create-branch
         if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
         if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -340,14 +341,15 @@ jobs:
           echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
-      - name: Resolve Neon DB URL (job-local)
+      - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -404,7 +406,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,br-main'
+          protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Check for relevant changes
@@ -435,15 +437,16 @@ jobs:
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
 
-      - name: Create or reuse Neon branch
+      - name: Create or reuse Neon branch (with retry)
         id: create-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -713,15 +716,16 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
-      - name: Create ephemeral Neon database branch
+      - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b  # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -809,15 +813,16 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Resolve Neon DB URL (job-local)
+      - name: Resolve Neon DB URL (job-local, with retry)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve_neon
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL for E2E
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -891,14 +896,15 @@ jobs:
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Resolve Neon DB URL (job-local)
+      - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL for E2E
         run: |
@@ -1410,15 +1416,16 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
-      - name: Resolve Neon DB URL (job-local)
+      - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations for Smoke DB
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

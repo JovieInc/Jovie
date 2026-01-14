@@ -275,22 +275,24 @@ async function runMigrations() {
     }
   }
 
-  async function detectAppliedThroughMillis(): Promise<number | null> {
+  async function detectAppliedThroughIdx(): Promise<number | null> {
+    type JournalEntry = { idx: number; tag: string; when: number };
+
     type Probe = {
+      idx: number | null;
       tag: string;
-      when: number;
       existsQuery: string;
     };
 
     const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
-      entries?: Array<{ tag: string; when: number }>;
+      entries?: JournalEntry[];
     };
 
     const byTag = new Map(
-      (journal.entries ?? []).map(entry => [entry.tag, entry.when] as const)
+      (journal.entries ?? []).map(entry => [entry.tag, entry] as const)
     );
 
-    const whenFor = (tag: string): number | null => byTag.get(tag) ?? null;
+    const idxFor = (tag: string): number | null => byTag.get(tag)?.idx ?? null;
 
     const schemaExistsResult = await (client ?? pool).query<{
       has_schema: boolean;
@@ -303,73 +305,73 @@ async function runMigrations() {
     const probes: Probe[] = [
       {
         tag: '0029_auth_hardening',
-        when: whenFor('0029_auth_hardening') ?? 0,
+        idx: idxFor('0029_auth_hardening'),
         existsQuery:
           "SELECT (to_regclass('public.admin_audit_log') IS NOT NULL) AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='status') AS ok",
       },
       {
         tag: '0028_click_events_analytics_idx',
-        when: whenFor('0028_click_events_analytics_idx') ?? 0,
+        idx: idxFor('0028_click_events_analytics_idx'),
         existsQuery:
           "SELECT (to_regclass('public.click_events_creator_profile_id_is_bot_created_at_idx') IS NOT NULL) AS ok",
       },
       {
         tag: '0027_social_links_creator_profile_state_idx',
-        when: whenFor('0027_social_links_creator_profile_state_idx') ?? 0,
+        idx: idxFor('0027_social_links_creator_profile_state_idx'),
         existsQuery:
           "SELECT (to_regclass('public.social_links_creator_profile_state_idx') IS NOT NULL) AS ok",
       },
       {
         tag: '0026_billing_hardening',
-        when: whenFor('0026_billing_hardening') ?? 0,
+        idx: idxFor('0026_billing_hardening'),
         existsQuery:
           "SELECT (to_regclass('public.billing_audit_log') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='billing_version') AS ok",
       },
       {
         tag: '0025_dashboard_links_hardening',
-        when: whenFor('0025_dashboard_links_hardening') ?? 0,
+        idx: idxFor('0025_dashboard_links_hardening'),
         existsQuery:
           "SELECT (to_regclass('public.dashboard_idempotency_keys') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='social_links' AND column_name='version') AS ok",
       },
       {
         tag: '0001_add_deleted_at_to_users',
-        when: whenFor('0001_add_deleted_at_to_users') ?? 0,
+        idx: idxFor('0001_add_deleted_at_to_users'),
         existsQuery:
           "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='deleted_at') AS ok",
       },
       {
         tag: '0002_add_claim_and_ingestion_columns',
-        when: whenFor('0002_add_claim_and_ingestion_columns') ?? 0,
+        idx: idxFor('0002_add_claim_and_ingestion_columns'),
         existsQuery:
           "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='creator_profiles' AND column_name='claim_token_expires_at') OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ingestion_jobs' AND column_name='max_attempts') AS ok",
       },
       {
         tag: '0003_add_waitlist_entries',
-        when: whenFor('0003_add_waitlist_entries') ?? 0,
+        idx: idxFor('0003_add_waitlist_entries'),
         existsQuery:
           "SELECT (to_regclass('public.waitlist_entries') IS NOT NULL) AS ok",
       },
       {
         tag: '0004_add_creator_contacts',
-        when: whenFor('0004_add_creator_contacts') ?? 0,
+        idx: idxFor('0004_add_creator_contacts'),
         existsQuery:
           "SELECT (to_regclass('public.creator_contacts') IS NOT NULL) AS ok",
       },
       {
         tag: '0000_initial_schema',
-        when: whenFor('0000_initial_schema') ?? 0,
+        idx: idxFor('0000_initial_schema'),
         existsQuery: "SELECT (to_regclass('public.users') IS NOT NULL) AS ok",
       },
     ]
-      .filter(probe => probe.when > 0)
-      .sort((a, b) => b.when - a.when);
+      .filter((probe): probe is Probe & { idx: number } => probe.idx !== null)
+      .sort((a, b) => b.idx - a.idx);
 
     for (const probe of probes) {
       const result = await (client ?? pool).query<{ ok: boolean }>(
         probe.existsQuery
       );
       const ok = Boolean(result.rows[0]?.ok);
-      if (ok) return probe.when;
+      if (ok) return probe.idx;
     }
 
     return null;
@@ -387,8 +389,8 @@ async function runMigrations() {
       return;
     }
 
-    const appliedThrough = await detectAppliedThroughMillis();
-    if (!appliedThrough) {
+    const appliedThroughIdx = await detectAppliedThroughIdx();
+    if (appliedThroughIdx === null) {
       return;
     }
 
@@ -409,12 +411,12 @@ async function runMigrations() {
     }
 
     const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
-      entries?: Array<{ tag: string; when: number }>;
+      entries?: Array<{ idx: number; tag: string; when: number }>;
     };
 
     const entries = (journal.entries ?? [])
-      .filter(entry => entry.when <= appliedThrough)
-      .sort((a, b) => a.when - b.when);
+      .filter(entry => entry.idx <= appliedThroughIdx)
+      .sort((a, b) => a.idx - b.idx);
 
     if (entries.length === 0) {
       return;
