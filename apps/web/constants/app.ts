@@ -8,14 +8,15 @@ export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
 
 /**
- * APP_URL - The app/dashboard domain (meetjovie.com)
+ * APP_URL - The primary domain (jov.ie)
  * Use this for:
  * - Dashboard/app routes
  * - Marketing pages
  * - Auth-related URLs
  * - Email links to app features
+ * - Profile URLs
  *
- * For profile URLs (jov.ie), use PROFILE_URL instead.
+ * Single-domain architecture: everything on jov.ie
  */
 export const APP_URL = DOMAINS_APP_URL;
 

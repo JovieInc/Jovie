@@ -5,13 +5,14 @@
 
 /**
  * Production hostnames
+ * All traffic consolidated to jov.ie
  */
-const PRODUCTION_HOSTNAMES = ['jov.ie', 'meetjovie.com'];
+const PRODUCTION_HOSTNAMES = ['jov.ie'];
 
 /**
  * Preview/staging hostnames
  */
-const PREVIEW_HOSTNAMES = ['main.jov.ie', 'main.meetjovie.com'];
+const PREVIEW_HOSTNAMES = ['main.jov.ie'];
 
 /**
  * Dynamically get the correct base URL for the current environment

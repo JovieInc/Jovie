@@ -9,7 +9,6 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
-import { MARKETING_HOSTNAME, PROFILE_HOSTNAME } from '@/constants/domains';
 import { getUserState } from '@/lib/auth/proxy-state';
 import {
   buildContentSecurityPolicy,
@@ -19,46 +18,11 @@ import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
 // ============================================================================
-// Multi-Domain Routing Configuration
+// Single-Domain Architecture: jov.ie
 // ============================================================================
-// - jov.ie (PROFILE_HOSTNAME): Public creator profiles + viewer subscription cookies
-// - meetjovie.com (MARKETING_HOSTNAME): Marketing + Dashboard + Auth (single domain for Clerk)
+// All traffic (profiles, marketing, dashboard, auth) served from jov.ie
+// meetjovie.com redirects handled at Vercel/DNS level
 // ============================================================================
-
-/**
- * Check if a hostname matches the profile domain (jov.ie)
- */
-function isProfileHost(hostname: string): boolean {
-  return (
-    hostname === PROFILE_HOSTNAME ||
-    hostname === `www.${PROFILE_HOSTNAME}` ||
-    hostname === `main.${PROFILE_HOSTNAME}`
-  );
-}
-
-/**
- * Check if a hostname matches the marketing domain (meetjovie.com)
- */
-function isMarketingHost(hostname: string): boolean {
-  return (
-    hostname === MARKETING_HOSTNAME || hostname === `www.${MARKETING_HOSTNAME}`
-  );
-}
-
-// Note: isAppHost removed - we now use meetjovie.com for both marketing and app
-// to avoid Clerk's satellite domain costs for subdomains
-
-/**
- * Check if we're in a development/preview environment
- */
-function isDevOrPreview(hostname: string): boolean {
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.includes('vercel.app') ||
-    hostname.startsWith('main.')
-  );
-}
 
 const EU_EEA_UK = [
   'AT',
@@ -161,75 +125,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       // Only block Meta crawlers on sensitive API endpoints to avoid anti-cloaking penalties
       if (botResult.shouldBlock) {
         return createBotResponse(204);
-      }
-    }
-
-    // ========================================================================
-    // Multi-Domain Routing
-    // ========================================================================
-    const hostname = req.nextUrl.hostname;
-
-    // Skip domain routing in development/preview environments
-    if (!isDevOrPreview(hostname)) {
-      // Profile domain (jov.ie): Only allow profile-related paths
-      if (isProfileHost(hostname)) {
-        // Allow: /{username}, /{username}/tip, /{username}/listen, /api/*, static assets
-        const isProfilePath =
-          pathname === '/' ||
-          pathname.startsWith('/api/') ||
-          /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) || // /{username}
-          /^\/[a-zA-Z0-9_-]+\/(tip|listen|subscribe)\/?$/.test(pathname); // /{username}/tip etc.
-
-        // Redirect non-profile paths to marketing domain
-        if (!isProfilePath) {
-          const marketingUrl = new URL(
-            pathname,
-            `https://${MARKETING_HOSTNAME}`
-          );
-          marketingUrl.search = req.nextUrl.search;
-          return NextResponse.redirect(marketingUrl, 301);
-        }
-      }
-
-      // Marketing/App domain (meetjovie.com): Handles both marketing and app paths
-      // Note: We use meetjovie.com for both to avoid Clerk satellite domain costs
-      if (isMarketingHost(hostname)) {
-        // Redirect profile paths (/{username}) to profile domain
-        if (
-          /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) &&
-          !pathname.startsWith('/api/')
-        ) {
-          // Check if this looks like a username (not a marketing/app page)
-          const reservedPages = [
-            '/blog',
-            '/pricing',
-            '/support',
-            '/legal',
-            '/about',
-            '/features',
-            '/app',
-            '/signin',
-            '/signup',
-            '/sign-in',
-            '/sign-up',
-            '/waitlist',
-            '/onboarding',
-            '/claim',
-            '/billing',
-            '/settings',
-            '/account',
-            '/dashboard',
-            '/monitoring', // Sentry tunnel route - must not redirect to profile domain
-          ];
-          const isReservedPage = reservedPages.some(
-            page => pathname === page || pathname.startsWith(`${page}/`)
-          );
-          if (!isReservedPage) {
-            const profileUrl = new URL(pathname, `https://${PROFILE_HOSTNAME}`);
-            profileUrl.search = req.nextUrl.search;
-            return NextResponse.redirect(profileUrl, 301);
-          }
-        }
       }
     }
 
@@ -341,11 +236,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (!userState.needsOnboarding && pathname === '/onboarding') {
         // Active user trying to access onboarding → redirect to dashboard
         res = NextResponse.redirect(new URL('/app/dashboard', req.url));
-      } else if (
-        pathname === '/' ||
-        pathname === '/signin' ||
-        pathname === '/signup'
-      ) {
+      } else if (pathname === '/signin' || pathname === '/signup') {
         // Fully authenticated user hitting auth pages → redirect to dashboard
         res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       } else if (pathname.startsWith('/dashboard')) {

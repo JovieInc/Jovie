@@ -13,16 +13,8 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-const baseUrl = (process.env.BASE_URL ?? 'http://localhost:3100').trim();
-const baseHostname = (() => {
-  try {
-    return new URL(baseUrl).hostname;
-  } catch {
-    return '';
-  }
-})();
-const isMarketingBaseUrl =
-  baseHostname === 'meetjovie.com' || baseHostname === 'www.meetjovie.com';
+// All traffic consolidated to jov.ie - no separate marketing domain
+const isMarketingBaseUrl = false;
 
 const describePublicProfile = isMarketingBaseUrl
   ? test.describe.skip

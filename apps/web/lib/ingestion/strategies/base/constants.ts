@@ -7,8 +7,7 @@
 export const DEFAULT_TIMEOUT_MS = 10000;
 export const DEFAULT_MAX_RETRIES = 2;
 export const RETRY_DELAY_MS = 1000;
-export const DEFAULT_USER_AGENT =
-  'jovie-link-ingestion/1.0 (+https://meetjovie.com)';
+export const DEFAULT_USER_AGENT = 'jovie-link-ingestion/1.0 (+https://jov.ie)';
 export const DEFAULT_MAX_RESPONSE_BYTES = 2_000_000;
 export const MAX_REDIRECTS = 3;
 

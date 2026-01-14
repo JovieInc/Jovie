@@ -29,7 +29,7 @@ export default async function TermsPage() {
           'Jovie is a creative workspace governed by clear, fair policies so you can focus on sharing your music.',
         highlight: 'Creators first',
       }}
-      contactEmail='legal@meetjovie.com'
+      contactEmail='legal@jov.ie'
       supportDescription='Need clarity on usage, bans, or upcoming billing updates?'
     />
   );

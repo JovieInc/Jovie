@@ -27,7 +27,7 @@
   "rewrites": [
     {
       "source": "/clerk/(.*)",
-      "destination": "https://clerk.meetjovie.com/$1"
+      "destination": "https://clerk.jov.ie/$1"
     },
     {
       "source": "/ingest/static/(.*)",

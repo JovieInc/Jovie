@@ -29,7 +29,7 @@ export default async function PrivacyPage() {
           'We collect only what is essential, guard it with modern controls, and keep you in the loop about every change.',
         highlight: 'Data handled with care',
       }}
-      contactEmail='privacy@meetjovie.com'
+      contactEmail='privacy@jov.ie'
       supportDescription='Questions about your data, exports, or opt-outs?'
     />
   );
