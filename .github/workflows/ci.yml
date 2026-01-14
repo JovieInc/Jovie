@@ -212,7 +212,7 @@ jobs:
           fi
 
       - name: Cleanup old Neon branches (prevent limit errors)
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-branch-cleanup
         with:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
@@ -223,7 +223,7 @@ jobs:
 
       - name: Determine sanitized branch name
         id: sanitize-branch
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           RAW="${{ github.head_ref || github.ref_name }}"
 
@@ -242,7 +242,7 @@ jobs:
           echo "name=$FINAL" >> $GITHUB_OUTPUT
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -252,7 +252,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           DB_URL="${{ steps.create-branch.outputs.db_url }}"
           DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
