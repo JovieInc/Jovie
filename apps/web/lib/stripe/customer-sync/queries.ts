@@ -80,8 +80,8 @@ async function fetchUserDataWithFallback<
 >(
   clerkUserId: string,
   fields: T,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  selectObj: any // Must be any to satisfy Drizzle's SelectedFields type
+  // Use ReturnType of buildSelectObject for Drizzle-compatible typing
+  selectObj: ReturnType<typeof buildSelectObject<T>>
 ): Promise<Record<string, unknown> | undefined> {
   try {
     const [result] = await db
