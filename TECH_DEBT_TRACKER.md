@@ -1,6 +1,6 @@
 # Tech Debt Tracker
 
-> **Last Updated:** 2026-01-08
+> **Last Updated:** 2026-01-14
 > **Maintainers:** All AI agents and developers
 
 This document tracks technical debt in the Jovie codebase. AI agents **must** update this file when they address or discover tech debt items.
@@ -36,11 +36,11 @@ When you **discover** new tech debt:
 
 | Metric | Count | Target | Last Updated |
 |--------|-------|--------|--------------|
-| `@ts-nocheck` files | **0** | 0 | 2026-01-08 |
-| `@ts-ignore` in production | ~15 | <5 | 2026-01-08 |
-| Deprecated files | 30+ | 0 | 2026-01-08 |
-| TODO comments | 6 | 0 | 2026-01-08 |
-| Empty catch blocks | **0** | 0 | 2026-01-08 |
+| `@ts-nocheck` files | **0** | 0 | 2026-01-14 |
+| `@ts-ignore` in production | ~15 | <5 | 2026-01-14 |
+| Deprecated files | 30+ | 0 | 2026-01-14 |
+| TODO comments | 6 | 0 | 2026-01-14 |
+| Empty catch blocks | **0** | 0 | 2026-01-14 |
 
 ---
 

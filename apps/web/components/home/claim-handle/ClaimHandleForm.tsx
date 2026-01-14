@@ -3,7 +3,14 @@
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
@@ -13,6 +20,117 @@ import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
+
+const getFormErrors = ({
+  formSubmitted,
+  handleError,
+  availError,
+  available,
+}: {
+  formSubmitted: boolean;
+  handleError: string | null;
+  availError: string | null;
+  available: boolean | null;
+}) => {
+  const errors: Record<string, string> = {};
+
+  if (!formSubmitted) {
+    return errors;
+  }
+
+  if (handleError) {
+    errors.handle = handleError;
+  } else if (availError) {
+    errors.handle = availError;
+  } else if (available === false) {
+    errors.handle = 'Handle already taken';
+  }
+
+  return errors;
+};
+
+const getValidationState = ({
+  handle,
+  unavailable,
+  available,
+  checkingAvail,
+}: {
+  handle: string;
+  unavailable: boolean;
+  available: boolean | null;
+  checkingAvail: boolean;
+}) => {
+  if (!handle) return null;
+  if (unavailable) return 'invalid';
+  if (available === true) return 'valid';
+  if (checkingAvail) return 'pending';
+  return null;
+};
+
+const getInputClassName = ({
+  isShaking,
+  available,
+}: {
+  isShaking: boolean;
+  available: boolean | null;
+}) =>
+  `${isShaking ? 'jv-shake' : ''} ${
+    available === true ? 'jv-available' : ''
+  } transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`;
+
+const getButtonContent = ({
+  showChecking,
+  navigating,
+  available,
+  handle,
+}: {
+  showChecking: boolean;
+  navigating: boolean;
+  available: boolean | null;
+  handle: string;
+}): ReactNode => {
+  if (showChecking) {
+    return (
+      <>
+        <LoadingSpinner size='sm' className='text-white' />
+        <span>Checking availability…</span>
+      </>
+    );
+  }
+
+  if (navigating) {
+    return (
+      <>
+        <LoadingSpinner size='sm' className='text-white' />
+        <span>Creating your profile…</span>
+      </>
+    );
+  }
+
+  if (available === true) {
+    return (
+      <>
+        <span>Claim @{handle}</span>
+        <svg
+          className='w-4 h-4 transition-transform group-hover:translate-x-1'
+          fill='none'
+          viewBox='0 0 24 24'
+          stroke='currentColor'
+          aria-hidden='true'
+        >
+          <path
+            strokeLinecap='round'
+            strokeLinejoin='round'
+            strokeWidth={2}
+            d='M9 5l7 7-7 7'
+          />
+        </svg>
+      </>
+    );
+  }
+
+  return 'Request Early Access';
+};
 
 export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const router = useRouter();
@@ -121,19 +239,12 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const helperId = `${fieldId}-hint`;
 
   const formErrors = useMemo(() => {
-    const errors: Record<string, string> = {};
-
-    if (formSubmitted) {
-      if (handleError) {
-        errors.handle = handleError;
-      } else if (availError) {
-        errors.handle = availError;
-      } else if (available === false) {
-        errors.handle = 'Handle already taken';
-      }
-    }
-
-    return errors;
+    return getFormErrors({
+      formSubmitted,
+      handleError,
+      availError,
+      available,
+    });
   }, [formSubmitted, handleError, availError, available]);
 
   const helperState = useHelperState({
@@ -189,20 +300,13 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
             autoCapitalize='none'
             autoCorrect='off'
             aria-describedby={helperState.text ? helperId : undefined}
-            validationState={
-              !handle
-                ? null
-                : unavailable
-                  ? 'invalid'
-                  : available === true
-                    ? 'valid'
-                    : checkingAvail
-                      ? 'pending'
-                      : null
-            }
-            className={`${isShaking ? 'jv-shake' : ''} ${
-              available === true ? 'jv-available' : ''
-            } transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`}
+            validationState={getValidationState({
+              handle,
+              unavailable,
+              available,
+              checkingAvail,
+            })}
+            className={getInputClassName({ isShaking, available })}
             inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
             statusIcon={
               <HandleStatusIcon
@@ -237,37 +341,12 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         disabled={btnDisabled || !handle}
       >
         <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>
-          {showChecking ? (
-            <>
-              <LoadingSpinner size='sm' className='text-white' />
-              <span>Checking availability…</span>
-            </>
-          ) : navigating ? (
-            <>
-              <LoadingSpinner size='sm' className='text-white' />
-              <span>Creating your profile…</span>
-            </>
-          ) : available === true ? (
-            <>
-              <span>Claim @{handle}</span>
-              <svg
-                className='w-4 h-4 transition-transform group-hover:translate-x-1'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                aria-hidden='true'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M9 5l7 7-7 7'
-                />
-              </svg>
-            </>
-          ) : (
-            'Request Early Access'
-          )}
+          {getButtonContent({
+            showChecking,
+            navigating,
+            available,
+            handle,
+          })}
         </span>
       </Button>
 
