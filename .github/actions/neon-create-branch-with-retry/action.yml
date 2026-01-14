@@ -8,21 +8,15 @@ inputs:
   branch_name:
     description: 'Sanitized branch name'
     required: true
-  parent:
+  parent_branch:
     description: 'Parent branch name (optional)'
     required: false
   role:
     description: 'Database role (optional, defaults to neondb_owner)'
     required: false
     default: 'neondb_owner'
-  username:
-    description: 'Database username (optional)'
-    required: false
   api_key:
     description: 'Neon API key'
-    required: true
-  neon_api_key:
-    description: 'Neon API key for cleanup action'
     required: true
   branch_limit:
     description: 'Total branch limit (default: 10)'
@@ -58,16 +52,15 @@ runs:
       with:
         project_id: ${{ inputs.project_id }}
         branch_name: ${{ inputs.branch_name }}
-        parent: ${{ inputs.parent }}
+        parent_branch: ${{ inputs.parent_branch }}
         role: ${{ inputs.role }}
-        username: ${{ inputs.username }}
         api_key: ${{ inputs.api_key }}
 
     - name: Aggressive cleanup on limit error
       if: steps.create-branch-attempt-1.outcome == 'failure'
       uses: ./.github/actions/neon-branch-cleanup
       with:
-        neon_api_key: ${{ inputs.neon_api_key }}
+        neon_api_key: ${{ inputs.api_key }}
         neon_project_id: ${{ inputs.project_id }}
         branch_limit: ${{ inputs.branch_limit }}
         protected_branches: ${{ inputs.protected_branches }}
@@ -80,9 +73,8 @@ runs:
       with:
         project_id: ${{ inputs.project_id }}
         branch_name: ${{ inputs.branch_name }}
-        parent: ${{ inputs.parent }}
+        parent_branch: ${{ inputs.parent_branch }}
         role: ${{ inputs.role }}
-        username: ${{ inputs.username }}
         api_key: ${{ inputs.api_key }}
 
     - name: Set outputs from successful attempt
@@ -103,9 +95,29 @@ runs:
       if: always()
       shell: bash
       run: |
-        if [ "${{ steps.create-branch-attempt-1.outcome }}" == "failure" ]; then
-          echo "⚠️ First attempt failed - ran aggressive cleanup and retried" >> $GITHUB_STEP_SUMMARY
-          echo "Branch created on retry: ${{ steps.set-outputs.outputs.branch_id }}" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "✅ Branch created on first attempt: ${{ steps.set-outputs.outputs.branch_id }}" >> $GITHUB_STEP_SUMMARY
+        ATTEMPT_1_OUTCOME='${{ steps.create-branch-attempt-1.outcome }}'
+        ATTEMPT_1_CONCLUSION='${{ steps.create-branch-attempt-1.conclusion }}'
+        ATTEMPT_2_OUTCOME='${{ steps.create-branch-attempt-2.outcome }}'
+        ATTEMPT_2_CONCLUSION='${{ steps.create-branch-attempt-2.conclusion }}'
+        BRANCH_ID='${{ steps.set-outputs.outputs.branch_id }}'
+
+        if [ "$ATTEMPT_1_OUTCOME" == "success" ]; then
+          echo "✅ Branch created on first attempt: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
         fi
+
+        if [ "$ATTEMPT_2_OUTCOME" == "success" ]; then
+          echo "⚠️ First attempt failed - ran aggressive cleanup and retried" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Branch created on retry: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        echo "❌ Failed to create Neon branch after 2 attempts" >> "$GITHUB_STEP_SUMMARY"
+        echo "Attempt 1 outcome: $ATTEMPT_1_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+        echo "Attempt 1 conclusion: $ATTEMPT_1_CONCLUSION" >> "$GITHUB_STEP_SUMMARY"
+        echo "Attempt 2 outcome: $ATTEMPT_2_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+        echo "Attempt 2 conclusion: $ATTEMPT_2_CONCLUSION" >> "$GITHUB_STEP_SUMMARY"
+        echo "Attempt 1 branch_id: ${{ steps.create-branch-attempt-1.outputs.branch_id }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "Attempt 2 branch_id: ${{ steps.create-branch-attempt-2.outputs.branch_id }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "set-outputs branch_id: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
+        echo "See the 'Create Neon branch' step logs above for Neon API error details." >> "$GITHUB_STEP_SUMMARY"

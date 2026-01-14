@@ -212,7 +212,7 @@ jobs:
           fi
 
       - name: Cleanup old Neon branches (prevent limit errors)
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-branch-cleanup
         with:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
@@ -223,7 +223,7 @@ jobs:
 
       - name: Determine sanitized branch name
         id: sanitize-branch
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           RAW="${{ github.head_ref || github.ref_name }}"
 
@@ -242,17 +242,16 @@ jobs:
           echo "name=$FINAL" >> $GITHUB_OUTPUT
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           DB_URL="${{ steps.create-branch.outputs.db_url }}"
           DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
@@ -349,7 +348,6 @@ jobs:
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -446,7 +444,6 @@ jobs:
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -725,7 +722,6 @@ jobs:
           branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -822,7 +818,6 @@ jobs:
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL for E2E
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -904,7 +899,6 @@ jobs:
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL for E2E
         run: |
@@ -1425,7 +1419,6 @@ jobs:
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations for Smoke DB
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
