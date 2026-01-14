@@ -13,6 +13,7 @@ import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { logger } from '@/lib/utils/logger';
 import { encryptIP } from '@/lib/utils/pii-encryption';
 import {
   checkPublicRateLimit,
@@ -335,7 +336,7 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('[Audience Click] Error', error);
+    logger.error('[Audience Click] Error', error);
     return NextResponse.json(
       { error: 'Unable to record click' },
       { status: 500, headers: NO_STORE_HEADERS }

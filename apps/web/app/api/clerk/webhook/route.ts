@@ -8,6 +8,7 @@ import {
   syncAllClerkMetadata,
 } from '@/lib/auth/clerk-sync';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
+import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
     const webhook_secret = process.env.CLERK_WEBHOOK_SECRET;
 
     if (!webhook_secret) {
-      console.error('Missing CLERK_WEBHOOK_SECRET environment variable');
+      logger.error('Missing CLERK_WEBHOOK_SECRET environment variable');
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
         'svix-signature': svix_signature,
       }) as WebhookEvent;
     } catch (err) {
-      console.error('Webhook signature verification failed:', err);
+      logger.error('Webhook signature verification failed:', err);
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
         // Sync initial Jovie metadata to Clerk (user created but not yet in DB)
         await syncAllClerkMetadata(user.id);
 
-        console.log(`Post-signup processing completed for user ${user.id}`);
+        logger.info(`Post-signup processing completed for user ${user.id}`);
 
         return NextResponse.json(
           {
@@ -155,7 +156,7 @@ export async function POST(request: NextRequest) {
           { headers: NO_STORE_HEADERS }
         );
       } catch (error) {
-        console.error(
+        logger.error(
           `Failed to process user.created event for ${user.id}:`,
           error
         );
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
           user.private_metadata
         );
       } catch (error) {
-        console.error(
+        logger.error(
           `Failed to sync username from Clerk for user.updated ${user.id}:`,
           error
         );
@@ -211,7 +212,7 @@ export async function POST(request: NextRequest) {
         const result = await handleClerkUserDeleted(user.id);
 
         if (!result.success) {
-          console.error(
+          logger.error(
             `Failed to handle user.deleted for ${user.id}:`,
             result.error
           );
@@ -225,7 +226,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        console.log(`User deletion processed for ${user.id}`);
+        logger.info(`User deletion processed for ${user.id}`);
 
         return NextResponse.json(
           {
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
           { headers: NO_STORE_HEADERS }
         );
       } catch (error) {
-        console.error(
+        logger.error(
           `Failed to process user.deleted event for ${user.id}:`,
           error
         );
@@ -258,7 +259,7 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    logger.error('Webhook processing error:', error);
     return NextResponse.json(
       {
         error: 'Internal server error',
