@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type SortingState,
-} from '@tanstack/react-table';
+import { createColumnHelper, type SortingState } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -74,7 +70,7 @@ export function ReleaseTable({
 
   // Build dynamic column definitions
   const columns = useMemo(() => {
-    const baseColumns: ColumnDef<ReleaseViewModel>[] = [
+    const baseColumns = [
       // Release column (artwork + title + artist)
       columnHelper.accessor('title', {
         id: 'release',
