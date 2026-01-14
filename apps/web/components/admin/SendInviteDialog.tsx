@@ -49,6 +49,12 @@ export function SendInviteDialog({
       return;
     }
 
+    // Limit input length to prevent ReDoS (RFC 5321 max email length is 254)
+    if (trimmedEmail.length > 254) {
+      setError('Email address is too long');
+      return;
+    }
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {

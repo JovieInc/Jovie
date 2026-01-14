@@ -69,14 +69,21 @@ export function EmailStep({
   }, [onBack, isLoading]);
 
   const validateEmail = useCallback((value: string): boolean => {
-    if (!value.trim()) {
+    const trimmed = value.trim();
+    if (!trimmed) {
       setLocalError('Please enter your email address.');
+      return false;
+    }
+
+    // Limit input length to prevent ReDoS (RFC 5321 max email length is 254)
+    if (trimmed.length > 254) {
+      setLocalError('Email address is too long.');
       return false;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) {
+    if (!emailRegex.test(trimmed)) {
       setLocalError('Please enter a valid email address.');
       return false;
     }
