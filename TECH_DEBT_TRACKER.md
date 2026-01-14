@@ -50,7 +50,7 @@ When you **discover** new tech debt:
 
 | Item | Priority | Resolution | Reference |
 |------|----------|------------|-----------|
-| Oversized `apps/web/app/api/dashboard/social-links/route.ts` | P1 | Split handlers and shared utilities to keep route files under 200 lines | fix/batch-42-social-links-refactor |
+| Excessive return statements in shared web utilities | P2 | Consolidated guard clauses to satisfy S1142 | fix/batch-47-multiple-returns |
 
 ### 2026-01-08
 

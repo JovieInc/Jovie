@@ -67,7 +67,7 @@ export function TableCheckboxCell<TData = unknown>(
             <span
               className={cn(
                 'absolute inset-0 flex items-center justify-center text-[11px] tabular-nums text-tertiary-token transition-opacity',
-                (checked || 'group-hover:opacity-0') && 'opacity-0'
+                checked ? 'opacity-0' : 'group-hover:opacity-0'
               )}
             >
               {rowNumber}

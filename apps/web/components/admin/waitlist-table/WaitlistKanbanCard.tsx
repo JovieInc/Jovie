@@ -2,7 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { Mail } from 'lucide-react';
-import { DateCell } from '@/components/admin/table/atoms/DateCell';
+import { DateCell } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
 import {

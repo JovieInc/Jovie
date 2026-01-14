@@ -348,7 +348,7 @@ function slugify(text: string): string {
       // Replace spaces and special chars with hyphens
       .replace(/[^a-z0-9]+/g, '-')
       // Remove leading/trailing hyphens
-      .replace(/^-+|-+$/g, '')
+      .replace(/(^-+)|(-+$)/g, '')
       // Limit length
       .substring(0, 50)
   );

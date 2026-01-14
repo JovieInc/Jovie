@@ -111,16 +111,16 @@ export function PerformanceDashboard({
   return (
     <div className='fixed bottom-4 right-4 z-50'>
       <div className='bg-white rounded-lg shadow-lg overflow-hidden'>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive dashboard header */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Custom interactive dashboard header */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Custom interactive dashboard header */}
-        <div
-          className='px-4 py-2 bg-indigo-600 text-white cursor-pointer flex justify-between items-center'
+        <button
+          type='button'
+          className='w-full px-4 py-2 bg-indigo-600 text-white cursor-pointer flex justify-between items-center'
           onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-label='Toggle performance metrics'
         >
           <h3 className='text-sm font-medium'>Performance Metrics</h3>
-          <span>{expanded ? '▼' : '▲'}</span>
-        </div>
+          <span aria-hidden='true'>{expanded ? '▼' : '▲'}</span>
+        </button>
 
         {expanded && (
           <div className='p-4'>

@@ -438,7 +438,7 @@ export async function resolveUserState(
 
   // 5. Fully active user
   return {
-    state: dbUser?.isAdmin ? UserState.ACTIVE : UserState.ACTIVE,
+    state: UserState.ACTIVE,
     clerkUserId,
     dbUserId,
     profileId: profile.id,

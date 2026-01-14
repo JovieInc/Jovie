@@ -7,6 +7,15 @@ import type { PhoneMockupPreviewProps } from './types';
 import { usePhoneMockupPreview } from './usePhoneMockupPreview';
 import { getPlatformIcon, getPlatformName } from './utils';
 
+// Animation constants
+const LINK_ANIMATION_BASE_DELAY = 0.1;
+const LINK_ANIMATION_DELAY_INCREMENT = 0.05;
+const LINK_ANIMATION_DURATION = 0.3;
+const HOVER_SCALE = 1.02;
+const TAP_SCALE = 0.98;
+const HOVER_DURATION = 0.2;
+const TAP_DURATION = 0.1;
+
 export function PhoneMockupPreview({
   username,
   avatarUrl,
@@ -133,18 +142,20 @@ export function PhoneMockupPreview({
                       opacity: isLoaded ? 1 : 0,
                       y: isLoaded ? 0 : 10,
                       transition: {
-                        delay: 0.1 + index * 0.05,
-                        duration: 0.3,
+                        delay:
+                          LINK_ANIMATION_BASE_DELAY +
+                          index * LINK_ANIMATION_DELAY_INCREMENT,
+                        duration: LINK_ANIMATION_DURATION,
                         ease: 'easeOut',
                       },
                     }}
                     whileHover={{
-                      scale: 1.02,
-                      transition: { duration: 0.2 },
+                      scale: HOVER_SCALE,
+                      transition: { duration: HOVER_DURATION },
                     }}
                     whileTap={{
-                      scale: 0.98,
-                      transition: { duration: 0.1 },
+                      scale: TAP_SCALE,
+                      transition: { duration: TAP_DURATION },
                     }}
                     onHoverStart={() => setActiveLink(link.id)}
                     onHoverEnd={() => setActiveLink(null)}

@@ -62,7 +62,7 @@ export function slugify(text: string): string {
     .trim()
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/(^-+)|(-+$)/g, '');
 }
 
 export function generateHandle(name: string): string {
@@ -96,15 +96,22 @@ export function formatDate(date: string | Date): string {
 }
 
 export function detectPlatformFromUA(userAgent?: string): string | null {
-  if (!userAgent) return null;
+  if (!userAgent) {
+    return null;
+  }
 
   const ua = userAgent.toLowerCase();
+  const platformMatchers = [
+    { tokens: ['iphone', 'ipad'], platform: 'ios' },
+    { tokens: ['android'], platform: 'android' },
+    { tokens: ['macintosh'], platform: 'macos' },
+    { tokens: ['windows'], platform: 'windows' },
+    { tokens: ['linux'], platform: 'linux' },
+  ];
 
-  if (ua.includes('iphone') || ua.includes('ipad')) return 'ios';
-  if (ua.includes('android')) return 'android';
-  if (ua.includes('macintosh')) return 'macos';
-  if (ua.includes('windows')) return 'windows';
-  if (ua.includes('linux')) return 'linux';
+  const matched = platformMatchers.find(({ tokens }) =>
+    tokens.some(token => ua.includes(token))
+  );
 
-  return 'web';
+  return matched?.platform ?? 'web';
 }

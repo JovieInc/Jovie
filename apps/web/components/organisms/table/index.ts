@@ -62,6 +62,7 @@ export { TableRow } from './atoms/TableRow';
 // =============================================================================
 
 export { ContextMenuSubmenu } from './molecules/ContextMenuSubmenu';
+export type { ViewMode } from './molecules/DisplayMenuDropdown';
 export { DisplayMenuDropdown } from './molecules/DisplayMenuDropdown';
 export type { ExportCSVButtonProps } from './molecules/ExportCSVButton';
 export { ExportCSVButton } from './molecules/ExportCSVButton';
@@ -71,7 +72,11 @@ export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
 export { SocialLinksCell } from './molecules/SocialLinksCell';
 export type { BulkAction } from './molecules/TableBulkActionsToolbar';
 export { TableBulkActionsToolbar } from './molecules/TableBulkActionsToolbar';
-export { TableContextMenu } from './molecules/TableContextMenu';
+export type { ContextMenuItemType } from './molecules/TableContextMenu';
+export {
+  convertContextMenuItems,
+  TableContextMenu,
+} from './molecules/TableContextMenu';
 export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
 export type { TablePaginationFooterProps } from './molecules/TablePaginationFooter';
@@ -102,7 +107,13 @@ export type {
 export { useTableKeyboardNav } from './hooks/useTableKeyboardNav';
 
 // =============================================================================
-// Utilities & Styles
+// Utilities & Hooks
+// =============================================================================
+
+export { useTableGrouping } from './utils/useTableGrouping';
+
+// =============================================================================
+// Styles
 // =============================================================================
 
 export { cn, presets } from './table.styles';
