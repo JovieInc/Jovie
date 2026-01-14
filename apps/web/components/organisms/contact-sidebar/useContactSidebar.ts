@@ -24,7 +24,7 @@ export interface UseContactSidebarReturn {
   handleAddLink: () => void;
   handleRemoveLink: (index: number) => void;
   handleNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-  handleKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  handleKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
 }
 
 export function useContactSidebar({

@@ -124,7 +124,7 @@ export function DashboardAudienceTableUnified({
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `${member.displayName.replace(/[^a-z0-9]/gi, '_')}.vcf`;
+            link.download = `${(member.displayName || 'contact').replace(/[^a-z0-9]/gi, '_')}.vcf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
