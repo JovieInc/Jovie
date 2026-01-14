@@ -1,6 +1,7 @@
 import { lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { dashboardIdempotencyKeys, db } from '@/lib/db';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
 
     const deletedCount = result.length;
 
-    console.log(
+    logger.info(
       `[cleanup-idempotency-keys] Deleted ${deletedCount} expired keys`
     );
 
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('[cleanup-idempotency-keys] Cleanup failed:', error);
+    logger.error('[cleanup-idempotency-keys] Cleanup failed:', error);
     return NextResponse.json(
       {
         success: false,

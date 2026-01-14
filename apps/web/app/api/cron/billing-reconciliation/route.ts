@@ -20,6 +20,7 @@ import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+import { logger } from '@/lib/utils/logger';
 
 // Pagination settings
 const BATCH_SIZE = 100;
@@ -110,7 +111,7 @@ export async function GET(request: Request) {
       duration,
     };
 
-    console.log('[billing-reconciliation] Completed:', result);
+    logger.info('[billing-reconciliation] Completed:', result);
 
     // Report any issues to error tracking
     if (stats.mismatches > 0 || stats.errors > 0) {
@@ -271,7 +272,7 @@ async function reconcileUsersWithSubscriptions(
 
           if (result.success) {
             stats.fixed++;
-            console.log(
+            logger.info(
               `[billing-reconciliation] Fixed user ${user.id}: isPro ${user.isPro} -> ${shouldBePro}`
             );
           } else {
@@ -381,7 +382,7 @@ async function reconcileProUsersWithoutSubscription(
 
       if (result.success) {
         stats.fixed++;
-        console.log(
+        logger.info(
           `[billing-reconciliation] Downgraded user ${user.id}: Pro without subscription`
         );
       } else {
