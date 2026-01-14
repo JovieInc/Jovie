@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
+// Simulated search delay in milliseconds
+const SEARCH_DELAY_MS = 1000;
+
 export function ArtistSearch() {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -17,7 +20,7 @@ export function ArtistSearch() {
 
     try {
       // Simulate search delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, SEARCH_DELAY_MS));
 
       // Redirect to waitlist (invite-only)
       router.push('/waitlist');
