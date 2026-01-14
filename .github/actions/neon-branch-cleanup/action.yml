@@ -121,7 +121,7 @@ runs:
           # - <sanitizedSlug>-<runId>-<attempt> (where runId is a long numeric GitHub run id)
           #
           # This protects manually-created branches (e.g., 'dev', 'staging', 'tim-dev')
-          EPHEMERAL_RE='^(pr-[0-9]+-[0-9]+|preview-pr-[0-9]+|main-[0-9]+-[0-9]+|e2e-full-[0-9]+(-[A-Za-z0-9._-]+)?|e2e-smoke-[0-9]+-[0-9]+|[a-z0-9._-]{1,40}-[0-9]{7,}-[0-9]+)$'
+          EPHEMERAL_RE='^(pr-[0-9]+-[0-9]+|preview-pr-[0-9]+|main-[0-9]+-[0-9]+|e2e-full-[0-9]+(-[A-Za-z0-9._-]+)?|e2e-smoke-[0-9]+-[0-9]+|[a-z0-9._-]{1,80}-[0-9]{7,}-[0-9]+|br-[a-z0-9-]+-ad[0-9a-z]+)$'
           if ! [[ "$branch_name" =~ $EPHEMERAL_RE ]]; then
             echo "Skipping non-ephemeral branch (no pattern match): $branch_name"
             continue
