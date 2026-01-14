@@ -1,6 +1,10 @@
 'use client';
 
-import { createColumnHelper, type SortingState } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type SortingState,
+} from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -223,7 +227,7 @@ export function ReleaseTable({
   return (
     <UnifiedTable
       data={releases}
-      columns={columns}
+      columns={columns as ColumnDef<ReleaseViewModel, unknown>[]}
       sorting={sorting}
       onSortingChange={setSorting}
       getContextMenuItems={getContextMenuItems}

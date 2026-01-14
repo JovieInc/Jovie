@@ -501,6 +501,7 @@ export function OldButton() { ... }
     - ❌ **DON'T:** Explicitly type columns as `ColumnDef<TData, unknown>[]`
     - ✅ **DO:** Let TypeScript infer the column union type naturally
     - **Why:** TanStack Table has specific accessor types (`AccessorKeyColumnDef<TData, string>`) that conflict with explicit generic typing
+    - **Type Assertion:** When passing inferred columns to components that expect `ColumnDef<TData, unknown>[]`, use type assertion: `as ColumnDef<TData, unknown>[]`
     - **Example:**
       ```typescript
       // ❌ WRONG: Explicit typing causes type errors
@@ -520,6 +521,12 @@ export function OldButton() { ... }
         ];
         return baseColumns;
       }, [deps]);
+
+      // ✅ When passing to UnifiedTable, use type assertion:
+      <UnifiedTable
+        data={data}
+        columns={columns as ColumnDef<MyType, unknown>[]}
+      />
       ```
 - **Virtualization:** TanStack Virtual v3.13.13 (`@tanstack/react-virtual`)
   - Use `useVirtualizer` for list/table virtualization
