@@ -237,9 +237,9 @@ export async function verifyProfileOwnership(
   const [profile] = await tx
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
-      and(eq(users.clerkId, clerkUserId), eq(creatorProfiles.id, profileId))
+      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
     )
     .limit(1);
 

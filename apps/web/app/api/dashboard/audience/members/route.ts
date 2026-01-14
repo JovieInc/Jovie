@@ -1,7 +1,8 @@
-import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { audienceMembers, creatorProfiles, users } from '@/lib/db/schema';
+import { verifyProfileOwnership } from '@/lib/db/queries/shared';
+import { audienceMembers } from '@/lib/db/schema';
 import { membersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -37,6 +38,16 @@ export async function GET(request: NextRequest) {
       }
 
       const { profileId, sort, direction, page, pageSize } = parsed.data;
+
+      // Verify user owns the profile
+      const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
+      if (!profile) {
+        return NextResponse.json(
+          { members: [], total: 0 },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const offset = (page - 1) * pageSize;
@@ -63,17 +74,7 @@ export async function GET(request: NextRequest) {
           createdAt: audienceMembers.firstSeenAt,
         })
         .from(audienceMembers)
-        .innerJoin(
-          creatorProfiles,
-          eq(audienceMembers.creatorProfileId, creatorProfiles.id)
-        )
-        .innerJoin(users, eq(creatorProfiles.userId, users.id))
-        .where(
-          and(
-            eq(users.clerkId, clerkUserId),
-            eq(audienceMembers.creatorProfileId, profileId)
-          )
-        );
+        .where(eq(audienceMembers.creatorProfileId, profileId));
 
       const [rows, [{ total }]] = await Promise.all([
         baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
@@ -82,17 +83,7 @@ export async function GET(request: NextRequest) {
             total: drizzleSql`COALESCE(COUNT(${audienceMembers.id}), 0)`,
           })
           .from(audienceMembers)
-          .innerJoin(
-            creatorProfiles,
-            eq(audienceMembers.creatorProfileId, creatorProfiles.id)
-          )
-          .innerJoin(users, eq(creatorProfiles.userId, users.id))
-          .where(
-            and(
-              eq(users.clerkId, clerkUserId),
-              eq(audienceMembers.creatorProfileId, profileId)
-            )
-          ),
+          .where(eq(audienceMembers.creatorProfileId, profileId)),
       ]);
 
       const members = rows.map(member => ({
