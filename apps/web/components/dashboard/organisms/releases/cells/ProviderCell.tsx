@@ -7,11 +7,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+
+// Provider domain mapping for URL validation
+const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
+  apple_music: ['music.apple.com', 'itunes.apple.com'],
+  spotify: ['open.spotify.com', 'spotify.com'],
+  youtube_music: ['music.youtube.com', 'youtube.com'],
+  soundcloud: ['soundcloud.com'],
+  deezer: ['deezer.com'],
+  amazon_music: ['music.amazon.com', 'amazon.com'],
+  tidal: ['tidal.com'],
+};
 
 interface ProviderConfig {
   label: string;
@@ -57,6 +68,7 @@ function ProviderStatusDot({ status, accent }: ProviderStatusDotProps) {
 
 interface AddProviderUrlPopoverProps {
   providerLabel: string;
+  providerKey: ProviderKey;
   accent: string;
   onSave: (url: string) => Promise<void>;
   isSaving?: boolean;
@@ -67,24 +79,52 @@ interface AddProviderUrlPopoverProps {
  *
  * Features:
  * - Auto-focus input on open
- * - URL validation
+ * - URL validation (valid URL + provider domain check)
  * - Loading state during save
  * - Error handling (parent component shows toast)
  */
 function AddProviderUrlPopover({
   providerLabel,
+  providerKey,
   accent,
   onSave,
   isSaving,
 }: AddProviderUrlPopoverProps) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
+  const [validationError, setValidationError] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
+
+    // Validate URL format
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(trimmed);
+    } catch {
+      setValidationError('Please enter a valid URL');
+      return;
+    }
+
+    // Validate provider domain
+    const allowedDomains = PROVIDER_DOMAINS[providerKey];
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isValidDomain = allowedDomains.some(
+      domain => hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+
+    if (!isValidDomain) {
+      setValidationError(
+        `URL must be from ${allowedDomains.length === 1 ? allowedDomains[0] : `one of: ${allowedDomains.join(', ')}`}`
+      );
+      return;
+    }
+
+    // Clear validation error and proceed with save
+    setValidationError('');
     try {
       await onSave(trimmed);
       setUrl('');
@@ -131,17 +171,25 @@ function AddProviderUrlPopover({
               Add {providerLabel} link
             </span>
           </div>
-          <Input
-            ref={inputRef}
-            type='url'
-            inputSize='sm'
-            placeholder='Paste URL here...'
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            disabled={isSaving}
-            autoComplete='off'
-            className='text-xs'
-          />
+          <div className='space-y-1'>
+            <Input
+              ref={inputRef}
+              type='url'
+              inputSize='sm'
+              placeholder='Paste URL here...'
+              value={url}
+              onChange={e => {
+                setUrl(e.target.value);
+                setValidationError(''); // Clear error on change
+              }}
+              disabled={isSaving}
+              autoComplete='off'
+              className='text-xs'
+            />
+            {validationError && (
+              <p className='text-xs text-(--color-error)'>{validationError}</p>
+            )}
+          </div>
           <div className='flex justify-end gap-2'>
             <Button
               type='button'
@@ -201,12 +249,27 @@ export function ProviderCell({
   isAddingUrl,
 }: ProviderCellProps) {
   const [copiedTestId, setCopiedTestId] = useState<string | null>(null);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
       await onCopy(path, label, testId);
       setCopiedTestId(testId);
-      setTimeout(() => setCopiedTestId(null), 2000);
+
+      // Clear existing timeout before setting a new one
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
     },
     [onCopy]
   );
@@ -263,6 +326,7 @@ export function ProviderCell({
       ) : onAddUrl ? (
         <AddProviderUrlPopover
           providerLabel={config.label}
+          providerKey={providerKey}
           accent={config.accent}
           onSave={handleAddUrl}
           isSaving={isAddingUrl}
