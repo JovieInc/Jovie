@@ -11,17 +11,19 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import { GroupedTableBody } from '@/components/admin/table/molecules/GroupedTableBody';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
 } from '@/components/admin/table/molecules/TableContextMenu';
-import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
-import { useTableGrouping } from '@/components/admin/table/utils/useTableGrouping';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import {
+  DateCell,
+  GroupedTableBody,
+  UnifiedTable,
+  useTableGrouping,
+} from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';

@@ -6,7 +6,6 @@ import { BellRing, Users } from 'lucide-react';
 import * as React from 'react';
 import { useMemo } from 'react';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
-import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
@@ -19,6 +18,7 @@ import {
 } from '@/components/dashboard/audience/table/atoms';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { UnifiedTable } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';

@@ -13,15 +13,11 @@ import { toast } from 'sonner';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { AvatarCell } from '@/components/admin/table/atoms/AvatarCell';
-import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import { SocialLinksCell } from '@/components/admin/table/molecules/SocialLinksCell';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
 } from '@/components/admin/table/molecules/TableContextMenu';
-import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
@@ -29,6 +25,12 @@ import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import {
+  AvatarCell,
+  DateCell,
+  SocialLinksCell,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';

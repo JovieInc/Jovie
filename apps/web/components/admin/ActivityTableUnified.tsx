@@ -4,7 +4,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
+import { UnifiedTable } from '@/components/organisms/table';
 import type {
   AdminActivityItem,
   AdminActivityStatus,

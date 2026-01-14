@@ -3,10 +3,6 @@
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import {
-  DisplayMenuDropdown,
-  type ViewMode,
-} from '@/components/admin/table/molecules/DisplayMenuDropdown';
 import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
 import {
   KanbanBoard,
@@ -14,6 +10,10 @@ import {
 } from '@/components/admin/table/organisms/KanbanBoard';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import {
+  DisplayMenuDropdown,
+  type ViewMode,
+} from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';

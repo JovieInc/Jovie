@@ -8,7 +8,6 @@ import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { DateCell } from '@/components/admin/table/atoms/DateCell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
@@ -16,10 +15,10 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
 } from '@/components/admin/table/molecules/TableContextMenu';
-import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { DateCell, UnifiedTable } from '@/components/organisms/table';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
