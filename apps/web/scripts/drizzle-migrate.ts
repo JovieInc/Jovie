@@ -279,7 +279,7 @@ async function runMigrations() {
     type JournalEntry = { idx: number; tag: string; when: number };
 
     type Probe = {
-      idx: number;
+      idx: number | null;
       tag: string;
       existsQuery: string;
     };
@@ -305,65 +305,65 @@ async function runMigrations() {
     const probes: Probe[] = [
       {
         tag: '0029_auth_hardening',
-        idx: idxFor('0029_auth_hardening') ?? 0,
+        idx: idxFor('0029_auth_hardening'),
         existsQuery:
           "SELECT (to_regclass('public.admin_audit_log') IS NOT NULL) AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='status') AS ok",
       },
       {
         tag: '0028_click_events_analytics_idx',
-        idx: idxFor('0028_click_events_analytics_idx') ?? 0,
+        idx: idxFor('0028_click_events_analytics_idx'),
         existsQuery:
           "SELECT (to_regclass('public.click_events_creator_profile_id_is_bot_created_at_idx') IS NOT NULL) AS ok",
       },
       {
         tag: '0027_social_links_creator_profile_state_idx',
-        idx: idxFor('0027_social_links_creator_profile_state_idx') ?? 0,
+        idx: idxFor('0027_social_links_creator_profile_state_idx'),
         existsQuery:
           "SELECT (to_regclass('public.social_links_creator_profile_state_idx') IS NOT NULL) AS ok",
       },
       {
         tag: '0026_billing_hardening',
-        idx: idxFor('0026_billing_hardening') ?? 0,
+        idx: idxFor('0026_billing_hardening'),
         existsQuery:
           "SELECT (to_regclass('public.billing_audit_log') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='billing_version') AS ok",
       },
       {
         tag: '0025_dashboard_links_hardening',
-        idx: idxFor('0025_dashboard_links_hardening') ?? 0,
+        idx: idxFor('0025_dashboard_links_hardening'),
         existsQuery:
           "SELECT (to_regclass('public.dashboard_idempotency_keys') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='social_links' AND column_name='version') AS ok",
       },
       {
         tag: '0001_add_deleted_at_to_users',
-        idx: idxFor('0001_add_deleted_at_to_users') ?? 0,
+        idx: idxFor('0001_add_deleted_at_to_users'),
         existsQuery:
           "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='deleted_at') AS ok",
       },
       {
         tag: '0002_add_claim_and_ingestion_columns',
-        idx: idxFor('0002_add_claim_and_ingestion_columns') ?? 0,
+        idx: idxFor('0002_add_claim_and_ingestion_columns'),
         existsQuery:
           "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='creator_profiles' AND column_name='claim_token_expires_at') OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ingestion_jobs' AND column_name='max_attempts') AS ok",
       },
       {
         tag: '0003_add_waitlist_entries',
-        idx: idxFor('0003_add_waitlist_entries') ?? 0,
+        idx: idxFor('0003_add_waitlist_entries'),
         existsQuery:
           "SELECT (to_regclass('public.waitlist_entries') IS NOT NULL) AS ok",
       },
       {
         tag: '0004_add_creator_contacts',
-        idx: idxFor('0004_add_creator_contacts') ?? 0,
+        idx: idxFor('0004_add_creator_contacts'),
         existsQuery:
           "SELECT (to_regclass('public.creator_contacts') IS NOT NULL) AS ok",
       },
       {
         tag: '0000_initial_schema',
-        idx: idxFor('0000_initial_schema') ?? 0,
+        idx: idxFor('0000_initial_schema'),
         existsQuery: "SELECT (to_regclass('public.users') IS NOT NULL) AS ok",
       },
     ]
-      .filter(probe => probe.idx > 0)
+      .filter((probe): probe is Probe & { idx: number } => probe.idx !== null)
       .sort((a, b) => b.idx - a.idx);
 
     for (const probe of probes) {
