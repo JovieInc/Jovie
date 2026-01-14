@@ -1,11 +1,8 @@
-import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
-import {
-  creatorProfiles,
-  notificationSubscriptions,
-  users,
-} from '@/lib/db/schema';
+import { verifyProfileOwnership } from '@/lib/db/queries/shared';
+import { notificationSubscriptions } from '@/lib/db/schema';
 import { subscribersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -39,6 +36,16 @@ export async function GET(request: Request) {
       }
 
       const { profileId, sort, direction, page, pageSize } = parsed.data;
+
+      // Verify user owns the profile
+      const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
+      if (!profile) {
+        return NextResponse.json(
+          { subscribers: [], total: 0 },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
       const sortColumn = SORTABLE_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const offset = (page - 1) * pageSize;
@@ -53,17 +60,7 @@ export async function GET(request: Request) {
           channel: notificationSubscriptions.channel,
         })
         .from(notificationSubscriptions)
-        .innerJoin(
-          creatorProfiles,
-          eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-        )
-        .innerJoin(users, eq(creatorProfiles.userId, users.id))
-        .where(
-          and(
-            eq(users.clerkId, clerkUserId),
-            eq(notificationSubscriptions.creatorProfileId, profileId)
-          )
-        );
+        .where(eq(notificationSubscriptions.creatorProfileId, profileId));
 
       const [rows, [{ total }]] = await Promise.all([
         baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
@@ -72,17 +69,7 @@ export async function GET(request: Request) {
             total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
           })
           .from(notificationSubscriptions)
-          .innerJoin(
-            creatorProfiles,
-            eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-          )
-          .innerJoin(users, eq(creatorProfiles.userId, users.id))
-          .where(
-            and(
-              eq(users.clerkId, clerkUserId),
-              eq(notificationSubscriptions.creatorProfileId, profileId)
-            )
-          ),
+          .where(eq(notificationSubscriptions.creatorProfileId, profileId)),
       ]);
 
       return NextResponse.json(

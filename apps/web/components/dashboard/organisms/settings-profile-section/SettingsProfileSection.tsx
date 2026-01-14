@@ -5,7 +5,7 @@ import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { APP_URL } from '@/constants/app';
+import { PROFILE_URL } from '@/constants/app';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
@@ -21,7 +21,7 @@ export function SettingsProfileSection({
   const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
   const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
 
-  const appDomain = APP_URL.replace(/^https?:\/\//, '');
+  const profileDomain = PROFILE_URL.replace(/^https?:\/\//, '');
 
   const {
     formData,
@@ -91,7 +91,7 @@ export function SettingsProfileSection({
               <div className='relative'>
                 <div className='flex rounded-lg shadow-sm'>
                   <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary-token text-sm select-none'>
-                    {appDomain}/
+                    {profileDomain}/
                   </span>
                   <Input
                     type='text'
