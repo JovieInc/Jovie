@@ -38,6 +38,8 @@ vi.mock('@/lib/stripe/client', () => ({
 vi.mock('@/lib/stripe/webhooks/utils', () => ({
   getUserIdFromStripeCustomer: mockGetUserIdFromStripeCustomer,
   invalidateBillingCache: mockInvalidateBillingCache,
+  isActiveSubscription: (status: Stripe.Subscription.Status) =>
+    status === 'active' || status === 'trialing',
   getCustomerId: (customer: string | { id: string } | null) => {
     if (!customer) return null;
     if (typeof customer === 'string') return customer;

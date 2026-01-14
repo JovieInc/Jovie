@@ -220,8 +220,8 @@ describe('DashboardAudienceTable - Virtualization', () => {
       );
 
       const tbody = container.querySelector('tbody');
-      // 500 rows * 60px estimated height = 30000px
-      expect(tbody).toHaveStyle({ height: '30000px' });
+      // 500 rows * 44px estimated height = 22000px
+      expect(tbody).toHaveStyle({ height: '22000px' });
     });
   });
 
@@ -264,14 +264,14 @@ describe('DashboardAudienceTable - Virtualization', () => {
       expect(renderedRows.length).toBeLessThan(100);
 
       // Total virtual size should reflect all rows
-      expect(tbody).toHaveStyle({ height: '60000px' }); // 1000 * 60px
+      expect(tbody).toHaveStyle({ height: '44000px' }); // 1000 * 44px
     });
   });
 
   describe('virtualization configuration', () => {
     const testDataset = generateMockAudienceMembers(100);
 
-    it('uses correct estimated row height (60px)', () => {
+    it('uses correct estimated row height (44px)', () => {
       render(
         <DashboardAudienceTable
           {...defaultProps}
@@ -280,7 +280,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
         />
       );
 
-      // Check tbody height calculation: 100 rows * 60px = 6000px
+      // Check tbody height calculation: 100 rows * 44px = 4400px
       const { container } = render(
         <DashboardAudienceTable
           {...defaultProps}
@@ -290,7 +290,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
       );
 
       const tbody = container.querySelector('tbody');
-      expect(tbody).toHaveStyle({ height: '6000px' });
+      expect(tbody).toHaveStyle({ height: '4400px' });
     });
 
     it('applies translateY transform to position rows', () => {
