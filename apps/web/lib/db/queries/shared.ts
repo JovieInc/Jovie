@@ -163,7 +163,7 @@ export interface UserRecord {
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;
-  userStatus: string | null;
+  userStatus: string;
   deletedAt: Date | null;
 }
 
@@ -207,26 +207,26 @@ export async function getUserByClerkId(
 }
 
 /**
- * Verify that a user owns a creator profile.
+ * Verify profile ownership without fetching full profile data.
  *
- * Lightweight ownership check that returns minimal profile data.
- * Use this when you only need to verify ownership before performing
- * operations on profile-related data.
+ * Lightweight ownership check that returns only the profile ID if the
+ * authenticated user owns the specified profile. Use this when you only
+ * need to verify ownership and don't need other profile fields.
  *
  * Security: Returns null if profile doesn't exist OR user doesn't own it.
  *
  * @param tx - Database transaction or connection
- * @param profileId - Profile ID to verify ownership for
+ * @param profileId - Profile ID to verify
  * @param clerkUserId - Authenticated user's Clerk ID
- * @returns Minimal profile data if owned by user, null otherwise
+ * @returns Object with profile ID if owned by user, null otherwise
  *
  * @example
  * ```ts
- * const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
+ * const profile = await verifyProfileOwnership(db, profileId, clerkUserId);
  * if (!profile) {
- *   return NextResponse.json({ error: 'Not found' }, { status: 404 });
+ *   return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
  * }
- * // Continue with profile-related operations...
+ * // profile.id is now available for queries
  * ```
  */
 export async function verifyProfileOwnership(
@@ -235,9 +235,7 @@ export async function verifyProfileOwnership(
   clerkUserId: string
 ): Promise<{ id: string } | null> {
   const [profile] = await tx
-    .select({
-      id: creatorProfiles.id,
-    })
+    .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
