@@ -13,12 +13,14 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import React, { useCallback, useMemo, useRef } from 'react';
+import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
 import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
 import { cn, presets } from '../table.styles';
+import { useTableGrouping } from '../utils/useTableGrouping';
 
 export interface UnifiedTableProps<TData> {
   /**
@@ -124,6 +126,15 @@ export interface UnifiedTableProps<TData> {
    * @default 20
    */
   skeletonRows?: number;
+
+  /**
+   * Optional grouping configuration
+   * When provided, table will render with grouped rows and sticky group headers
+   */
+  groupingConfig?: {
+    getGroupKey: (row: TData) => string;
+    getGroupLabel: (key: string) => string;
+  };
 }
 
 /**
@@ -182,8 +193,18 @@ export function UnifiedTable<TData>({
   className,
   minWidth = '960px',
   skeletonRows = 20,
+  groupingConfig,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize grouping if config provided
+  const { groupedData, observeGroupHeader, visibleGroupIndex } =
+    useTableGrouping({
+      data,
+      getGroupKey: groupingConfig?.getGroupKey ?? (() => ''),
+      getGroupLabel: groupingConfig?.getGroupLabel ?? (key => key),
+      enabled: Boolean(groupingConfig),
+    });
 
   // Auto-enable virtualization for 20+ rows
   const shouldVirtualize =
@@ -368,6 +389,159 @@ export function UnifiedTable<TData>({
               </td>
             </tr>
           </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Render grouped table if grouping is enabled
+  if (groupingConfig && groupedData.length > 0) {
+    return (
+      <div ref={tableContainerRef} className='overflow-auto'>
+        <table
+          className={cn(
+            'w-full border-separate border-spacing-0 text-[13px]',
+            className
+          )}
+          style={{ minWidth }}
+        >
+          <caption className='sr-only'>Grouped table data</caption>
+
+          {/* Header */}
+          <thead>
+            {table.getHeaderGroups().map(headerGroup => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map(header => {
+                  const canSort = header.column.getCanSort();
+                  const sortDirection = header.column.getIsSorted();
+
+                  return (
+                    <th
+                      key={header.id}
+                      className={cn(presets.stickyHeader)}
+                      style={{
+                        width:
+                          header.getSize() !== 150
+                            ? header.getSize()
+                            : undefined,
+                      }}
+                    >
+                      {header.isPlaceholder ? null : canSort ? (
+                        <button
+                          type='button'
+                          onClick={header.column.getToggleSortingHandler()}
+                          className={cn(
+                            'flex items-center gap-2 px-6 py-3 text-left w-full',
+                            'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
+                            'hover:bg-surface-2/50 transition-colors rounded-md',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                          )}
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                          {sortDirection && (
+                            <svg
+                              width='12'
+                              height='12'
+                              viewBox='0 0 12 12'
+                              fill='none'
+                              className='shrink-0'
+                              style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
+                              aria-hidden='true'
+                            >
+                              <title>
+                                {sortDirection === 'asc'
+                                  ? 'Sorted ascending'
+                                  : 'Sorted descending'}
+                              </title>
+                              {sortDirection === 'asc' ? (
+                                <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
+                              ) : (
+                                <path d='M6 9L3 5H9L6 9Z' fill='currentColor' />
+                              )}
+                            </svg>
+                          )}
+                        </button>
+                      ) : (
+                        <div className={cn(presets.tableHeader)}>
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+
+          {/* Grouped Body */}
+          <GroupedTableBody
+            groupedData={groupedData}
+            observeGroupHeader={observeGroupHeader}
+            visibleGroupIndex={visibleGroupIndex}
+            columns={columns.length}
+            renderRow={(item, index) => {
+              const row = table
+                .getRowModel()
+                .rows.find(r =>
+                  getRowId
+                    ? getRowId(r.original) === getRowId(item)
+                    : r.original === item
+                );
+              if (!row) return null;
+
+              const rowData = row.original as TData;
+
+              // Build row element
+              const rowElement = (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    presets.tableRow,
+                    onRowClick && 'cursor-pointer',
+                    getRowClassName?.(rowData, index)
+                  )}
+                  onClick={() => onRowClick?.(rowData)}
+                  onContextMenu={e => onRowContextMenu?.(rowData, e)}
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <td
+                      key={cell.id}
+                      className={presets.tableCell}
+                      style={{
+                        width:
+                          cell.column.getSize() !== 150
+                            ? cell.column.getSize()
+                            : undefined,
+                      }}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+
+              // Wrap with context menu if provided
+              if (getContextMenuItems) {
+                const contextMenuItems = getContextMenuItems(rowData);
+                return (
+                  <TableContextMenu key={row.id} items={contextMenuItems}>
+                    {rowElement}
+                  </TableContextMenu>
+                );
+              }
+
+              return rowElement;
+            }}
+          />
         </table>
       </div>
     );
