@@ -415,7 +415,7 @@ function extractHandleFromSocialUrl(url: string): string | null {
     // Clean up the handle
     handle = handle
       .replace(/^@/, '') // Remove @ prefix
-      .replace(/[?#].*$/, '') // Remove query strings/fragments
+      .replace(/[?#].*/, '') // Remove query strings/fragments (safe: greedy match, no backtracking)
       .toLowerCase();
 
     // Validate handle format (30 char limit to match downstream validation)

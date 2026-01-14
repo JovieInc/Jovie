@@ -1,6 +1,6 @@
 'use client';
 
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface HandleStatusIconProps {
   showChecking: boolean;

@@ -221,9 +221,10 @@ export function useUserMenuActions({
   return {
     handleProfile,
     handleSettings,
-    handleUpgrade,
-    handleManageBilling,
-    handleSignOut,
+    // Wrap async handlers to prevent promise leakage in onClick handlers
+    handleUpgrade: () => void handleUpgrade(),
+    handleManageBilling: () => void handleManageBilling(),
+    handleSignOut: () => void handleSignOut(),
     loading: derivedLoading,
   } as const;
 }
