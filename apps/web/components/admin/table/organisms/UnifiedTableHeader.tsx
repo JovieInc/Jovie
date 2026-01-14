@@ -3,7 +3,7 @@ import {
   type Header,
   type HeaderGroup,
 } from '@tanstack/react-table';
-import { cn, presets } from '../table.styles';
+import { cn, presets } from '@/components/organisms/table';
 
 type HeaderVariant = 'loading' | 'standard';
 
