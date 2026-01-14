@@ -12,13 +12,11 @@ import {
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import {
-  type ContextMenuItemType,
-  convertContextMenuItems,
-} from '@/components/admin/table/molecules/TableContextMenu';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
   DateCell,
   GroupedTableBody,
   UnifiedTable,

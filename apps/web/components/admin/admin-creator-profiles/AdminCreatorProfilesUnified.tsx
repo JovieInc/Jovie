@@ -14,10 +14,6 @@ import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFoote
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import {
-  type ContextMenuItemType,
-  convertContextMenuItems,
-} from '@/components/admin/table/molecules/TableContextMenu';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
@@ -27,6 +23,8 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import {
   AvatarCell,
+  type ContextMenuItemType,
+  convertContextMenuItems,
   DateCell,
   SocialLinksCell,
   UnifiedTable,

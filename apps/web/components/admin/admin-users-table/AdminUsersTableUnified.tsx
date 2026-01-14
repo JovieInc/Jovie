@@ -11,14 +11,15 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
-import {
-  type ContextMenuItemType,
-  convertContextMenuItems,
-} from '@/components/admin/table/molecules/TableContextMenu';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { DateCell, UnifiedTable } from '@/components/organisms/table';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+  DateCell,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
