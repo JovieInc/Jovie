@@ -88,7 +88,7 @@ export async function GET(request: Request) {
 
   try {
     // 1. Environment validation
-    console.log('[HEALTH] Running comprehensive health check...');
+    logger.info('[HEALTH] Running comprehensive health check...');
     const envValidation = validateEnvironment('runtime');
     const envInfo = getEnvironmentInfo();
 
