@@ -8,52 +8,37 @@
  */
 
 import type { AsyncDebouncerState } from '@tanstack/react-pacer';
-import {
-  useAsyncDebouncer,
-  useDebouncedValue as usePacerDebouncedValue,
-  useThrottler,
-} from '@tanstack/react-pacer';
+import { useAsyncDebouncer, useThrottler } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Default timing constants
-export const DEFAULT_DEBOUNCE_MS = 300;
-export const DEFAULT_SEARCH_DEBOUNCE_MS = 300;
-export const DEFAULT_VALIDATION_DEBOUNCE_MS = 450;
-export const DEFAULT_SAVE_DEBOUNCE_MS = 500;
-export const DEFAULT_THROTTLE_MS = 100;
-
 /**
- * Debounce a value with TanStack Pacer, returning the debounced version.
- * Direct replacement for the custom useDebouncedValue hook.
- *
- * @example
- * ```tsx
- * const [search, setSearch] = useState('');
- * const { value: debouncedSearch, isPending } = useSearch(search, 300);
- *
- * useEffect(() => {
- *   fetchResults(debouncedSearch);
- * }, [debouncedSearch]);
- * ```
+ * Centralized timing constants for TanStack Pacer hooks.
+ * Use these to ensure consistent debounce/throttle behavior across the app.
  */
-export function useSearch<T>(
-  value: T,
-  wait: number = DEFAULT_SEARCH_DEBOUNCE_MS
-): {
-  value: T;
-  isPending: boolean;
-} {
-  const [debouncedValue, debouncer] = usePacerDebouncedValue(
-    value,
-    { wait },
-    state => ({ isPending: state.isPending })
-  );
+export const PACER_TIMING = {
+  /** Default debounce for general use */
+  DEBOUNCE_MS: 300,
+  /** Debounce for search inputs */
+  SEARCH_DEBOUNCE_MS: 300,
+  /** Debounce for async validation (handle checks, etc.) */
+  VALIDATION_DEBOUNCE_MS: 450,
+  /** Debounce for auto-save operations */
+  SAVE_DEBOUNCE_MS: 500,
+  /** Default throttle for event handlers */
+  THROTTLE_MS: 100,
+  /** Throttle for scroll/animation (60fps) */
+  SCROLL_THROTTLE_MS: 16,
+  /** Default timeout for validation requests */
+  VALIDATION_TIMEOUT_MS: 5000,
+} as const;
 
-  return {
-    value: debouncedValue,
-    isPending: debouncer.state.isPending,
-  };
-}
+// Legacy exports for backwards compatibility
+export const DEFAULT_DEBOUNCE_MS = PACER_TIMING.DEBOUNCE_MS;
+export const DEFAULT_SEARCH_DEBOUNCE_MS = PACER_TIMING.SEARCH_DEBOUNCE_MS;
+export const DEFAULT_VALIDATION_DEBOUNCE_MS =
+  PACER_TIMING.VALIDATION_DEBOUNCE_MS;
+export const DEFAULT_SAVE_DEBOUNCE_MS = PACER_TIMING.SAVE_DEBOUNCE_MS;
+export const DEFAULT_THROTTLE_MS = PACER_TIMING.THROTTLE_MS;
 
 /**
  * Hook for debounced async API validation (e.g., handle availability checks).

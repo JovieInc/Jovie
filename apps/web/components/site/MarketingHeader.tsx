@@ -3,16 +3,15 @@
 /**
  * Marketing Header Component
  *
- * Header with scroll-aware background transition, using TanStack Pacer
- * for throttled scroll handling.
+ * Header with scroll-aware background transition, using the shared
+ * useThrottledScroll hook from TanStack Pacer.
  *
  * @see https://tanstack.com/pacer
  */
 
-import { useThrottler } from '@tanstack/react-pacer';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { Header } from '@/components/site/Header';
+import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 import { cn } from '@/lib/utils';
 
 export interface MarketingHeaderProps {
@@ -21,42 +20,22 @@ export interface MarketingHeaderProps {
   hideNav?: boolean;
 }
 
-// Use 16ms throttle (~60fps) for smooth scroll tracking
-const SCROLL_THROTTLE_MS = 16;
-
+/**
+ * Marketing header with scroll-aware background.
+ * Uses the shared useThrottledScroll hook for optimized scroll handling.
+ */
 export function MarketingHeader({
   logoSize = 'xs',
   scrollThresholdPx = 0,
   hideNav,
 }: MarketingHeaderProps) {
   const pathname = usePathname();
-  const [isScrolled, setIsScrolled] = useState<boolean>(
-    typeof window !== 'undefined' && window.scrollY > scrollThresholdPx
-  );
 
-  // TanStack Pacer throttler for scroll events
-  const throttler = useThrottler(
-    () => {
-      setIsScrolled(window.scrollY > scrollThresholdPx);
-    },
-    { wait: SCROLL_THROTTLE_MS, leading: true, trailing: true }
-  );
-
-  useEffect(() => {
-    // Initialize on mount and pathname changes
-    setIsScrolled(window.scrollY > scrollThresholdPx);
-
-    const onScroll = () => {
-      throttler.maybeExecute();
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      throttler.cancel();
-    };
-  }, [scrollThresholdPx, pathname, throttler]);
+  // Use the shared throttled scroll hook
+  const { isScrolled } = useThrottledScroll({
+    threshold: scrollThresholdPx,
+    wait: PACER_TIMING.SCROLL_THROTTLE_MS,
+  });
 
   const showSolid = pathname !== '/' || isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';

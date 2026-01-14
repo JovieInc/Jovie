@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { PACER_TIMING } from '@/lib/pacer/hooks';
 
 export interface FeaturedArtistsDriftRowProps {
   creators: FeaturedCreator[];
@@ -22,8 +23,6 @@ export interface FeaturedArtistsDriftRowProps {
 }
 
 const MAX_SHIFT_PX = 56;
-// Use 16ms throttle (~60fps) for smooth parallax animations
-const ANIMATION_THROTTLE_MS = 16;
 
 export function FeaturedArtistsDriftRow({
   creators,
@@ -63,7 +62,7 @@ export function FeaturedArtistsDriftRow({
         }
       }
     },
-    { wait: ANIMATION_THROTTLE_MS, leading: true, trailing: true }
+    { wait: PACER_TIMING.SCROLL_THROTTLE_MS, leading: true, trailing: true }
   );
 
   useEffect(() => {

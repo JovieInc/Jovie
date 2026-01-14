@@ -1,15 +1,14 @@
 /**
  * Handle Validation Hook
  *
- * Provides debounced handle availability checking using TanStack Pacer
- * for world-class debouncing with proper async handling.
+ * Provides debounced handle availability checking using the shared
+ * useAsyncValidation hook from TanStack Pacer.
  *
  * @see https://tanstack.com/pacer
  */
 
-import type { AsyncDebouncerState } from '@tanstack/react-pacer';
-import { useAsyncDebouncer } from '@tanstack/react-pacer';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 
 export interface HandleValidationResult {
   handleError: string | null;
@@ -20,16 +19,22 @@ export interface HandleValidationResult {
   cancel: () => void;
 }
 
-const VALIDATION_DEBOUNCE_MS = 450; // Within 350-500ms requirement
+interface HandleCheckResponse {
+  available: boolean;
+  error?: string;
+}
 
+/**
+ * Hook for validating handle format and availability.
+ *
+ * Uses the shared useAsyncValidation hook to reduce code duplication
+ * while maintaining the same API surface.
+ */
 export function useHandleValidation(handle: string): HandleValidationResult {
-  const [checkingAvail, setCheckingAvail] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
-  const lastQueriedRef = useRef<string>('');
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Better handle validation with stricter regex for lowercase a-z, 0-9, hyphen
+  // Client-side handle validation
   const handleError = useMemo(() => {
     if (!handle) return null;
     if (handle.length < 3) return 'Handle must be at least 3 characters';
@@ -41,93 +46,76 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  // TanStack Pacer async debouncer for handle validation
-  const asyncDebouncer = useAsyncDebouncer(
-    async (handleValue: string) => {
-      const value = handleValue.toLowerCase();
-      lastQueriedRef.current = value;
-
-      // Cancel any in-flight request
-      abortControllerRef.current?.abort();
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      try {
+  // Use the shared async validation hook
+  const { validate, cancel, isValidating, isPending, result, error } =
+    useAsyncValidation<string, HandleCheckResponse>({
+      validatorFn: async (handleValue, signal) => {
+        const value = handleValue.toLowerCase();
         const res = await fetch(
           `/api/handle/check?handle=${encodeURIComponent(value)}`,
-          { signal: controller.signal }
+          { signal }
         );
         const json = await res
           .json()
           .catch(() => ({ available: false, error: 'Parse error' }));
 
-        // Ignore out-of-order responses
-        if (lastQueriedRef.current !== value) return;
-
         if (!res.ok) {
-          setAvailable(null);
-          setAvailError(json?.error || 'Error checking availability');
-        } else {
-          setAvailable(Boolean(json?.available));
-          setAvailError(null);
+          throw new Error(json?.error || 'Error checking availability');
         }
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        if (lastQueriedRef.current !== value) return;
-        setAvailable(null);
-        setAvailError('Network error');
-      } finally {
-        if (lastQueriedRef.current === value) setCheckingAvail(false);
-      }
-    },
-    {
-      wait: VALIDATION_DEBOUNCE_MS,
-      onError: err => {
-        if (err instanceof Error && err.name === 'AbortError') {
-          return;
-        }
-        setAvailable(null);
-        setAvailError('Network error');
-        setCheckingAvail(false);
+
+        return json as HandleCheckResponse;
       },
-    },
-    (state: AsyncDebouncerState<(handleValue: string) => Promise<void>>) => ({
-      isPending: state.isPending,
-      isExecuting: state.isExecuting,
-    })
-  );
+      wait: PACER_TIMING.VALIDATION_DEBOUNCE_MS,
+      enabled: !handleError && handle.length >= 3,
+      onSuccess: res => {
+        setAvailable(Boolean(res?.available));
+        setAvailError(null);
+      },
+      onError: err => {
+        setAvailable(null);
+        setAvailError(err.message === 'AbortError' ? null : err.message);
+      },
+    });
 
-  const cancel = useCallback(() => {
-    asyncDebouncer.cancel();
-    abortControllerRef.current?.abort();
-  }, [asyncDebouncer]);
+  // Sync result state
+  useEffect(() => {
+    if (result) {
+      setAvailable(Boolean(result.available));
+      setAvailError(null);
+    }
+  }, [result]);
 
-  // Debounced live availability check
+  // Sync error state
+  useEffect(() => {
+    if (error && error.name !== 'AbortError') {
+      setAvailable(null);
+      setAvailError(error.message || 'Network error');
+    }
+  }, [error]);
+
+  // Trigger validation when handle changes
   useEffect(() => {
     setAvailError(null);
+
     if (!handle || handleError) {
       cancel();
       setAvailable(null);
-      setCheckingAvail(false);
       return;
     }
 
-    setCheckingAvail(true);
-    void asyncDebouncer.maybeExecute(handle);
-  }, [handle, handleError, asyncDebouncer, cancel]);
+    void validate(handle);
+  }, [handle, handleError, validate, cancel]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
+  // Wrap cancel to also reset state
+  const handleCancel = useCallback(() => {
+    cancel();
+  }, [cancel]);
 
   return {
     handleError,
-    checkingAvail,
+    checkingAvail: isValidating || isPending,
     available,
     availError,
-    cancel,
+    cancel: handleCancel,
   };
 }

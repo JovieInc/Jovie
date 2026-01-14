@@ -13,6 +13,7 @@
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
+import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { queryKeys } from './keys';
 
 // Response shape from /api/spotify/search
@@ -58,7 +59,6 @@ export interface UseArtistSearchQueryReturn {
   isPending: boolean;
 }
 
-const DEFAULT_DEBOUNCE_MS = 300;
 const DEFAULT_LIMIT = 5;
 const DEFAULT_MIN_QUERY_LENGTH = 2;
 
@@ -108,7 +108,7 @@ export function useArtistSearchQuery(
   options: UseArtistSearchQueryOptions = {}
 ): UseArtistSearchQueryReturn {
   const {
-    debounceMs = DEFAULT_DEBOUNCE_MS,
+    debounceMs = PACER_TIMING.SEARCH_DEBOUNCE_MS,
     limit = DEFAULT_LIMIT,
     minQueryLength = DEFAULT_MIN_QUERY_LENGTH,
   } = options;
