@@ -150,8 +150,8 @@ export async function GET(request: NextRequest) {
   // Parse and clamp limit
   let limit = DEFAULT_LIMIT;
   if (limitParam) {
-    const parsed = parseInt(limitParam, 10);
-    if (!isNaN(parsed) && parsed > 0) {
+    const parsed = Number.parseInt(limitParam, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) {
       limit = Math.min(parsed, MAX_LIMIT);
     }
   }
