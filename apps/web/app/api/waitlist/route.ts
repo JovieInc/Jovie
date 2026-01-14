@@ -8,6 +8,7 @@ import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
+import { logger } from '@/lib/utils/logger';
 import {
   detectPlatformFromUrl,
   extractHandleFromUrl,
@@ -20,7 +21,9 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Module-level log to verify this file is loaded
-console.log('[Waitlist Route Module] Loaded at', new Date().toISOString());
+logger.info('Waitlist Route Module loaded', {
+  timestamp: new Date().toISOString(),
+});
 
 function deriveFullName(params: {
   userFullName: string | null | undefined;
@@ -101,7 +104,7 @@ async function findAvailableHandle(
 }
 
 export async function GET() {
-  console.log('[Waitlist API] GET request received');
+  logger.info('Waitlist API GET request received');
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
@@ -213,7 +216,7 @@ export async function POST(request: Request) {
 
       hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
     } catch (error) {
-      console.error('[Waitlist API] DB connectivity error:', error);
+      logger.error('Waitlist API DB connectivity error', error);
       const debugMsg =
         error instanceof Error
           ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
@@ -421,7 +424,7 @@ export async function POST(request: Request) {
             },
           });
       } catch (txError) {
-        console.error('[Waitlist API] Transaction error:', txError);
+        logger.error('Waitlist API transaction error', txError);
         throw txError;
       }
     });
@@ -431,7 +434,7 @@ export async function POST(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('[Waitlist API] Error:', error);
+    logger.error('Waitlist API error', error);
 
     // In development, return the actual error for debugging
     const isDev = process.env.NODE_ENV === 'development';
