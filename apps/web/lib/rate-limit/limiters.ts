@@ -266,20 +266,36 @@ export const spotifyPublicSearchLimiter = createRateLimiter(
 // ============================================================================
 
 /**
+ * Generic rate limit checker with custom error message.
+ * Eliminates duplication across single-limiter check functions.
+ */
+async function checkRateLimit(
+  limiter: RateLimiter,
+  key: string,
+  errorMessage: string
+): Promise<RateLimitResult> {
+  const result = await limiter.limit(key);
+  if (!result.success) {
+    return {
+      ...result,
+      reason: errorMessage,
+    };
+  }
+  return result;
+}
+
+/**
  * Check Spotify search rate limits (authenticated user)
  * Returns the first failure or success if all pass
  */
 export async function checkSpotifySearchRateLimit(
   userId: string
 ): Promise<RateLimitResult> {
-  const result = await spotifySearchLimiter.limit(userId);
-  if (!result.success) {
-    return {
-      ...result,
-      reason: 'Search rate limit exceeded. Please wait before searching again.',
-    };
-  }
-  return result;
+  return checkRateLimit(
+    spotifySearchLimiter,
+    userId,
+    'Search rate limit exceeded. Please wait before searching again.'
+  );
 }
 
 /**
@@ -289,14 +305,11 @@ export async function checkSpotifySearchRateLimit(
 export async function checkSpotifyPublicSearchRateLimit(
   ipAddress: string
 ): Promise<RateLimitResult> {
-  const result = await spotifyPublicSearchLimiter.limit(ipAddress);
-  if (!result.success) {
-    return {
-      ...result,
-      reason: 'Too many search requests. Please wait before trying again.',
-    };
-  }
-  return result;
+  return checkRateLimit(
+    spotifyPublicSearchLimiter,
+    ipAddress,
+    'Too many search requests. Please wait before trying again.'
+  );
 }
 
 /**
@@ -306,14 +319,11 @@ export async function checkSpotifyPublicSearchRateLimit(
 export async function checkSpotifyClaimRateLimit(
   userId: string
 ): Promise<RateLimitResult> {
-  const result = await spotifyClaimLimiter.limit(userId);
-  if (!result.success) {
-    return {
-      ...result,
-      reason: 'Too many claim attempts. Please try again later.',
-    };
-  }
-  return result;
+  return checkRateLimit(
+    spotifyClaimLimiter,
+    userId,
+    'Too many claim attempts. Please try again later.'
+  );
 }
 
 /**
@@ -323,15 +333,11 @@ export async function checkSpotifyClaimRateLimit(
 export async function checkSpotifyRefreshRateLimit(
   artistId: string
 ): Promise<RateLimitResult> {
-  const result = await spotifyRefreshLimiter.limit(artistId);
-  if (!result.success) {
-    return {
-      ...result,
-      reason:
-        'Artist data was recently refreshed. Please wait before refreshing again.',
-    };
-  }
-  return result;
+  return checkRateLimit(
+    spotifyRefreshLimiter,
+    artistId,
+    'Artist data was recently refreshed. Please wait before refreshing again.'
+  );
 }
 
 /**

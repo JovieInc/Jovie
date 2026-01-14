@@ -221,6 +221,31 @@ function upgradeGravatarUrl(url: string): string {
 }
 
 /**
+ * Helper to check if a hostname matches known OAuth avatar providers.
+ * Eliminates duplication between upgrade and validation functions.
+ */
+function matchesKnownProvider(hostname: string): {
+  isGoogle: boolean;
+  isFacebook: boolean;
+  isTwitter: boolean;
+  isGitHub: boolean;
+  isClerk: boolean;
+  isGravatar: boolean;
+} {
+  return {
+    isGoogle: hostname.endsWith('.googleusercontent.com'),
+    isFacebook:
+      hostname.includes('fbsbx.com') ||
+      hostname.includes('fbcdn.net') ||
+      hostname.includes('facebook.com'),
+    isTwitter: hostname === 'pbs.twimg.com',
+    isGitHub: hostname === 'avatars.githubusercontent.com',
+    isClerk: hostname === 'img.clerk.com' || hostname === 'images.clerk.dev',
+    isGravatar: hostname.includes('gravatar.com'),
+  };
+}
+
+/**
  * Detect the OAuth provider from an avatar URL and upgrade it to high resolution.
  *
  * Supports:
@@ -244,43 +269,23 @@ export function upgradeOAuthAvatarUrl(
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.toLowerCase();
+    const providers = matchesKnownProvider(hostname);
 
-    // Google (most common for OAuth)
-    if (hostname.endsWith('.googleusercontent.com')) {
-      return upgradeGoogleAvatarUrl(url);
-    }
+    const upgradeFn = providers.isGoogle
+      ? upgradeGoogleAvatarUrl
+      : providers.isFacebook
+        ? upgradeFacebookAvatarUrl
+        : providers.isTwitter
+          ? upgradeTwitterAvatarUrl
+          : providers.isGitHub
+            ? upgradeGitHubAvatarUrl
+            : providers.isClerk
+              ? upgradeClerkAvatarUrl
+              : providers.isGravatar
+                ? upgradeGravatarUrl
+                : undefined;
 
-    // Facebook/Meta
-    if (
-      hostname.includes('fbsbx.com') ||
-      hostname.includes('fbcdn.net') ||
-      hostname.includes('facebook.com')
-    ) {
-      return upgradeFacebookAvatarUrl(url);
-    }
-
-    // Twitter/X
-    if (hostname === 'pbs.twimg.com') {
-      return upgradeTwitterAvatarUrl(url);
-    }
-
-    // GitHub
-    if (hostname === 'avatars.githubusercontent.com') {
-      return upgradeGitHubAvatarUrl(url);
-    }
-
-    // Clerk CDN
-    if (hostname === 'img.clerk.com' || hostname === 'images.clerk.dev') {
-      return upgradeClerkAvatarUrl(url);
-    }
-
-    // Gravatar
-    if (hostname.includes('gravatar.com')) {
-      return upgradeGravatarUrl(url);
-    }
-
-    // Unknown provider - return as-is
-    return url;
+    return upgradeFn ? upgradeFn(url) : url;
   } catch {
     // Invalid URL - return as-is
     return url;
@@ -300,17 +305,15 @@ export function isUpgradeableAvatarUrl(
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.toLowerCase();
+    const providers = matchesKnownProvider(hostname);
 
     return (
-      hostname.endsWith('.googleusercontent.com') ||
-      hostname.includes('fbsbx.com') ||
-      hostname.includes('fbcdn.net') ||
-      hostname.includes('facebook.com') ||
-      hostname === 'pbs.twimg.com' ||
-      hostname === 'avatars.githubusercontent.com' ||
-      hostname === 'img.clerk.com' ||
-      hostname === 'images.clerk.dev' ||
-      hostname.includes('gravatar.com')
+      providers.isGoogle ||
+      providers.isFacebook ||
+      providers.isTwitter ||
+      providers.isGitHub ||
+      providers.isClerk ||
+      providers.isGravatar
     );
   } catch {
     return false;

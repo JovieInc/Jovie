@@ -119,7 +119,9 @@ export function IngestProfileDialog({
               type='url'
               placeholder='https://linktr.ee/username'
               value={url}
-              onChange={e => setUrl(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setUrl(e.target.value)
+              }
               disabled={isLoading}
               autoFocus
               className='w-full'

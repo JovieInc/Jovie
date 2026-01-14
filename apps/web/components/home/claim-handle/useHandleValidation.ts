@@ -1,19 +1,40 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+/**
+ * Handle Validation Hook
+ *
+ * Provides debounced handle availability checking using the shared
+ * useAsyncValidation hook from TanStack Pacer.
+ *
+ * @see https://tanstack.com/pacer
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 
 export interface HandleValidationResult {
   handleError: string | null;
   checkingAvail: boolean;
   available: boolean | null;
   availError: string | null;
+  /** Cancel pending validation */
+  cancel: () => void;
 }
 
+interface HandleCheckResponse {
+  available: boolean;
+  error?: string;
+}
+
+/**
+ * Hook for validating handle format and availability.
+ *
+ * Uses the shared useAsyncValidation hook to reduce code duplication
+ * while maintaining the same API surface.
+ */
 export function useHandleValidation(handle: string): HandleValidationResult {
-  const [checkingAvail, setCheckingAvail] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
-  const lastQueriedRef = useRef<string>('');
 
-  // Better handle validation with stricter regex for lowercase a-z, 0-9, hyphen
+  // Client-side handle validation
   const handleError = useMemo(() => {
     if (!handle) return null;
     if (handle.length < 3) return 'Handle must be at least 3 characters';
@@ -25,57 +46,76 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  // Debounced live availability check (350-500ms per requirements)
-  useEffect(() => {
-    setAvailError(null);
-    if (!handle || handleError) {
-      setAvailable(null);
-      setCheckingAvail(false);
-      return;
-    }
-
-    const value = handle.toLowerCase();
-    lastQueriedRef.current = value;
-    setCheckingAvail(true);
-    const controller = new AbortController();
-    const id = setTimeout(async () => {
-      try {
+  // Use the shared async validation hook
+  const { validate, cancel, isValidating, isPending, result, error } =
+    useAsyncValidation<string, HandleCheckResponse>({
+      validatorFn: async (handleValue, signal) => {
+        const value = handleValue.toLowerCase();
         const res = await fetch(
           `/api/handle/check?handle=${encodeURIComponent(value)}`,
-          { signal: controller.signal }
+          { signal }
         );
         const json = await res
           .json()
           .catch(() => ({ available: false, error: 'Parse error' }));
-        // Ignore out-of-order responses
-        if (lastQueriedRef.current !== value) return;
-        if (!res.ok) {
-          setAvailable(null);
-          setAvailError(json?.error || 'Error checking availability');
-        } else {
-          setAvailable(Boolean(json?.available));
-          setAvailError(null);
-        }
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        if (lastQueriedRef.current !== value) return;
-        setAvailable(null);
-        setAvailError('Network error');
-      } finally {
-        if (lastQueriedRef.current === value) setCheckingAvail(false);
-      }
-    }, 450); // 450ms debounce (within 350-500ms requirement)
 
-    return () => {
-      clearTimeout(id);
-      controller.abort();
-    };
-  }, [handle, handleError]);
+        if (!res.ok) {
+          throw new Error(json?.error || 'Error checking availability');
+        }
+
+        return json as HandleCheckResponse;
+      },
+      wait: PACER_TIMING.VALIDATION_DEBOUNCE_MS,
+      enabled: !handleError && handle.length >= 3,
+      onSuccess: res => {
+        setAvailable(Boolean(res?.available));
+        setAvailError(null);
+      },
+      onError: err => {
+        setAvailable(null);
+        setAvailError(err.message === 'AbortError' ? null : err.message);
+      },
+    });
+
+  // Sync result state
+  useEffect(() => {
+    if (result) {
+      setAvailable(Boolean(result.available));
+      setAvailError(null);
+    }
+  }, [result]);
+
+  // Sync error state
+  useEffect(() => {
+    if (error && error.name !== 'AbortError') {
+      setAvailable(null);
+      setAvailError(error.message || 'Network error');
+    }
+  }, [error]);
+
+  // Trigger validation when handle changes
+  useEffect(() => {
+    setAvailError(null);
+
+    if (!handle || handleError) {
+      cancel();
+      setAvailable(null);
+      return;
+    }
+
+    void validate(handle);
+  }, [handle, handleError, validate, cancel]);
+
+  // Wrap cancel to also reset state
+  const handleCancel = useCallback(() => {
+    cancel();
+  }, [cancel]);
 
   return {
     handleError,
-    checkingAvail,
+    checkingAvail: isValidating || isPending,
     available,
     availError,
+    cancel: handleCancel,
   };
 }

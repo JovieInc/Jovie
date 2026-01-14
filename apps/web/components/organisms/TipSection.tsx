@@ -1,9 +1,11 @@
+'use client';
+
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { LoadingButton } from '@/components/molecules/LoadingButton';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import { useToast } from '@/components/molecules/ToastContainer';
 
 interface TipSectionProps {
   handle: string;
@@ -28,7 +30,6 @@ export function TipSection({
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'venmo' | null>(
     null
   );
-  const { showToast } = useToast();
 
   const handleStripePayment = async (amount: number) => {
     if (!onStripePayment) return;
@@ -36,18 +37,10 @@ export function TipSection({
     setLoading(amount);
     try {
       await onStripePayment(amount);
-      showToast({
-        message: `Thanks for the $${amount} tip 🎉`,
-        type: 'success',
-        duration: 5000,
-      });
+      toast.success(`Thanks for the $${amount} tip!`, { duration: 5000 });
     } catch (error) {
       console.error('Tip failed', error);
-      showToast({
-        message: 'Payment failed. Please try again.',
-        type: 'error',
-        duration: 7000,
-      });
+      toast.error('Payment failed. Please try again.', { duration: 7000 });
     } finally {
       setLoading(null);
     }

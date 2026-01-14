@@ -3,8 +3,8 @@
 import { Star } from 'lucide-react';
 import { useState } from 'react';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
@@ -25,10 +25,10 @@ export function CreatorAvatarCell({
   verified = false,
   isFeatured = false,
 }: CreatorAvatarCellProps) {
+  const notifications = useNotifications();
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null
   );
-  const { showToast } = useToast();
 
   const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData();
@@ -56,13 +56,9 @@ export function CreatorAvatarCell({
     try {
       await updateCreatorAvatarAsAdmin(profileId, url);
       setPreviewUrl(url);
-      showToast({ type: 'success', message: 'Avatar updated' });
+      notifications.success('Avatar updated');
     } catch (error) {
       console.error('Failed to update creator avatar as admin', error);
-      showToast({
-        type: 'error',
-        message: 'Failed to update avatar. Please try again.',
-      });
       // Re-throw so AvatarUploadable can show error state
       throw error instanceof Error
         ? error
@@ -83,10 +79,9 @@ export function CreatorAvatarCell({
           uploadable
           onUpload={handleUpload}
           onError={message => {
-            showToast({
-              type: 'error',
-              message: message || 'Failed to upload avatar. Please try again.',
-            });
+            notifications.error(
+              message || 'Failed to upload avatar. Please try again.'
+            );
           }}
           maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
           acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}

@@ -1,8 +1,17 @@
 'use client';
 
+/**
+ * Marketing Header Component
+ *
+ * Header with scroll-aware background transition, using the shared
+ * useThrottledScroll hook from TanStack Pacer.
+ *
+ * @see https://tanstack.com/pacer
+ */
+
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/site/Header';
+import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 import { cn } from '@/lib/utils';
 
 export interface MarketingHeaderProps {
@@ -11,43 +20,22 @@ export interface MarketingHeaderProps {
   hideNav?: boolean;
 }
 
+/**
+ * Marketing header with scroll-aware background.
+ * Uses the shared useThrottledScroll hook for optimized scroll handling.
+ */
 export function MarketingHeader({
   logoSize = 'xs',
   scrollThresholdPx = 0,
   hideNav,
 }: MarketingHeaderProps) {
   const pathname = usePathname();
-  const [isScrolled, setIsScrolled] = useState<boolean>(
-    typeof window !== 'undefined' && window.scrollY > scrollThresholdPx
-  );
-  const rafRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    const updateScrollState = () => {
-      setIsScrolled(window.scrollY > scrollThresholdPx);
-      rafRef.current = null;
-    };
-
-    const onScroll = () => {
-      // Throttle using requestAnimationFrame
-      if (rafRef.current === null) {
-        rafRef.current = requestAnimationFrame(updateScrollState);
-      }
-    };
-
-    // Initialize on mount and pathname changes
-    updateScrollState();
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-    };
-  }, [scrollThresholdPx, pathname]);
+  // Use the shared throttled scroll hook
+  const { isScrolled } = useThrottledScroll({
+    threshold: scrollThresholdPx,
+    wait: PACER_TIMING.SCROLL_THROTTLE_MS,
+  });
 
   const showSolid = pathname !== '/' || isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';

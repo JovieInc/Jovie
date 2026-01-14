@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { type DbType, ingestionJobs } from '@/lib/db';
+import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { logger } from '@/lib/utils/logger';
 import {
   beaconsPayloadSchema,
@@ -124,6 +125,10 @@ export function getCreatorProfileIdFromJob(
     }
     case 'import_beacons': {
       const parsed = beaconsPayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
+    case 'send_claim_invite': {
+      const parsed = sendClaimInvitePayloadSchema.safeParse(job.payload);
       return parsed.success ? parsed.data.creatorProfileId : null;
     }
     default:

@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { getAvailablePricing } from '@/lib/stripe/config';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -30,7 +31,7 @@ export async function GET() {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Error getting pricing options:', error);
+    logger.error('Error getting pricing options:', error);
     return NextResponse.json(
       { error: 'Failed to get pricing options' },
       { status: 500, headers: NO_STORE_HEADERS }

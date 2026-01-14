@@ -214,7 +214,7 @@ describe('Avatar Component', () => {
       );
 
       const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveClass('custom-avatar-class');
+      expect(container.parentElement).toHaveClass('custom-avatar-class');
     });
 
     it('accepts custom style props', () => {
@@ -230,9 +230,10 @@ describe('Avatar Component', () => {
       );
 
       const container = screen.getByLabelText('User avatar');
+      const wrapper = container.parentElement;
       // Check that style attribute exists and contains our custom styles
-      expect(container).toHaveAttribute('style');
-      const style = container.getAttribute('style');
+      expect(wrapper).toHaveAttribute('style');
+      const style = wrapper?.getAttribute('style');
       expect(style).toContain('border');
       expect(style).toContain('opacity');
     });

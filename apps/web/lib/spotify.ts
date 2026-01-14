@@ -1,4 +1,5 @@
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 
 // Spotify API configuration
 const SPOTIFY_CLIENT_ID = env.SPOTIFY_CLIENT_ID;
@@ -246,10 +247,15 @@ export async function getSpotifyArtistAlbums(
       );
 
       if (!response.ok) {
-        console.error(
-          'Spotify API error:',
-          response.status,
-          await response.text()
+        const errorText = await response.text();
+        await captureError(
+          'Spotify artist albums API error',
+          new Error(`Status ${response.status}: ${errorText}`),
+          {
+            artistId,
+            status: response.status,
+            operation: 'getSpotifyArtistAlbums',
+          }
         );
         break;
       }
@@ -272,7 +278,10 @@ export async function getSpotifyArtistAlbums(
 
     return albums;
   } catch (error) {
-    console.error('Failed to fetch Spotify artist albums:', error);
+    await captureError('Failed to fetch Spotify artist albums', error, {
+      artistId,
+      operation: 'getSpotifyArtistAlbums',
+    });
     return [];
   }
 }
@@ -300,13 +309,24 @@ export async function getSpotifyAlbum(
     );
 
     if (!response.ok) {
-      console.error('Spotify API error:', response.status);
+      await captureError(
+        'Spotify album API error',
+        new Error(`Status ${response.status}`),
+        {
+          albumId,
+          status: response.status,
+          operation: 'getSpotifyAlbum',
+        }
+      );
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to fetch Spotify album:', error);
+    await captureError('Failed to fetch Spotify album', error, {
+      albumId,
+      operation: 'getSpotifyAlbum',
+    });
     return null;
   }
 }
@@ -343,7 +363,15 @@ export async function getSpotifyAlbums(
       );
 
       if (!response.ok) {
-        console.error('Spotify API error:', response.status);
+        await captureError(
+          'Spotify albums batch API error',
+          new Error(`Status ${response.status}`),
+          {
+            albumIds: chunk,
+            status: response.status,
+            operation: 'getSpotifyAlbums',
+          }
+        );
         continue;
       }
 
@@ -353,7 +381,10 @@ export async function getSpotifyAlbums(
 
     return albums;
   } catch (error) {
-    console.error('Failed to fetch Spotify albums:', error);
+    await captureError('Failed to fetch Spotify albums batch', error, {
+      albumIdsCount: albumIds.length,
+      operation: 'getSpotifyAlbums',
+    });
     return [];
   }
 }

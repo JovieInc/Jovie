@@ -69,6 +69,18 @@ export function isPlatformUrl(url: string, config: StrategyConfig): boolean {
 }
 
 /**
+ * Helper to construct invalid URL validation result.
+ * Eliminates duplication in error return statements.
+ */
+function createInvalidResult(): {
+  valid: false;
+  normalized: null;
+  handle: null;
+} {
+  return { valid: false, normalized: null, handle: null };
+}
+
+/**
  * Validates that a URL belongs to a specific platform.
  */
 export function validatePlatformUrl(
@@ -81,12 +93,12 @@ export function validatePlatformUrl(
 
     // Reject dangerous or unsupported schemes early
     if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     // Reject protocol-relative URLs to avoid inheriting caller context
     if (candidate.startsWith('//')) {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     // Check original URL protocol before normalization (normalizeUrl converts http to https)
@@ -94,7 +106,7 @@ export function validatePlatformUrl(
       candidate.startsWith('http') ? candidate : `https://${candidate}`
     );
     if (originalParsed.protocol !== 'https:') {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     const normalized = normalizeUrl(candidate);
@@ -102,28 +114,28 @@ export function validatePlatformUrl(
 
     // Must be HTTPS (after normalization, should always be true if original was https)
     if (parsed.protocol !== 'https:') {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     // Ensure canonical host is an allowed host to avoid misconfiguration
     if (!config.validHosts.has(canonicalHost)) {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     // Must be a valid host
     if (!config.validHosts.has(parsed.hostname.toLowerCase())) {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     // Extract handle from path
     const parts = parsed.pathname.split('/').filter(Boolean);
     if (parts.length === 0) {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     const rawHandle = parts[0].replace(/^@/, '').toLowerCase();
     if (!isValidHandle(rawHandle)) {
-      return { valid: false, normalized: null, handle: null };
+      return createInvalidResult();
     }
 
     return {
@@ -132,6 +144,6 @@ export function validatePlatformUrl(
       handle: rawHandle,
     };
   } catch {
-    return { valid: false, normalized: null, handle: null };
+    return createInvalidResult();
   }
 }

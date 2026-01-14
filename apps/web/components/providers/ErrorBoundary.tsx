@@ -2,12 +2,8 @@
 
 import * as Sentry from '@sentry/nextjs';
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
-import {
-  createErrorToast,
-  getUserFriendlyErrorMessage,
-  isUserFacingError,
-} from '@/lib/utils/toast-utils';
 
 interface Props {
   children: ReactNode;
@@ -35,6 +31,40 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  /** Check if an error should be shown to the user */
+  private isUserFacingError(error: unknown): boolean {
+    if (typeof error === 'string') return true;
+    if (error instanceof Error) {
+      const technicalErrors = [
+        'Network request failed',
+        'TypeError',
+        'ReferenceError',
+        'SyntaxError',
+      ];
+      return !technicalErrors.some(techError =>
+        error.message.includes(techError)
+      );
+    }
+    return false;
+  }
+
+  /** Extract user-friendly message from error */
+  private getUserFriendlyErrorMessage(error: unknown): string {
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) {
+      if (error.message.includes('fetch')) {
+        return 'Network error. Please check your connection.';
+      }
+      if (error.message.includes('rate limit')) {
+        return 'Too many requests. Please wait a moment.';
+      }
+      if (error.message.length < 100 && !error.message.includes('at ')) {
+        return error.message;
+      }
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
@@ -44,18 +74,15 @@ export class ErrorBoundary extends Component<Props, State> {
     this.captureErrorInSentry(error, errorInfo);
 
     // Show toast notification if enabled and error is user-facing
-    if (this.props.showToast !== false && isUserFacingError(error)) {
-      // We can't use hooks in class components, so we'll dispatch a custom event
-      // that the ToastProvider can listen to
-      const toastEvent = new CustomEvent('error-boundary-toast', {
-        detail: createErrorToast(getUserFriendlyErrorMessage(error), {
-          action: {
-            label: 'Reload',
-            onClick: () => window.location.reload(),
-          },
-        }),
+    if (this.props.showToast !== false && this.isUserFacingError(error)) {
+      // Sonner's toast function works without React context
+      toast.error(this.getUserFriendlyErrorMessage(error), {
+        duration: 6000,
+        action: {
+          label: 'Reload',
+          onClick: () => window.location.reload(),
+        },
       });
-      window.dispatchEvent(toastEvent);
     }
 
     // Track error for monitoring with gtag as backup
@@ -231,11 +258,39 @@ export const useErrorHandler = () => {
       }
 
       // Show toast for user-facing errors
-      if (isUserFacingError(error)) {
-        const toastEvent = new CustomEvent('error-boundary-toast', {
-          detail: createErrorToast(getUserFriendlyErrorMessage(error)),
-        });
-        window.dispatchEvent(toastEvent);
+      const isUserFacing = (() => {
+        if (typeof error === 'string') return true;
+        if (error instanceof Error) {
+          const technicalErrors = [
+            'Network request failed',
+            'TypeError',
+            'ReferenceError',
+            'SyntaxError',
+          ];
+          return !technicalErrors.some(techError =>
+            error.message.includes(techError)
+          );
+        }
+        return false;
+      })();
+
+      if (isUserFacing) {
+        const message = (() => {
+          if (typeof error === 'string') return error;
+          if (error instanceof Error) {
+            if (error.message.includes('fetch')) {
+              return 'Network error. Please check your connection.';
+            }
+            if (error.message.includes('rate limit')) {
+              return 'Too many requests. Please wait a moment.';
+            }
+            if (error.message.length < 100 && !error.message.includes('at ')) {
+              return error.message;
+            }
+          }
+          return 'Something went wrong. Please try again.';
+        })();
+        toast.error(message, { duration: 6000 });
       }
     },
     []

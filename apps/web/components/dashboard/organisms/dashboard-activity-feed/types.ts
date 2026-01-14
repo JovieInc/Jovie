@@ -10,13 +10,4 @@ export interface Activity {
 export interface DashboardActivityFeedProps {
   profileId: string;
   range?: ActivityRange;
-  refreshSignal?: number;
-}
-
-export interface UseActivityFeedReturn {
-  activities: Activity[];
-  isLoading: boolean;
-  isRefreshing: boolean;
-  error: string | null;
-  isEnabled: boolean;
 }

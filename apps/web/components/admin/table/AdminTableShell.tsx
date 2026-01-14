@@ -53,13 +53,13 @@ export function AdminTableShell({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col rounded-md border border-subtle bg-surface-1 shadow-sm contain-layout',
+        'flex h-full min-h-0 flex-col rounded-xl border border-subtle bg-surface-1 contain-layout',
         className
       )}
     >
       <div
         ref={tableContainerRef}
-        className='min-h-0 flex-1 overflow-auto flex flex-col rounded-md focus:outline-none'
+        className='min-h-0 flex-1 overflow-auto flex flex-col rounded-xl focus:outline-none'
         {...scrollContainerProps}
       >
         {toolbar ? (
@@ -74,13 +74,13 @@ export function AdminTableShell({
         ) : null}
 
         {children({ headerElevated, stickyTopPx })}
-
-        {footer ? (
-          <div className='sticky bottom-0 z-20 border-t border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
-            {footer}
-          </div>
-        ) : null}
       </div>
+
+      {footer ? (
+        <div className='border-t border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,123 +1,107 @@
 'use client';
 
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
-import { MoreHorizontal } from 'lucide-react';
-import * as React from 'react';
-import {
-  geistTableMenuContentClass,
-  geistTableMenuDestructiveItemClass,
-  geistTableMenuItemClass,
-  geistTableMenuSeparatorClass,
-} from '@/lib/ui/geist-table-menu';
-import { cn } from '@/lib/utils';
+import type { CommonDropdownItem } from '@jovie/ui';
+import { CommonDropdown } from '@jovie/ui';
+import { MoreVertical } from 'lucide-react';
 
 import type { TableActionMenuProps } from './types';
 import { isSeparatorItem } from './utils';
 
+// Geist-style overrides for table menus (smaller, more compact)
+const GEIST_CONTENT_CLASS =
+  'min-w-[10.5rem] rounded-lg p-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_16px_50px_rgba(0,0,0,0.55)]';
+
+const GEIST_ITEM_CLASS =
+  'rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] [&_svg]:text-tertiary-token hover:[&_svg]:text-secondary-token data-[highlighted]:[&_svg]:text-secondary-token focus-visible:[&_svg]:text-secondary-token';
+
+/**
+ * TableActionMenu - Wrapper around CommonDropdown with Geist table styling
+ *
+ * Provides a compact, table-optimized dropdown menu for row actions.
+ * Uses CommonDropdown internally with Geist-specific styling overrides.
+ *
+ * @example
+ * <TableActionMenu
+ *   items={[
+ *     { id: 'edit', label: 'Edit', icon: Pencil, onClick: handleEdit },
+ *     { id: 'separator' },
+ *     { id: 'delete', label: 'Delete', icon: Trash2, onClick: handleDelete, variant: 'destructive' },
+ *   ]}
+ * />
+ */
 export function TableActionMenu({
   items,
   trigger = 'button',
-  triggerIcon: TriggerIcon = MoreHorizontal,
+  triggerIcon: TriggerIcon = MoreVertical,
   align = 'end',
   open,
   onOpenChange,
   children,
 }: TableActionMenuProps) {
-  // Render menu items
-  const renderMenuItems = (isContextMenu: boolean): React.ReactNode => {
-    return items.map((item, index) => {
-      // Render separator
-      if (isSeparatorItem(item.id)) {
-        return (
-          <div
-            key={`separator-${index}`}
-            className={geistTableMenuSeparatorClass}
-          />
-        );
-      }
+  // Convert TableActionMenu items to CommonDropdown items
+  const dropdownItems: CommonDropdownItem[] = items.map((item, index) => {
+    // Handle separator
+    if (isSeparatorItem(item.id)) {
+      return {
+        type: 'separator',
+        id: `separator-${index}`,
+        className: '-mx-0.5 my-1', // Geist separator spacing
+      };
+    }
 
-      const Icon = item.icon;
-      const MenuItemComponent = isContextMenu
-        ? ContextMenuItem
-        : DropdownMenuItem;
+    // Handle action item
+    return {
+      type: 'action',
+      id: item.id,
+      label: item.label,
+      icon: item.icon,
+      onClick: item.onClick,
+      disabled: item.disabled,
+      variant: item.variant,
+      subText: item.subText,
+      className: GEIST_ITEM_CLASS,
+    };
+  });
 
-      return (
-        <MenuItemComponent
-          key={item.id}
-          onClick={e => {
-            e.stopPropagation();
-            item.onClick();
-          }}
-          disabled={item.disabled}
-          className={cn(
-            geistTableMenuItemClass,
-            item.variant === 'destructive' && geistTableMenuDestructiveItemClass
-          )}
-        >
-          {Icon && <Icon className='h-3.5 w-3.5' />}
-          <span className='flex-1'>{item.label}</span>
-          {item.subText && (
-            <span className='text-[11px] text-tertiary-token'>
-              {item.subText}
-            </span>
-          )}
-        </MenuItemComponent>
-      );
-    });
-  };
-
-  // Context menu trigger (right-click)
+  // Context menu variant
   if (trigger === 'context' && children) {
     return (
-      <ContextMenu>
-        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent className={geistTableMenuContentClass}>
-          {renderMenuItems(true)}
-        </ContextMenuContent>
-      </ContextMenu>
+      <CommonDropdown
+        variant='context'
+        items={dropdownItems}
+        contentClassName={GEIST_CONTENT_CLASS}
+      >
+        {children}
+      </CommonDropdown>
     );
   }
 
-  // Custom trigger (passed as children)
+  // Custom trigger variant
   if (trigger === 'custom' && children) {
     return (
-      <DropdownMenu open={open} onOpenChange={onOpenChange}>
-        <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-        <DropdownMenuContent
-          align={align}
-          className={geistTableMenuContentClass}
-        >
-          {renderMenuItems(false)}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <CommonDropdown
+        variant='dropdown'
+        items={dropdownItems}
+        trigger={children}
+        align={align}
+        open={open}
+        onOpenChange={onOpenChange}
+        contentClassName={GEIST_CONTENT_CLASS}
+      />
     );
   }
 
   // Default button trigger
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-          aria-label='More actions'
-          onClick={e => e.stopPropagation()}
-        >
-          <TriggerIcon className='h-4 w-4' />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className={geistTableMenuContentClass}>
-        {renderMenuItems(false)}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <CommonDropdown
+      variant='dropdown'
+      items={dropdownItems}
+      triggerIcon={TriggerIcon}
+      align={align}
+      open={open}
+      onOpenChange={onOpenChange}
+      contentClassName={GEIST_CONTENT_CLASS}
+      triggerClassName='ml-auto'
+    />
   );
 }

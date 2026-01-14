@@ -130,7 +130,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='border border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[10px] text-[var(--color-warning-foreground)]'
+                          className='border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
                         >
                           Manual
                         </Badge>

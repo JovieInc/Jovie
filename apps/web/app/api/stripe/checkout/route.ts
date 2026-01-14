@@ -17,6 +17,7 @@ import {
   PRICE_MAPPINGS,
 } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // Get price details for logging
     const priceDetails = getPriceMappingDetails(priceId);
-    console.log('Creating checkout session for:', {
+    logger.info('Creating checkout session for:', {
       userId,
       priceId,
       plan: priceDetails?.plan,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Ensure Stripe customer exists
     const customerResult = await ensureStripeCustomer();
     if (!customerResult.success || !customerResult.customerId) {
-      console.error('Failed to ensure Stripe customer:', customerResult.error);
+      logger.error('Failed to ensure Stripe customer:', customerResult.error);
       return NextResponse.json(
         { error: 'Failed to create customer' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Log successful checkout creation
-    console.log('Checkout session created:', {
+    logger.info('Checkout session created:', {
       sessionId: session.id,
       userId,
       priceId,
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    logger.error('Error creating checkout session:', error);
 
     // Return appropriate error based on the error type
     if (error instanceof Error) {

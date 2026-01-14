@@ -143,10 +143,7 @@ export function LinkPill({
               ref={setFloatingRef}
               tabIndex={-1}
               style={floatingStyles}
-              className={cn(
-                'z-[100] min-w-[176px]',
-                geistTableMenuContentClass
-              )}
+              className={cn('z-100 min-w-[176px]', geistTableMenuContentClass)}
               {...getFloatingProps()}
             >
               {menuItems.map((item, index) => (

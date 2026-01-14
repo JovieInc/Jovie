@@ -46,12 +46,9 @@ jobs:
         env:
           BASE_URL: https://jov.ie
           PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          # Use production Clerk/Supabase for synthetic tests
+          # Use production Clerk for synthetic tests
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_PROD }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PROD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PROD }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
           # Enable synthetic monitoring mode
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production

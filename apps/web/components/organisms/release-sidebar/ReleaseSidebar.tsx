@@ -42,6 +42,8 @@ export function ReleaseSidebar({
     isEditable,
     hasRelease,
     canUploadArtwork,
+    isAddingDspLink,
+    isRemovingDspLink,
     handleArtworkUpload,
     handleCopySmartLink,
     handleTitleChange,
@@ -107,6 +109,8 @@ export function ReleaseSidebar({
                 isAddingLink={isAddingLink}
                 newLinkUrl={newLinkUrl}
                 selectedProvider={selectedProvider}
+                isAddingDspLink={isAddingDspLink}
+                isRemovingDspLink={isRemovingDspLink}
                 onSetIsAddingLink={setIsAddingLink}
                 onSetNewLinkUrl={setNewLinkUrl}
                 onSetSelectedProvider={setSelectedProvider}

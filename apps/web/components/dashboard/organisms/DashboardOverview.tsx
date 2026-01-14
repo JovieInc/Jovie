@@ -7,7 +7,7 @@ import { DashboardOverviewControlsProvider } from '@/components/dashboard/organi
 import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/organisms/DashboardOverviewHeaderToolbarClient';
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
-import { APP_URL } from '@/constants/app';
+import { PROFILE_URL } from '@/constants/app';
 import type { Artist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -52,7 +52,7 @@ export function DashboardOverview({
 
   const profileUrl = (() => {
     if (!artist.handle) return undefined;
-    const base = APP_URL.replace(/\/+$/, '');
+    const base = PROFILE_URL.replace(/\/+$/, '');
     const path = artist.handle.replace(/^\/+/, '');
     return `${base}/${path}`;
   })();

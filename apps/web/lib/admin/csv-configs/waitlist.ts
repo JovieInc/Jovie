@@ -5,6 +5,7 @@
 
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import type { CSVColumn } from '@/lib/utils/csv';
+import { capitalize, formatOptionalString } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting waitlist entries.
@@ -26,7 +27,7 @@ export const waitlistCSVColumns: CSVColumn<WaitlistEntryRow>[] = [
   {
     header: 'Primary Goal',
     accessor: 'primaryGoal',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Primary Social URL',
@@ -39,27 +40,22 @@ export const waitlistCSVColumns: CSVColumn<WaitlistEntryRow>[] = [
   {
     header: 'Follower Count',
     accessor: 'primarySocialFollowerCount',
-    formatter: value =>
-      value !== null && value !== undefined ? String(value) : '',
+    formatter: formatOptionalString,
   },
   {
     header: 'Spotify URL',
     accessor: 'spotifyUrl',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Heard About',
     accessor: 'heardAbout',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Status',
     accessor: 'status',
-    formatter: value => {
-      // Capitalize first letter for better readability
-      const str = String(value);
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    },
+    formatter: capitalize,
   },
   {
     header: 'Created At',

@@ -8,6 +8,8 @@ export * from './CookieBannerSection';
 export * from './CookieModal';
 export * from './CTASection';
 export * from './DeferredSection';
+// Migrated from /ui
+export * from './EmptyState';
 export * from './FeaturedArtistsSection';
 export * from './HeaderNav';
 export * from './HeroSection';

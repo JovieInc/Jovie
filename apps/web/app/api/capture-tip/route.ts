@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { creatorProfiles, tips } from '@/lib/db/schema';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
         process.env.STRIPE_TIP_WEBHOOK_SECRET
       );
     } catch (err) {
-      console.error('Invalid signature', err);
+      logger.error('Invalid signature', err);
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -106,12 +107,12 @@ export async function POST(req: NextRequest) {
         .returning({ id: tips.id });
 
       if (!inserted) {
-        console.log('Duplicate tip event, record already exists', {
+        logger.info('Duplicate tip event, record already exists', {
           payment_intent: pi.id,
         });
       }
 
-      console.log('Tip received:', {
+      logger.info('Tip received:', {
         artist_id: handle,
         amount_cents: pi.amount_received,
         currency: pi.currency?.toUpperCase(),
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    console.error('Tip webhook error:', error);
+    logger.error('Tip webhook error:', error);
     await captureCriticalError('Tip webhook error', error, {
       route: '/api/capture-tip',
     });

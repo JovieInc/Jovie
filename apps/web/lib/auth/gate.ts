@@ -3,7 +3,8 @@ import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
-import { captureCriticalError } from '@/lib/error-tracking';
+import { captureCriticalError, captureError } from '@/lib/error-tracking';
+import { normalizeEmail } from '@/lib/utils/email';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 
 /**
@@ -102,9 +103,6 @@ async function createUserWithRetry(
       if (attempt > 0) {
         const delay = Math.min(1000 * attempt, 3000);
         await new Promise(resolve => setTimeout(resolve, delay));
-        console.log(
-          `[AUTH] Retry attempt ${attempt + 1}/${maxRetries} for user creation`
-        );
       }
 
       // Derive userStatus based on actual user lifecycle state
@@ -179,15 +177,19 @@ async function createUserWithRetry(
         throw new Error('Failed to create or retrieve user');
       }
 
-      console.log(
-        `[AUTH] User created/updated successfully (attempt ${attempt + 1})`
-      );
       return createdUser.id;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
-      console.error(
-        `[AUTH] User creation failed (attempt ${attempt + 1}/${maxRetries}):`,
-        lastError
+      await captureError(
+        `User creation failed (attempt ${attempt + 1}/${maxRetries})`,
+        lastError,
+        {
+          clerkUserId,
+          email,
+          attempt: attempt + 1,
+          maxRetries,
+          operation: 'createUserWithRetry',
+        }
       );
 
       // Don't retry on constraint violations or permanent errors
@@ -200,9 +202,15 @@ async function createUserWithRetry(
     }
   }
 
-  console.error(
-    `[AUTH] User creation failed after ${maxRetries} attempts:`,
-    lastError
+  await captureCriticalError(
+    `User creation failed after ${maxRetries} attempts`,
+    lastError,
+    {
+      clerkUserId,
+      email,
+      maxRetries,
+      operation: 'createUserWithRetry',
+    }
   );
   return null;
 }
@@ -299,9 +307,14 @@ export async function resolveUserState(
   if (!dbUserId) {
     if (createDbUserIfMissing) {
       if (!email) {
-        console.error('[Auth Gate] Cannot create user without email', {
-          clerkUserId,
-        });
+        await captureError(
+          'Cannot create user without email',
+          new Error('Email is required for user creation'),
+          {
+            clerkUserId,
+            operation: 'resolveUserState',
+          }
+        );
         throw new Error('Email is required for user creation');
       }
 
@@ -330,8 +343,6 @@ export async function resolveUserState(
       );
 
       if (!dbUserId) {
-        console.error('[AUTH] Failed to create user record after retries');
-
         // Capture to Sentry for monitoring
         await captureCriticalError(
           'User creation failed after retries',
@@ -427,7 +438,7 @@ export async function resolveUserState(
 
   // 5. Fully active user
   return {
-    state: dbUser?.isAdmin ? UserState.ACTIVE : UserState.ACTIVE,
+    state: UserState.ACTIVE,
     clerkUserId,
     dbUserId,
     profileId: profile.id,
@@ -472,7 +483,7 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
   status: 'new' | 'claimed' | null;
 }> {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   const [entry] = await db
     .select({

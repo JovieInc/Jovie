@@ -11,6 +11,55 @@ interface VerificationStatusToggleProps {
   onToggle: () => Promise<void> | void;
 }
 
+function getButtonStyles(
+  isVerified: boolean,
+  isLoading: boolean,
+  isSuccess: boolean,
+  isError: boolean
+) {
+  return cn(
+    // Base badge-like styles
+    'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
+    // Transition effects
+    'transition-all duration-200 ease-out',
+    // Focus ring
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent',
+    // Cursor
+    isLoading ? 'cursor-wait' : 'cursor-pointer',
+    // Verified state
+    isVerified && [
+      'bg-accent/10 text-accent',
+      'hover:bg-destructive/10 hover:text-destructive',
+    ],
+    // Not verified state
+    !isVerified && [
+      'bg-secondary-token/10 text-secondary-token',
+      'hover:bg-accent/10 hover:text-accent',
+    ],
+    // Status animations
+    isSuccess && 'animate-pulse ring-1 ring-accent',
+    isError && 'ring-1 ring-destructive'
+  );
+}
+
+function getStatusIcon(
+  isLoading: boolean,
+  isSuccess: boolean,
+  isError: boolean,
+  isVerified: boolean
+) {
+  if (isLoading) {
+    return <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />;
+  }
+  if (isSuccess || (isVerified && !isError)) {
+    return <Check className='h-3 w-3' aria-hidden='true' />;
+  }
+  if (isError) {
+    return <X className='h-3 w-3' aria-hidden='true' />;
+  }
+  return null;
+}
+
 export function VerificationStatusToggle({
   isVerified,
   status,
@@ -51,42 +100,9 @@ export function VerificationStatusToggle({
       disabled={isLoading}
       aria-label={isVerified ? 'Unverify creator' : 'Verify creator'}
       aria-pressed={isVerified}
-      className={cn(
-        // Base badge-like styles
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
-        // Transition effects
-        'transition-all duration-200 ease-out',
-        // Focus ring
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent',
-        // Cursor
-        isLoading ? 'cursor-wait' : 'cursor-pointer',
-        // Verified state
-        isVerified && [
-          'bg-accent/10 text-accent',
-          // Hover state - show unverify intent
-          'hover:bg-destructive/10 hover:text-destructive',
-        ],
-        // Not verified state
-        !isVerified && [
-          'bg-secondary-token/10 text-secondary-token',
-          // Hover state - show verify intent
-          'hover:bg-accent/10 hover:text-accent',
-        ],
-        // Success state animation
-        isSuccess && 'animate-pulse ring-1 ring-accent',
-        // Error state animation
-        isError && 'ring-1 ring-destructive'
-      )}
+      className={getButtonStyles(isVerified, isLoading, isSuccess, isError)}
     >
-      {isLoading ? (
-        <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
-      ) : isSuccess ? (
-        <Check className='h-3 w-3' aria-hidden='true' />
-      ) : isError ? (
-        <X className='h-3 w-3' aria-hidden='true' />
-      ) : isVerified ? (
-        <Check className='h-3 w-3' aria-hidden='true' />
-      ) : null}
+      {getStatusIcon(isLoading, isSuccess, isError, isVerified)}
       <span>{isVerified ? 'Verified' : 'Not verified'}</span>
       {isSuccess && (
         <span className='sr-only' aria-live='polite'>

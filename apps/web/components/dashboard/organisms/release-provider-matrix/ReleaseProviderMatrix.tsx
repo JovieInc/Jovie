@@ -98,21 +98,24 @@ export function ReleaseProviderMatrix({
               )}
               {isConnected && (
                 <Button
-                  variant='secondary'
+                  variant='outline'
                   size='sm'
                   disabled={isSyncing}
                   onClick={handleSync}
                   data-testid='sync-spotify-button'
+                  className='rounded-lg border-subtle hover:bg-base'
+                  aria-label='Sync releases from Spotify'
+                  aria-busy={isSyncing}
                 >
                   <Icon
                     name={isSyncing ? 'Loader2' : 'RefreshCw'}
                     className={cn(
-                      'mr-2 h-4 w-4',
+                      'h-3.5 w-3.5',
                       isSyncing && 'animate-spin motion-reduce:animate-none'
                     )}
                     aria-hidden='true'
                   />
-                  {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+                  <span>{isSyncing ? 'Syncing...' : 'Sync from Spotify'}</span>
                 </Button>
               )}
             </div>
@@ -168,12 +171,12 @@ export function ReleaseProviderMatrix({
                         'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                   >
-                    <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                      <th className='w-[220px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
+                    <tr>
+                      <th className='w-[220px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
                         <button
                           type='button'
                           onClick={() => toggleSort('title')}
-                          className='group inline-flex items-center gap-1.5 hover:text-primary-token transition-colors'
+                          className='group -mx-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-surface-2/50 hover:text-primary-token'
                         >
                           Release
                           <Icon
@@ -194,11 +197,11 @@ export function ReleaseProviderMatrix({
                           />
                         </button>
                       </th>
-                      <th className='w-[120px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
+                      <th className='w-[120px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
                         <button
                           type='button'
                           onClick={() => toggleSort('releaseDate')}
-                          className='group inline-flex items-center gap-1.5 hover:text-primary-token transition-colors'
+                          className='group -mx-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-surface-2/50 hover:text-primary-token'
                         >
                           Released
                           <Icon
@@ -219,13 +222,13 @@ export function ReleaseProviderMatrix({
                           />
                         </button>
                       </th>
-                      <th className='w-[140px] border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'>
-                        Smart Link
+                      <th className='w-[140px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
+                        <span className='line-clamp-1'>Smart link</span>
                       </th>
                       {primaryProviders.map(provider => (
                         <th
                           key={provider}
-                          className='border-b border-subtle px-4 py-3 text-left font-semibold sm:px-6'
+                          className='border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'
                         >
                           <div className='flex items-center gap-2'>
                             <span
@@ -236,12 +239,14 @@ export function ReleaseProviderMatrix({
                               }}
                               aria-hidden='true'
                             />
-                            {providerConfig[provider].label}
+                            <span className='line-clamp-1'>
+                              {providerConfig[provider].label}
+                            </span>
                           </div>
                         </th>
                       ))}
-                      <th className='w-[100px] border-b border-subtle px-4 py-3 text-right font-semibold sm:px-6'>
-                        Actions
+                      <th className='w-[100px] border-b border-subtle px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
+                        <span className='line-clamp-1'>Actions</span>
                       </th>
                     </tr>
                   </thead>
@@ -258,6 +263,7 @@ export function ReleaseProviderMatrix({
                         onEdit={openEditor}
                         onAddUrl={handleAddUrl}
                         isAddingUrl={isSaving}
+                        artistName={artistName}
                       />
                     ))}
                   </tbody>

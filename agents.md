@@ -4,6 +4,17 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 
 ## Core rules (read this first)
 
+### Philosophy: Always Be Shipping 🚀
+
+The guiding principle for all work in this repository is **"Always Be Shipping"**. This means:
+- **Bias toward action:** Ship fast, iterate faster. Don't overthink, don't over-engineer.
+- **Small, frequent deployments:** One user-visible outcome per PR. Keep scope tight, keep changes reversible.
+- **Quality gates without gatekeeping:** Automated checks catch issues; humans ship features.
+- **Prototype in production:** Use feature flags to ship incomplete work safely and gather real feedback.
+- **Fail fast, learn faster:** CI failures are learning opportunities, not blockers. Fix and move on.
+
+### Core Engineering Rules
+
 - **Work style:** One user-visible outcome per PR, keep scope tight, keep changes reversible.
 - **Branches:** Create feature branches from `main` (`feat/…`, `fix/…`, `chore/…`). Never push directly to `main`.
 - **Protected repo settings:** Never modify repository settings, branch protection rules, or `.github/rulesets/*`.
@@ -27,6 +38,41 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **CI/CD flow:** `.github/CI_CD_FLOW.md`
 - **Branch protection (human-owned):** `.github/BRANCH_PROTECTION.md`
 
+## 5.1 Claude Code Hooks (Automated Guardrails)
+
+Claude Code uses hooks to automatically enforce code quality and prevent common mistakes:
+
+### Active Hooks
+
+**PreToolUse Hooks** (run before file operations/bash commands):
+- **bash-safety-check.sh**: Blocks dangerous commands (force push to main, rm -rf /, publishing)
+- **file-protection-check.sh**: Enforces HARD GUARDRAILS:
+  - Prevents modification of Drizzle migrations (append-only)
+  - Blocks creation of `middleware.ts` (must use `proxy.ts`)
+  - Rejects `biome-ignore` suppressions
+
+**PostToolUse Hooks** (run after file operations):
+- **biome-formatter.sh**: Auto-formats TypeScript/JavaScript files with Biome after every edit
+- **console-check.sh**: Blocks `console.*` statements in production code (use Sentry instead)
+- **ts-strict-check.sh**: Blocks explicit `any` types and warns on `@ts-ignore` usage
+- **file-size-check.sh**: Warns when files exceed 500 lines
+
+### Hook Behavior
+
+- Hooks run automatically on every relevant tool use
+- Blocked operations display clear error messages with guidance
+- Auto-formatting happens silently after edits
+- Hooks have short timeouts (5-30s) to avoid blocking workflow
+
+### Configuration
+
+Hooks are configured in `.claude/settings.json` and implemented in `.claude/hooks/`.
+
+To temporarily disable hooks for testing:
+```bash
+export CLAUDE_HOOKS_DISABLED=1
+```
+
 ## 6. Agent-Specific Notes
 
 - **Claude (feature work, refactors)**
@@ -34,6 +80,7 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
   - Own end-to-end changes: schema → backend → UI → tests.
   - Prefer server components and feature-flagged rollouts.
   - Always use Statsig for feature gates/experiments; do not introduce any other flag or analytics SDKs.
+  - Claude Code hooks automatically enforce code quality and guardrails (see section 5.1).
 
 - **Codex (CI auto-fix, focused cleanups)**
 
@@ -50,21 +97,271 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **No direct pushes** to `main`.
 - **HARD GUARDRAIL – Drizzle migrations are immutable:** Treat everything under `drizzle/migrations` as append-only. Do **not** edit, delete, reorder, squash, or regenerate existing migration files for any reason; only add new migrations. If a past migration appears incorrect, stop and escalate to a human instead of attempting an automated fix.
 - **HARD GUARDRAIL – Never suppress Biome errors:** Do **not** use `biome-ignore` comments to suppress lint or format errors. Always address the root cause by fixing the code to comply with Biome rules. If a rule seems incorrect, discuss with the team before suppressing. Proper fixes include: using semantic HTML elements, adding proper ARIA roles, refactoring for accessibility, or restructuring code to follow best practices.
+- **HARD GUARDRAIL – CI ownership (you touch it, you fix it):** If you work on a branch, you are responsible for making CI pass — even if errors existed before you started. This is non-negotiable.
+  - **Before starting work:** Run `pnpm typecheck && pnpm lint` to see current state
+  - **If pre-existing errors exist:** Fix them as part of your work, or explicitly flag to the user that the branch has pre-existing failures you cannot resolve
+  - **Before committing:** Always verify `pnpm typecheck && pnpm lint` passes
+  - **Never say "not my code":** PRs that fail CI block the entire team. If you touched the branch, you own making it green.
+  - **Scope creep is acceptable for CI:** Fixing unrelated type/lint errors to unblock CI is always in-scope, even if "outside your task"
 - New features ship **behind Statsig flags/experiments** and with **Statsig events** (or equivalent Statsig metrics) for primary actions.
 
 ## 8. Engineering Guardrails & Architecture
 
-### 8.1 Component Architecture (Atomic)
+### 8.1 Component Architecture (Atomic Design - 2026)
 
-- **One component per file.** Named export only; no default exports. Export name must match file name.
-- **Atoms:** UI-only primitives (no business logic, no API calls), usually under `components/atoms/`.
-- **Molecules:** Small combinations of atoms with minimal state, under `components/molecules/`.
-- **Organisms:** Self-contained sections that can own state and feature logic, under `components/organisms/`.
-- **Feature directories:** Use `components/<feature>/...` for domain-specific components that aren't widely reused.
-- **Props:** Interface named `<ComponentName>Props`; children typed as `React.ReactNode`.
-- **A11y & testing:** Add appropriate `aria-*` attributes; see section 8.1.1 for `data-testid` requirements.
-- **forwardRef:** Use `React.forwardRef` for DOM atoms/molecules and set `Component.displayName`.
-- **Deprecation:** Mark old components with `/** @deprecated Reason */` and point to the replacement.
+#### Overview
+
+Atomic Design organizes components into a clear hierarchy:
+1. **Atoms** - Smallest UI primitives (buttons, inputs, icons)
+2. **Molecules** - Simple combinations of atoms (search bar = input + button)
+3. **Organisms** - Complex UI sections (navigation header, data table)
+4. **Templates** - Page layouts without content (optional in this codebase)
+5. **Pages** - Complete pages with real data (Next.js routes)
+
+**Philosophy:** Build reusable components that serve a single purpose. Refactor regularly to improve reusability and consistency.
+
+#### Core Rules
+
+- **One component per file:** Named export only; no default exports. Export name must match file name.
+- **Single Responsibility:** Each component should do one thing well
+- **Composition over complexity:** Prefer small, composable components over large monoliths
+- **TypeScript-first:** All components must have proper type definitions
+- **Accessibility-first:** ARIA, semantic HTML, keyboard navigation are non-negotiable
+
+#### Atoms - UI Primitives
+
+**Characteristics:**
+- **No business logic:** Pure UI components, no API calls or complex state
+- **Highly reusable:** Used across many molecules and organisms
+- **Minimal props:** Simple, focused API surface
+- **No data fetching:** Never call external services
+
+**Examples:**
+- `Button.tsx` - Generic button with variants
+- `Input.tsx` - Form input with validation states
+- `Icon.tsx` - Icon wrapper for Lucide React
+- `Badge.tsx` - Status/label badge
+- `Spinner.tsx` - Loading indicator
+
+**Anti-patterns to avoid:**
+- ❌ Atoms with `useState` for complex state management
+- ❌ Atoms that fetch data or call APIs
+- ❌ Atoms with business logic (validation, calculations)
+- ❌ Atoms over 100 lines of code
+
+**Best Practices:**
+```typescript
+// ✅ Good: Simple, focused atom
+interface ButtonProps {
+  variant?: 'primary' | 'secondary' | 'outline';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  children: React.ReactNode;
+  onClick?: () => void;
+}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'primary', size = 'md', children, ...props }, ref) => {
+    return (
+      <button
+        ref={ref}
+        className={cn(buttonVariants({ variant, size }))}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+  }
+);
+
+Button.displayName = 'Button';
+```
+
+#### Molecules - Simple Combinations
+
+**Characteristics:**
+- **Compose atoms:** Combine 2-3 atoms into functional units
+- **Minimal state:** Simple local state only (`useState` for UI state)
+- **Single feature:** One clear purpose (e.g., search bar, form field)
+- **Reusable patterns:** Used in multiple organisms
+
+**Examples:**
+- `SearchBar.tsx` - Input + search icon button
+- `FormField.tsx` - Label + input + error message
+- `AvatarWithName.tsx` - Avatar + display name
+- `CardHeader.tsx` - Title + subtitle + action button
+
+**Anti-patterns to avoid:**
+- ❌ Molecules with complex business logic
+- ❌ Molecules with API calls or data fetching
+- ❌ Molecules with more than 3-4 atoms
+- ❌ Molecules over 150 lines of code
+
+**Best Practices:**
+```typescript
+// ✅ Good: Focused molecule combining atoms
+interface SearchBarProps {
+  onSearch: (query: string) => void;
+  placeholder?: string;
+}
+
+export function SearchBar({ onSearch, placeholder }: SearchBarProps) {
+  const [query, setQuery] = useState('');
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+      />
+      <Button onClick={() => onSearch(query)}>
+        <Icon name="search" />
+      </Button>
+    </div>
+  );
+}
+```
+
+#### Organisms - Complex Sections
+
+**Characteristics:**
+- **Self-contained:** Own state, data fetching, business logic
+- **Feature-complete:** Can be dropped into pages as-is
+- **Compose molecules/atoms:** Build complex UI from smaller parts
+- **Domain-aware:** Understand business concepts (users, profiles, etc.)
+
+**Examples:**
+- `NavigationHeader.tsx` - App header with menu, auth, notifications
+- `DataTable.tsx` - Table with sorting, filtering, pagination
+- `ProfileCard.tsx` - User profile display with actions
+- `DashboardStats.tsx` - Analytics cards with data fetching
+
+**Anti-patterns to avoid:**
+- ❌ Organisms that are just renamed molecules (too simple)
+- ❌ Organisms with hardcoded data (should accept props or fetch)
+- ❌ Organisms over 500 lines (split into smaller organisms)
+- ❌ Organisms without `data-testid` on root element
+
+**Best Practices:**
+```typescript
+// ✅ Good: Self-contained organism with data fetching
+interface ProfileCardProps {
+  userId: string;
+}
+
+export function ProfileCard({ userId }: ProfileCardProps) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['profile', userId],
+    queryFn: () => fetchProfile(userId),
+  });
+
+  if (isLoading) return <ProfileCardSkeleton />;
+  if (!data) return <EmptyState message="Profile not found" />;
+
+  return (
+    <Card data-testid="profile-card">
+      <CardHeader>
+        <AvatarWithName
+          avatar={data.avatar}
+          name={data.displayName}
+        />
+        <Button variant="outline" onClick={() => handleFollow()}>
+          Follow
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <p>{data.bio}</p>
+        <SocialLinks links={data.socialLinks} />
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+#### Feature Directories
+
+Use `components/<feature>/...` for domain-specific components that aren't widely reused.
+
+**Examples:**
+- `components/profile/` - Profile-specific components
+- `components/dashboard/` - Dashboard-specific components
+- `components/onboarding/` - Onboarding flow components
+
+**When to use:**
+- Component is only used in one feature/route
+- Component has high coupling to feature domain
+- Component is unlikely to be reused elsewhere
+
+#### TypeScript Patterns
+
+**Props Interface Naming:**
+```typescript
+// ✅ Always suffix with Props
+interface ButtonProps { ... }
+interface SearchBarProps { ... }
+interface ProfileCardProps { ... }
+```
+
+**Children Typing:**
+```typescript
+// ✅ Use React.ReactNode for flexibility
+interface CardProps {
+  children: React.ReactNode;
+  title?: string;
+}
+```
+
+**ForwardRef Pattern:**
+```typescript
+// ✅ Use for DOM atoms/molecules
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  (props, ref) => {
+    return <input ref={ref} {...props} />;
+  }
+);
+
+Input.displayName = 'Input';
+```
+
+#### Deprecation Strategy
+
+**Mark old components with JSDoc:**
+```typescript
+/**
+ * @deprecated Use Button from @/components/atoms/Button instead.
+ * This component will be removed in v2.0.
+ */
+export function OldButton() { ... }
+```
+
+**Migration path:**
+1. Mark component as `@deprecated` with reason
+2. Point to replacement in deprecation notice
+3. Add console warning in development
+4. Remove after 2 major versions or 6 months
+
+#### Common Pitfalls (2026)
+
+**Problem:** Classification paralysis - spending too long deciding if something is an atom vs. molecule.
+**Solution:** Start as molecule, refactor to atom if reused 3+ times.
+
+**Problem:** State management doesn't align with atomic structure.
+**Solution:** Use URL state (nuqs) for shareable state, React Context for feature state, TanStack Query for server state.
+
+**Problem:** Blurring of stateful and stateless components.
+**Solution:** Atoms should be stateless presentational components. Move state to organisms or use composition.
+
+**Problem:** Over-abstraction creating unused components.
+**Solution:** Build components when you need them (YAGNI principle). Refactor when you have 3+ similar instances.
+
+#### Real-World Guidelines
+
+**From Industry Leaders (Shopify, IBM):**
+- Document components in Storybook with examples
+- Write tests for organisms (required) and molecules (recommended)
+- Keep component files under 500 lines (split if exceeded)
+- Use consistent naming: `<Noun>` for atoms, `<Noun><Noun>` for molecules, `<Feature><Noun>` for organisms
 
 #### 8.1.1 data-testid Strategy
 
@@ -117,17 +414,201 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
   - Never describe Jovie itself as a "link-in-bio" product (only use that phrase when comparing competitors).
   - Apple-level clarity; concise, active voice; focus copy on activation and MRR.
 
-### 8.3 Stack & Packages
+### 8.3 Stack & Packages (2026)
 
-- **Runtime & framework:** Next.js App Router + React Server Components.
-- **Package manager:** `pnpm` only.
-- **DB:** Neon + Drizzle (`@neondatabase/serverless`, `drizzle-orm/neon-serverless` with WebSocket support for transactions).
-- **Auth:** Clerk via `@clerk/nextjs` / `@clerk/nextjs/server`.
-- **Styling:** Tailwind CSS v4 + small helpers (e.g., `clsx`, `tailwind-merge`) where needed.
-- **Headless UI:** Prefer `@headlessui/react` and `@floating-ui/*` for dialogs, menus, sheets, tooltips, and popovers.
-- **Billing:** Stripe (`stripe` on server, `@stripe/stripe-js` on client); no Clerk Billing.
-- **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
-- **Icons:** Use **Lucide React only** (`lucide-react`). Do not use Heroicons, Simple Icons (except for brand logos via `SocialIcon`), or other icon libraries. Import icons directly (e.g., `import { Check, X } from 'lucide-react'`) and use the `<Icon name="..." />` wrapper component for dynamic icon names.
+#### Core Framework & Runtime
+
+- **Runtime & framework:** Next.js 16.1.1 + App Router + React Server Components (RSC)
+  - Next.js 16 features: Cache Components with `use cache`, Turbopack stable, React Compiler support
+  - Default to request-time execution unless explicitly cached with `use cache`
+  - Combine Cache Components with Suspense-based Partial Prerendering (PPR)
+- **Package manager:** `pnpm` only (v9.15.9+)
+- **Monorepo:** Turborepo with remote caching enabled (Vercel Remote Cache)
+  - Cache outputs defined in `turbo.json` for build, typecheck, lint, test tasks
+  - Use `dependsOn` to declare task dependencies across workspace
+  - Enable filesystem caching for faster dev server restarts
+
+#### Database & Backend
+
+- **DB:** Neon Postgres + Drizzle ORM
+  - Use `@neondatabase/serverless` with WebSocket support for full transaction capabilities
+  - Connection pooling via `Pool` for production-ready performance
+  - Configure `neonConfig.webSocketConstructor = ws` for transactions
+  - Implement retry logic for transient connection errors
+  - **Best Practice:** Use interactive transactions via `neon-serverless` driver (Pool/Client) when you need session/transaction support
+  - **Migrations:** Never run from Edge runtime; always use Node.js environment
+- **Auth:** Clerk v6.36.7 (`@clerk/nextjs` + `@clerk/nextjs/server`)
+  - Use `clerkMiddleware()` for route protection (compatible with App Router)
+  - Server helpers from `@clerk/nextjs/server`: `auth()`, `currentUser()`
+  - Client hooks/components from `@clerk/nextjs`
+  - **Best Practice:** Use `auth.protect()` for automatic redirects on unauthorized access
+- **Payments:** Stripe v20.1.2
+  - Server-only SDK (`stripe`) in Node.js routes only
+  - Client SDK (`@stripe/stripe-js`) for checkout flows
+  - Webhook signature verification required: `stripe.webhooks.constructEvent()`
+  - Use `req.text()` in App Router webhooks to prevent body parsing
+
+#### Styling & UI
+
+- **Styling:** Tailwind CSS v4.1.18 with PostCSS (`@tailwindcss/postcss`)
+  - **CSS-first configuration:** Use `@import "tailwindcss"` and `@theme` directive
+  - **Modern syntax (REQUIRED):**
+    - `z-100` not `z-[100]` (arbitrary z-index)
+    - `shrink-0` not `flex-shrink-0`
+    - `bg-linear-to-r` not `bg-gradient-to-r`
+    - `border-(--var-name)` not `border-[var(--var-name)]` (CSS variable references)
+    - `bg-black!` not `!bg-black` (important modifier is postfix)
+    - `hover:bg-gray-800!` not `hover:!bg-gray-800`
+  - **Performance:** 5x faster full builds, 100x faster incremental builds
+  - **Color palette:** Uses `oklch` color space for P3-compatible vibrant colors
+- **Headless UI:**
+  - Primary: `@headlessui/react` v2.2.8 (Tailwind Labs, WAI-ARIA compliant)
+  - Radix UI for specific primitives: Dialog, Dropdown, Tooltip, etc. (v1.x)
+  - `@floating-ui/react` v0.27.16 for custom positioning
+  - **Best Practice:** Headless UI manages accessibility, keyboard nav, ARIA - never skip semantic HTML
+- **Icons:**
+  - **UI icons:** Lucide React v0.562.0 (`lucide-react`) ONLY
+  - **Brand icons:** Simple Icons v16.1.0 (`simple-icons`) via `<SocialIcon />` wrapper
+  - Import directly: `import { Check, X } from 'lucide-react'`
+  - Use `<Icon name="..." />` wrapper for dynamic icon names
+  - ❌ Do NOT use Heroicons, Font Awesome, or other icon libraries
+
+#### State Management & Data Fetching
+
+- **Server State:** TanStack Query v5.90.16 (`@tanstack/react-query`)
+  - Full Suspense support with `useSuspenseQuery`, `useSuspenseInfiniteQuery`
+  - Requires React 18+ (uses `useSyncExternalStore`)
+  - Server streaming with `react-query-next-experimental` adapter
+  - Dehydrate pending queries for early prefetches (v5.40.0+)
+- **Client State:**
+  - Local state: `useState` + React Context
+  - URL state: **nuqs** v2.8.6 for type-safe search params
+  - ❌ Do NOT add Zustand, Jotai, Redux, or Recoil
+- **URL State (nuqs):**
+  - Server Components: `await searchParams.parse()` for type-safe params
+  - Client Components: `useTableParams()`, `usePaginationParams()`, `useSortParams()`
+  - **When to use:** pagination, sorting, filtering, tab selection, shareable state
+  - **When NOT to use:** one-time reads, form state, temporary UI state
+
+#### Tables & Virtualization
+
+- **Table State:** TanStack Table v8.21.3 (`@tanstack/react-table`)
+  - Use `useReactTable` with `getCoreRowModel`, `getSortedRowModel`
+  - Type-safe column definitions with `ColumnDef<TData>`
+  - Built-in row selection, sorting, filtering support
+- **Virtualization:** TanStack Virtual v3.13.13 (`@tanstack/react-virtual`)
+  - Use `useVirtualizer` for list/table virtualization
+  - Auto-enable for datasets 20+ rows
+  - **Best Practice:** Set `useFlushSync: false` for React 19 compatibility (batches updates naturally)
+  - Memoize `getItemKey` with `useCallback` to avoid recalculations
+  - Use `rangeExtractor` for sticky headers/footers/custom rendering
+
+#### Forms & Validation
+
+- **Forms:** React Hook Form v7.69.0 (`react-hook-form`)
+  - Schema validation via Zod v4.2.1 with `@hookform/resolvers` v5.2.2
+  - Use `zodResolver` to connect schemas: `useForm({ resolver: zodResolver(schema) })`
+  - **Best Practice:** Define schema once, reuse across client + server
+  - Validate on client for UX, re-validate on server for security
+  - Works with Next.js Server Actions for full-stack type safety
+
+#### Animation & Interaction
+
+- **Motion:** Framer Motion v12.23.26 (`framer-motion`)
+  - Use for complex animations, gestures, layout animations
+  - Prefer CSS transitions for simple hover/focus states
+- **Drag & Drop:** dnd-kit v6.3.1 (`@dnd-kit/core`, `@dnd-kit/sortable`)
+  - Accessible, performant, framework-agnostic
+  - Use for sortable lists, kanban boards, file uploads
+
+#### Analytics & Feature Flags
+
+- **Analytics & Flags:** Statsig ONLY
+  - `@statsig/react-bindings` v3.30.0 for feature gates/experiments
+  - `@statsig/web-analytics` v3.31.0 for product analytics
+  - `@statsig/session-replay` v3.30.0 for session replay
+  - ❌ Do NOT add PostHog, Segment, RudderStack, Amplitude
+  - All feature flags must be registered in `docs/STATSIG_FEATURE_GATES.md`
+
+#### Observability & Error Tracking
+
+- **Monitoring:** Sentry v10 (`@sentry/nextjs`)
+  - Configured for client, server, and edge runtimes
+  - Use `Sentry.captureException()` for errors
+  - Use `Sentry.startSpan()` for performance tracing
+  - Import: `import * as Sentry from '@sentry/nextjs'`
+  - **Best Practice:** Use structured logging with `logger.error(message, context)`
+  - Enable `consoleLoggingIntegration` to forward console to Sentry
+
+#### Development Tools
+
+- **TypeScript:** v5 with strict mode enabled
+- **Linting:** Biome v2.3.11 (`@biomejs/biome`)
+  - Auto-format on save with 80-char line width
+  - Accessibility rules enforced (a11y)
+  - No explicit `any` types in production (error level)
+- **Testing:**
+  - Unit: Vitest v3.2.4 (`vitest`)
+  - E2E: Playwright v1.55.0 (`@playwright/test`)
+  - A11y: `@axe-core/playwright` v4.11.0
+  - Component: Storybook v10.1.10 with Vite
+- **Package Updates:** Check for updates weekly; keep dependencies current for security
+
+### 8.4 URL State Management (nuqs)
+
+Use `nuqs` for all URL search params state management. This provides type-safe, reactive URL state with automatic serialization.
+
+**When to use nuqs:**
+- Pagination (page, pageSize)
+- Sorting (sort field, direction)
+- Filtering and search queries
+- Tab/view selection that should be shareable via URL
+- Any state that should persist across page refreshes or be shareable
+
+**When NOT to use nuqs:**
+- One-time reads on page load (e.g., redirect URLs)
+- Form state that doesn't belong in the URL
+- Temporary UI state (modals open/close without URL persistence)
+
+**Server Component Usage:**
+
+```typescript
+import type { SearchParams } from 'nuqs/server';
+import { adminCreatorsSearchParams } from '@/lib/nuqs';
+
+export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const { page, pageSize, sort, q } = await adminCreatorsSearchParams.parse(searchParams);
+  // Use type-safe params
+}
+```
+
+**Client Component Usage:**
+
+```typescript
+'use client';
+import { useTableParams } from '@/lib/nuqs';
+
+function DataTable() {
+  const [{ page, sort, direction }, { setPage, toggleSort }] = useTableParams({
+    defaultPageSize: 20,
+    defaultSort: 'createdAt',
+    defaultDirection: 'desc',
+  });
+  // Reactive URL state with type-safe updates
+}
+```
+
+**Key files:**
+- `lib/nuqs/search-params.ts` - Server-side parsers and cache definitions
+- `lib/nuqs/hooks.ts` - Client-side hooks (usePaginationParams, useSortParams, useTableParams)
+- `lib/nuqs/index.ts` - Re-exports for convenience
+- `components/providers/NuqsProvider.tsx` - NuqsAdapter wrapper (included in ClientProviders)
+
+**Anti-patterns to avoid:**
+- ❌ Manual URLSearchParams manipulation with `useRouter().push()`
+- ❌ Using `useSearchParams()` directly for state that changes frequently
+- ❌ Duplicating param parsing logic across components
+- ❌ String-based param parsing without type validation
 
 ## 9. Runtime, Auth, Database & RLS
 
@@ -333,24 +814,291 @@ if (!authResult.dbUserId && !isFreshSignup) {
   - Tailwind v4 plugin/config drift.
   - Env/secret sprawl or mixing preview and production credentials.
 
-## 14. Next.js 16 Best Practices
+## 14. Next.js 16 Best Practices (2026 Edition)
 
-- Enable Cache Components with the `use cache` directive so caching is explicit and the compiler can generate consistent cache keys.
-- Default to request-time execution for dynamic server code unless Cache Components explicitly wrap it, matching the new “opt-in cache” mindset.
-- Combine Cache Components with Suspense-based Partial Prerendering to deliver static shells with targeted dynamic updates.
-- Pass a cacheLife profile (we recommend `'max'`) as the second argument to `revalidateTag()` to get SWR-style behavior instead of manually tracking expirations.
-- Call `updateTag()` inside Server Actions when mutations must show read-your-write data immediately within the same request.
-- Use the Server Actions-only `refresh()` when you need to refresh uncached data without touching cached page shells, complementing `router.refresh`.
-- Plug into Next.js DevTools MCP so agents and teammates can inspect routing, caching, and the unified log surface for faster debugging.
-- Replace `middleware.ts` with `proxy.ts`/`proxy` (Node runtime) handlers to keep the network boundary clear; keep Edge middleware only for legacy cases.
-- Monitor the enhanced dev/build logs that break out compile work vs. React rendering so you can spot time sinks faster.
-- Default to the stable Turbopack bundler in both dev and prod for the 2–5× faster builds and up to 10× speedier Fast Refresh, falling back to webpack only when absolutely necessary.
-- Turn on Turbopack filesystem caching so repeated restarts reuse artifacts and large repositories feel snappier.
-- Start new features from the refreshed `create-next-app` template (App Router, TypeScript-first, Tailwind, ESLint) to stay aligned with current defaults.
-- Use the Build Adapters API when you need to hook into the build flow for custom deployment hosts or infrastructure automation.
-- Gradually opt into `reactCompiler` once you’ve measured the build-time cost; it automatically memoizes components to cut redundant renders.
-- Lean on layout deduplication and incremental prefetching (built into Next.js 16) so shared layouts download once and cached chunks only refresh when invalidated.
-- Take advantage of React 19.2 additions (`View Transitions`, `useEffectEvent`, `<Activity />`) whenever you build new transitions or interaction patterns.
+### 14.1 Cache Components & Caching Strategy
+
+**GOLDEN RULE:** Caching is now **opt-in** by default. All dynamic code executes at request time unless explicitly cached.
+
+#### Cache Components (`use cache`)
+
+```typescript
+// ✅ Explicitly cache expensive operations
+'use cache';
+
+export async function getCreatorProfile(username: string) {
+  const profile = await db.query.creatorProfiles.findFirst({
+    where: eq(creatorProfiles.username, username),
+  });
+  return profile;
+}
+```
+
+**Best Practices:**
+- Use `use cache` directive to make caching explicit
+- Compiler generates consistent cache keys automatically
+- Combine with Suspense for Partial Prerendering (PPR)
+- Pass `cacheLife: 'max'` to `revalidateTag()` for SWR-style behavior
+- Use `updateTag()` in Server Actions for read-your-write consistency
+
+#### Caching Anti-Patterns
+- ❌ Don't rely on implicit caching (removed in Next.js 16)
+- ❌ Don't cache at component level - cache data fetching functions instead
+- ❌ Don't manually manage cache expirations - use `cacheLife` profiles
+
+### 14.2 Turbopack - Stable & Production-Ready
+
+**ENABLED BY DEFAULT** in Next.js 16 for 2-5x faster builds and 10x faster Fast Refresh.
+
+**Configuration:**
+```javascript
+// next.config.js
+export default {
+  experimental: {
+    turbo: {
+      // Enable filesystem caching for faster restarts
+      cache: true,
+    },
+  },
+};
+```
+
+**Performance Gains:**
+- **Full builds:** 2-5x faster than Webpack
+- **Fast Refresh:** Up to 10x faster hot module replacement
+- **Incremental builds:** Reuse cached artifacts across restarts
+- **Dev server startup:** Significantly faster for large repositories
+
+**When to use Webpack:**
+- Only when absolutely necessary (legacy plugins, custom loaders)
+- Most projects should use Turbopack exclusively
+
+### 14.3 React Compiler Support
+
+Next.js 16 includes stable support for the React Compiler (following React Compiler 1.0 release).
+
+**When to enable:**
+- After measuring build-time cost impact
+- For applications with frequent re-renders
+- When you want automatic memoization without manual `useMemo`/`useCallback`
+
+**Configuration:**
+```javascript
+// next.config.js
+export default {
+  experimental: {
+    reactCompiler: true,
+  },
+};
+```
+
+**Benefits:**
+- Automatically memoizes components to cut redundant renders
+- Reduces need for manual `useMemo`, `useCallback`, `memo`
+- Improves runtime performance at the cost of slightly longer builds
+
+### 14.4 Server Actions & Mutations
+
+**Best Practices:**
+- Use Server Actions for all mutations (create, update, delete)
+- Call `refresh()` to refresh uncached data within the same request
+- Use `revalidateTag()` to invalidate cached data after mutations
+- Use `updateTag()` for immediate read-your-write consistency
+
+```typescript
+'use server';
+
+import { revalidateTag } from 'next/cache';
+
+export async function updateProfile(data: ProfileData) {
+  await db.update(profiles).set(data);
+
+  // Invalidate cache for this profile
+  revalidateTag(`profile-${data.id}`);
+
+  return { success: true };
+}
+```
+
+### 14.5 Partial Prerendering (PPR)
+
+Combine static shells with dynamic content for optimal performance.
+
+**Pattern:**
+```tsx
+export default function Page() {
+  return (
+    <div>
+      {/* Static shell - prerendered */}
+      <Header />
+      <Sidebar />
+
+      {/* Dynamic content - streamed */}
+      <Suspense fallback={<ProfileSkeleton />}>
+        <ProfileContent />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+**Benefits:**
+- Static shell delivers instantly (TTFB < 50ms)
+- Dynamic data streams in via Suspense
+- Best of both worlds: fast initial load + fresh data
+
+### 14.6 Layout Deduplication & Prefetching
+
+**Built-in optimizations:**
+- Shared layouts download once and cache client-side
+- Incremental prefetching: only fetch chunks that changed
+- Automatic route prefetching on link hover
+
+**Best Practice:**
+- Maximize shared layouts to benefit from deduplication
+- Use `<Link prefetch={false}>` to disable prefetch for low-priority routes
+- Monitor Network tab to verify layout chunks are cached
+
+### 14.7 Enhanced Dev & Build Logs
+
+Next.js 16 breaks out compile work vs. React rendering for faster debugging.
+
+**Monitor for:**
+- Slow compilation (Turbopack should be fast)
+- Large bundle sizes (use Bundle Analyzer)
+- Render bottlenecks (use React DevTools Profiler)
+
+### 14.8 React 19 Features
+
+Take advantage of React 19.2 additions when building new UI:
+
+- **View Transitions API:** Native page transitions without libraries
+- **`useEffectEvent()`:** Stable event handlers without exhaustive deps
+- **`<Activity />`:** Built-in loading/activity indicators
+- **Form Actions:** Native form handling with Server Actions
+
+### 14.9 Next.js DevTools & Debugging
+
+**Recommended Setup:**
+- Install Next.js DevTools MCP for agent/team debugging
+- Use unified log surface to inspect routing, caching, rendering
+- Enable React DevTools for component profiling
+
+### 14.10 Build Adapters API
+
+Use when you need to hook into the build flow for:
+- Custom deployment hosts
+- Infrastructure automation
+- CDN integration
+- Asset optimization pipelines
+
+**Example Use Cases:**
+- Deploy to self-hosted infrastructure
+- Integrate with custom CDNs
+- Add post-build asset processing
+
+## 14.11 Turborepo Monorepo Best Practices (2026)
+
+### Remote Caching Strategy
+
+**ENABLED** in this repo via Vercel Remote Cache.
+
+**Configuration in `turbo.json`:**
+```json
+{
+  "remoteCache": {
+    "enabled": true
+  },
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "dist/**"]
+    }
+  }
+}
+```
+
+**Best Practices:**
+- **Cache outputs aggressively:** Define all build artifacts in `outputs`
+- **Declare dependencies:** Use `dependsOn` to order tasks correctly
+- **Incremental builds:** CI will reuse cache from previous runs
+- **Local development:** Cache shared across team members
+
+### Task Pipeline Optimization
+
+**Critical Rules:**
+1. **Build shared packages first:** Use `^build` dependency
+2. **Parallel execution:** Tasks without dependencies run concurrently
+3. **Minimal cache keys:** Only include files that affect output
+
+**Example Pipeline:**
+```json
+{
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": [".cache/tsbuildinfo"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    }
+  }
+}
+```
+
+### Code Sharing Strategy
+
+**GOLDEN RULE:** Start with **less sharing**, not more. It's easier to extract shared code later than to untangle overshared code.
+
+**Best Practices:**
+- **Shared packages:** Only extract when code is used in 3+ places
+- **Workspace dependencies:** Use `workspace:*` protocol
+- **TypeScript paths:** Configure `paths` in `tsconfig.json` for clean imports
+- **No circular dependencies:** Enforce with `dependency-cruiser`
+
+### Dependency Management
+
+**Optimization tactics:**
+- **Hoist common deps to root:** Move React, Next.js, TypeScript to root `package.json`
+- **Remove unused devDependencies:** Audit with `depcheck`
+- **Use pnpm:** Avoids duplication, ensures consistency
+- **Lock versions:** Use exact versions in `package.json` for predictability
+
+### Performance Targets
+
+**Benchmark your setup:**
+- **Cold build:** < 2 minutes (with Turbopack + remote cache)
+- **Cached build:** < 10 seconds (with Turborepo remote cache)
+- **Fast Refresh:** < 1 second (with Turbopack)
+- **Dev server startup:** < 5 seconds
+
+**If you exceed these:**
+1. Check remote cache is enabled and working
+2. Verify Turbopack is active (not webpack fallback)
+3. Audit large dependencies with Bundle Analyzer
+4. Split large packages into smaller ones
+
+### Global Environment Variables
+
+**Configured in `turbo.json`:**
+```json
+{
+  "globalPassThroughEnv": [
+    "SENTRY_AUTH_TOKEN",
+    "DOPPLER_PROJECT",
+    "DOPPLER_CONFIG"
+  ]
+}
+```
+
+**Best Practice:**
+- Only pass env vars that are truly global
+- Use task-level `env` for task-specific vars
+- Never commit secrets - use Doppler/Vault
 
 ## 15. Sentry Instrumentation & Logging
 
@@ -565,5 +1313,80 @@ Update the metrics dashboard when counts change:
 ```
 
 **Failure to update the tech debt tracker when addressing or discovering tech debt is a violation of agent protocol.**
+
+## 18. Code Quality Enforcement (REQUIRED)
+
+AI agents **must** follow these code quality rules, which are enforced by Claude Code hooks and Biome.
+
+### Console Statement Policy
+
+- **No `console.*` in production code** - Use Sentry logging per Section 15
+- **Allowed locations:** tests, scripts/, dev-only files, config files
+- **Enforcement:** Claude hook (blocks), Biome (future)
+
+**Correct pattern:**
+```typescript
+import * as Sentry from '@sentry/nextjs';
+
+// For errors
+Sentry.captureException(error);
+
+// For structured logging
+const { logger } = Sentry;
+logger.error('message', { context });
+```
+
+### TypeScript Strictness
+
+- **No explicit `any` types in production code** - Use proper typing or `unknown`
+- **Avoid `@ts-ignore`** - Use `@ts-expect-error` with explanation comment
+- **Track unavoidable exceptions** in `TECH_DEBT_TRACKER.md`
+- **Enforcement:** Biome (error), Claude hook (blocks)
+
+**Correct pattern:**
+```typescript
+// Instead of: const data: any = ...
+const data: unknown = response.json();
+
+// Type guard for unknown
+function isUser(obj: unknown): obj is User {
+  return typeof obj === 'object' && obj !== null && 'id' in obj;
+}
+
+// Instead of: @ts-ignore
+// @ts-expect-error - Drizzle type mismatch during migration (tracked in TECH_DEBT_TRACKER.md)
+```
+
+### File Size Limits
+
+- **Max file size: 500 lines** - Split if exceeded
+- **Exceptions:** test files, generated files, migrations
+- **Enforcement:** Claude hook (warning)
+
+**Refactoring strategies:**
+- Extract utility functions to separate files
+- Split by feature/concern
+- Create sub-components for large React components
+- Use composition patterns
+
+### Code Coverage Requirements
+
+- **New code coverage: 60%** minimum
+- **Critical paths:** Higher coverage expected (auth, payments, onboarding)
+- **Enforcement:** SonarCloud quality gate (warning mode)
+
+### Biome Configuration
+
+The following rules are enforced as errors:
+
+| Rule | Level | Purpose |
+|------|-------|---------|
+| `noExplicitAny` | error | Type safety in production |
+| `noUnusedVariables` | error | Clean code |
+| `noUnusedImports` | error | Bundle size |
+| `noArrayIndexKey` | warn | React best practice |
+| `noUselessFragments` | warn | Performance |
+
+**Override for tests:** `any` types are allowed in test files (`*.test.ts`, `*.spec.ts`, `/tests/`)
 
 </details>

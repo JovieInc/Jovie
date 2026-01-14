@@ -487,7 +487,17 @@ export async function completeOnboarding({
     );
 
     // Log database-specific error details
-    const dbError = error as any;
+    // Define shape for PostgreSQL database errors
+    interface DatabaseErrorShape {
+      code?: string;
+      constraint?: string;
+      detail?: string;
+      hint?: string;
+      table?: string;
+      column?: string;
+      cause?: unknown;
+    }
+    const dbError = error as DatabaseErrorShape;
     console.error('🔴 DATABASE ERROR DETAILS:', {
       code: dbError?.code,
       constraint: dbError?.constraint,

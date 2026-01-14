@@ -2,13 +2,14 @@
  * useSuggestionSync Hook
  *
  * Custom hook for syncing link suggestions from the server.
- * Handles polling, version tracking, and accept/dismiss API calls.
+ * Uses TanStack Query for polling, version tracking, and caching.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
-import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
+import { queryKeys, useSuggestionsQuery } from '@/lib/queries';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { LinkItem, SuggestedLink } from '../types';
 import {
@@ -59,8 +60,8 @@ export interface UseSuggestionSyncReturn {
  * Custom hook for syncing suggestions with the server
  *
  * Features:
- * - Polling with configurable interval
- * - Auto-refresh after ingestable URLs
+ * - TanStack Query for automatic caching and polling
+ * - Dynamic polling interval (faster during auto-refresh mode)
  * - Accept/dismiss API integration
  * - Version tracking for optimistic locking
  *
@@ -87,104 +88,55 @@ export function useSuggestionSync({
   suggestionsEnabled,
   autoRefreshUntilMs,
   setAutoRefreshUntilMs,
-  linksVersion,
   setLinksVersion,
   setLinks,
   setSuggestedLinks,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
-  // Abort controller for canceling in-flight requests
-  const suggestionSyncAbortRef = useRef<AbortController | null>(null);
+  const queryClient = useQueryClient();
 
   // Polling interval depends on whether we're in auto-refresh mode
-  const pollIntervalMs = useMemo(
+  const refetchInterval = useMemo(
     () => (autoRefreshUntilMs ? 2000 : 4500),
     [autoRefreshUntilMs]
   );
 
-  // Sync suggestions from server
+  // Use TanStack Query for fetching and polling suggestions
+  const { data, refetch } = useSuggestionsQuery({
+    profileId,
+    enabled: suggestionsEnabled && !!profileId,
+    refetchInterval,
+  });
+
+  // Process query data and update local state
+  useEffect(() => {
+    if (!data?.links) return;
+
+    // Update version from server response
+    if (data.maxVersion > 1) {
+      setLinksVersion(prev => Math.max(prev, data.maxVersion));
+    }
+
+    // Update suggested links
+    const nextSuggestions = convertDbLinksToSuggestions(
+      data.links.filter(link => link.state === 'suggested')
+    );
+    setSuggestedLinks(prev =>
+      areSuggestionListsEqual(prev, nextSuggestions) ? prev : nextSuggestions
+    );
+  }, [data, setLinksVersion, setSuggestedLinks]);
+
+  // Check auto-refresh deadline and clear it when expired
+  useEffect(() => {
+    if (autoRefreshUntilMs && Date.now() >= autoRefreshUntilMs) {
+      setAutoRefreshUntilMs(null);
+    }
+  }, [autoRefreshUntilMs, setAutoRefreshUntilMs, data]);
+
+  // Manual sync function for immediate refresh
   const syncSuggestionsFromServer = useCallback(async () => {
     if (!profileId || !suggestionsEnabled) return;
-
-    suggestionSyncAbortRef.current?.abort();
-    const controller = new AbortController();
-    suggestionSyncAbortRef.current = controller;
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/social-links?profileId=${profileId}`,
-        { cache: 'no-store', signal: controller.signal }
-      );
-      if (!response.ok) return;
-
-      const data = (await response.json().catch(() => null)) as {
-        links?: ProfileSocialLink[];
-      } | null;
-
-      if (!data?.links) return;
-
-      // Update version from server response
-      const serverVersions = data.links
-        .map(l => l.version ?? 1)
-        .filter(v => typeof v === 'number');
-      if (serverVersions.length > 0) {
-        const serverVersion = Math.max(...serverVersions);
-        setLinksVersion(prev => Math.max(prev, serverVersion));
-      }
-
-      const nextSuggestions = convertDbLinksToSuggestions(
-        data.links.filter(link => link.state === 'suggested')
-      );
-      setSuggestedLinks(prev =>
-        areSuggestionListsEqual(prev, nextSuggestions) ? prev : nextSuggestions
-      );
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      console.error('Failed to refresh suggestions', error);
-    } finally {
-      suggestionSyncAbortRef.current = null;
-    }
-  }, [profileId, suggestionsEnabled, setLinksVersion, setSuggestedLinks]);
-
-  // Set up polling using the coordinator
-  const { registerTask, unregisterTask, updateTask } = usePollingCoordinator();
-
-  useEffect(() => {
-    if (!profileId || !suggestionsEnabled) {
-      unregisterTask('sync-suggestions');
-      return;
-    }
-
-    const cleanup = registerTask({
-      id: 'sync-suggestions',
-      callback: async () => {
-        await syncSuggestionsFromServer();
-        if (autoRefreshUntilMs && Date.now() >= autoRefreshUntilMs) {
-          setAutoRefreshUntilMs(null);
-        }
-      },
-      intervalMs: pollIntervalMs,
-      priority: 1,
-      enabled: true,
-    });
-
-    return cleanup;
-  }, [
-    profileId,
-    suggestionsEnabled,
-    pollIntervalMs,
-    autoRefreshUntilMs,
-    syncSuggestionsFromServer,
-    registerTask,
-    unregisterTask,
-    setAutoRefreshUntilMs,
-  ]);
-
-  // Update interval when pollIntervalMs changes
-  useEffect(() => {
-    if (profileId && suggestionsEnabled) {
-      updateTask('sync-suggestions', { intervalMs: pollIntervalMs });
-    }
-  }, [pollIntervalMs, profileId, suggestionsEnabled, updateTask]);
+    await refetch();
+  }, [profileId, suggestionsEnabled, refetch]);
 
   // Handle accepting a suggestion
   const handleAcceptSuggestion = useCallback(
@@ -213,24 +165,28 @@ export function useSuggestionSync({
         });
 
         if (!response.ok) {
-          const data = (await response.json().catch(() => null)) as {
+          const errorData = (await response.json().catch(() => null)) as {
             error?: string;
           } | null;
-          throw new Error(data?.error || 'Failed to accept link');
+          throw new Error(errorData?.error || 'Failed to accept link');
         }
 
-        const data = (await response.json()) as {
+        const responseData = (await response.json()) as {
           link?: ProfileSocialLink;
         };
 
-        if (data.link) {
-          const [detected] = convertDbLinksToLinkItems([data.link]);
+        if (responseData.link) {
+          const [detected] = convertDbLinksToLinkItems([responseData.link]);
           setSuggestedLinks(prev =>
             prev.filter(s => s.suggestionId !== suggestionId)
           );
           if (detected) {
             setLinks(prev => [...prev, detected]);
           }
+          // Invalidate the suggestions query to ensure fresh data
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.suggestions.list(profileId),
+          });
           toast.success('Link added to your list');
           return detected ?? null;
         }
@@ -242,7 +198,7 @@ export function useSuggestionSync({
       }
       return null;
     },
-    [profileId, setLinks, setSuggestedLinks]
+    [profileId, setLinks, setSuggestedLinks, queryClient]
   );
 
   // Handle dismissing a suggestion
@@ -271,15 +227,19 @@ export function useSuggestionSync({
         });
 
         if (!response.ok) {
-          const data = (await response.json().catch(() => null)) as {
+          const errorData = (await response.json().catch(() => null)) as {
             error?: string;
           } | null;
-          throw new Error(data?.error || 'Failed to dismiss link');
+          throw new Error(errorData?.error || 'Failed to dismiss link');
         }
 
         setSuggestedLinks(prev =>
           prev.filter(s => s.suggestionId !== suggestion.suggestionId)
         );
+        // Invalidate the suggestions query to ensure fresh data
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.suggestions.list(profileId),
+        });
         toast.success('Suggestion dismissed');
       } catch (error) {
         console.error(error);
@@ -288,7 +248,7 @@ export function useSuggestionSync({
         );
       }
     },
-    [profileId, setSuggestedLinks]
+    [profileId, setSuggestedLinks, queryClient]
   );
 
   return {

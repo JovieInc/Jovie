@@ -1,3 +1,4 @@
+import { Debouncer } from '@tanstack/react-pacer';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -5,6 +6,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Creates a debounced function using TanStack Pacer.
+ *
+ * The debounced function delays invoking `func` until after `wait` milliseconds
+ * have elapsed since the last time the debounced function was invoked.
+ *
+ * @param func - The function to debounce
+ * @param wait - The number of milliseconds to delay
+ * @returns A debounced function with cancel and flush methods
+ *
+ * @example
+ * ```ts
+ * const debouncedSave = debounce(saveData, 500);
+ * debouncedSave(data); // Will execute after 500ms of no calls
+ * debouncedSave.cancel(); // Cancel pending execution
+ * debouncedSave.flush(); // Execute immediately if pending
+ * ```
+ */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
@@ -12,33 +31,25 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
   cancel: () => void;
   flush: () => void;
 } {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  let lastArgs: Parameters<T> | null = null;
+  const debouncer = new Debouncer(func, { wait });
+
   const debounced = (...args: Parameters<T>) => {
-    lastArgs = args;
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => {
-      timeout = null;
-      lastArgs = null;
-      func(...args);
-    }, wait);
+    debouncer.maybeExecute(...args);
   };
+
   debounced.cancel = () => {
-    if (timeout) {
-      clearTimeout(timeout);
-      timeout = null;
-      lastArgs = null;
-    }
+    debouncer.cancel();
   };
+
   debounced.flush = () => {
-    if (timeout && lastArgs) {
-      clearTimeout(timeout);
-      timeout = null;
-      const args = lastArgs;
-      lastArgs = null;
-      func(...args);
+    // Get the last args that were passed and execute immediately if pending
+    const state = debouncer.store.state;
+    if (state.isPending && state.lastArgs) {
+      debouncer.cancel();
+      func(...(state.lastArgs as Parameters<T>));
     }
   };
+
   return debounced as ((...args: Parameters<T>) => void) & {
     cancel: () => void;
     flush: () => void;
@@ -51,7 +62,7 @@ export function slugify(text: string): string {
     .trim()
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/(^-+)|(-+$)/g, '');
 }
 
 export function generateHandle(name: string): string {
@@ -85,15 +96,22 @@ export function formatDate(date: string | Date): string {
 }
 
 export function detectPlatformFromUA(userAgent?: string): string | null {
-  if (!userAgent) return null;
+  if (!userAgent) {
+    return null;
+  }
 
   const ua = userAgent.toLowerCase();
+  const platformMatchers = [
+    { tokens: ['iphone', 'ipad'], platform: 'ios' },
+    { tokens: ['android'], platform: 'android' },
+    { tokens: ['macintosh'], platform: 'macos' },
+    { tokens: ['windows'], platform: 'windows' },
+    { tokens: ['linux'], platform: 'linux' },
+  ];
 
-  if (ua.includes('iphone') || ua.includes('ipad')) return 'ios';
-  if (ua.includes('android')) return 'android';
-  if (ua.includes('macintosh')) return 'macos';
-  if (ua.includes('windows')) return 'windows';
-  if (ua.includes('linux')) return 'linux';
+  const matched = platformMatchers.find(({ tokens }) =>
+    tokens.some(token => ua.includes(token))
+  );
 
-  return 'web';
+  return matched?.platform ?? 'web';
 }

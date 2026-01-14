@@ -5,6 +5,15 @@
  * Import from '@/lib/spotify' for a clean API.
  */
 
+// Circuit breaker for fault tolerance
+export {
+  CircuitBreaker,
+  type CircuitBreakerConfig,
+  type CircuitBreakerStats,
+  CircuitOpenError,
+  type CircuitState,
+  spotifyCircuitBreaker,
+} from './circuit-breaker';
 // Client and API functions
 export {
   getSpotifyArtist,
@@ -13,6 +22,7 @@ export {
   searchSpotifyArtists,
   spotifyClient,
 } from './client';
+
 // Environment and configuration
 export {
   getSpotifyConfig,
@@ -29,6 +39,17 @@ export {
   validateSpotifyConfigOnStartup,
   validateSpotifyEnv,
 } from './env';
+
+// Retry utilities
+export {
+  calculateDelay,
+  type RetryConfig,
+  type RetryResult,
+  retryAsync,
+  SPOTIFY_RETRY_CONFIG,
+  withRetry,
+} from './retry';
+
 // Data sanitization
 export {
   ALLOWED_EXTERNAL_DOMAINS,

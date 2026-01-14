@@ -5,6 +5,7 @@
  * Uses shared validation core for consistency with server-side validation.
  */
 
+import { debounce as utilsDebounce } from '@/lib/utils';
 import {
   type DetailedValidationResult,
   generateUsernameSuggestions as generateSuggestions,
@@ -61,18 +62,8 @@ export const generateUsernameSuggestions = generateSuggestions;
 
 /**
  * Debounce utility for API calls.
- * Use this to debounce availability checks against the server.
+ * Re-exported from @/lib/utils for backwards compatibility.
+ *
+ * @see https://tanstack.com/pacer
  */
-export function debounce<T extends (...args: never[]) => unknown>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<T>) => {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
+export const debounce = utilsDebounce;

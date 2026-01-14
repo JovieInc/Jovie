@@ -25,6 +25,11 @@ export interface AdminCreatorsTableHeaderProps {
   stickyTopPx: number;
   onToggleSelectAll: () => void;
   onSortChange: (column: SortableColumnKey) => void;
+  /**
+   * Optional header actions (e.g., ingest profile button, drawer toggle).
+   * If provided, these will be displayed in the Actions column header.
+   */
+  headerActions?: React.ReactNode;
 }
 
 export function AdminCreatorsTableHeader({
@@ -35,6 +40,7 @@ export function AdminCreatorsTableHeader({
   stickyTopPx,
   onToggleSelectAll,
   onSortChange,
+  headerActions,
 }: AdminCreatorsTableHeaderProps) {
   const headerCellClass = cn(
     'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
@@ -43,7 +49,7 @@ export function AdminCreatorsTableHeader({
 
   return (
     <thead className='text-left text-secondary-token'>
-      <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+      <tr className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
         <th
           className={cn(headerCellClass, 'w-14')}
           style={{ top: stickyTopPx }}
@@ -52,7 +58,7 @@ export function AdminCreatorsTableHeader({
             aria-label='Select all creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
-            className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+            className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
           />
         </th>
         <th className={headerCellClass} style={{ top: stickyTopPx }}>
@@ -88,6 +94,14 @@ export function AdminCreatorsTableHeader({
           </div>
         </th>
         <th
+          className={cn(headerCellClass, 'hidden lg:table-cell')}
+          style={{ top: stickyTopPx }}
+        >
+          <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+            Social
+          </span>
+        </th>
+        <th
           className={cn(
             headerCellClass,
             'cursor-pointer select-none hidden md:table-cell'
@@ -101,34 +115,16 @@ export function AdminCreatorsTableHeader({
           />
         </th>
         <th
-          className={cn(
-            headerCellClass,
-            'cursor-pointer select-none hidden md:table-cell'
-          )}
-          style={{ top: stickyTopPx }}
-        >
-          <SortableHeaderButton
-            label={SORTABLE_COLUMNS.claimed.label}
-            direction={getSortDirection(sort, 'claimed')}
-            onClick={() => onSortChange('claimed')}
-          />
-        </th>
-        <th
-          className={cn(headerCellClass, 'cursor-pointer select-none')}
-          style={{ top: stickyTopPx }}
-        >
-          <SortableHeaderButton
-            label={SORTABLE_COLUMNS.verified.label}
-            direction={getSortDirection(sort, 'verified')}
-            onClick={() => onSortChange('verified')}
-          />
-        </th>
-        <th
           className={cn(headerCellClass, 'text-right')}
           style={{ top: stickyTopPx }}
         >
-          <span className='sr-only'>Action</span>
-          <div className='flex items-center justify-end' />
+          {headerActions ? (
+            <div className='flex items-center justify-end'>{headerActions}</div>
+          ) : (
+            <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+              Actions
+            </span>
+          )}
         </th>
       </tr>
     </thead>

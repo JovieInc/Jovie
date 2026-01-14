@@ -2,13 +2,13 @@ import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import {
   audienceMembers,
   clickEvents,
-  creatorProfiles,
   notificationSubscriptions,
-  users,
 } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 import { recentActivityQuerySchema } from '@/lib/validation/schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -123,14 +123,8 @@ export async function GET(request: NextRequest) {
             : 7 * 24 * 60 * 60 * 1000;
       const since = new Date(Date.now() - rangeMs);
 
-      const [profile] = await db
-        .select({ id: creatorProfiles.id })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(creatorProfiles.userId, users.id))
-        .where(
-          and(eq(users.clerkId, clerkUserId), eq(creatorProfiles.id, profileId))
-        )
-        .limit(1);
+      // Verify user owns the profile
+      const profile = await verifyProfileOwnership(db, profileId, clerkUserId);
 
       if (!profile) {
         return NextResponse.json(
@@ -267,7 +261,7 @@ export async function GET(request: NextRequest) {
       );
     });
   } catch (error) {
-    console.error('[Dashboard Activity] Error loading recent actions', error);
+    logger.error('[Dashboard Activity] Error loading recent actions', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

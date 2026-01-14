@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +28,7 @@ export async function POST() {
     // Get user's billing information
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success || !billingResult.data) {
-      console.error('Failed to get user billing info:', billingResult.error);
+      logger.error('Failed to get user billing info:', billingResult.error);
       return NextResponse.json(
         { error: 'Failed to retrieve billing information' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -63,7 +64,7 @@ export async function POST() {
     });
 
     // Log portal session creation
-    console.log('Billing portal session created:', {
+    logger.info('Billing portal session created:', {
       userId,
       customerId: stripeCustomerId,
       sessionId: session.id,
@@ -78,7 +79,7 @@ export async function POST() {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Error creating billing portal session:', error);
+    logger.error('Error creating billing portal session:', error);
 
     // Return appropriate error based on the error type
     if (error instanceof Error) {

@@ -1,11 +1,11 @@
 'use client';
 
+import { toast } from 'sonner';
 import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
-import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { APP_URL } from '@/constants/app';
+import { PROFILE_URL } from '@/constants/app';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
@@ -18,11 +18,10 @@ export function SettingsProfileSection({
   onArtistUpdate,
   onRefresh,
 }: SettingsProfileSectionProps) {
-  const { showToast } = useToast();
   const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
   const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
 
-  const appDomain = APP_URL.replace(/^https?:\/\//, '');
+  const profileDomain = PROFILE_URL.replace(/^https?:\/\//, '');
 
   const {
     formData,
@@ -31,7 +30,8 @@ export function SettingsProfileSection({
     setProfileSaveStatus,
     handleAvatarUpload,
     handleAvatarUpdate,
-    debouncedProfileSave,
+    saveProfile,
+    flushSave,
   } = useSettingsProfile({
     artist,
     onArtistUpdate,
@@ -66,7 +66,7 @@ export function SettingsProfileSection({
                 showHoverOverlay
                 onUpload={handleAvatarUpload}
                 onSuccess={handleAvatarUpdate}
-                onError={message => showToast({ type: 'error', message })}
+                onError={message => toast.error(message)}
                 maxFileSize={maxAvatarSize}
                 acceptedTypes={acceptedAvatarTypes}
                 className='mx-auto animate-in fade-in duration-300'
@@ -91,7 +91,7 @@ export function SettingsProfileSection({
               <div className='relative'>
                 <div className='flex rounded-lg shadow-sm'>
                   <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary-token text-sm select-none'>
-                    {appDomain}/
+                    {profileDomain}/
                   </span>
                   <Input
                     type='text'
@@ -109,14 +109,14 @@ export function SettingsProfileSection({
                           success: null,
                           error: null,
                         }));
-                        debouncedProfileSave({
+                        saveProfile({
                           displayName: next.displayName,
                           username: next.username,
                         });
                         return next;
                       });
                     }}
-                    onBlur={() => debouncedProfileSave.flush()}
+                    onBlur={() => flushSave()}
                     placeholder='yourname'
                     className='flex-1 min-w-0'
                     inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors'
@@ -146,14 +146,14 @@ export function SettingsProfileSection({
                       success: null,
                       error: null,
                     }));
-                    debouncedProfileSave({
+                    saveProfile({
                       displayName: next.displayName,
                       username: next.username,
                     });
                     return next;
                   });
                 }}
-                onBlur={() => debouncedProfileSave.flush()}
+                onBlur={() => flushSave()}
                 placeholder='The name your fans will see'
                 inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />

@@ -1,13 +1,14 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { ArtistTheme } from '@/components/profile/ArtistThemeProvider';
 import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { verifyProfileOwnership } from '@/lib/db/queries/shared';
+import { creatorProfiles } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import { logger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,21 +44,23 @@ export async function POST(request: NextRequest) {
     }
 
     return await withDbSession(async clerkUserId => {
-      // Update the creator profile's theme preference (ownership enforced)
+      // Verify user owns the profile
+      const profile = await verifyProfileOwnership(db, artistId, clerkUserId);
+      if (!profile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Update the creator profile's theme preference
       const result = await db
         .update(creatorProfiles)
         .set({
           theme: { mode: theme },
           updatedAt: new Date(),
         })
-        .from(users)
-        .where(
-          and(
-            eq(creatorProfiles.userId, users.id),
-            eq(users.clerkId, clerkUserId),
-            eq(creatorProfiles.id, artistId)
-          )
-        )
+        .where(eq(creatorProfiles.id, artistId))
         .returning();
 
       if (result.length === 0) {
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     });
   } catch (error) {
-    console.error('Error in theme API:', error);
+    logger.error('Error in theme API:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

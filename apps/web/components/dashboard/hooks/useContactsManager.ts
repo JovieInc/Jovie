@@ -29,6 +29,32 @@ function makeTempId(): string {
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * Toggle a territory for a contact with input sanitization.
+ * Extracted to reduce nesting depth in handleToggleTerritory.
+ */
+function toggleTerritoryForContact(
+  contact: EditableContact,
+  territory: string,
+  profileId: string
+): EditableContact {
+  const exists = contact.territories.includes(territory);
+  const nextTerritories = exists
+    ? contact.territories.filter(t => t !== territory)
+    : [...contact.territories, territory];
+
+  try {
+    const sanitized = sanitizeContactInput({
+      ...contact,
+      profileId,
+      territories: nextTerritories,
+    } as DashboardContactInput);
+    return { ...contact, territories: sanitized.territories };
+  } catch {
+    return { ...contact, territories: nextTerritories };
+  }
+}
+
 export interface UseContactsManagerProps {
   profileId: string;
   artistHandle: string;
@@ -83,23 +109,11 @@ export function useContactsManager({
 
   const handleToggleTerritory = (contactId: string, territory: string) => {
     setContacts(prev =>
-      prev.map(contact => {
-        if (contact.id !== contactId) return contact;
-        const exists = contact.territories.includes(territory);
-        const next = exists
-          ? contact.territories.filter(t => t !== territory)
-          : [...contact.territories, territory];
-        try {
-          const sanitized = sanitizeContactInput({
-            ...contact,
-            profileId,
-            territories: next,
-          } as DashboardContactInput);
-          return { ...contact, territories: sanitized.territories };
-        } catch {
-          return { ...contact, territories: next };
-        }
-      })
+      prev.map(contact =>
+        contact.id === contactId
+          ? toggleTerritoryForContact(contact, territory, profileId)
+          : contact
+      )
     );
   };
 

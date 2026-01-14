@@ -11,6 +11,7 @@ export interface UseRowSelectionResult {
   toggleSelect: (id: string) => void;
   toggleSelectAll: () => void;
   clearSelection: () => void;
+  setSelection: (ids: Set<string>) => void;
 }
 
 export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
@@ -68,6 +69,10 @@ export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
     setSelectedIds(new Set());
   }, []);
 
+  const setSelection = useCallback((ids: Set<string>) => {
+    setSelectedIds(ids);
+  }, []);
+
   return {
     selectedIds,
     selectedCount,
@@ -75,5 +80,6 @@ export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
     toggleSelect,
     toggleSelectAll,
     clearSelection,
+    setSelection,
   };
 }

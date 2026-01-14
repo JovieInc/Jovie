@@ -1,6 +1,8 @@
 // Atomic Design - Molecules
 // Simple combinations of atoms functioning together
 
+// Migrated from /ui to ../ui/CTAButton.tsx
+export { CTAButton, type CTAButtonProps } from '../ui/CTAButton';
 export * from './ArtistCard';
 export * from './ArtistInfo';
 export * from './AuthActions';
@@ -14,3 +16,6 @@ export * from './QRCodeCard';
 export * from './SocialLink';
 export * from './StepCard';
 export * from './TipSelector';
+
+// Migrated from atoms (has business logic - useState, useEffect, API calls)
+export * from './WrappedSocialLink';

@@ -1,22 +1,25 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import React from 'react';
+import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TipSection } from '@/components/organisms/TipSection';
 
-// Mock the ToastContainer module
-const mockShowToast = vi.fn();
-vi.mock('@/components/molecules/ToastContainer', () => {
-  return {
-    useToast: () => ({
-      showToast: mockShowToast,
-      hideToast: vi.fn(),
-      clearToasts: vi.fn(),
-    }),
-    ToastProvider: ({ children }: { children: React.ReactNode }) => (
-      <>{children}</>
-    ),
-  };
-});
+// Mock Sonner toast with vi.hoisted for proper setup
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+  loading: vi.fn(),
+  dismiss: vi.fn(),
+  message: vi.fn(),
+  promise: vi.fn(),
+  custom: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: mockToast,
+  Toaster: () => null,
+}));
 
 // Mock the ToastProvider from providers
 vi.mock('@/components/providers/ToastProvider', () => ({
@@ -48,18 +51,14 @@ describe('TipSection', () => {
     const tipButton = screen.getByText('$2 Tip');
     fireEvent.click(tipButton);
 
-    // Wait for the payment to complete
+    // Wait for the payment to complete and toast to be called
     await waitFor(() => {
       expect(mockOnStripePayment).toHaveBeenCalledWith(2);
+      expect(mockToast.success).toHaveBeenCalledWith(
+        'Thanks for the $2 tip!',
+        expect.objectContaining({ duration: 5000 })
+      );
     });
-
-    // Verify toast was shown with success message
-    expect(mockShowToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Thanks for the $2 tip 🎉',
-        type: 'success',
-      })
-    );
   });
 
   it('shows error toast when Stripe payment fails', async () => {
@@ -77,18 +76,14 @@ describe('TipSection', () => {
     const tipButton = screen.getByText('$2 Tip');
     fireEvent.click(tipButton);
 
-    // Wait for the payment to fail
+    // Wait for the payment to fail and error toast to be called
     await waitFor(() => {
       expect(mockOnStripePayment).toHaveBeenCalledWith(2);
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Payment failed. Please try again.',
+        expect.objectContaining({ duration: 7000 })
+      );
     });
-
-    // Verify toast was shown with error message
-    expect(mockShowToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Payment failed. Please try again.',
-        type: 'error',
-      })
-    );
   });
 
   it('renders payment method selection when both Stripe and Venmo are available', () => {

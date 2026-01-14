@@ -6,13 +6,13 @@ const {
   mockDbSelect,
   mockDbUpdate,
   mockDbInsert,
-  mockCaptureException,
+  mockCaptureError,
 } = vi.hoisted(() => ({
   mockClerkClient: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbInsert: vi.fn(),
-  mockCaptureException: vi.fn(),
+  mockCaptureError: vi.fn(),
 }));
 
 // Mock Clerk client
@@ -29,9 +29,9 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-// Mock Sentry
-vi.mock('@sentry/nextjs', () => ({
-  captureException: mockCaptureException,
+// Mock error tracking
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
 }));
 
 describe('clerk-sync module', () => {
@@ -132,7 +132,7 @@ describe('clerk-sync module', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Clerk API error');
-      expect(mockCaptureException).toHaveBeenCalled();
+      expect(mockCaptureError).toHaveBeenCalled();
     });
   });
 

@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatformIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
-import {
-  type SpotifyArtistResult,
-  useArtistSearch,
-} from '@/lib/hooks/useArtistSearch';
+import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { isBrandDark } from '@/lib/utils/color';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { ARTIST_SEARCH_PLATFORMS } from '../universalLinkInput.constants';
@@ -67,7 +64,7 @@ export function useArtistSearchMode({
 
   const resultsListRef = useRef<HTMLUListElement>(null);
 
-  const { results, state, error, search, clear } = useArtistSearch({
+  const { results, state, error, search, clear } = useArtistSearchQuery({
     debounceMs: 300,
     limit: 5,
   });

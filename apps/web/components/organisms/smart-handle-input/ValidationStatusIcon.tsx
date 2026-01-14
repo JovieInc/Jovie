@@ -1,7 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface ValidationStatusIconProps {
   showAvailability: boolean;

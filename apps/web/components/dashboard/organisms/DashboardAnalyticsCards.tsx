@@ -5,12 +5,16 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
+import { EmptyState } from '@/components/organisms/EmptyState';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
 type CityRange = Extract<AnalyticsRange, '7d' | '30d' | '90d'>;
+
+// Clipboard feedback delay in milliseconds
+const CLIPBOARD_FEEDBACK_DELAY_MS = 1500;
 
 interface DashboardAnalyticsCardsProps {
   profileUrl?: string;
@@ -23,6 +27,7 @@ export function DashboardAnalyticsCards({
   range = '7d',
   refreshSignal,
 }: DashboardAnalyticsCardsProps) {
+  const notifications = useNotifications();
   const lastRefreshSignalRef = useRef<number>(
     typeof refreshSignal === 'number' ? refreshSignal : 0
   );
@@ -31,17 +36,22 @@ export function DashboardAnalyticsCards({
   const [displayProfileViews, setDisplayProfileViews] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const { data, error, loading, refreshing, refresh } = useDashboardAnalytics({
-    range,
-    view: 'traffic',
-  });
+  const { data, error, isLoading, isFetching, refetch } =
+    useDashboardAnalyticsQuery({
+      range,
+      view: 'traffic',
+    });
+
+  const loading = isLoading;
+  const refreshing = isFetching && !isLoading;
 
   useEffect(() => {
     if (typeof refreshSignal !== 'number') return;
     if (lastRefreshSignalRef.current === refreshSignal) return;
     lastRefreshSignalRef.current = refreshSignal;
-    void refresh();
-  }, [refresh, refreshSignal]);
+    // Fire-and-forget refetch - errors are handled by TanStack Query
+    refetch();
+  }, [refetch, refreshSignal]);
 
   const rangeLabel = useMemo(() => {
     if (range === '7d') return 'Last 7 days';
@@ -60,7 +70,7 @@ export function DashboardAnalyticsCards({
     const step = (now: number) => {
       const t = Math.min(1, (now - startTime) / duration);
       // easeOutCubic
-      const eased = 1 - Math.pow(1 - t, 3);
+      const eased = 1 - (1 - t) ** 3;
       const nextValue = Math.round(
         startValue + (endValue - startValue) * eased
       );
@@ -73,7 +83,7 @@ export function DashboardAnalyticsCards({
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, displayProfileViews]);
 
   const profileViewsLabel = useMemo(() => {
     const value = displayProfileViews;
@@ -141,9 +151,11 @@ export function DashboardAnalyticsCards({
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      notifications.success('Copied to clipboard', { duration: 2000 });
+      setTimeout(() => setCopied(false), CLIPBOARD_FEEDBACK_DELAY_MS);
     } catch (e) {
       console.error('Copy failed', e);
+      notifications.error('Failed to copy');
     }
   };
 
@@ -167,7 +179,7 @@ export function DashboardAnalyticsCards({
                 profileUrl
                   ? {
                       label: copied ? 'Copied!' : 'Copy profile link',
-                      onClick: handleCopy,
+                      onClick: () => void handleCopy(),
                     }
                   : {
                       label: 'Open profile settings',

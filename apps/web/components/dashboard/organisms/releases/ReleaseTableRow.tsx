@@ -8,9 +8,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
+import { PencilLine, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -92,8 +94,10 @@ function AddProviderUrlPopover({
             className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
             aria-hidden='true'
           />
-          <span className='group-hover/add:hidden'>Not found</span>
-          <span className='hidden group-hover/add:inline'>Click to add</span>
+          <span className='line-clamp-1 group-hover/add:hidden'>Not found</span>
+          <span className='line-clamp-1 hidden group-hover/add:inline'>
+            Click to add
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -169,6 +173,7 @@ interface ReleaseTableRowProps {
     url: string
   ) => Promise<void>;
   isAddingUrl?: boolean;
+  artistName?: string | null;
 }
 
 export function ReleaseTableRow({
@@ -181,6 +186,7 @@ export function ReleaseTableRow({
   onEdit,
   onAddUrl,
   isAddingUrl,
+  artistName,
 }: ReleaseTableRowProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -242,6 +248,11 @@ export function ReleaseTableRow({
                 </Badge>
               )}
             </div>
+            {artistName && (
+              <div className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
+                {artistName}
+              </div>
+            )}
           </div>
         </div>
       </td>
@@ -288,7 +299,9 @@ export function ReleaseTableRow({
                 className='mr-1 h-3.5 w-3.5'
                 aria-hidden='true'
               />
-              {isCopied ? 'Copied!' : 'Copy link'}
+              <span className='line-clamp-1'>
+                {isCopied ? 'Copied!' : 'Copy link'}
+              </span>
             </Button>
           );
         })()}
@@ -388,16 +401,46 @@ export function ReleaseTableRow({
 
       {/* Actions cell */}
       <td className='px-4 py-4 align-middle text-right sm:px-6'>
-        <Button
-          variant='ghost'
-          size='sm'
-          className='inline-flex items-center gap-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100'
-          data-testid={`edit-links-${release.id}`}
-          onClick={() => onEdit(release)}
-        >
-          <Icon name='PencilLine' className='h-3.5 w-3.5' aria-hidden='true' />
-          Edit
-        </Button>
+        <div className='flex justify-end'>
+          <TableActionMenu
+            items={[
+              {
+                id: 'edit',
+                label: 'Edit links',
+                icon: PencilLine,
+                onClick: () => onEdit(release),
+              },
+              {
+                id: 'copy-smart-link',
+                label: 'Copy smart link',
+                icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
+                onClick: () => {
+                  void handleCopyWithFeedback(
+                    release.smartLinkPath,
+                    `${release.title} smart link`,
+                    `action-copy-${release.id}`
+                  );
+                },
+              },
+              {
+                id: 'separator-1',
+                label: 'separator',
+                onClick: () => {},
+              },
+              {
+                id: 'delete',
+                label: 'Delete release',
+                icon: Trash2,
+                variant: 'destructive' as const,
+                onClick: () => {
+                  // TODO: Implement delete confirmation dialog
+                  console.log('Delete release:', release.id);
+                },
+                disabled: true,
+              },
+            ]}
+          />
+        </div>
       </td>
     </tr>
   );

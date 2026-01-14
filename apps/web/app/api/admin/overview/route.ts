@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { db, waitlistEntries } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -53,7 +54,7 @@ export async function GET() {
 
     return NextResponse.json(body, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    console.error('Error in admin overview API:', error);
+    logger.error('Error in admin overview API:', error);
     return NextResponse.json(
       { error: 'Failed to load admin overview' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -74,7 +75,7 @@ async function getStripeMrr(): Promise<{
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown error fetching MRR';
-    console.error('Error computing Stripe MRR for admin overview:', error);
+    logger.error('Error computing Stripe MRR for admin overview:', error);
     return { mrrUsd: 0, activeSubscribers: 0, error: message };
   }
 }
@@ -93,7 +94,7 @@ async function getWaitlistCount(): Promise<{
       error instanceof Error
         ? error.message
         : 'Unknown error fetching waitlist count';
-    console.error('Error computing waitlist count for admin overview:', error);
+    logger.error('Error computing waitlist count for admin overview:', error);
     return { count: 0, error: message };
   }
 }

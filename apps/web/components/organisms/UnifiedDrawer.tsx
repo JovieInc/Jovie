@@ -29,11 +29,13 @@ export function UnifiedDrawer({
   return (
     <aside
       className={cn(
-        'fixed top-0 right-0 h-full bg-surface-2 border-l border-subtle z-40',
-        'transition-transform duration-300 ease-out',
-        isOpen ? 'translate-x-0' : 'translate-x-full'
+        'shrink-0 h-full bg-surface-1 border-l border-subtle',
+        'transition-[width,opacity] duration-300 ease-out',
+        isOpen
+          ? 'opacity-100 visible'
+          : 'opacity-0 pointer-events-none invisible w-0 border-l-0'
       )}
-      style={{ width }}
+      style={{ width: isOpen ? width : 0 }}
     >
       <div className='h-full overflow-y-auto'>{children}</div>
     </aside>

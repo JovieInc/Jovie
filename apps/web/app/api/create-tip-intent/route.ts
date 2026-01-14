@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 import {
   type TipIntentPayload,
   tipIntentSchema,
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Create tip intent error:', error);
+    logger.error('Create tip intent error:', error);
     return NextResponse.json(
       { error: 'Failed to create tip' },
       { status: 500, headers: NO_STORE_HEADERS }

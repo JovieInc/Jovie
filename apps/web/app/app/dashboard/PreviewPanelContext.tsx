@@ -49,8 +49,35 @@ export function PreviewPanelProvider({
   defaultOpen = false,
   enabled = true,
 }: PreviewPanelProviderProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  // Check if screen is large (md breakpoint: 768px)
+  const [isLargeScreen, setIsLargeScreen] = useState(() => {
+    if (typeof window === 'undefined') return true; // SSR default
+    return window.matchMedia('(min-width: 768px)').matches;
+  });
+
+  // Update isLargeScreen on resize
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsLargeScreen(e.matches);
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Use defaultOpen on large screens, false on small screens
+  const initialOpen = defaultOpen && isLargeScreen;
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
+
+  // Update open state when screen size changes
+  useEffect(() => {
+    if (defaultOpen && !isLargeScreen && isOpen) {
+      // Close drawer when switching to small screen
+      setIsOpen(false);
+    }
+  }, [isLargeScreen, defaultOpen, isOpen]);
 
   const open = useCallback(() => {
     if (!enabled) return;

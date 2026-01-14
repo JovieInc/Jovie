@@ -52,8 +52,7 @@ export function useProfileShell({
     [searchParams]
   );
 
-  const notificationsEnabled =
-    forceNotificationsEnabled || true || forceNotifications;
+  const notificationsEnabled = forceNotificationsEnabled || forceNotifications;
 
   useTipPageTracking({
     artistHandle: artist.handle,

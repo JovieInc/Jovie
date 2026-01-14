@@ -1,4 +1,4 @@
-export { DashboardAudienceTable } from './DashboardAudienceTable';
+export { DashboardAudienceTableUnified as DashboardAudienceTable } from './DashboardAudienceTableUnified';
 export type {
   AudienceMode,
   AudienceRow,

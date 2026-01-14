@@ -29,8 +29,13 @@ export function IngestProfileDropdown({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type='button' size='sm' variant='secondary'>
-          <Icon name='Plus' className='h-4 w-4 mr-2' />
+        <Button
+          type='button'
+          size='sm'
+          variant='ghost'
+          className='gap-1.5 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+        >
+          <Icon name='Plus' className='h-3.5 w-3.5' />
           Ingest Profile
         </Button>
       </PopoverTrigger>
@@ -66,7 +71,9 @@ export function IngestProfileDropdown({
                 type='text'
                 placeholder='https://instagram.com/username'
                 value={url}
-                onChange={e => setUrl(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setUrl(e.target.value)
+                }
                 disabled={isLoading}
                 autoFocus
                 className='w-full'

@@ -51,10 +51,21 @@ export function extractUsernameFromUrl(value: string): string | null {
     const first = segments[0] ?? '';
     const second = segments[1] ?? '';
 
+    // Common path segments that aren't usernames
+    const ignoredSegments = [
+      'artist',
+      'user',
+      'channel',
+      'c',
+      'profile',
+      'watch',
+    ];
+
     // Define allowed hostnames for each platform (no partials)
     const tiktokHosts = ['tiktok.com'];
     const snapchatHosts = ['snapchat.com'];
     const youtubeHosts = ['youtube.com'];
+    const spotifyHosts = ['spotify.com', 'open.spotify.com'];
 
     if (tiktokHosts.includes(host)) {
       const candidate = first.startsWith('@') ? first.slice(1) : first;
@@ -71,6 +82,20 @@ export function extractUsernameFromUrl(value: string): string | null {
 
     if (youtubeHosts.includes(host)) {
       if (first.startsWith('@')) return first.slice(1) || null;
+      return null;
+    }
+
+    // Spotify URLs: /artist/ID or /user/username
+    if (spotifyHosts.includes(host)) {
+      // Skip artist IDs, return null (no displayable username)
+      if (first === 'artist') return null;
+      // For user profiles, use the second segment
+      if (first === 'user' && second) return second;
+      return null;
+    }
+
+    // Filter out common ignored segments
+    if (ignoredSegments.includes(first.toLowerCase())) {
       return null;
     }
 

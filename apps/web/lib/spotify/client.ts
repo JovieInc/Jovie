@@ -6,15 +6,20 @@
  * - Rate limit handling
  * - Error mapping to IngestError types
  * - Data sanitization
+ * - Circuit breaker for fault tolerance
+ * - Retry logic with exponential backoff
  *
  * Security:
  * - Server-only module (cannot be imported in client code)
  * - Tokens are never exposed to client
  * - All responses are sanitized before return
+ * - Circuit breaker prevents cascading failures
  */
 
 import 'server-only';
+import * as Sentry from '@sentry/nextjs';
 import { type IngestErrorCode, spotifyApiError } from '@/lib/errors/ingest';
+import { spotifyCircuitBreaker } from './circuit-breaker';
 import {
   getSpotifyEnv,
   isSpotifyConfigured,
@@ -24,6 +29,7 @@ import {
   SPOTIFY_TOKEN_LIFETIME_MS,
   SPOTIFY_TOKEN_REFRESH_BUFFER_MS,
 } from './env';
+import { retryAsync, SPOTIFY_RETRY_CONFIG } from './retry';
 import {
   type RawSpotifyArtist,
   type SanitizedArtist,
@@ -63,6 +69,26 @@ export interface SearchArtistResult {
   imageUrl: string | null;
   followerCount: number;
   popularity: number;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create an AbortController with a timeout that auto-aborts.
+ * Returns both the controller and a cleanup function.
+ */
+function createAbortWithTimeout(timeoutMs: number): {
+  controller: AbortController;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    controller,
+    cleanup: () => clearTimeout(timeoutId),
+  };
 }
 
 // ============================================================================
@@ -168,11 +194,28 @@ class SpotifyClientManager {
 
   /**
    * Make an authenticated request to the Spotify API.
+   * Protected by circuit breaker and retry logic.
    */
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    // Check circuit breaker before attempting request
+    if (!spotifyCircuitBreaker.canExecute()) {
+      const stats = spotifyCircuitBreaker.getStats();
+      Sentry.captureMessage('Spotify circuit breaker is open', {
+        level: 'warning',
+        extra: { stats, endpoint },
+      });
+      throw spotifyApiError(
+        {
+          reason: 'Service temporarily unavailable',
+          circuitState: stats.state,
+        },
+        'SPOTIFY_UNAVAILABLE'
+      );
+    }
+
     const token = await this.getAccessToken();
 
     if (!token) {
@@ -186,33 +229,87 @@ class SpotifyClientManager {
       ? endpoint
       : `${SPOTIFY_API_BASE}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
-      signal: AbortSignal.timeout(SPOTIFY_DEFAULT_TIMEOUT_MS),
+    // Execute with circuit breaker and retry logic
+    return spotifyCircuitBreaker.execute(async () => {
+      return Sentry.startSpan(
+        { op: 'http.client', name: `Spotify API ${endpoint}` },
+        async span => {
+          span.setAttribute('spotify.endpoint', endpoint);
+
+          const result = await retryAsync(
+            () => this.executeRequest<T>(url, token, options, span),
+            SPOTIFY_RETRY_CONFIG
+          );
+
+          return result;
+        }
+      );
     });
+  }
 
-    // Handle error responses
-    if (!response.ok) {
-      const errorCode = this.mapStatusToErrorCode(response.status);
+  /**
+   * Execute a single HTTP request with timeout handling.
+   * Extracted to reduce nesting depth in the request method.
+   */
+  private async executeRequest<T>(
+    url: string,
+    token: string,
+    options: RequestInit,
+    span: { setAttribute: (key: string, value: string | number) => void }
+  ): Promise<T> {
+    const { controller, cleanup } = createAbortWithTimeout(
+      SPOTIFY_DEFAULT_TIMEOUT_MS
+    );
 
-      let errorDetails: unknown;
-      try {
-        errorDetails = (await response.json()) as SpotifyErrorResponse;
-      } catch {
-        errorDetails = {
-          status: response.status,
-          statusText: response.statusText,
-        };
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...options.headers,
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        return this.handleErrorResponse<T>(response, span);
       }
 
-      throw spotifyApiError(errorDetails, errorCode);
+      span.setAttribute('spotify.status', response.status);
+      return response.json() as Promise<T>;
+    } finally {
+      cleanup();
+    }
+  }
+
+  /**
+   * Handle error responses from Spotify API.
+   */
+  private async handleErrorResponse<T>(
+    response: Response,
+    span: { setAttribute: (key: string, value: string | number) => void }
+  ): Promise<T> {
+    const errorCode = this.mapStatusToErrorCode(response.status);
+    span.setAttribute('spotify.status', response.status);
+    span.setAttribute('spotify.error_code', errorCode);
+
+    let errorDetails: unknown;
+    try {
+      errorDetails = (await response.json()) as SpotifyErrorResponse;
+    } catch {
+      errorDetails = {
+        status: response.status,
+        statusText: response.statusText,
+      };
     }
 
-    return response.json() as Promise<T>;
+    const retryAfter = response.headers.get('Retry-After');
+    const error = spotifyApiError(errorDetails, errorCode);
+    if (retryAfter) {
+      Object.assign(error, { retryAfter: parseInt(retryAfter, 10) });
+    }
+
+    throw error;
   }
 
   /**

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries';
 import { creatorProfiles } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,7 +75,7 @@ export async function GET() {
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error('Unknown error');
     // Log full error details server-side for debugging
-    console.error('[health/auth] Error:', error);
+    logger.error('[health/auth] Error:', error);
     return NextResponse.json(
       { ok: false, error: error.message },
       { status: 500, headers: NO_STORE_HEADERS }

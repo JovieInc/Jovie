@@ -3,14 +3,22 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 import { fastRender } from '@/tests/utils/fast-render';
 
-// Mock the toast context
-const mockShowToast = vi.fn();
-vi.mock('@/components/molecules/ToastContainer', () => ({
-  useToast: () => ({
-    showToast: mockShowToast,
-    hideToast: vi.fn(),
-    clearToasts: vi.fn(),
-  }),
+// Mock Sonner toast with vi.hoisted for proper setup
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+  loading: vi.fn(),
+  dismiss: vi.fn(),
+  message: vi.fn(),
+  promise: vi.fn(),
+  custom: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: mockToast,
+  Toaster: () => null,
 }));
 
 // Mock analytics
@@ -53,11 +61,8 @@ describe('AvatarUpload - Error Handling', () => {
     fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
     await waitFor(() => {
-      expect(mockShowToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-          message: expect.stringContaining('Invalid file type'),
-        })
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid file type')
       );
     });
   });
@@ -80,11 +85,8 @@ describe('AvatarUpload - Error Handling', () => {
     fireEvent.change(fileInput, { target: { files: [largeFile] } });
 
     await waitFor(() => {
-      expect(mockShowToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-          message: expect.stringContaining('File too large'),
-        })
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining('File too large')
       );
     });
   });
@@ -111,12 +113,7 @@ describe('AvatarUpload - Error Handling', () => {
     fireEvent.change(fileInput, { target: { files: [validFile] } });
 
     await waitFor(() => {
-      expect(mockShowToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'success',
-          message: 'Profile photo updated successfully!',
-        })
-      );
+      expect(mockToast.success).toHaveBeenCalledWith('Profile photo updated');
     });
 
     expect(onUploadSuccess).toHaveBeenCalledWith('/new-avatar.jpg');
@@ -141,12 +138,7 @@ describe('AvatarUpload - Error Handling', () => {
     fireEvent.change(fileInput, { target: { files: [validFile] } });
 
     await waitFor(() => {
-      expect(mockShowToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-          message: 'Upload failed',
-        })
-      );
+      expect(mockToast.error).toHaveBeenCalledWith('Upload failed');
     });
   });
 
