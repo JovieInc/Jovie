@@ -140,6 +140,23 @@ export function useTableGrouping<T>({
       }))
     : [];
 
+  // Handle intersection entry for sticky header tracking
+  const handleIntersectionEntry = (
+    entry: IntersectionObserverEntry,
+    groups: GroupedData<T>[]
+  ) => {
+    if (!entry.isIntersecting || entry.boundingClientRect.top > 0) return;
+
+    // Use .dataset API instead of getAttribute for cleaner access
+    const key = (entry.target as HTMLElement).dataset.groupKey;
+    if (!key) return;
+
+    const index = groups.findIndex(g => g.key === key);
+    if (index !== -1) {
+      setVisibleGroupIndex(index);
+    }
+  };
+
   // Set up Intersection Observer for sticky header behavior
   useEffect(() => {
     if (!enabled || groupedData.length === 0) return;
@@ -149,19 +166,10 @@ export function useTableGrouping<T>({
       observerRef.current.disconnect();
     }
 
-    // Create new observer
+    // Create new observer with extracted handler to reduce nesting
     observerRef.current = new IntersectionObserver(
       entries => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting && entry.boundingClientRect.top <= 0) {
-            // Header is at the top - update visible index
-            const key = entry.target.getAttribute('data-group-key');
-            const index = groupedData.findIndex(g => g.key === key);
-            if (index !== -1) {
-              setVisibleGroupIndex(index);
-            }
-          }
-        });
+        entries.forEach(entry => handleIntersectionEntry(entry, groupedData));
       },
       {
         threshold: [0, 1],

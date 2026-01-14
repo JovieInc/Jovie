@@ -49,7 +49,8 @@ export function DashboardAnalyticsCards({
     if (typeof refreshSignal !== 'number') return;
     if (lastRefreshSignalRef.current === refreshSignal) return;
     lastRefreshSignalRef.current = refreshSignal;
-    void refetch();
+    // Fire-and-forget refetch - errors are handled by TanStack Query
+    refetch();
   }, [refetch, refreshSignal]);
 
   const rangeLabel = useMemo(() => {
