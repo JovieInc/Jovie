@@ -7,7 +7,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -17,11 +23,13 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
   apple_music: ['music.apple.com', 'itunes.apple.com'],
   spotify: ['open.spotify.com', 'spotify.com'],
-  youtube_music: ['music.youtube.com', 'youtube.com'],
+  youtube: ['music.youtube.com', 'youtube.com'],
   soundcloud: ['soundcloud.com'],
   deezer: ['deezer.com'],
   amazon_music: ['music.amazon.com', 'amazon.com'],
   tidal: ['tidal.com'],
+  bandcamp: ['bandcamp.com'],
+  beatport: ['beatport.com'],
 };
 
 interface ProviderConfig {
@@ -94,8 +102,9 @@ function AddProviderUrlPopover({
   const [url, setUrl] = useState('');
   const [validationError, setValidationError] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const isSavingRef = useRef(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
@@ -125,12 +134,16 @@ function AddProviderUrlPopover({
 
     // Clear validation error and proceed with save
     setValidationError('');
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       await onSave(trimmed);
       setUrl('');
       setOpen(false);
     } catch {
       // Error toast is shown by the hook; keep popover open so user can retry
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
@@ -249,7 +262,7 @@ export function ProviderCell({
   isAddingUrl,
 }: ProviderCellProps) {
   const [copiedTestId, setCopiedTestId] = useState<string | null>(null);
-  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {

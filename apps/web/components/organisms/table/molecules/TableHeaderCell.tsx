@@ -2,6 +2,7 @@
 
 import type { Header } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
+import { Icon } from '@/components/atoms/Icon';
 import { cn } from '../table.styles';
 
 interface TableHeaderCellProps<TData> {
@@ -10,7 +11,7 @@ interface TableHeaderCellProps<TData> {
   sortDirection: false | 'asc' | 'desc';
   stickyHeaderClass: string;
   tableHeaderClass: string;
-  onToggleSort?: () => void;
+  onToggleSort?: (event: unknown) => void;
 }
 
 /**
@@ -29,9 +30,20 @@ export function TableHeaderCell<TData>({
   tableHeaderClass,
   onToggleSort,
 }: TableHeaderCellProps<TData>) {
+  const ariaSort =
+    canSort && !header.isPlaceholder
+      ? sortDirection === 'asc'
+        ? 'ascending'
+        : sortDirection === 'desc'
+          ? 'descending'
+          : 'none'
+      : undefined;
+
   return (
     <th
       key={header.id}
+      scope='col'
+      aria-sort={ariaSort}
       className={cn(stickyHeaderClass)}
       style={{
         width: header.getSize() !== 150 ? header.getSize() : undefined,
@@ -42,34 +54,25 @@ export function TableHeaderCell<TData>({
           type='button'
           onClick={onToggleSort}
           className={cn(
-            'flex items-center gap-2 px-6 py-3 text-left w-full',
-            'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
+            tableHeaderClass,
+            'flex w-full items-center gap-2',
             'hover:bg-surface-2/50 transition-colors rounded-md',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
           )}
         >
           {flexRender(header.column.columnDef.header, header.getContext())}
           {sortDirection && (
-            <svg
-              width='12'
-              height='12'
-              viewBox='0 0 12 12'
-              fill='none'
+            <Icon
+              name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
               className='shrink-0'
               style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
-              aria-hidden='true'
-            >
-              <title>
-                {sortDirection === 'asc'
+              ariaLabel={
+                sortDirection === 'asc'
                   ? 'Sorted ascending'
-                  : 'Sorted descending'}
-              </title>
-              {sortDirection === 'asc' ? (
-                <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
-              ) : (
-                <path d='M6 9L3 5H9L6 9Z' fill='currentColor' />
-              )}
-            </svg>
+                  : 'Sorted descending'
+              }
+              size={12}
+            />
           )}
         </button>
       ) : (

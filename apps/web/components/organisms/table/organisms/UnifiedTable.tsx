@@ -15,11 +15,11 @@ import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import React, { useCallback, useMemo, useRef } from 'react';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
-import { TableHeaderCell } from '../molecules/TableHeaderCell';
 import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
+import { TableHeaderCell } from '../molecules/TableHeaderCell';
 import { cn, presets } from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
 
@@ -198,15 +198,6 @@ export function UnifiedTable<TData>({
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize grouping if config provided
-  const { groupedData, observeGroupHeader, visibleGroupIndex } =
-    useTableGrouping({
-      data,
-      getGroupKey: groupingConfig?.getGroupKey ?? (() => ''),
-      getGroupLabel: groupingConfig?.getGroupLabel ?? (key => key),
-      enabled: Boolean(groupingConfig),
-    });
-
   // Auto-enable virtualization for 20+ rows
   const shouldVirtualize =
     enableVirtualization ?? (data.length >= 20 && !isLoading);
@@ -228,6 +219,21 @@ export function UnifiedTable<TData>({
   });
 
   const { rows } = table.getRowModel();
+
+  const groupingEnabled = Boolean(groupingConfig);
+  const groupingSourceData = useMemo(
+    () => (groupingEnabled ? rows.map(r => r.original) : []),
+    [groupingEnabled, rows]
+  );
+
+  // Initialize grouping (uses TanStack-sorted row order)
+  const { groupedData, observeGroupHeader, visibleGroupIndex } =
+    useTableGrouping({
+      data: groupingSourceData,
+      getGroupKey: groupingConfig?.getGroupKey ?? (() => ''),
+      getGroupLabel: groupingConfig?.getGroupLabel ?? (key => key),
+      enabled: groupingEnabled,
+    });
 
   // Initialize virtualizer
   const rowVirtualizer = useVirtualizer({
@@ -271,21 +277,15 @@ export function UnifiedTable<TData>({
           <thead>
             <tr>
               {table.getHeaderGroups()[0]?.headers.map(header => (
-                <th
+                <TableHeaderCell
                   key={header.id}
-                  className={cn(presets.stickyHeader, presets.tableHeader)}
-                  style={{
-                    width:
-                      header.getSize() !== 150 ? header.getSize() : undefined,
-                  }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </th>
+                  header={header}
+                  canSort={header.column.getCanSort()}
+                  sortDirection={header.column.getIsSorted()}
+                  stickyHeaderClass={presets.stickyHeader}
+                  tableHeaderClass={presets.tableHeader}
+                  onToggleSort={header.column.getToggleSortingHandler()}
+                />
               ))}
             </tr>
           </thead>
@@ -380,10 +380,12 @@ export function UnifiedTable<TData>({
           {(() => {
             // Build row lookup map once for O(1) lookups: O(n)
             const rowMap = new Map(
-              table.getRowModel().rows.map(r => [
-                getRowId ? getRowId(r.original) : r.original,
-                r,
-              ])
+              table
+                .getRowModel()
+                .rows.map(r => [
+                  getRowId ? getRowId(r.original) : r.original,
+                  r,
+                ])
             );
 
             return (
@@ -396,51 +398,51 @@ export function UnifiedTable<TData>({
                   const row = rowMap.get(getRowId ? getRowId(item) : item);
                   if (!row) return null;
 
-              const rowData = row.original as TData;
+                  const rowData = row.original as TData;
 
-              // Build row element
-              const rowElement = (
-                <tr
-                  key={row.id}
-                  className={cn(
-                    presets.tableRow,
-                    onRowClick && 'cursor-pointer',
-                    getRowClassName?.(rowData, index)
-                  )}
-                  onClick={() => onRowClick?.(rowData)}
-                  onContextMenu={e => onRowContextMenu?.(rowData, e)}
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <td
-                      key={cell.id}
-                      className={presets.tableCell}
-                      style={{
-                        width:
-                          cell.column.getSize() !== 150
-                            ? cell.column.getSize()
-                            : undefined,
-                      }}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
+                  // Build row element
+                  const rowElement = (
+                    <tr
+                      key={row.id}
+                      className={cn(
+                        presets.tableRow,
+                        onRowClick && 'cursor-pointer',
+                        getRowClassName?.(rowData, index)
                       )}
-                    </td>
-                  ))}
-                </tr>
-              );
+                      onClick={() => onRowClick?.(rowData)}
+                      onContextMenu={e => onRowContextMenu?.(rowData, e)}
+                    >
+                      {row.getVisibleCells().map(cell => (
+                        <td
+                          key={cell.id}
+                          className={presets.tableCell}
+                          style={{
+                            width:
+                              cell.column.getSize() !== 150
+                                ? cell.column.getSize()
+                                : undefined,
+                          }}
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  );
 
-              // Wrap with context menu if provided
-              if (getContextMenuItems) {
-                const contextMenuItems = getContextMenuItems(rowData);
-                return (
-                  <TableContextMenu key={row.id} items={contextMenuItems}>
-                    {rowElement}
-                  </TableContextMenu>
-                );
-              }
+                  // Wrap with context menu if provided
+                  if (getContextMenuItems) {
+                    const contextMenuItems = getContextMenuItems(rowData);
+                    return (
+                      <TableContextMenu key={row.id} items={contextMenuItems}>
+                        {rowElement}
+                      </TableContextMenu>
+                    );
+                  }
 
-              return rowElement;
+                  return rowElement;
                 }}
               />
             );
