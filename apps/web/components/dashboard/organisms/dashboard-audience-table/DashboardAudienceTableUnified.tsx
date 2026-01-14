@@ -18,7 +18,7 @@ import {
   AudienceVisitsCell,
 } from '@/components/dashboard/audience/table/atoms';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';

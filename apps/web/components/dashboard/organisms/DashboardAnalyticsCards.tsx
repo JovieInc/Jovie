@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import type { AnalyticsRange } from '@/types/analytics';

@@ -4,9 +4,9 @@ import { Button, type ButtonProps } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
-import { LoadingSpinner } from './LoadingSpinner';
 
 export interface CTAButtonProps extends Omit<ButtonProps, 'loading' | 'size'> {
   href?: string;
