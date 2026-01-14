@@ -59,6 +59,10 @@ vi.mock('react', async () => {
 
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
   startSpan: startSpanMock,
 }));
 

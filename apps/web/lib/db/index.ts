@@ -10,6 +10,7 @@ import {
   startDevMemoryMonitor,
 } from '@/lib/utils/dev-cleanup';
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
+import { buildDbHealthChecker } from './health';
 import * as schema from './schema';
 
 export { and, eq } from 'drizzle-orm';
@@ -464,82 +465,30 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
 /**
  * Comprehensive health check function for database connectivity
  */
-export async function checkDbHealth(): Promise<{
-  healthy: boolean;
-  latency?: number;
-  error?: string;
-  details?: {
-    connection: boolean;
-    query: boolean;
-    transaction: boolean;
-    schemaAccess: boolean;
-  };
-}> {
-  const startTime = Date.now();
-  const details = {
-    connection: false,
-    query: false,
-    transaction: false,
-    schemaAccess: false,
-  };
-
-  try {
-    await withRetry(async () => {
-      if (!_db) {
-        _db = initializeDb();
-      }
-      // Capture in local const for type narrowing in nested callbacks
-      const database = _db;
-
-      // 1. Basic connection test
-      await database.execute(drizzleSql`SELECT 1 as health_check`);
-      details.connection = true;
-
-      // 2. Query test with current timestamp
-      await database.execute(drizzleSql`SELECT NOW() as current_time`);
-      details.query = true;
-
-      // 3. Transaction test
-      await database.transaction(async tx => {
-        await tx.execute(drizzleSql`SELECT 'transaction_test' as test`);
-      });
-      details.transaction = true;
-
-      // 4. Schema access test (try to query a table if it exists)
-      try {
-        await database.execute(
-          drizzleSql`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = ${TABLE_NAMES.creatorProfiles}) as table_exists`
-        );
-        details.schemaAccess = true;
-      } catch {
-        // Schema access might fail if tables don't exist yet, but connection is still healthy
-        logDbInfo(
-          'healthCheck',
-          'Schema access test failed (tables may not exist)',
-          {}
-        );
-      }
-    }, 'healthCheck');
-
-    const latency = Date.now() - startTime;
-    logDbInfo('healthCheck', 'Database health check passed', {
-      latency,
-      details,
-    });
-
-    return { healthy: true, latency, details };
-  } catch (error) {
-    const latency = Date.now() - startTime;
-    logDbError('healthCheck', error, { latency, details });
-
-    return {
-      healthy: false,
-      latency,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      details,
-    };
+const getDbForHealthCheck = () => {
+  if (!_db) {
+    _db = initializeDb();
   }
-}
+  return _db;
+};
+
+const getPoolState = () =>
+  _pool
+    ? {
+        totalCount: _pool.totalCount,
+        idleCount: _pool.idleCount,
+        waitingCount: _pool.waitingCount,
+      }
+    : null;
+
+export const checkDbHealth = buildDbHealthChecker({
+  getDb: getDbForHealthCheck,
+  getPoolState,
+  logDbInfo,
+  logDbError,
+  tableNames: TABLE_NAMES,
+  withRetry,
+});
 
 /**
  * Lightweight connection validation for startup

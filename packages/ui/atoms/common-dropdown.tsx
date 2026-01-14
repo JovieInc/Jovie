@@ -312,7 +312,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     itemsToRender: CommonDropdownItem[],
     isContextMenu: boolean
   ): React.ReactNode {
-    return itemsToRender.map((item, index) => {
+    return itemsToRender.map(item => {
       // Separator
       if (isSeparator(item)) {
         const Separator = isContextMenu
@@ -321,7 +321,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
 
         return (
           <Separator
-            key={`separator-${index}`}
+            key={item.id}
             className={cn(
               '-mx-1 my-1 h-px bg-[var(--color-border-subtle)]/70',
               item.className

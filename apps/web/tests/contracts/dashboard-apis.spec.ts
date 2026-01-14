@@ -256,6 +256,7 @@ describe('Dashboard API contracts', () => {
     it('validates audience members requests and returns normalized payloads', async () => {
       const tx = {
         select: createSelectQueue([
+          [{ id: PROFILE_ID }],
           [
             {
               id: 'member_1',
@@ -312,6 +313,7 @@ describe('Dashboard API contracts', () => {
     it('paginates subscribers with contract-safe response', async () => {
       const tx = {
         select: createSelectQueue([
+          [{ id: PROFILE_ID }],
           [
             {
               id: 'sub_1',
