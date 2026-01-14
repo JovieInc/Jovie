@@ -19,6 +19,7 @@ import {
   recalculateAllFitScores,
 } from '@/lib/fit-scoring';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -96,7 +97,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Admin fit scores GET failed:', error);
+    logger.error('Admin fit scores GET failed:', error);
     return NextResponse.json(
       {
         error: 'Failed to fetch fit scores',
@@ -204,7 +205,7 @@ export async function POST(request: Request) {
         );
     }
   } catch (error) {
-    console.error('Admin fit scores POST failed:', error);
+    logger.error('Admin fit scores POST failed:', error);
     return NextResponse.json(
       {
         error: 'Failed to process fit scores action',

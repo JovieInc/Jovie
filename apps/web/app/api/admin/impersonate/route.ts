@@ -11,6 +11,7 @@ import {
   startImpersonation,
 } from '@/lib/admin/impersonation';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 
 const StartImpersonationSchema = z.object({
   targetClerkId: z.string().min(1, 'Target user ID is required'),
@@ -59,7 +60,7 @@ export async function GET() {
       timeRemainingMinutes: Math.floor(timeRemaining / 60000),
     });
   } catch (error) {
-    console.error(
+    logger.error(
       '[admin/impersonate] Failed to get impersonation status:',
       error
     );
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    console.log(
+    logger.info(
       `[admin/impersonate] Impersonation started: admin=${adminClerkId} target=${targetClerkId}`
     );
 
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
       expiresInMinutes: 15,
     });
   } catch (error) {
-    console.error('[admin/impersonate] Failed to start impersonation:', error);
+    logger.error('[admin/impersonate] Failed to start impersonation:', error);
     await captureCriticalError('Failed to start impersonation', error, {
       route: '/api/admin/impersonate',
       method: 'POST',
@@ -182,14 +183,14 @@ export async function DELETE() {
       );
     }
 
-    console.log('[admin/impersonate] Impersonation session ended');
+    logger.info('[admin/impersonate] Impersonation session ended');
 
     return NextResponse.json({
       success: true,
       message: 'Impersonation session ended',
     });
   } catch (error) {
-    console.error('[admin/impersonate] Failed to end impersonation:', error);
+    logger.error('[admin/impersonate] Failed to end impersonation:', error);
     await captureCriticalError('Failed to end impersonation', error, {
       route: '/api/admin/impersonate',
       method: 'DELETE',

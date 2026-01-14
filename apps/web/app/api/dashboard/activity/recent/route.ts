@@ -8,6 +8,7 @@ import {
   clickEvents,
   notificationSubscriptions,
 } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 import { recentActivityQuerySchema } from '@/lib/validation/schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -260,7 +261,7 @@ export async function GET(request: NextRequest) {
       );
     });
   } catch (error) {
-    console.error('[Dashboard Activity] Error loading recent actions', error);
+    logger.error('[Dashboard Activity] Error loading recent actions', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

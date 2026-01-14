@@ -11,6 +11,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max for cleanup
@@ -41,21 +42,21 @@ export async function GET(request: NextRequest) {
   const cronSecret = authHeader?.replace('Bearer ', '');
 
   if (!process.env.CRON_SECRET) {
-    console.error('[Data Retention Cron] CRON_SECRET not configured');
+    logger.error('[Data Retention Cron] CRON_SECRET not configured');
     return NextResponse.json({ error: 'Cron not configured' }, { status: 500 });
   }
 
   if (!verifyCronSecret(cronSecret)) {
-    console.warn('[Data Retention Cron] Unauthorized access attempt');
+    logger.warn('[Data Retention Cron] Unauthorized access attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    console.log('[Data Retention Cron] Starting scheduled cleanup');
+    logger.info('[Data Retention Cron] Starting scheduled cleanup');
 
     const result = await runDataRetentionCleanup();
 
-    console.log('[Data Retention Cron] Cleanup completed successfully', {
+    logger.info('[Data Retention Cron] Cleanup completed successfully', {
       clickEventsDeleted: result.clickEventsDeleted,
       audienceMembersDeleted: result.audienceMembersDeleted,
       notificationSubscriptionsDeleted: result.notificationSubscriptionsDeleted,
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[Data Retention Cron] Cleanup failed', error);
+    logger.error('[Data Retention Cron] Cleanup failed', error);
     return NextResponse.json(
       { error: 'Cleanup failed', message: (error as Error).message },
       { status: 500 }

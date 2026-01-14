@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { notificationSubscriptions } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 import { subscribersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
       );
     }
 
-    console.error('Error fetching notification subscribers', error);
+    logger.error('Error fetching notification subscribers', error);
     return NextResponse.json(
       { error: 'Failed to load subscribers' },
       { status: 500, headers: NO_STORE_HEADERS }

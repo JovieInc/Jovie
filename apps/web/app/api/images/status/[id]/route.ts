@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { and, db, eq, profilePhotos } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'edge';
 
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Photo status check error:', error);
+    logger.error('Photo status check error:', error);
     return NextResponse.json(
       { error: 'Failed to check status' },
       { status: 500, headers: NO_STORE_HEADERS }

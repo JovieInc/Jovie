@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
 
 /**
@@ -73,14 +74,14 @@ export async function POST(request: Request) {
         userAgent
       );
     } catch (syncError) {
-      console.warn(
+      logger.warn(
         '[admin/roles] Failed to sync admin role to Clerk:',
         syncError
       );
       // Continue - Clerk sync is best-effort
     }
 
-    console.log(
+    logger.info(
       `[admin/roles] Admin role granted to user ${targetUserId} by ${currentAdminId}`
     );
 
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error('[admin/roles] Failed to grant admin role:', error);
+    logger.error('[admin/roles] Failed to grant admin role:', error);
     await captureCriticalError('Failed to grant admin role', error, {
       route: '/api/admin/roles',
       action: 'grant',
@@ -175,14 +176,14 @@ export async function DELETE(request: Request) {
         userAgent
       );
     } catch (syncError) {
-      console.warn(
+      logger.warn(
         '[admin/roles] Failed to sync admin role revocation to Clerk:',
         syncError
       );
       // Continue - Clerk sync is best-effort
     }
 
-    console.log(
+    logger.info(
       `[admin/roles] Admin role revoked from user ${targetUserId} by ${currentAdminId}`
     );
 
@@ -196,7 +197,7 @@ export async function DELETE(request: Request) {
       },
     });
   } catch (error) {
-    console.error('[admin/roles] Failed to revoke admin role:', error);
+    logger.error('[admin/roles] Failed to revoke admin role:', error);
     await captureCriticalError('Failed to revoke admin role', error, {
       route: '/api/admin/roles',
       action: 'revoke',

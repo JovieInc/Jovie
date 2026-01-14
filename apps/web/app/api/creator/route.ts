@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -76,7 +77,7 @@ export async function GET(
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Error fetching creator profile:', error);
+    logger.error('Error fetching creator profile:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500, headers: NO_STORE_HEADERS }

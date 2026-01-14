@@ -12,6 +12,7 @@ import {
   syncCanonicalUsernameFromApp,
   UsernameValidationError,
 } from '@/lib/username/sync';
+import { logger } from '@/lib/utils/logger';
 import { profileUpdateSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -74,7 +75,7 @@ export async function GET() {
       );
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    logger.error('Error fetching profile:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -328,7 +329,7 @@ export async function PUT(req: Request) {
         }
       } catch (error) {
         clerkSyncFailed = true;
-        console.error('Failed to sync profile updates with Clerk:', {
+        logger.error('Failed to sync profile updates with Clerk:', {
           error: error instanceof Error ? error.message : error,
           userId: clerkUserId,
           hasAvatarUrl: !!avatarUrl,
@@ -375,7 +376,7 @@ export async function PUT(req: Request) {
         'dashboard_profile_updated',
         undefined,
         clerkUserId
-      ).catch(error => console.warn('Analytics tracking failed:', error));
+      ).catch(error => logger.warn('Analytics tracking failed:', error));
 
       // Add cache-busting query parameter to avatar URL if present
       const responseProfile = { ...updatedProfile };
@@ -396,7 +397,7 @@ export async function PUT(req: Request) {
       );
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
+    logger.error('Error updating profile:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

@@ -6,6 +6,7 @@ import { invalidateSocialLinksCache } from '@/lib/cache';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
 export const runtime = 'nodejs';
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Admin creator social links error:', error);
+    logger.error('Admin creator social links error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to load social links' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -249,7 +250,7 @@ export async function PUT(request: NextRequest) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Admin creator social links PUT error:', error);
+    logger.error('Admin creator social links PUT error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to save social links' },
       { status: 500, headers: NO_STORE_HEADERS }

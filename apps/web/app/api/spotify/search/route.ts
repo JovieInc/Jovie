@@ -4,6 +4,7 @@ import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
+import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 
 // API routes should be dynamic
@@ -237,7 +238,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (vipError) {
       // VIP lookup failure should not break search - log and continue
-      console.warn('[Spotify Search] VIP lookup failed:', vipError);
+      logger.warn('[Spotify Search] VIP lookup failed:', vipError);
     }
 
     // Cache the results
@@ -287,7 +288,7 @@ export async function GET(request: NextRequest) {
       extra: { query: q, limit },
     });
 
-    console.error('[Spotify Search] Search failed:', {
+    logger.error('[Spotify Search] Search failed:', {
       query: q,
       limit,
       error: error instanceof Error ? error.message : String(error),
