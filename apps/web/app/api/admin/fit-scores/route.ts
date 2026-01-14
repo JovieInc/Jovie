@@ -71,11 +71,11 @@ export async function GET(request: Request) {
     // Default: return top fit profiles
     const limit = Math.min(
       200,
-      Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10) || 50)
+      Math.max(1, Number.parseInt(searchParams.get('limit') ?? '50', 10) || 50)
     );
     const minScore = Math.max(
       0,
-      parseInt(searchParams.get('minScore') ?? '0', 10) || 0
+      Number.parseInt(searchParams.get('minScore') ?? '0', 10) || 0
     );
 
     const profiles = await getTopFitProfiles(db, limit, minScore);
