@@ -152,7 +152,7 @@ export function useContactSidebar({
   );
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
+    (event: React.KeyboardEvent<HTMLElement>) => {
       if (event.key === 'Escape' && !isFormElement(event.target)) {
         onClose?.();
       }
