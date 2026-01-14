@@ -39,7 +39,7 @@ export interface ExportCSVButtonProps<T extends object> {
   className?: string;
   /**
    * Button variant.
-   * @default 'secondary'
+   * @default 'outline'
    */
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   /**
@@ -88,7 +88,7 @@ export function ExportCSVButton<T extends object>({
   filename = 'export',
   disabled = false,
   className,
-  variant = 'secondary',
+  variant = 'outline',
   size = 'sm',
   label = 'Export CSV',
   ariaLabel = 'Export data to CSV file',
@@ -144,7 +144,7 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleExport}
       disabled={disabled || isExporting}
-      className={cn('gap-2 rounded-lg hover:bg-base', className)}
+      className={cn('gap-3 rounded-lg border-subtle hover:bg-base', className)}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >

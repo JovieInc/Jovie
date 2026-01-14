@@ -239,7 +239,7 @@ export function AdminCreatorProfilesUnified({
           id: 'refresh-ingest',
           label: 'Refresh ingest',
           icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => refreshIngest(profile.id),
+          onClick: () => void refreshIngest(profile.id),
           disabled: refreshIngestStatus === 'loading',
         });
         items.push({ type: 'separator' as const });
@@ -252,26 +252,30 @@ export function AdminCreatorProfilesUnified({
               id: 'unverify',
               label: 'Unverify creator',
               icon: <XCircle className='h-3.5 w-3.5' />,
-              onClick: async () => {
-                const result = await toggleVerification(profile.id, false);
-                if (!result.success) {
-                  toast.error('Failed to unverify creator');
-                } else {
-                  toast.success('Creator unverified');
-                }
+              onClick: () => {
+                void (async () => {
+                  const result = await toggleVerification(profile.id, false);
+                  if (!result.success) {
+                    toast.error('Failed to unverify creator');
+                  } else {
+                    toast.success('Creator unverified');
+                  }
+                })();
               },
             }
           : {
               id: 'verify',
               label: 'Verify creator',
               icon: <CheckCircle className='h-3.5 w-3.5' />,
-              onClick: async () => {
-                const result = await toggleVerification(profile.id, true);
-                if (!result.success) {
-                  toast.error('Failed to verify creator');
-                } else {
-                  toast.success('Creator verified');
-                }
+              onClick: () => {
+                void (async () => {
+                  const result = await toggleVerification(profile.id, true);
+                  if (!result.success) {
+                    toast.error('Failed to verify creator');
+                  } else {
+                    toast.success('Creator verified');
+                  }
+                })();
               },
             }
       );
@@ -281,17 +285,22 @@ export function AdminCreatorProfilesUnified({
         id: 'feature',
         label: profile.isFeatured ? 'Unfeature' : 'Feature',
         icon: <Star className='h-3.5 w-3.5' />,
-        onClick: async () => {
-          const result = await toggleFeatured(profile.id, !profile.isFeatured);
-          if (!result.success) {
-            toast.error(
-              `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`
+        onClick: () => {
+          void (async () => {
+            const result = await toggleFeatured(
+              profile.id,
+              !profile.isFeatured
             );
-          } else {
-            toast.success(
-              `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`
-            );
-          }
+            if (!result.success) {
+              toast.error(
+                `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`
+              );
+            } else {
+              toast.success(
+                `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`
+              );
+            }
+          })();
         },
       });
 
@@ -304,14 +313,16 @@ export function AdminCreatorProfilesUnified({
           ? 'Enable marketing emails'
           : 'Disable marketing emails',
         icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: async () => {
-          const result = await toggleMarketing(
-            profile.id,
-            !profile.marketingOptOut
-          );
-          if (!result.success) {
-            toast.error('Failed to toggle marketing');
-          }
+        onClick: () => {
+          void (async () => {
+            const result = await toggleMarketing(
+              profile.id,
+              !profile.marketingOptOut
+            );
+            if (!result.success) {
+              toast.error('Failed to toggle marketing');
+            }
+          })();
         },
       });
 

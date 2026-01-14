@@ -2,31 +2,50 @@
  * Unified Table System
  *
  * A comprehensive table component system with:
+ * - TanStack Table integration for powerful table features
+ * - TanStack Virtual for performance with large datasets
  * - Keyboard navigation (arrow keys, spacebar, enter)
- * - Virtualization for large datasets
+ * - Virtualization for large datasets (auto-enabled for 20+ rows)
  * - Sorting and pagination
  * - Bulk actions and row selection
  * - Search functionality
+ * - Context menus
+ * - Loading skeletons
  * - Responsive design with mobile breakpoints
  * - Accessibility (ARIA roles, screen reader support)
  *
  * @example
  * ```tsx
- * import { Table } from '@/components/organisms/table';
+ * // Modern approach with UnifiedTable (recommended)
+ * import { UnifiedTable } from '@/components/organisms/table';
  *
- * <Table
- *   data={rows}
+ * const columns: ColumnDef<User>[] = [
+ *   { accessorKey: 'name', header: 'Name' },
+ *   { accessorKey: 'email', header: 'Email' },
+ * ];
+ *
+ * <UnifiedTable
+ *   data={users}
  *   columns={columns}
- *   getRowId={(row) => row.id}
- *   selectable
- *   searchable
- *   pagination={paginationConfig}
+ *   isLoading={isLoading}
+ *   rowSelection={rowSelection}
+ *   onRowSelectionChange={setRowSelection}
  * />
  * ```
  */
 
-export type { TableCellProps } from './atoms/TableCell';
+// =============================================================================
 // Atoms
+// =============================================================================
+
+export { ActionsCell } from './atoms/ActionsCell';
+export { AvatarCell } from './atoms/AvatarCell';
+export { DateCell } from './atoms/DateCell';
+export { GroupHeader } from './atoms/GroupHeader';
+export { SkeletonCell } from './atoms/SkeletonCell';
+export { SkeletonRow } from './atoms/SkeletonRow';
+export { TableBadge } from './atoms/TableBadge';
+export type { TableCellProps } from './atoms/TableCell';
 export { TableCell } from './atoms/TableCell';
 export type { TableCheckboxCellProps } from './atoms/TableCheckboxCell';
 export { TableCheckboxCell } from './atoms/TableCheckboxCell';
@@ -34,21 +53,56 @@ export type { TableEmptyStateProps } from './atoms/TableEmptyState';
 export { TableEmptyState } from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
 export { TableHeaderCell } from './atoms/TableHeaderCell';
+export { TableIconButton } from './atoms/TableIconButton';
 export type { TableRowProps } from './atoms/TableRow';
 export { TableRow } from './atoms/TableRow';
-export { useRowSelection } from './hooks/useRowSelection';
-export type {
-  UseTableKeyboardNavProps,
-  UseTableKeyboardNavReturn,
-} from './hooks/useTableKeyboardNav';
-// Hooks
-export { useTableKeyboardNav } from './hooks/useTableKeyboardNav';
+
+// =============================================================================
+// Molecules
+// =============================================================================
+
+export { ContextMenuSubmenu } from './molecules/ContextMenuSubmenu';
+export { DisplayMenuDropdown } from './molecules/DisplayMenuDropdown';
+export type { ExportCSVButtonProps } from './molecules/ExportCSVButton';
+export { ExportCSVButton } from './molecules/ExportCSVButton';
+export { GroupedTableBody } from './molecules/GroupedTableBody';
+export { LoadingTableBody } from './molecules/LoadingTableBody';
+export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
+export { SocialLinksCell } from './molecules/SocialLinksCell';
 export type { BulkAction } from './molecules/TableBulkActionsToolbar';
 export { TableBulkActionsToolbar } from './molecules/TableBulkActionsToolbar';
+export { TableContextMenu } from './molecules/TableContextMenu';
 export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
-// Molecules
 export { TableHeaderRow } from './molecules/TableHeaderRow';
 export type { TablePaginationFooterProps } from './molecules/TablePaginationFooter';
 export { TablePaginationFooter } from './molecules/TablePaginationFooter';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
+
+// =============================================================================
+// Organisms
+// =============================================================================
+
+export type { UnifiedTableProps } from './organisms/UnifiedTable';
+export { UnifiedTable } from './organisms/UnifiedTable';
+
+// =============================================================================
+// Hooks
+// =============================================================================
+
+export type {
+  HeaderCheckboxState,
+  UseRowSelectionResult,
+} from './hooks/useRowSelection';
+export { useRowSelection } from './hooks/useRowSelection';
+export type {
+  UseTableKeyboardNavProps,
+  UseTableKeyboardNavReturn,
+} from './hooks/useTableKeyboardNav';
+export { useTableKeyboardNav } from './hooks/useTableKeyboardNav';
+
+// =============================================================================
+// Utilities & Styles
+// =============================================================================
+
+export { cn, presets } from './table.styles';
