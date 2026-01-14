@@ -5,7 +5,7 @@
  * Uses shared validation core for consistency with server-side validation.
  */
 
-import { debounce as pacerDebounce } from '@tanstack/react-pacer';
+import { debounce as utilsDebounce } from '@/lib/utils';
 import {
   type DetailedValidationResult,
   generateUsernameSuggestions as generateSuggestions,
@@ -62,21 +62,8 @@ export const generateUsernameSuggestions = generateSuggestions;
 
 /**
  * Debounce utility for API calls.
- * Use this to debounce availability checks against the server.
+ * Re-exported from @/lib/utils for backwards compatibility.
  *
- * Creates a debounced function that delays invoking `func` until after `wait`
- * milliseconds have elapsed since the last time the debounced function was invoked.
- *
- * Now powered by TanStack Pacer for world-class debouncing.
  * @see https://tanstack.com/pacer
- *
- * @param func - The function to debounce
- * @param wait - The number of milliseconds to delay
- * @returns A debounced function
  */
-export function debounce<T extends (...args: Parameters<T>) => unknown>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  return pacerDebounce(func, { wait });
-}
+export const debounce = utilsDebounce;
