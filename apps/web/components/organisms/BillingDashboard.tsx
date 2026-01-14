@@ -68,7 +68,7 @@ export function BillingDashboard() {
         title='Billing is temporarily unavailable'
         description={errorMessage}
         actions={[
-          { label: 'Retry', onClick: refresh },
+          { label: 'Retry', onClick: () => void refresh() },
           { label: 'Contact support', href: '/support' },
         ]}
         testId='billing-error-state'

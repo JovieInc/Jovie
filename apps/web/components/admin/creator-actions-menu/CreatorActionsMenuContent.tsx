@@ -64,7 +64,7 @@ export function CreatorActionsMenuContent({
       {onRefreshIngest ? (
         <>
           {renderItem({
-            onClick: onRefreshIngest,
+            onClick: () => void onRefreshIngest?.(),
             disabled: isLoading,
             children: (
               <>
@@ -77,7 +77,7 @@ export function CreatorActionsMenuContent({
         </>
       ) : null}
       {renderItem({
-        onClick: onToggleVerification,
+        onClick: () => void onToggleVerification?.(),
         children: profile.isVerified ? (
           <>
             <X className='h-4 w-4' />
@@ -92,7 +92,7 @@ export function CreatorActionsMenuContent({
       })}
 
       {renderItem({
-        onClick: onToggleFeatured,
+        onClick: () => void onToggleFeatured?.(),
         children: (
           <>
             <Star
@@ -109,7 +109,7 @@ export function CreatorActionsMenuContent({
       {renderSeparator()}
 
       {renderItem({
-        onClick: onToggleMarketing,
+        onClick: () => void onToggleMarketing?.(),
         children: profile.marketingOptOut ? (
           <>
             <Mail className='h-4 w-4' />
@@ -136,7 +136,7 @@ export function CreatorActionsMenuContent({
       {!profile.isClaimed && profile.claimToken && (
         <>
           {renderItem({
-            onClick: onCopyClaimLink,
+            onClick: () => void onCopyClaimLink(),
             children: (
               <>
                 <Copy className='h-4 w-4' />

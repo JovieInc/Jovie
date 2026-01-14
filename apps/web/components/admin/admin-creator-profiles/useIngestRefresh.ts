@@ -59,7 +59,7 @@ export function useIngestRefresh({
         router.refresh();
 
         if (selectedId === profileId && onRefreshComplete) {
-          onRefreshComplete(profileId);
+          void onRefreshComplete(profileId);
         }
       } catch (error) {
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));

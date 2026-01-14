@@ -175,7 +175,7 @@ export function DashboardAnalyticsCards({
                 profileUrl
                   ? {
                       label: copied ? 'Copied!' : 'Copy profile link',
-                      onClick: handleCopy,
+                      onClick: () => void handleCopy(),
                     }
                   : {
                       label: 'Open profile settings',
