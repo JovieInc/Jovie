@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { APP_URL } from '@/constants/app';
+import { PROFILE_URL } from '@/constants/app';
 import { ClaimHandleStyles } from './ClaimHandleStyles';
 import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
@@ -21,7 +21,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const displayDomain = APP_URL.replace(/^https?:\/\//, '');
+  const displayDomain = PROFILE_URL.replace(/^https?:\/\//, '');
 
   const [handle, setHandle] = useState('');
   const [navigating, setNavigating] = useState(false);

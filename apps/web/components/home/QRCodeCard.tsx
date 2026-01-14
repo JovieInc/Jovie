@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { APP_URL } from '@/constants/app';
+import { PROFILE_URL } from '@/constants/app';
 
 interface QRCodeCardProps {
   handle: string;
@@ -13,7 +13,7 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const profileUrl = `${APP_URL}/${effectiveHandle}`;
+  const profileUrl = `${PROFILE_URL}/${effectiveHandle}`;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

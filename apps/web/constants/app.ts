@@ -1,4 +1,3 @@
-import { publicEnv } from '@/lib/env-public';
 import {
   APP_URL as DOMAINS_APP_URL,
   MARKETING_URL,
@@ -8,9 +7,17 @@ import {
 export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
 
-// Legacy APP_URL export - now points to profile domain for backward compatibility
-// Use constants/domains.ts for explicit domain references
-export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL ?? PROFILE_URL;
+/**
+ * APP_URL - The app/dashboard domain (meetjovie.com)
+ * Use this for:
+ * - Dashboard/app routes
+ * - Marketing pages
+ * - Auth-related URLs
+ * - Email links to app features
+ *
+ * For profile URLs (jov.ie), use PROFILE_URL instead.
+ */
+export const APP_URL = DOMAINS_APP_URL;
 
 // Re-export domain URLs for convenience
 export { PROFILE_URL, MARKETING_URL, DOMAINS_APP_URL as DASHBOARD_URL };
