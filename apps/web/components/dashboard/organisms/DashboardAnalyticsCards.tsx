@@ -13,6 +13,9 @@ import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
 type CityRange = Extract<AnalyticsRange, '7d' | '30d' | '90d'>;
 
+// Clipboard feedback delay in milliseconds
+const CLIPBOARD_FEEDBACK_DELAY_MS = 1500;
+
 interface DashboardAnalyticsCardsProps {
   profileUrl?: string;
   range?: CityRange;
@@ -148,7 +151,7 @@ export function DashboardAnalyticsCards({
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
       notifications.success('Copied to clipboard', { duration: 2000 });
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), CLIPBOARD_FEEDBACK_DELAY_MS);
     } catch (e) {
       console.error('Copy failed', e);
       notifications.error('Failed to copy');
