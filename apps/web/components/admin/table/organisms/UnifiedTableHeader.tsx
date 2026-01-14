@@ -25,9 +25,6 @@ const renderSortIcon = (sortDirection: false | 'asc' | 'desc') => {
       style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
       aria-hidden='true'
     >
-      <title>
-        {sortDirection === 'asc' ? 'Sorted ascending' : 'Sorted descending'}
-      </title>
       {sortDirection === 'asc' ? (
         <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
       ) : (
@@ -89,20 +86,36 @@ export function UnifiedTableHeader<TData>({
     <thead>
       {groupsToRender.map(headerGroup => (
         <tr key={headerGroup.id}>
-          {headerGroup.headers.map(header => (
-            <th
-              key={header.id}
-              className={cn(
-                presets.stickyHeader,
-                variant === 'loading' && presets.tableHeader
-              )}
-              style={{
-                width: header.getSize() !== 150 ? header.getSize() : undefined,
-              }}
-            >
-              {renderHeaderCell(header, variant)}
-            </th>
-          ))}
+          {headerGroup.headers.map(header => {
+            const canSort =
+              variant === 'standard' && header.column.getCanSort();
+            const sortDirection = canSort ? header.column.getIsSorted() : false;
+
+            const ariaSort = canSort
+              ? sortDirection === 'asc'
+                ? 'ascending'
+                : sortDirection === 'desc'
+                  ? 'descending'
+                  : 'none'
+              : undefined;
+
+            return (
+              <th
+                key={header.id}
+                className={cn(
+                  presets.stickyHeader,
+                  variant === 'loading' && presets.tableHeader
+                )}
+                style={{
+                  width:
+                    header.getSize() !== 150 ? header.getSize() : undefined,
+                }}
+                aria-sort={ariaSort}
+              >
+                {renderHeaderCell(header, variant)}
+              </th>
+            );
+          })}
         </tr>
       ))}
     </thead>

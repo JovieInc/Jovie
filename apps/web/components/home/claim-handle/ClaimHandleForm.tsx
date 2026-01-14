@@ -2,6 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
+import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
@@ -15,6 +16,7 @@ import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { PROFILE_URL } from '@/constants/app';
+import { cn } from '@/lib/utils';
 import { ClaimHandleStyles } from './ClaimHandleStyles';
 import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
@@ -74,9 +76,11 @@ const getInputClassName = ({
   isShaking: boolean;
   available: boolean | null;
 }) =>
-  `${isShaking ? 'jv-shake' : ''} ${
-    available === true ? 'jv-available' : ''
-  } transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`;
+  cn(
+    isShaking && 'jv-shake',
+    available === true && 'jv-available',
+    'transition-all duration-150 hover:shadow-lg focus-within:shadow-lg'
+  );
 
 const getButtonContent = ({
   showChecking,
@@ -111,20 +115,10 @@ const getButtonContent = ({
     return (
       <>
         <span>Claim @{handle}</span>
-        <svg
+        <ChevronRight
           className='w-4 h-4 transition-transform group-hover:translate-x-1'
-          fill='none'
-          viewBox='0 0 24 24'
-          stroke='currentColor'
           aria-hidden='true'
-        >
-          <path
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth={2}
-            d='M9 5l7 7-7 7'
-          />
-        </svg>
+        />
       </>
     );
   }
