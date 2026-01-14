@@ -28,7 +28,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/biome-formatter.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lint-check.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typecheck.sh",
             "timeout": 30
           },
           {
