@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
   resetProviderOverride,
@@ -20,7 +13,6 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
   ReleaseProviderMatrixProps,
-  SortColumn,
   SortState,
   UseReleaseProviderMatrixReturn,
 } from './types';
@@ -51,49 +43,18 @@ export function useReleaseProviderMatrix({
   const [drafts, setDrafts] = useState<DraftState>({});
   const [isSaving, startSaving] = useTransition();
   const [isSyncing, startSyncing] = useTransition();
-  const [headerElevated, setHeaderElevated] = useState(false);
-  const [sortState, setSortState] = useState<SortState>({
-    column: 'releaseDate',
-    direction: 'desc',
-  });
+
+  // These are no longer needed since UnifiedTable handles sorting internally,
+  // but kept for backward compatibility with return interface
+  const headerElevated = false;
+  const sortState: SortState = { column: 'releaseDate', direction: 'desc' };
+  const toggleSort = useCallback(() => {
+    // No-op: UnifiedTable handles sorting internally now
+  }, []);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Sort rows based on current sort state
-  const rows = useMemo(() => {
-    const sorted = [...rawRows].sort((a, b) => {
-      if (sortState.column === 'title') {
-        const comparison = a.title.localeCompare(b.title);
-        return sortState.direction === 'asc' ? comparison : -comparison;
-      }
-      // releaseDate sorting
-      const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-      const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-      const comparison = dateA - dateB;
-      return sortState.direction === 'asc' ? comparison : -comparison;
-    });
-    return sorted;
-  }, [rawRows, sortState]);
-
-  const toggleSort = useCallback((column: SortColumn) => {
-    setSortState(prev => ({
-      column,
-      direction:
-        prev.column === column && prev.direction === 'desc' ? 'asc' : 'desc',
-    }));
-  }, []);
-
-  useEffect(() => {
-    const container = tableContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      setHeaderElevated(container.scrollTop > 0);
-    };
-
-    handleScroll();
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
+  // No custom sorting needed - UnifiedTable handles this
+  const rows = rawRows;
 
   const providerList = useMemo(
     () =>
