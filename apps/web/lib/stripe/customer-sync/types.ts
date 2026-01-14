@@ -230,8 +230,13 @@ export function buildSelectObject<T extends readonly UserBillingFieldKey[]>(
 
   const selectObj: Partial<typeof fieldMap> = {};
   for (const field of fields) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (selectObj as any)[field] = fieldMap[field];
+    // Type-safe dynamic property assignment using Record indexing
+    (
+      selectObj as Record<
+        UserBillingFieldKey,
+        (typeof fieldMap)[UserBillingFieldKey]
+      >
+    )[field] = fieldMap[field];
   }
   return selectObj as Pick<typeof fieldMap, T[number]>;
 }
