@@ -31,54 +31,53 @@ export function validateDatabaseUrl(url: string): DatabaseUrlValidationResult {
     return { valid: false, error: 'DATABASE_URL is not set' };
   }
 
+  let result: DatabaseUrlValidationResult;
+
   try {
     const parsed = new URL(url);
+    const isProtocolValid = VALID_DATABASE_PROTOCOLS.includes(
+      parsed.protocol as (typeof VALID_DATABASE_PROTOCOLS)[number]
+    );
 
     // Validate protocol
-    if (
-      !VALID_DATABASE_PROTOCOLS.includes(
-        parsed.protocol as (typeof VALID_DATABASE_PROTOCOLS)[number]
-      )
-    ) {
-      return {
+    if (!isProtocolValid) {
+      result = {
         valid: false,
         error: `Invalid database protocol: ${parsed.protocol}. Expected one of: ${VALID_DATABASE_PROTOCOLS.join(', ')}`,
         protocol: parsed.protocol,
       };
-    }
-
-    // Validate hostname
-    if (!parsed.hostname) {
-      return {
+    } else if (!parsed.hostname) {
+      // Validate hostname
+      result = {
         valid: false,
         error: 'Database hostname is missing',
         protocol: parsed.protocol,
       };
-    }
-
-    // Validate database name (pathname should exist and not be just '/')
-    if (!parsed.pathname || parsed.pathname === '/') {
-      return {
+    } else if (!parsed.pathname || parsed.pathname === '/') {
+      // Validate database name (pathname should exist and not be just '/')
+      result = {
         valid: false,
         error: 'Database name is missing from URL path',
         protocol: parsed.protocol,
         hostname: parsed.hostname,
         pathname: parsed.pathname,
       };
+    } else {
+      result = {
+        valid: true,
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        pathname: parsed.pathname,
+      };
     }
-
-    return {
-      valid: true,
-      protocol: parsed.protocol,
-      hostname: parsed.hostname,
-      pathname: parsed.pathname,
-    };
   } catch (error) {
-    return {
+    result = {
       valid: false,
       error: `Invalid URL format: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
+
+  return result;
 }
 
 /**

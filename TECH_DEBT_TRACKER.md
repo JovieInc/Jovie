@@ -46,6 +46,12 @@ When you **discover** new tech debt:
 
 ## Resolved Issues
 
+### 2026-01-14
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Excessive return statements in shared web utilities | P2 | Consolidated guard clauses to satisfy S1142 | fix/batch-47-multiple-returns |
+
 ### 2026-01-08
 
 | Item | Priority | Resolution | Reference |
