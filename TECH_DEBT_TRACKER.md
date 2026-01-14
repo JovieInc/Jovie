@@ -46,6 +46,12 @@ When you **discover** new tech debt:
 
 ## Resolved Issues
 
+### 2026-01-14
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Oversized `apps/web/app/api/dashboard/social-links/route.ts` | P1 | Split handlers and shared utilities to keep route files under 200 lines | fix/batch-42-social-links-refactor |
+
 ### 2026-01-08
 
 | Item | Priority | Resolution | Reference |
