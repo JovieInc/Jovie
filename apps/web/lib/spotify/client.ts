@@ -72,6 +72,26 @@ export interface SearchArtistResult {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create an AbortController with a timeout that auto-aborts.
+ * Returns both the controller and a cleanup function.
+ */
+function createAbortWithTimeout(timeoutMs: number): {
+  controller: AbortController;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    controller,
+    cleanup: () => clearTimeout(timeoutId),
+  };
+}
+
+// ============================================================================
 // Client Manager Class
 // ============================================================================
 
@@ -216,64 +236,80 @@ class SpotifyClientManager {
         async span => {
           span.setAttribute('spotify.endpoint', endpoint);
 
-          const result = await retryAsync(async () => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(
-              () => controller.abort(),
-              SPOTIFY_DEFAULT_TIMEOUT_MS
-            );
-
-            try {
-              const response = await fetch(url, {
-                ...options,
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  ...options.headers,
-                },
-                signal: controller.signal,
-              });
-
-              // Handle error responses
-              if (!response.ok) {
-                const errorCode = this.mapStatusToErrorCode(response.status);
-                span.setAttribute('spotify.status', response.status);
-                span.setAttribute('spotify.error_code', errorCode);
-
-                let errorDetails: unknown;
-                try {
-                  errorDetails =
-                    (await response.json()) as SpotifyErrorResponse;
-                } catch {
-                  errorDetails = {
-                    status: response.status,
-                    statusText: response.statusText,
-                  };
-                }
-
-                // Extract Retry-After for 429 responses
-                const retryAfter = response.headers.get('Retry-After');
-                const error = spotifyApiError(errorDetails, errorCode);
-                if (retryAfter) {
-                  // Type-safe way to attach retryAfter property
-                  Object.assign(error, {
-                    retryAfter: parseInt(retryAfter, 10),
-                  });
-                }
-
-                throw error;
-              }
-
-              span.setAttribute('spotify.status', response.status);
-              return response.json() as Promise<T>;
-            } finally {
-              clearTimeout(timeoutId);
-            }
-          }, SPOTIFY_RETRY_CONFIG);
+          const result = await retryAsync(
+            () => this.executeRequest<T>(url, token, options, span),
+            SPOTIFY_RETRY_CONFIG
+          );
 
           return result;
         }
       );
     });
+  }
+
+  /**
+   * Execute a single HTTP request with timeout handling.
+   * Extracted to reduce nesting depth in the request method.
+   */
+  private async executeRequest<T>(
+    url: string,
+    token: string,
+    options: RequestInit,
+    span: { setAttribute: (key: string, value: string | number) => void }
+  ): Promise<T> {
+    const { controller, cleanup } = createAbortWithTimeout(
+      SPOTIFY_DEFAULT_TIMEOUT_MS
+    );
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...options.headers,
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        return this.handleErrorResponse<T>(response, span);
+      }
+
+      span.setAttribute('spotify.status', response.status);
+      return response.json() as Promise<T>;
+    } finally {
+      cleanup();
+    }
+  }
+
+  /**
+   * Handle error responses from Spotify API.
+   */
+  private async handleErrorResponse<T>(
+    response: Response,
+    span: { setAttribute: (key: string, value: string | number) => void }
+  ): Promise<T> {
+    const errorCode = this.mapStatusToErrorCode(response.status);
+    span.setAttribute('spotify.status', response.status);
+    span.setAttribute('spotify.error_code', errorCode);
+
+    let errorDetails: unknown;
+    try {
+      errorDetails = (await response.json()) as SpotifyErrorResponse;
+    } catch {
+      errorDetails = {
+        status: response.status,
+        statusText: response.statusText,
+      };
+    }
+
+    const retryAfter = response.headers.get('Retry-After');
+    const error = spotifyApiError(errorDetails, errorCode);
+    if (retryAfter) {
+      Object.assign(error, { retryAfter: parseInt(retryAfter, 10) });
+    }
+
+    throw error;
   }
 
   /**

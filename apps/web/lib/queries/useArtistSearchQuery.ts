@@ -191,7 +191,8 @@ export function useArtistSearchQuery(
       }
 
       setIsPending(true);
-      void asyncDebouncer.maybeExecute(searchQuery);
+      // Fire-and-forget: debouncer handles async execution internally
+      asyncDebouncer.maybeExecute(searchQuery);
     },
     [asyncDebouncer, minQueryLength]
   );

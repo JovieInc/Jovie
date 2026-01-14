@@ -59,7 +59,8 @@ export function useIngestRefresh({
         router.refresh();
 
         if (selectedId === profileId && onRefreshComplete) {
-          void onRefreshComplete(profileId);
+          // Fire-and-forget: callback may be async but we don't need to await
+          onRefreshComplete(profileId);
         }
       } catch (error) {
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
