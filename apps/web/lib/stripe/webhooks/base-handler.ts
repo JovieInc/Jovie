@@ -24,7 +24,7 @@ import type {
   SupportedEventType,
   WebhookHandler,
 } from './types';
-import { getCustomerId } from './utils';
+import { getCustomerId, isActiveSubscription } from './utils';
 
 /**
  * Result of processing a subscription for billing status.
@@ -125,8 +125,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
     } = options;
 
     // Determine if subscription is active
-    const isActive =
-      subscription.status === 'active' || subscription.status === 'trialing';
+    const isActive = isActiveSubscription(subscription.status);
 
     if (!isActive) {
       // Subscription is not active, downgrade user

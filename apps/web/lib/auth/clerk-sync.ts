@@ -1,10 +1,10 @@
 'use server';
 
 import { clerkClient } from '@clerk/nextjs/server';
-import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Clerk metadata fields that Jovie mirrors from the database.
@@ -69,14 +69,11 @@ export async function syncClerkMetadata(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed to sync metadata for ${clerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync' },
-      extra: { clerkUserId, data },
+    await captureError('Failed to sync Clerk metadata', error, {
+      component: 'clerk-sync',
+      clerkUserId,
+      data,
     });
 
     return { success: false, error: errorMessage };
@@ -169,14 +166,11 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed full sync for ${clerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync', operation: 'full-sync' },
-      extra: { clerkUserId },
+    await captureError('Failed to perform full Clerk metadata sync', error, {
+      component: 'clerk-sync',
+      operation: 'full-sync',
+      clerkUserId,
     });
 
     return { success: false, error: errorMessage };
@@ -260,18 +254,61 @@ export async function handleClerkUserDeleted(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed to handle user deletion for ${clerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync', operation: 'user-deletion' },
-      extra: { clerkUserId },
+    await captureError('Failed to handle Clerk user deletion', error, {
+      component: 'clerk-sync',
+      operation: 'user-deletion',
+      clerkUserId,
     });
 
     return { success: false, error: errorMessage };
   }
+}
+
+/**
+ * Helper: Get user ID from Clerk ID.
+ * @internal Used by syncAdminRoleChange
+ */
+async function getUserIdByClerkId(clerkId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  return user?.id ?? null;
+}
+
+/**
+ * Helper: Log admin role change to audit log.
+ * @internal Used by syncAdminRoleChange
+ */
+async function logAdminRoleChange(
+  adminClerkUserId: string,
+  targetClerkUserId: string,
+  isAdmin: boolean,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<void> {
+  const adminUserId = await getUserIdByClerkId(adminClerkUserId);
+  const targetUserId = await getUserIdByClerkId(targetClerkUserId);
+
+  if (!adminUserId || !targetUserId) {
+    return;
+  }
+
+  await db.insert(adminAuditLog).values({
+    adminUserId,
+    targetUserId,
+    action: isAdmin ? 'admin_role_granted' : 'admin_role_revoked',
+    metadata: {
+      targetClerkUserId,
+      newRole: isAdmin ? 'admin' : 'user',
+      changedAt: new Date().toISOString(),
+    },
+    ipAddress: ipAddress ?? null,
+    userAgent: userAgent ?? null,
+  });
 }
 
 /**
@@ -306,32 +343,13 @@ export async function syncAdminRoleChange(
 
     // Log the admin action if we have admin context
     if (adminClerkUserId) {
-      const [adminUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, adminClerkUserId))
-        .limit(1);
-
-      const [targetUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, targetClerkUserId))
-        .limit(1);
-
-      if (adminUser && targetUser) {
-        await db.insert(adminAuditLog).values({
-          adminUserId: adminUser.id,
-          targetUserId: targetUser.id,
-          action: isAdmin ? 'admin_role_granted' : 'admin_role_revoked',
-          metadata: {
-            targetClerkUserId,
-            newRole: isAdmin ? 'admin' : 'user',
-            changedAt: new Date().toISOString(),
-          },
-          ipAddress: ipAddress ?? null,
-          userAgent: userAgent ?? null,
-        });
-      }
+      await logAdminRoleChange(
+        adminClerkUserId,
+        targetClerkUserId,
+        isAdmin,
+        ipAddress,
+        userAgent
+      );
     }
 
     console.info(
@@ -341,14 +359,12 @@ export async function syncAdminRoleChange(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(
-      `[clerk-sync] Failed to sync admin role for ${targetClerkUserId}:`,
-      errorMessage
-    );
 
-    Sentry.captureException(error, {
-      tags: { component: 'clerk-sync', operation: 'admin-role-change' },
-      extra: { targetClerkUserId, isAdmin },
+    await captureError('Failed to sync admin role change to Clerk', error, {
+      component: 'clerk-sync',
+      operation: 'admin-role-change',
+      targetClerkUserId,
+      isAdmin,
     });
 
     return { success: false, error: errorMessage };

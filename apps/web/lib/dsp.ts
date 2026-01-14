@@ -51,54 +51,50 @@ export interface AvailableDSP {
   config: DSPConfig;
 }
 
+/**
+ * Helper to add a DSP to the list if URL is available and not already present.
+ * Eliminates duplication in DSP object construction.
+ */
+function addDSP(
+  dsps: AvailableDSP[],
+  key: string,
+  url: string | null | undefined
+): void {
+  if (!url || dsps.find(d => d.key === key)) {
+    return;
+  }
+
+  const config = DSP_CONFIGS[key];
+  if (!config) {
+    return;
+  }
+
+  dsps.push({
+    key,
+    name: config.name,
+    url,
+    config,
+  });
+}
+
 export function getAvailableDSPs(
   artist: Artist,
   releases?: Release[]
 ): AvailableDSP[] {
   const dsps: AvailableDSP[] = [];
 
-  // Check Spotify
+  // Check artist URLs
   const spotifyUrl =
     artist.spotify_url ||
     (artist.spotify_id ? buildSpotifyArtistUrl(artist.spotify_id) : null);
-  if (spotifyUrl) {
-    dsps.push({
-      key: 'spotify',
-      name: 'Spotify',
-      url: spotifyUrl,
-      config: DSP_CONFIGS.spotify,
-    });
-  }
-
-  // Check Apple Music
-  if (artist.apple_music_url) {
-    dsps.push({
-      key: 'apple_music',
-      name: 'Apple Music',
-      url: artist.apple_music_url,
-      config: DSP_CONFIGS.apple_music,
-    });
-  }
-
-  // Check YouTube
-  if (artist.youtube_url) {
-    dsps.push({
-      key: 'youtube',
-      name: 'YouTube',
-      url: artist.youtube_url,
-      config: DSP_CONFIGS.youtube,
-    });
-  }
-
-  // Check SoundCloud
-  if ((artist as Artist & { soundcloud_url?: string }).soundcloud_url) {
-    dsps.push({
-      key: 'soundcloud',
-      name: 'SoundCloud',
-      url: (artist as Artist & { soundcloud_url?: string }).soundcloud_url!,
-      config: DSP_CONFIGS.soundcloud,
-    });
-  }
+  addDSP(dsps, 'spotify', spotifyUrl);
+  addDSP(dsps, 'apple_music', artist.apple_music_url);
+  addDSP(dsps, 'youtube', artist.youtube_url);
+  addDSP(
+    dsps,
+    'soundcloud',
+    (artist as Artist & { soundcloud_url?: string }).soundcloud_url
+  );
 
   // Check for release-specific URLs if releases are provided
   if (releases) {
@@ -106,31 +102,9 @@ export function getAvailableDSPs(
     const appleRelease = releases.find(r => r.dsp === 'apple_music');
     const youtubeRelease = releases.find(r => r.dsp === 'youtube');
 
-    // Override with release URLs if available
-    if (spotifyRelease && !dsps.find(d => d.key === 'spotify')) {
-      dsps.push({
-        key: 'spotify',
-        name: 'Spotify',
-        url: spotifyRelease.url,
-        config: DSP_CONFIGS.spotify,
-      });
-    }
-    if (appleRelease && !dsps.find(d => d.key === 'apple_music')) {
-      dsps.push({
-        key: 'apple_music',
-        name: 'Apple Music',
-        url: appleRelease.url,
-        config: DSP_CONFIGS.apple_music,
-      });
-    }
-    if (youtubeRelease && !dsps.find(d => d.key === 'youtube')) {
-      dsps.push({
-        key: 'youtube',
-        name: 'YouTube',
-        url: youtubeRelease.url,
-        config: DSP_CONFIGS.youtube,
-      });
-    }
+    addDSP(dsps, 'spotify', spotifyRelease?.url);
+    addDSP(dsps, 'apple_music', appleRelease?.url);
+    addDSP(dsps, 'youtube', youtubeRelease?.url);
   }
 
   return dsps;

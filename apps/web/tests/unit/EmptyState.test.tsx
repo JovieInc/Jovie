@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@/components/organisms/EmptyState';
 
 vi.mock('next/link', () => {
   return {

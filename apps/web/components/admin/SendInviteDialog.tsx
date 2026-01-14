@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { normalizeEmail } from '@/lib/utils/email';
 
 interface SendInviteDialogProps {
   profile: AdminCreatorProfileRow | null;
@@ -41,10 +42,16 @@ export function SendInviteDialog({
     setError(null);
     setSuccess(false);
 
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedEmail = normalizeEmail(email);
 
     if (!trimmedEmail) {
       setError('Please enter an email address');
+      return;
+    }
+
+    // Limit input length to prevent ReDoS (RFC 5321 max email length is 254)
+    if (trimmedEmail.length > 254) {
+      setError('Email address is too long');
       return;
     }
 
@@ -135,7 +142,9 @@ export function SendInviteDialog({
               type='email'
               placeholder='creator@example.com'
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setEmail(e.target.value)
+              }
               disabled={isLoading || success}
               autoFocus
               className='w-full'

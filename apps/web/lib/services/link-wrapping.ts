@@ -47,6 +47,28 @@ export interface LinkStats {
 }
 
 /**
+ * Helper to construct WrappedLink object from database record.
+ * Eliminates duplication in link object construction.
+ */
+function buildWrappedLinkFromRecord(
+  data: typeof wrappedLinks.$inferSelect,
+  originalUrl: string
+): WrappedLink {
+  return {
+    id: data.id,
+    shortId: data.shortId,
+    originalUrl,
+    kind: data.kind as 'normal' | 'sensitive',
+    domain: data.domain,
+    category: data.category || undefined,
+    titleAlias: data.titleAlias || undefined,
+    clickCount: data.clickCount || 0,
+    createdAt: data.createdAt.toISOString(),
+    expiresAt: data.expiresAt?.toISOString() || undefined,
+  };
+}
+
+/**
  * Creates a new wrapped link with anti-cloaking protection
  */
 export async function createWrappedLink(
@@ -113,18 +135,7 @@ export async function createWrappedLink(
       return null;
     }
 
-    return {
-      id: data.id,
-      shortId: data.shortId,
-      originalUrl: url,
-      kind: data.kind as 'normal' | 'sensitive',
-      domain: data.domain,
-      category: data.category || undefined,
-      titleAlias: data.titleAlias || undefined,
-      clickCount: data.clickCount || 0,
-      createdAt: data.createdAt.toISOString(),
-      expiresAt: data.expiresAt?.toISOString() || undefined,
-    };
+    return buildWrappedLinkFromRecord(data, url);
   };
 
   try {
@@ -174,18 +185,7 @@ export async function getWrappedLink(
     // Decrypt URL
     const originalUrl = simpleDecryptUrl(data.encryptedUrl);
 
-    return {
-      id: data.id,
-      shortId: data.shortId,
-      originalUrl,
-      kind: data.kind as 'normal' | 'sensitive',
-      domain: data.domain,
-      category: data.category || undefined,
-      titleAlias: data.titleAlias || undefined,
-      clickCount: data.clickCount || 0,
-      createdAt: data.createdAt.toISOString(),
-      expiresAt: data.expiresAt?.toISOString() || undefined,
-    };
+    return buildWrappedLinkFromRecord(data, originalUrl);
   } catch (error: unknown) {
     console.error('Failed to get wrapped link:', error);
     return null;

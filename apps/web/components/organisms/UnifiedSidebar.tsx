@@ -31,6 +31,9 @@ import {
 import { UserButton } from '@/components/organisms/user-button';
 import { cn } from '@/lib/utils';
 
+// Delay before hiding floating sidebar (milliseconds)
+const FLOATING_SIDEBAR_HIDE_DELAY_MS = 150;
+
 export interface UnifiedSidebarProps {
   section: 'admin' | 'dashboard' | 'settings';
   navigation: NavItem[];
@@ -83,7 +86,10 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
       }
       // Hide when mouse moves away from sidebar area
       else if (e.clientX > SIDEBAR_WIDTH) {
-        hideTimeout = setTimeout(() => setIsFloatingVisible(false), 150);
+        hideTimeout = setTimeout(
+          () => setIsFloatingVisible(false),
+          FLOATING_SIDEBAR_HIDE_DELAY_MS
+        );
       }
     };
 
@@ -224,7 +230,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         </SidebarHeader>
 
         {/* Navigation Content */}
-        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>
           <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
             <SidebarGroupContent className='flex-1'>
               {/* Dashboard and Admin use DashboardNav, Settings uses custom */}

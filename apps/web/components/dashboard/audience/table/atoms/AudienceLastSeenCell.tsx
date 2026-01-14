@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
@@ -13,7 +14,10 @@ export interface AudienceLastSeenCellProps {
   className?: string;
 }
 
-export function AudienceLastSeenCell({
+/**
+ * Memoized for performance in virtualized tables to prevent unnecessary re-renders.
+ */
+export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
   row,
   lastSeenAt,
   isMenuOpen,
@@ -48,4 +52,4 @@ export function AudienceLastSeenCell({
       </div>
     </td>
   );
-}
+});

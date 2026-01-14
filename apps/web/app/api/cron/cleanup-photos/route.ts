@@ -2,6 +2,7 @@ import { del } from '@vercel/blob';
 import { and, eq, lt, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, profilePhotos } from '@/lib/db';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for cleanup
@@ -109,7 +110,7 @@ export async function GET(request: Request) {
         blobsDeleted = blobUrlsToDelete.length;
       } catch (blobError) {
         // Log but don't fail - blob deletion is best-effort
-        console.warn('Failed to delete some blobs:', blobError);
+        logger.warn('Failed to delete some blobs:', blobError);
       }
     }
 
@@ -119,7 +120,7 @@ export async function GET(request: Request) {
       await db.delete(profilePhotos).where(eq(profilePhotos.id, id));
     }
 
-    console.log(
+    logger.info(
       `[cleanup-photos] Deleted ${recordIds.length} orphaned records, ${blobsDeleted} blobs`
     );
 
@@ -141,7 +142,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('[cleanup-photos] Cleanup failed:', error);
+    logger.error('[cleanup-photos] Cleanup failed:', error);
     return NextResponse.json(
       {
         success: false,

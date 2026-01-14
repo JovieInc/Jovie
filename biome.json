@@ -1,5 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "root": true,
+  "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -62,7 +63,7 @@
       },
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn",
+        "noUnusedVariables": "error",
         "noConstAssign": "error",
         "noUndeclaredVariables": "error",
         "noUnreachable": "error",
@@ -75,17 +76,39 @@
         "noDebugger": "error",
         "noFallthroughSwitchClause": "error",
         "noDoubleEquals": "error",
-        "noExplicitAny": "off",
-        "noArrayIndexKey": "off"
+        "noExplicitAny": "error",
+        "noArrayIndexKey": "warn"
       },
       "complexity": {
-        "noUselessFragments": "off"
+        "noUselessFragments": "warn"
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"
       }
     }
   },
+  "overrides": [
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/tests/**",
+        "**/.storybook/**",
+        "**/scripts/**",
+        "**/*TableUnified.tsx",
+        "**/*ProfilesUnified.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "globals": [
       "describe",

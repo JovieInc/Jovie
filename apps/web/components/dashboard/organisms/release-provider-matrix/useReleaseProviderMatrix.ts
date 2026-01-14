@@ -25,6 +25,17 @@ import type {
   UseReleaseProviderMatrixReturn,
 } from './types';
 
+/**
+ * Extract provider URL from release, defaulting to empty string.
+ * Extracted to reduce nesting depth in handleReset.
+ */
+function getProviderUrl(
+  release: ReleaseViewModel,
+  provider: ProviderKey
+): string {
+  return release.providers.find(item => item.key === provider)?.url ?? '';
+}
+
 export function useReleaseProviderMatrix({
   releases,
   providerConfig,
@@ -192,8 +203,7 @@ export function useReleaseProviderMatrix({
         updateRow(updated);
         setDrafts(prev => ({
           ...prev,
-          [provider]:
-            updated.providers.find(item => item.key === provider)?.url ?? '',
+          [provider]: getProviderUrl(updated, provider),
         }));
         toast.success('Reverted to detected link');
       } catch (error) {

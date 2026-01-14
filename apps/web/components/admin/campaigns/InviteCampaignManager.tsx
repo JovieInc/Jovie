@@ -194,7 +194,9 @@ export function InviteCampaignManager() {
               min={1}
               max={100}
               value={limit}
-              onChange={e => setLimit(Number(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setLimit(Number(e.target.value))
+              }
               className='w-full'
             />
             <p className='text-xs text-secondary-token'>
@@ -225,7 +227,7 @@ export function InviteCampaignManager() {
               min={10}
               max={300}
               value={throttling.minDelayMs / 1000}
-              onChange={e =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setThrottling(t => {
                   const newMin = Number(e.target.value) * 1000;
                   return {
@@ -253,7 +255,7 @@ export function InviteCampaignManager() {
               min={30}
               max={600}
               value={throttling.maxDelayMs / 1000}
-              onChange={e =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setThrottling(t => {
                   const newMax = Number(e.target.value) * 1000;
                   return {
@@ -359,13 +361,13 @@ export function InviteCampaignManager() {
                   <table className='w-full text-sm'>
                     <thead className='bg-surface-2'>
                       <tr>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-secondary-token'>
+                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                           Username
                         </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-secondary-token'>
+                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                           Fit Score
                         </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-secondary-token'>
+                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                           Email
                         </th>
                       </tr>

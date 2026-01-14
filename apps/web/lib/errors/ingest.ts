@@ -122,6 +122,37 @@ export class IngestError extends Error {
 }
 
 // ============================================================================
+// Error Messages Registry
+// ============================================================================
+
+/**
+ * Centralized error messages for all ingest error codes.
+ * Single source of truth for user-facing error messages.
+ */
+const ERROR_MESSAGES: Record<IngestErrorCode, string> = {
+  RATE_LIMITED: 'Too many requests. Please wait and try again.',
+  INVALID_INPUT: 'Invalid input. Please check your data and try again.',
+  INVALID_SPOTIFY_ID: 'Invalid Spotify artist ID.',
+  INVALID_HANDLE:
+    'Invalid handle. Use only lowercase letters, numbers, and underscores.',
+  INVALID_QUERY: 'Invalid search query.',
+  UNAUTHORIZED: 'Please sign in to continue.',
+  NOT_ARTIST_OWNER: 'You must be the owner of this Spotify artist account.',
+  SPOTIFY_NOT_CONNECTED: 'Please connect your Spotify account first.',
+  ARTIST_ALREADY_CLAIMED: 'This artist has already been claimed.',
+  HANDLE_TAKEN: 'This handle is already in use.',
+  CLAIM_IN_PROGRESS: 'A claim is already in progress. Please wait.',
+  SPOTIFY_API_ERROR: 'Failed to communicate with Spotify.',
+  SPOTIFY_NOT_FOUND: 'Artist not found on Spotify.',
+  SPOTIFY_RATE_LIMITED: 'Spotify rate limit reached. Please wait.',
+  SPOTIFY_UNAVAILABLE: 'Spotify is temporarily unavailable.',
+  DATABASE_ERROR: 'A database error occurred.',
+  TRANSACTION_FAILED: 'Operation failed. Please try again.',
+  INTERNAL_ERROR: 'An unexpected error occurred.',
+  NETWORK_ERROR: 'Network error. Please check your connection.',
+};
+
+// ============================================================================
 // Error Factories
 // ============================================================================
 
@@ -131,7 +162,7 @@ export class IngestError extends Error {
 export function rateLimitedError(retryAfter?: number): IngestError {
   const message = retryAfter
     ? `Rate limited. Please try again in ${retryAfter} seconds.`
-    : 'Rate limited. Please try again later.';
+    : ERROR_MESSAGES.RATE_LIMITED;
 
   return new IngestError('RATE_LIMITED', message, {
     retryable: true,
@@ -143,23 +174,24 @@ export function rateLimitedError(retryAfter?: number): IngestError {
  * Create an unauthorized error.
  */
 export function unauthorizedError(details?: string): IngestError {
-  return new IngestError('UNAUTHORIZED', 'Please sign in to continue.', {
+  return new IngestError('UNAUTHORIZED', ERROR_MESSAGES.UNAUTHORIZED, {
     internalDetails: details,
   });
 }
 
 /**
  * Create a validation error.
+ * Accepts custom message or uses default from registry.
  */
 export function validationError(
-  message: string,
+  message?: string,
   code:
     | 'INVALID_INPUT'
     | 'INVALID_SPOTIFY_ID'
     | 'INVALID_HANDLE'
     | 'INVALID_QUERY' = 'INVALID_INPUT'
 ): IngestError {
-  return new IngestError(code, message);
+  return new IngestError(code, message ?? ERROR_MESSAGES[code]);
 }
 
 /**
@@ -173,15 +205,7 @@ export function spotifyApiError(
     | 'SPOTIFY_RATE_LIMITED'
     | 'SPOTIFY_UNAVAILABLE' = 'SPOTIFY_API_ERROR'
 ): IngestError {
-  const messages: Record<string, string> = {
-    SPOTIFY_API_ERROR: 'Failed to fetch data from Spotify. Please try again.',
-    SPOTIFY_NOT_FOUND: 'Artist not found on Spotify.',
-    SPOTIFY_RATE_LIMITED: 'Spotify rate limit reached. Please try again later.',
-    SPOTIFY_UNAVAILABLE:
-      'Spotify is temporarily unavailable. Please try again later.',
-  };
-
-  return new IngestError(code, messages[code], {
+  return new IngestError(code, ERROR_MESSAGES[code], {
     internalDetails,
     retryable: code !== 'SPOTIFY_NOT_FOUND',
     retryAfter: code === 'SPOTIFY_RATE_LIMITED' ? 60 : undefined,
@@ -200,16 +224,7 @@ export function claimError(
     | 'CLAIM_IN_PROGRESS',
   details?: unknown
 ): IngestError {
-  const messages: Record<string, string> = {
-    ARTIST_ALREADY_CLAIMED: 'This artist has already been claimed.',
-    HANDLE_TAKEN: 'This handle is already in use. Please choose another.',
-    NOT_ARTIST_OWNER:
-      'You must be the owner of this Spotify artist account to claim it.',
-    SPOTIFY_NOT_CONNECTED: 'Please connect your Spotify account first.',
-    CLAIM_IN_PROGRESS: 'A claim for this artist is already in progress.',
-  };
-
-  return new IngestError(code, messages[code], {
+  return new IngestError(code, ERROR_MESSAGES[code], {
     internalDetails: details,
   });
 }
@@ -218,28 +233,20 @@ export function claimError(
  * Create a database error.
  */
 export function databaseError(internalDetails?: unknown): IngestError {
-  return new IngestError(
-    'DATABASE_ERROR',
-    'A database error occurred. Please try again.',
-    {
-      internalDetails,
-      retryable: true,
-    }
-  );
+  return new IngestError('DATABASE_ERROR', ERROR_MESSAGES.DATABASE_ERROR, {
+    internalDetails,
+    retryable: true,
+  });
 }
 
 /**
  * Create an internal error (for unexpected failures).
  */
 export function internalError(internalDetails?: unknown): IngestError {
-  return new IngestError(
-    'INTERNAL_ERROR',
-    'An unexpected error occurred. Please try again.',
-    {
-      internalDetails,
-      retryable: true,
-    }
-  );
+  return new IngestError('INTERNAL_ERROR', ERROR_MESSAGES.INTERNAL_ERROR, {
+    internalDetails,
+    retryable: true,
+  });
 }
 
 // ============================================================================
@@ -310,30 +317,8 @@ export function toIngestError(error: unknown): IngestError {
 
 /**
  * Get a user-friendly message for an error code.
+ * Uses the centralized ERROR_MESSAGES registry.
  */
 export function getUserFriendlyMessage(code: IngestErrorCode): string {
-  const messages: Record<IngestErrorCode, string> = {
-    RATE_LIMITED: 'Too many requests. Please wait and try again.',
-    INVALID_INPUT: 'Invalid input. Please check your data and try again.',
-    INVALID_SPOTIFY_ID: 'Invalid Spotify artist ID.',
-    INVALID_HANDLE:
-      'Invalid handle. Use only lowercase letters, numbers, and underscores.',
-    INVALID_QUERY: 'Invalid search query.',
-    UNAUTHORIZED: 'Please sign in to continue.',
-    NOT_ARTIST_OWNER: 'You must be the owner of this Spotify artist account.',
-    SPOTIFY_NOT_CONNECTED: 'Please connect your Spotify account first.',
-    ARTIST_ALREADY_CLAIMED: 'This artist has already been claimed.',
-    HANDLE_TAKEN: 'This handle is already in use.',
-    CLAIM_IN_PROGRESS: 'A claim is already in progress. Please wait.',
-    SPOTIFY_API_ERROR: 'Failed to communicate with Spotify.',
-    SPOTIFY_NOT_FOUND: 'Artist not found on Spotify.',
-    SPOTIFY_RATE_LIMITED: 'Spotify rate limit reached. Please wait.',
-    SPOTIFY_UNAVAILABLE: 'Spotify is temporarily unavailable.',
-    DATABASE_ERROR: 'A database error occurred.',
-    TRANSACTION_FAILED: 'Operation failed. Please try again.',
-    INTERNAL_ERROR: 'An unexpected error occurred.',
-    NETWORK_ERROR: 'Network error. Please check your connection.',
-  };
-
-  return messages[code] ?? 'An unexpected error occurred.';
+  return ERROR_MESSAGES[code] ?? ERROR_MESSAGES.INTERNAL_ERROR;
 }

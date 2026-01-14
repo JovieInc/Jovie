@@ -116,6 +116,70 @@ export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
   );
 }
 
+/**
+ * Known provider domains for validation
+ */
+const PROVIDER_DOMAINS: Partial<Record<ProviderKey, string[]>> = {
+  spotify: ['open.spotify.com', 'spotify.com', 'spotify.link'],
+  apple_music: [
+    'music.apple.com',
+    'itunes.apple.com',
+    'geo.music.apple.com',
+    'apple.co',
+  ],
+  youtube: [
+    'youtube.com',
+    'www.youtube.com',
+    'm.youtube.com',
+    'youtu.be',
+    'music.youtube.com',
+  ],
+  soundcloud: ['soundcloud.com', 'on.soundcloud.com', 'm.soundcloud.com'],
+  deezer: ['deezer.com', 'www.deezer.com', 'deezer.page.link'],
+  tidal: ['tidal.com', 'listen.tidal.com'],
+  amazon_music: ['music.amazon.com', 'amazon.com'],
+  bandcamp: ['bandcamp.com'],
+};
+
+/**
+ * Validate URL format and optionally check provider domain
+ */
+function validateUrl(
+  url: string,
+  provider?: ProviderKey
+): { valid: boolean; error?: string } {
+  try {
+    const parsed = new URL(url);
+
+    // Check protocol
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return { valid: false, error: 'URL must use http:// or https://' };
+    }
+
+    // Check provider domain if specified
+    if (provider && PROVIDER_DOMAINS[provider]) {
+      const domains = PROVIDER_DOMAINS[provider]!;
+      const hostname = parsed.hostname.toLowerCase();
+
+      const isValidDomain = domains.some(
+        domain => hostname === domain || hostname.endsWith(`.${domain}`)
+      );
+
+      if (!isValidDomain) {
+        const expectedDomains = domains.join(', ');
+        return {
+          valid: false,
+          error: `URL must be from ${PROVIDER_CONFIG[provider].label} (${expectedDomains})`,
+        };
+      }
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: false, error: 'Invalid URL format' };
+  }
+}
+
 export async function saveProviderOverride(params: {
   profileId: string;
   releaseId: string;
@@ -123,38 +187,57 @@ export async function saveProviderOverride(params: {
   url: string;
 }): Promise<ReleaseViewModel> {
   noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
+
+  try {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+
+    const profile = await requireProfile();
+    if (profile.id !== params.profileId) {
+      throw new Error('Profile mismatch');
+    }
+
+    const trimmedUrl = params.url.trim();
+    if (!trimmedUrl) {
+      throw new Error('URL is required');
+    }
+
+    // Validate URL format and provider domain
+    const validation = validateUrl(trimmedUrl, params.provider);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    // Validate provider key
+    if (!PROVIDER_CONFIG[params.provider]) {
+      throw new Error('Invalid provider');
+    }
+
+    // Save the provider link override
+    await upsertProviderLink({
+      releaseId: params.releaseId,
+      providerId: params.provider,
+      url: trimmedUrl,
+      sourceType: 'manual',
+    });
+
+    // Fetch the updated release
+    const release = await getReleaseById(params.releaseId);
+    if (!release) {
+      throw new Error('Release not found');
+    }
+
+    const providerLabels = buildProviderLabels();
+    revalidatePath('/app/dashboard/releases');
+    return mapReleaseToViewModel(release, providerLabels, profile.id);
+  } catch (error) {
+    // Re-throw with user-friendly message
+    const message =
+      error instanceof Error ? error.message : 'Failed to save provider link';
+    throw new Error(message);
   }
-
-  const profile = await requireProfile();
-  if (profile.id !== params.profileId) {
-    throw new Error('Profile mismatch');
-  }
-
-  const trimmedUrl = params.url.trim();
-  if (!trimmedUrl) {
-    throw new Error('URL is required');
-  }
-
-  // Save the provider link override
-  await upsertProviderLink({
-    releaseId: params.releaseId,
-    providerId: params.provider,
-    url: trimmedUrl,
-    sourceType: 'manual',
-  });
-
-  // Fetch the updated release
-  const release = await getReleaseById(params.releaseId);
-  if (!release) {
-    throw new Error('Release not found');
-  }
-
-  const providerLabels = buildProviderLabels();
-  revalidatePath('/app/dashboard/releases');
-  return mapReleaseToViewModel(release, providerLabels, profile.id);
 }
 
 export async function resetProviderOverride(params: {
@@ -163,35 +246,51 @@ export async function resetProviderOverride(params: {
   provider: ProviderKey;
 }): Promise<ReleaseViewModel> {
   noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
+
+  try {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+
+    const profile = await requireProfile();
+    if (profile.id !== params.profileId) {
+      throw new Error('Profile mismatch');
+    }
+
+    // Validate provider key
+    if (!PROVIDER_CONFIG[params.provider]) {
+      throw new Error('Invalid provider');
+    }
+
+    // Get the current provider link to check for ingested URL
+    const existingLink = await getProviderLink(
+      params.releaseId,
+      params.provider
+    );
+
+    // Get the ingested URL from metadata if available
+    const ingestedUrl =
+      existingLink?.sourceType === 'ingested' ? existingLink.url : undefined;
+
+    // Reset the provider link
+    await resetProviderLinkDb(params.releaseId, params.provider, ingestedUrl);
+
+    // Fetch the updated release
+    const release = await getReleaseById(params.releaseId);
+    if (!release) {
+      throw new Error('Release not found');
+    }
+
+    const providerLabels = buildProviderLabels();
+    revalidatePath('/app/dashboard/releases');
+    return mapReleaseToViewModel(release, providerLabels, profile.id);
+  } catch (error) {
+    // Re-throw with user-friendly message
+    const message =
+      error instanceof Error ? error.message : 'Failed to reset provider link';
+    throw new Error(message);
   }
-
-  const profile = await requireProfile();
-  if (profile.id !== params.profileId) {
-    throw new Error('Profile mismatch');
-  }
-
-  // Get the current provider link to check for ingested URL
-  const existingLink = await getProviderLink(params.releaseId, params.provider);
-
-  // Get the ingested URL from metadata if available
-  const ingestedUrl =
-    existingLink?.sourceType === 'ingested' ? existingLink.url : undefined;
-
-  // Reset the provider link
-  await resetProviderLinkDb(params.releaseId, params.provider, ingestedUrl);
-
-  // Fetch the updated release
-  const release = await getReleaseById(params.releaseId);
-  if (!release) {
-    throw new Error('Release not found');
-  }
-
-  const providerLabels = buildProviderLabels();
-  revalidatePath('/app/dashboard/releases');
-  return mapReleaseToViewModel(release, providerLabels, profile.id);
 }
 
 /**

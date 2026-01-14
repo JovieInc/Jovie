@@ -1,10 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache } from '@/lib/cache';
-import { creatorProfiles, profilePhotos, users } from '@/lib/db';
+import { creatorProfiles, eq, profilePhotos } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -14,6 +14,7 @@ import {
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 import { imageUploadSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -100,7 +101,7 @@ async function getVercelBlobUploader(): Promise<BlobPut | null> {
     const blobModule = await import('@vercel/blob');
     return blobModule.put;
   } catch {
-    console.warn('@vercel/blob not available, using mock implementation');
+    logger.warn('@vercel/blob not available, using mock implementation');
     return null;
   }
 }
@@ -142,7 +143,7 @@ async function uploadBufferToBlob(
     if (process.env.NODE_ENV === 'production') {
       throw new Error('Blob storage not configured');
     }
-    console.warn(
+    logger.warn(
       '[DEV] BLOB_READ_WRITE_TOKEN missing, returning mock URL for:',
       path
     );
@@ -173,7 +174,7 @@ async function uploadBufferToBlob(
         throw lastError;
       }
 
-      console.warn(
+      logger.warn(
         `Blob upload attempt ${attempt + 1} failed, retrying in ${BLOB_RETRY_DELAY_MS}ms:`,
         lastError.message
       );
@@ -259,7 +260,7 @@ export async function POST(request: NextRequest) {
     process.env.NODE_ENV === 'production' &&
     !process.env.BLOB_READ_WRITE_TOKEN
   ) {
-    console.error('BLOB_READ_WRITE_TOKEN is not configured');
+    logger.error('BLOB_READ_WRITE_TOKEN is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',
       UPLOAD_ERROR_CODES.MISSING_BLOB_TOKEN,
@@ -314,7 +315,7 @@ export async function POST(request: NextRequest) {
         }
       } else if (process.env.NODE_ENV === 'production') {
         // Log warning in production when rate limiting is disabled
-        console.warn(
+        logger.warn(
           '[upload] Rate limiting disabled - Redis not configured. User:',
           userIdFromSession.slice(0, 10) + '...'
         );
@@ -364,7 +365,7 @@ export async function POST(request: NextRequest) {
       // Validate magic bytes to prevent MIME type spoofing
       const fileBuffer = await fileToBuffer(file);
       if (!validateMagicBytes(fileBuffer, normalizedType)) {
-        console.warn(
+        logger.warn(
           `[upload] Magic bytes mismatch for claimed type ${normalizedType}`
         );
         return errorResponse(
@@ -385,15 +386,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Look up the internal user ID (UUID) for the authenticated Clerk user
-      const [dbUser] = await tx
-        .select({
-          id: users.id,
-          clerkId: users.clerkId,
-        })
-        .from(users)
-        // @ts-ignore drizzle version mismatch in tests/runtime
-        .where(eq(users.clerkId, userIdFromSession))
-        .limit(1);
+      const dbUser = await getUserByClerkId(tx, userIdFromSession);
 
       if (!dbUser) {
         return errorResponse(
@@ -422,7 +415,6 @@ export async function POST(request: NextRequest) {
             status: 'processing',
             updatedAt: new Date(),
           })
-          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         // Process image with timeout protection (single canonical AVIF)
@@ -473,14 +465,12 @@ export async function POST(request: NextRequest) {
             processedAt: new Date(),
             updatedAt: new Date(),
           })
-          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         // Get the user's profile username for cache invalidation
         const [profile] = await tx
           .select({ usernameNormalized: creatorProfiles.usernameNormalized })
           .from(creatorProfiles)
-          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(creatorProfiles.userId, dbUser.id))
           .limit(1);
 
@@ -508,7 +498,7 @@ export async function POST(request: NextRequest) {
           error instanceof Error ? error.message : 'Upload failed';
         const pgError = extractPgError(error);
 
-        console.error('[upload] Finalize failed', {
+        logger.error('[upload] Finalize failed', {
           photoId: photoRecord.id,
           message,
           stack: error instanceof Error ? error.stack : undefined,
@@ -520,7 +510,7 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Avatar upload error:', error);
+    logger.error('Avatar upload error:', error);
 
     if (error instanceof Error && error.message === 'Unauthorized') {
       return errorResponse(

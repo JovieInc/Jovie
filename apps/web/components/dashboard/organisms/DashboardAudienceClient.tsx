@@ -1,8 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { parseAsInteger, parseAsStringLiteral, useQueryStates } from 'nuqs';
 import * as React from 'react';
+import { DashboardErrorFallback } from '@/components/atoms/DashboardErrorFallback';
+import { audienceSortFields } from '@/lib/nuqs';
+import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 
 const DashboardAudienceTable = dynamic(
@@ -48,25 +51,16 @@ export interface DashboardAudienceClientProps {
   profileUrl?: string;
 }
 
-function clampInt(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(max, Math.max(min, Math.trunc(value)));
-}
-
-function setSearchParams(
-  current: URLSearchParams,
-  next: Record<string, string | number | null | undefined>
-): URLSearchParams {
-  const copy = new URLSearchParams(current);
-  Object.entries(next).forEach(([key, value]) => {
-    if (value === null || value === undefined || value === '') {
-      copy.delete(key);
-      return;
-    }
-    copy.set(key, String(value));
-  });
-  return copy;
-}
+/**
+ * nuqs parsers for audience table URL params.
+ * Reuses audienceSortFields from the centralized lib/nuqs module to avoid drift.
+ */
+const audienceUrlParsers = {
+  page: parseAsInteger.withDefault(1),
+  pageSize: parseAsInteger.withDefault(20),
+  sort: parseAsStringLiteral(audienceSortFields).withDefault('lastSeen'),
+  direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
+};
 
 export function DashboardAudienceClient({
   mode,
@@ -78,62 +72,60 @@ export function DashboardAudienceClient({
   direction,
   profileUrl,
 }: DashboardAudienceClientProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  // State comes from server props; we only use nuqs to update the URL
+  const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
+    shallow: false,
+    history: 'push',
+  });
 
   const handlePageChange = React.useCallback(
     (nextPage: number) => {
-      const clamped = clampInt(nextPage, 1, 9999);
-      const next = setSearchParams(searchParams, { page: clamped });
-      router.push(`${pathname}?${next.toString()}`);
+      const clampedPage = Math.max(1, Math.min(9999, Math.floor(nextPage)));
+      setUrlParams({ page: clampedPage });
     },
-    [pathname, router, searchParams]
+    [setUrlParams]
   );
 
   const handlePageSizeChange = React.useCallback(
     (nextPageSize: number) => {
-      const clamped = clampInt(nextPageSize, 1, 100);
-      const next = setSearchParams(searchParams, {
-        pageSize: clamped,
-        page: 1,
-      });
-      router.push(`${pathname}?${next.toString()}`);
+      const clampedSize = Math.max(1, Math.min(100, Math.floor(nextPageSize)));
+      setUrlParams({ pageSize: clampedSize, page: 1 });
     },
-    [pathname, router, searchParams]
+    [setUrlParams]
   );
 
   const handleSortChange = React.useCallback(
     (nextSort: string) => {
-      const isSame = sort === nextSort;
+      const isSameSort = sort === nextSort;
       const nextDirection: 'asc' | 'desc' =
-        isSame && direction === 'asc' ? 'desc' : 'asc';
+        isSameSort && direction === 'asc' ? 'desc' : 'asc';
 
-      const next = setSearchParams(searchParams, {
-        sort: nextSort,
+      setUrlParams({
+        sort: nextSort as (typeof audienceUrlParsers.sort)['defaultValue'],
         direction: nextDirection,
         page: 1,
       });
-      router.push(`${pathname}?${next.toString()}`);
     },
-    [direction, pathname, router, searchParams, sort]
+    [sort, direction, setUrlParams]
   );
 
   return (
-    <div data-testid='dashboard-audience-client'>
-      <DashboardAudienceTable
-        mode={mode}
-        rows={initialRows}
-        total={total}
-        page={page}
-        pageSize={pageSize}
-        sort={sort}
-        direction={direction}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
-        onSortChange={handleSortChange}
-        profileUrl={profileUrl}
-      />
-    </div>
+    <QueryErrorBoundary fallback={DashboardErrorFallback}>
+      <div data-testid='dashboard-audience-client'>
+        <DashboardAudienceTable
+          mode={mode}
+          rows={initialRows}
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          sort={sort}
+          direction={direction}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          onSortChange={handleSortChange}
+          profileUrl={profileUrl}
+        />
+      </div>
+    </QueryErrorBoundary>
   );
 }

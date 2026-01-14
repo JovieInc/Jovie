@@ -21,9 +21,7 @@ export function CategorySection({
   return (
     <section
       className={cn(
-        variant === 'flat'
-          ? 'py-2'
-          : 'rounded-xl border border-subtle bg-surface-1/60 p-3',
+        variant === 'flat' ? 'py-2' : 'rounded-xl bg-surface-1/60 p-3',
         className
       )}
     >

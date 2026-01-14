@@ -32,6 +32,8 @@ interface ReleaseDspLinksProps {
   isAddingLink: boolean;
   newLinkUrl: string;
   selectedProvider: ProviderKey | null;
+  isAddingDspLink: boolean;
+  isRemovingDspLink: string | null;
   onSetIsAddingLink: (value: boolean) => void;
   onSetNewLinkUrl: (value: string) => void;
   onSetSelectedProvider: (value: ProviderKey | null) => void;
@@ -59,6 +61,8 @@ export function ReleaseDspLinks({
   isAddingLink,
   newLinkUrl,
   selectedProvider,
+  isAddingDspLink,
+  isRemovingDspLink,
   onSetIsAddingLink,
   onSetNewLinkUrl,
   onSetSelectedProvider,
@@ -128,8 +132,9 @@ export function ReleaseDspLinks({
                     {isEditable && (
                       <button
                         type='button'
-                        className='inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+                        className='inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-50'
                         aria-label={`Remove ${ariaLabel}`}
+                        disabled={isRemovingDspLink === provider.key}
                         onClick={event => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -211,9 +216,11 @@ export function ReleaseDspLinks({
               size='sm'
               variant='primary'
               onClick={() => void onAddLink()}
-              disabled={!isValidUrl(newLinkUrl) || !selectedProvider}
+              disabled={
+                !isValidUrl(newLinkUrl) || !selectedProvider || isAddingDspLink
+              }
             >
-              Add
+              {isAddingDspLink ? 'Adding...' : 'Add'}
             </Button>
           </div>
         </div>

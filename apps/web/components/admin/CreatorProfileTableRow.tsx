@@ -9,18 +9,13 @@ import {
   ContextMenuTrigger,
 } from '@jovie/ui';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
+import { CreatorProfileSocialLinks } from '@/components/admin/CreatorProfileSocialLinks';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
 import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-menu/CreatorActionsMenuContent';
 import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
-import {
-  extractUsernameFromLabel,
-  extractUsernameFromUrl,
-  formatUsername,
-} from '@/components/organisms/contact-sidebar/utils';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   geistTableMenuContentClass,
@@ -30,6 +25,58 @@ import {
 } from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+
+const getRowClassName = (isChecked: boolean, isSelected: boolean) =>
+  cn(
+    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
+    isChecked
+      ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+      : isSelected
+        ? 'bg-base dark:bg-surface-2'
+        : 'hover:bg-base dark:hover:bg-surface-2'
+  );
+
+const renderContextMenuItem = ({
+  onClick,
+  href,
+  disabled,
+  destructive,
+  children,
+}: {
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  destructive?: boolean;
+  children: ReactNode;
+}) => {
+  if (href) {
+    return (
+      <ContextMenuItem asChild className={geistTableMenuItemClass}>
+        <Link
+          href={href}
+          target='_blank'
+          rel='noopener noreferrer'
+          onClick={e => e.stopPropagation()}
+        >
+          {children}
+        </Link>
+      </ContextMenuItem>
+    );
+  }
+
+  return (
+    <ContextMenuItem
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        geistTableMenuItemClass,
+        destructive && geistTableMenuDestructiveItemClass
+      )}
+    >
+      {children}
+    </ContextMenuItem>
+  );
+};
 
 export interface CreatorProfileTableRowProps {
   profile: AdminCreatorProfileRow;
@@ -92,14 +139,7 @@ export function CreatorProfileTableRow({
 
   const rowContent = (
     <tr
-      className={cn(
-        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-        isChecked
-          ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
-          : isSelected
-            ? 'bg-base dark:bg-surface-2'
-            : 'hover:bg-base dark:hover:bg-surface-2'
-      )}
+      className={getRowClassName(isChecked, isSelected)}
       onClick={() => onRowClick(profile.id)}
       aria-selected={isSelected}
     >
@@ -172,30 +212,7 @@ export function CreatorProfileTableRow({
       </td>
       <td className='px-4 py-3 align-middle hidden lg:table-cell'>
         <div className='flex gap-1.5 overflow-hidden'>
-          {profile.socialLinks && profile.socialLinks.length > 0 ? (
-            profile.socialLinks.slice(0, 3).map(link => {
-              const username =
-                extractUsernameFromUrl(link.url) ??
-                extractUsernameFromLabel(link.displayText ?? '') ??
-                '';
-              const displayUsername = formatUsername(username);
-
-              return (
-                <PlatformPill
-                  key={link.id}
-                  platformIcon={link.platformType}
-                  platformName={link.platform}
-                  primaryText={displayUsername || link.platformType}
-                  onClick={() => {
-                    window.open(link.url, '_blank', 'noopener,noreferrer');
-                  }}
-                  className='shrink-0'
-                />
-              );
-            })
-          ) : (
-            <span className='text-xs text-tertiary-token'>—</span>
-          )}
+          <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
       <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
@@ -277,34 +294,7 @@ export function CreatorProfileTableRow({
           onDelete={onDelete}
           copySuccess={copySuccess}
           onCopyClaimLink={handleCopyClaimLink}
-          renderItem={({ onClick, href, disabled, destructive, children }) => {
-            if (href) {
-              return (
-                <ContextMenuItem asChild className={geistTableMenuItemClass}>
-                  <Link
-                    href={href}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {children}
-                  </Link>
-                </ContextMenuItem>
-              );
-            }
-            return (
-              <ContextMenuItem
-                onClick={onClick}
-                disabled={disabled}
-                className={cn(
-                  geistTableMenuItemClass,
-                  destructive && geistTableMenuDestructiveItemClass
-                )}
-              >
-                {children}
-              </ContextMenuItem>
-            );
-          }}
+          renderItem={renderContextMenuItem}
           renderSeparator={() => (
             <ContextMenuSeparator className={geistTableMenuSeparatorClass} />
           )}

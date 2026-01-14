@@ -3,11 +3,10 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
-  SortableColumnKey,
+  type SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
@@ -18,9 +17,11 @@ import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminT
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
@@ -55,14 +56,6 @@ const ContactSidebar = dynamic(
   }
 );
 
-function useOptionalTableMeta() {
-  try {
-    return useTableMeta();
-  } catch {
-    return null;
-  }
-}
-
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
   page,
@@ -74,7 +67,7 @@ export function AdminCreatorProfilesWithSidebar({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
-  const { showToast } = useToast();
+  const notifications = useNotifications();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -93,12 +86,6 @@ export function AdminCreatorProfilesWithSidebar({
     null
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const tableMetaCtx = useOptionalTableMeta();
-  const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => {}),
-    [tableMetaCtx]
-  );
 
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -204,183 +191,163 @@ export function AdminCreatorProfilesWithSidebar({
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
-      setSelectedId(profilesWithActions[0]!.id);
+      setSelectedId(profilesWithActions[0]?.id);
       setDraftContact(null);
     }
   }, [sidebarOpen, selectedId, profilesWithActions, setDraftContact]);
 
-  React.useEffect(() => {
-    const toggle = () => {
-      setSidebarOpen(prev => {
-        const next = !prev;
-        if (next && !selectedId && filteredProfiles[0]) {
-          setSelectedId(filteredProfiles[0]!.id);
-          setDraftContact(null);
-        }
-        return next;
-      });
-    };
-
-    setTableMeta({
-      rowCount: filteredProfiles.length,
-      toggle,
-      rightPanelWidth:
-        sidebarOpen && Boolean(effectiveContact) ? CONTACT_PANEL_WIDTH : 0,
-    });
-
-    return () => {
-      setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
-    };
-  }, [
-    filteredProfiles,
-    selectedId,
-    setTableMeta,
-    sidebarOpen,
-    effectiveContact,
-    setDraftContact,
-  ]);
-
   return (
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
       <div className='flex-1 min-h-0 overflow-hidden'>
-        <AdminTableShell
-          scrollContainerProps={{
-            tabIndex: 0,
-            onKeyDown: handleKeyDown,
-          }}
-          toolbar={
-            <AdminCreatorsToolbar
-              basePath={basePath}
-              search={search}
-              sort={sort}
-              pageSize={pageSize}
-              from={from}
-              to={to}
-              total={total}
-              clearHref={clearHref}
-              profiles={profilesWithActions}
-            />
-          }
-          footer={
-            <AdminCreatorsFooter
-              page={page}
-              totalPages={totalPages}
-              from={from}
-              to={to}
-              total={total}
-              pageSize={pageSize}
-              canPrev={canPrev}
-              canNext={canNext}
-              prevHref={prevHref}
-              nextHref={nextHref}
-            />
-          }
-        >
-          {({ headerElevated, stickyTopPx }) => (
-            <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
-              <colgroup>
-                <col className='w-14' />
-                <col className='w-[320px]' />
-                <col className='w-[160px]' />
-                <col className='w-[200px]' />
-              </colgroup>
-              <AdminCreatorsTableHeader
+        <QueryErrorBoundary fallback={TableErrorFallback}>
+          <AdminTableShell
+            scrollContainerProps={{
+              tabIndex: 0,
+              onKeyDown: handleKeyDown,
+            }}
+            toolbar={
+              <AdminCreatorsToolbar
+                basePath={basePath}
+                search={search}
                 sort={sort}
-                headerCheckboxState={headerCheckboxState}
-                selectedCount={selectedCount}
-                headerElevated={headerElevated}
-                stickyTopPx={stickyTopPx}
-                onToggleSelectAll={toggleSelectAll}
-                onSortChange={handleSortChange}
+                pageSize={pageSize}
+                from={from}
+                to={to}
+                total={total}
+                clearHref={clearHref}
+                profiles={profilesWithActions}
               />
-              <tbody>
-                {profilesWithActions.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className='px-4 py-10 text-center text-sm text-secondary-token'
-                    >
-                      No creator profiles found.
-                    </td>
-                  </tr>
-                ) : (
-                  profilesWithActions.map((profile, index) => (
-                    <CreatorProfileTableRow
-                      key={profile.id}
-                      profile={profile}
-                      rowNumber={(page - 1) * pageSize + index + 1}
-                      isSelected={profile.id === selectedId}
-                      isChecked={selectedIds.has(profile.id)}
-                      isMobile={isMobile}
-                      verificationStatus={
-                        verificationStatuses[profile.id] ?? 'idle'
-                      }
-                      refreshIngestStatus={
-                        ingestRefreshStatuses[profile.id] ?? 'idle'
-                      }
-                      isMenuOpen={openMenuProfileId === profile.id}
-                      onRowClick={handleRowClick}
-                      onContextMenu={setOpenMenuProfileId}
-                      onToggleSelect={toggleSelect}
-                      onMenuOpenChange={open =>
-                        setOpenMenuProfileId(open ? profile.id : null)
-                      }
-                      onRefreshIngest={() => refreshIngest(profile.id)}
-                      onToggleVerification={async () => {
-                        const result = await toggleVerification(
-                          profile.id,
-                          !profile.isVerified
-                        );
-                        if (!result.success) {
-                          console.error(
-                            'Failed to toggle verification',
-                            result.error
-                          );
+            }
+            footer={
+              <AdminCreatorsFooter
+                page={page}
+                totalPages={totalPages}
+                from={from}
+                to={to}
+                total={total}
+                pageSize={pageSize}
+                canPrev={canPrev}
+                canNext={canNext}
+                prevHref={prevHref}
+                nextHref={nextHref}
+              />
+            }
+          >
+            {({ headerElevated, stickyTopPx }) => (
+              <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
+                <colgroup>
+                  <col className='w-14' />
+                  <col className='w-[320px]' />
+                  <col className='w-[160px]' />
+                  <col className='w-[200px]' />
+                </colgroup>
+                <AdminCreatorsTableHeader
+                  sort={sort}
+                  headerCheckboxState={headerCheckboxState}
+                  selectedCount={selectedCount}
+                  headerElevated={headerElevated}
+                  stickyTopPx={stickyTopPx}
+                  onToggleSelectAll={toggleSelectAll}
+                  onSortChange={handleSortChange}
+                />
+                <tbody>
+                  {profilesWithActions.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className='px-4 py-10 text-center text-sm text-secondary-token'
+                      >
+                        No creator profiles found.
+                      </td>
+                    </tr>
+                  ) : (
+                    profilesWithActions.map((profile, index) => (
+                      <CreatorProfileTableRow
+                        key={profile.id}
+                        profile={profile}
+                        rowNumber={(page - 1) * pageSize + index + 1}
+                        isSelected={profile.id === selectedId}
+                        isChecked={selectedIds.has(profile.id)}
+                        isMobile={isMobile}
+                        verificationStatus={
+                          verificationStatuses[profile.id] ?? 'idle'
                         }
-                      }}
-                      onToggleFeatured={async () => {
-                        const result = await toggleFeatured(
-                          profile.id,
-                          !profile.isFeatured
-                        );
-                        if (!result.success) {
-                          console.error(
-                            'Failed to toggle featured',
-                            result.error
-                          );
+                        refreshIngestStatus={
+                          ingestRefreshStatuses[profile.id] ?? 'idle'
                         }
-                      }}
-                      onToggleMarketing={async () => {
-                        const result = await toggleMarketing(
-                          profile.id,
-                          !profile.marketingOptOut
-                        );
-                        if (!result.success) {
-                          console.error(
-                            'Failed to toggle marketing',
-                            result.error
-                          );
+                        isMenuOpen={openMenuProfileId === profile.id}
+                        onRowClick={handleRowClick}
+                        onContextMenu={setOpenMenuProfileId}
+                        onToggleSelect={toggleSelect}
+                        onMenuOpenChange={open =>
+                          setOpenMenuProfileId(open ? profile.id : null)
                         }
-                      }}
-                      onSendInvite={
-                        !profile.isClaimed && profile.claimToken
-                          ? () => {
-                              setProfileToInvite(profile);
-                              setInviteDialogOpen(true);
-                            }
-                          : undefined
-                      }
-                      onDelete={() => {
-                        setProfileToDelete(profile);
-                        setDeleteDialogOpen(true);
-                      }}
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-        </AdminTableShell>
+                        onRefreshIngest={() => refreshIngest(profile.id)}
+                        onToggleVerification={async () => {
+                          const result = await toggleVerification(
+                            profile.id,
+                            !profile.isVerified
+                          );
+                          if (!result.success) {
+                            console.error(
+                              'Failed to toggle verification',
+                              result.error
+                            );
+                            notifications.error(
+                              `Failed to update verification status${result.error ? `: ${result.error}` : ''}`
+                            );
+                          }
+                        }}
+                        onToggleFeatured={async () => {
+                          const result = await toggleFeatured(
+                            profile.id,
+                            !profile.isFeatured
+                          );
+                          if (!result.success) {
+                            console.error(
+                              'Failed to toggle featured',
+                              result.error
+                            );
+                            notifications.error(
+                              `Failed to update featured status${result.error ? `: ${result.error}` : ''}`
+                            );
+                          }
+                        }}
+                        onToggleMarketing={async () => {
+                          const result = await toggleMarketing(
+                            profile.id,
+                            !profile.marketingOptOut
+                          );
+                          if (!result.success) {
+                            console.error(
+                              'Failed to toggle marketing',
+                              result.error
+                            );
+                            notifications.error(
+                              `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`
+                            );
+                          }
+                        }}
+                        onSendInvite={
+                          !profile.isClaimed && profile.claimToken
+                            ? () => {
+                                setProfileToInvite(profile);
+                                setInviteDialogOpen(true);
+                              }
+                            : undefined
+                        }
+                        onDelete={() => {
+                          setProfileToDelete(profile);
+                          setDeleteDialogOpen(true);
+                        }}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </AdminTableShell>
+        </QueryErrorBoundary>
       </div>
       <RightDrawer
         isOpen={sidebarOpen && Boolean(effectiveContact)}
@@ -426,10 +393,7 @@ export function AdminCreatorProfilesWithSidebar({
         onOpenChange={setInviteDialogOpen}
         onSuccess={() => {
           setProfileToInvite(null);
-          showToast({
-            type: 'success',
-            message: 'Invite created successfully',
-          });
+          notifications.success('Invite created successfully');
         }}
       />
     </div>

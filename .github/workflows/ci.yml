@@ -116,7 +116,7 @@ jobs:
             git fetch origin "${{ github.base_ref }}" --depth=1
             # Use diff-filter=d to exclude deleted files (biome can't lint deleted files)
             # Include .mts/.mjs extensions for ESM config files
-            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' | tr '\n' ' ')
+            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' | tr '\n' ' ')
             if [ -n "$CHANGED_FILES" ]; then
               echo "Linting changed files only: $CHANGED_FILES"
               pnpm biome ci --reporter=github $CHANGED_FILES
@@ -212,18 +212,18 @@ jobs:
           fi
 
       - name: Cleanup old Neon branches (prevent limit errors)
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-branch-cleanup
         with:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,br-main'
+          protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Determine sanitized branch name
         id: sanitize-branch
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           RAW="${{ github.head_ref || github.ref_name }}"
 
@@ -240,10 +240,10 @@ jobs:
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
-      - name: Create or reuse Neon branch
+      - name: Create or reuse Neon branch (with retry)
         id: create-branch
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
@@ -251,7 +251,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
-        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           DB_URL="${{ steps.create-branch.outputs.db_url }}"
           DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
@@ -340,10 +340,9 @@ jobs:
           echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
-      - name: Resolve Neon DB URL (job-local)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+      - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
-        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
@@ -370,7 +369,6 @@ jobs:
           fi
 
       - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Run Drizzle Check
@@ -406,7 +404,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,br-main'
+          protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Check for relevant changes
@@ -437,10 +435,10 @@ jobs:
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
 
-      - name: Create or reuse Neon branch
+      - name: Create or reuse Neon branch (with retry)
         id: create-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
@@ -489,7 +487,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          # Standardized cache key includes playwright config for better invalidation
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -520,8 +519,8 @@ jobs:
 
   ci-build:
     name: Build
-    # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect build output)
-    needs: [ci-typecheck]
+    # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
+    # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Build runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -570,9 +569,6 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -607,15 +603,12 @@ jobs:
           # Clean up
           kill $SERVER_PID 2>/dev/null || true
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
   ci-unit-tests:
     name: Unit Tests
-    # Optimized: only wait for typecheck, lint can run in parallel (doesn't affect tests)
-    needs: [ci-typecheck]
+    # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
+    # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
     # Unit tests run on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -688,35 +681,12 @@ jobs:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
-  ci-merge-smoke:
-    name: Merge Group Smoke
-    if: ${{ github.event_name == 'merge_group' }}
+  ci-e2e-smoke:
+    name: E2E Smoke (PR Fast Feedback)
     needs: [ci-fast]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 7
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 2
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Build (smoke)
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
-
-  ci-e2e-tests:
-    name: E2E Tests
-    needs: [ci-build, neon-db]
-    # E2E runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -724,7 +694,100 @@ jobs:
         with:
           fetch-depth: 2
 
-      # Check if E2E-related changes require running this job
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: false
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping E2E smoke; no E2E-relevant paths changed."
+          exit 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run E2E Smoke (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          CI: true
+          SMOKE_ONLY: '1'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
+  ci-e2e-migrate:
+    name: E2E DB Migrate
+    needs: [ci-fast, ci-build, neon-db]
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
       - name: Check for relevant changes
         id: check_changes
         uses: ./.github/actions/check-path-changes
@@ -735,23 +798,21 @@ jobs:
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
 
-      # Skip remaining steps if no relevant changes
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
-          echo "Skipping E2E tests as no critical paths were changed."
+          echo "Skipping E2E DB migrate as no critical paths were changed."
           echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
-      # Continue with CI steps only if relevant changes detected or full-ci label present
       - name: Setup Node.js and pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Resolve Neon DB URL (job-local)
+      - name: Resolve Neon DB URL (job-local, with retry)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve_neon
-        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
@@ -762,16 +823,11 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
-          SRC=""
           if [ -n "$CANDIDATE" ]; then
-            echo "Using Neon DB URL from neon-db job outputs"
             echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
-            SRC="neon-job-output"
           else
             echo "No Neon ephemeral DB URL available from neon-db job."
-            SRC="unresolved"
           fi
-          echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
 
       - name: Fail if Neon DB URL is missing (E2E)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -790,23 +846,99 @@ jobs:
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+  ci-merge-smoke:
+    name: Merge Group Smoke
+    if: ${{ github.event_name == 'merge_group' }}
+    needs: [ci-fast]
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Build (smoke)
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+  ci-e2e-tests:
+    name: E2E Tests
+    # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
+    # E2E runs on push to main or PRs with testing label
+    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Set shard env
+        run: |
+          echo "SHARD_TOTAL=2" >> $GITHUB_ENV
+          echo "SHARD_INDEX=${{ matrix.shard }}" >> $GITHUB_ENV
+
+      # Continue with CI steps only if relevant changes detected or full-ci label present
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Resolve Neon DB URL (job-local, with retry)
+        id: resolve_neon
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ needs.neon-db.outputs.branch_name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL for E2E
+        run: |
+          CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
+          SRC=""
+          if [ -n "$CANDIDATE" ]; then
+            echo "Using Neon DB URL from neon-db job outputs"
+            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            SRC="neon-job-output"
+          else
+            echo "No Neon ephemeral DB URL available from neon-db job."
+            SRC="unresolved"
+          fi
+          echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
+
+      - name: Fail if Neon DB URL is missing (E2E)
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run E2E against staging/production DBs."
+            exit 1
+          fi
+
       - name: Cache Playwright Browsers
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'playwright.config*.ts') }}
+          # Standardized cache key - chromium only for CI (Firefox runs weekly)
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
+            ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
           pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Load quarantined E2E specs
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         id: quarantine
         run: |
           FILE="apps/web/tests/quarantine.json"
@@ -842,7 +974,7 @@ jobs:
           fi
 
       - name: E2E Smoke (PR to Preview)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         env:
           SMOKE_ONLY: '1'
         run: |
@@ -851,10 +983,10 @@ jobs:
             exit 0
           fi
           # Chrome-only for PRs - faster feedback, Firefox runs on main only
-          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/auth-smoke.spec.ts') != '' }}
+        if: ${{ matrix.shard == 1 && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -871,32 +1003,32 @@ jobs:
           cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
 
       - name: E2E Full (Main Branch)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test --reporter=line --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_quarantine == 'true' }}
+        if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
         continue-on-error: true
         run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
-        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ github.job }}-shard-${{ matrix.shard }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
           retention-days: 7
 
       - name: Upload Playwright Test Results on Failure
-        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 7
 
@@ -944,8 +1076,8 @@ jobs:
           TEST_PERFORMANCE_SUITE="$SUITE" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="$SUITE" --use-baseline
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    # Only needs build - no DB dependencies for fast UI-only PRs
-    needs: [ci-build]
+    # Optimized: needs ci-fast to ensure typecheck/lint passed before deploying preview
+    needs: [ci-fast, ci-build]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -970,9 +1102,6 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -1041,7 +1170,7 @@ jobs:
             --collect.url="$PREVIEW_URL/tim"
 
   ci-summary:
-    name: CI Summary
+    name: PR Summary
     if: ${{ always() && github.event_name == 'pull_request' }}
     permissions:
       actions: read
@@ -1056,10 +1185,12 @@ jobs:
       - drizzle-migration-guard
       - ci-drizzle-check
       - ci-fast
+      - ci-e2e-smoke
       - ci-pr-neon-migrate
       - ci-build
       - ci-unit-tests
       - ci-test-performance
+      - ci-e2e-migrate
       - ci-e2e-tests
       - ci-pr-vercel-preview
       - ci-lighthouse-pr
@@ -1071,7 +1202,8 @@ jobs:
         env:
           BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
           DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
-          E2E_RUN_FULL_CI: ${{ needs.ci-e2e-tests.outputs.run_full_ci }}
+          E2E_RUN_FULL_CI: ${{ needs.ci-e2e-migrate.outputs.run_full_ci }}
+          E2E_SMOKE_RUN_FULL_CI: ${{ needs.ci-e2e-smoke.outputs.run_full_ci }}
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
           UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
@@ -1169,6 +1301,11 @@ jobs:
                 runFullCi: process.env.UNIT_RUN_FULL_CI
               },
               {
+                label: 'E2E Smoke',
+                jobName: 'E2E Smoke (PR Fast Feedback)',
+                runFullCi: process.env.E2E_SMOKE_RUN_FULL_CI
+              },
+              {
                 label: 'Test Performance Budgets',
                 jobName: 'Test Performance Budgets'
               },
@@ -1245,45 +1382,76 @@ jobs:
   # These tests verify the most critical user flows: public profiles + auth
   ci-smoke-required:
     name: Smoke Tests (Required)
-    needs: [ci-fast, ci-build, neon-db]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke]
+    if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Gate required smoke on PRs
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          if [ "${{ needs.ci-e2e-smoke.outputs.run_full_ci }}" != "true" ]; then
+            echo "No E2E-relevant changes detected; not requiring E2E smoke."
+            exit 0
+          fi
+
+          if [ "${{ needs.ci-e2e-smoke.result }}" != "success" ]; then
+            echo "E2E Smoke (PR Fast Feedback) did not succeed."
+            exit 1
+          fi
+
+          echo "E2E Smoke (PR Fast Feedback) succeeded."
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         with:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
-      - name: Resolve Neon DB URL (job-local)
+      - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
-        uses: neondatabase/create-branch-action@607926662b32237c14c30c9b4f0105f938e9feaf # v6.3.0
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
 
+      - name: Run migrations for Smoke DB
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: ${{ github.ref_name }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
       - name: Cache Playwright Browsers
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          # Standardized cache key includes playwright config for better invalidation
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Run Required Smoke Tests
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-required.spec.ts --project=chromium --reporter=line
+          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-auth.spec.ts tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure()
+        if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: smoke-required-report-${{ github.run_id }}
@@ -1311,7 +1479,8 @@ jobs:
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          # Standardized cache key includes playwright config for better invalidation
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1320,7 +1489,7 @@ jobs:
 
       - name: Run Homepage Smoke Test against production
         run: |
-          CI=true BASE_URL=https://meetjovie.com pnpm --filter=@jovie/web run test:e2e tests/e2e/homepage-smoke.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=https://meetjovie.com pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
@@ -1381,9 +1550,6 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PROD }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0

@@ -1,8 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
-import { debounce } from '@/lib/utils';
+/**
+ * Settings Profile Hook
+ *
+ * Manages profile form state with debounced auto-save using the shared
+ * useAutoSave hook from TanStack Pacer.
+ *
+ * @see https://tanstack.com/pacer
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useAutoSave } from '@/lib/pacer/hooks';
 import type { Artist } from '@/types/db';
 import type { ProfileFormData, ProfileSaveStatus } from './types';
 
@@ -19,7 +28,23 @@ interface UseSettingsProfileReturn {
   setProfileSaveStatus: React.Dispatch<React.SetStateAction<ProfileSaveStatus>>;
   handleAvatarUpload: (file: File) => Promise<string>;
   handleAvatarUpdate: (imageUrl: string) => Promise<void>;
-  debouncedProfileSave: ReturnType<typeof debounce> & { flush: () => void };
+  /** Trigger debounced profile save */
+  saveProfile: (data: { displayName: string; username: string }) => void;
+  /** Flush pending save immediately */
+  flushSave: () => void;
+  /** Cancel pending save */
+  cancelSave: () => void;
+  /** Whether a save is pending */
+  isSavePending: boolean;
+}
+
+// Use longer debounce than default (500ms) for profile saves
+// to avoid excessive API calls during rapid form edits
+const SAVE_DEBOUNCE_MS = 900;
+
+interface ProfileUpdateData {
+  displayName: string;
+  username: string;
 }
 
 /**
@@ -30,8 +55,7 @@ export function useSettingsProfile({
   onArtistUpdate,
   onRefresh,
 }: UseSettingsProfileOptions): UseSettingsProfileReturn {
-  const { showToast } = useToast();
-
+  const notifications = useNotifications();
   const [formData, setFormData] = useState<ProfileFormData>({
     username: artist.handle || '',
     displayName: artist.name || '',
@@ -45,10 +69,119 @@ export function useSettingsProfile({
     }
   );
 
-  const lastProfileSavedRef = useRef<{
-    displayName: string;
-    username: string;
-  } | null>(null);
+  // Track last saved values for deduplication
+  const lastProfileSavedRef = useRef<ProfileUpdateData | null>({
+    displayName: artist.name || '',
+    username: artist.handle || '',
+  });
+
+  // Store artist ref for async operations
+  const artistRef = useRef(artist);
+  artistRef.current = artist;
+
+  // Use the shared auto-save hook
+  const {
+    save: triggerSave,
+    flush,
+    cancel,
+    isSaving,
+    isPending,
+    error: saveError,
+  } = useAutoSave<ProfileUpdateData>({
+    saveFn: async data => {
+      const displayName = data.displayName.trim();
+      const username = data.username.trim();
+
+      if (!displayName || !username) {
+        return;
+      }
+
+      // Deduplication check
+      const lastSaved = lastProfileSavedRef.current;
+      if (
+        lastSaved &&
+        lastSaved.displayName === displayName &&
+        lastSaved.username === username
+      ) {
+        return;
+      }
+
+      setProfileSaveStatus({ saving: true, success: null, error: null });
+
+      const response = await fetch('/api/dashboard/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updates: {
+            username,
+            displayName,
+          },
+        }),
+      });
+
+      const responseData = (await response.json().catch(() => ({}))) as {
+        profile?: {
+          username?: string;
+          usernameNormalized?: string;
+          displayName?: string;
+          bio?: string | null;
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to update profile');
+      }
+
+      // Update cache
+      lastProfileSavedRef.current = { displayName, username };
+
+      // Update artist state
+      if (responseData.profile && onArtistUpdate) {
+        onArtistUpdate({
+          ...artistRef.current,
+          handle: responseData.profile.username ?? artistRef.current.handle,
+          name: responseData.profile.displayName ?? artistRef.current.name,
+          tagline: responseData.profile.bio ?? artistRef.current.tagline,
+        });
+      }
+
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        username: responseData.profile?.username ?? username,
+        displayName: responseData.profile?.displayName ?? displayName,
+      }));
+
+      setProfileSaveStatus({ saving: false, success: true, error: null });
+    },
+    wait: SAVE_DEBOUNCE_MS,
+    onSuccess: () => {
+      onRefresh();
+    },
+    onError: err => {
+      const message = err.message || 'Failed to update profile';
+      setProfileSaveStatus({ saving: false, success: false, error: message });
+      notifications.error(message);
+    },
+  });
+
+  // Sync saving state with hook
+  useEffect(() => {
+    if (isSaving) {
+      setProfileSaveStatus(prev => ({ ...prev, saving: true }));
+    }
+  }, [isSaving]);
+
+  // Handle save errors from hook
+  useEffect(() => {
+    if (saveError) {
+      const message = saveError.message || 'Failed to update profile';
+      setProfileSaveStatus({ saving: false, success: false, error: message });
+    }
+  }, [saveError]);
 
   const handleAvatarUpload = useCallback(async (file: File) => {
     const formData = new FormData();
@@ -119,7 +252,7 @@ export function useSettingsProfile({
         }
 
         if (warning) {
-          showToast({ type: 'warning', message: warning });
+          notifications.warning(warning);
         }
       } catch (error) {
         if (onArtistUpdate) {
@@ -133,91 +266,28 @@ export function useSettingsProfile({
           error instanceof Error && error.message
             ? error.message
             : 'Failed to update profile photo';
-        showToast({ type: 'error', message });
+        notifications.error(message);
       }
     },
-    [artist, onArtistUpdate, showToast]
+    [artist, notifications, onArtistUpdate]
   );
 
   const saveProfile = useCallback(
-    async (next: { displayName: string; username: string }) => {
-      const displayName = next.displayName.trim();
-      const username = next.username.trim();
-
-      if (!displayName || !username) {
-        return;
-      }
-
-      const lastSaved = lastProfileSavedRef.current;
-      if (
-        lastSaved &&
-        lastSaved.displayName === displayName &&
-        lastSaved.username === username
-      ) {
-        return;
-      }
-
-      setProfileSaveStatus({ saving: true, success: null, error: null });
-
-      try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            updates: {
-              username,
-              displayName,
-            },
-          }),
-        });
-
-        const data = (await response.json().catch(() => ({}))) as {
-          profile?: {
-            username?: string;
-            usernameNormalized?: string;
-            displayName?: string;
-            bio?: string | null;
-          };
-          error?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to update profile');
-        }
-
-        lastProfileSavedRef.current = { displayName, username };
-
-        if (data.profile && onArtistUpdate) {
-          onArtistUpdate({
-            ...artist,
-            handle: data.profile.username ?? artist.handle,
-            name: data.profile.displayName ?? artist.name,
-            tagline: data.profile.bio ?? artist.tagline,
-          });
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          username: data.profile?.username ?? username,
-          displayName: data.profile?.displayName ?? displayName,
-        }));
-
-        setProfileSaveStatus({ saving: false, success: true, error: null });
-        onRefresh();
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : 'Failed to update profile';
-        setProfileSaveStatus({ saving: false, success: false, error: message });
-        showToast({ type: 'error', message });
-      }
+    (data: { displayName: string; username: string }) => {
+      triggerSave(data);
     },
-    [artist, onArtistUpdate, onRefresh, showToast]
+    [triggerSave]
   );
 
+  const flushSave = useCallback(() => {
+    void flush();
+  }, [flush]);
+
+  const cancelSave = useCallback(() => {
+    cancel();
+  }, [cancel]);
+
+  // Reset status when artist changes
   useEffect(() => {
     lastProfileSavedRef.current = {
       displayName: artist.name || '',
@@ -226,21 +296,7 @@ export function useSettingsProfile({
     setProfileSaveStatus({ saving: false, success: null, error: null });
   }, [artist.handle, artist.name]);
 
-  const debouncedProfileSave = useMemo(
-    () =>
-      debounce(async (...args: unknown[]) => {
-        const [next] = args as [{ displayName: string; username: string }];
-        await saveProfile(next);
-      }, 900),
-    [saveProfile]
-  );
-
-  useEffect(() => {
-    return () => {
-      debouncedProfileSave.flush();
-    };
-  }, [debouncedProfileSave]);
-
+  // Clear success status after delay
   useEffect(() => {
     if (!profileSaveStatus.success) return;
     const timeoutId = window.setTimeout(() => {
@@ -258,6 +314,9 @@ export function useSettingsProfile({
     setProfileSaveStatus,
     handleAvatarUpload,
     handleAvatarUpdate,
-    debouncedProfileSave,
+    saveProfile,
+    flushSave,
+    cancelSave,
+    isSavePending: isPending,
   };
 }

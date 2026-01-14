@@ -36,6 +36,7 @@ import {
   stripeTimestampToDate,
   type WebhookContext,
 } from '@/lib/stripe/webhooks';
+import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for Stripe SDK compatibility
 export const runtime = 'nodejs';
@@ -180,7 +181,7 @@ async function processWebhookEvent(
   if (!handler) {
     // Unhandled event types are expected - Stripe sends many event types
     // Log unexpected events to help detect configuration issues or new event types
-    console.warn(
+    logger.warn(
       `[Stripe Webhook] Received unexpected event type: ${event.type}`,
       { eventId: event.id, eventType: event.type }
     );

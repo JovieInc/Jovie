@@ -4,13 +4,15 @@ import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { and, db, eq } from '@/lib/db';
+import { db, eq } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   syncCanonicalUsernameFromApp,
   UsernameValidationError,
 } from '@/lib/username/sync';
+import { logger } from '@/lib/utils/logger';
 import { profileUpdateSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -50,16 +52,17 @@ type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      const [row] = await db
-        .select({ profile: creatorProfiles })
+      // Get the user's profile
+      const [userProfile] = await db
+        .select({
+          profile: creatorProfiles,
+        })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      const profile = row?.profile;
-
-      if (!profile) {
+      if (!userProfile) {
         return NextResponse.json(
           { error: "We couldn't find your profile." },
           { status: 404, headers: NO_STORE_HEADERS }
@@ -67,12 +70,12 @@ export async function GET() {
       }
 
       return NextResponse.json(
-        { profile },
+        { profile: userProfile.profile },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    logger.error('Error fetching profile:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -326,7 +329,7 @@ export async function PUT(req: Request) {
         }
       } catch (error) {
         clerkSyncFailed = true;
-        console.error('Failed to sync profile updates with Clerk:', {
+        logger.error('Failed to sync profile updates with Clerk:', {
           error: error instanceof Error ? error.message : error,
           userId: clerkUserId,
           hasAvatarUrl: !!avatarUrl,
@@ -334,16 +337,20 @@ export async function PUT(req: Request) {
         // Don't fail the entire request - avatar is still stored in our DB
       }
 
+      // Get user to verify they exist and get internal ID
+      const user = await getUserByClerkId(db, clerkUserId);
+      if (!user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Update the user's profile
       const updateResult = await db
         .update(creatorProfiles)
         .set({ ...dbProfileUpdates, updatedAt: new Date() })
-        .from(users)
-        .where(
-          and(
-            eq(creatorProfiles.userId, users.id),
-            eq(users.clerkId, clerkUserId)
-          )
-        )
+        .where(eq(creatorProfiles.userId, user.id))
         .returning();
       const [updatedProfile] = updateResult;
 
@@ -351,7 +358,7 @@ export async function PUT(req: Request) {
         await db
           .update(users)
           .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-          .where(eq(users.clerkId, clerkUserId));
+          .where(eq(users.id, user.id));
       }
 
       if (!updatedProfile) {
@@ -369,7 +376,7 @@ export async function PUT(req: Request) {
         'dashboard_profile_updated',
         undefined,
         clerkUserId
-      ).catch(error => console.warn('Analytics tracking failed:', error));
+      ).catch(error => logger.warn('Analytics tracking failed:', error));
 
       // Add cache-busting query parameter to avatar URL if present
       const responseProfile = { ...updatedProfile };
@@ -390,7 +397,7 @@ export async function PUT(req: Request) {
       );
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
+    logger.error('Error updating profile:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

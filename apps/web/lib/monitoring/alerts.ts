@@ -59,86 +59,73 @@ export class PerformanceAlerts {
    * Add Core Web Vitals rules with standard thresholds
    */
   addCoreWebVitalsRules() {
-    this.rules = [
-      // LCP (Largest Contentful Paint)
+    /**
+     * Core Web Vitals threshold configurations.
+     * Centralizes Google's recommended thresholds for performance metrics.
+     */
+    const coreWebVitalsConfig = [
       {
         metric: 'lcp',
-        threshold: 2500,
-        severity: 'warning',
-        description:
-          'Largest Contentful Paint exceeds 2.5s (Google "Needs Improvement" threshold)',
-      },
-      {
-        metric: 'lcp',
-        threshold: 4000,
-        severity: 'error',
-        description:
-          'Largest Contentful Paint exceeds 4s (Google "Poor" threshold)',
-      },
-
-      // FID (First Input Delay) - will be replaced by INP in the future
-      {
-        metric: 'fid',
-        threshold: 100,
-        severity: 'warning',
-        description:
-          'First Input Delay exceeds 100ms (Google "Needs Improvement" threshold)',
+        name: 'Largest Contentful Paint',
+        unit: 's',
+        warning: 2500,
+        error: 4000,
+        warningLabel: '2.5s',
+        errorLabel: '4s',
       },
       {
         metric: 'fid',
-        threshold: 300,
-        severity: 'error',
-        description:
-          'First Input Delay exceeds 300ms (Google "Poor" threshold)',
-      },
-
-      // CLS (Cumulative Layout Shift)
-      {
-        metric: 'cls',
-        threshold: 0.1,
-        severity: 'warning',
-        description:
-          'Cumulative Layout Shift exceeds 0.1 (Google "Needs Improvement" threshold)',
+        name: 'First Input Delay',
+        unit: 'ms',
+        warning: 100,
+        error: 300,
+        warningLabel: '100ms',
+        errorLabel: '300ms',
       },
       {
         metric: 'cls',
-        threshold: 0.25,
-        severity: 'error',
-        description:
-          'Cumulative Layout Shift exceeds 0.25 (Google "Poor" threshold)',
-      },
-
-      // FCP (First Contentful Paint)
-      {
-        metric: 'fcp',
-        threshold: 1800,
-        severity: 'warning',
-        description:
-          'First Contentful Paint exceeds 1.8s (Google "Needs Improvement" threshold)',
+        name: 'Cumulative Layout Shift',
+        unit: '',
+        warning: 0.1,
+        error: 0.25,
+        warningLabel: '0.1',
+        errorLabel: '0.25',
       },
       {
         metric: 'fcp',
-        threshold: 3000,
-        severity: 'error',
-        description:
-          'First Contentful Paint exceeds 3s (Google "Poor" threshold)',
-      },
-
-      // TTFB (Time to First Byte)
-      {
-        metric: 'ttfb',
-        threshold: 800,
-        severity: 'warning',
-        description: 'Time to First Byte exceeds 800ms (recommended threshold)',
+        name: 'First Contentful Paint',
+        unit: 's',
+        warning: 1800,
+        error: 3000,
+        warningLabel: '1.8s',
+        errorLabel: '3s',
       },
       {
         metric: 'ttfb',
-        threshold: 1800,
-        severity: 'error',
-        description:
-          'Time to First Byte exceeds 1.8s (poor performance threshold)',
+        name: 'Time to First Byte',
+        unit: 'ms',
+        warning: 800,
+        error: 1800,
+        warningLabel: '800ms',
+        errorLabel: '1.8s',
+        customErrorLabel: 'poor performance threshold',
       },
     ];
+
+    this.rules = coreWebVitalsConfig.flatMap(config => [
+      {
+        metric: config.metric,
+        threshold: config.warning,
+        severity: 'warning' as const,
+        description: `${config.name} exceeds ${config.warningLabel} (Google "Needs Improvement" threshold)`,
+      },
+      {
+        metric: config.metric,
+        threshold: config.error,
+        severity: 'error' as const,
+        description: `${config.name} exceeds ${config.errorLabel} (${config.customErrorLabel || 'Google "Poor" threshold'})`,
+      },
+    ]);
 
     return this;
   }

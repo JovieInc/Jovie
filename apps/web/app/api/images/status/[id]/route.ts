@@ -1,7 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
-import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { db, profilePhotos, users } from '@/lib/db';
+import { and, db, eq, profilePhotos } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'edge';
 
@@ -47,20 +48,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Get photo record - ensure user owns it by matching Clerk user to internal UUID
-    // @ts-ignore drizzle version mismatch between test/runtime typings
-    const [row] = await db
-      // @ts-ignore drizzle version mismatch between test/runtime typings
-      .select({ photo: profilePhotos })
-      // @ts-ignore drizzle version mismatch between test/runtime typings
-      .from(profilePhotos)
-      // @ts-ignore drizzle version mismatch between test/runtime typings
-      .innerJoin(users, eq(users.id, profilePhotos.userId))
-      // @ts-ignore drizzle version mismatch between test/runtime typings
-      .where(and(eq(profilePhotos.id, photoId), eq(users.clerkId, clerkUserId)))
-      .limit(1);
+    // Verify user exists and get their internal ID
+    const user = await getUserByClerkId(db, clerkUserId);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    const photo = row?.photo;
+    // Get photo record - ensure user owns it
+    const [photo] = await db
+      .select()
+      .from(profilePhotos)
+      .where(
+        and(eq(profilePhotos.id, photoId), eq(profilePhotos.userId, user.id))
+      )
+      .limit(1);
 
     if (!photo) {
       return NextResponse.json(
@@ -91,7 +95,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Photo status check error:', error);
+    logger.error('Photo status check error:', error);
     return NextResponse.json(
       { error: 'Failed to check status' },
       { status: 500, headers: NO_STORE_HEADERS }

@@ -1,10 +1,11 @@
 import { clerkClient } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { db, eq } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 import { accountEmailSyncSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -60,10 +61,20 @@ export async function POST(request: Request) {
         );
       }
 
+      // Get user to verify they exist and get internal ID
+      const user = await getUserByClerkId(db, clerkUserId);
+      if (!user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Update user's email
       await db
         .update(users)
         .set({ email, updatedAt: new Date() })
-        .where(eq(users.clerkId, clerkUserId));
+        .where(eq(users.id, user.id));
 
       return NextResponse.json(
         { success: true },
@@ -71,7 +82,7 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
-    console.error('Failed to sync email address:', error);
+    logger.error('Failed to sync email address:', error);
     return NextResponse.json(
       { error: 'Unable to sync email address' },
       { status: 500, headers: NO_STORE_HEADERS }

@@ -123,91 +123,83 @@ function isPrivateIp(ip: string): boolean {
 }
 
 /**
+ * Create validation error result.
+ * Eliminates duplication in error return statements.
+ */
+function createValidationError(error: string): UrlValidationResult {
+  return { valid: false, error };
+}
+
+/**
  * Validate a URL for use as a social link
  * Returns an error message if invalid, undefined if valid
  */
 export function validateSocialLinkUrl(url: string): UrlValidationResult {
+  let error: string | undefined;
+
   // Check length
   if (url.length > MAX_URL_LENGTH) {
-    return {
-      valid: false,
-      error: `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`,
-    };
+    error = `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`;
   }
 
   // Parse the URL
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return {
-      valid: false,
-      error: 'Invalid URL format',
-    };
+  let parsed: URL | undefined;
+  if (!error) {
+    try {
+      parsed = new URL(url);
+    } catch {
+      error = 'Invalid URL format';
+    }
   }
 
-  const protocol = parsed.protocol.toLowerCase();
+  if (!error && parsed) {
+    const protocol = parsed.protocol.toLowerCase();
 
-  // Check for dangerous protocols
-  if (DANGEROUS_PROTOCOLS.includes(protocol)) {
-    return {
-      valid: false,
-      error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
-    };
+    // Check for dangerous protocols
+    if (DANGEROUS_PROTOCOLS.includes(protocol)) {
+      error = `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`;
+    }
+
+    // Only allow http and https
+    if (!error && protocol !== 'http:' && protocol !== 'https:') {
+      error = `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`;
+    }
+
+    // Check for private/internal hostnames
+    const hostname = parsed.hostname.toLowerCase();
+    if (!error && isPrivateHostname(hostname)) {
+      error = 'URLs pointing to internal/private addresses are not allowed';
+    }
+
+    // Check for IP addresses that are private
+    // This catches cases where someone uses an IP directly
+    if (!error && isPrivateIp(hostname)) {
+      error = 'URLs pointing to internal/private IP addresses are not allowed';
+    }
+
+    // Check for common internal domains
+    if (
+      !error &&
+      (hostname.endsWith('.internal') ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.localhost') ||
+        hostname.endsWith('.localdomain'))
+    ) {
+      error = 'URLs pointing to internal domains are not allowed';
+    }
+
+    // Check for metadata endpoints (cloud provider security)
+    if (
+      !error &&
+      (hostname === '169.254.169.254' || // AWS/GCP/Azure metadata
+        hostname === 'metadata.google.internal' ||
+        hostname.includes('metadata'))
+    ) {
+      error = 'URLs pointing to cloud metadata endpoints are not allowed';
+    }
   }
 
-  // Only allow http and https
-  if (protocol !== 'http:' && protocol !== 'https:') {
-    return {
-      valid: false,
-      error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
-    };
-  }
-
-  // Check for private/internal hostnames
-  const hostname = parsed.hostname.toLowerCase();
-  if (isPrivateHostname(hostname)) {
-    return {
-      valid: false,
-      error: 'URLs pointing to internal/private addresses are not allowed',
-    };
-  }
-
-  // Check for IP addresses that are private
-  // This catches cases where someone uses an IP directly
-  if (isPrivateIp(hostname)) {
-    return {
-      valid: false,
-      error: 'URLs pointing to internal/private IP addresses are not allowed',
-    };
-  }
-
-  // Check for common internal domains
-  if (
-    hostname.endsWith('.internal') ||
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.localhost') ||
-    hostname.endsWith('.localdomain')
-  ) {
-    return {
-      valid: false,
-      error: 'URLs pointing to internal domains are not allowed',
-    };
-  }
-
-  // Check for metadata endpoints (cloud provider security)
-  if (
-    hostname === '169.254.169.254' || // AWS/GCP/Azure metadata
-    hostname === 'metadata.google.internal' ||
-    hostname.includes('metadata')
-  ) {
-    return {
-      valid: false,
-      error: 'URLs pointing to cloud metadata endpoints are not allowed',
-    };
-  }
-
-  return { valid: true };
+  return error ? createValidationError(error) : { valid: true };
 }
 
 /**

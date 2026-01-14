@@ -119,7 +119,7 @@ export function ImpersonationBanner({
   // Minimized view
   if (minimized) {
     return (
-      <div className={`fixed bottom-4 right-4 z-[9999] ${className}`}>
+      <div className={`fixed bottom-4 right-4 z-9999 ${className}`}>
         <Button
           variant='primary'
           size='sm'
@@ -138,7 +138,7 @@ export function ImpersonationBanner({
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 z-[9999] border-b-2 border-amber-500 bg-amber-500/95 px-4 py-2 text-black backdrop-blur ${className}`}
+      className={`fixed inset-x-0 top-0 z-9999 border-b-2 border-amber-500 bg-amber-500/95 px-4 py-2 text-black backdrop-blur ${className}`}
       role='alert'
       aria-live='polite'
       data-testid='impersonation-banner'

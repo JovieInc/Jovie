@@ -26,6 +26,14 @@ export interface PlatformPillProps {
   trailing?: React.ReactNode;
   onClick?: () => void;
   shimmerOnMount?: boolean;
+  /** Collapsed mode shows only icon, expands on hover to show text */
+  collapsed?: boolean;
+  /** @deprecated Use collapsed instead */
+  compact?: boolean;
+  /** Enable avatar-style stacking with negative margin overlap */
+  stackable?: boolean;
+  /** When stacked, expand this pill by default (for highest z-index item) */
+  defaultExpanded?: boolean;
   className?: string;
   testId?: string;
 }
@@ -44,11 +52,17 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       trailing,
       onClick,
       shimmerOnMount = false,
+      collapsed: collapsedProp,
+      compact: compactProp,
+      stackable = false,
+      defaultExpanded = false,
       className,
       testId,
     },
     ref
   ) {
+    // Support both collapsed and compact (backwards compatibility)
+    const collapsed = collapsedProp ?? compactProp ?? false;
     const isInteractive = Boolean(onClick);
 
     const [showShimmer, setShowShimmer] = React.useState<boolean>(false);
@@ -78,13 +92,23 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     );
 
     const borderColors = React.useMemo(() => {
+      /**
+       * Helper to generate border colors for a specific state color.
+       * Eliminates duplication for ready/error states.
+       */
+      const createStateBorder = (colorHex: string) => {
+        const baseAlpha = tone === 'faded' ? 0.35 : 0.55;
+        return {
+          base: hexToRgba(colorHex, baseAlpha),
+          hover: hexToRgba(colorHex, 0.65),
+        };
+      };
+
       if (state === 'ready') {
-        const color = hexToRgba('#22c55e', tone === 'faded' ? 0.35 : 0.55);
-        return { base: color, hover: hexToRgba('#22c55e', 0.65) };
+        return createStateBorder('#22c55e');
       }
       if (state === 'error') {
-        const color = hexToRgba('#ef4444', tone === 'faded' ? 0.35 : 0.55);
-        return { base: color, hover: hexToRgba('#ef4444', 0.65) };
+        return createStateBorder('#ef4444');
       }
 
       const baseAlpha = tone === 'faded' ? 0.45 : 0.65;
@@ -102,6 +126,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       const cssVars: React.CSSProperties = {
         '--pill-border': borderColors.base,
         '--pill-border-hover': borderColors.hover,
+        '--pill-bg-hover': hexToRgba(brandHex, 0.08),
       } as React.CSSProperties;
 
       if (!isTikTok || state === 'ready' || state === 'error') {
@@ -119,6 +144,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     }, [
       borderColors.base,
       borderColors.hover,
+      brandHex,
       isTikTok,
       state,
       tikTokGradient,
@@ -166,14 +192,34 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         tabIndex={isInteractive ? 0 : undefined}
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
+        title={
+          collapsed
+            ? platformName === primaryText
+              ? primaryText
+              : `${platformName}: ${primaryText}`
+            : undefined
+        }
         className={cn(
-          'group relative inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 min-h-[32px] text-xs font-medium',
-          'border-[var(--pill-border)] hover:border-[var(--pill-border-hover)]',
+          'group/pill relative inline-flex items-center rounded-full border text-xs font-medium',
+          'border-(--pill-border) hover:border-(--pill-border-hover)',
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
-          'transition-colors hover:bg-surface-2 dark:hover:bg-surface-2/60',
+          'transition-all duration-200',
+          // Collapsed: starts as icon circle, expands on hover
+          collapsed && 'h-7 justify-center px-2',
+          collapsed && !defaultExpanded && 'w-7 p-0',
+          collapsed && defaultExpanded && 'w-auto gap-1',
+          // Expanded: full width with padding
+          !collapsed && 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
+          // Stackable: negative margin for avatar-style overlap, last item has higher z-index
+          stackable && '-ml-2 first:ml-0',
+          stackable && 'last:z-10',
+          // Hover brings pill to front when stacked
+          stackable && 'hover:z-20',
+          isInteractive &&
+            'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
           isInteractive
-            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-surface-2'
+            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-(--pill-bg-hover)'
             : 'cursor-default',
           tone === 'faded' &&
             'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',
@@ -183,7 +229,13 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         )}
         style={wrapperStyle}
         data-testid={testId}
-        aria-label={isInteractive ? `Select ${platformName}` : undefined}
+        aria-label={
+          isInteractive
+            ? collapsed
+              ? `${platformName}: ${primaryText}`
+              : `Select ${platformName}`
+            : undefined
+        }
       >
         {showShimmer ? (
           <span
@@ -197,45 +249,62 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           />
         ) : null}
 
-        <div className='flex items-center gap-1.5 overflow-hidden flex-1'>
-          <span
-            className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-            style={{ ...iconChipStyle }}
-            aria-hidden='true'
-          >
-            <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-          </span>
+        {/* Icon - always visible */}
+        <span
+          className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
+          style={{ ...iconChipStyle }}
+          aria-hidden='true'
+        >
+          <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+        </span>
 
-          <div className='min-w-0 flex-1'>
-            <span className={cn(primaryText.length > 40 && 'truncate')}>
-              {primaryText}
-            </span>
-            {hasSecondary ? (
-              <span
-                className={cn(
-                  'ml-2 text-[10px] text-tertiary-token/80',
-                  secondaryText && secondaryText.length > 40 && 'truncate'
-                )}
-              >
-                {secondaryText}
+        {/* Content - visible in expanded mode, or on hover/defaultExpanded in collapsed mode */}
+        {collapsed ? (
+          // Collapsed mode: text hidden unless defaultExpanded or on hover
+          <span
+            className={cn(
+              'whitespace-nowrap overflow-hidden transition-all duration-200',
+              !defaultExpanded &&
+                'w-0 opacity-0 group-hover/pill:w-auto group-hover/pill:opacity-100',
+              defaultExpanded && 'w-auto opacity-100'
+            )}
+          >
+            {primaryText}
+          </span>
+        ) : (
+          // Expanded mode: full layout with all features
+          <div className='flex items-center gap-1.5 overflow-hidden flex-1 min-w-0'>
+            <div className='min-w-0 flex-1'>
+              <span className={cn(primaryText.length > 40 && 'truncate')}>
+                {primaryText}
+              </span>
+              {hasSecondary ? (
+                <span
+                  className={cn(
+                    'ml-2 text-[10px] text-tertiary-token/80',
+                    secondaryText && secondaryText.length > 40 && 'truncate'
+                  )}
+                >
+                  {secondaryText}
+                </span>
+              ) : null}
+            </div>
+
+            {badgeText ? (
+              <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
+                {badgeText}
+              </span>
+            ) : null}
+
+            {suffix ? (
+              <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
+                {suffix}
               </span>
             ) : null}
           </div>
+        )}
 
-          {badgeText ? (
-            <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
-              {badgeText}
-            </span>
-          ) : null}
-
-          {suffix ? (
-            <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
-              {suffix}
-            </span>
-          ) : null}
-        </div>
-
-        {trailing ? (
+        {trailing && !collapsed ? (
           <div className='relative ml-1 shrink-0'>{trailing}</div>
         ) : null}
       </div>

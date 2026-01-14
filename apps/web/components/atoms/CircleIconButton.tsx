@@ -88,10 +88,9 @@ const variantStyles: Record<CircleIconButtonVariant, string> = {
     'bg-transparent text-secondary-token',
     'hover:bg-surface-1 hover:text-primary-token'
   ),
-  // Secondary - subtle background with border
+  // Secondary - subtle background without border
   secondary: cn(
     'bg-surface-1 text-secondary-token',
-    'border border-subtle',
     'shadow-sm',
     'hover:bg-surface-2 hover:text-primary-token'
   ),

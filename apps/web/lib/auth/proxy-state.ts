@@ -3,6 +3,7 @@ import 'server-only';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 
 export interface ProxyUserState {
   needsWaitlist: boolean;
@@ -79,10 +80,9 @@ export async function getUserState(
     return { needsWaitlist: false, needsOnboarding: false, isActive: true };
   } catch (error) {
     // Log error with context for debugging
-    console.error('[proxy-state] Database query failed:', {
-      error,
+    await captureError('Database query failed in proxy state check', error, {
       clerkUserId,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      operation: 'getProxyUserState',
     });
 
     // Safe fallback: treat as needing waitlist to avoid exposing app to unauthorized access

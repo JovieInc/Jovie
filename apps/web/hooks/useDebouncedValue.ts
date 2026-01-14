@@ -2,9 +2,19 @@
 
 /**
  * Debounce hooks for search inputs and other delayed updates.
+ *
+ * Built on TanStack Pacer for world-class debouncing with proper
+ * state management, cancellation, and type safety.
+ *
+ * @see https://tanstack.com/pacer
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useDebouncer,
+  useDebouncedCallback as usePacerDebouncedCallback,
+  useDebouncedValue as usePacerDebouncedValue,
+} from '@tanstack/react-pacer';
+import { useCallback, useEffect, useState } from 'react';
 
 /**
  * Debounce a value, returning the debounced version.
@@ -21,18 +31,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * ```
  */
 export function useDebouncedValue<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [value, delay]);
-
+  const [debouncedValue] = usePacerDebouncedValue(value, { wait: delay });
   return debouncedValue;
 }
 
@@ -51,35 +50,7 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
 export function useDebouncedCallback<
   T extends (...args: Parameters<T>) => void,
 >(callback: T, delay: number): (...args: Parameters<T>) => void {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const callbackRef = useRef(callback);
-
-  // Keep callback ref up to date
-  useEffect(() => {
-    callbackRef.current = callback;
-  }, [callback]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return useCallback(
-    (...args: Parameters<T>) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        callbackRef.current(...args);
-      }, delay);
-    },
-    [delay]
-  );
+  return usePacerDebouncedCallback(callback, { wait: delay });
 }
 
 export interface UseSearchOptions {
@@ -104,14 +75,18 @@ export interface UseSearchReturn {
   isValid: boolean;
   /** Whether the debounced value is pending */
   isPending: boolean;
+  /** Cancel pending debounce */
+  cancel: () => void;
 }
 
 /**
  * Combined hook for search input with debouncing.
  *
+ * Built on TanStack Pacer's useDebouncer for robust state management.
+ *
  * @example
  * ```tsx
- * const { value, setValue, searchTerm, clear } = useSearch({
+ * const { value, setValue, searchTerm, clear, isPending } = useSearch({
  *   delay: 300,
  *   minLength: 2,
  *   onSearch: (term) => fetchResults(term),
@@ -120,6 +95,7 @@ export interface UseSearchReturn {
  * return (
  *   <div>
  *     <input value={value} onChange={e => setValue(e.target.value)} />
+ *     {isPending && <Spinner />}
  *     <button onClick={clear}>Clear</button>
  *   </div>
  * );
@@ -129,9 +105,23 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
   const { delay = 300, minLength = 0, onSearch } = options;
 
   const [value, setValue] = useState('');
-  const searchTerm = useDebouncedValue(value, delay);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Use TanStack Pacer's debouncer with selector for reactive isPending state
+  const debouncer = useDebouncer(
+    (newValue: string) => {
+      setSearchTerm(newValue);
+    },
+    { wait: delay },
+    state => ({ isPending: state.isPending })
+  );
+
+  // Update debounced value when input changes
+  useEffect(() => {
+    debouncer.maybeExecute(value);
+  }, [value, debouncer]);
+
   const isValid = searchTerm.length >= minLength;
-  const isPending = value !== searchTerm;
 
   // Call onSearch when debounced value changes
   useEffect(() => {
@@ -141,8 +131,14 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
   }, [searchTerm, isValid, onSearch]);
 
   const clear = useCallback(() => {
+    debouncer.cancel();
     setValue('');
-  }, []);
+    setSearchTerm('');
+  }, [debouncer]);
+
+  const cancel = useCallback(() => {
+    debouncer.cancel();
+  }, [debouncer]);
 
   return {
     value,
@@ -150,6 +146,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
     setValue,
     clear,
     isValid,
-    isPending,
+    isPending: debouncer.state.isPending,
+    cancel,
   };
 }

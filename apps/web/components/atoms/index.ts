@@ -60,6 +60,5 @@ export * from './SocialIcon';
 export * from './Spacer';
 export * from './StatusBadge';
 export * from './Textarea';
-export * from './Toast';
 export * from './Tooltip';
 export * from './VerifiedBadge';

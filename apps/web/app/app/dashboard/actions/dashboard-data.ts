@@ -38,7 +38,10 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+
+const { logger } = Sentry;
 
 /**
  * Complete dashboard data structure containing all information
@@ -85,10 +88,6 @@ async function fetchDashboardDataWithSession(
   try {
     const emptyTippingStats = createEmptyTippingStats();
 
-    // Tolerate missing tables/columns during migrations (PostgreSQL error codes:
-    // 42703=undefined_column, 42P01=undefined_table, 42P02=undefined_parameter)
-    const MIGRATION_ERROR_CODES = ['42703', '42P01', '42P02'];
-
     // First check if user exists in users table
     const [userData] = await dbClient
       .select({ id: users.id })
@@ -117,26 +116,13 @@ async function fetchDashboardDataWithSession(
       .where(eq(creatorProfiles.userId, userData.id))
       .orderBy(asc(creatorProfiles.createdAt))
       .catch((error: unknown) => {
-        const e = error as {
-          code?: string;
-          message?: string;
-          cause?: { code?: string; message?: string };
-        };
-        const code = e.code ?? e.cause?.code;
-        const message = e.message ?? e.cause?.message ?? '';
+        const migrationResult = handleMigrationErrors(error, {
+          userId: userData.id,
+          operation: 'creator_profiles',
+        });
 
-        const isCreatorProfilesColumnMissing =
-          message.includes('creator_profiles.') ||
-          (message.includes('column') && message.includes('creator_profiles'));
-
-        if (
-          (code && MIGRATION_ERROR_CODES.includes(code)) ||
-          isCreatorProfilesColumnMissing
-        ) {
-          console.warn(
-            '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding'
-          );
-          return [];
+        if (!migrationResult.shouldRetry) {
+          return migrationResult.fallbackData as CreatorProfile[];
         }
 
         Sentry.captureException(error, {
@@ -171,10 +157,15 @@ async function fetchDashboardDataWithSession(
           result => result?.[0] as { sidebarCollapsed: boolean } | undefined
         )
         .catch((error: unknown) => {
-          const code = (error as { code?: string })?.code;
-          if (code && MIGRATION_ERROR_CODES.includes(code)) {
-            console.warn('[Dashboard] user_settings migration in progress');
-            return undefined;
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'user_settings',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return migrationResult.fallbackData as
+              | { sidebarCollapsed: boolean }
+              | undefined;
           }
           Sentry.captureException(error, {
             tags: { query: 'user_settings', context: 'dashboard_data' },
@@ -192,20 +183,13 @@ async function fetchDashboardDataWithSession(
         )
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
         .catch((error: unknown) => {
-          const code = (error as { code?: string })?.code;
-          const message = (error as { message?: string })?.message ?? '';
-          const isMissingColumn =
-            message.includes('social_links.state') ||
-            (message.includes('column') && message.includes('social_links'));
-          if (code && MIGRATION_ERROR_CODES.includes(code)) {
-            console.warn('[Dashboard] social_links migration in progress');
-            return false;
-          }
-          if (isMissingColumn) {
-            console.warn(
-              '[Dashboard] social_links.state column missing; treating as no links'
-            );
-            return false;
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'social_links_count',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return migrationResult.fallbackData as boolean;
           }
           Sentry.captureException(error, {
             tags: { query: 'social_links_count', context: 'dashboard_data' },
@@ -230,20 +214,13 @@ async function fetchDashboardDataWithSession(
         )
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
         .catch((error: unknown) => {
-          const code = (error as { code?: string })?.code;
-          const message = (error as { message?: string })?.message ?? '';
-          const isMissingColumn =
-            message.includes('social_links.state') ||
-            (message.includes('column') && message.includes('social_links'));
-          if (code && MIGRATION_ERROR_CODES.includes(code)) {
-            console.warn('[Dashboard] social_links migration in progress');
-            return false;
-          }
-          if (isMissingColumn) {
-            console.warn(
-              '[Dashboard] social_links.state column missing; treating as no music links'
-            );
-            return false;
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'music_links_count',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return migrationResult.fallbackData as boolean;
           }
           Sentry.captureException(error, {
             tags: { query: 'music_links_count', context: 'dashboard_data' },
@@ -337,7 +314,7 @@ async function fetchDashboardDataWithSession(
     const errorType = errorObj?.constructor?.name ?? typeof errorObj;
 
     // Log with full context for debugging - serialize everything to avoid empty objects
-    console.error('Error fetching dashboard data:', {
+    logger.error('Error fetching dashboard data', {
       message,
       code,
       errorType,
@@ -347,7 +324,7 @@ async function fetchDashboardDataWithSession(
     });
 
     // Also log the raw error for server-side debugging
-    console.error('Raw error object:', error);
+    logger.error('Raw error object', { error });
 
     // On error, treat as needs onboarding to be safe
     return {

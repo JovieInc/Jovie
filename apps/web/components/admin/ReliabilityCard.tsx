@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
@@ -18,42 +17,45 @@ export function ReliabilityCard({ summary }: ReliabilityCardProps) {
     : '—';
 
   return (
-    <Card className='h-full border-subtle bg-surface-1'>
-      <CardHeader className='flex flex-row items-start justify-between'>
-        <CardTitle className='text-lg'>Reliability</CardTitle>
-        <span className='rounded-full border border-subtle bg-surface-2 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-300'>
+    <div className='h-full space-y-4'>
+      <div className='flex items-start justify-between'>
+        <div>
+          <h3 className='text-sm font-medium text-primary-token'>
+            Reliability
+          </h3>
+          <p className='text-xs text-tertiary-token'>System health metrics</p>
+        </div>
+        <span className='text-xs font-medium text-emerald-600 dark:text-emerald-400'>
           Healthy
         </span>
-      </CardHeader>
-      <CardContent className='space-y-4 text-sm text-secondary-token'>
-        <div className='grid gap-3'>
-          <div className='flex items-center justify-between rounded-lg border border-subtle bg-surface-2 px-3 py-2'>
-            <div className='flex items-center gap-2 font-medium text-primary-token'>
-              <CheckCircle2 className='size-4 text-emerald-500' />
-              Error rate
-            </div>
-            <span className='text-primary-token'>{errorRateLabel}</span>
+      </div>
+      <div className='space-y-3 text-sm text-secondary-token'>
+        <div className='flex items-center justify-between py-2'>
+          <div className='flex items-center gap-2 font-medium text-primary-token'>
+            <CheckCircle2 className='size-4 text-emerald-500' />
+            Error rate
           </div>
-          <div className='flex items-center justify-between rounded-lg border border-subtle bg-surface-2 px-3 py-2'>
-            <div className='flex items-center gap-2 font-medium text-primary-token'>
-              <Clock3 className='size-4 text-blue-500' />
-              p95 latency
-            </div>
-            <span className='text-primary-token'>{latencyLabel}</span>
-          </div>
-          <div className='flex items-center justify-between rounded-lg border border-subtle bg-surface-2 px-3 py-2'>
-            <div className='flex items-center gap-2 font-medium text-primary-token'>
-              <AlertTriangle className='size-4 text-amber-500' />
-              Incidents (24h)
-            </div>
-            <span className='text-primary-token'>{incidentsLabel}</span>
-          </div>
+          <span className='text-primary-token'>{errorRateLabel}</span>
         </div>
-        <p className='text-xs text-tertiary-token'>
-          Last incident resolved on {lastIncidentLabel}. Review logs and alerts
-          before shipping new changes.
-        </p>
-      </CardContent>
-    </Card>
+        <div className='flex items-center justify-between py-2'>
+          <div className='flex items-center gap-2 font-medium text-primary-token'>
+            <Clock3 className='size-4 text-blue-500' />
+            p95 latency
+          </div>
+          <span className='text-primary-token'>{latencyLabel}</span>
+        </div>
+        <div className='flex items-center justify-between py-2'>
+          <div className='flex items-center gap-2 font-medium text-primary-token'>
+            <AlertTriangle className='size-4 text-amber-500' />
+            Incidents (24h)
+          </div>
+          <span className='text-primary-token'>{incidentsLabel}</span>
+        </div>
+      </div>
+      <p className='text-xs text-tertiary-token'>
+        Last incident resolved on {lastIncidentLabel}. Review logs and alerts
+        before shipping new changes.
+      </p>
+    </div>
   );
 }

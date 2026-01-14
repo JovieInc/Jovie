@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 describe('LoadingSpinner', () => {
   it('renders with default props and has proper accessibility', () => {

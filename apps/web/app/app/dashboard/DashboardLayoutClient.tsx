@@ -105,37 +105,48 @@ export default function DashboardLayoutClient({
     const adminIndex = parts.indexOf('admin');
     const settingsIndex = parts.indexOf('settings');
 
-    const mode: 'dashboard' | 'admin' | 'settings' =
-      settingsIndex >= 0 ? 'settings' : adminIndex >= 0 ? 'admin' : 'dashboard';
+    // Determine the mode based on which section is active
+    const getMode = (): 'dashboard' | 'admin' | 'settings' => {
+      if (settingsIndex >= 0) return 'settings';
+      if (adminIndex >= 0) return 'admin';
+      return 'dashboard';
+    };
+    const mode = getMode();
 
-    const subs =
-      mode === 'dashboard'
-        ? dashboardIndex >= 0
-          ? parts.slice(dashboardIndex + 1)
-          : []
-        : mode === 'admin'
-          ? adminIndex >= 0
-            ? parts.slice(adminIndex + 1)
-            : []
-          : settingsIndex >= 0
-            ? parts.slice(settingsIndex + 1)
-            : [];
+    // Extract sub-paths based on the current mode
+    const getSubPaths = (): string[] => {
+      if (mode === 'dashboard' && dashboardIndex >= 0) {
+        return parts.slice(dashboardIndex + 1);
+      }
+      if (mode === 'admin' && adminIndex >= 0) {
+        return parts.slice(adminIndex + 1);
+      }
+      if (mode === 'settings' && settingsIndex >= 0) {
+        return parts.slice(settingsIndex + 1);
+      }
+      return [];
+    };
+    const subs = getSubPaths();
     const toTitle = (s: string): string =>
       s.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
 
-    const items: DashboardBreadcrumbItem[] =
-      mode === 'admin'
-        ? [{ label: 'Admin', href: '/app/admin' }]
-        : mode === 'settings'
-          ? [{ label: 'Settings', href: '/app/settings' }]
-          : [{ label: 'Dashboard', href: '/app/dashboard' }];
+    // Build base breadcrumb item based on mode
+    const getBaseBreadcrumb = (): DashboardBreadcrumbItem => {
+      if (mode === 'admin') return { label: 'Admin', href: '/app/admin' };
+      if (mode === 'settings')
+        return { label: 'Settings', href: '/app/settings' };
+      return { label: 'Dashboard', href: '/app/dashboard' };
+    };
+    const items: DashboardBreadcrumbItem[] = [getBaseBreadcrumb()];
+
     if (subs.length > 0) {
-      let acc =
-        mode === 'admin'
-          ? '/app/admin'
-          : mode === 'settings'
-            ? '/app/settings'
-            : '/app/dashboard';
+      // Build base path for accumulating breadcrumb URLs
+      const getBasePath = (): string => {
+        if (mode === 'admin') return '/app/admin';
+        if (mode === 'settings') return '/app/settings';
+        return '/app/dashboard';
+      };
+      let acc = getBasePath();
       subs.forEach((seg, i) => {
         acc += `/${seg}`;
         const isLast = i === subs.length - 1;
@@ -319,7 +330,7 @@ function DashboardLayoutInner({
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
                   showDivider={true}
-                  action={<>{ContactToggleButton}</>}
+                  action={ContactToggleButton}
                 />
                 <div className='flex-1 min-h-0 overflow-hidden flex'>
                   <div
@@ -349,9 +360,7 @@ function DashboardLayoutInner({
                   breadcrumbs={crumbs}
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
-                  action={
-                    <>{previewEnabled ? <PreviewToggleButton /> : null}</>
-                  }
+                  action={previewEnabled ? <PreviewToggleButton /> : null}
                 />
                 <div className='flex-1 min-h-0 overflow-hidden flex relative'>
                   <div

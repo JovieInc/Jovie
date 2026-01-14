@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'edge';
 export const revalidate = 3600; // Cache results for 1 hour
@@ -53,7 +54,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error fetching featured creators:', error);
+    logger.error('Error fetching featured creators:', error);
     return NextResponse.json(
       { error: 'Failed to load featured creators' },
       { status: 500, headers: NO_STORE_HEADERS }

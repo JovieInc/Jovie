@@ -66,7 +66,7 @@ function AuthShellInner({
     <>
       <UnifiedSidebar section={section} navigation={navigation} />
 
-      <SidebarInset style={{ marginRight: drawerWidth || 0 }}>
+      <SidebarInset>
         <div className='mt-2 mb-2 mr-2 ml-0 h-full'>
           <main className='flex-1 min-h-0 overflow-hidden border border-subtle rounded-md bg-base h-full'>
             <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>

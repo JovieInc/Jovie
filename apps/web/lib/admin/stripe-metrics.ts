@@ -3,6 +3,7 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { env } from '@/lib/env-server';
 import { stripe } from '@/lib/stripe/client';
+import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 
 export interface AdminStripeOverviewMetrics {
   mrrUsd: number;
@@ -111,21 +112,16 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
       });
 
       for (const sub of page.data) {
-        if (sub.status !== 'active' && sub.status !== 'trialing') continue;
+        if (!isActiveSubscription(sub.status)) continue;
         if (!Array.isArray(sub.items.data) || sub.items.data.length === 0)
           continue;
 
-        const isCurrentActive =
-          sub.status === 'active' || sub.status === 'trialing';
-        if (isCurrentActive) {
-          activeSubscribers += 1;
-        }
+        activeSubscribers += 1;
 
         for (const item of sub.items.data) {
           const itemMrrCents = computeMonthlyCentsFromPriceItem(item);
-          if (isCurrentActive) {
-            mrrCents += itemMrrCents;
-          }
+          // Subscription is active (verified by isActiveSubscription check above)
+          mrrCents += itemMrrCents;
           if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
             pastMrrCents += itemMrrCents;
           }

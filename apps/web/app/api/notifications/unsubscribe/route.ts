@@ -3,6 +3,7 @@ import {
   buildInvalidRequestResponse,
   unsubscribeFromNotificationsDomain,
 } from '@/lib/notifications/domain';
+import { logger } from '@/lib/utils/logger';
 import {
   checkRateLimit,
   createRateLimitHeaders,
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[Notifications Unsubscribe] Error:', error);
+    logger.error('[Notifications Unsubscribe] Error:', error);
     return NextResponse.json(
       {
         success: false,

@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
+import { logger } from '@/lib/utils/logger';
 import type { AnalyticsRange, DashboardAnalyticsView } from '@/types/analytics';
 
 type TimeRange = AnalyticsRange;
@@ -102,7 +103,7 @@ export async function GET(request: Request) {
       }
     });
   } catch (error) {
-    console.error('Error in analytics API:', error);
+    logger.error('Error in analytics API:', error);
 
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(

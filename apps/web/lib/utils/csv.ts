@@ -65,6 +65,57 @@ export function escapeCSVValue(value: unknown): string {
 }
 
 /**
+ * Capitalize the first letter of a string.
+ * Common formatter for CSV status and enum values.
+ *
+ * @param value - The value to capitalize (will be converted to string)
+ * @returns String with first letter capitalized
+ *
+ * @example
+ * capitalize('pending') // 'Pending'
+ * capitalize('active') // 'Active'
+ */
+export function capitalize(value: unknown): string {
+  const str = String(value);
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Format a boolean value as 'Yes' or 'No'.
+ * Common formatter for CSV boolean fields.
+ *
+ * @param value - The boolean value to format
+ * @returns 'Yes' if truthy, 'No' if falsy
+ *
+ * @example
+ * formatYesNo(true) // 'Yes'
+ * formatYesNo(false) // 'No'
+ * formatYesNo(1) // 'Yes'
+ * formatYesNo(0) // 'No'
+ */
+export function formatYesNo(value: unknown): string {
+  return value ? 'Yes' : 'No';
+}
+
+/**
+ * Format an optional value as a string, returning empty string if falsy.
+ * Common formatter for CSV nullable/optional fields.
+ *
+ * @param value - The value to format (will be converted to string if truthy)
+ * @returns String representation of value, or empty string if falsy
+ *
+ * @example
+ * formatOptionalString('hello') // 'hello'
+ * formatOptionalString(null) // ''
+ * formatOptionalString(undefined) // ''
+ * formatOptionalString('') // ''
+ * formatOptionalString(123) // '123'
+ */
+export function formatOptionalString(value: unknown): string {
+  return value ? String(value) : '';
+}
+
+/**
  * Format a Date value according to the specified format.
  *
  * @param date - The Date to format

@@ -11,6 +11,7 @@ import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { normalizeString } from '@/lib/utils/string-utils';
 import { LinkType } from '@/types/db';
 import {
   createFingerprint,
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     const resolvedSource = (() => {
       if (typeof source !== 'string') return undefined;
-      const normalized = source.trim().toLowerCase();
+      const normalized = normalizeString(source);
       if (normalized === 'qr') return 'qr';
       if (normalized === 'link') return 'link';
       return undefined;

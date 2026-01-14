@@ -17,6 +17,7 @@ import {
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { normalizeString } from '@/lib/utils/string-utils';
 import { extractMetaContent, fetchDocument } from './strategies/base';
 import {
   extractBeacons,
@@ -87,7 +88,7 @@ export async function maybeCopyIngestionAvatarFromLinks(params: {
   links: string[];
 }): Promise<string | null> {
   const { handle, links } = params;
-  const safeHandle = handle.trim().toLowerCase();
+  const safeHandle = normalizeString(handle);
   if (!safeHandle) return null;
   if (links.length === 0) return null;
 
@@ -580,7 +581,7 @@ export async function copyExternalAvatarToStorage(params: {
   const sanitized = sanitizeHttpsUrl(externalUrl);
   if (!sanitized) return null;
 
-  const safeHandle = handle.trim().toLowerCase();
+  const safeHandle = normalizeString(handle);
   if (!safeHandle) return null;
 
   try {

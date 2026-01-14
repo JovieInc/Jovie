@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 
+// Delay before showing loading message (milliseconds)
+const LOADING_MESSAGE_DELAY_MS = 2000;
+
 /**
  * AuthLoader - Loading state for authenticated pages
  *
@@ -13,8 +16,11 @@ export function AuthLoader() {
   const [showMessage, setShowMessage] = useState(false);
 
   useEffect(() => {
-    // Show additional message after 2 seconds if still loading
-    const timer = setTimeout(() => setShowMessage(true), 2000);
+    // Show additional message after delay if still loading
+    const timer = setTimeout(
+      () => setShowMessage(true),
+      LOADING_MESSAGE_DELAY_MS
+    );
     return () => clearTimeout(timer);
   }, []);
 

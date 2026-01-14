@@ -5,6 +5,7 @@
 
 import type { AdminUserRow } from '@/lib/admin/users';
 import type { CSVColumn } from '@/lib/utils/csv';
+import { capitalize, formatOptionalString, formatYesNo } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for exporting admin user data.
@@ -22,36 +23,32 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
   {
     header: 'Name',
     accessor: 'name',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Email',
     accessor: 'email',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Plan',
     accessor: 'plan',
-    formatter: value => {
-      // Capitalize first letter for better readability
-      const str = String(value);
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    },
+    formatter: capitalize,
   },
   {
     header: 'Is Pro',
     accessor: 'isPro',
-    formatter: value => (value ? 'Yes' : 'No'),
+    formatter: formatYesNo,
   },
   {
     header: 'Stripe Customer ID',
     accessor: 'stripeCustomerId',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Stripe Subscription ID',
     accessor: 'stripeSubscriptionId',
-    formatter: value => (value ? String(value) : ''),
+    formatter: formatOptionalString,
   },
   {
     header: 'Created At',

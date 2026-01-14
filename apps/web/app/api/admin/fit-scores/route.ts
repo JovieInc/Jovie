@@ -19,6 +19,7 @@ import {
   recalculateAllFitScores,
 } from '@/lib/fit-scoring';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -70,11 +71,11 @@ export async function GET(request: Request) {
     // Default: return top fit profiles
     const limit = Math.min(
       200,
-      Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10) || 50)
+      Math.max(1, Number.parseInt(searchParams.get('limit') ?? '50', 10) || 50)
     );
     const minScore = Math.max(
       0,
-      parseInt(searchParams.get('minScore') ?? '0', 10) || 0
+      Number.parseInt(searchParams.get('minScore') ?? '0', 10) || 0
     );
 
     const profiles = await getTopFitProfiles(db, limit, minScore);
@@ -96,7 +97,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Admin fit scores GET failed:', error);
+    logger.error('Admin fit scores GET failed:', error);
     return NextResponse.json(
       {
         error: 'Failed to fetch fit scores',
@@ -204,7 +205,7 @@ export async function POST(request: Request) {
         );
     }
   } catch (error) {
-    console.error('Admin fit scores POST failed:', error);
+    logger.error('Admin fit scores POST failed:', error);
     return NextResponse.json(
       {
         error: 'Failed to process fit scores action',

@@ -31,7 +31,7 @@ interface KpiCardsProps {
 function UnavailableBadge({ message }: { message?: string }) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400'
+      className='inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 line-clamp-1'
       title={message ?? 'Data source unavailable'}
     >
       <AlertTriangle className='size-3' aria-hidden='true' />
@@ -44,7 +44,7 @@ function UnavailableBadge({ message }: { message?: string }) {
 function NotConfiguredBadge({ message }: { message?: string }) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400'
+      className='inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-1'
       title={message ?? 'Data source not configured'}
     >
       <span className='hidden sm:inline'>Not configured</span>
@@ -142,14 +142,13 @@ export function KpiCards({
   };
 
   return (
-    <div className='space-y-0 divide-y divide-subtle'>
+    <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
       <KpiItem
         title='MRR'
         value={mrrLabel}
         metadata={renderStripeMetadata('Monthly recurring revenue')}
         icon={CircleDollarSign}
         iconClassName='text-sky-600 dark:text-sky-400'
-        iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
       />
 
       <KpiItem
@@ -158,7 +157,6 @@ export function KpiCards({
         metadata={renderMercuryMetadata('Mercury checking')}
         icon={Banknote}
         iconClassName='text-emerald-600 dark:text-emerald-400'
-        iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
       />
 
       <KpiItem
@@ -167,7 +165,6 @@ export function KpiCards({
         metadata={renderMercuryMetadata('Spend in the last 30 days')}
         icon={TrendingDown}
         iconClassName='text-rose-500 dark:text-rose-300'
-        iconChipClassName='bg-rose-500/10 dark:bg-rose-500/15'
       />
 
       <KpiItem
@@ -176,7 +173,6 @@ export function KpiCards({
         metadata={renderRunwayMetadata()}
         icon={Clock}
         iconClassName='text-amber-500 dark:text-amber-300'
-        iconChipClassName='bg-amber-500/10 dark:bg-amber-500/15'
       />
 
       <KpiItem
@@ -185,7 +181,6 @@ export function KpiCards({
         metadata='Future customers on deck'
         icon={ClipboardList}
         iconClassName='text-indigo-500 dark:text-indigo-300'
-        iconChipClassName='bg-indigo-500/10 dark:bg-indigo-500/15'
       />
 
       <KpiItem
@@ -194,7 +189,6 @@ export function KpiCards({
         metadata={renderStripeMetadata('Paying customers this month')}
         icon={Users}
         iconClassName='text-purple-500 dark:text-purple-300'
-        iconChipClassName='bg-purple-500/10 dark:bg-purple-500/15'
       />
     </div>
   );

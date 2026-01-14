@@ -17,6 +17,7 @@ import { db } from '@/lib/db';
 import { billingAuditLog, stripeWebhookEvents, users } from '@/lib/db/schema';
 import { captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -178,14 +179,14 @@ export async function GET() {
       );
     }
 
-    const statusCode = hasCritical ? 503 : hasWarning ? 200 : 200;
+    const statusCode = hasCritical ? 503 : 200;
 
     return NextResponse.json(result, {
       status: statusCode,
       headers: NO_STORE_HEADERS,
     });
   } catch (error) {
-    console.error('Billing health check failed:', error);
+    logger.error('Billing health check failed:', error);
 
     return NextResponse.json(
       {
@@ -213,7 +214,7 @@ async function getStripeActiveSubscriptionCount(): Promise<number> {
 
     return count;
   } catch (error) {
-    console.error('Failed to get Stripe subscription count:', error);
+    logger.error('Failed to get Stripe subscription count:', error);
     return -1; // Return -1 to indicate error
   }
 }
@@ -267,7 +268,7 @@ async function countSubscriptionsWithStatus(
 
   // If we hit the page limit, log a warning but return the count we have
   if (hasMore && pageCount >= MAX_STRIPE_PAGES) {
-    console.warn(
+    logger.warn(
       `[billing-health] Hit pagination limit for ${status} subscriptions. Count may be incomplete.`
     );
   }

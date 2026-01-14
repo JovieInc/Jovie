@@ -2,9 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the useArtistSearch hook
-vi.mock('@/lib/hooks/useArtistSearch', () => ({
-  useArtistSearch: vi.fn(() => ({
+// Mock the useArtistSearchQuery hook
+vi.mock('@/lib/queries', () => ({
+  useArtistSearchQuery: vi.fn(() => ({
     results: [],
     state: 'idle',
     error: null,
@@ -12,6 +12,7 @@ vi.mock('@/lib/hooks/useArtistSearch', () => ({
     searchImmediate: vi.fn(),
     clear: vi.fn(),
     query: '',
+    isPending: false,
   })),
 }));
 
@@ -22,7 +23,7 @@ vi.mock('@/lib/analytics', () => ({
 
 // Import after mocks
 import { UniversalLinkInput } from '@/components/dashboard/molecules/universal-link-input';
-import { useArtistSearch } from '@/lib/hooks/useArtistSearch';
+import { useArtistSearchQuery } from '@/lib/queries';
 
 const mockOnAdd = vi.fn();
 
@@ -36,7 +37,7 @@ describe('UniversalLinkInput Accessibility', () => {
       const mockSearch = vi.fn();
       const mockClear = vi.fn();
 
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [
           {
             id: '1',
@@ -52,6 +53,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: mockClear,
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -81,7 +83,7 @@ describe('UniversalLinkInput Accessibility', () => {
     });
 
     it('should have aria-expanded true when results are shown', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [
           {
             id: '1',
@@ -96,6 +98,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -124,7 +127,7 @@ describe('UniversalLinkInput Accessibility', () => {
     });
 
     it('should have listbox role on results container', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [
           {
             id: '1',
@@ -139,6 +142,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -165,7 +169,7 @@ describe('UniversalLinkInput Accessibility', () => {
     });
 
     it('should have option role on each result item', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [
           {
             id: '1',
@@ -186,6 +190,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -214,7 +219,7 @@ describe('UniversalLinkInput Accessibility', () => {
 
   describe('Screen reader status announcements', () => {
     it('should announce loading state', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [],
         state: 'loading',
         error: null,
@@ -222,6 +227,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -241,7 +247,7 @@ describe('UniversalLinkInput Accessibility', () => {
     });
 
     it('should announce empty results', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [],
         state: 'empty',
         error: null,
@@ -249,6 +255,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -266,7 +273,7 @@ describe('UniversalLinkInput Accessibility', () => {
     });
 
     it('should announce result count', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [
           {
             id: '1',
@@ -287,6 +294,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: 'test',
+        isPending: false,
       });
 
       render(
@@ -306,7 +314,7 @@ describe('UniversalLinkInput Accessibility', () => {
 
   describe('Exit search mode button', () => {
     it('should have accessible label on exit button', async () => {
-      vi.mocked(useArtistSearch).mockReturnValue({
+      vi.mocked(useArtistSearchQuery).mockReturnValue({
         results: [],
         state: 'idle',
         error: null,
@@ -314,6 +322,7 @@ describe('UniversalLinkInput Accessibility', () => {
         searchImmediate: vi.fn(),
         clear: vi.fn(),
         query: '',
+        isPending: false,
       });
 
       render(

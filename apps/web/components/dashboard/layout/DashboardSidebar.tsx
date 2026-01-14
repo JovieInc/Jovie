@@ -82,16 +82,11 @@ export function DashboardSidebar({
               href='/app/dashboard'
               aria-label='Go to dashboard'
               className={cn(
-                'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                'group-data-[collapsible=icon]:justify-center'
+                'flex h-9 w-9 items-center justify-center rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
               )}
             >
-              <div className='flex items-center justify-center'>
-                <BrandLogo size={16} tone='auto' className='h-5 w-5' />
-              </div>
-              <span className='sr-only group-data-[collapsible=icon]:hidden'>
-                Dashboard
-              </span>
+              <BrandLogo size={16} tone='auto' className='h-5 w-5' />
+              <span className='sr-only'>Dashboard</span>
             </Link>
           )}
           <div className='group/shortcut ml-auto flex items-center gap-2'>

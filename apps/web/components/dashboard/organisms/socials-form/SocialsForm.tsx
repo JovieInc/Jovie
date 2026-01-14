@@ -11,7 +11,7 @@ import {
 import { Share2 } from 'lucide-react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import type { SocialsFormProps } from './types';
 import { useSocialsForm } from './useSocialsForm';
 

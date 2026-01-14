@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { useToast } from '@/components/molecules/ToastContainer';
+import { toast } from 'sonner';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -29,7 +29,6 @@ export function AvatarUpload({
   onUploadError,
   className,
 }: AvatarUploadProps) {
-  const { showToast } = useToast();
   const uploadableRef = useRef<HTMLDivElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -63,26 +62,20 @@ export function AvatarUpload({
     (url: string) => {
       setIsUploading(false);
       setLastError(null);
-      showToast({
-        type: 'success',
-        message: 'Profile photo updated successfully!',
-      });
+      toast.success('Profile photo updated');
       onUploadSuccess?.(url);
     },
-    [onUploadSuccess, showToast]
+    [onUploadSuccess]
   );
 
   const handleError = useCallback(
     (message: string) => {
       setIsUploading(false);
       setLastError(message);
-      showToast({
-        type: 'error',
-        message,
-      });
+      toast.error(message);
       onUploadError?.(message);
     },
-    [onUploadError, showToast]
+    [onUploadError]
   );
 
   return (

@@ -1,4 +1,4 @@
-import { ActivityTable } from '@/components/admin/ActivityTable';
+import { ActivityTableUnified } from '@/components/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 
 export async function AdminActivitySection() {
@@ -6,7 +6,7 @@ export async function AdminActivitySection() {
 
   return (
     <section id='activity'>
-      <ActivityTable items={activityItems} />
+      <ActivityTableUnified items={activityItems} />
     </section>
   );
 }

@@ -13,7 +13,7 @@ import { SettingsNotificationsSection } from '@/components/dashboard/organisms/S
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
-import { useBillingStatus } from '@/hooks/useBillingStatus';
+import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
@@ -30,8 +30,9 @@ export function SettingsPolished({
   focusSection,
 }: SettingsPolishedProps) {
   const router = useRouter();
-  const billingStatus = useBillingStatus();
-  const { isPro } = billingStatus;
+  const { data: billingData, isLoading: billingLoading } =
+    useBillingStatusQuery();
+  const isPro = billingData?.isPro ?? false;
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   const notificationsEnabled = true;
 
@@ -70,7 +71,7 @@ export function SettingsPolished({
       description={description}
       icon={icon}
       onUpgrade={handleBilling}
-      loading={isBillingLoading || billingStatus.loading}
+      loading={isBillingLoading || billingLoading}
       buttonClassName={SETTINGS_BUTTON_CLASS}
     />
   );
