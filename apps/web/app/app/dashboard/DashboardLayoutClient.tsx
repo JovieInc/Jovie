@@ -319,7 +319,7 @@ function DashboardLayoutInner({
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
                   showDivider={true}
-                  action={<>{ContactToggleButton}</>}
+                  action={ContactToggleButton}
                 />
                 <div className='flex-1 min-h-0 overflow-hidden flex'>
                   <div
@@ -349,9 +349,7 @@ function DashboardLayoutInner({
                   breadcrumbs={crumbs}
                   leading={MobileMenuButton}
                   sidebarTrigger={SidebarExpandButton}
-                  action={
-                    <>{previewEnabled ? <PreviewToggleButton /> : null}</>
-                  }
+                  action={previewEnabled ? <PreviewToggleButton /> : null}
                 />
                 <div className='flex-1 min-h-0 overflow-hidden flex relative'>
                   <div

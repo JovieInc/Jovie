@@ -19,6 +19,7 @@ import {
   TableContextMenu,
 } from '../molecules/TableContextMenu';
 import { cn, presets } from '../table.styles';
+import { UnifiedTableHeader } from './UnifiedTableHeader';
 
 export interface UnifiedTableProps<TData> {
   /**
@@ -232,6 +233,100 @@ export function UnifiedTable<TData>({
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
 
+  const getRowDetails = useCallback(
+    (item: Row<TData> | VirtualItem, listIndex: number) => {
+      if (!shouldVirtualize) {
+        return {
+          row: item as Row<TData>,
+          rowIndex: listIndex,
+          virtualItem: undefined,
+        };
+      }
+
+      const virtualItem = item as VirtualItem;
+      const row = rows[virtualItem.index]!;
+
+      return {
+        row,
+        rowIndex: virtualItem.index,
+        virtualItem,
+      };
+    },
+    [rows, shouldVirtualize]
+  );
+
+  const renderRowElement = useCallback(
+    (
+      row: Row<TData>,
+      rowData: TData,
+      rowIndex: number,
+      virtualItem?: VirtualItem
+    ) => (
+      <tr
+        key={row.id}
+        ref={shouldVirtualize ? rowVirtualizer.measureElement : undefined}
+        data-index={rowIndex}
+        className={cn(
+          presets.tableRow,
+          onRowClick && 'cursor-pointer',
+          getRowClassName?.(rowData, rowIndex)
+        )}
+        onClick={() => onRowClick?.(rowData)}
+        onContextMenu={e => onRowContextMenu?.(rowData, e)}
+        style={
+          shouldVirtualize && virtualItem
+            ? {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }
+            : undefined
+        }
+      >
+        {row.getVisibleCells().map(cell => (
+          <td
+            key={cell.id}
+            className={presets.tableCell}
+            style={{
+              width:
+                cell.column.getSize() !== 150
+                  ? cell.column.getSize()
+                  : undefined,
+            }}
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </td>
+        ))}
+      </tr>
+    ),
+    [
+      getRowClassName,
+      onRowClick,
+      onRowContextMenu,
+      rowVirtualizer.measureElement,
+      shouldVirtualize,
+    ]
+  );
+
+  const renderTableRow = useCallback(
+    (rowData: TData, rowId: string, rowElement: React.ReactNode) => {
+      if (!getContextMenuItems) {
+        return rowElement;
+      }
+
+      const contextMenuItems = getContextMenuItems(rowData);
+
+      return (
+        <TableContextMenu key={rowId} items={contextMenuItems}>
+          {rowElement}
+        </TableContextMenu>
+      );
+    },
+    [getContextMenuItems]
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -246,27 +341,10 @@ export function UnifiedTable<TData>({
           <caption className='sr-only'>Loading table data</caption>
 
           {/* Header */}
-          <thead>
-            <tr>
-              {table.getHeaderGroups()[0]?.headers.map(header => (
-                <th
-                  key={header.id}
-                  className={cn(presets.stickyHeader, presets.tableHeader)}
-                  style={{
-                    width:
-                      header.getSize() !== 150 ? header.getSize() : undefined,
-                  }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </th>
-              ))}
-            </tr>
-          </thead>
+          <UnifiedTableHeader
+            headerGroups={table.getHeaderGroups()}
+            variant='loading'
+          />
 
           {/* Loading skeleton */}
           <LoadingTableBody
@@ -293,72 +371,10 @@ export function UnifiedTable<TData>({
           <caption className='sr-only'>Empty table</caption>
 
           {/* Header */}
-          <thead>
-            <tr>
-              {table.getHeaderGroups()[0]?.headers.map(header => {
-                const canSort = header.column.getCanSort();
-                const sortDirection = header.column.getIsSorted();
-
-                return (
-                  <th
-                    key={header.id}
-                    className={cn(presets.stickyHeader)}
-                    style={{
-                      width:
-                        header.getSize() !== 150 ? header.getSize() : undefined,
-                    }}
-                  >
-                    {header.isPlaceholder ? null : canSort ? (
-                      <button
-                        type='button'
-                        onClick={header.column.getToggleSortingHandler()}
-                        className={cn(
-                          'flex items-center gap-2 px-6 py-3 text-left w-full',
-                          'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
-                          'hover:bg-surface-2/50 transition-colors rounded-md',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-                        )}
-                      >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                        {sortDirection && (
-                          <svg
-                            width='12'
-                            height='12'
-                            viewBox='0 0 12 12'
-                            fill='none'
-                            className='shrink-0'
-                            style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
-                            aria-hidden='true'
-                          >
-                            <title>
-                              {sortDirection === 'asc'
-                                ? 'Sorted ascending'
-                                : 'Sorted descending'}
-                            </title>
-                            {sortDirection === 'asc' ? (
-                              <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
-                            ) : (
-                              <path d='M6 9L3 5H9L6 9Z' fill='currentColor' />
-                            )}
-                          </svg>
-                        )}
-                      </button>
-                    ) : (
-                      <div className={cn(presets.tableHeader)}>
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                      </div>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+          <UnifiedTableHeader
+            headerGroups={table.getHeaderGroups()}
+            variant='standard'
+          />
 
           {/* Empty state */}
           <tbody>
@@ -386,74 +402,10 @@ export function UnifiedTable<TData>({
         <caption className='sr-only'>Data table</caption>
 
         {/* Header */}
-        <thead>
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => {
-                const canSort = header.column.getCanSort();
-                const sortDirection = header.column.getIsSorted();
-
-                return (
-                  <th
-                    key={header.id}
-                    className={cn(presets.stickyHeader)}
-                    style={{
-                      width:
-                        header.getSize() !== 150 ? header.getSize() : undefined,
-                    }}
-                  >
-                    {header.isPlaceholder ? null : canSort ? (
-                      <button
-                        type='button'
-                        onClick={header.column.getToggleSortingHandler()}
-                        className={cn(
-                          'flex items-center gap-2 px-6 py-3 text-left w-full',
-                          'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
-                          'hover:bg-surface-2/50 transition-colors rounded-md',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-                        )}
-                      >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                        {sortDirection && (
-                          <svg
-                            width='12'
-                            height='12'
-                            viewBox='0 0 12 12'
-                            fill='none'
-                            className='shrink-0'
-                            style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
-                            aria-hidden='true'
-                          >
-                            <title>
-                              {sortDirection === 'asc'
-                                ? 'Sorted ascending'
-                                : 'Sorted descending'}
-                            </title>
-                            {sortDirection === 'asc' ? (
-                              <path d='M6 3L9 7H3L6 3Z' fill='currentColor' />
-                            ) : (
-                              <path d='M6 9L3 5H9L6 9Z' fill='currentColor' />
-                            )}
-                          </svg>
-                        )}
-                      </button>
-                    ) : (
-                      <div className={cn(presets.tableHeader)}>
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                      </div>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          ))}
-        </thead>
+        <UnifiedTableHeader
+          headerGroups={table.getHeaderGroups()}
+          variant='standard'
+        />
 
         {/* Body */}
         <tbody
@@ -471,83 +423,24 @@ export function UnifiedTable<TData>({
 
           {/* Rows */}
           {(shouldVirtualize ? virtualRows : rows).map((item, listIndex) => {
-            // When virtualized, item is VirtualItem and we need to get the actual row
-            // When not virtualized, item IS the row
-            let row: Row<TData>;
-            let virtualItem: VirtualItem | undefined;
-            let rowIndex: number;
-
-            if (shouldVirtualize) {
-              virtualItem = item as VirtualItem;
-              row = rows[virtualItem.index]!;
-              rowIndex = virtualItem.index;
-            } else {
-              row = item as Row<TData>;
-              rowIndex = listIndex;
-            }
-
+            const { row, rowIndex, virtualItem } = getRowDetails(
+              item,
+              listIndex
+            );
             const rowData = row.original as TData;
 
-            // Custom row renderer
             if (renderRow) {
               return renderRow(rowData, rowIndex);
             }
 
-            // Default row renderer
-            const rowElement = (
-              <tr
-                key={row.id}
-                ref={
-                  shouldVirtualize ? rowVirtualizer.measureElement : undefined
-                }
-                data-index={rowIndex}
-                className={cn(
-                  presets.tableRow,
-                  onRowClick && 'cursor-pointer',
-                  getRowClassName?.(rowData, rowIndex)
-                )}
-                onClick={() => onRowClick?.(rowData)}
-                onContextMenu={e => onRowContextMenu?.(rowData, e)}
-                style={
-                  shouldVirtualize && virtualItem
-                    ? {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }
-                    : undefined
-                }
-              >
-                {row.getVisibleCells().map(cell => (
-                  <td
-                    key={cell.id}
-                    className={presets.tableCell}
-                    style={{
-                      width:
-                        cell.column.getSize() !== 150
-                          ? cell.column.getSize()
-                          : undefined,
-                    }}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
+            const rowElement = renderRowElement(
+              row,
+              rowData,
+              rowIndex,
+              virtualItem
             );
 
-            // Wrap with context menu if provided
-            if (getContextMenuItems) {
-              const contextMenuItems = getContextMenuItems(rowData);
-              return (
-                <TableContextMenu key={row.id} items={contextMenuItems}>
-                  {rowElement}
-                </TableContextMenu>
-              );
-            }
-
-            return rowElement;
+            return renderTableRow(rowData, row.id, rowElement);
           })}
 
           {/* Bottom padding for virtualization */}
