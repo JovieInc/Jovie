@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/images/status/[id]/route';
 
 // Hoisted mocks so they can be shared between vi.mock and tests
-const { auth, mockEq, mockAnd } = vi.hoisted(() => ({
+const { auth, mockEq, mockAnd, mockGetUserByClerkId } = vi.hoisted(() => ({
   auth: vi.fn(),
   mockEq: vi.fn(),
   mockAnd: vi.fn(),
+  mockGetUserByClerkId: vi.fn(),
 }));
 
 const { db } = vi.hoisted(() => {
@@ -43,6 +44,10 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/db/queries/shared', () => ({
+  getUserByClerkId: mockGetUserByClerkId,
+}));
+
 // Valid UUID v4 for tests
 const TEST_PHOTO_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const NON_EXISTENT_UUID = '550e8400-e29b-41d4-a716-446655440001';
@@ -50,6 +55,7 @@ const NON_EXISTENT_UUID = '550e8400-e29b-41d4-a716-446655440001';
 describe('/api/images/status/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUserByClerkId.mockResolvedValue({ id: 'internal-user-id' });
   });
 
   it('should reject requests without authentication', async () => {
@@ -101,10 +107,7 @@ describe('/api/images/status/[id]', () => {
       updatedAt: new Date(),
     };
 
-    db.select()
-      .from()
-      .where()
-      .limit.mockResolvedValue([{ photo: mockPhoto }]);
+    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
 
     const request = new NextRequest(
       `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`
@@ -137,10 +140,7 @@ describe('/api/images/status/[id]', () => {
       updatedAt: new Date(),
     };
 
-    db.select()
-      .from()
-      .where()
-      .limit.mockResolvedValue([{ photo: mockPhoto }]);
+    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
 
     const request = new NextRequest(
       `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`
@@ -171,10 +171,7 @@ describe('/api/images/status/[id]', () => {
       updatedAt: new Date(),
     };
 
-    db.select()
-      .from()
-      .where()
-      .limit.mockResolvedValue([{ photo: mockPhoto }]);
+    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
 
     const request = new NextRequest(
       `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`

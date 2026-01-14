@@ -61,6 +61,12 @@ describe('useArtistSearchQuery', () => {
   });
 
   it('should update query immediately on search', async () => {
+    let resolveFetch: ((value: unknown) => void) | undefined;
+    const fetchPromise = new Promise(resolve => {
+      resolveFetch = resolve;
+    });
+    mockFetch.mockReturnValue(fetchPromise);
+
     const { result } = renderHook(() => useArtistSearchQuery(), {
       wrapper: createWrapper(),
     });
@@ -73,6 +79,11 @@ describe('useArtistSearchQuery', () => {
     // State transitions to loading when isPending is set (happens async)
     await waitFor(() => {
       expect(result.current.state).toBe('loading');
+    });
+
+    resolveFetch?.({
+      ok: true,
+      json: () => Promise.resolve([]),
     });
   });
 

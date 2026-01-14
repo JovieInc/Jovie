@@ -36,11 +36,11 @@ When you **discover** new tech debt:
 
 | Metric | Count | Target | Last Updated |
 |--------|-------|--------|--------------|
-| `@ts-nocheck` files | **0** | 0 | 2026-01-08 |
-| `@ts-ignore` in production | ~15 | <5 | 2026-01-08 |
-| Deprecated files | 30+ | 0 | 2026-01-08 |
-| TODO comments | 6 | 0 | 2026-01-08 |
-| Empty catch blocks | **0** | 0 | 2026-01-08 |
+| `@ts-nocheck` files | **0** | 0 | 2026-01-14 |
+| `@ts-ignore` in production | ~15 | <5 | 2026-01-14 |
+| Deprecated files | 30+ | 0 | 2026-01-14 |
+| TODO comments | 6 | 0 | 2026-01-14 |
+| Empty catch blocks | **0** | 0 | 2026-01-14 |
 
 ---
 
