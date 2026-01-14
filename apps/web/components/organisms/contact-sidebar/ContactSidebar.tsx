@@ -9,7 +9,8 @@
 
 import { Button } from '@jovie/ui';
 
-import { cn } from '@/lib/utils';
+import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 
 import { ContactAvatar } from './ContactAvatar';
 import { ContactFields } from './ContactFields';
@@ -55,17 +56,13 @@ export function ContactSidebar({
   });
 
   return (
-    <aside
-      aria-label='Contact details'
-      aria-hidden={!isOpen}
-      data-testid='contact-sidebar'
-      className={cn(
-        'relative flex h-full min-h-screen flex-col bg-surface-2 text-sidebar-foreground border-l border-subtle transition-[width,opacity,transform] duration-200 ease-out overflow-hidden',
-        'w-0 opacity-0 translate-x-4 pointer-events-none',
-        isOpen &&
-          'pointer-events-auto w-full opacity-100 translate-x-0 md:w-[300px] lg:w-[320px]'
-      )}
+    <RightDrawer
+      isOpen={isOpen}
+      width={SIDEBAR_WIDTH}
+      ariaLabel='Contact details'
       onKeyDown={handleKeyDown}
+      className='bg-surface-2 text-sidebar-foreground'
+      data-testid='contact-sidebar'
     >
       <ContactSidebarHeader
         contact={contact}
@@ -129,6 +126,6 @@ export function ContactSidebar({
           </>
         )}
       </div>
-    </aside>
+    </RightDrawer>
   );
 }
