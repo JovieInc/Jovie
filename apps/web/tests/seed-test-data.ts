@@ -6,7 +6,7 @@
  */
 
 import { neonConfig, Pool } from '@neondatabase/serverless';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import * as schema from '@/lib/db/schema';
@@ -77,22 +77,28 @@ export async function seedTestData() {
       }
 
       // Create the creator profile (no user association needed for public profiles)
-      const [createdProfile] = await db
-        .insert(creatorProfiles)
-        .values({
-          username: profile.username,
-          usernameNormalized: profile.username.toLowerCase(),
-          displayName: profile.displayName,
-          bio: profile.bio,
-          spotifyUrl: profile.spotifyUrl,
-          avatarUrl: profile.avatarUrl,
-          creatorType: 'artist',
-          isPublic: true,
-          isVerified: false,
-          isClaimed: false,
-          ingestionStatus: 'idle',
-        })
-        .returning({ id: creatorProfiles.id });
+      // NOTE: Uses explicit column list to be resilient to schema changes (e.g., waitlist_entry_id migration)
+      // This avoids Drizzle trying to insert columns that may not exist in all environments
+      const result = await db.execute<{ id: string }>(
+        sql`INSERT INTO creator_profiles (
+          username, username_normalized, display_name, bio,
+          spotify_url, avatar_url, creator_type,
+          is_public, is_verified, is_claimed, ingestion_status
+        ) VALUES (
+          ${profile.username},
+          ${profile.username.toLowerCase()},
+          ${profile.displayName},
+          ${profile.bio},
+          ${profile.spotifyUrl || null},
+          ${profile.avatarUrl || null},
+          ${'artist'},
+          ${true},
+          ${false},
+          ${false},
+          ${'idle'}
+        ) RETURNING id`
+      );
+      const createdProfile = result.rows[0];
 
       console.log(
         `    ✓ Created profile ${profile.username} (ID: ${createdProfile.id})`
