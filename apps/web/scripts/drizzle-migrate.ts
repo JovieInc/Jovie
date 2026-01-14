@@ -39,6 +39,7 @@ const migrationsDir = path.join(webRootDir, 'drizzle', 'migrations');
 const migrationsJournalPath = path.join(migrationsDir, 'meta', '_journal.json');
 
 type DrizzleMigrationsSchema = 'drizzle' | 'public';
+type JournalEntry = { idx: number; tag: string; when: number };
 
 // ANSI color codes for terminal output
 const colors = {
@@ -276,8 +277,6 @@ async function runMigrations() {
   }
 
   async function detectAppliedThroughIdx(): Promise<number | null> {
-    type JournalEntry = { idx: number; tag: string; when: number };
-
     type Probe = {
       idx: number | null;
       tag: string;
@@ -411,7 +410,7 @@ async function runMigrations() {
     }
 
     const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
-      entries?: Array<{ idx: number; tag: string; when: number }>;
+      entries?: JournalEntry[];
     };
 
     const entries = (journal.entries ?? [])
