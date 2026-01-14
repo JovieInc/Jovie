@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { and, db, eq } from '@/lib/db';
+import { db, eq } from '@/lib/db';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
@@ -335,16 +336,20 @@ export async function PUT(req: Request) {
         // Don't fail the entire request - avatar is still stored in our DB
       }
 
+      // Get user to verify they exist and get internal ID
+      const user = await getUserByClerkId(db, clerkUserId);
+      if (!user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Update the user's profile
       const updateResult = await db
         .update(creatorProfiles)
         .set({ ...dbProfileUpdates, updatedAt: new Date() })
-        .from(users)
-        .where(
-          and(
-            eq(creatorProfiles.userId, users.id),
-            eq(users.clerkId, clerkUserId)
-          )
-        )
+        .where(eq(creatorProfiles.userId, user.id))
         .returning();
       const [updatedProfile] = updateResult;
 
@@ -352,7 +357,7 @@ export async function PUT(req: Request) {
         await db
           .update(users)
           .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-          .where(eq(users.clerkId, clerkUserId));
+          .where(eq(users.id, user.id));
       }
 
       if (!updatedProfile) {
