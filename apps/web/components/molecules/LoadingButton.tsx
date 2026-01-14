@@ -2,7 +2,7 @@ import { Button, type ButtonProps } from '@jovie/ui';
 import {
   LoadingSpinner,
   type LoadingSpinnerTone,
-} from '@/components/ui/LoadingSpinner';
+} from '@/components/atoms/LoadingSpinner';
 
 // Trigger CI run to resolve check suite failures - updated
 

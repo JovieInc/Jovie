@@ -10,7 +10,7 @@ import {
   AudienceTableHeader,
 } from '@/components/dashboard/audience/table';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 

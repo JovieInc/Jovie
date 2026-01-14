@@ -3,7 +3,7 @@
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import { forwardRef } from 'react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ComboboxOptionItem } from './ComboboxOptionItem';
 import type { ComboboxOption } from './types';
 

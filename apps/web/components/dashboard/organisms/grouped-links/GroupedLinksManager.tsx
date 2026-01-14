@@ -7,7 +7,7 @@ import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/universal-link-input';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import { cn } from '@/lib/utils';
 import '@/lib/utils/color';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
