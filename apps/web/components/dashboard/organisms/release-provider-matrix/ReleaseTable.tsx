@@ -73,8 +73,8 @@ export function ReleaseTable({
   ]);
 
   // Build dynamic column definitions
-  const columns = useMemo<ColumnDef<ReleaseViewModel, unknown>[]>(() => {
-    const baseColumns: ColumnDef<ReleaseViewModel, unknown>[] = [
+  const columns = useMemo(() => {
+    const baseColumns: ColumnDef<ReleaseViewModel>[] = [
       // Release column (artwork + title + artist)
       columnHelper.accessor('title', {
         id: 'release',
@@ -93,7 +93,7 @@ export function ReleaseTable({
         cell: ({ getValue }) => {
           const date = getValue();
           return date ? (
-            <DateCell date={date} />
+            <DateCell date={new Date(date)} />
           ) : (
             <span className='text-xs text-tertiary-token'>TBD</span>
           );
