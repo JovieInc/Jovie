@@ -104,15 +104,8 @@ export function AdminWaitlistTableUnified({
 
   // Helper to copy to clipboard
   const copyToClipboard = useCallback((text: string, label: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        // Could show a toast notification here
-        console.log(`Copied ${label} to clipboard`);
-      })
-      .catch(err => {
-        console.error('Failed to copy:', err);
-      });
+    void navigator.clipboard.writeText(text);
+    // Note: Silent copy - toast notifications can be added in future PR
   }, []);
 
   // Create context menu items for a waitlist entry
