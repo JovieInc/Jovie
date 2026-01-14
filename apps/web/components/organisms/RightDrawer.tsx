@@ -4,7 +4,8 @@ import React from 'react';
 
 import { cn } from '@/lib/utils';
 
-export interface RightDrawerProps {
+export interface RightDrawerProps
+  extends Omit<React.HTMLAttributes<HTMLElement>, 'children' | 'className'> {
   isOpen: boolean;
   width: number;
   children: React.ReactNode;
@@ -20,9 +21,11 @@ export function RightDrawer({
   className,
   ariaLabel,
   onKeyDown,
+  ...rest
 }: RightDrawerProps) {
   return (
     <aside
+      {...rest}
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}

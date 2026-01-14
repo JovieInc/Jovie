@@ -31,13 +31,13 @@ import {
 } from '@/components/organisms/table';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
-import { CONTACT_PANEL_WIDTH } from './utils';
 
 const DeleteCreatorDialog = dynamic(
   () =>
@@ -700,7 +700,7 @@ export function AdminCreatorProfilesUnified({
       </div>
       <RightDrawer
         isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={CONTACT_PANEL_WIDTH}
+        width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
         className='hidden md:flex bg-surface-0 border-subtle'
       >

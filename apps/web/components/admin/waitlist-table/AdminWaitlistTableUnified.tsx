@@ -4,10 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
-  flexRender,
-  getCoreRowModel,
   type RowSelectionState,
-  useReactTable,
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -18,9 +15,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
-  GroupedTableBody,
   UnifiedTable,
-  useTableGrouping,
 } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import type { WaitlistTableProps } from './types';
@@ -109,15 +104,8 @@ export function AdminWaitlistTableUnified({
 
   // Helper to copy to clipboard
   const copyToClipboard = useCallback((text: string, label: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        // Could show a toast notification here
-        console.log(`Copied ${label} to clipboard`);
-      })
-      .catch(err => {
-        console.error('Failed to copy:', err);
-      });
+    void navigator.clipboard.writeText(text);
+    // Note: Silent copy - toast notifications can be added in future PR
   }, []);
 
   // Create context menu items for a waitlist entry
@@ -284,103 +272,12 @@ export function AdminWaitlistTableUnified({
     ]
   );
 
-  // Initialize TanStack Table for grouping view
-  const table = useReactTable({
-    data: entries,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: row => row.id,
-  });
-
   // Get row className
   const getRowClassName = useCallback(() => {
     return 'group hover:bg-base dark:hover:bg-surface-2';
   }, []);
 
-  // Grouping logic
-  const { groupedData, observeGroupHeader } = useTableGrouping({
-    data: entries,
-    getGroupKey: entry => entry.status,
-    getGroupLabel: key => STATUS_LABELS[key] || key,
-    enabled: groupingEnabled,
-  });
-
-  // If grouping is enabled, render grouped table directly
-  // Note: Row selection is intentionally disabled in grouped view for UX simplicity
-  if (groupingEnabled) {
-    return (
-      <div className='overflow-auto'>
-        <table
-          className='w-full border-separate border-spacing-0 text-[13px]'
-          style={{ minWidth: '1100px' }}
-        >
-          <caption className='sr-only'>
-            Waitlist entries grouped by status
-          </caption>
-
-          {/* Header */}
-          <thead>
-            <tr>
-              {table.getHeaderGroups()[0]?.headers.map(header => (
-                <th
-                  key={header.id}
-                  className='sticky top-0 z-20 border-b border-subtle bg-base/95 backdrop-blur-sm px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'
-                  style={{
-                    width:
-                      header.getSize() !== 150 ? header.getSize() : undefined,
-                  }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : // Skip rendering checkbox header in grouped view
-                      header.id === 'select'
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          {/* Grouped Body */}
-          <GroupedTableBody
-            groupedData={groupedData}
-            observeGroupHeader={observeGroupHeader}
-            columns={columns.length}
-            renderRow={(entry, index) => {
-              const row = table
-                .getRowModel()
-                .rows.find(r => r.original.id === entry.id);
-              if (!row) return null;
-
-              return (
-                <tr key={entry.id} className={getRowClassName()}>
-                  {row.getVisibleCells().map(cell => (
-                    <td
-                      key={cell.id}
-                      className='border-b border-subtle px-4 py-3 text-secondary-token'
-                    >
-                      {/* Skip rendering checkbox cells in grouped view */}
-                      {cell.column.id === 'select'
-                        ? null
-                        : flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                    </td>
-                  ))}
-                </tr>
-              );
-            }}
-          />
-        </table>
-      </div>
-    );
-  }
-
-  // Default ungrouped table view
+  // Render unified table with optional grouping
   return (
     <UnifiedTable
       data={entries}
@@ -406,6 +303,14 @@ export function AdminWaitlistTableUnified({
       className='text-[13px]'
       rowSelection={rowSelection}
       onRowSelectionChange={handleRowSelectionChange}
+      groupingConfig={
+        groupingEnabled
+          ? {
+              getGroupKey: entry => entry.status,
+              getGroupLabel: key => STATUS_LABELS[key] || key,
+            }
+          : undefined
+      }
     />
   );
 }

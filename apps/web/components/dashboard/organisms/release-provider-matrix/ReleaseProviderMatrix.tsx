@@ -4,11 +4,11 @@ import { Button } from '@jovie/ui';
 import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { ReleaseTableRow } from '@/components/dashboard/organisms/releases';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
+import { ReleaseTable } from './ReleaseTable';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -29,12 +29,8 @@ export function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
-    headerElevated,
-    tableContainerRef,
     totalReleases,
     totalOverrides,
-    sortState,
-    toggleSort,
     openEditor,
     closeEditor,
     handleCopy,
@@ -124,10 +120,7 @@ export function ReleaseProviderMatrix({
 
         <div className='flex-1 min-h-0 overflow-hidden'>
           <div className='flex h-full min-h-0 flex-col bg-base'>
-            <div
-              className='flex-1 min-h-0 overflow-auto'
-              ref={tableContainerRef}
-            >
+            <div className='flex-1 min-h-0 overflow-auto'>
               {showEmptyState && (
                 <ReleasesEmptyState
                   onConnected={handleArtistConnected}
@@ -156,118 +149,18 @@ export function ReleaseProviderMatrix({
               )}
 
               {showReleasesTable && (
-                <table
-                  className='w-full min-w-[1000px] border-separate border-spacing-0 text-[13px]'
-                  aria-label='Releases table'
-                >
-                  <caption className='sr-only'>
-                    Table showing all releases with smart links and provider
-                    availability
-                  </caption>
-                  <thead
-                    className={cn(
-                      'sticky top-0 z-20 bg-base backdrop-blur-md',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                  >
-                    <tr>
-                      <th className='w-[220px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
-                        <button
-                          type='button'
-                          onClick={() => toggleSort('title')}
-                          className='group -mx-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-surface-2/50 hover:text-primary-token'
-                        >
-                          Release
-                          <Icon
-                            name={
-                              sortState.column === 'title'
-                                ? sortState.direction === 'asc'
-                                  ? 'ArrowUp'
-                                  : 'ArrowDown'
-                                : 'ArrowUpDown'
-                            }
-                            className={cn(
-                              'h-3.5 w-3.5 transition-opacity',
-                              sortState.column === 'title'
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover:opacity-50'
-                            )}
-                            aria-hidden='true'
-                          />
-                        </button>
-                      </th>
-                      <th className='w-[120px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
-                        <button
-                          type='button'
-                          onClick={() => toggleSort('releaseDate')}
-                          className='group -mx-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-surface-2/50 hover:text-primary-token'
-                        >
-                          Released
-                          <Icon
-                            name={
-                              sortState.column === 'releaseDate'
-                                ? sortState.direction === 'asc'
-                                  ? 'ArrowUp'
-                                  : 'ArrowDown'
-                                : 'ArrowUpDown'
-                            }
-                            className={cn(
-                              'h-3.5 w-3.5 transition-opacity',
-                              sortState.column === 'releaseDate'
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover:opacity-50'
-                            )}
-                            aria-hidden='true'
-                          />
-                        </button>
-                      </th>
-                      <th className='w-[140px] border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
-                        <span className='line-clamp-1'>Smart link</span>
-                      </th>
-                      {primaryProviders.map(provider => (
-                        <th
-                          key={provider}
-                          className='border-b border-subtle px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'
-                        >
-                          <div className='flex items-center gap-2'>
-                            <span
-                              className='h-2 w-2 shrink-0 rounded-full'
-                              style={{
-                                backgroundColor:
-                                  providerConfig[provider].accent,
-                              }}
-                              aria-hidden='true'
-                            />
-                            <span className='line-clamp-1'>
-                              {providerConfig[provider].label}
-                            </span>
-                          </div>
-                        </th>
-                      ))}
-                      <th className='w-[100px] border-b border-subtle px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-tertiary-token sm:px-6'>
-                        <span className='line-clamp-1'>Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((release, index) => (
-                      <ReleaseTableRow
-                        key={release.slug}
-                        release={release}
-                        index={index}
-                        totalRows={rows.length}
-                        primaryProviders={primaryProviders}
-                        providerConfig={providerConfig}
-                        onCopy={handleCopy}
-                        onEdit={openEditor}
-                        onAddUrl={handleAddUrl}
-                        isAddingUrl={isSaving}
-                        artistName={artistName}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                <ReleaseTable
+                  releases={rows}
+                  primaryProviders={primaryProviders}
+                  providerConfig={providerConfig}
+                  artistName={artistName}
+                  onCopy={handleCopy}
+                  onEdit={openEditor}
+                  onAddUrl={handleAddUrl}
+                  onSync={handleSync}
+                  isAddingUrl={isSaving}
+                  isSyncing={isSyncing}
+                />
               )}
 
               {/* Show "No releases" state when connected but no releases and not importing */}

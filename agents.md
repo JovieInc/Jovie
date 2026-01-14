@@ -496,6 +496,38 @@ export function OldButton() { ... }
   - Use `useReactTable` with `getCoreRowModel`, `getSortedRowModel`
   - Type-safe column definitions with `ColumnDef<TData>`
   - Built-in row selection, sorting, filtering support
+  - **CRITICAL: Column Type Inference Pattern**
+    - When mixing `columnHelper.accessor()` and `columnHelper.display()` columns, **ALWAYS use type inference**
+    - ❌ **DON'T:** Explicitly type columns as `ColumnDef<TData, unknown>[]`
+    - ✅ **DO:** Let TypeScript infer the column union type naturally
+    - **Why:** TanStack Table has specific accessor types (`AccessorKeyColumnDef<TData, string>`) that conflict with explicit generic typing
+    - **Type Assertion:** When passing inferred columns to components that expect `ColumnDef<TData, unknown>[]`, use type assertion: `as ColumnDef<TData, unknown>[]`
+    - **Example:**
+      ```typescript
+      // ❌ WRONG: Explicit typing causes type errors
+      const columns = useMemo<ColumnDef<MyType, unknown>[]>(() => {
+        const baseColumns: ColumnDef<MyType, unknown>[] = [
+          columnHelper.accessor('field', { /* ... */ }),
+          columnHelper.display({ /* ... */ }),
+        ];
+        return baseColumns;
+      }, [deps]);
+
+      // ✅ CORRECT: Let TypeScript infer types
+      const columns = useMemo(() => {
+        const baseColumns = [
+          columnHelper.accessor('field', { /* ... */ }),
+          columnHelper.display({ /* ... */ }),
+        ];
+        return baseColumns;
+      }, [deps]);
+
+      // ✅ When passing to UnifiedTable, use type assertion:
+      <UnifiedTable
+        data={data}
+        columns={columns as ColumnDef<MyType, unknown>[]}
+      />
+      ```
 - **Virtualization:** TanStack Virtual v3.13.13 (`@tanstack/react-virtual`)
   - Use `useVirtualizer` for list/table virtualization
   - Auto-enable for datasets 20+ rows

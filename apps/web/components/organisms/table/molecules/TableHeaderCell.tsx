@@ -1,0 +1,85 @@
+'use client';
+
+import type { Header } from '@tanstack/react-table';
+import { flexRender } from '@tanstack/react-table';
+import { Icon } from '@/components/atoms/Icon';
+import { cn } from '../table.styles';
+
+interface TableHeaderCellProps<TData> {
+  header: Header<TData, unknown>;
+  canSort: boolean;
+  sortDirection: false | 'asc' | 'desc';
+  stickyHeaderClass: string;
+  tableHeaderClass: string;
+  onToggleSort?: (event: unknown) => void;
+}
+
+/**
+ * TableHeaderCell - Reusable table header cell component
+ *
+ * Features:
+ * - Sortable headers with visual indicators
+ * - Consistent styling across all table states
+ * - Accessibility support (aria-labels, keyboard navigation)
+ */
+export function TableHeaderCell<TData>({
+  header,
+  canSort,
+  sortDirection,
+  stickyHeaderClass,
+  tableHeaderClass,
+  onToggleSort,
+}: TableHeaderCellProps<TData>) {
+  const ariaSort =
+    canSort && !header.isPlaceholder
+      ? sortDirection === 'asc'
+        ? 'ascending'
+        : sortDirection === 'desc'
+          ? 'descending'
+          : 'none'
+      : undefined;
+
+  return (
+    <th
+      key={header.id}
+      scope='col'
+      aria-sort={ariaSort}
+      className={cn(stickyHeaderClass)}
+      style={{
+        width: header.getSize() !== 150 ? header.getSize() : undefined,
+      }}
+    >
+      {header.isPlaceholder ? null : canSort ? (
+        <button
+          type='button'
+          onClick={onToggleSort}
+          className={cn(
+            tableHeaderClass,
+            'flex w-full items-center gap-2',
+            'hover:bg-surface-2/50 transition-colors rounded-md',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          )}
+        >
+          {flexRender(header.column.columnDef.header, header.getContext())}
+          {sortDirection && (
+            <Icon
+              name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
+              className='shrink-0'
+              style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
+              ariaLabel={
+                sortDirection === 'asc'
+                  ? 'Sorted ascending'
+                  : 'Sorted descending'
+              }
+              size={12}
+            />
+          )}
+        </button>
+      ) : (
+        <div className={cn(tableHeaderClass)}>
+          {flexRender(header.column.columnDef.header, header.getContext())}
+        </div>
+      )}
+    </th>
+  );
+}

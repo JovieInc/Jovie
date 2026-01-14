@@ -20,6 +20,7 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -27,7 +28,6 @@ import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
-import { CONTACT_PANEL_WIDTH } from './utils';
 
 const DeleteCreatorDialog = dynamic(
   () =>
@@ -351,7 +351,7 @@ export function AdminCreatorProfilesWithSidebar({
       </div>
       <RightDrawer
         isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={CONTACT_PANEL_WIDTH}
+        width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
         className='hidden md:flex bg-surface-0 border-subtle'
       >

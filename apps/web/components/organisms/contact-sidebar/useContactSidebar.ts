@@ -24,7 +24,7 @@ export interface UseContactSidebarReturn {
   handleAddLink: () => void;
   handleRemoveLink: (index: number) => void;
   handleNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-  handleKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  handleKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
 }
 
 export function useContactSidebar({
@@ -152,7 +152,7 @@ export function useContactSidebar({
   );
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
+    (event: React.KeyboardEvent<HTMLElement>) => {
       if (event.key === 'Escape' && !isFormElement(event.target)) {
         onClose?.();
       }

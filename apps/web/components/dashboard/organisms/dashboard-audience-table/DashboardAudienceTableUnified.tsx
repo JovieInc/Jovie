@@ -2,10 +2,12 @@
 
 import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { BellRing, Users } from 'lucide-react';
+import { BellRing, Copy, Download, Eye, Phone, Users } from 'lucide-react';
 import * as React from 'react';
 import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
+import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
@@ -18,7 +20,11 @@ import {
 } from '@/components/dashboard/audience/table/atoms';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
-import { UnifiedTable } from '@/components/organisms/table';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
@@ -60,6 +66,76 @@ export function DashboardAudienceTableUnified({
     direction,
     profileUrl,
   });
+
+  // Context menu items for right-click
+  const getContextMenuItems = React.useCallback(
+    (member: AudienceMember): ContextMenuItemType[] => {
+      return [
+        {
+          id: 'view-details',
+          label: 'View details',
+          icon: <Eye className='h-3.5 w-3.5' />,
+          onClick: () => setSelectedMember(member),
+        },
+        {
+          id: 'copy-email',
+          label: 'Copy email',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            if (member.email) {
+              void navigator.clipboard.writeText(member.email);
+              toast.success('Email copied to clipboard');
+            }
+          },
+          disabled: !member.email,
+        },
+        {
+          id: 'copy-phone',
+          label: 'Copy phone',
+          icon: <Phone className='h-3.5 w-3.5' />,
+          onClick: () => {
+            if (member.phone) {
+              void navigator.clipboard.writeText(member.phone);
+              toast.success('Phone number copied to clipboard');
+            }
+          },
+          disabled: !member.phone,
+        },
+        { type: 'separator' as const },
+        {
+          id: 'export-contact',
+          label: 'Export as vCard',
+          icon: <Download className='h-3.5 w-3.5' />,
+          onClick: () => {
+            // Generate vCard format
+            const vcard = [
+              'BEGIN:VCARD',
+              'VERSION:3.0',
+              `FN:${member.displayName}`,
+              member.email ? `EMAIL:${member.email}` : '',
+              member.phone ? `TEL:${member.phone}` : '',
+              'END:VCARD',
+            ]
+              .filter(Boolean)
+              .join('\n');
+
+            // Create blob and download
+            const blob = new Blob([vcard], { type: 'text/vcard' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${(member.displayName || 'contact').replace(/[^a-z0-9]/gi, '_')}.vcf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            toast.success('Contact exported as vCard');
+          },
+        },
+      ];
+    },
+    [setSelectedMember]
+  );
 
   // Define columns for members mode
   const memberColumns = useMemo<ColumnDef<AudienceMember, any>[]>(
@@ -166,8 +242,33 @@ export function DashboardAudienceTableUnified({
         ),
         size: 160,
       }),
+
+      // Ellipsis menu column
+      memberColumnHelper.display({
+        id: 'menu',
+        header: '',
+        cell: ({ row }) => {
+          const contextMenuItems = getContextMenuItems(row.original);
+          const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+          return (
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={actionMenuItems} align='end' />
+            </div>
+          );
+        },
+        size: 48,
+      }),
     ],
-    [page, pageSize, selectedIds, toggleSelect, openMenuRowId, setOpenMenuRowId]
+    [
+      page,
+      pageSize,
+      selectedIds,
+      toggleSelect,
+      openMenuRowId,
+      setOpenMenuRowId,
+      getContextMenuItems,
+    ]
   );
 
   // Define columns for subscribers mode (simplified)
@@ -233,8 +334,33 @@ export function DashboardAudienceTableUnified({
         ),
         size: 180,
       }),
+
+      // Ellipsis menu column
+      memberColumnHelper.display({
+        id: 'menu',
+        header: '',
+        cell: ({ row }) => {
+          const contextMenuItems = getContextMenuItems(row.original);
+          const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+          return (
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={actionMenuItems} align='end' />
+            </div>
+          );
+        },
+        size: 48,
+      }),
     ],
-    [page, pageSize, selectedIds, toggleSelect, openMenuRowId, setOpenMenuRowId]
+    [
+      page,
+      pageSize,
+      selectedIds,
+      toggleSelect,
+      openMenuRowId,
+      setOpenMenuRowId,
+      getContextMenuItems,
+    ]
   );
 
   const columns = mode === 'members' ? memberColumns : subscriberColumns;
@@ -328,6 +454,7 @@ export function DashboardAudienceTableUnified({
                 className='text-[13px]'
                 getRowClassName={getRowClassName}
                 onRowClick={row => setSelectedMember(row)}
+                getContextMenuItems={getContextMenuItems}
               />
             </div>
           )}
