@@ -42,6 +42,9 @@ Claude Code uses hooks to automatically enforce code quality and prevent common 
 
 **PostToolUse Hooks** (run after file operations):
 - **biome-formatter.sh**: Auto-formats TypeScript/JavaScript files with Biome after every edit
+- **console-check.sh**: Blocks `console.*` statements in production code (use Sentry instead)
+- **ts-strict-check.sh**: Blocks explicit `any` types and warns on `@ts-ignore` usage
+- **file-size-check.sh**: Warns when files exceed 500 lines
 
 ### Hook Behavior
 
@@ -670,5 +673,80 @@ Update the metrics dashboard when counts change:
 ```
 
 **Failure to update the tech debt tracker when addressing or discovering tech debt is a violation of agent protocol.**
+
+## 18. Code Quality Enforcement (REQUIRED)
+
+AI agents **must** follow these code quality rules, which are enforced by Claude Code hooks and Biome.
+
+### Console Statement Policy
+
+- **No `console.*` in production code** - Use Sentry logging per Section 15
+- **Allowed locations:** tests, scripts/, dev-only files, config files
+- **Enforcement:** Claude hook (blocks), Biome (future)
+
+**Correct pattern:**
+```typescript
+import * as Sentry from '@sentry/nextjs';
+
+// For errors
+Sentry.captureException(error);
+
+// For structured logging
+const { logger } = Sentry;
+logger.error('message', { context });
+```
+
+### TypeScript Strictness
+
+- **No explicit `any` types in production code** - Use proper typing or `unknown`
+- **Avoid `@ts-ignore`** - Use `@ts-expect-error` with explanation comment
+- **Track unavoidable exceptions** in `TECH_DEBT_TRACKER.md`
+- **Enforcement:** Biome (error), Claude hook (blocks)
+
+**Correct pattern:**
+```typescript
+// Instead of: const data: any = ...
+const data: unknown = response.json();
+
+// Type guard for unknown
+function isUser(obj: unknown): obj is User {
+  return typeof obj === 'object' && obj !== null && 'id' in obj;
+}
+
+// Instead of: @ts-ignore
+// @ts-expect-error - Drizzle type mismatch during migration (tracked in TECH_DEBT_TRACKER.md)
+```
+
+### File Size Limits
+
+- **Max file size: 500 lines** - Split if exceeded
+- **Exceptions:** test files, generated files, migrations
+- **Enforcement:** Claude hook (warning)
+
+**Refactoring strategies:**
+- Extract utility functions to separate files
+- Split by feature/concern
+- Create sub-components for large React components
+- Use composition patterns
+
+### Code Coverage Requirements
+
+- **New code coverage: 60%** minimum
+- **Critical paths:** Higher coverage expected (auth, payments, onboarding)
+- **Enforcement:** SonarCloud quality gate (warning mode)
+
+### Biome Configuration
+
+The following rules are enforced as errors:
+
+| Rule | Level | Purpose |
+|------|-------|---------|
+| `noExplicitAny` | error | Type safety in production |
+| `noUnusedVariables` | error | Clean code |
+| `noUnusedImports` | error | Bundle size |
+| `noArrayIndexKey` | warn | React best practice |
+| `noUselessFragments` | warn | Performance |
+
+**Override for tests:** `any` types are allowed in test files (`*.test.ts`, `*.spec.ts`, `/tests/`)
 
 </details>
