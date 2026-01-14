@@ -110,7 +110,7 @@ export async function GET(request: Request) {
         blobsDeleted = blobUrlsToDelete.length;
       } catch (blobError) {
         // Log but don't fail - blob deletion is best-effort
-        console.warn('Failed to delete some blobs:', blobError);
+        logger.warn('Failed to delete some blobs:', blobError);
       }
     }
 

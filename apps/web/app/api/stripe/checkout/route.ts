@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // Get price details for logging
     const priceDetails = getPriceMappingDetails(priceId);
-    console.log('Creating checkout session for:', {
+    logger.info('Creating checkout session for:', {
       userId,
       priceId,
       plan: priceDetails?.plan,
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Log successful checkout creation
-    console.log('Checkout session created:', {
+    logger.info('Checkout session created:', {
       sessionId: session.id,
       userId,
       priceId,

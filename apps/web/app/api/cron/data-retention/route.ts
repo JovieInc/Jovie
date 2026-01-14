@@ -47,16 +47,16 @@ export async function GET(request: NextRequest) {
   }
 
   if (!verifyCronSecret(cronSecret)) {
-    console.warn('[Data Retention Cron] Unauthorized access attempt');
+    logger.warn('[Data Retention Cron] Unauthorized access attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    console.log('[Data Retention Cron] Starting scheduled cleanup');
+    logger.info('[Data Retention Cron] Starting scheduled cleanup');
 
     const result = await runDataRetentionCleanup();
 
-    console.log('[Data Retention Cron] Cleanup completed successfully', {
+    logger.info('[Data Retention Cron] Cleanup completed successfully', {
       clickEventsDeleted: result.clickEventsDeleted,
       audienceMembersDeleted: result.audienceMembersDeleted,
       notificationSubscriptionsDeleted: result.notificationSubscriptionsDeleted,

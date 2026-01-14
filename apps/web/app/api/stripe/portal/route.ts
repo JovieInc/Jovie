@@ -64,7 +64,7 @@ export async function POST() {
     });
 
     // Log portal session creation
-    console.log('Billing portal session created:', {
+    logger.info('Billing portal session created:', {
       userId,
       customerId: stripeCustomerId,
       sessionId: session.id,
