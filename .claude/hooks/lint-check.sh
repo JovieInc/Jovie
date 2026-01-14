@@ -22,7 +22,7 @@ pnpm biome check --write "$file_path" 2>/dev/null || true
 
 # Then check for remaining errors and report them
 # Use --reporter=github for cleaner output
-lint_output=$(pnpm biome check "$file_path" 2>&1) || lint_exit=$?
+lint_output=$(pnpm biome check --reporter=github "$file_path" 2>&1) || lint_exit=$?
 
 if [ "${lint_exit:-0}" -ne 0 ]; then
   echo "⚠️ Biome lint errors in $file_path:"
