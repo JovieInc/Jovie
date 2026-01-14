@@ -277,6 +277,13 @@ export const ALL_PLATFORMS = [
     icon: 'pandora',
     color: '005483',
   },
+  {
+    id: 'beatport',
+    name: 'Beatport',
+    category: 'music',
+    icon: 'beatport',
+    color: 'A3E422',
+  },
 
   // ========================================
   // Social Media Platforms
