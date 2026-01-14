@@ -2,6 +2,18 @@
 
 import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
 
+// Animation constants
+const ANIMATION_STIFFNESS = 400;
+const ANIMATION_DAMPING = 17;
+const ANIMATION_MASS = 0.8;
+const REDUCED_MOTION_DURATION = 0.1;
+const GLOW_TRANSITION_DURATION = 0.3;
+const GLOW_OPACITY_REDUCED = 0.5;
+const GLOW_OPACITY_FULL = 1;
+const HOVER_SCALE = 1.02;
+const HOVER_Y_OFFSET = -5;
+const HOVER_Y_OFFSET_REDUCED = -2;
+
 export interface FeatureCardProps {
   /** Feature title */
   title: string;
@@ -42,24 +54,24 @@ export function FeatureCard({
 
   const containerWhileHover: MotionProps['whileHover'] = interactive
     ? prefersReducedMotion
-      ? { y: -2 }
-      : { scale: 1.02, y: -5 }
+      ? { y: HOVER_Y_OFFSET_REDUCED }
+      : { scale: HOVER_SCALE, y: HOVER_Y_OFFSET }
     : undefined;
 
   const containerWhileFocus: MotionProps['whileFocus'] = interactive
     ? prefersReducedMotion
-      ? { y: -2 }
-      : { scale: 1.02, y: -5 }
+      ? { y: HOVER_Y_OFFSET_REDUCED }
+      : { scale: HOVER_SCALE, y: HOVER_Y_OFFSET }
     : undefined;
 
   const containerTransition: MotionProps['transition'] = interactive
     ? prefersReducedMotion
-      ? { duration: 0.1 }
+      ? { duration: REDUCED_MOTION_DURATION }
       : {
           type: 'spring',
-          stiffness: 400,
-          damping: 17,
-          mass: 0.8,
+          stiffness: ANIMATION_STIFFNESS,
+          damping: ANIMATION_DAMPING,
+          mass: ANIMATION_MASS,
         }
     : undefined;
 
@@ -75,8 +87,12 @@ export function FeatureCard({
 
   const cardTransition: MotionProps['transition'] = interactive
     ? prefersReducedMotion
-      ? { duration: 0.1 }
-      : { type: 'spring', stiffness: 400, damping: 17 }
+      ? { duration: REDUCED_MOTION_DURATION }
+      : {
+          type: 'spring',
+          stiffness: ANIMATION_STIFFNESS,
+          damping: ANIMATION_DAMPING,
+        }
     : undefined;
 
   const glowInitial: MotionProps['initial'] = interactive
@@ -85,14 +101,14 @@ export function FeatureCard({
 
   const glowWhileHover: MotionProps['whileHover'] = interactive
     ? prefersReducedMotion
-      ? { opacity: 0.5 }
-      : { opacity: 1 }
+      ? { opacity: GLOW_OPACITY_REDUCED }
+      : { opacity: GLOW_OPACITY_FULL }
     : undefined;
 
   const glowTransition: MotionProps['transition'] = interactive
     ? prefersReducedMotion
-      ? { duration: 0.1 }
-      : { duration: 0.3 }
+      ? { duration: REDUCED_MOTION_DURATION }
+      : { duration: GLOW_TRANSITION_DURATION }
     : undefined;
 
   return (
