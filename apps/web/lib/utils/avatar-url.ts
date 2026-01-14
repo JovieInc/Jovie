@@ -271,38 +271,21 @@ export function upgradeOAuthAvatarUrl(
     const hostname = urlObj.hostname.toLowerCase();
     const providers = matchesKnownProvider(hostname);
 
-    // Google (most common for OAuth)
-    if (providers.isGoogle) {
-      return upgradeGoogleAvatarUrl(url);
-    }
+    const upgradeFn = providers.isGoogle
+      ? upgradeGoogleAvatarUrl
+      : providers.isFacebook
+        ? upgradeFacebookAvatarUrl
+        : providers.isTwitter
+          ? upgradeTwitterAvatarUrl
+          : providers.isGitHub
+            ? upgradeGitHubAvatarUrl
+            : providers.isClerk
+              ? upgradeClerkAvatarUrl
+              : providers.isGravatar
+                ? upgradeGravatarUrl
+                : undefined;
 
-    // Facebook/Meta
-    if (providers.isFacebook) {
-      return upgradeFacebookAvatarUrl(url);
-    }
-
-    // Twitter/X
-    if (providers.isTwitter) {
-      return upgradeTwitterAvatarUrl(url);
-    }
-
-    // GitHub
-    if (providers.isGitHub) {
-      return upgradeGitHubAvatarUrl(url);
-    }
-
-    // Clerk CDN
-    if (providers.isClerk) {
-      return upgradeClerkAvatarUrl(url);
-    }
-
-    // Gravatar
-    if (providers.isGravatar) {
-      return upgradeGravatarUrl(url);
-    }
-
-    // Unknown provider - return as-is
-    return url;
+    return upgradeFn ? upgradeFn(url) : url;
   } catch {
     // Invalid URL - return as-is
     return url;

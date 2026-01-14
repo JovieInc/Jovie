@@ -96,46 +96,30 @@ function getRating(
   name: string,
   value: number
 ): 'good' | 'needs-improvement' | 'poor' {
-  switch (name) {
-    case 'cls':
-      return value <= 0.1
-        ? 'good'
-        : value <= 0.25
-          ? 'needs-improvement'
-          : 'poor';
-    case 'fid':
-      return value <= 100
-        ? 'good'
-        : value <= 300
-          ? 'needs-improvement'
-          : 'poor';
-    case 'inp':
-      return value <= 200
-        ? 'good'
-        : value <= 500
-          ? 'needs-improvement'
-          : 'poor';
-    case 'lcp':
-      return value <= 2500
-        ? 'good'
-        : value <= 4000
-          ? 'needs-improvement'
-          : 'poor';
-    case 'fcp':
-      return value <= 1800
-        ? 'good'
-        : value <= 3000
-          ? 'needs-improvement'
-          : 'poor';
-    case 'ttfb':
-      return value <= 800
-        ? 'good'
-        : value <= 1800
-          ? 'needs-improvement'
-          : 'poor';
-    default:
-      return 'good';
+  const thresholds: Record<string, { good: number; needsImprovement: number }> =
+    {
+      cls: { good: 0.1, needsImprovement: 0.25 },
+      fid: { good: 100, needsImprovement: 300 },
+      inp: { good: 200, needsImprovement: 500 },
+      lcp: { good: 2500, needsImprovement: 4000 },
+      fcp: { good: 1800, needsImprovement: 3000 },
+      ttfb: { good: 800, needsImprovement: 1800 },
+    };
+
+  const limits = thresholds[name];
+  if (!limits) {
+    return 'good';
   }
+
+  if (value <= limits.good) {
+    return 'good';
+  }
+
+  if (value <= limits.needsImprovement) {
+    return 'needs-improvement';
+  }
+
+  return 'poor';
 }
 
 /**
