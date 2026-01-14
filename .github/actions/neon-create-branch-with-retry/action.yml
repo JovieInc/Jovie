@@ -8,16 +8,13 @@ inputs:
   branch_name:
     description: 'Sanitized branch name'
     required: true
-  parent:
+  parent_branch:
     description: 'Parent branch name (optional)'
     required: false
   role:
     description: 'Database role (optional, defaults to neondb_owner)'
     required: false
     default: 'neondb_owner'
-  username:
-    description: 'Database username (optional)'
-    required: false
   api_key:
     description: 'Neon API key'
     required: true
@@ -58,9 +55,8 @@ runs:
       with:
         project_id: ${{ inputs.project_id }}
         branch_name: ${{ inputs.branch_name }}
-        parent: ${{ inputs.parent }}
+        parent_branch: ${{ inputs.parent_branch }}
         role: ${{ inputs.role }}
-        username: ${{ inputs.username }}
         api_key: ${{ inputs.api_key }}
 
     - name: Aggressive cleanup on limit error
@@ -80,9 +76,8 @@ runs:
       with:
         project_id: ${{ inputs.project_id }}
         branch_name: ${{ inputs.branch_name }}
-        parent: ${{ inputs.parent }}
+        parent_branch: ${{ inputs.parent_branch }}
         role: ${{ inputs.role }}
-        username: ${{ inputs.username }}
         api_key: ${{ inputs.api_key }}
 
     - name: Set outputs from successful attempt
