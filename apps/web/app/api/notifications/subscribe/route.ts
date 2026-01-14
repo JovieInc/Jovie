@@ -4,6 +4,7 @@ import {
   buildInvalidRequestResponse,
   subscribeToNotificationsDomain,
 } from '@/lib/notifications/domain';
+import { logger } from '@/lib/utils/logger';
 import {
   checkRateLimit,
   createRateLimitHeaders,
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('[Notifications Subscribe] Error:', error);
+    logger.error('[Notifications Subscribe] Error:', error);
     const response = NextResponse.json(
       {
         success: false,

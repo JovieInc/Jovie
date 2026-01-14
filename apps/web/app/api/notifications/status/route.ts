@@ -3,6 +3,7 @@ import {
   buildInvalidRequestResponse,
   getNotificationStatusDomain,
 } from '@/lib/notifications/domain';
+import { logger } from '@/lib/utils/logger';
 import {
   checkRateLimit,
   createRateLimitHeaders,
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[Notifications Status] Error:', error);
+    logger.error('[Notifications Status] Error:', error);
     return NextResponse.json(
       {
         success: false,

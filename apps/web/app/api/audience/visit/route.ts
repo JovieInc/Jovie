@@ -13,6 +13,7 @@ import { audienceMembers, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { logger } from '@/lib/utils/logger';
 import {
   checkPublicRateLimit,
   getPublicRateLimitStatus,
@@ -247,7 +248,7 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('[Audience Visit] Error', error);
+    logger.error('[Audience Visit] Error', error);
     return NextResponse.json(
       { error: 'Unable to record visit' },
       { status: 500, headers: NO_STORE_HEADERS }
