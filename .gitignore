@@ -60,6 +60,7 @@ storybook-static/
 .claude/
 !.claude/
 !.claude/config.yaml
+!.claude/settings.json
 .claude_settings.json
 apps/should-i-make/node_modules
 apps/should-i-make/.next
