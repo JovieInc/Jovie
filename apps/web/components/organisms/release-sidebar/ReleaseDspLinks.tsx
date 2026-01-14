@@ -51,6 +51,7 @@ const PROVIDER_ICONS: Record<ProviderKey, string> = {
   tidal: 'tidal',
   amazon_music: 'amazon_music',
   bandcamp: 'bandcamp',
+  beatport: 'beatport',
 };
 
 export function ReleaseDspLinks({
