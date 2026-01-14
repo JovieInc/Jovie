@@ -300,11 +300,11 @@ describe('proxy-state.ts', () => {
       await getUserState('clerk_test_user');
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[proxy-state] Database query failed:',
+        '[ERROR] Database query failed in proxy state check',
         expect.objectContaining({
-          error: dbError,
           clerkUserId: 'clerk_test_user',
           message: 'Connection timeout',
+          operation: 'getProxyUserState',
         })
       );
 
@@ -336,9 +336,12 @@ describe('proxy-state.ts', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[proxy-state] Database query failed:',
+        '[ERROR] Database query failed in proxy state check',
         expect.objectContaining({
-          message: 'Unknown error',
+          clerkUserId: 'clerk_123',
+          message: 'String error',
+          operation: 'getProxyUserState',
+          type: 'StringError',
         })
       );
 

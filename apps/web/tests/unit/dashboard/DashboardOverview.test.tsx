@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
@@ -47,8 +48,18 @@ function renderDashboard(
   hasSocialLinks = false
 ) {
   const artist = convertDrizzleCreatorProfileToArtist(profile);
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+      },
+    },
+  });
   return render(
-    <DashboardOverview artist={artist} hasSocialLinks={hasSocialLinks} />
+    <QueryClientProvider client={queryClient}>
+      <DashboardOverview artist={artist} hasSocialLinks={hasSocialLinks} />
+    </QueryClientProvider>
   );
 }
 
