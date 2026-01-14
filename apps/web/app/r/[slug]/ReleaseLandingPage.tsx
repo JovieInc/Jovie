@@ -47,7 +47,8 @@ function getIconPlatform(
   | 'deezer'
   | 'tidal'
   | 'amazonmusic'
-  | 'bandcamp' {
+  | 'bandcamp'
+  | 'beatport' {
   const mapping: Record<ProviderKey, string> = {
     spotify: 'spotify',
     apple_music: 'applemusic',
@@ -57,6 +58,7 @@ function getIconPlatform(
     tidal: 'tidal',
     amazon_music: 'amazonmusic',
     bandcamp: 'bandcamp',
+    beatport: 'beatport',
   };
   return mapping[providerKey] as ReturnType<typeof getIconPlatform>;
 }
