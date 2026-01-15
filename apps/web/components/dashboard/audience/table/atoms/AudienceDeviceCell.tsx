@@ -16,12 +16,7 @@ export function AudienceDeviceCell({
   const deviceIndicator = getDeviceIndicator(deviceType);
 
   return (
-    <td
-      className={cn(
-        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
-        className
-      )}
-    >
+    <div className={cn('text-sm', className)}>
       {deviceIndicator ? (
         <Icon
           name={deviceIndicator.iconName}
@@ -32,6 +27,6 @@ export function AudienceDeviceCell({
       ) : (
         <span className='text-secondary-token'>—</span>
       )}
-    </td>
+    </div>
   );
 }
