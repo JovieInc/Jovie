@@ -3,15 +3,15 @@
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
 import {
   KanbanBoard,
   type KanbanColumn,
 } from '@/components/admin/table/organisms/KanbanBoard';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
   DisplayMenuDropdown,
+  TableBulkActionsToolbar,
+  useRowSelection,
   type ViewMode,
 } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';

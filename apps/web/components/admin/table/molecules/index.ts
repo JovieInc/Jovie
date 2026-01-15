@@ -5,12 +5,16 @@
 
 // Re-export from unified organisms/table location
 export {
+  type BulkAction,
   ContextMenuSubmenu,
   DisplayMenuDropdown,
+  ExportCSVButton,
+  type ExportCSVButtonProps,
   GroupedTableBody,
   LoadingTableBody,
   ResponsiveActionsCell,
   SocialLinksCell,
+  TableBulkActionsToolbar,
   TableContextMenu,
   TableHeaderRow,
   type TableHeaderRowProps,
@@ -19,14 +23,5 @@ export {
 } from '@/components/organisms/table';
 
 // Admin-specific components (kept for now)
-export {
-  ExportCSVButton,
-  type ExportCSVButtonProps,
-} from './ExportCSVButton';
-export {
-  type BulkAction,
-  TableBulkActionsToolbar,
-  type TableBulkActionsToolbarProps,
-} from './TableBulkActionsToolbar';
 export { TableRow, type TableRowProps } from './TableRow';
 export { TableSearchBar, type TableSearchBarProps } from './TableSearchBar';
