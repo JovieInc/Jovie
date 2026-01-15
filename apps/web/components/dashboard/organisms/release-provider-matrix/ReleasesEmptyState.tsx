@@ -422,9 +422,12 @@ export function ReleasesEmptyState({
               <div className='absolute z-100 w-full mt-2 rounded-xl border border-subtle bg-surface-1 shadow-lg overflow-hidden'>
                 {searchState === 'loading' && results.length === 0 && (
                   <div className='p-3 space-y-2'>
-                    {[...Array(3)].map((_, i) => (
+                    {Array.from(
+                      { length: 3 },
+                      (_, i) => `releases-empty-loading-${i + 1}`
+                    ).map(key => (
                       <div
-                        key={i}
+                        key={key}
                         className='flex items-center gap-3 animate-pulse'
                       >
                         <div className='w-10 h-10 rounded-full bg-surface-3' />

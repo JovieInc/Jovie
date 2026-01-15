@@ -28,6 +28,10 @@ export function OtpInput({
   errorId,
 }: OtpInputProps) {
   const autofillInputId = useId();
+  const digitKeys = Array.from(
+    { length: OTP_LENGTH },
+    (_, i) => `${autofillInputId}-digit-${i + 1}`
+  );
 
   const {
     currentValue,
@@ -59,9 +63,9 @@ export function OtpInput({
         className='absolute -top-6 left-0 right-0 flex justify-center gap-1.5 sm:hidden'
         aria-hidden='true'
       >
-        {Array.from({ length: OTP_LENGTH }).map((_, i) => (
+        {digitKeys.map((key, i) => (
           <div
-            key={i}
+            key={key}
             className={cn(
               'h-1 w-1 rounded-full transition-all duration-200',
               i < currentValue.length
@@ -108,7 +112,7 @@ export function OtpInput({
         onPaste={handlePaste}
       >
         <legend className='sr-only'>{ariaLabel}</legend>
-        {Array.from({ length: OTP_LENGTH }).map((_, index) => {
+        {digitKeys.map((key, index) => {
           const digit = getDigit(index);
           const isFocused = focusedIndex === index;
           const isCursor = isFocused && !digit;
@@ -116,7 +120,7 @@ export function OtpInput({
 
           return (
             <div
-              key={index}
+              key={key}
               className={cn(
                 'relative flex items-center justify-center rounded-[--radius-xl] border text-xl sm:text-2xl font-sans transition-all duration-150',
                 'h-14 w-11 sm:h-12 sm:w-10',

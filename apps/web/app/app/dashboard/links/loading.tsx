@@ -1,5 +1,14 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const LINKS_LOADING_CHIP_KEYS = Array.from(
+  { length: 6 },
+  (_, i) => `links-chip-${i + 1}`
+);
+const LINKS_LOADING_ROW_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `links-row-${i + 1}`
+);
+
 export default function LinksLoading() {
   return (
     <div className='min-h-screen'>
@@ -10,9 +19,9 @@ export default function LinksLoading() {
         </div>
 
         <div className='mt-6 flex flex-wrap gap-2'>
-          {Array.from({ length: 6 }).map((_, index) => (
+          {LINKS_LOADING_CHIP_KEYS.map(key => (
             <LoadingSkeleton
-              key={index}
+              key={key}
               height='h-8'
               width='w-24'
               rounded='full'
@@ -22,9 +31,9 @@ export default function LinksLoading() {
         </div>
 
         <div className='mt-6 space-y-3'>
-          {Array.from({ length: 4 }).map((_, index) => (
+          {LINKS_LOADING_ROW_KEYS.map(key => (
             <div
-              key={index}
+              key={key}
               className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-0 p-3'
             >
               <LoadingSkeleton

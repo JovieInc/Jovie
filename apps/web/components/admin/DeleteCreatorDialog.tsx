@@ -101,8 +101,8 @@ export function DeleteCreatorDialog({
             Data to be deleted
           </p>
           <ul className='space-y-2'>
-            {items.map((item, i) => (
-              <li key={i} className='flex items-center gap-2 text-sm'>
+            {items.map(item => (
+              <li key={item} className='flex items-center gap-2 text-sm'>
                 <Icon name='X' className='h-3.5 w-3.5 text-red-500/70' />
                 <span className='text-secondary-token'>{item}</span>
               </li>

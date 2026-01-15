@@ -18,6 +18,11 @@ import {
 } from './links/utils/link-transformers';
 import { ProfileEditorSection } from './ProfileEditorSection';
 
+const GROUPED_LINKS_MANAGER_LOADING_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `grouped-links-loading-${i + 1}`
+);
+
 const GroupedLinksManager = dynamic(
   () =>
     import('@/components/dashboard/organisms/GroupedLinksManager').then(
@@ -28,8 +33,11 @@ const GroupedLinksManager = dynamic(
   {
     loading: () => (
       <div className='space-y-3'>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className='h-16 animate-pulse rounded-lg bg-surface-1' />
+        {GROUPED_LINKS_MANAGER_LOADING_KEYS.map(key => (
+          <div
+            key={key}
+            className='h-16 animate-pulse rounded-lg bg-surface-1'
+          />
         ))}
       </div>
     ),

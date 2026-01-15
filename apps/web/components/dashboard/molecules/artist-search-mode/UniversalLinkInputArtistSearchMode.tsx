@@ -9,6 +9,11 @@ import type { ArtistSearchModeProps } from './types';
 import { useArtistSearchMode } from './useArtistSearchMode';
 import { formatFollowers } from './utils';
 
+const ARTIST_SEARCH_LOADING_KEYS = Array.from(
+  { length: 3 },
+  (_, i) => `artist-search-loading-${i + 1}`
+);
+
 export function UniversalLinkInputArtistSearchMode({
   provider,
   creatorName,
@@ -120,9 +125,9 @@ export function UniversalLinkInputArtistSearchMode({
         >
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
-              {[...Array(3)].map((_, i) => (
+              {ARTIST_SEARCH_LOADING_KEYS.map(key => (
                 <div
-                  key={i}
+                  key={key}
                   className='flex items-center gap-3 animate-pulse motion-reduce:animate-none'
                 >
                   <div className='w-10 h-10 rounded-full bg-surface-3' />

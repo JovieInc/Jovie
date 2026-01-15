@@ -1,5 +1,10 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const PROFILE_LOADING_LINK_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `profile-link-${i + 1}`
+);
+
 export default function ProfileLoading() {
   return (
     <div className='min-h-screen'>
@@ -28,9 +33,9 @@ export default function ProfileLoading() {
         <div className='mt-8 space-y-4'>
           <LoadingSkeleton height='h-5' width='w-24' />
           <div className='space-y-3'>
-            {Array.from({ length: 4 }).map((_, index) => (
+            {PROFILE_LOADING_LINK_KEYS.map(key => (
               <div
-                key={index}
+                key={key}
                 className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 p-3'
               >
                 <LoadingSkeleton

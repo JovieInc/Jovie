@@ -81,8 +81,8 @@ export default function PricingPage() {
                   Join waitlist →
                 </Link>
                 <ul className='space-y-3 grow'>
-                  {freeFeatures.map((feature, index) => (
-                    <li key={index} className='flex items-start gap-3'>
+                  {freeFeatures.map(feature => (
+                    <li key={feature} className='flex items-start gap-3'>
                       <Check className='w-4 h-4 text-neutral-400 dark:text-neutral-500 mt-0.5 shrink-0' />
                       <span className='text-sm text-neutral-600 dark:text-neutral-400'>
                         {feature}
@@ -121,8 +121,8 @@ export default function PricingPage() {
                   Join waitlist →
                 </Link>
                 <ul className='space-y-3 grow'>
-                  {proFeatures.map((feature, index) => (
-                    <li key={index} className='flex items-start gap-3'>
+                  {proFeatures.map(feature => (
+                    <li key={feature} className='flex items-start gap-3'>
                       <Check className='w-4 h-4 text-neutral-900 dark:text-white mt-0.5 shrink-0' />
                       <span className='text-sm text-neutral-700 dark:text-neutral-300'>
                         {feature}
@@ -161,8 +161,8 @@ export default function PricingPage() {
                   Join waitlist →
                 </Link>
                 <ul className='space-y-3 grow'>
-                  {growthFeatures.map((feature, index) => (
-                    <li key={index} className='flex items-start gap-3'>
+                  {growthFeatures.map(feature => (
+                    <li key={feature} className='flex items-start gap-3'>
                       <Check className='w-4 h-4 text-neutral-400 dark:text-neutral-500 mt-0.5 shrink-0' />
                       <span className='text-sm text-neutral-600 dark:text-neutral-400'>
                         {feature}

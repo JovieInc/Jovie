@@ -1,4 +1,4 @@
-import { RefreshCw, Mail, Palette, BarChart3 } from 'lucide-react';
+import { BarChart3, Mail, Palette, RefreshCw } from 'lucide-react';
 import { Container } from '@/components/site/Container';
 
 const features = [

@@ -15,6 +15,11 @@ import { EmptyState } from '@/components/organisms/EmptyState';
 import type { SocialsFormProps } from './types';
 import { useSocialsForm } from './useSocialsForm';
 
+const SOCIALS_FORM_LOADING_KEYS = Array.from(
+  { length: 3 },
+  (_, i) => `socials-form-loading-${i + 1}`
+);
+
 export function SocialsForm({ artist }: SocialsFormProps) {
   const {
     loading,
@@ -32,9 +37,9 @@ export function SocialsForm({ artist }: SocialsFormProps) {
   if (loading) {
     return (
       <div className='space-y-4'>
-        {[...Array(3)].map((_, i) => (
+        {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div
-            key={i}
+            key={key}
             className='h-16 bg-surface-2 rounded-lg animate-pulse motion-reduce:animate-none'
           />
         ))}

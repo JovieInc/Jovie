@@ -4,7 +4,7 @@ const steps = [
   {
     number: '1',
     title: 'Paste your Spotify',
-    description: 'Drop your artist link. That's it.',
+    description: "Drop your artist link. That's it.",
   },
   {
     number: '2',
@@ -20,7 +20,10 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className='section-spacing-linear bg-base border-t border-subtle'>
+    <section
+      id='how-it-works'
+      className='section-spacing-linear bg-base border-t border-subtle'
+    >
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto'>
           <h2 className='marketing-h2-linear text-center mb-4'>
@@ -39,7 +42,9 @@ export function HowItWorksSection() {
                 <h3 className='text-lg font-medium text-primary-token mb-2'>
                   {step.title}
                 </h3>
-                <p className='text-sm text-tertiary-token'>{step.description}</p>
+                <p className='text-sm text-tertiary-token'>
+                  {step.description}
+                </p>
               </div>
             ))}
           </div>

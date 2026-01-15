@@ -1,10 +1,16 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
+
+const DASHBOARD_ANALYTICS_LOADING_KEYS = Array.from(
+  { length: 5 },
+  (_, i) => `dashboard-analytics-loading-${i + 1}`
+);
 
 export function DashboardAnalytics() {
   const {
@@ -35,7 +41,7 @@ export function DashboardAnalytics() {
             ariaLabel='Refresh analytics'
             onRefreshed={() => {
               refresh().catch(error => {
-                console.error('[DashboardAnalytics] Failed to refresh:', error);
+                Sentry.captureException(error);
               });
             }}
           />
@@ -127,8 +133,8 @@ export function DashboardAnalytics() {
             </h3>
             {loading ? (
               <ul className='space-y-3' aria-hidden='true'>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <li key={i} className='flex items-center justify-between'>
+                {DASHBOARD_ANALYTICS_LOADING_KEYS.map(key => (
+                  <li key={key} className='flex items-center justify-between'>
                     <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
                     <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
                   </li>
@@ -136,9 +142,9 @@ export function DashboardAnalytics() {
               </ul>
             ) : (
               <ul className='divide-y divide-subtle/60'>
-                {(data?.top_countries ?? []).map((c, idx) => (
+                {(data?.top_countries ?? []).map(c => (
                   <li
-                    key={c.country + idx}
+                    key={c.country}
                     className='flex items-center justify-between py-2'
                   >
                     <span className='text-sm text-secondary-token'>
@@ -164,8 +170,8 @@ export function DashboardAnalytics() {
             </h3>
             {loading ? (
               <ul className='space-y-3' aria-hidden='true'>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <li key={i} className='flex items-center justify-between'>
+                {DASHBOARD_ANALYTICS_LOADING_KEYS.map(key => (
+                  <li key={key} className='flex items-center justify-between'>
                     <LoadingSkeleton height='h-4' width='w-36' rounded='md' />
                     <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
                   </li>
@@ -173,9 +179,9 @@ export function DashboardAnalytics() {
               </ul>
             ) : (
               <ul className='divide-y divide-subtle/60'>
-                {(data?.top_referrers ?? []).map((r, idx) => (
+                {(data?.top_referrers ?? []).map(r => (
                   <li
-                    key={r.referrer + idx}
+                    key={r.referrer}
                     className='flex items-center justify-between py-2'
                   >
                     <span className='text-sm text-secondary-token break-all'>
