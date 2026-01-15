@@ -3,7 +3,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
+import { useRowSelection } from '@/components/organisms/table';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type {

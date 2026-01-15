@@ -6,7 +6,6 @@ import { BellRing, Copy, Download, Eye, Phone, Users } from 'lucide-react';
 import * as React from 'react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
@@ -21,6 +20,7 @@ import {
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
+  AdminPageSizeSelect,
   type ContextMenuItemType,
   convertContextMenuItems,
   UnifiedTable,

@@ -18,8 +18,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Import components and hooks to test
-import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
 import { useCSVExport } from '@/components/admin/table/useCSVExport';
+import { ExportCSVButton } from '@/components/organisms/table';
 // Import CSV configs for admin tables
 import {
   CREATORS_CSV_FILENAME_PREFIX,
