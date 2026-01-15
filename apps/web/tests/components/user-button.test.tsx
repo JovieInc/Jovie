@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   afterAll,
   beforeEach,
@@ -132,11 +133,14 @@ describe('UserButton billing actions', () => {
       json: async () => ({ url: checkoutUrl }),
     });
 
+    const user = userEvent.setup();
     render(<UserButton showUserInfo />);
 
-    fireEvent.click(screen.getByText('Adele Adkins'));
+    await user.click(screen.getByText('Adele Adkins'));
 
-    fireEvent.click(screen.getByText('Upgrade to Pro'));
+    // Wait for dropdown menu to render
+    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    await user.click(upgradeButton);
 
     await flushMicrotasks();
 
@@ -175,13 +179,14 @@ describe('UserButton billing actions', () => {
       json: async () => ({ url: portalUrl }),
     });
 
+    const user = userEvent.setup();
     render(<UserButton showUserInfo />);
 
-    fireEvent.click(screen.getByText('Adele Adkins'));
+    await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown to render
     const manageBillingButton = await screen.findByText('Manage billing');
-    fireEvent.click(manageBillingButton);
+    await user.click(manageBillingButton);
 
     await flushMicrotasks();
 
