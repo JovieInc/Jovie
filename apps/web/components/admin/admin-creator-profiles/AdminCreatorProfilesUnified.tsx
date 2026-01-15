@@ -16,7 +16,6 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -28,6 +27,7 @@ import {
   DateCell,
   SocialLinksCell,
   UnifiedTable,
+  useRowSelection,
 } from '@/components/organisms/table';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';

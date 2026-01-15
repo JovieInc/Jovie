@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import { BellRing, Users } from 'lucide-react';
 import * as React from 'react';
-import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import {
   AudienceMemberRow,
   AudienceSubscriberRow,
@@ -11,6 +10,7 @@ import {
 } from '@/components/dashboard/audience/table';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { AdminPageSizeSelect } from '@/components/organisms/table';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 

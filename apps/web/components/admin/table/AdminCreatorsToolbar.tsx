@@ -4,7 +4,7 @@ import { Button, Input } from '@jovie/ui';
 import { CheckCircle, Star, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
+import { ExportCSVButton } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   CREATORS_CSV_FILENAME_PREFIX,

@@ -10,6 +10,7 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 // Smoke test optimization: faster timeouts for quick feedback
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
+const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
 
 const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
@@ -71,15 +72,15 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // Only run Firefox in full suite (not for smoke tests)
-    ...(isSmokeOnly
-      ? []
-      : [
+    // Only run Firefox in full-matrix workflow (weekly comprehensive testing)
+    ...(isFullMatrix
+      ? [
           {
             name: 'firefox',
             use: { ...devices['Desktop Firefox'] },
           },
-        ]),
+        ]
+      : []),
     // Keep WebKit for local testing only (skip in CI)
     ...(!isCI
       ? [
