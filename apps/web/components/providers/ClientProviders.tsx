@@ -5,7 +5,6 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
-import { publicEnv } from '@/lib/env-public';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
@@ -278,8 +277,8 @@ const clerkAppearance = {
   },
 };
 
-// Get the Clerk proxy URL for custom domain setup (e.g., clerk.jov.ie)
-const clerkProxyUrl = publicEnv.NEXT_PUBLIC_CLERK_FRONTEND_API;
+// Custom domain is configured via CNAME (clerk.jov.ie → frontend-api.clerk.services)
+// No proxyUrl needed - Clerk SDK uses the domain from publishable key configuration
 
 // Main export - wraps children with ClerkProvider (client-side only)
 // Uses hydration guard to prevent SSR of ClerkProvider which accesses window
@@ -324,7 +323,6 @@ export function ClientProviders({
     <ClerkProvider
       publishableKey={publishableKey!}
       appearance={clerkAppearance}
-      proxyUrl={clerkProxyUrl}
     >
       <ClientProvidersInner
         initialThemeMode={initialThemeMode}
