@@ -37,7 +37,6 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('clerk-sync module', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   describe('JovieClerkMetadata interface', () => {

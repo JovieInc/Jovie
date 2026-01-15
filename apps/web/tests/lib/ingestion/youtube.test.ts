@@ -10,8 +10,17 @@ import {
   validateYouTubeChannelUrl,
 } from '@/lib/ingestion/strategies/youtube';
 
-const readFixture = (name: string) =>
-  readFileSync(path.join(__dirname, 'fixtures', 'youtube', name), 'utf-8');
+// Load fixtures at module scope to avoid I/O overhead in tests
+const FIXTURES = {
+  structured: readFileSync(
+    path.join(__dirname, 'fixtures', 'youtube', 'structured.html'),
+    'utf-8'
+  ),
+  edgeCase: readFileSync(
+    path.join(__dirname, 'fixtures', 'youtube', 'edge-case.html'),
+    'utf-8'
+  ),
+} as const;
 
 describe('YouTube Strategy', () => {
   describe('isYouTubeChannelUrl', () => {
@@ -151,7 +160,7 @@ describe('YouTube Strategy', () => {
 
   describe('extractYouTube', () => {
     it('extracts links from structured ytInitialData', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractYouTube(html);
 
       expect(result.links.length).toBeGreaterThanOrEqual(3);
@@ -163,21 +172,21 @@ describe('YouTube Strategy', () => {
     });
 
     it('extracts display name from metadata', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractYouTube(html);
 
       expect(result.displayName).toBe('Artist Name');
     });
 
     it('extracts avatar URL from header', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractYouTube(html);
 
       expect(result.avatarUrl).toContain('yt3.googleusercontent.com');
     });
 
     it('detects official artist badge', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractYouTube(html);
 
       const hasOfficialSignal = result.links.some(l =>
@@ -187,7 +196,7 @@ describe('YouTube Strategy', () => {
     });
 
     it('handles edge cases with minimal data', () => {
-      const html = readFixture('edge-case.html');
+      const html = FIXTURES.edgeCase;
       const result = extractYouTube(html);
 
       expect(result.displayName).toBe('Minimal Channel');
@@ -210,7 +219,7 @@ describe('YouTube Strategy', () => {
     });
 
     it('includes source platform evidence', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractYouTube(html);
 
       for (const link of result.links) {

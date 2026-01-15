@@ -12,8 +12,17 @@ import {
   validateBeaconsUrl,
 } from '@/lib/ingestion/strategies/beacons';
 
-const readFixture = (name: string) =>
-  readFileSync(path.join(__dirname, 'fixtures', 'beacons', name), 'utf-8');
+// Load fixtures at module scope to avoid I/O overhead in tests
+const FIXTURES = {
+  structured: readFileSync(
+    path.join(__dirname, 'fixtures', 'beacons', 'structured.html'),
+    'utf-8'
+  ),
+  edgeCase: readFileSync(
+    path.join(__dirname, 'fixtures', 'beacons', 'edge-case.html'),
+    'utf-8'
+  ),
+} as const;
 
 describe('Beacons Strategy', () => {
   describe('isBeaconsUrl', () => {
@@ -315,7 +324,7 @@ describe('Beacons Strategy', () => {
     });
 
     it('prefers structured data sources before href scanning', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractBeacons(html);
 
       const platforms = result.links.map(link => link.platformId).sort();
@@ -336,7 +345,7 @@ describe('Beacons Strategy', () => {
     });
 
     it('falls back when structured data is absent', () => {
-      const html = readFixture('edge-case.html');
+      const html = FIXTURES.edgeCase;
       const result = extractBeacons(html);
 
       const platforms = result.links.map(link => link.platformId).sort();

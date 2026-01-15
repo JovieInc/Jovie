@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
+const mockGetUserByClerkId = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -37,6 +38,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: vi.fn(),
 }));
 
+vi.mock('@/lib/db/queries/shared', () => ({
+  getUserByClerkId: mockGetUserByClerkId,
+}));
+
 describe('Admin Roles API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,6 +72,12 @@ describe('Admin Roles API', () => {
     it('grants admin role successfully', async () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockAuth.mockResolvedValue({ userId: 'admin_123' });
+      mockGetUserByClerkId.mockResolvedValue({
+        id: 'user_1',
+        clerkId: 'user_123',
+        email: 'user@example.com',
+        isAdmin: false,
+      });
       mockDbUpdate.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -116,6 +127,12 @@ describe('Admin Roles API', () => {
     it('revokes admin role successfully', async () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockAuth.mockResolvedValue({ userId: 'admin_123' });
+      mockGetUserByClerkId.mockResolvedValue({
+        id: 'user_1',
+        clerkId: 'target_user',
+        email: 'target@example.com',
+        isAdmin: true,
+      });
       mockDbUpdate.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
