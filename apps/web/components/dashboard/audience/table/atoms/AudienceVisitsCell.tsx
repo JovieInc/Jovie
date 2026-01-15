@@ -16,16 +16,9 @@ export function AudienceVisitsCell({
   className,
 }: AudienceVisitsCellProps) {
   return (
-    <td
-      className={cn(
-        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
-        className
-      )}
-    >
-      <div className='flex items-center gap-2'>
-        <span className='font-semibold'>{visits}</span>
-        <AudienceIntentBadge intentLevel={intentLevel} />
-      </div>
-    </td>
+    <div className={cn('flex items-center gap-2 text-sm', className)}>
+      <span className='font-semibold'>{visits}</span>
+      <AudienceIntentBadge intentLevel={intentLevel} />
+    </div>
   );
 }

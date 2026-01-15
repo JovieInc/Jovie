@@ -45,12 +45,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   const secondaryLabel = getSecondaryLabel();
 
   return (
-    <td
-      className={cn(
-        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
-        className
-      )}
-    >
+    <div className={cn('text-sm text-primary-token', className)}>
       <div className='font-semibold line-clamp-1'>
         {displayName || 'Visitor'}
       </div>
@@ -59,6 +54,6 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
           {secondaryLabel}
         </div>
       )}
-    </td>
+    </div>
   );
 });
