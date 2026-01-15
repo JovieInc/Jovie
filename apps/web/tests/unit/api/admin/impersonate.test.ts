@@ -38,6 +38,8 @@ describe('Admin Impersonate API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    // Set up default auth mock to return proper structure
+    mockAuth.mockResolvedValue({ userId: 'admin-123', sessionClaims: {} });
   });
 
   describe('GET /api/admin/impersonate', () => {
