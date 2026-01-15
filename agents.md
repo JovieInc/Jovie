@@ -162,6 +162,35 @@ Before marking any task complete, run `/verify` to self-check your work. This 2-
 **For UI changes:** Also verify visually in dev server.
 **For security changes:** Also check for OWASP Top 10 vulnerabilities.
 
+#### 6.3.1 Simplify Before Verify
+
+After completing implementation, run the code-simplifier to clean up your work:
+
+```
+/simplify
+```
+
+Or ask Claude: "Run the code-simplifier agent on the changes we made"
+
+This step follows Boris Cherny's "Spec → Draft → **Simplify** → Verify" pipeline:
+- Reduces complexity in newly written code
+- Ensures consistency with project patterns
+- Makes code review easier
+- Saves tokens in future sessions (cleaner code = fewer tokens)
+
+**When to simplify:**
+- After implementing a feature (before PR)
+- After a long coding session
+- Before submitting for review
+- When code feels "hacky" or rushed
+
+**What it does:**
+- Eliminates nested ternaries
+- Removes unused code
+- Improves variable naming
+- Consolidates repeated logic
+- Never changes functionality
+
 ### 6.4 Continuous Improvement (REQUIRED)
 
 **This file (`agents.md`) is a living document.** It should improve over time as Claude learns from mistakes and discovers new patterns.
