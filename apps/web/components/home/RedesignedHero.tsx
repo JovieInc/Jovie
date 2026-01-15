@@ -37,7 +37,7 @@ export function RedesignedHero() {
 
             {/* Supporting text - Tertiary */}
             <p className='text-sm text-tertiary-token'>
-              Limited access. Zero setup.
+              Free to start. Zero setup.
             </p>
           </div>
 
