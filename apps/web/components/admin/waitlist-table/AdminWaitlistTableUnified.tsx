@@ -9,13 +9,13 @@ import {
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
   UnifiedTable,
+  useRowSelection,
 } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import type { WaitlistTableProps } from './types';

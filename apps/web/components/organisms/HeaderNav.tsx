@@ -16,7 +16,7 @@ export interface HeaderNavProps {
   logoVariant?: LogoVariant;
   hideNav?: boolean;
   hidePricingLink?: boolean;
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
 }
 
 export function HeaderNav({

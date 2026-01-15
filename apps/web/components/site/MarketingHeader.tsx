@@ -48,12 +48,12 @@ export function MarketingHeader({
       logoVariant='word'
       hideNav={resolvedHideNav}
       hidePricingLink={hidePricingLink}
-      containerSize='md'
+      containerSize='homepage'
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid
           ? 'bg-[#08090a] border-subtle backdrop-blur'
-          : '!bg-transparent !border-transparent'
+          : 'bg-transparent! border-transparent!'
       )}
     />
   );

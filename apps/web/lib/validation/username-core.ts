@@ -36,6 +36,12 @@ export const RESERVED_USERNAMES = [
   'reset',
   'forgot',
   'app',
+  'notify',
+  'clerk',
+  'mail',
+  'changelog',
+  'engagement-engine',
+  'link-in-bio',
 
   // Legal/company pages
   'about',
@@ -71,7 +77,6 @@ export const RESERVED_USERNAMES = [
 
   // Common reserved
   'www',
-  'mail',
   'ftp',
   'email',
   'smtp',

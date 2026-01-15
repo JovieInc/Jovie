@@ -36,6 +36,8 @@ export type { RateLimiterName } from './config';
 export { parseWindowToMs, RATE_LIMITERS } from './config';
 // Pre-configured Limiter Instances
 export {
+  // Admin
+  adminImpersonateLimiter,
   apiLimiter,
   // Auth & User
   avatarUploadLimiter,

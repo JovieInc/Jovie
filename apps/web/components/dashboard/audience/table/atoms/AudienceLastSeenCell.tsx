@@ -25,31 +25,29 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
   className,
 }: AudienceLastSeenCellProps) {
   return (
-    <td
+    <div
       className={cn(
-        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
+        'flex items-center justify-between gap-2 text-sm',
         className
       )}
     >
-      <div className='flex items-center justify-between gap-2'>
-        <span className='line-clamp-1'>{formatTimeAgo(lastSeenAt)}</span>
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-        <div
-          className={cn(
-            'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-            isMenuOpen && 'opacity-100 pointer-events-auto'
-          )}
-          onClick={event => event.stopPropagation()}
-        >
-          <AudienceRowActionsMenu
-            row={row}
-            open={isMenuOpen}
-            onOpenChange={onMenuOpenChange}
-          />
-        </div>
+      <span className='line-clamp-1'>{formatTimeAgo(lastSeenAt)}</span>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
+      <div
+        className={cn(
+          'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+          isMenuOpen && 'opacity-100 pointer-events-auto'
+        )}
+        onClick={event => event.stopPropagation()}
+      >
+        <AudienceRowActionsMenu
+          row={row}
+          open={isMenuOpen}
+          onOpenChange={onMenuOpenChange}
+        />
       </div>
-    </td>
+    </div>
   );
 });

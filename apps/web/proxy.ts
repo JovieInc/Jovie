@@ -21,8 +21,9 @@ import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 // ============================================================================
 // Multi-Domain Routing Configuration
 // ============================================================================
-// - jov.ie (PROFILE_HOSTNAME): Public creator profiles + viewer subscription cookies
-// - meetjovie.com (MARKETING_HOSTNAME): Marketing + Dashboard + Auth (single domain for Clerk)
+// - jov.ie (PROFILE_HOSTNAME): Marketing homepage + Public creator profiles
+// - app.jov.ie (APP_HOSTNAME): Dashboard + App (authenticated)
+// - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
 // ============================================================================
 
 /**
@@ -37,7 +38,7 @@ function isProfileHost(hostname: string): boolean {
 }
 
 /**
- * Check if a hostname matches the marketing domain (meetjovie.com)
+ * Check if a hostname matches the marketing domain (jov.ie - same as profile)
  */
 function isMarketingHost(hostname: string): boolean {
   return (
@@ -45,8 +46,15 @@ function isMarketingHost(hostname: string): boolean {
   );
 }
 
-// Note: isAppHost removed - we now use meetjovie.com for both marketing and app
-// to avoid Clerk's satellite domain costs for subdomains
+/**
+ * Check if a hostname matches the app subdomain (app.jov.ie)
+ */
+function isAppSubdomain(hostname: string): boolean {
+  return (
+    hostname === 'app.jov.ie' ||
+    (isDevOrPreview(hostname) && hostname.startsWith('app.'))
+  );
+}
 
 /**
  * Check if we're in a development/preview environment
@@ -169,66 +177,80 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // ========================================================================
     const hostname = req.nextUrl.hostname;
 
+    // 301 redirect ALL meetjovie.com traffic to jov.ie (kept for email marketing only)
+    if (hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com') {
+      const targetUrl = new URL(pathname, 'https://jov.ie');
+      targetUrl.search = req.nextUrl.search;
+      return NextResponse.redirect(targetUrl, 301);
+    }
+
     // Skip domain routing in development/preview environments
     if (!isDevOrPreview(hostname)) {
-      // Profile domain (jov.ie): Only allow profile-related paths
-      if (isProfileHost(hostname)) {
-        // Allow: /{username}, /{username}/tip, /{username}/listen, /api/*, static assets
-        const isProfilePath =
-          pathname === '/' ||
-          pathname.startsWith('/api/') ||
-          /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) || // /{username}
-          /^\/[a-zA-Z0-9_-]+\/(tip|listen|subscribe)\/?$/.test(pathname); // /{username}/tip etc.
+      // app.jov.ie: Only allow app paths (no /app prefix)
+      if (isAppSubdomain(hostname)) {
+        const appPaths = [
+          '/', // Dashboard at root
+          '/analytics',
+          '/audience',
+          '/contacts',
+          '/earnings',
+          '/links',
+          '/profile',
+          '/releases',
+          '/settings',
+          '/admin',
+          '/onboarding',
+          '/billing',
+          '/account',
+          '/waitlist',
+        ];
 
-        // Redirect non-profile paths to marketing domain
-        if (!isProfilePath) {
-          const marketingUrl = new URL(
-            pathname,
-            `https://${MARKETING_HOSTNAME}`
+        const isAppPath =
+          appPaths.some(p => pathname === p || pathname.startsWith(`${p}/`)) ||
+          pathname.startsWith('/api/');
+
+        if (!isAppPath) {
+          // Redirect non-app paths to root jov.ie
+          return NextResponse.redirect(
+            new URL(pathname, 'https://jov.ie'),
+            301
           );
-          marketingUrl.search = req.nextUrl.search;
-          return NextResponse.redirect(marketingUrl, 301);
         }
+        // Continue to auth middleware below
       }
 
-      // Marketing/App domain (meetjovie.com): Handles both marketing and app paths
-      // Note: We use meetjovie.com for both to avoid Clerk satellite domain costs
-      if (isMarketingHost(hostname)) {
-        // Redirect profile paths (/{username}) to profile domain
+      // jov.ie root: Marketing + Profiles
+      if (isProfileHost(hostname) || isMarketingHost(hostname)) {
+        // Redirect app paths to app subdomain (legacy /app/* or direct app paths)
+        const appPaths = [
+          '/settings',
+          '/admin',
+          '/analytics',
+          '/audience',
+          '/contacts',
+          '/earnings',
+          '/links',
+          '/profile',
+          '/releases',
+          '/account',
+          '/billing',
+        ];
         if (
-          /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) &&
-          !pathname.startsWith('/api/')
+          appPaths.some(p => pathname === p || pathname.startsWith(`${p}/`))
         ) {
-          // Check if this looks like a username (not a marketing/app page)
-          const reservedPages = [
-            '/blog',
-            '/pricing',
-            '/support',
-            '/legal',
-            '/about',
-            '/features',
-            '/app',
-            '/signin',
-            '/signup',
-            '/sign-in',
-            '/sign-up',
-            '/waitlist',
-            '/onboarding',
-            '/claim',
-            '/billing',
-            '/settings',
-            '/account',
-            '/dashboard',
-            '/monitoring', // Sentry tunnel route - must not redirect to profile domain
-          ];
-          const isReservedPage = reservedPages.some(
-            page => pathname === page || pathname.startsWith(`${page}/`)
+          return NextResponse.redirect(
+            new URL(pathname, 'https://app.jov.ie'),
+            301
           );
-          if (!isReservedPage) {
-            const profileUrl = new URL(pathname, `https://${PROFILE_HOSTNAME}`);
-            profileUrl.search = req.nextUrl.search;
-            return NextResponse.redirect(profileUrl, 301);
-          }
+        }
+
+        // Legacy /app/* prefix redirect
+        if (pathname.startsWith('/app/')) {
+          const withoutPrefix = pathname.replace(/^\/app/, '');
+          return NextResponse.redirect(
+            new URL(withoutPrefix, 'https://app.jov.ie'),
+            301
+          );
         }
       }
     }
@@ -266,12 +288,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathname === '/signin/sso-callback';
 
     const normalizeRedirectPath = (path: string): string => {
-      if (path.startsWith('/dashboard')) {
-        return path.replace(/^\/dashboard/, '/app/dashboard');
-      }
-      if (path.startsWith('/settings')) {
-        return path.replace(/^\/settings/, '/app/settings');
-      }
+      // No longer need to add /app prefix - paths are clean
+      // Legacy /app/* paths are already redirected in domain routing above
       return path;
     };
 
@@ -298,8 +316,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           new URL(normalizeRedirectPath(redirectUrl), req.url)
         );
       } else {
-        // Fully active user, no redirect_url - go to dashboard
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+        // Fully active user, no redirect_url - go to dashboard at app.jov.ie/
+        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -337,43 +355,48 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         });
       } else if (!userState.needsWaitlist && pathname === '/waitlist') {
         // Active user trying to access waitlist → redirect to dashboard
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
       } else if (!userState.needsOnboarding && pathname === '/onboarding') {
         // Active user trying to access onboarding → redirect to dashboard
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
       } else if (
         pathname === '/' ||
         pathname === '/signin' ||
         pathname === '/signup'
       ) {
         // Fully authenticated user hitting auth pages → redirect to dashboard
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
-      } else if (pathname.startsWith('/dashboard')) {
-        // Legacy /dashboard paths → normalize to /app/dashboard
-        res = NextResponse.redirect(
-          new URL(normalizeRedirectPath(pathname), req.url)
-        );
+        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
       } else {
         // All other paths - user is authenticated and on correct page
         res = NextResponse.next({ request: { headers: requestHeaders } });
       }
     } else {
       // Handle unauthenticated users
-      if (
-        pathname === '/waitlist' ||
-        pathname.startsWith('/app') ||
-        pathname.startsWith('/dashboard') ||
-        pathname.startsWith('/account') ||
-        pathname.startsWith('/billing')
-      ) {
+      const protectedPaths = [
+        '/waitlist',
+        '/analytics',
+        '/audience',
+        '/contacts',
+        '/earnings',
+        '/links',
+        '/profile',
+        '/releases',
+        '/settings',
+        '/admin',
+        '/account',
+        '/billing',
+      ];
+
+      const needsAuth = protectedPaths.some(
+        p => pathname === p || pathname.startsWith(`${p}/`)
+      );
+
+      if (needsAuth) {
         // Redirect to signup for waitlist (new users creating accounts)
         // Redirect to signin for everything else (existing users)
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
-        const authUrl = new URL(authPage, req.url);
-        authUrl.searchParams.set(
-          'redirect_url',
-          normalizeRedirectPath(req.nextUrl.pathname)
-        );
+        const authUrl = new URL(authPage, 'https://jov.ie');
+        authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
         res = NextResponse.redirect(authUrl);
       } else {
         res = NextResponse.next({ request: { headers: requestHeaders } });

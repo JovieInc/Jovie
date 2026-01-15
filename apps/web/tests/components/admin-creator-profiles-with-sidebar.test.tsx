@@ -142,7 +142,7 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     );
 
     expect(screen.getByText('@bob')).toBeInTheDocument();
-    expect(screen.getByText('Unclaimed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Not claimed')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Creator actions' })
     ).toBeInTheDocument();

@@ -488,16 +488,34 @@ export function setupComponentMocks() {
       width,
       height,
       className,
-      ...props
-    }: React.ComponentProps<'img'>) => {
+      style,
+      onClick,
+      onLoad,
+      onError,
+      // Filter out Next.js-specific props that aren't valid on <img>
+      priority: _priority,
+      blurDataURL: _blurDataURL,
+      fill: _fill,
+      loading: _loading,
+      placeholder: _placeholder,
+      quality: _quality,
+      sizes: _sizes,
+      loader: _loader,
+      unoptimized: _unoptimized,
+      ...restProps
+    }: any) => {
       return React.createElement('img', {
         src,
         alt,
         width,
         height,
         className,
+        style,
+        onClick,
+        onLoad,
+        onError,
         'data-testid': 'next-image',
-        ...props,
+        ...restProps,
       });
     },
   }));

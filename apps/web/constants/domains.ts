@@ -1,12 +1,13 @@
 /**
  * Domain Configuration for Jovie
  *
- * This file centralizes all domain-related constants for the multi-domain setup:
- * - jov.ie: Public creator profiles (canonical, indexed, viewer subscription cookies)
- * - meetjovie.com: Marketing + Dashboard + Auth (Clerk authentication lives here)
+ * This file centralizes all domain-related constants for the unified jov.ie setup:
+ * - jov.ie: Marketing homepage + Public creator profiles (canonical, indexed)
+ * - app.jov.ie: Dashboard + App (authenticated)
+ * - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
  *
- * Note: We use meetjovie.com for both marketing and app to avoid Clerk's
- * satellite domain costs for subdomains like app.meetjovie.com.
+ * Note: We use jov.ie for auth (root domain) and app.jov.ie for dashboard.
+ * Clerk sessions work across both via cookie domain .jov.ie (no satellite costs).
  *
  * Environment variables can override defaults for local development or staging.
  */
@@ -23,15 +24,15 @@ export const PROFILE_HOSTNAME =
 
 /** Marketing/company domain hostname */
 export const MARKETING_HOSTNAME =
-  process.env.NEXT_PUBLIC_MARKETING_HOSTNAME ?? 'meetjovie.com';
+  process.env.NEXT_PUBLIC_MARKETING_HOSTNAME ?? 'jov.ie';
 
-/** App/dashboard domain hostname (same as marketing to avoid Clerk satellite domain costs) */
+/** App/dashboard domain hostname (subdomain for dashboard and app) */
 export const APP_HOSTNAME =
-  process.env.NEXT_PUBLIC_APP_HOSTNAME ?? 'meetjovie.com';
+  process.env.NEXT_PUBLIC_APP_HOSTNAME ?? 'app.jov.ie';
 
 /** Admin email domain - emails ending with this domain get admin access */
 export const ADMIN_EMAIL_DOMAIN =
-  process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN ?? 'meetjovie.com';
+  process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN ?? 'jov.ie';
 
 // ============================================================================
 // Full URLs (with protocol)
@@ -171,5 +172,5 @@ export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${MARKETING_URL}
 // ============================================================================
 
 /** Clerk proxy URL for custom domain setup */
-export const CLERK_PROXY_HOSTNAME = `clerk.${MARKETING_HOSTNAME}`;
+export const CLERK_PROXY_HOSTNAME = 'clerk.jov.ie';
 export const CLERK_PROXY_URL = `https://${CLERK_PROXY_HOSTNAME}`;
