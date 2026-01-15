@@ -90,7 +90,98 @@ export CLAUDE_HOOKS_DISABLED=1
 - **Copilot / other LLM helpers**
   - Local assistance only; any branch/PR they help produce must still obey this guide.
 
+### 6.1 Model Selection Policy
+
+**Default Model:** Use Opus 4.5 for tasks requiring architectural decisions or multi-file changes.
+
+| Task Type | Recommended Model | Rationale |
+|-----------|-------------------|-----------|
+| Complex architecture, multi-file refactors | **Opus 4.5 (thinking)** | Better first-attempt accuracy, less steering |
+| Feature development, bug fixes, standard tasks | **Sonnet 4.5** | Good balance of speed and quality |
+| Simple edits, formatting, quick fixes | **Haiku** | Fast iteration, cost-efficient |
+| Security reviews, critical path changes | **Opus 4.5 (thinking)** | Thoroughness over speed |
+
+**When to use Opus 4.5:**
+- Any task requiring >3 file changes
+- Architectural decisions or new patterns
+- Security-sensitive code (auth, payments, admin)
+- Database schema changes
+- Performance optimization
+
+**When to use Sonnet:**
+- Single-file feature additions
+- Bug fixes with clear scope
+- Test writing
+- Documentation updates
+
+**When to use Haiku:**
+- Typo fixes, renames
+- Simple formatting changes
+- Quick research queries
+
+### 6.2 Plan Mode Workflow (REQUIRED for Complex Tasks)
+
+Use **Plan Mode** (Shift+Tab twice in CLI, or EnterPlanMode tool) before making changes for:
+
+**When to use Plan Mode:**
+- Multi-file refactors (>3 files affected)
+- Architecture changes (new patterns, state management)
+- Database schema changes (migrations, RLS policies)
+- Security-sensitive code (auth, payments, admin)
+- Performance optimization (caching, rate limiting)
+- Unfamiliar areas of codebase
+
+**When to skip Plan Mode:**
+- Single-file bug fixes
+- Documentation updates
+- Test additions to existing files
+- Formatting/style changes
+
+**Plan Mode Process:**
+1. **Analyze:** Read relevant files, understand existing patterns
+2. **Design:** Create implementation plan with concrete steps
+3. **Present:** Show plan to user for approval
+4. **Clarify:** Use AskUserQuestion if approaches unclear
+5. **Execute:** Implement with verification at each step
+6. **Verify:** Run `/verify` before marking complete
+
+**Anti-patterns:**
+- Starting implementation without understanding existing code
+- Making architectural decisions without plan approval
+- Skipping plan mode for "quick" multi-file changes
+
+### 6.3 Self-Verification (REQUIRED)
+
+Before marking any task complete, run `/verify` to self-check your work. This 2-3x's code quality.
+
+**Minimum verification steps:**
+1. `pnpm turbo typecheck --filter=@jovie/web` - No type errors
+2. `pnpm biome check .` - No lint/format errors
+3. `pnpm vitest --run --changed` - All tests pass
+
+**For UI changes:** Also verify visually in dev server.
+**For security changes:** Also check for OWASP Top 10 vulnerabilities.
+
 ## 7. Safety & Guardrails
+
+### 7.1 Permission Strategy
+
+**Pre-approved operations** (no prompt needed):
+- Read any file in the repository
+- Run typecheck, lint, test commands
+- Format code with Biome
+- Create feature branches from main
+- Run readonly bash commands (ls, cat, grep, git status, git log)
+
+**Requires explicit approval:**
+- Write to database (any environment)
+- Push to remote (feature branches OK after first push)
+- Modify `.github/workflows/` or `.github/rulesets/`
+- Run destructive bash commands (rm -rf, force push)
+- Modify Drizzle migrations after merge
+- Install new dependencies
+
+### 7.2 Core Restrictions
 
 - **No direct dependencies** on analytics/flags outside of the existing Statsig and analytics wrappers in `@/lib` and `@/lib/statsig`.
 - **No direct Neon branch management** from agents; always go through CI workflows.

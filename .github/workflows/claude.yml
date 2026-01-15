@@ -43,8 +43,7 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          # claude_args: '--model claude-opus-4-1-20250805 --allowed-tools Bash(gh pr:*)'
+          # Use Opus 4.5 for GitHub-triggered tasks (complex by nature)
+          # Per agents.md section 6.1: Use Opus for multi-file changes and architectural decisions
+          claude_args: '--model claude-opus-4-5-20250805'
 
