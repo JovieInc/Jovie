@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 import { LinearButton } from '@/components/atoms/LinearButton';
 import { Container } from '@/components/site/Container';
 
@@ -11,8 +12,8 @@ export function RedesignedHero() {
       </div>
 
       <Container size='homepage' className='relative z-10'>
-        <div className='max-w-4xl mx-auto'>
-          <div className='max-w-2xl text-left space-y-8'>
+        <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]'>
+          <div className='text-left space-y-8'>
             {/* H1 - Linear Typography */}
             <h1 className='marketing-h1-linear text-primary-token'>
               Turn fans into subscribers.
@@ -39,6 +40,21 @@ export function RedesignedHero() {
             <p className='text-sm text-tertiary-token'>
               Limited access. Zero setup.
             </p>
+          </div>
+
+          <div className='relative w-full'>
+            <div className='rounded-[28px] border border-subtle bg-surface-1 p-3 shadow-(--shadow-sm)'>
+              <div className='overflow-hidden rounded-[20px] bg-surface-2'>
+                <Image
+                  src='/images/feature_design_linear_grey_notext_1344x1280.png'
+                  alt='Jovie profile preview'
+                  width={1344}
+                  height={1280}
+                  priority
+                  className='h-auto w-full object-cover'
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Container>
