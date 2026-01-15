@@ -13,7 +13,7 @@ export function buildSmartLinkPath(
   slug: string,
   provider?: ProviderKey
 ): string {
-  const query = provider ? `?dsp=${encodeURIComponent(provider)}` : '';
+  const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
   return `/r/${slug}${query}`;
 }
 
