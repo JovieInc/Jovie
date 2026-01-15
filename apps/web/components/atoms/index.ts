@@ -1,15 +1,6 @@
 // Atomic Design - Atoms
 // Basic building blocks that can't be broken down further
 
-/**
- * @deprecated WrappedSocialLink moved to molecules (has useState, useEffect, API calls).
- * Import from @/components/molecules/WrappedSocialLink instead.
- */
-export {
-  LegacySocialLink,
-  WrappedDSPButton,
-  WrappedSocialLink,
-} from '@/components/molecules/WrappedSocialLink';
 export * from './AmountSelector';
 export * from './ArtistAvatar';
 export * from './ArtistName';
@@ -21,6 +12,7 @@ export * from './Badge';
 export * from './BrandLogo';
 export * from './CircleIconButton';
 export * from './Copyright';
+export * from './DashboardErrorFallback';
 export * from './Divider';
 export * from './DropdownMenu';
 export * from './DSPButton';
@@ -59,6 +51,8 @@ export * from './SkipToContent';
 export * from './SocialIcon';
 export * from './Spacer';
 export * from './StatusBadge';
+export * from './TableErrorFallback';
 export * from './Textarea';
 export * from './Tooltip';
 export * from './VerifiedBadge';
+export * from './WrappedSocialLink';

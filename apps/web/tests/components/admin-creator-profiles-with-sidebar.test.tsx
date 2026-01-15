@@ -53,7 +53,13 @@ vi.mock('@/components/organisms/ContactSidebar', () => ({
 
 vi.mock('@/components/admin/table/TableRowActions', () => ({
   TableRowActions: ({ isClaimed }: { isClaimed: boolean }) => (
-    <div>{isClaimed ? 'Claimed' : 'Unclaimed'}</div>
+    <button
+      type='button'
+      aria-label={isClaimed ? 'Claimed' : 'Not claimed'}
+      disabled
+    >
+      {isClaimed ? 'Claimed' : 'Unclaimed'}
+    </button>
   ),
 }));
 

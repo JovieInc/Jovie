@@ -35,6 +35,12 @@ vi.mock('@/lib/db', () => ({
     update: dbMock.update,
   },
   users: {},
+  eq: vi.fn(),
+}));
+
+const mockGetUserByClerkId = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/db/queries/shared', () => ({
+  getUserByClerkId: mockGetUserByClerkId,
 }));
 
 describe('POST /api/account/email', () => {
@@ -105,6 +111,12 @@ describe('POST /api/account/email', () => {
           verification: { status: 'verified' },
         },
       ],
+    });
+
+    mockGetUserByClerkId.mockResolvedValue({
+      id: 'internal_user_id',
+      clerkId: 'user_123',
+      email: 'old@example.com',
     });
 
     const request = new NextRequest('http://localhost/api/account/email', {
