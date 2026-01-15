@@ -15,10 +15,11 @@ import { EmptyState } from '@/components/organisms/EmptyState';
 import type { SocialsFormProps } from './types';
 import { useSocialsForm } from './useSocialsForm';
 
-const SOCIALS_FORM_LOADING_KEYS = Array.from(
-  { length: 3 },
-  (_, i) => `socials-form-loading-${i + 1}`
-);
+const SOCIALS_FORM_LOADING_KEYS = [
+  'socials-form-loading-1',
+  'socials-form-loading-2',
+  'socials-form-loading-3',
+];
 
 export function SocialsForm({ artist }: SocialsFormProps) {
   const {

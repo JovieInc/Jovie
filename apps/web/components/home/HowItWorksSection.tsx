@@ -1,6 +1,12 @@
 import { Container } from '@/components/site/Container';
 
-const steps = [
+interface Step {
+  number: string;
+  title: string;
+  description: string;
+}
+
+const steps: Step[] = [
   {
     number: '1',
     title: 'Paste your Spotify',

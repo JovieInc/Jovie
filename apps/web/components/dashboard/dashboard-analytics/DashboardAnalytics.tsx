@@ -40,8 +40,8 @@ export function DashboardAnalytics() {
           <DashboardRefreshButton
             ariaLabel='Refresh analytics'
             onRefreshed={() => {
-              refresh().catch(error => {
-                Sentry.captureException(error);
+              refresh().catch(refreshError => {
+                Sentry.captureException(refreshError);
               });
             }}
           />
