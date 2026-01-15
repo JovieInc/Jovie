@@ -1,13 +1,7 @@
 import Image from 'next/image';
 import { Container } from '@/components/site/Container';
 
-interface DemoArtist {
-  name: string;
-  handle: string;
-  image: string;
-}
-
-const DEMO_ARTISTS: DemoArtist[] = [
+const DEMO_ARTISTS = [
   {
     name: 'Billie Eilish',
     handle: 'billieeilish',
@@ -52,14 +46,13 @@ export function SeeItInActionSection() {
         </div>
 
         <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6'>
-          {DEMO_ARTISTS.map((artist: DemoArtist) => (
+          {DEMO_ARTISTS.map(artist => (
             <div key={artist.handle} className='flex flex-col items-center'>
               <div className='relative w-20 h-20 mb-3'>
                 <Image
                   src={artist.image}
                   alt={`${artist.name} example profile`}
                   fill
-                  sizes='80px'
                   className='rounded-full object-cover border border-subtle'
                 />
               </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import { CaptureFlowSection } from '@/components/home/CaptureFlowSection';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { HowItWorksSection } from '@/components/home/HowItWorksSection';
+import { InsightSection } from '@/components/home/InsightSection';
+import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionSection } from '@/components/home/SeeItInActionSection';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
@@ -234,11 +234,11 @@ export default function HomePage() {
       {/* 2. See It In Action Section */}
       <SeeItInActionSection />
 
-      {/* 3. How It Works Section */}
-      <HowItWorksSection />
+      {/* 3. Problem Section */}
+      <ProblemSection />
 
-      {/* 4. Capture Flow Section */}
-      <CaptureFlowSection />
+      {/* 4. Insight Section */}
+      <InsightSection />
 
       {/* 5. What You Get Section */}
       <WhatYouGetSection />
