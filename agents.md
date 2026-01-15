@@ -162,6 +162,43 @@ Before marking any task complete, run `/verify` to self-check your work. This 2-
 **For UI changes:** Also verify visually in dev server.
 **For security changes:** Also check for OWASP Top 10 vulnerabilities.
 
+### 6.4 Continuous Improvement (REQUIRED)
+
+**This file (`agents.md`) is a living document.** It should improve over time as Claude learns from mistakes and discovers new patterns.
+
+**Philosophy:** Every mistake is an opportunity to add a guardrail. If Claude does something incorrectly, the fix isn't just correcting the immediate error—it's documenting the pattern to prevent future occurrences.
+
+**When to suggest additions to agents.md:**
+
+1. **After making a mistake:** If you did something wrong (broke a test, used wrong pattern, missed a convention), propose a guardrail.
+2. **After discovering an undocumented pattern:** If you had to figure out how something works that wasn't documented, suggest adding it.
+3. **After a user corrects you:** If the user points out an error or preference, suggest codifying it.
+4. **After encountering a "gotcha":** If you hit a non-obvious issue that could trip up future work, document it.
+
+**How to suggest guardrails:**
+
+```markdown
+## Suggested Addition to agents.md
+
+**Section:** [Where it should go, e.g., "7. Safety & Guardrails" or "8.3 Stack & Packages"]
+
+**Proposed content:**
+[The actual text to add]
+
+**Rationale:** [Why this would prevent future mistakes]
+```
+
+**Examples of good guardrails:**
+
+- "Never use `includes()` for domain validation—use exact match or subdomain check with leading dot"
+- "Always check if a file exists before using `Edit` tool—use `Read` first"
+- "Rate limiters must have both Redis and in-memory fallback"
+- "Admin endpoints require rate limiting, not just auth checks"
+
+**User approval required:** Always present suggestions for human review. Don't modify agents.md without explicit approval.
+
+**Feedback loop:** The goal is to make agents.md comprehensive enough that new Claude sessions start with all the context they need to avoid known pitfalls. Each guardrail added saves time on every future task.
+
 ## 7. Safety & Guardrails
 
 ### 7.1 Permission Strategy
