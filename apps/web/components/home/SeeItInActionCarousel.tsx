@@ -115,7 +115,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
             >
               <Image
                 src={creator.src}
-                alt='Featured creator'
+                alt={`${creator.name}'s avatar`}
                 fill
                 sizes='120px'
                 placeholder='blur'

@@ -60,6 +60,12 @@ const FALLBACK_AVATARS: FeaturedCreator[] = [
     name: 'Artist',
     src: '/images/avatars/maneskin.jpg',
   },
+  {
+    id: 'fallback-10',
+    handle: 'placeholder',
+    name: 'Artist',
+    src: '/images/avatars/placeholder.jpg',
+  },
 ];
 
 const MIN_CREATORS = 10;

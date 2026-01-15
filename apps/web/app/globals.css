@@ -772,6 +772,10 @@ body {
 
 @utility animate-scroll-infinite {
   animation: scroll-infinite 30s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 /* Micro-animations */

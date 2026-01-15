@@ -32,7 +32,7 @@ export function ProblemSection() {
               <div key={index} className='flex items-start gap-4'>
                 {/* Icon - Linear 24px treatment */}
                 <div className='flex items-center justify-center w-6 h-6 shrink-0'>
-                  <CheckCircle2 className='w-5 h-5 text-emerald-500' />
+                  <CheckCircle2 className='w-5 h-5 text-success' />
                 </div>
                 <div className='space-y-1'>
                   <h3 className='text-lg font-medium text-primary-token'>
