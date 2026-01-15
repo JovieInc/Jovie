@@ -16,13 +16,12 @@ export function RedesignedHero() {
           <div className='text-left space-y-8'>
             {/* H1 - Linear Typography */}
             <h1 className='marketing-h1-linear text-primary-token'>
-              Turn fans into subscribers.
+              The link in bio your music deserves
             </h1>
 
             {/* Lead - Secondary color hierarchy */}
             <p className='marketing-lead-linear text-secondary-token'>
-              Replace your link stack with an AI-driven profile that converts
-              more fans and improves automatically.
+              Capture every fan with an AI-powered profile that updates itself.
             </p>
 
             {/* CTAs - Linear button treatment */}
