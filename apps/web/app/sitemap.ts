@@ -1,21 +1,17 @@
 import { eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
-import { MARKETING_URL, PROFILE_URL } from '@/constants/app';
+import { PROFILE_URL } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 
 /**
- * Multi-domain sitemap configuration
+ * Sitemap configuration for jov.ie
  *
- * Serves domain-specific sitemaps based on the requesting hostname:
- * - jov.ie: Only profile pages (creator profiles)
- * - meetjovie.com: Only marketing pages (blog, legal, homepage)
- *
- * This follows Google's recommendation that sitemaps should only include
- * URLs from the same domain they're served from.
+ * Includes both profile pages and marketing pages (blog, legal, homepage)
+ * since everything is now served from the unified jov.ie domain.
  */
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -94,42 +90,40 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
 }
 
 /**
- * Sitemap for meetjovie.com - marketing pages only
+ * Sitemap for marketing pages (blog, legal)
  */
 async function buildMarketingSitemap(): Promise<MetadataRoute.Sitemap> {
   const blogSlugs = await getBlogPostSlugs();
 
-  // Marketing pages on meetjovie.com
   const marketingPages = [
     {
-      url: MARKETING_URL,
+      url: PROFILE_URL,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 1,
     },
     {
-      url: `${MARKETING_URL}/blog`,
+      url: `${PROFILE_URL}/blog`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     },
     {
-      url: `${MARKETING_URL}/legal/privacy`,
+      url: `${PROFILE_URL}/legal/privacy`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
     {
-      url: `${MARKETING_URL}/legal/terms`,
+      url: `${PROFILE_URL}/legal/terms`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
   ];
 
-  // Blog pages on meetjovie.com
   const blogPages = blogSlugs.map(slug => ({
-    url: `${MARKETING_URL}/blog/${slug}`,
+    url: `${PROFILE_URL}/blog/${slug}`,
     lastModified: new Date(),
     changeFrequency: 'monthly' as const,
     priority: 0.6,
