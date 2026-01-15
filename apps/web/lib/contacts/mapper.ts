@@ -5,7 +5,24 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from './constants';
-import { encodeContactPayload } from './obfuscation';
+
+/**
+ * Build a mailto: URL for email contact.
+ * Constructs the URL server-side so no decoding is needed on the client.
+ */
+function buildEmailActionUrl(email: string, subject?: string): string {
+  const subjectParam = subject ? `?subject=${encodeURIComponent(subject)}` : '';
+  return `mailto:${email}${subjectParam}`;
+}
+
+/**
+ * Build a tel: URL for phone contact.
+ * Normalizes the phone number and constructs the URL server-side.
+ */
+function buildPhoneActionUrl(phone: string): string {
+  const normalized = phone.replace(/[^\d+]/g, '');
+  return `tel:${normalized}`;
+}
 
 export function toPublicContacts(
   contacts: CreatorContact[],
@@ -21,14 +38,10 @@ export function toPublicContacts(
       const channels: PublicContact['channels'] = [];
 
       if (contact.email) {
+        const subject = buildRoleSubject(contact.role, artistName);
         channels.push({
           type: 'email',
-          encoded: encodeContactPayload({
-            type: 'email',
-            value: contact.email,
-            subject: buildRoleSubject(contact.role, artistName),
-            contactId: contact.id,
-          }),
+          actionUrl: buildEmailActionUrl(contact.email, subject),
           preferred: contact.preferredChannel === 'email',
         });
       }
@@ -36,11 +49,7 @@ export function toPublicContacts(
       if (contact.phone) {
         channels.push({
           type: 'phone',
-          encoded: encodeContactPayload({
-            type: 'phone',
-            value: contact.phone,
-            contactId: contact.id,
-          }),
+          actionUrl: buildPhoneActionUrl(contact.phone),
           preferred: contact.preferredChannel === 'phone',
         });
       }

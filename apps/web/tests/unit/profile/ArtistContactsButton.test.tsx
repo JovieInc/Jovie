@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ArtistContactsButton } from '@/components/profile/artist-contacts-button';
-import { encodeContactPayload } from '@/lib/contacts/obfuscation';
 import type { PublicContact } from '@/types/contacts';
 
 vi.mock('@statsig/react-bindings', () => ({
@@ -22,12 +21,8 @@ function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {
     channels: [
       {
         type: 'email',
-        encoded: encodeContactPayload({
-          type: 'email',
-          value: 'agent@example.com',
-          subject: 'Booking - Test Artist',
-          contactId: 'contact-1',
-        }),
+        actionUrl:
+          'mailto:agent@example.com?subject=Booking%20-%20Test%20Artist',
         preferred: true,
       },
     ],

@@ -41,7 +41,7 @@ export function ArtistContactsButton({
         type='button'
         className={triggerClass}
         aria-label='Contacts'
-        data-contact-encoded={channel.encoded}
+        data-contact-action={channel.actionUrl}
         data-testid='contacts-trigger'
         onClick={() => {
           onIconClick();
@@ -97,7 +97,7 @@ export function ArtistContactsButton({
                 <button
                   type='button'
                   className='flex flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] rounded-md px-1'
-                  data-contact-encoded={primary.encoded}
+                  data-contact-action={primary.actionUrl}
                   data-role={contact.role}
                   data-territories={contact.territoryCount}
                   onClick={() => performAction(primary, contact)}
@@ -117,7 +117,7 @@ export function ArtistContactsButton({
                       key={`${contact.id}-${channel.type}`}
                       type='button'
                       className='flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] data-[preferred=true]:bg-surface-2'
-                      data-contact-encoded={channel.encoded}
+                      data-contact-action={channel.actionUrl}
                       data-channel={channel.type}
                       data-preferred={channel.preferred ? 'true' : undefined}
                       aria-label={`${channel.type === 'email' ? 'Email' : 'Call'} ${contact.roleLabel}`}

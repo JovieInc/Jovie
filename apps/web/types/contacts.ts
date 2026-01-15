@@ -34,7 +34,8 @@ export interface DashboardContactInput {
 
 export interface PublicContactChannel {
   type: ContactChannel;
-  encoded: string;
+  /** Pre-built action URL (mailto: or tel:) for direct navigation */
+  actionUrl: string;
   preferred?: boolean;
 }
 

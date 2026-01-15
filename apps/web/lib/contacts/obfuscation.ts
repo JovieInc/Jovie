@@ -1,3 +1,12 @@
+/**
+ * Contact payload obfuscation utilities.
+ *
+ * NOTE: This module is client-safe. The actual contact data is now pre-processed
+ * server-side in mapper.ts, which builds action URLs directly.
+ * These utilities are kept for backwards compatibility with tests and any
+ * legacy data that might still use the old encoded format.
+ */
+
 export interface EncodedContactPayload {
   type: 'email' | 'phone';
   value: string;
@@ -33,11 +42,21 @@ function base64Decode(value: string): string {
   throw new Error('Base64 decoding unavailable in this environment');
 }
 
+/**
+ * Encode a contact payload using simple obfuscation.
+ * @deprecated This is kept for test compatibility only.
+ * Production code should use the pre-built actionUrl from mapper.ts.
+ */
 export function encodeContactPayload(payload: EncodedContactPayload): string {
   const rotated = rotateCharacters(JSON.stringify(payload), 1);
   return base64Encode(rotated);
 }
 
+/**
+ * Decode a contact payload.
+ * @deprecated This is kept for backwards compatibility only.
+ * New code should use the pre-built actionUrl from mapper.ts.
+ */
 export function decodeContactPayload(
   encoded: string
 ): EncodedContactPayload | null {
@@ -50,8 +69,7 @@ export function decodeContactPayload(
     }
     if (!parsed.value) return null;
     return parsed;
-  } catch (error) {
-    console.warn('Failed to decode contact payload', error);
+  } catch {
     return null;
   }
 }

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
-import { decodeContactPayload } from '@/lib/contacts/obfuscation';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
@@ -42,8 +41,8 @@ export function useArtistContacts({
       setOpen(false);
     }
 
-    const decoded = decodeContactPayload(channel.encoded);
-    if (!decoded) return;
+    // actionUrl is pre-built server-side (mailto: or tel: URL)
+    if (!channel.actionUrl) return;
 
     track('contacts_contact_click', {
       handle: artistHandle,
@@ -52,16 +51,7 @@ export function useArtistContacts({
       territory_count: contact.territoryCount,
     });
 
-    if (decoded.type === 'email') {
-      const subject = decoded.subject
-        ? `?subject=${encodeURIComponent(decoded.subject)}`
-        : '';
-      navigate(`mailto:${decoded.value}${subject}`);
-      return;
-    }
-
-    const normalized = decoded.value.replace(/[^\d+]/g, '');
-    navigate(`tel:${normalized}`);
+    navigate(channel.actionUrl);
   };
 
   const onIconClick = () => {
