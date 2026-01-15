@@ -3,6 +3,7 @@ import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { InsightSection } from '@/components/home/InsightSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
+import { SeeItInActionSection } from '@/components/home/SeeItInActionSection';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
@@ -230,16 +231,19 @@ export default function HomePage() {
       {/* 1. Hero Section */}
       <RedesignedHero />
 
-      {/* 2. Problem Section */}
+      {/* 2. See It In Action Section */}
+      <SeeItInActionSection />
+
+      {/* 3. Problem Section */}
       <ProblemSection />
 
-      {/* 3. Insight Section */}
+      {/* 4. Insight Section */}
       <InsightSection />
 
-      {/* 4. What You Get Section */}
+      {/* 5. What You Get Section */}
       <WhatYouGetSection />
 
-      {/* 5. Final CTA Section */}
+      {/* 6. Final CTA Section */}
       <FinalCTASection />
     </div>
   );
