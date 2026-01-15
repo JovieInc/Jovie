@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
-import type { HeaderCheckboxState } from '@/components/admin/table/useRowSelection';
+import type { HeaderCheckboxState } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import type { AudienceMode } from '../types';
 

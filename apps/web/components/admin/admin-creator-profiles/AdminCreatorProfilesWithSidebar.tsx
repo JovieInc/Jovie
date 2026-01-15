@@ -14,11 +14,11 @@ import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsTool
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { useRowSelection } from '@/components/organisms/table';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
