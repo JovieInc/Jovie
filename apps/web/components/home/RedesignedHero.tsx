@@ -21,7 +21,7 @@ export function RedesignedHero() {
 
             {/* Lead - Secondary color hierarchy */}
             <p className='marketing-lead-linear text-secondary-token'>
-              Capture every fan with AI smartlinks that update themselves.
+              Capture every fan with an AI-powered profile that updates itself.
             </p>
 
             {/* CTAs - Linear button treatment */}
