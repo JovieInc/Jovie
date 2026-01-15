@@ -1,6 +1,8 @@
 import { expect, Page, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
 
+const baseUrl = process.env.BASE_URL || 'http://localhost:3100';
+
 type Issue = {
   theme: 'light' | 'dark' | 'both';
   page: string;
@@ -247,9 +249,7 @@ test.describe('Accessibility Audit', () => {
     }
 
     for (const route of routes) {
-      const url = route.startsWith('http')
-        ? route
-        : `http://localhost:3000${route}`;
+      const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
       await page.goto(url);
       await page.waitForLoadState('networkidle');
 
@@ -315,7 +315,7 @@ test.describe('Accessibility Audit', () => {
     }
 
     for (const route of authRoutes) {
-      const url = `http://localhost:3000${route}`;
+      const url = `${baseUrl}${route}`;
       await page.goto(url);
       await page.waitForLoadState('networkidle');
 
