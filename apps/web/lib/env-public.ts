@@ -22,8 +22,7 @@ const rawPublicEnv = {
   NEXT_PUBLIC_CLERK_FRONTEND_API:
     process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || undefined,
   // Domain configuration - unified jov.ie domain architecture
-  NEXT_PUBLIC_APP_URL:
-    process.env.NEXT_PUBLIC_APP_URL || 'https://app.jov.ie',
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://app.jov.ie',
   NEXT_PUBLIC_PROFILE_URL:
     process.env.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie',
   NEXT_PUBLIC_MARKETING_URL:
