@@ -2,17 +2,26 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { redis } from '@/lib/redis';
 
 /**
- * In-memory cache for admin role checks
- * TTL: 5 minutes
+ * Redis-based distributed cache for admin role checks
+ * Primary: Redis (1 minute TTL, distributed across instances)
+ * Fallback: In-memory Map (when Redis unavailable)
  */
-const roleCache = new Map<string, { isAdmin: boolean; expiresAt: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const REDIS_CACHE_TTL_SECONDS = 60; // 1 minute (reduced from 5 for faster revocation)
+const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute fallback
+const REDIS_KEY_PREFIX = 'admin:role:';
+
+// Keep in-memory cache as fallback when Redis unavailable
+const fallbackCache = new Map<
+  string,
+  { isAdmin: boolean; expiresAt: number }
+>();
 
 /**
  * Check if a user has admin role based on database verification.
- * Results are cached for 5 minutes to reduce database queries.
+ * Results are cached for 1 minute (distributed via Redis, or in-memory fallback).
  *
  * @param userId - Clerk user ID
  * @returns Promise<boolean> - True if user has admin role
@@ -20,29 +29,69 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export async function isAdmin(userId: string): Promise<boolean> {
   if (!userId) return false;
 
-  // Check cache first
-  const cached = roleCache.get(userId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.isAdmin;
+  const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
+
+  // 1. Try Redis first (distributed cache)
+  if (redis) {
+    try {
+      const cached = await redis.get(cacheKey);
+
+      if (cached !== null) {
+        return cached === '1'; // '1' = admin, '0' = not admin
+      }
+
+      // Cache miss - query database
+      const isUserAdmin = await queryAdminRoleFromDB(userId);
+
+      // Store in Redis with TTL
+      await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
+        ex: REDIS_CACHE_TTL_SECONDS,
+      });
+
+      return isUserAdmin;
+    } catch (error) {
+      console.warn(
+        '[admin/roles] Redis cache failed, falling back to memory:',
+        error
+      );
+      // Fall through to memory cache
+    }
   }
 
+  // 2. Fallback to in-memory cache
+  const now = Date.now();
+  const memCached = fallbackCache.get(userId);
+
+  if (memCached && now < memCached.expiresAt) {
+    return memCached.isAdmin;
+  }
+
+  // Query database
+  const isUserAdmin = await queryAdminRoleFromDB(userId);
+
+  // Store in memory cache
+  fallbackCache.set(userId, {
+    isAdmin: isUserAdmin,
+    expiresAt: now + MEMORY_CACHE_TTL_MS,
+  });
+
+  return isUserAdmin;
+}
+
+/**
+ * Query the database for admin role status.
+ * Extracted for reuse in both Redis and memory cache paths.
+ * @internal
+ */
+async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
   try {
-    // Query database for admin role
     const [user] = await db
       .select({ isAdmin: users.isAdmin })
       .from(users)
       .where(eq(users.clerkId, userId))
       .limit(1);
 
-    const isUserAdmin = user?.isAdmin ?? false;
-
-    // Cache the result
-    roleCache.set(userId, {
-      isAdmin: isUserAdmin,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
-
-    return isUserAdmin;
+    return user?.isAdmin ?? false;
   } catch (error) {
     console.error('[admin/roles] Failed to check admin status:', error);
     // Fail closed - deny access on error
@@ -53,17 +102,28 @@ export async function isAdmin(userId: string): Promise<boolean> {
 /**
  * Invalidate the admin role cache for a specific user.
  * Call this after granting or revoking admin privileges.
+ * Clears both Redis and memory cache for immediate effect.
  *
  * @param userId - Clerk user ID
  */
 export function invalidateAdminCache(userId: string): void {
-  roleCache.delete(userId);
+  // Clear memory cache
+  fallbackCache.delete(userId);
+
+  // Clear Redis cache (best-effort, async)
+  if (redis) {
+    const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
+    redis.del(cacheKey).catch(error => {
+      console.warn('[admin/roles] Failed to invalidate Redis cache:', error);
+    });
+  }
 }
 
 /**
  * Clear the entire admin role cache.
  * Useful for testing or after bulk role updates.
+ * Note: Only clears memory cache, not Redis (to avoid affecting other instances).
  */
 export function clearAdminCache(): void {
-  roleCache.clear();
+  fallbackCache.clear();
 }

@@ -223,6 +223,9 @@ function upgradeGravatarUrl(url: string): string {
 /**
  * Helper to check if a hostname matches known OAuth avatar providers.
  * Eliminates duplication between upgrade and validation functions.
+ *
+ * Security: Uses exact domain matching to prevent subdomain injection attacks.
+ * For example, "evil.fbsbx.com.attacker.com" will NOT match "fbsbx.com".
  */
 function matchesKnownProvider(hostname: string): {
   isGoogle: boolean;
@@ -232,16 +235,37 @@ function matchesKnownProvider(hostname: string): {
   isClerk: boolean;
   isGravatar: boolean;
 } {
+  const lowerHostname = hostname.toLowerCase();
+
   return {
-    isGoogle: hostname.endsWith('.googleusercontent.com'),
+    // Google: exact domain or subdomain match only (with leading dot)
+    isGoogle:
+      lowerHostname === 'googleusercontent.com' ||
+      lowerHostname.endsWith('.googleusercontent.com'),
+
+    // Facebook: exact domain or subdomain matches only
     isFacebook:
-      hostname.includes('fbsbx.com') ||
-      hostname.includes('fbcdn.net') ||
-      hostname.includes('facebook.com'),
-    isTwitter: hostname === 'pbs.twimg.com',
-    isGitHub: hostname === 'avatars.githubusercontent.com',
-    isClerk: hostname === 'img.clerk.com' || hostname === 'images.clerk.dev',
-    isGravatar: hostname.includes('gravatar.com'),
+      lowerHostname === 'fbsbx.com' ||
+      lowerHostname.endsWith('.fbsbx.com') ||
+      lowerHostname === 'fbcdn.net' ||
+      lowerHostname.endsWith('.fbcdn.net') ||
+      lowerHostname === 'facebook.com' ||
+      lowerHostname.endsWith('.facebook.com'),
+
+    // Twitter: exact match only (no subdomains)
+    isTwitter: lowerHostname === 'pbs.twimg.com',
+
+    // GitHub: exact match only (no subdomains)
+    isGitHub: lowerHostname === 'avatars.githubusercontent.com',
+
+    // Clerk: exact matches only (no subdomains)
+    isClerk:
+      lowerHostname === 'img.clerk.com' || lowerHostname === 'images.clerk.dev',
+
+    // Gravatar: exact domain or subdomain match only
+    isGravatar:
+      lowerHostname === 'gravatar.com' ||
+      lowerHostname.endsWith('.gravatar.com'),
   };
 }
 

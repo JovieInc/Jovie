@@ -100,6 +100,19 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
+  // Admin Operations
+  // ---------------------------------------------------------------------------
+
+  /** Admin impersonation: 5 attempts per hour per admin - CRITICAL for security */
+  adminImpersonate: {
+    name: 'Admin Impersonate',
+    limit: 5,
+    window: '1 h',
+    prefix: 'admin:impersonate',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
   // Tracking & Analytics
   // ---------------------------------------------------------------------------
 
