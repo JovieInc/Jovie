@@ -36,7 +36,42 @@ function verifyCronSecret(provided: string | undefined): boolean {
   return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
+/**
+ * Verify request origin is from trusted sources (Vercel Cron or internal).
+ * Defense in depth - verify source before checking secret.
+ */
+function verifyOrigin(request: NextRequest): boolean {
+  // Vercel Cron requests include this header
+  const vercelCronHeader = request.headers.get('x-vercel-cron');
+  if (vercelCronHeader === '1') {
+    return true;
+  }
+
+  // Allow requests from Vercel's internal network or our domains
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (
+    forwardedHost?.endsWith('.vercel.app') ||
+    forwardedHost?.endsWith('.jov.ie') ||
+    forwardedHost === 'jov.ie'
+  ) {
+    return true;
+  }
+
+  // In development, allow localhost
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
+
+  return false;
+}
+
 export async function GET(request: NextRequest) {
+  // Verify request origin (defense in depth - verify source before checking secret)
+  if (!verifyOrigin(request)) {
+    logger.warn('[Data Retention Cron] Rejected request from untrusted origin');
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   // Verify cron authorization
   const authHeader = request.headers.get('authorization');
   const cronSecret = authHeader?.replace('Bearer ', '');
@@ -76,9 +111,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    // Log full error details internally
     logger.error('[Data Retention Cron] Cleanup failed', error);
+    // Return sanitized error to prevent information disclosure
     return NextResponse.json(
-      { error: 'Cleanup failed', message: (error as Error).message },
+      { error: 'Cleanup failed' },
       { status: 500 }
     );
   }

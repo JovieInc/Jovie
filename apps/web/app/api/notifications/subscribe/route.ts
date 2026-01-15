@@ -71,9 +71,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (result.audienceIdentified) {
+      // Set secure flag based on environment:
+      // - Always secure in production and preview (Vercel)
+      // - Secure in non-development environments
+      const vercelEnv = process.env.VERCEL_ENV;
+      const isSecureEnv =
+        vercelEnv === 'production' ||
+        vercelEnv === 'preview' ||
+        process.env.NODE_ENV === 'production';
+
       response.cookies.set(AUDIENCE_COOKIE_NAME, '1', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isSecureEnv,
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 365,
         path: '/',

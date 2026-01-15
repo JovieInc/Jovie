@@ -23,16 +23,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signedLinkAccess } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import {
   getWrappedLink,
   incrementClickCount,
 } from '@/lib/services/link-wrapping';
 import {
-  checkRateLimit,
   createBotResponse,
   detectBot,
   logBotDetection,
 } from '@/lib/utils/bot-detection';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { generateSignedToken } from '@/lib/utils/url-encryption.server';
 
 const SECURITY_HEADERS = {
@@ -53,10 +54,8 @@ export async function POST(
 ) {
   const { id } = await params;
   const shortId = id;
-  const ip =
-    request.headers.get('x-forwarded-for') ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
+  // Use secure IP extraction with proper priority
+  const ip = extractClientIP(request.headers);
 
   if (!shortId || shortId.length > 20) {
     return NextResponse.json(
@@ -83,12 +82,18 @@ export async function POST(
       return createBotResponse(204);
     }
 
-    // Rate limiting for API endpoints
-    const isRateLimited = await checkRateLimit(ip, '/api/link'); // 10 requests per 5 minutes
-    if (isRateLimited) {
+    // Rate limiting for API endpoints (enabled)
+    const rateLimitResult = await apiLimiter.limit(ip);
+    if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
-        { status: 429, headers: SECURITY_HEADERS }
+        {
+          status: 429,
+          headers: {
+            ...SECURITY_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 

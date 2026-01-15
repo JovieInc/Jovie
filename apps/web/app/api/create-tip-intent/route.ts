@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -11,6 +12,28 @@ import {
 import { validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
+
+/**
+ * Hash a handle for metadata storage to prevent PII exposure.
+ * Uses SHA-256 with a prefix for lookup correlation.
+ */
+function hashHandleForMetadata(handle: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`jovie:tip:${handle.toLowerCase()}`)
+    .digest('hex')
+    .substring(0, 16); // Truncate for brevity
+}
+
+/**
+ * Convert amount to cents with overflow protection.
+ * Maximum amount is 500 * 100 = 50000 cents.
+ */
+function amountToCents(amount: number): number {
+  // Schema already validates 1-500, but add explicit bounds check
+  const clampedAmount = Math.max(1, Math.min(500, Math.floor(amount)));
+  return clampedAmount * 100;
+}
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -76,11 +99,22 @@ export async function POST(req: NextRequest) {
     }
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+    // Convert to cents with overflow protection
+    const amountInCents = amountToCents(amount);
+
+    // Hash handle to prevent PII exposure in third-party metadata
+    // The original handle can be correlated via internal logs if needed
+    const handleHash = hashHandleForMetadata(handle);
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100,
+      amount: amountInCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
-      metadata: { handle, amount },
+      // Store hashed handle instead of plaintext to prevent PII exposure
+      metadata: {
+        handle_hash: handleHash,
+        amount_cents: amountInCents,
+      },
     });
 
     return NextResponse.json(

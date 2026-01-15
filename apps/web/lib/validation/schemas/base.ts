@@ -64,12 +64,84 @@ const hasSafeHttpProtocol = (value: string): boolean => {
  * HTTP URL validation schema.
  * Validates that a string is a properly formatted URL with http or https protocol.
  * Includes trimming, max length validation, and protocol verification.
+ *
+ * NOTE: This schema only validates protocol. For SSRF-safe URLs (e.g., avatar URLs),
+ * use safeHttpUrlSchema which also blocks private/internal IPs.
  */
 export const httpUrlSchema = z
   .string()
   .trim()
   .max(2048)
   .refine(hasSafeHttpProtocol, 'URL must start with http or https');
+
+/**
+ * Private IP patterns for SSRF protection
+ */
+const PRIVATE_IP_PATTERNS = [
+  /^127\./, // Loopback
+  /^10\./, // Class A private
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private
+  /^192\.168\./, // Class C private
+  /^169\.254\./, // Link-local
+  /^0\./, // Current network
+];
+
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  '127.0.0.1',
+  '::1',
+]);
+
+/**
+ * Validates a URL is safe from SSRF attacks by checking for private IPs and internal hosts.
+ */
+const isSsrfSafeUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+
+    // Block known internal hostnames
+    if (BLOCKED_HOSTNAMES.has(hostname)) {
+      return false;
+    }
+
+    // Block private IP addresses
+    if (PRIVATE_IP_PATTERNS.some(pattern => pattern.test(hostname))) {
+      return false;
+    }
+
+    // Block internal domain suffixes
+    if (
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.localhost')
+    ) {
+      return false;
+    }
+
+    // Block cloud metadata endpoints
+    if (hostname === '169.254.169.254' || hostname.includes('metadata')) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * SSRF-safe HTTP URL validation schema.
+ * Validates URL format, protocol, AND blocks private/internal addresses.
+ * Use this for any URL that will be fetched server-side (e.g., avatar URLs).
+ */
+export const safeHttpUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(hasSafeHttpProtocol, 'URL must start with http or https')
+  .refine(isSsrfSafeUrl, 'URL must not point to internal or private addresses');
 
 /**
  * Generic metadata schema for extensible key-value pairs.

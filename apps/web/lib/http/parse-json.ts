@@ -7,7 +7,16 @@ interface ParseJsonOptions<T> {
   logContext?: Record<string, unknown>;
   allowEmptyBody?: boolean;
   emptyBodyValue?: T;
+  /**
+   * Maximum allowed body size in bytes.
+   * Default: 1MB (1048576 bytes)
+   * Helps prevent DoS attacks via large payloads.
+   */
+  maxBodySize?: number;
 }
+
+/** Default max body size: 1MB */
+const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
 type ParsedJsonSuccess<T> = {
   ok: true;
@@ -39,7 +48,40 @@ export async function parseJsonBody<T = unknown>(
   request: Request,
   options: ParseJsonOptions<T>
 ): Promise<ParsedJsonResult<T>> {
+  const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
+
+  // Check Content-Length header first for early rejection
+  const contentLength = request.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > maxBodySize) {
+    console.warn(`[${options.route}] Request body too large`, {
+      contentLength,
+      maxBodySize,
+    });
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Request body too large' },
+        { status: 413, headers: options.headers }
+      ),
+    };
+  }
+
   const rawBody = await request.text();
+
+  // Check actual body size (in case Content-Length was missing or incorrect)
+  if (rawBody.length > maxBodySize) {
+    console.warn(`[${options.route}] Request body exceeds size limit`, {
+      actualSize: rawBody.length,
+      maxBodySize,
+    });
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Request body too large' },
+        { status: 413, headers: options.headers }
+      ),
+    };
+  }
 
   if (rawBody.trim().length === 0 && options.allowEmptyBody) {
     return {
