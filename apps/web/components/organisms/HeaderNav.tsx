@@ -5,9 +5,9 @@ import { AuthActions } from '@/components/molecules/AuthActions';
 import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
 
-// Geist nav link styles
+// Linear nav link styles - text color change only, no bg hover
 const navLinkClass =
-  'inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 focus-ring-themed';
+  'inline-flex items-center justify-center h-8 px-3 text-sm font-medium text-secondary-token hover:text-primary-token transition-colors duration-150 focus-ring-themed';
 
 export interface HeaderNavProps {
   sticky?: boolean;

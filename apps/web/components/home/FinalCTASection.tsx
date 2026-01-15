@@ -14,7 +14,7 @@ export function FinalCTASection() {
             <GradientText variant='secondary'>capture every fan</GradientText>?
           </h2>
 
-          <p className='marketing-lead-linear text-secondary-token'>
+          <p className='marketing-lead-linear text-tertiary-token'>
             Paste your Spotify. Get a page that converts.
           </p>
 
