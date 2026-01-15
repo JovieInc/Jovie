@@ -9,7 +9,7 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
-import { MARKETING_HOSTNAME, PROFILE_HOSTNAME } from '@/constants/domains';
+import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { getUserState } from '@/lib/auth/proxy-state';
 import {
   buildContentSecurityPolicy,
@@ -34,15 +34,6 @@ function isProfileHost(hostname: string): boolean {
     hostname === PROFILE_HOSTNAME ||
     hostname === `www.${PROFILE_HOSTNAME}` ||
     hostname === `main.${PROFILE_HOSTNAME}`
-  );
-}
-
-/**
- * Check if a hostname matches the marketing domain (jov.ie - same as profile)
- */
-function isMarketingHost(hostname: string): boolean {
-  return (
-    hostname === MARKETING_HOSTNAME || hostname === `www.${MARKETING_HOSTNAME}`
   );
 }
 
@@ -220,7 +211,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
 
       // jov.ie root: Marketing + Profiles
-      if (isProfileHost(hostname) || isMarketingHost(hostname)) {
+      if (isProfileHost(hostname)) {
         // Redirect app paths to app subdomain (legacy /app/* or direct app paths)
         const appPaths = [
           '/settings',

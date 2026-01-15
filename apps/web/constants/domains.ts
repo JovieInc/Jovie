@@ -2,9 +2,8 @@
  * Domain Configuration for Jovie
  *
  * This file centralizes all domain-related constants for the unified jov.ie setup:
- * - jov.ie: Marketing homepage + Public creator profiles (canonical, indexed)
+ * - jov.ie: Homepage + Public creator profiles (canonical, indexed)
  * - app.jov.ie: Dashboard + App (authenticated)
- * - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
  *
  * Note: We use jov.ie for auth (root domain) and app.jov.ie for dashboard.
  * Clerk sessions work across both via cookie domain .jov.ie (no satellite costs).
@@ -18,13 +17,9 @@ import { publicEnv } from '@/lib/env-public';
 // Domain Hostnames (without protocol)
 // ============================================================================
 
-/** Profile domain hostname - where public creator profiles live */
+/** Profile domain hostname - where public creator profiles and homepage live */
 export const PROFILE_HOSTNAME =
   process.env.NEXT_PUBLIC_PROFILE_HOSTNAME ?? 'jov.ie';
-
-/** Marketing/company domain hostname */
-export const MARKETING_HOSTNAME =
-  process.env.NEXT_PUBLIC_MARKETING_HOSTNAME ?? 'jov.ie';
 
 /** App/dashboard domain hostname (subdomain for dashboard and app) */
 export const APP_HOSTNAME =
@@ -41,10 +36,6 @@ export const ADMIN_EMAIL_DOMAIN =
 /** Profile base URL - for building profile links */
 export const PROFILE_URL =
   process.env.NEXT_PUBLIC_PROFILE_URL ?? `https://${PROFILE_HOSTNAME}`;
-
-/** Marketing/company base URL */
-export const MARKETING_URL =
-  process.env.NEXT_PUBLIC_MARKETING_URL ?? `https://${MARKETING_HOSTNAME}`;
 
 /** App/dashboard base URL */
 export const APP_URL =
@@ -77,21 +68,11 @@ export function getTipUrl(handle: string, source?: 'qr' | 'link'): string {
 /**
  * Build an app/dashboard URL
  * @param path - Path within the app (e.g., '/dashboard', '/settings')
- * @returns Full URL like https://meetjovie.com/dashboard
+ * @returns Full URL like https://app.jov.ie/dashboard
  */
 export function getAppUrl(path: string = ''): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${APP_URL}${normalizedPath}`;
-}
-
-/**
- * Build a marketing site URL
- * @param path - Path within marketing site (e.g., '/pricing', '/blog')
- * @returns Full URL like https://meetjovie.com/pricing
- */
-export function getMarketingUrl(path: string = ''): string {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${MARKETING_URL}${normalizedPath}`;
 }
 
 /**
@@ -100,15 +81,6 @@ export function getMarketingUrl(path: string = ''): string {
 export function isProfileDomain(hostname: string): boolean {
   return (
     hostname === PROFILE_HOSTNAME || hostname === `www.${PROFILE_HOSTNAME}`
-  );
-}
-
-/**
- * Check if a hostname matches the marketing domain
- */
-export function isMarketingDomain(hostname: string): boolean {
-  return (
-    hostname === MARKETING_HOSTNAME || hostname === `www.${MARKETING_HOSTNAME}`
   );
 }
 
@@ -134,11 +106,7 @@ export function isPreviewEnvironment(hostname: string): boolean {
  * Check if we're in production
  */
 export function isProductionEnvironment(hostname: string): boolean {
-  return (
-    hostname === PROFILE_HOSTNAME ||
-    hostname === MARKETING_HOSTNAME ||
-    hostname === APP_HOSTNAME
-  );
+  return hostname === PROFILE_HOSTNAME || hostname === APP_HOSTNAME;
 }
 
 /**
@@ -148,7 +116,6 @@ export function isProductionEnvironment(hostname: string): boolean {
 export function getBaseUrlForHostname(hostname: string): string {
   if (isProfileDomain(hostname)) return PROFILE_URL;
   if (isAppDomain(hostname)) return APP_URL;
-  if (isMarketingDomain(hostname)) return MARKETING_URL;
   // Fallback for preview/development
   return `https://${hostname}`;
 }
@@ -157,15 +124,15 @@ export function getBaseUrlForHostname(hostname: string): string {
 // Email Addresses (using company domain)
 // ============================================================================
 
-export const SUPPORT_EMAIL = `support@${MARKETING_HOSTNAME}`;
-export const LEGAL_EMAIL = `legal@${MARKETING_HOSTNAME}`;
-export const PRIVACY_EMAIL = `privacy@${MARKETING_HOSTNAME}`;
+export const SUPPORT_EMAIL = `support@${PROFILE_HOSTNAME}`;
+export const LEGAL_EMAIL = `legal@${PROFILE_HOSTNAME}`;
+export const PRIVACY_EMAIL = `privacy@${PROFILE_HOSTNAME}`;
 
 // ============================================================================
 // User Agent for external requests
 // ============================================================================
 
-export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${MARKETING_URL})`;
+export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${PROFILE_URL})`;
 
 // ============================================================================
 // Clerk Configuration

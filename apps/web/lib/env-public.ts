@@ -6,9 +6,7 @@ const PublicEnvSchema = z.object({
   // Domain configuration - unified jov.ie domain architecture
   NEXT_PUBLIC_APP_URL: z.string().url().default('https://app.jov.ie'),
   NEXT_PUBLIC_PROFILE_URL: z.string().url().default('https://jov.ie'),
-  NEXT_PUBLIC_MARKETING_URL: z.string().url().default('https://jov.ie'),
   NEXT_PUBLIC_PROFILE_HOSTNAME: z.string().default('jov.ie'),
-  NEXT_PUBLIC_MARKETING_HOSTNAME: z.string().default('jov.ie'),
   NEXT_PUBLIC_APP_HOSTNAME: z.string().default('app.jov.ie'),
   NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN: z.string().default('jov.ie'),
   NEXT_PUBLIC_STATSIG_CLIENT_KEY: z.string().optional(),
@@ -25,12 +23,8 @@ const rawPublicEnv = {
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://app.jov.ie',
   NEXT_PUBLIC_PROFILE_URL:
     process.env.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie',
-  NEXT_PUBLIC_MARKETING_URL:
-    process.env.NEXT_PUBLIC_MARKETING_URL || 'https://jov.ie',
   NEXT_PUBLIC_PROFILE_HOSTNAME:
     process.env.NEXT_PUBLIC_PROFILE_HOSTNAME || 'jov.ie',
-  NEXT_PUBLIC_MARKETING_HOSTNAME:
-    process.env.NEXT_PUBLIC_MARKETING_HOSTNAME || 'jov.ie',
   NEXT_PUBLIC_APP_HOSTNAME:
     process.env.NEXT_PUBLIC_APP_HOSTNAME || 'app.jov.ie',
   NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN:
@@ -69,15 +63,9 @@ export const publicEnv = {
   NEXT_PUBLIC_PROFILE_URL: parsed.success
     ? parsed.data.NEXT_PUBLIC_PROFILE_URL
     : process.env.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie',
-  NEXT_PUBLIC_MARKETING_URL: parsed.success
-    ? parsed.data.NEXT_PUBLIC_MARKETING_URL
-    : process.env.NEXT_PUBLIC_MARKETING_URL || 'https://jov.ie',
   NEXT_PUBLIC_PROFILE_HOSTNAME: parsed.success
     ? parsed.data.NEXT_PUBLIC_PROFILE_HOSTNAME
     : process.env.NEXT_PUBLIC_PROFILE_HOSTNAME || 'jov.ie',
-  NEXT_PUBLIC_MARKETING_HOSTNAME: parsed.success
-    ? parsed.data.NEXT_PUBLIC_MARKETING_HOSTNAME
-    : process.env.NEXT_PUBLIC_MARKETING_HOSTNAME || 'jov.ie',
   NEXT_PUBLIC_APP_HOSTNAME: parsed.success
     ? parsed.data.NEXT_PUBLIC_APP_HOSTNAME
     : process.env.NEXT_PUBLIC_APP_HOSTNAME || 'app.jov.ie',
