@@ -295,11 +295,6 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now(),
     });
 
-    // Proactively clean up cache and rate limit entries to prevent memory exhaustion
-    // Run cleanup on every request for better memory management
-    cleanupSearchCache();
-    cleanupRateLimitMap();
-
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
     // Handle circuit breaker open error
@@ -333,5 +328,10 @@ export async function GET(request: NextRequest) {
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
     );
+  } finally {
+    // Proactively clean up cache and rate limit entries to prevent memory exhaustion
+    // Run cleanup on every request for better memory management
+    cleanupSearchCache();
+    cleanupRateLimitMap();
   }
 }

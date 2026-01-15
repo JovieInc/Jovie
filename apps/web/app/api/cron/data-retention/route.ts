@@ -114,9 +114,6 @@ export async function GET(request: NextRequest) {
     // Log full error details internally
     logger.error('[Data Retention Cron] Cleanup failed', error);
     // Return sanitized error to prevent information disclosure
-    return NextResponse.json(
-      { error: 'Cleanup failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
   }
 }

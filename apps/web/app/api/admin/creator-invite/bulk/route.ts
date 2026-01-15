@@ -398,7 +398,9 @@ export async function GET(request: Request) {
 
     // Validate parsed values are finite numbers within expected range
     const fitScoreThreshold =
-      Number.isFinite(parsedThreshold) && parsedThreshold >= 0 && parsedThreshold <= 100
+      Number.isFinite(parsedThreshold) &&
+      parsedThreshold >= 0 &&
+      parsedThreshold <= 100
         ? parsedThreshold
         : 50;
     const limit =

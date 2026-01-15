@@ -1,6 +1,6 @@
 import 'server-only';
-import crypto from 'crypto';
 import { auth } from '@clerk/nextjs/server';
+import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { isAdmin } from './roles';
 
@@ -70,7 +70,9 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   }
 
   // Log successful admin access with masked ID (for audit trail)
-  console.log(`[admin/middleware] Admin access granted to user: ${maskedUserId}`);
+  console.log(
+    `[admin/middleware] Admin access granted to user: ${maskedUserId}`
+  );
 
   // Authorization successful
   return null;

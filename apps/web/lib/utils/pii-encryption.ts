@@ -67,7 +67,8 @@ export function encryptPII(value: string | null | undefined): string | null {
   }
 
   if (!isPIIEncryptionEnabled()) {
-    const vercelEnv = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    const vercelEnv =
+      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 
     // Fail-fast in production and preview environments
     if (vercelEnv === 'production' || vercelEnv === 'preview') {
@@ -125,7 +126,8 @@ export function decryptPII(
   }
 
   if (!isPIIEncryptionEnabled()) {
-    const vercelEnv = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    const vercelEnv =
+      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 
     // Fail-fast in production and preview environments
     if (vercelEnv === 'production' || vercelEnv === 'preview') {

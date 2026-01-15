@@ -44,6 +44,57 @@ function formatErrorMessage(error: unknown): string {
   }
 }
 
+/**
+ * Read request body with streaming size limit to prevent OOM attacks.
+ * Stops reading if body exceeds maxSize bytes.
+ */
+async function readBodyWithLimit(
+  request: Request,
+  maxSize: number
+): Promise<{ body: string; exceeded: boolean; actualSize: number }> {
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return { body: '', exceeded: false, actualSize: 0 };
+  }
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+
+      // Stop reading if we exceed the limit
+      if (totalBytes > maxSize) {
+        reader.cancel();
+        return { body: '', exceeded: true, actualSize: totalBytes };
+      }
+
+      chunks.push(value);
+    }
+
+    // Concatenate chunks and decode
+    const combined = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    const decoder = new TextDecoder('utf-8');
+    return {
+      body: decoder.decode(combined),
+      exceeded: false,
+      actualSize: totalBytes,
+    };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function parseJsonBody<T = unknown>(
   request: Request,
   options: ParseJsonOptions<T>
@@ -66,12 +117,17 @@ export async function parseJsonBody<T = unknown>(
     };
   }
 
-  const rawBody = await request.text();
+  // Use streaming read with size cap to prevent OOM if Content-Length is missing/spoofed
+  const {
+    body: rawBody,
+    exceeded,
+    actualSize,
+  } = await readBodyWithLimit(request, maxBodySize);
 
-  // Check actual body size (in case Content-Length was missing or incorrect)
-  if (rawBody.length > maxBodySize) {
+  // Check if body exceeded limit during streaming read
+  if (exceeded) {
     console.warn(`[${options.route}] Request body exceeds size limit`, {
-      actualSize: rawBody.length,
+      actualSize,
       maxBodySize,
     });
     return {

@@ -35,7 +35,7 @@ if (!isBuildTime && !ENCRYPTION_KEY) {
   if (vercelEnv === 'development') {
     console.warn(
       '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set. ' +
-        'URL encryption will use base64 fallback. Generate a secure key with: openssl rand -base64 32'
+        'URL encryption will fail in this environment. Generate a secure key with: openssl rand -base64 32'
     );
   }
 }

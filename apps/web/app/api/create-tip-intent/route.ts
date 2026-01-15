@@ -1,7 +1,8 @@
-import crypto from 'crypto';
 import { auth } from '@clerk/nextjs/server';
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { env } from '@/lib/env-server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
@@ -15,24 +16,34 @@ export const runtime = 'nodejs';
 
 /**
  * Hash a handle for metadata storage to prevent PII exposure.
- * Uses SHA-256 with a prefix for lookup correlation.
+ * Uses HMAC-SHA256 keyed by METADATA_HASH_KEY for secure, non-reversible hashing.
  */
 function hashHandleForMetadata(handle: string): string {
+  const key = env.METADATA_HASH_KEY;
+  if (!key) {
+    // Fall back to unkeyed hash if key not configured (development only)
+    return crypto
+      .createHash('sha256')
+      .update(`jovie:tip:${handle.toLowerCase()}`)
+      .digest('hex')
+      .substring(0, 16);
+  }
   return crypto
-    .createHash('sha256')
-    .update(`jovie:tip:${handle.toLowerCase()}`)
+    .createHmac('sha256', key)
+    .update(handle.toLowerCase())
     .digest('hex')
-    .substring(0, 16); // Truncate for brevity
+    .substring(0, 16);
 }
 
 /**
  * Convert amount to cents with overflow protection.
- * Maximum amount is 500 * 100 = 50000 cents.
+ * Converts dollars (potentially fractional) to cents, then clamps.
+ * Maximum: 50000 cents ($500), Minimum: 100 cents ($1)
  */
 function amountToCents(amount: number): number {
-  // Schema already validates 1-500, but add explicit bounds check
-  const clampedAmount = Math.max(1, Math.min(500, Math.floor(amount)));
-  return clampedAmount * 100;
+  // Convert to cents first, then clamp
+  const cents = Math.round(amount * 100);
+  return Math.max(100, Math.min(50000, cents));
 }
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -111,9 +122,10 @@ export async function POST(req: NextRequest) {
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
       // Store hashed handle instead of plaintext to prevent PII exposure
+      // Stripe metadata values must be strings
       metadata: {
         handle_hash: handleHash,
-        amount_cents: amountInCents,
+        amount_cents: String(amountInCents),
       },
     });
 

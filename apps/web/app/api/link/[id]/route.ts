@@ -2,15 +2,8 @@
  * Signed URL API Route (/api/link/[id])
  * Generates time-limited signed URLs for sensitive links with bot protection
  *
- * Rate Limiting Status: IMPLEMENTED BUT DISABLED
- * This endpoint calls checkRateLimit() which is currently globally disabled in lib/utils/bot-detection.ts.
- * Following YC principle: "do things that don't scale until you have to"
- *
- * Rate limiting will be enabled when:
- * - Signed link requests exceed ~5k/day
- * - Abuse patterns detected (same IP hammering links)
- *
- * Current Protection:
+ * Security Measures:
+ * - Rate limiting via apiLimiter (IP-based)
  * - Bot detection (aggressive for API endpoints)
  * - Time-limited tokens (60 second TTL)
  * - Timestamp verification (5 minute window)

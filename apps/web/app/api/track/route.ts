@@ -10,8 +10,8 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
-  checkTrackingRateLimit,
   createRateLimitHeaders,
+  trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limiting: Check IP-based rate limit for track events
     const ipAddress = extractClientIP(request.headers);
-    const rateLimitResult = await checkTrackingRateLimit(ipAddress, 'click');
+    const rateLimitResult = await trackingIpClicksLimiter.limit(ipAddress);
 
     if (!rateLimitResult.success) {
       return NextResponse.json(
