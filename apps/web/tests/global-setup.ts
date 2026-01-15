@@ -20,7 +20,7 @@ async function globalSetup() {
     return;
   }
 
-  // Set up Clerk testing token if we have real Clerk keys and test user credentials
+  // Set up Clerk testing token if we have real Clerk keys
   const SENSITIVE_PATTERNS = [
     'dummy',
     'mock',
@@ -28,23 +28,29 @@ async function globalSetup() {
     'test-key',
     'placeholder',
   ];
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  const publishableKey =
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
+    process.env.CLERK_PUBLISHABLE_KEY;
   const hasRealClerkKeys =
-    process.env.CLERK_SECRET_KEY &&
+    Boolean(secretKey && publishableKey) &&
     !SENSITIVE_PATTERNS.some(pattern =>
-      process.env.CLERK_SECRET_KEY!.toLowerCase().includes(pattern)
+      secretKey!.toLowerCase().includes(pattern)
+    ) &&
+    !SENSITIVE_PATTERNS.some(pattern =>
+      publishableKey!.toLowerCase().includes(pattern)
     );
 
   const hasTestUser =
     process.env.E2E_CLERK_USER_USERNAME && process.env.E2E_CLERK_USER_PASSWORD;
 
-  if (hasRealClerkKeys && hasTestUser) {
+  if (hasRealClerkKeys) {
     try {
       await clerkSetup({
-        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
-        secretKey: process.env.CLERK_SECRET_KEY!,
+        publishableKey: publishableKey!,
+        secretKey: secretKey!,
       });
       console.log('✓ Clerk testing token set up successfully');
-      console.log('✓ E2E test user is configured');
     } catch (error) {
       console.warn('⚠ Failed to set up Clerk testing token');
       // Only log error details in development, not the actual error which may contain sensitive info
@@ -56,9 +62,13 @@ async function globalSetup() {
       }
       console.log('  Tests will run without Clerk authentication');
     }
-  } else if (!hasRealClerkKeys) {
+  } else {
     console.log('ℹ Using mock Clerk keys for testing');
-  } else if (!hasTestUser) {
+  }
+
+  if (hasTestUser) {
+    console.log('✓ E2E test user is configured');
+  } else if (hasRealClerkKeys) {
     console.log('⚠ Clerk keys found but no test user configured');
     console.log(
       '  Set E2E_CLERK_USER_USERNAME and E2E_CLERK_USER_PASSWORD for authenticated tests'

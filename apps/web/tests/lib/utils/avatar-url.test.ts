@@ -237,3 +237,105 @@ describe('isUpgradeableAvatarUrl', () => {
     expect(isUpgradeableAvatarUrl(undefined)).toBe(false);
   });
 });
+
+describe('Security: Subdomain Injection Prevention', () => {
+  describe('should reject subdomain injection attacks', () => {
+    it('should reject evil.fbsbx.com.attacker.com (Facebook)', () => {
+      const maliciousUrl = 'https://evil.fbsbx.com.attacker.com/image.jpg';
+      expect(isUpgradeableAvatarUrl(maliciousUrl)).toBe(false);
+      const result = upgradeOAuthAvatarUrl(maliciousUrl);
+      // Should return unchanged (not upgraded as Facebook)
+      expect(result).toBe(maliciousUrl);
+    });
+
+    it('should reject grafavatar.com (Gravatar substring)', () => {
+      const maliciousUrl = 'https://grafavatar.com/avatar/abc123';
+      expect(isUpgradeableAvatarUrl(maliciousUrl)).toBe(false);
+      const result = upgradeOAuthAvatarUrl(maliciousUrl);
+      expect(result).toBe(maliciousUrl);
+    });
+
+    it('should reject notgoogleusercontent.com (Google suffix)', () => {
+      const maliciousUrl = 'https://notgoogleusercontent.com/image.jpg';
+      expect(isUpgradeableAvatarUrl(maliciousUrl)).toBe(false);
+      const result = upgradeOAuthAvatarUrl(maliciousUrl);
+      expect(result).toBe(maliciousUrl);
+    });
+
+    it('should reject evil.gravatar.com.attacker.com', () => {
+      const maliciousUrl = 'https://evil.gravatar.com.attacker.com/avatar/abc';
+      expect(isUpgradeableAvatarUrl(maliciousUrl)).toBe(false);
+      const result = upgradeOAuthAvatarUrl(maliciousUrl);
+      expect(result).toBe(maliciousUrl);
+    });
+
+    it('should reject facebook.com.attacker.com', () => {
+      const maliciousUrl = 'https://facebook.com.attacker.com/image.jpg';
+      expect(isUpgradeableAvatarUrl(maliciousUrl)).toBe(false);
+      const result = upgradeOAuthAvatarUrl(maliciousUrl);
+      expect(result).toBe(maliciousUrl);
+    });
+  });
+
+  describe('should accept legitimate subdomains', () => {
+    it('should accept lh3.googleusercontent.com (Google subdomain)', () => {
+      const validUrl = 'https://lh3.googleusercontent.com/a/abc=s96-c';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+      const result = upgradeOAuthAvatarUrl(validUrl);
+      expect(result).toContain('=s512-c');
+    });
+
+    it('should accept scontent.fbsbx.com (Facebook subdomain)', () => {
+      const validUrl = 'https://scontent.fbsbx.com/v/image.jpg';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+    });
+
+    it('should accept secure.gravatar.com (Gravatar subdomain)', () => {
+      const validUrl = 'https://secure.gravatar.com/avatar/abc123?s=80';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+      const result = upgradeOAuthAvatarUrl(validUrl);
+      expect(result).toContain('s=512');
+    });
+
+    it('should accept www.gravatar.com (Gravatar www subdomain)', () => {
+      const validUrl = 'https://www.gravatar.com/avatar/abc123';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+    });
+  });
+
+  describe('should accept exact domain matches', () => {
+    it('should accept googleusercontent.com (bare domain)', () => {
+      const validUrl = 'https://googleusercontent.com/image.jpg';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+    });
+
+    it('should accept gravatar.com (bare domain)', () => {
+      const validUrl = 'https://gravatar.com/avatar/abc123';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+    });
+
+    it('should accept fbsbx.com (bare domain)', () => {
+      const validUrl = 'https://fbsbx.com/image.jpg';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+    });
+
+    it('should accept facebook.com (bare domain)', () => {
+      const validUrl = 'https://facebook.com/image.jpg';
+      expect(isUpgradeableAvatarUrl(validUrl)).toBe(true);
+    });
+  });
+
+  describe('case insensitivity', () => {
+    it('should handle mixed case domains correctly', () => {
+      const mixedCaseUrl = 'https://Lh3.GoogleUserContent.COM/a/abc=s96-c';
+      expect(isUpgradeableAvatarUrl(mixedCaseUrl)).toBe(true);
+      const result = upgradeOAuthAvatarUrl(mixedCaseUrl);
+      expect(result).toContain('=s512-c');
+    });
+
+    it('should reject mixed case injection attempts', () => {
+      const maliciousUrl = 'https://Evil.FbSbx.Com.Attacker.Com/image.jpg';
+      expect(isUpgradeableAvatarUrl(maliciousUrl)).toBe(false);
+    });
+  });
+});

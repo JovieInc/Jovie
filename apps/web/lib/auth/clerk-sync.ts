@@ -1,7 +1,9 @@
 'use server';
 
 import { clerkClient } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
+
 import { db } from '@/lib/db';
 import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
@@ -64,7 +66,12 @@ export async function syncClerkMetadata(
       publicMetadata: updatedMetadata,
     });
 
-    console.info(`[clerk-sync] Synced metadata for user ${clerkUserId}:`, data);
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced metadata for user',
+      level: 'info',
+      data: { clerkUserId, metadata: data },
+    });
     return { success: true };
   } catch (error) {
     const errorMessage =
@@ -210,7 +217,12 @@ export async function handleClerkUserDeleted(
     }
 
     if (dbUser.deletedAt) {
-      console.info(`[clerk-sync] User ${clerkUserId} already soft-deleted`);
+      Sentry.addBreadcrumb({
+        category: 'clerk-sync',
+        message: 'User already soft-deleted',
+        level: 'info',
+        data: { clerkUserId },
+      });
       return { success: true }; // Already deleted
     }
 
@@ -247,9 +259,12 @@ export async function handleClerkUserDeleted(
       }
     }
 
-    console.info(
-      `[clerk-sync] Soft-deleted user ${clerkUserId} from Clerk deletion event`
-    );
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Soft-deleted user from Clerk deletion event',
+      level: 'info',
+      data: { clerkUserId },
+    });
     return { success: true };
   } catch (error) {
     const errorMessage =
@@ -352,9 +367,12 @@ export async function syncAdminRoleChange(
       );
     }
 
-    console.info(
-      `[clerk-sync] Synced admin role for ${targetClerkUserId}: isAdmin=${isAdmin}`
-    );
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced admin role change',
+      level: 'info',
+      data: { targetClerkUserId, isAdmin },
+    });
     return { success: true };
   } catch (error) {
     const errorMessage =

@@ -69,6 +69,19 @@ export const paymentIntentLimiter = createRateLimiter(
 );
 
 // ============================================================================
+// Admin Operations
+// ============================================================================
+
+/**
+ * Admin impersonation rate limiter
+ * Limit: 5 impersonation attempts per hour per admin
+ * CRITICAL: Prevents admin account abuse and brute-force user enumeration
+ */
+export const adminImpersonateLimiter = createRateLimiter(
+  RATE_LIMITERS.adminImpersonate
+);
+
+// ============================================================================
 // Tracking & Analytics
 // ============================================================================
 
@@ -351,6 +364,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     handleCheck: handleCheckLimiter,
     dashboardLinks: dashboardLinksLimiter,
     paymentIntent: paymentIntentLimiter,
+    adminImpersonate: adminImpersonateLimiter,
     trackingClicks: trackingClicksLimiter,
     trackingVisits: trackingVisitsLimiter,
     trackingIpClicks: trackingIpClicksLimiter,

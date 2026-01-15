@@ -4,7 +4,9 @@
  * Creates Upstash Redis-backed rate limiters with consistent configuration.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { Ratelimit } from '@upstash/ratelimit';
+
 import { redis } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 
@@ -38,6 +40,12 @@ export function createRedisRateLimiter(
   config: RateLimitConfig
 ): Ratelimit | null {
   if (!redis) {
+    if (process.env.NODE_ENV === 'production') {
+      Sentry.captureMessage(
+        `Rate limiter "${config.name}" falling back to memory - Redis unavailable`,
+        'warning'
+      );
+    }
     return null;
   }
 
