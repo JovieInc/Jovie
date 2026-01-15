@@ -315,7 +315,7 @@ test.describe('Accessibility Audit', () => {
     }
 
     for (const route of authRoutes) {
-      const url = `${baseUrl}${route}`;
+      const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
       await page.goto(url);
       await page.waitForLoadState('networkidle');
 
