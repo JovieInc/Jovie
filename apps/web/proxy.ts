@@ -316,8 +316,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           new URL(normalizeRedirectPath(redirectUrl), req.url)
         );
       } else {
-        // Fully active user, no redirect_url - go to dashboard at app.jov.ie/
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        // Fully active user, no redirect_url - go to dashboard
+        res = NextResponse.redirect(new URL('/', req.url));
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -355,17 +355,17 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         });
       } else if (!userState.needsWaitlist && pathname === '/waitlist') {
         // Active user trying to access waitlist → redirect to dashboard
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        res = NextResponse.redirect(new URL('/', req.url));
       } else if (!userState.needsOnboarding && pathname === '/onboarding') {
         // Active user trying to access onboarding → redirect to dashboard
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        res = NextResponse.redirect(new URL('/', req.url));
       } else if (
         pathname === '/' ||
         pathname === '/signin' ||
         pathname === '/signup'
       ) {
         // Fully authenticated user hitting auth pages → redirect to dashboard
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        res = NextResponse.redirect(new URL('/', req.url));
       } else {
         // All other paths - user is authenticated and on correct page
         res = NextResponse.next({ request: { headers: requestHeaders } });
@@ -395,7 +395,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         // Redirect to signup for waitlist (new users creating accounts)
         // Redirect to signin for everything else (existing users)
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
-        const authUrl = new URL(authPage, 'https://jov.ie');
+        const authUrl = new URL(authPage, req.url);
         authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
         res = NextResponse.redirect(authUrl);
       } else {
