@@ -12,8 +12,17 @@ import {
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 
-const readFixture = (name: string) =>
-  readFileSync(path.join(__dirname, 'fixtures', 'linktree', name), 'utf-8');
+// Load fixtures at module scope to avoid I/O overhead in tests
+const FIXTURES = {
+  structured: readFileSync(
+    path.join(__dirname, 'fixtures', 'linktree', 'structured.html'),
+    'utf-8'
+  ),
+  edgeCase: readFileSync(
+    path.join(__dirname, 'fixtures', 'linktree', 'edge-case.html'),
+    'utf-8'
+  ),
+} as const;
 
 describe('Linktree Strategy', () => {
   describe('isLinktreeUrl', () => {
@@ -268,7 +277,7 @@ describe('Linktree Strategy', () => {
     });
 
     it('prefers structured Next.js data when available', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractLinktree(html);
 
       expect(result.displayName).toBe('Casey Stone');
@@ -297,7 +306,7 @@ describe('Linktree Strategy', () => {
     });
 
     it('falls back to href scanning when structured data is missing', () => {
-      const html = readFixture('edge-case.html');
+      const html = FIXTURES.edgeCase;
       const result = extractLinktree(html);
 
       const platforms = result.links.map(link => link.platformId).sort();

@@ -108,6 +108,11 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
   }));
 }
 
+// Pre-generate large datasets at module scope to avoid overhead in tests
+const MOCK_DATA_500 = generateMockAudienceMembers(500);
+const MOCK_DATA_1000 = generateMockAudienceMembers(1000);
+const MOCK_DATA_100 = generateMockAudienceMembers(100);
+
 const defaultProps = {
   mode: 'members' as const,
   total: 0,
@@ -138,7 +143,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
   });
 
   describe('with large dataset (500+ rows)', () => {
-    const largeDataset = generateMockAudienceMembers(500);
+    const largeDataset = MOCK_DATA_500;
 
     it('virtualizes rows - renders significantly fewer DOM rows than total data', () => {
       render(
@@ -226,7 +231,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
   });
 
   describe('with exactly 500 rows (threshold)', () => {
-    const thresholdDataset = generateMockAudienceMembers(500);
+    const thresholdDataset = MOCK_DATA_500;
 
     it('still virtualizes at the 500 row threshold', () => {
       render(
@@ -244,7 +249,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
   });
 
   describe('with 1000+ rows (stress test)', () => {
-    const veryLargeDataset = generateMockAudienceMembers(1000);
+    const veryLargeDataset = MOCK_DATA_1000;
 
     it('efficiently handles 1000 rows via virtualization', () => {
       const { container } = render(
@@ -269,7 +274,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
   });
 
   describe('virtualization configuration', () => {
-    const testDataset = generateMockAudienceMembers(100);
+    const testDataset = MOCK_DATA_100;
 
     it('uses correct estimated row height (44px)', () => {
       render(
@@ -374,7 +379,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
 
 describe('DashboardAudienceTable - Subscribers Mode', () => {
   it('virtualizes subscriber rows the same as member rows', () => {
-    const largeDataset = generateMockAudienceMembers(500);
+    const largeDataset = MOCK_DATA_500;
 
     render(
       <DashboardAudienceTable
