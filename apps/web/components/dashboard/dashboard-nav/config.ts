@@ -25,28 +25,28 @@ export const primaryNavigation: NavItem[] = [
   },
   {
     name: 'Profile',
-    href: '//profile',
+    href: '/profile',
     id: 'links',
     icon: UserCircle,
     description: 'Update your profile and links',
   },
   {
     name: 'Contacts',
-    href: '//contacts',
+    href: '/contacts',
     id: 'contacts',
     icon: IdCard,
     description: 'Manage your team and contact routes',
   },
   {
     name: 'Releases',
-    href: '//releases',
+    href: '/releases',
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
   },
   {
     name: 'Audience',
-    href: '//audience',
+    href: '/audience',
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
@@ -65,7 +65,7 @@ export const navShortcuts: Record<string, string> = {
 export const secondaryNavigation: NavItem[] = [
   {
     name: 'Earnings',
-    href: '//earnings',
+    href: '/earnings',
     id: 'earnings',
     icon: Banknote,
     description: 'Manage tips and monetization',
