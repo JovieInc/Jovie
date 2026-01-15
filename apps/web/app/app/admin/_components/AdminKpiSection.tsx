@@ -2,6 +2,8 @@ import { DefaultStatusBanner } from '@/components/admin/DefaultStatusBanner';
 import { KpiCards } from '@/components/admin/KpiCards';
 import { getAdminOverviewMetrics } from '@/lib/admin/overview';
 
+const KPI_SKELETON_KEYS = Array.from({ length: 6 }, (_, i) => `kpi-${i + 1}`);
+
 export async function AdminKpiSection() {
   const metrics = await getAdminOverviewMetrics();
 
@@ -38,8 +40,8 @@ export function AdminKpiSectionSkeleton() {
       <div className='h-16 rounded-xl skeleton' />
       <section id='users' className='space-y-4'>
         <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className='h-24 rounded-xl skeleton' />
+          {KPI_SKELETON_KEYS.map(key => (
+            <div key={key} className='h-24 rounded-xl skeleton' />
           ))}
         </div>
       </section>

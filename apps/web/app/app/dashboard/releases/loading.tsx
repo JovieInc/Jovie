@@ -1,5 +1,18 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const RELEASES_LOADING_PROVIDER_HEADER_KEYS = Array.from(
+  { length: 5 },
+  (_, i) => `releases-provider-header-${i + 1}`
+);
+const RELEASES_LOADING_ROW_KEYS = Array.from(
+  { length: 5 },
+  (_, i) => `releases-row-${i + 1}`
+);
+const RELEASES_LOADING_PROVIDER_BADGE_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `releases-provider-badge-${i + 1}`
+);
+
 export default function ReleasesLoading() {
   return (
     <div className='min-h-screen'>
@@ -15,21 +28,16 @@ export default function ReleasesLoading() {
 
         {/* Provider columns header */}
         <div className='mt-6 flex gap-2'>
-          {Array.from({ length: 5 }).map((_, index) => (
-            <LoadingSkeleton
-              key={index}
-              height='h-8'
-              width='w-20'
-              rounded='lg'
-            />
+          {RELEASES_LOADING_PROVIDER_HEADER_KEYS.map(key => (
+            <LoadingSkeleton key={key} height='h-8' width='w-20' rounded='lg' />
           ))}
         </div>
 
         {/* Release rows */}
         <div className='mt-4 space-y-3'>
-          {Array.from({ length: 5 }).map((_, index) => (
+          {RELEASES_LOADING_ROW_KEYS.map(rowKey => (
             <div
-              key={index}
+              key={rowKey}
               className='flex items-center gap-4 rounded-lg border border-subtle bg-surface-0 p-4'
             >
               {/* Album artwork */}
@@ -46,9 +54,9 @@ export default function ReleasesLoading() {
               </div>
               {/* Provider status badges */}
               <div className='flex gap-2'>
-                {Array.from({ length: 4 }).map((_, i) => (
+                {RELEASES_LOADING_PROVIDER_BADGE_KEYS.map(badgeKey => (
                   <LoadingSkeleton
-                    key={i}
+                    key={`${rowKey}-${badgeKey}`}
                     height='h-8'
                     width='w-8'
                     rounded='lg'

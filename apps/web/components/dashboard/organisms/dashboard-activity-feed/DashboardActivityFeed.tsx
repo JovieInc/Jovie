@@ -6,6 +6,11 @@ import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { DashboardActivityFeedProps } from './types';
 
+const DASHBOARD_ACTIVITY_LOADING_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `dashboard-activity-loading-${i + 1}`
+);
+
 export function DashboardActivityFeed({
   profileId,
   range = '7d',
@@ -49,9 +54,9 @@ export function DashboardActivityFeed({
             className='space-y-3 rounded-xl border border-subtle bg-surface-1/20 p-4'
             aria-busy='true'
           >
-            {Array.from({ length: 4 }).map((_, i) => (
+            {DASHBOARD_ACTIVITY_LOADING_KEYS.map(key => (
               <div
-                key={i}
+                key={key}
                 className='flex items-center gap-3'
                 aria-hidden='true'
               >

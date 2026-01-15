@@ -1,3 +1,8 @@
+const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
+  { length: 8 },
+  (_, i) => `activity-row-${i + 1}`
+);
+
 export default function AdminActivityLoading() {
   return (
     <div className='space-y-8'>
@@ -33,9 +38,9 @@ export default function AdminActivityLoading() {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: 8 }).map((_, index) => (
+                {ADMIN_ACTIVITY_ROW_KEYS.map(key => (
                   <tr
-                    key={index}
+                    key={key}
                     className='border-b border-subtle last:border-b-0'
                   >
                     <td className='px-4 py-3'>

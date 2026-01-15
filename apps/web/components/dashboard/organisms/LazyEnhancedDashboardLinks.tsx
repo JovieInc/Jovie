@@ -3,6 +3,11 @@
 import dynamic from 'next/dynamic';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 
+const LAZY_ENHANCED_DASHBOARD_LINKS_LOADING_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `lazy-enhanced-links-loading-${i + 1}`
+);
+
 const EnhancedDashboardLinks = dynamic(
   () =>
     import('@/components/dashboard/organisms/EnhancedDashboardLinks').then(
@@ -22,9 +27,9 @@ const EnhancedDashboardLinks = dynamic(
         </div>
         <div className='h-12 animate-pulse rounded-lg bg-surface-1' />
         <div className='space-y-3'>
-          {Array.from({ length: 4 }).map((_, i) => (
+          {LAZY_ENHANCED_DASHBOARD_LINKS_LOADING_KEYS.map(key => (
             <div
-              key={i}
+              key={key}
               className='h-16 animate-pulse rounded-lg bg-surface-1'
             />
           ))}

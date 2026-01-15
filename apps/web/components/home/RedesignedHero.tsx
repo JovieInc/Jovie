@@ -37,12 +37,12 @@ export function RedesignedHero() {
 
             {/* Supporting text - Tertiary */}
             <p className='text-sm text-tertiary-token'>
-              Limited access. Zero setup.
+              Free to start. Zero setup.
             </p>
           </div>
 
           <div className='relative w-full'>
-            <div className='rounded-[28px] border border-subtle bg-surface-1 p-3 shadow-(--shadow-sm)'>
+            <div className='rounded-[28px] border border-subtle bg-surface-1 p-3 shadow-sm'>
               <div className='overflow-hidden rounded-[20px] bg-surface-2'>
                 <Image
                   src='/images/feature_design_linear_grey_notext_1344x1280.png'

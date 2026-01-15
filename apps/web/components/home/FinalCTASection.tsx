@@ -10,12 +10,12 @@ export function FinalCTASection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center space-y-6'>
           <h2 className='marketing-h2-linear text-primary-token'>
-            Stop sending fans to{' '}
-            <GradientText variant='secondary'>a stack of links</GradientText>
+            Ready to{' '}
+            <GradientText variant='secondary'>capture every fan</GradientText>?
           </h2>
 
           <p className='marketing-lead-linear text-secondary-token'>
-            Give every visit a purpose: subscribe first, listen next.
+            Paste your Spotify. Get a page that converts.
           </p>
 
           <Spacer size='sm' />
@@ -25,9 +25,8 @@ export function FinalCTASection() {
             <ArrowRight className='h-4 w-4 ml-1' />
           </LinearButton>
 
-          {/* Zero setup emphasis */}
           <p className='text-sm text-tertiary-token'>
-            Zero setup. Start instantly.
+            Free to start. No credit card required.
           </p>
         </div>
       </Container>

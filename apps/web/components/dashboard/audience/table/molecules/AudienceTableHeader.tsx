@@ -159,9 +159,9 @@ export function AudienceTableHeader({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='end'>
-                          {bulkActions.map((action, actionIndex) => (
+                          {bulkActions.map(action => (
                             <DropdownMenuItem
-                              key={actionIndex}
+                              key={action.label}
                               disabled={action.disabled}
                               onClick={action.onClick}
                             >
