@@ -6,8 +6,9 @@ interface SiteFooterProps {
   version?: FooterVersion;
   className?: string;
   brandingMark?: 'wordmark' | 'icon';
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   themeShortcutKey?: string;
+  showThemeToggle?: boolean;
 }
 
 export function Footer({
@@ -16,6 +17,7 @@ export function Footer({
   brandingMark,
   containerSize,
   themeShortcutKey,
+  showThemeToggle = true,
 }: SiteFooterProps) {
   const mappedVariant =
     version === 1 || version === 'minimal' ? 'minimal' : 'regular';
@@ -26,7 +28,7 @@ export function Footer({
       variant={mappedVariant}
       brandingMark={brandingMark}
       containerSize={containerSize}
-      showThemeToggle={true}
+      showThemeToggle={showThemeToggle}
       themeShortcutKey={themeShortcutKey}
       links={[
         { href: '/legal/privacy', label: 'Privacy' },

@@ -52,7 +52,7 @@ export function MarketingHeader({
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid
-          ? 'bg-[#08090a] border-subtle backdrop-blur'
+          ? 'bg-base/95 border-subtle backdrop-blur-md'
           : 'bg-transparent! border-transparent!'
       )}
     />

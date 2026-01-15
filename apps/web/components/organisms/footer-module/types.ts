@@ -9,7 +9,7 @@ export interface FooterProps {
   className?: string;
   themeShortcutKey?: string;
   brandingMark?: 'wordmark' | 'icon';
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   links?: Array<{
     href: string;
     label: string;
@@ -17,7 +17,7 @@ export interface FooterProps {
 }
 
 export type FooterVariant = 'marketing' | 'profile' | 'minimal' | 'regular';
-export type ContainerSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type ContainerSize = 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
 export type ThemeAppearance = 'icon' | 'segmented';
 export type FooterLayout = 'horizontal' | 'vertical';
 export type ColorVariant = 'light' | 'dark';

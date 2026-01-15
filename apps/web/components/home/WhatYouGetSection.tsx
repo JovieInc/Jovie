@@ -5,22 +5,26 @@ const features = [
   {
     icon: RefreshCw,
     title: 'Auto-updating',
-    description: 'New releases sync automatically. No manual updates.',
+    description: 'New releases sync instantly. Nothing to manage.',
+    iconColor: 'text-blue-500',
   },
   {
     icon: Mail,
     title: 'Built-in fan capture',
-    description: 'Email and SMS collection on every visit.',
+    description: 'Email and SMS on every visit. Automatic.',
+    iconColor: 'text-violet-500',
   },
   {
     icon: Palette,
     title: 'Beautiful by default',
-    description: 'Looks great instantly. Customize if you want.',
+    description: 'One design, perfected. No choices, no guesswork.',
+    iconColor: 'text-pink-500',
   },
   {
     icon: BarChart3,
     title: 'Simple analytics',
-    description: 'See who visits and what converts.',
+    description: 'Know who visits and what converts.',
+    iconColor: 'text-amber-500',
   },
 ];
 
@@ -38,9 +42,9 @@ export function WhatYouGetSection() {
               const Icon = feature.icon;
               return (
                 <div key={index} className='flex items-start gap-3'>
-                  {/* Linear 16px icon variant */}
+                  {/* Linear 16px icon variant with accent color */}
                   <div className='flex items-center justify-center w-4 h-4 shrink-0 mt-1'>
-                    <Icon className='w-4 h-4 text-tertiary-token' />
+                    <Icon className={`w-4 h-4 ${feature.iconColor}`} />
                   </div>
                   <div className='space-y-1'>
                     <h3 className='text-sm font-medium text-primary-token'>

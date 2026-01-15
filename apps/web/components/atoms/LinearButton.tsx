@@ -16,7 +16,7 @@ export const LinearButton = forwardRef<HTMLAnchorElement, LinearButtonProps>(
     const variantStyles = {
       primary: 'btn-linear-primary',
       secondary:
-        'h-8 px-3 rounded-lg text-sm font-medium bg-transparent text-tertiary-token hover:text-primary-token hover:bg-surface-2',
+        'h-10 px-4 rounded-lg text-sm font-medium bg-transparent text-secondary-token hover:text-primary-token hover:bg-surface-1 border border-transparent hover:border-subtle duration-150',
     };
 
     return (

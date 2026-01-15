@@ -3,7 +3,7 @@ import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { InsightSection } from '@/components/home/InsightSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { SeeItInActionSection } from '@/components/home/SeeItInActionSection';
+import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
@@ -232,7 +232,7 @@ export default function HomePage() {
       <RedesignedHero />
 
       {/* 2. See It In Action Section */}
-      <SeeItInActionSection />
+      <SeeItInAction />
 
       {/* 3. Problem Section */}
       <ProblemSection />
