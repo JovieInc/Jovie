@@ -71,7 +71,7 @@ If you modified queries or data fetching:
 
 Create a verification summary in your response:
 
-```
+```markdown
 ## Verification Results
 
 ### Passed
