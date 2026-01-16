@@ -8,7 +8,20 @@
 # Get file path and content from stdin (Windsurf passes JSON via stdin)
 input=$(cat)
 file_path=$(echo "$input" | jq -r '.tool_info.file_path // .file_path // empty' 2>/dev/null)
+jq_exit_path=$?
 content=$(echo "$input" | jq -r '.tool_info.content // .content // empty' 2>/dev/null)
+jq_exit_content=$?
+
+# Fail closed: block if jq fails or if input is non-empty but file_path is empty
+if [ "$jq_exit_path" -ne 0 ] || [ "$jq_exit_content" -ne 0 ]; then
+  echo "BLOCKED: Unable to parse JSON input for file protection checks" >&2
+  exit 2
+fi
+
+if [ -n "$input" ] && [ -z "$file_path" ]; then
+  echo "BLOCKED: Missing file_path in JSON input" >&2
+  exit 2
+fi
 
 if [ -z "$file_path" ]; then
   exit 0
