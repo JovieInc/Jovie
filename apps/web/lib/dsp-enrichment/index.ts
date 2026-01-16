@@ -20,7 +20,40 @@ export {
   musicBrainzCircuitBreaker,
   resetAllCircuitBreakers,
 } from './circuit-breakers';
+export type {
+  LocalArtistData,
+  LocalTrackData,
+  MatchingResult,
+} from './matching';
 
+// Matching algorithm (server-only)
+export {
+  // ISRC aggregation
+  aggregateIsrcMatches,
+  // Name similarity
+  areArtistNamesSimilar,
+  artistNameSimilarity,
+  // Confidence scoring
+  calculateConfidenceScore,
+  calculateFollowerRatioScore,
+  calculateGenreOverlapScore,
+  calculateIsrcMatchScore,
+  calculateNameSimilarityScore,
+  calculateUpcMatchScore,
+  // Orchestration
+  convertAppleMusicToIsrcMatches,
+  enrichCandidatesWithProfiles,
+  filterByMinMatches,
+  getBestCandidate,
+  jaroWinklerSimilarity,
+  mergeUpcMatches,
+  normalizeArtistName,
+  orchestrateMatching,
+  refineConfidenceScore,
+  scoreAndRankCandidates,
+  selectTracksForMatching,
+  validateMatch,
+} from './matching';
 // Providers (server-only)
 export {
   // Apple Music Provider
