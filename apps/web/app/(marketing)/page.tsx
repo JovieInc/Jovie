@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { InsightSection } from '@/components/home/InsightSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
@@ -237,8 +237,8 @@ export default function HomePage() {
       {/* 3. Problem Section */}
       <ProblemSection />
 
-      {/* 4. Insight Section */}
-      <InsightSection />
+      {/* 4. Comparison Section */}
+      <ComparisonSection />
 
       {/* 5. What You Get Section */}
       <WhatYouGetSection />

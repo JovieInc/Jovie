@@ -180,6 +180,32 @@ export const claimInviteStatusEnum = pgEnum('claim_invite_status', [
   'unsubscribed',
 ]);
 
+// DSP Enrichment Enums
+export const dspMatchStatusEnum = pgEnum('dsp_match_status', [
+  'suggested',
+  'confirmed',
+  'rejected',
+  'auto_confirmed',
+]);
+
+export const releaseNotificationTypeEnum = pgEnum('release_notification_type', [
+  'preview',
+  'release_day',
+]);
+
+export const releaseNotificationStatusEnum = pgEnum(
+  'release_notification_status',
+  ['pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled']
+);
+
+export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
+  'pending',
+  'accepted',
+  'rejected',
+  'email_sent',
+  'expired',
+]);
+
 // Audience & Analytics Enums
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',
