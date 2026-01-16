@@ -23,11 +23,11 @@ interface UseParticleFlowOptions {
   activeJovieIndex: number;
   maxParticles?: number;
   spawnRate?: number;
+  side: 'left' | 'right';
 }
 
-// Button positions relative to container
-const LEFT_BUTTONS_X_RATIO = 0.3; // Where left buttons are
-const RIGHT_BUTTONS_X_RATIO = 0.7; // Where right buttons are
+// Button positions relative to container (centered since each side has own container)
+const BUTTONS_X_RATIO = 0.65; // Where buttons are positioned in each container
 const BUTTON_HEIGHT = 40;
 const BUTTON_GAP = 12;
 
@@ -39,6 +39,7 @@ export function useParticleFlow({
   activeJovieIndex,
   maxParticles = 30,
   spawnRate = 200,
+  side,
 }: UseParticleFlowOptions) {
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
@@ -57,14 +58,14 @@ export function useParticleFlow({
   );
 
   const spawnParticle = useCallback(
-    (side: 'left' | 'right'): Particle => {
-      const startX = side === 'left' ? -10 : containerWidth * 0.4;
+    (spawnSide: 'left' | 'right'): Particle => {
+      const startX = -10;
       const centerY = containerHeight / 2;
 
       // For left: random target among 4 buttons
       // For right: always target the active button
       const targetIndex =
-        side === 'left' ? Math.floor(Math.random() * 4) : activeJovieIndex;
+        spawnSide === 'left' ? Math.floor(Math.random() * 4) : activeJovieIndex;
 
       return {
         id: particleIdRef.current++,
@@ -73,13 +74,13 @@ export function useParticleFlow({
         vx: 2,
         vy: 0,
         opacity: 0.9,
-        side,
+        side: spawnSide,
         state: 'stream',
         targetIndex,
         convertPulse: 0,
       };
     },
-    [containerWidth, containerHeight, activeJovieIndex]
+    [containerHeight, activeJovieIndex]
   );
 
   const updateParticle = useCallback(
@@ -92,7 +93,7 @@ export function useParticleFlow({
 
       if (particle.side === 'left') {
         // LEFT: Fork to 4 buttons
-        const targetX = containerWidth * LEFT_BUTTONS_X_RATIO;
+        const targetX = containerWidth * BUTTONS_X_RATIO;
         const targetY = getButtonY(particle.targetIndex, 4);
 
         if (state === 'stream') {
@@ -126,7 +127,7 @@ export function useParticleFlow({
         }
       } else {
         // RIGHT: Route to active button
-        const targetX = containerWidth * RIGHT_BUTTONS_X_RATIO;
+        const targetX = containerWidth * BUTTONS_X_RATIO;
         const targetY = getButtonY(particle.targetIndex, 3);
 
         if (state === 'stream') {
@@ -183,16 +184,10 @@ export function useParticleFlow({
     }
 
     const animate = (timestamp: number) => {
-      // Spawn new particles
+      // Spawn new particles (only for this side)
       if (timestamp - lastSpawnRef.current > spawnRate) {
         setParticles(prev => {
           if (prev.length >= maxParticles) return prev;
-          // Alternate between left and right
-          const side =
-            prev.filter(p => p.side === 'left').length <=
-            prev.filter(p => p.side === 'right').length
-              ? 'left'
-              : 'right';
           return [...prev, spawnParticle(side)];
         });
         lastSpawnRef.current = timestamp;
@@ -222,6 +217,7 @@ export function useParticleFlow({
     spawnRate,
     spawnParticle,
     updateParticle,
+    side,
   ]);
 
   // Clear particles when not visible
