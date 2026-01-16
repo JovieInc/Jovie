@@ -11,6 +11,25 @@
  */
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Maximum prefix length to consider in Jaro-Winkler (standard is 4) */
+const MAX_PREFIX_LENGTH = 4;
+
+/** Maximum prefix weight in Jaro-Winkler to prevent over-weighting */
+const MAX_PREFIX_WEIGHT = 0.25;
+
+/** Default prefix weight for Jaro-Winkler similarity */
+const DEFAULT_PREFIX_WEIGHT = 0.1;
+
+/** Default threshold for determining if two artist names are similar */
+const DEFAULT_SIMILARITY_THRESHOLD = 0.85;
+
+/** Common prefixes to remove from artist names during normalization */
+const ARTIST_NAME_PREFIXES = ['the ', 'a ', 'an ', 'dj ', 'mc ', 'lil '];
+
+// ============================================================================
 // Jaro Similarity
 // ============================================================================
 
@@ -95,13 +114,13 @@ function jaroSimilarity(s1: string, s2: string): number {
 export function jaroWinklerSimilarity(
   s1: string,
   s2: string,
-  prefixWeight = 0.1
+  prefixWeight = DEFAULT_PREFIX_WEIGHT
 ): number {
   const jaro = jaroSimilarity(s1, s2);
 
-  // Calculate common prefix length (up to 4 characters)
+  // Calculate common prefix length (up to MAX_PREFIX_LENGTH characters)
   let prefixLength = 0;
-  const maxPrefixLength = Math.min(4, s1.length, s2.length);
+  const maxPrefixLength = Math.min(MAX_PREFIX_LENGTH, s1.length, s2.length);
 
   for (let i = 0; i < maxPrefixLength; i++) {
     if (s1[i] === s2[i]) {
@@ -111,8 +130,8 @@ export function jaroWinklerSimilarity(
     }
   }
 
-  // Ensure prefix weight doesn't exceed 0.25 (standard limit)
-  const safeWeight = Math.min(prefixWeight, 0.25);
+  // Ensure prefix weight doesn't exceed standard limit
+  const safeWeight = Math.min(prefixWeight, MAX_PREFIX_WEIGHT);
 
   return jaro + prefixLength * safeWeight * (1 - jaro);
 }
@@ -148,8 +167,7 @@ export function normalizeArtistName(name: string): string {
     .trim();
 
   // Remove common prefixes
-  const prefixes = ['the ', 'a ', 'an ', 'dj ', 'mc ', 'lil '];
-  for (const prefix of prefixes) {
+  for (const prefix of ARTIST_NAME_PREFIXES) {
     if (normalized.startsWith(prefix)) {
       normalized = normalized.slice(prefix.length);
       break; // Only remove one prefix
@@ -200,7 +218,7 @@ export function artistNameSimilarity(name1: string, name2: string): number {
 export function areArtistNamesSimilar(
   name1: string,
   name2: string,
-  threshold = 0.85
+  threshold = DEFAULT_SIMILARITY_THRESHOLD
 ): boolean {
   return artistNameSimilarity(name1, name2) >= threshold;
 }

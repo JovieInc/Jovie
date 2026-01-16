@@ -50,6 +50,22 @@ export {
 } from './name-similarity';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Minimum confidence score for a valid match */
+const MIN_VALID_CONFIDENCE = 0.3;
+
+/** Minimum name similarity for validation without strong ISRC evidence */
+const MIN_NAME_SIMILARITY_FOR_VALIDATION = 0.5;
+
+/** Minimum ISRC matches to override low name similarity */
+const MIN_ISRC_MATCHES_FOR_NAME_OVERRIDE = 3;
+
+/** Default maximum tracks to select for ISRC matching */
+const DEFAULT_MAX_TRACKS_FOR_MATCHING = 20;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -220,7 +236,7 @@ export function orchestrateMatching(
  */
 export function selectTracksForMatching(
   tracks: LocalTrackData[],
-  maxTracks = 20
+  maxTracks = DEFAULT_MAX_TRACKS_FOR_MATCHING
 ): LocalTrackData[] {
   // Filter to tracks with ISRCs
   const tracksWithIsrc = tracks.filter(t => t.isrc && t.isrc.trim().length > 0);
@@ -249,16 +265,19 @@ export function validateMatch(
   _localArtist: LocalArtistData
 ): { valid: boolean; reason?: string } {
   // Check minimum confidence
-  if (match.confidenceScore < 0.3) {
+  if (match.confidenceScore < MIN_VALID_CONFIDENCE) {
     return { valid: false, reason: 'Confidence score too low' };
   }
 
   // Check name similarity isn't suspiciously low
-  if (match.confidenceBreakdown.nameSimilarityScore < 0.5) {
-    // Allow if we have strong ISRC matches
-    if (match.matchingIsrcs.length < 3) {
-      return { valid: false, reason: 'Name mismatch with few ISRC matches' };
-    }
+  const hasLowNameSimilarity =
+    match.confidenceBreakdown.nameSimilarityScore <
+    MIN_NAME_SIMILARITY_FOR_VALIDATION;
+  const hasStrongIsrcMatches =
+    match.matchingIsrcs.length >= MIN_ISRC_MATCHES_FOR_NAME_OVERRIDE;
+
+  if (hasLowNameSimilarity && !hasStrongIsrcMatches) {
+    return { valid: false, reason: 'Name mismatch with few ISRC matches' };
   }
 
   // Check that we have at least one ISRC match

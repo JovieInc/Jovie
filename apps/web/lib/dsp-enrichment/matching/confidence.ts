@@ -19,6 +19,19 @@ import {
 import { artistNameSimilarity } from './name-similarity';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Neutral score when data is missing or incomplete */
+const NEUTRAL_SCORE = 0.5;
+
+/** Minimum score for extreme follower ratio differences (10x+) */
+const MIN_FOLLOWER_RATIO_SCORE = 0.1;
+
+/** Maximum follower ratio before score drops to minimum */
+const MAX_FOLLOWER_RATIO = 10;
+
+// ============================================================================
 // Scoring Functions
 // ============================================================================
 
@@ -102,7 +115,7 @@ export function calculateFollowerRatioScore(
 ): number {
   // If either count is missing, return neutral score
   if (!localFollowers || !externalFollowers) {
-    return 0.5;
+    return NEUTRAL_SCORE;
   }
 
   // Calculate the ratio (always >= 1)
@@ -115,7 +128,7 @@ export function calculateFollowerRatioScore(
   // Ratio of 1 = 1.0, ratio of 2 = 0.85, ratio of 5 = 0.58, ratio of 10 = 0.37
   // Beyond 10x difference, score drops significantly
   if (ratio <= 1) return 1;
-  if (ratio >= 10) return 0.1;
+  if (ratio >= MAX_FOLLOWER_RATIO) return MIN_FOLLOWER_RATIO_SCORE;
 
   // Logarithmic decay
   return 1 - Math.log10(ratio);
@@ -136,7 +149,7 @@ export function calculateGenreOverlapScore(
 ): number {
   // If either is missing, return neutral score
   if (!localGenres?.length || !externalGenres?.length) {
-    return 0.5;
+    return NEUTRAL_SCORE;
   }
 
   // Normalize genres for comparison
@@ -155,7 +168,7 @@ export function calculateGenreOverlapScore(
 
   // Calculate Jaccard similarity
   const union = new Set([...normalizedLocal, ...normalizedExternal]);
-  if (union.size === 0) return 0.5;
+  if (union.size === 0) return NEUTRAL_SCORE;
 
   return overlap / union.size;
 }
@@ -196,8 +209,8 @@ export function calculateConfidenceScore(
 
   // These require external data that may not be available yet
   // Will be refined during enrichment phase
-  const followerRatioScore = 0.5; // Neutral until we fetch external data
-  const genreOverlapScore = 0.5; // Neutral until we fetch external data
+  const followerRatioScore = NEUTRAL_SCORE; // Neutral until we fetch external data
+  const genreOverlapScore = NEUTRAL_SCORE; // Neutral until we fetch external data
 
   // Calculate weighted total
   const confidenceScore =

@@ -50,6 +50,21 @@ export const MAX_ISRC_BATCH_SIZE = 25;
  */
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * Maximum search results limit (Apple's limit is 25)
+ */
+const MAX_SEARCH_LIMIT = 25;
+
+/**
+ * Default number of search results to return
+ */
+const DEFAULT_SEARCH_LIMIT = 10;
+
+/**
+ * Default number of albums to fetch per artist
+ */
+const DEFAULT_ALBUMS_LIMIT = 50;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -319,10 +334,10 @@ export async function getArtist(
 export async function searchArtist(
   query: string,
   options: AppleMusicProviderOptions = {},
-  limit = 10
+  limit = DEFAULT_SEARCH_LIMIT
 ): Promise<AppleMusicArtist[]> {
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
-  const safeLimit = Math.min(limit, 25);
+  const safeLimit = Math.min(limit, MAX_SEARCH_LIMIT);
 
   const result = await executeWithCircuitBreaker(async () => {
     const response = await musicKitRequest<AppleMusicArtist>(
@@ -346,7 +361,7 @@ export async function searchArtist(
 export async function getArtistAlbums(
   artistId: string,
   options: AppleMusicProviderOptions = {},
-  limit = 50
+  limit = DEFAULT_ALBUMS_LIMIT
 ): Promise<AppleMusicAlbum[]> {
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
