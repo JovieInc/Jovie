@@ -26,7 +26,8 @@ export default defineConfig({
   // Smoke tests: fewer retries for faster feedback; full suite: more resilience
   retries: isCI ? (isSmokeOnly ? 1 : 2) : 0,
   // Smoke tests: more parallelism since tests are faster
-  workers: isCI ? (isSmokeOnly ? 6 : 4) : undefined,
+  // Increased from 6 to 8 for smoke - tests are I/O-bound, not CPU-bound
+  workers: isCI ? (isSmokeOnly ? 8 : 4) : undefined,
   reporter: isCI
     ? [
         ['line'],

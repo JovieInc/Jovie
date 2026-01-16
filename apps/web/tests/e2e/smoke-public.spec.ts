@@ -37,123 +37,99 @@ const describeErrorHandling = isMarketingBaseUrl
  * CRITICAL: These tests run BEFORE production deploys.
  * They verify public-facing pages load without errors.
  *
- * Consolidates:
- * - smoke.spec.ts (homepage, 404, critical pages)
- * - homepage-smoke.spec.ts (homepage load, content, hydration)
- * - smoke-required.spec.ts (public profile, homepage)
- * - public-profile-smoke.spec.ts (public profile, 404)
- * - smoke.profile.spec.ts (profile modes)
+ * Optimized for speed: 4 consolidated tests covering critical paths.
+ * Previous tests merged for efficiency (was 10, now 4).
  *
  * @smoke @critical
  */
 test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
-  // HOMEPAGE TESTS
+  // HOMEPAGE - Consolidated test (was 3 separate tests)
   // =========================================================================
-  test.describe('Homepage', () => {
-    test('loads without server errors', async ({ page }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
+  test('homepage loads correctly with content and no errors', async ({
+    page,
+  }, testInfo) => {
+    const { getContext, cleanup } = setupPageMonitoring(page);
+    const hydrationErrors: string[] = [];
 
-      try {
-        const response = await smokeNavigate(page, '/');
-
-        // CRITICAL: Must not be a server error (5xx)
-        const status = response?.status() ?? 0;
-        expect(
-          status,
-          `Homepage returned ${status} - server error!`
-        ).toBeLessThan(500);
-        expect(status, `Homepage returned ${status} - expected 200`).toBe(200);
-
-        await waitForHydration(page);
-        await assertPageRendered(page);
-
-        const context = getContext();
-        await assertPageHealthy(page, context, testInfo);
-      } finally {
-        cleanup();
+    // Set up hydration error monitoring
+    page.on('console', msg => {
+      const text = msg.text();
+      const hydrationPatterns = [
+        'Hydration failed',
+        'hydration mismatch',
+        'Text content does not match',
+        'server rendered HTML',
+      ];
+      const isHydrationError = hydrationPatterns.some(pattern =>
+        text.toLowerCase().includes(pattern.toLowerCase())
+      );
+      if (isHydrationError && !isExpectedError(text)) {
+        hydrationErrors.push(text);
       }
     });
 
-    test('renders main content with h1', async ({ page }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
+    try {
+      const response = await smokeNavigate(page, '/');
 
-      try {
-        await smokeNavigate(page, '/');
-        await page.waitForLoadState('domcontentloaded');
+      // CRITICAL: Must not be a server error (5xx)
+      const status = response?.status() ?? 0;
+      expect(
+        status,
+        `Homepage returned ${status} - server error!`
+      ).toBeLessThan(500);
+      expect(status, `Homepage returned ${status} - expected 200`).toBe(200);
 
-        // Verify body has content (not blank page)
-        const bodyContent = await page.locator('body').textContent();
-        expect(
-          bodyContent && bodyContent.length > 100,
-          'Homepage body is empty or too short'
-        ).toBe(true);
+      await waitForHydration(page);
+      await assertPageRendered(page);
 
-        // Verify main heading exists
-        const h1 = page.locator('h1').first();
-        await expect(h1, 'Homepage missing h1 heading').toBeVisible({
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
+      // Verify body has content (not blank page)
+      const bodyContent = await page.locator('body').textContent();
+      expect(
+        bodyContent && bodyContent.length > 100,
+        'Homepage body is empty or too short'
+      ).toBe(true);
 
-        // Verify it's not an error page
-        const pageText = bodyContent?.toLowerCase() ?? '';
-        const errorIndicators = [
-          'application error',
-          'internal server error',
-          'something went wrong',
-          'unhandled runtime error',
-        ];
-        const hasErrorIndicator = errorIndicators.some(indicator =>
-          pageText.includes(indicator)
-        );
-        expect(hasErrorIndicator, 'Homepage shows error message').toBe(false);
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('has no React hydration errors', async ({ page }, testInfo) => {
-      const hydrationErrors: string[] = [];
-
-      page.on('console', msg => {
-        const text = msg.text();
-        const hydrationPatterns = [
-          'Hydration failed',
-          'hydration mismatch',
-          'Text content does not match',
-          'server rendered HTML',
-        ];
-        const isHydrationError = hydrationPatterns.some(pattern =>
-          text.toLowerCase().includes(pattern.toLowerCase())
-        );
-
-        if (isHydrationError && !isExpectedError(text)) {
-          hydrationErrors.push(text);
-        }
+      // Verify main heading exists
+      const h1 = page.locator('h1').first();
+      await expect(h1, 'Homepage missing h1 heading').toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
 
-      await smokeNavigate(page, '/');
-      await waitForHydration(page, { timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      // Verify it's not an error page
+      const pageText = bodyContent?.toLowerCase() ?? '';
+      const errorIndicators = [
+        'application error',
+        'internal server error',
+        'something went wrong',
+        'unhandled runtime error',
+      ];
+      const hasErrorIndicator = errorIndicators.some(indicator =>
+        pageText.includes(indicator)
+      );
+      expect(hasErrorIndicator, 'Homepage shows error message').toBe(false);
 
+      // Check for hydration errors
       if (hydrationErrors.length > 0 && testInfo) {
         await testInfo.attach('hydration-errors', {
           body: hydrationErrors.join('\n'),
           contentType: 'text/plain',
         });
       }
-
       expect(
         hydrationErrors,
         `Homepage has hydration errors: ${hydrationErrors.join(', ')}`
       ).toHaveLength(0);
-    });
+
+      const context = getContext();
+      await assertPageHealthy(page, context, testInfo);
+    } finally {
+      cleanup();
+    }
   });
 
   // =========================================================================
-  // PUBLIC PROFILE TESTS
+  // PUBLIC PROFILE - Single essential test (listen mode moved to full suite)
   // =========================================================================
   describePublicProfile('Public Profile', () => {
     test('loads and displays creator name', async ({ page }, testInfo) => {
@@ -228,109 +204,48 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
       }
     });
 
-    test('listen mode displays DSP options', async ({ page }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        const response = await smokeNavigate(
-          page,
-          `/${TEST_PROFILES.TAYLORSWIFT}?mode=listen`
-        );
-
-        // Must not be a server error
-        const status = response?.status() ?? 0;
-        expect(status, `Expected <500 but got ${status}`).toBeLessThan(500);
-
-        await expect(page).toHaveURL(/\/taylorswift\?mode=listen/, {
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-
-        const pageTitle = await page.title();
-        const isTemporarilyUnavailable = pageTitle.includes(
-          'temporarily unavailable'
-        );
-        const isNotFound = pageTitle
-          .toLowerCase()
-          .includes('profile not found');
-
-        if (status === 200 && !isTemporarilyUnavailable) {
-          expect(isNotFound, 'Expected profile to exist').toBe(false);
-
-          const dspButtons = page.locator(
-            'button[aria-label^="Open in"], button:has-text("Open in")'
-          );
-
-          await expect(dspButtons.first()).toBeVisible({
-            timeout: SMOKE_TIMEOUTS.VISIBILITY,
-          });
-        } else {
-          // For 404/400/temporarily unavailable, just verify page renders
-          await page.waitForLoadState('domcontentloaded');
-          const bodyContent = await page.locator('body').textContent();
-          expect(bodyContent, 'Page should have content').toBeTruthy();
-        }
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
+    // NOTE: 'listen mode displays DSP options' moved to profile.public.spec.ts (full suite only)
+    // It tests a feature detail, not a critical path for smoke testing
   });
 
   // =========================================================================
-  // 404 / ERROR HANDLING TESTS
+  // ERROR HANDLING - Consolidated test (was 2 separate tests)
   // =========================================================================
   describeErrorHandling('Error Handling', () => {
-    test('404 for non-existent profile', async ({ page }, testInfo) => {
+    test('handles non-existent routes gracefully without 500 errors', async ({
+      page,
+    }, testInfo) => {
       const { getContext, cleanup } = setupPageMonitoring(page);
+      const testRoutes = [
+        '/nonexistent-handle-xyz-123', // Non-existent profile
+        '/non-existent-route-123', // Unknown route
+      ];
 
       try {
-        const response = await smokeNavigate(
-          page,
-          '/nonexistent-handle-xyz-123'
-        );
-        const status = response?.status() ?? 0;
+        for (const route of testRoutes) {
+          const response = await smokeNavigate(page, route);
+          const status = response?.status() ?? 0;
 
-        // Should return 200, 400, or 404 - not a 500 server error
-        expect(
-          status < 500,
-          `Expected non-5xx but got ${status} (server error)`
-        ).toBe(true);
+          // Should return 200, 400, or 404 - not a 500 server error
+          expect(
+            status < 500,
+            `Route ${route}: Expected non-5xx but got ${status} (server error)`
+          ).toBe(true);
 
-        await page.waitForLoadState('domcontentloaded');
-        const bodyContent = await page.locator('body').textContent();
-        expect(bodyContent, 'Page should have content').toBeTruthy();
+          await page.waitForLoadState('domcontentloaded');
+          const bodyContent = await page.locator('body').textContent();
+          expect(
+            bodyContent,
+            `Route ${route}: Page should have content`
+          ).toBeTruthy();
 
-        // Should not have server error indicators
-        const bodyText = bodyContent?.toLowerCase() ?? '';
-        expect(
-          bodyText.includes('internal server error'),
-          'Page should not show internal server error'
-        ).toBe(false);
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('unknown routes handled gracefully', async ({ page }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        const response = await smokeNavigate(page, '/non-existent-route-123');
-
-        const status = response?.status() ?? 0;
-        expect(
-          status,
-          `Expected non-5xx status but got ${status}`
-        ).toBeLessThan(500);
-
-        await page.waitForLoadState('domcontentloaded');
-        const pageContent = await page.textContent('body');
-        expect(pageContent, 'Page should have content').toBeTruthy();
+          // Should not have server error indicators
+          const bodyText = bodyContent?.toLowerCase() ?? '';
+          expect(
+            bodyText.includes('internal server error'),
+            `Route ${route}: Page should not show internal server error`
+          ).toBe(false);
+        }
 
         const context = getContext();
         await assertNoCriticalErrors(context, testInfo);

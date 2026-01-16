@@ -686,7 +686,8 @@ jobs:
     needs: [ci-fast]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Reduced from 15 to 10 min after consolidating smoke tests (19 → 6 tests)
+    timeout-minutes: 10
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
