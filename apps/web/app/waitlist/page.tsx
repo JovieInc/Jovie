@@ -140,92 +140,34 @@ export default function WaitlistPage() {
     }
   }, []);
 
-  // Persist step changes
+  // Persist form state to sessionStorage (consolidated from 6 separate effects)
   useEffect(() => {
-    try {
-      window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.step, String(step));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [step]);
-
-  // Persist primary goal changes
-  useEffect(() => {
-    try {
-      if (primaryGoal) {
-        window.sessionStorage.setItem(
-          WAITLIST_STORAGE_KEYS.primaryGoal,
-          primaryGoal
-        );
-      } else {
-        window.sessionStorage.removeItem(WAITLIST_STORAGE_KEYS.primaryGoal);
+    const persist = (key: string, value: string | null) => {
+      try {
+        if (value) {
+          window.sessionStorage.setItem(key, value);
+        } else {
+          window.sessionStorage.removeItem(key);
+        }
+      } catch {
+        // Ignore storage errors
       }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [primaryGoal]);
+    };
 
-  // Persist social platform changes
-  useEffect(() => {
-    try {
-      window.sessionStorage.setItem(
-        WAITLIST_STORAGE_KEYS.socialPlatform,
-        socialPlatform
-      );
-    } catch {
-      // Ignore storage errors
-    }
-  }, [socialPlatform]);
-
-  // Persist primary social URL changes
-  useEffect(() => {
-    try {
-      if (primarySocialUrl) {
-        window.sessionStorage.setItem(
-          WAITLIST_STORAGE_KEYS.primarySocialUrl,
-          primarySocialUrl
-        );
-      } else {
-        window.sessionStorage.removeItem(
-          WAITLIST_STORAGE_KEYS.primarySocialUrl
-        );
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [primarySocialUrl]);
-
-  // Persist spotify URL changes
-  useEffect(() => {
-    try {
-      if (spotifyUrl) {
-        window.sessionStorage.setItem(
-          WAITLIST_STORAGE_KEYS.spotifyUrl,
-          spotifyUrl
-        );
-      } else {
-        window.sessionStorage.removeItem(WAITLIST_STORAGE_KEYS.spotifyUrl);
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [spotifyUrl]);
-
-  // Persist heard about changes
-  useEffect(() => {
-    try {
-      if (heardAbout) {
-        window.sessionStorage.setItem(
-          WAITLIST_STORAGE_KEYS.heardAbout,
-          heardAbout
-        );
-      } else {
-        window.sessionStorage.removeItem(WAITLIST_STORAGE_KEYS.heardAbout);
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [heardAbout]);
+    persist(WAITLIST_STORAGE_KEYS.step, String(step));
+    persist(WAITLIST_STORAGE_KEYS.primaryGoal, primaryGoal);
+    persist(WAITLIST_STORAGE_KEYS.socialPlatform, socialPlatform);
+    persist(WAITLIST_STORAGE_KEYS.primarySocialUrl, primarySocialUrl || null);
+    persist(WAITLIST_STORAGE_KEYS.spotifyUrl, spotifyUrl || null);
+    persist(WAITLIST_STORAGE_KEYS.heardAbout, heardAbout || null);
+  }, [
+    step,
+    primaryGoal,
+    socialPlatform,
+    primarySocialUrl,
+    spotifyUrl,
+    heardAbout,
+  ]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -345,15 +287,13 @@ export default function WaitlistPage() {
 
     setFieldErrors({});
 
-    if (step === 0) setStep(1);
-    if (step === 1) setStep(2);
+    if (step < 2) setStep((step + 1) as 0 | 1 | 2);
   };
 
   const handleBack = () => {
     setError('');
     setFieldErrors({});
-    if (step === 2) setStep(1);
-    if (step === 1) setStep(0);
+    if (step > 0) setStep((step - 1) as 0 | 1 | 2);
   };
 
   const handlePrimaryGoalSelect = (goal: PrimaryGoal) => {
