@@ -30,7 +30,8 @@ if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizz
 fi
 
 # HARD GUARDRAIL: No middleware.ts allowed (agents.md line 11)
-if [[ "$file_path" =~ /middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; then
+# Match both root-level and nested middleware.ts (but exclude .next/)
+if [[ "$file_path" =~ (^|/)middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; then
   echo "BLOCKED: Do not create middleware.ts (agents.md line 11)"
   echo "File: $file_path"
   echo ""

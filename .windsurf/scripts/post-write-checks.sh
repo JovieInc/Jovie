@@ -134,4 +134,11 @@ if [[ ! "$file_path" =~ \.(test|spec)\.(ts|tsx)$ ]] && \
 fi
 
 # Always exit 0 - post hooks cannot block
+if [ "$warnings" -ne 0 ]; then
+  echo "=================================================="
+  echo "Post-write checks completed with warnings."
+  echo "Please review the issues above before committing."
+  echo "=================================================="
+  echo ""
+fi
 exit 0

@@ -208,11 +208,12 @@
         "touch *",
         "cp *",
         "mv *",
-        "rm *.md",
-        "rm .windsurf/*",
-        "rm .claude/*"
+        "rm .windsurf/todos/*"
       ],
       "prompt": [
+        "rm *.md",
+        "rm .windsurf/*",
+        "rm .claude/*",
         "pnpm add *",
         "pnpm remove *",
         "pnpm update *",
