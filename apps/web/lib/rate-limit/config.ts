@@ -244,6 +244,64 @@ export const RATE_LIMITERS = {
     prefix: 'spotify:public-search',
     analytics: false,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // DSP Enrichment Operations
+  // ---------------------------------------------------------------------------
+
+  /** Apple Music ISRC lookup: 80 requests per minute (below 100/sec API limit) */
+  appleMusicLookup: {
+    name: 'Apple Music Lookup',
+    limit: 80,
+    window: '1 m',
+    prefix: 'dsp:apple-music:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Apple Music bulk ISRC lookup: 20 batch requests per minute */
+  appleMusicBulkIsrc: {
+    name: 'Apple Music Bulk ISRC',
+    limit: 20,
+    window: '1 m',
+    prefix: 'dsp:apple-music:bulk-isrc',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Deezer lookup: 40 requests per minute (below 50/sec API limit) */
+  deezerLookup: {
+    name: 'Deezer Lookup',
+    limit: 40,
+    window: '1 m',
+    prefix: 'dsp:deezer:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** MusicBrainz: 1 request per second (be respectful of free service) */
+  musicBrainzLookup: {
+    name: 'MusicBrainz Lookup',
+    limit: 1,
+    window: '1 s',
+    prefix: 'dsp:musicbrainz:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** DSP discovery: 10 discoveries per minute per user */
+  dspDiscovery: {
+    name: 'DSP Discovery',
+    limit: 10,
+    window: '1 m',
+    prefix: 'dsp:discovery',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** DSP enrichment: 100 enrichments per hour (global) */
+  dspEnrichment: {
+    name: 'DSP Enrichment',
+    limit: 100,
+    window: '1 h',
+    prefix: 'dsp:enrichment',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;
