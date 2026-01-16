@@ -222,8 +222,8 @@ describe('useSuggestions', () => {
         })
       );
 
-      // Give time for any potential tracking
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Flush any pending microtasks
+      await vi.waitFor(() => {});
 
       expect(track).not.toHaveBeenCalledWith(
         'link_suggestion_surfaced',
@@ -261,7 +261,8 @@ describe('useSuggestions', () => {
       // Trigger re-render with same suggestions
       rerender({ suggestions: [suggestion] });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Flush any pending microtasks
+      await vi.waitFor(() => {});
 
       const finalCallCount = vi
         .mocked(track)
