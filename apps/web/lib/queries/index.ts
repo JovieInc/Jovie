@@ -88,6 +88,38 @@ export {
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
 } from './useDashboardProfileQuery';
+// DSP enrichment queries and mutations
+export {
+  type ConfirmDspMatchInput,
+  type ConfirmDspMatchResponse,
+  type RejectDspMatchInput,
+  type RejectDspMatchResponse,
+  type TriggerDiscoveryInput,
+  type TriggerDiscoveryResponse,
+  useConfirmDspMatchMutation,
+  useDspEnrichmentMutations,
+  useRejectDspMatchMutation,
+  useTriggerDiscoveryMutation,
+} from './useDspEnrichmentMutations';
+export {
+  type EnrichmentPhase,
+  type EnrichmentStatus,
+  getPhaseLabel,
+  getTotalTracksEnriched,
+  isEnrichmentComplete,
+  isEnrichmentInProgress,
+  type ProviderEnrichmentStatus,
+  type UseDspEnrichmentStatusQueryOptions,
+  useDspEnrichmentStatusQuery,
+} from './useDspEnrichmentStatusQuery';
+export {
+  countMatchesByStatus,
+  type DspMatch,
+  getBestMatchPerProvider,
+  groupMatchesByProvider,
+  type UseDspMatchesQueryOptions,
+  useDspMatchesQuery,
+} from './useDspMatchesQuery';
 export {
   type SuggestionsQueryResult,
   type UseSuggestionsQueryOptions,
