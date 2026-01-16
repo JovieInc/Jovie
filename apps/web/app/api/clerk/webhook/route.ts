@@ -6,6 +6,7 @@ import { Webhook } from 'svix';
 import {
   handleClerkUserDeleted,
   syncAllClerkMetadata,
+  syncEmailFromClerkByClerkId,
 } from '@/lib/auth/clerk-sync';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 import { logger } from '@/lib/utils/logger';
@@ -16,7 +17,9 @@ type WebhookEvent = {
   data: {
     id: string;
     username?: string | null;
+    primary_email_address_id?: string;
     email_addresses: Array<{
+      id: string;
       email_address: string;
       verification: { status: string };
     }>;
@@ -177,14 +180,27 @@ export async function POST(request: NextRequest) {
       const { data: user } = evt;
 
       try {
+        // Sync username (existing)
         await syncUsernameFromClerkEvent(
           user.id,
           user.username ?? null,
           user.private_metadata
         );
+
+        // Sync email if primary email changed
+        // Only sync verified emails to prevent hijacking
+        const primaryEmail = user.email_addresses?.find(
+          e =>
+            e.id === user.primary_email_address_id &&
+            e.verification?.status === 'verified'
+        )?.email_address;
+
+        if (primaryEmail) {
+          await syncEmailFromClerkByClerkId(user.id, primaryEmail);
+        }
       } catch (error) {
         logger.error(
-          `Failed to sync username from Clerk for user.updated ${user.id}:`,
+          `Failed to sync from Clerk for user.updated ${user.id}:`,
           error
         );
 
@@ -192,7 +208,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Failed to sync username from Clerk',
+            error: 'Failed to sync from Clerk',
           },
           { status: 200, headers: NO_STORE_HEADERS }
         );

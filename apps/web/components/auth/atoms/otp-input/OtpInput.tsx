@@ -122,7 +122,7 @@ export function OtpInput({
             <div
               key={key}
               className={cn(
-                'relative flex items-center justify-center rounded-[--radius-xl] border text-xl sm:text-2xl font-sans transition-all duration-150',
+                'relative flex items-center justify-center rounded-[6px] border text-xl sm:text-2xl font-sans transition-all duration-150',
                 'h-14 w-11 sm:h-12 sm:w-10',
                 'bg-surface-0 text-primary-token',
                 isFocused
@@ -194,7 +194,7 @@ export function OtpInput({
           className='absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in-0 zoom-in-95 duration-200'
           aria-hidden='true'
         >
-          <div className='absolute inset-0 bg-success-subtle rounded-[--radius-xl]' />
+          <div className='absolute inset-0 bg-success-subtle rounded-[6px]' />
         </div>
       )}
     </div>
