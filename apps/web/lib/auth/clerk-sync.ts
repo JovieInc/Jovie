@@ -422,3 +422,96 @@ export async function syncUserStatus(
     jovie_status: status,
   });
 }
+
+/**
+ * Syncs email from Clerk to DB user record.
+ *
+ * Called from:
+ * - resolveUserState() on auth check (if email changed)
+ * - Webhook handler on user.updated event
+ *
+ * Clerk is the source of truth for identity (email, name, avatar).
+ * This function ensures the DB stays in sync when email changes in Clerk.
+ *
+ * @param userId - Database user ID (NOT clerk ID)
+ * @param newEmail - The verified email from Clerk
+ */
+export async function syncEmailFromClerk(
+  userId: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!userId || !newEmail) {
+    return { success: false, error: 'Missing userId or newEmail' };
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ email: newEmail, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced email from Clerk',
+      level: 'info',
+      data: { userId, newEmail },
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    await captureError('Failed to sync email from Clerk', error, {
+      component: 'clerk-sync',
+      userId,
+      newEmail,
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Syncs email from Clerk to DB user record by Clerk ID.
+ *
+ * Used by webhook handler which only has clerk_id available.
+ *
+ * @param clerkId - The Clerk user ID
+ * @param newEmail - The verified email from Clerk
+ */
+export async function syncEmailFromClerkByClerkId(
+  clerkId: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!clerkId || !newEmail) {
+    return { success: false, error: 'Missing clerkId or newEmail' };
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ email: newEmail, updatedAt: new Date() })
+      .where(eq(users.clerkId, clerkId));
+
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced email from Clerk by clerkId',
+      level: 'info',
+      data: { clerkId, newEmail },
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    await captureError('Failed to sync email from Clerk by clerkId', error, {
+      component: 'clerk-sync',
+      clerkId,
+      newEmail,
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}

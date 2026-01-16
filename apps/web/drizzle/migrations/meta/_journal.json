@@ -302,6 +302,13 @@
       "when": 1736600100000,
       "tag": "0042_add_creator_claim_invites_unique_constraint",
       "breakpoints": false
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1736700000000,
+      "tag": "0043_allow_waitlist_approved_onboarding",
+      "breakpoints": false
     }
   ]
 }

@@ -19,7 +19,7 @@ export const AUTH_STORAGE_KEYS = {
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'mt-3 text-sm text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200',
+    'mt-3 text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200',
   /** Step transition animation for multi-step forms */
   stepTransition:
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out',

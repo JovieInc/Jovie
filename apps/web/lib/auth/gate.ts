@@ -6,6 +6,7 @@ import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
+import { syncEmailFromClerk } from './clerk-sync';
 
 /**
  * Centralized user state enum for auth gating decisions.
@@ -262,6 +263,7 @@ export async function resolveUserState(
   const [dbUser] = await db
     .select({
       id: users.id,
+      email: users.email,
       userStatus: users.userStatus,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
@@ -276,6 +278,19 @@ export async function resolveUserState(
     isPro: dbUser?.isPro ?? false,
     email,
   };
+
+  // Sync email from Clerk if different (Clerk is source of truth for identity)
+  // Only sync verified emails to prevent hijacking
+  const verifiedClerkEmail = clerkUser?.emailAddresses?.find(
+    e => e.verification?.status === 'verified'
+  )?.emailAddress;
+
+  if (dbUser && verifiedClerkEmail && dbUser.email !== verifiedClerkEmail) {
+    // Best-effort sync - don't block auth on sync failure
+    await syncEmailFromClerk(dbUser.id, verifiedClerkEmail).catch(err => {
+      console.warn('[gate] Email sync failed:', err);
+    });
+  }
 
   // Handle soft-deleted users
   if (dbUser?.deletedAt) {

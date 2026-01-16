@@ -152,11 +152,11 @@ export function SignInForm() {
 
         {/* Sign up suggestion when account not found */}
         {shouldSuggestSignUp && step === 'email' && (
-          <p className='text-sm text-secondary-token text-center mt-4'>
+          <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center mt-4'>
             No account found.{' '}
             <Link
               href='/signup'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
             >
               Sign up instead
             </Link>

@@ -8,9 +8,9 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-[--radius-xl] flex items-center justify-center gap-3',
+    'w-full rounded-[6px] flex items-center justify-center gap-2',
     'disabled:opacity-70 disabled:cursor-not-allowed',
-    'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]',
     // Mobile-optimized height (min 48px for touch targets)
     'h-12 sm:h-12 min-h-[48px]',
     // Touch-optimized transitions
@@ -26,32 +26,32 @@ const authButtonVariants = cva(
     variants: {
       variant: {
         primary: [
-          'bg-btn-primary px-4 text-base sm:text-sm leading-5 font-medium text-btn-primary-foreground',
-          'shadow-(--shadow-sm)',
-          'hover:opacity-90',
+          'bg-[#575bc7] border border-[#6c78e6] px-[14px] text-[13px] leading-5 font-medium text-[#fefeff]',
+          'shadow-[0_4px_4px_-1px_rgba(0,0,0,0.06),0_1px_1px_0_rgba(0,0,0,0.118)]',
+          'hover:opacity-95',
           'active:shadow-none',
         ].join(' '),
         primaryLight: [
-          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
-          'shadow-(--shadow-sm)',
-          'hover:bg-surface-1',
-          'active:bg-surface-2 active:shadow-none',
+          'bg-[#1e2025] border border-[#2c2e33] px-[14px] text-[13px] leading-5 font-medium text-[#e3e4e6]',
+          'shadow-[0_4px_4px_-1px_rgba(0,0,0,0.06),0_1px_1px_0_rgba(0,0,0,0.118)]',
+          'hover:opacity-95',
+          'active:shadow-none',
         ].join(' '),
         oauthPrimary: [
-          'bg-btn-primary px-4 text-base sm:text-sm leading-5 font-medium text-btn-primary-foreground',
-          'shadow-(--shadow-sm)',
-          'hover:opacity-90',
+          'bg-[#575bc7] border border-[#6c78e6] px-[14px] text-[13px] leading-5 font-medium text-[#fefeff]',
+          'shadow-[0_4px_4px_-1px_rgba(0,0,0,0.06),0_1px_1px_0_rgba(0,0,0,0.118)]',
+          'hover:opacity-95',
           'active:shadow-none',
         ].join(' '),
         secondary: [
-          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
-          'shadow-(--shadow-sm)',
-          'hover:bg-surface-1',
-          'active:bg-surface-2 active:shadow-none',
+          'bg-[#1e2025] border border-[#2c2e33] px-[14px] text-[13px] leading-5 font-medium text-[#e3e4e6]',
+          'shadow-[0_4px_4px_-1px_rgba(0,0,0,0.06),0_1px_1px_0_rgba(0,0,0,0.118)]',
+          'hover:opacity-95',
+          'active:shadow-none',
         ].join(' '),
         link: [
-          'bg-transparent p-0 h-auto min-h-0 text-sm text-secondary-token',
-          'hover:text-primary-token',
+          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799]',
+          'hover:text-[#1f2023] dark:hover:text-[#e3e4e6]',
           'active:scale-100 active:opacity-70',
         ].join(' '),
       },

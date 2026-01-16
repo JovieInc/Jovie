@@ -16,7 +16,7 @@ import {
 import { ButtonSpinner } from '../ButtonSpinner';
 
 const FOOTER_LINK_CLASSES =
-  'text-primary-token hover:underline focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md touch-manipulation';
+  'text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md touch-manipulation';
 
 interface MethodSelectorProps {
   /**
@@ -159,26 +159,26 @@ export function MethodSelector({
 
   return (
     <div className={`space-y-4 ${AUTH_CLASSES.stepTransition}`}>
-      <h1 className='text-xl leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+      <h1 className='text-[18px] leading-[22px] font-medium text-[#1f2023] dark:text-[#e3e4e6] mb-0 text-center'>
         {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
       </h1>
 
       {error && (
         <p
-          className='text-sm text-destructive text-center animate-in fade-in-0 duration-200'
+          className='text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 duration-200'
           role='alert'
         >
           {error}
         </p>
       )}
 
-      <div className='pt-6 space-y-3 sm:space-y-3'>
+      <div className='mt-2 space-y-4'>
         {/* Primary method */}
         <div>{renderMethodButton(orderedMethods[0], true)}</div>
 
         {/* Last used indicator */}
         {lastMethod && orderedMethods.includes(lastMethod) && (
-          <p className='-mt-1 text-xs text-secondary-token text-center animate-in fade-in-0 duration-300'>
+          <p className='-mt-1 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
             You used{' '}
             {lastMethod === 'google'
               ? 'Google'
@@ -191,7 +191,7 @@ export function MethodSelector({
 
         {/* Secondary methods */}
         {orderedMethods.length > 1 && (
-          <div className='mt-6 sm:mt-8 space-y-3'>
+          <div className='space-y-4'>
             {orderedMethods.slice(1).map(method => (
               <div key={method}>{renderMethodButton(method, false)}</div>
             ))}
@@ -199,7 +199,7 @@ export function MethodSelector({
         )}
 
         {/* Footer link */}
-        <p className='mt-8 sm:mt-10 text-sm text-secondary-token text-center'>
+        <p className='mt-8 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center'>
           {mode === 'signin' ? (
             <>
               Don&apos;t have access?{' '}
