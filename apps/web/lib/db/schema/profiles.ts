@@ -25,6 +25,22 @@ import {
 import { waitlistEntries } from './waitlist';
 
 /**
+ * Notification preferences for creators.
+ * Allows granular control over notification categories.
+ */
+export interface NotificationPreferences {
+  // Release notifications (for artist profiles)
+  releasePreview?: boolean;
+  releaseDay?: boolean;
+  // Profile suggestions
+  dspMatchSuggested?: boolean;
+  socialLinkSuggested?: boolean;
+  // Profile updates
+  enrichmentComplete?: boolean;
+  newReleaseDetected?: boolean;
+}
+
+/**
  * Fit score breakdown for GTM prioritization.
  * Each field stores the points awarded for that criterion.
  */
@@ -78,6 +94,13 @@ export const creatorProfiles = pgTable(
     appleMusicUrl: text('apple_music_url'),
     youtubeUrl: text('youtube_url'),
     spotifyId: text('spotify_id'),
+    // Additional DSP IDs for cross-platform matching
+    appleMusicId: text('apple_music_id'),
+    youtubeMusicId: text('youtube_music_id'),
+    deezerId: text('deezer_id'),
+    tidalId: text('tidal_id'),
+    soundcloudId: text('soundcloud_id'),
+    musicbrainzId: text('musicbrainz_id'), // MusicBrainz MBID
     isPublic: boolean('is_public').default(true),
     isVerified: boolean('is_verified').default(false),
     isFeatured: boolean('is_featured').default(false),
@@ -101,6 +124,17 @@ export const creatorProfiles = pgTable(
     onboardingCompletedAt: timestamp('onboarding_completed_at'),
     settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
     theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
+    // Notification preferences for granular control
+    notificationPreferences: jsonb('notification_preferences')
+      .$type<NotificationPreferences>()
+      .default({
+        releasePreview: true,
+        releaseDay: true,
+        dspMatchSuggested: true,
+        socialLinkSuggested: true,
+        enrichmentComplete: false,
+        newReleaseDetected: true,
+      }),
     // Fit scoring for GTM prioritization
     fitScore: integer('fit_score'),
     fitScoreBreakdown: jsonb('fit_score_breakdown').$type<FitScoreBreakdown>(),

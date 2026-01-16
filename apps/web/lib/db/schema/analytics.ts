@@ -108,6 +108,14 @@ export const clickEvents = pgTable(
   })
 );
 
+/**
+ * Fan notification preferences for release alerts
+ */
+export interface FanNotificationPreferences {
+  releasePreview?: boolean;
+  releaseDay?: boolean;
+}
+
 // Notification subscriptions table
 export const notificationSubscriptions = pgTable(
   'notification_subscriptions',
@@ -123,6 +131,14 @@ export const notificationSubscriptions = pgTable(
     city: text('city'),
     ipAddress: text('ip_address'),
     source: text('source'),
+    // Fan notification preferences for granular control
+    preferences: jsonb('preferences')
+      .$type<FanNotificationPreferences>()
+      .default({
+        releasePreview: true,
+        releaseDay: true,
+      }),
+    unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
