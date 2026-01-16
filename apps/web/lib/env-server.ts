@@ -16,6 +16,14 @@ const databaseUrlValidator = z.string().optional().refine(isDatabaseUrlValid, {
 });
 
 const ServerEnvSchema = z.object({
+  // Runtime environment
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .optional()
+    .default('development'),
+  VITEST: z.string().optional(),
+  VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
+
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
@@ -61,6 +69,11 @@ const ServerEnvSchema = z.object({
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
 
+  // Security keys
+  METADATA_HASH_KEY: z.string().optional(),
+  CONTACT_OBFUSCATION_KEY: z.string().optional(),
+  PII_ENCRYPTION_KEY: z.string().optional(),
+
   // HUD (internal kiosk display)
   HUD_KIOSK_TOKEN: z.string().optional(),
   HUD_STARTUP_NAME: z.string().optional(),
@@ -76,6 +89,9 @@ const ServerEnvSchema = z.object({
  * Single source of truth for server environment configuration.
  */
 const ENV_KEYS = [
+  'NODE_ENV',
+  'VITEST',
+  'VERCEL_ENV',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'CLOUDINARY_API_KEY',
@@ -99,6 +115,9 @@ const ENV_KEYS = [
   'STATSIG_SERVER_API_KEY',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
+  'METADATA_HASH_KEY',
+  'CONTACT_OBFUSCATION_KEY',
+  'PII_ENCRYPTION_KEY',
   'HUD_KIOSK_TOKEN',
   'HUD_STARTUP_NAME',
   'HUD_STARTUP_LOGO_URL',
@@ -364,4 +383,20 @@ export function validateAndLogEnvironment(
   }
 
   return validation;
+}
+
+/**
+ * Check if running in a secure environment (production or preview)
+ * Use this for security-sensitive decisions like cookie flags, encryption requirements, etc.
+ */
+export function isSecureEnv(): boolean {
+  const vercelEnv = env.VERCEL_ENV || env.NODE_ENV || 'development';
+  return vercelEnv === 'production' || vercelEnv === 'preview';
+}
+
+/**
+ * Check if running in a test environment
+ */
+export function isTestEnv(): boolean {
+  return env.NODE_ENV === 'test' || env.VITEST === 'true';
 }

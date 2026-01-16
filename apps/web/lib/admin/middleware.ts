@@ -1,7 +1,21 @@
 import 'server-only';
 import { auth } from '@clerk/nextjs/server';
+import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { isAdmin } from './roles';
+
+/**
+ * Mask user ID for logging to prevent PII exposure while maintaining correlation.
+ * Format: first 4 chars + hash suffix for audit trail correlation
+ */
+function maskUserIdForLog(userId: string): string {
+  const hash = crypto
+    .createHash('sha256')
+    .update(userId)
+    .digest('hex')
+    .substring(0, 8);
+  return `${userId.substring(0, 4)}...${hash}`;
+}
 
 /**
  * Admin route protection middleware
@@ -40,10 +54,13 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   // Check admin status
   const userIsAdmin = await isAdmin(userId);
 
+  // Mask user ID for logging to prevent PII exposure
+  const maskedUserId = maskUserIdForLog(userId);
+
   if (!userIsAdmin) {
-    // Log unauthorized access attempt
+    // Log unauthorized access attempt with masked ID
     console.warn(
-      `[admin/middleware] Forbidden admin access attempt by user: ${userId}`
+      `[admin/middleware] Forbidden admin access attempt by user: ${maskedUserId}`
     );
 
     return NextResponse.json(
@@ -52,8 +69,10 @@ export async function requireAdmin(): Promise<NextResponse | null> {
     );
   }
 
-  // Log successful admin access (for audit trail)
-  console.log(`[admin/middleware] Admin access granted to user: ${userId}`);
+  // Log successful admin access with masked ID (for audit trail)
+  console.log(
+    `[admin/middleware] Admin access granted to user: ${maskedUserId}`
+  );
 
   // Authorization successful
   return null;

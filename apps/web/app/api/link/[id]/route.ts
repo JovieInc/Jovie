@@ -2,15 +2,8 @@
  * Signed URL API Route (/api/link/[id])
  * Generates time-limited signed URLs for sensitive links with bot protection
  *
- * Rate Limiting Status: IMPLEMENTED BUT DISABLED
- * This endpoint calls checkRateLimit() which is currently globally disabled in lib/utils/bot-detection.ts.
- * Following YC principle: "do things that don't scale until you have to"
- *
- * Rate limiting will be enabled when:
- * - Signed link requests exceed ~5k/day
- * - Abuse patterns detected (same IP hammering links)
- *
- * Current Protection:
+ * Security Measures:
+ * - Rate limiting via apiLimiter (IP-based)
  * - Bot detection (aggressive for API endpoints)
  * - Time-limited tokens (60 second TTL)
  * - Timestamp verification (5 minute window)
@@ -23,16 +16,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signedLinkAccess } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import {
   getWrappedLink,
   incrementClickCount,
 } from '@/lib/services/link-wrapping';
 import {
-  checkRateLimit,
   createBotResponse,
   detectBot,
   logBotDetection,
 } from '@/lib/utils/bot-detection';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { generateSignedToken } from '@/lib/utils/url-encryption.server';
 
 const SECURITY_HEADERS = {
@@ -53,10 +47,8 @@ export async function POST(
 ) {
   const { id } = await params;
   const shortId = id;
-  const ip =
-    request.headers.get('x-forwarded-for') ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
+  // Use secure IP extraction with proper priority
+  const ip = extractClientIP(request.headers);
 
   if (!shortId || shortId.length > 20) {
     return NextResponse.json(
@@ -83,12 +75,18 @@ export async function POST(
       return createBotResponse(204);
     }
 
-    // Rate limiting for API endpoints
-    const isRateLimited = await checkRateLimit(ip, '/api/link'); // 10 requests per 5 minutes
-    if (isRateLimited) {
+    // Rate limiting for API endpoints (enabled)
+    const rateLimitResult = await apiLimiter.limit(ip);
+    if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
-        { status: 429, headers: SECURITY_HEADERS }
+        {
+          status: 429,
+          headers: {
+            ...SECURITY_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 

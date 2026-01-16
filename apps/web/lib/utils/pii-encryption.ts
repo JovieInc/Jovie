@@ -48,8 +48,18 @@ export function isPIIEncryptionEnabled(): boolean {
 }
 
 /**
+ * Check if running in a test environment
+ */
+function isTestEnvironment(): boolean {
+  return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+}
+
+/**
  * Encrypts a PII value using AES-256-GCM
  * Returns null if the value is null/undefined
+ *
+ * SECURITY: In production/preview, throws if encryption key is not configured.
+ * In development/test, returns value unencrypted with a warning.
  */
 export function encryptPII(value: string | null | undefined): string | null {
   if (value === null || value === undefined || value === '') {
@@ -57,13 +67,26 @@ export function encryptPII(value: string | null | undefined): string | null {
   }
 
   if (!isPIIEncryptionEnabled()) {
-    // In development without key, return value as-is with warning
-    if (process.env.NODE_ENV === 'development') {
+    const vercelEnv =
+      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+
+    // Fail-fast in production and preview environments
+    if (vercelEnv === 'production' || vercelEnv === 'preview') {
+      throw new Error(
+        '[PII Encryption] PII_ENCRYPTION_KEY must be set in production/preview environments. ' +
+          'Generate a key with: openssl rand -base64 32'
+      );
+    }
+
+    // In development/test without key, return value as-is with warning
+    if (process.env.NODE_ENV === 'development' || isTestEnvironment()) {
       console.warn(
-        '[PII Encryption] PII_ENCRYPTION_KEY not set - storing value unencrypted'
+        '[PII Encryption] WARNING: PII_ENCRYPTION_KEY not set - storing value unencrypted. ' +
+          'This is only acceptable in development.'
       );
       return value;
     }
+
     throw new Error('PII encryption key not configured');
   }
 
@@ -88,6 +111,8 @@ export function encryptPII(value: string | null | undefined): string | null {
 /**
  * Decrypts a PII value encrypted with encryptPII
  * Returns null if the value is null/undefined
+ *
+ * SECURITY: Logs warnings for legacy unencrypted data to aid migration tracking.
  */
 export function decryptPII(
   encryptedValue: string | null | undefined
@@ -101,8 +126,18 @@ export function decryptPII(
   }
 
   if (!isPIIEncryptionEnabled()) {
+    const vercelEnv =
+      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+
+    // Fail-fast in production and preview environments
+    if (vercelEnv === 'production' || vercelEnv === 'preview') {
+      throw new Error(
+        '[PII Encryption] PII_ENCRYPTION_KEY must be set in production/preview environments'
+      );
+    }
+
     // In development without key, return value as-is
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || isTestEnvironment()) {
       return encryptedValue;
     }
     throw new Error('PII encryption key not configured');
@@ -110,14 +145,23 @@ export function decryptPII(
 
   // Check if value is encrypted (contains our separator pattern)
   if (!encryptedValue.includes(':')) {
-    // Value is not encrypted (legacy data), return as-is
+    // Value is not encrypted (legacy data) - log warning for migration tracking
+    console.warn(
+      '[PII Encryption] Detected legacy unencrypted PII data. ' +
+        'This data should be migrated to encrypted format. ' +
+        `Data length: ${encryptedValue.length} chars`
+    );
     return encryptedValue;
   }
 
   try {
     const parts = encryptedValue.split(':');
     if (parts.length !== 3) {
-      // Not our encryption format, return as-is (legacy data)
+      // Not our encryption format - log warning for migration tracking
+      console.warn(
+        '[PII Encryption] Detected data with unexpected format (not iv:authTag:ciphertext). ' +
+          'This may be legacy data that needs migration.'
+      );
       return encryptedValue;
     }
 
@@ -134,7 +178,12 @@ export function decryptPII(
 
     return decrypted;
   } catch (error) {
-    console.error('[PII Encryption] Failed to decrypt:', error);
+    // Log detailed error for debugging and security monitoring
+    console.error('[PII Encryption] Decryption failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      dataLength: encryptedValue.length,
+      hasExpectedFormat: encryptedValue.split(':').length === 3,
+    });
     // Return null on decryption failure to prevent exposing corrupt data
     return null;
   }

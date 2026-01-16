@@ -8,7 +8,12 @@ import {
   socialLinks,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  createRateLimitHeaders,
+  trackingIpClicksLimiter,
+} from '@/lib/rate-limit';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeString } from '@/lib/utils/string-utils';
@@ -20,22 +25,10 @@ import {
   trimHistory,
 } from '../audience/lib/audience-utils';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
-
-/**
- * Rate Limiting Status: NOT IMPLEMENTED
- * Following YC principle: "do things that don't scale until you have to"
- * Will add rate limiting when:
- * - Track events exceed ~50k/day
- * - Abuse/spam becomes measurable problem
- *
- * For now: basic input validation prevents most abuse
- */
 
 // Valid link types enum for validation
 const VALID_LINK_TYPES = ['listen', 'social', 'tip', 'other'] as const;
@@ -84,6 +77,23 @@ const ACTION_LABELS: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: Check IP-based rate limit for track events
+    const ipAddress = extractClientIP(request.headers);
+    const rateLimitResult = await trackingIpClicksLimiter.limit(ipAddress);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many tracking requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const {
       handle,
@@ -163,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
-    const ipAddress = extractClientIP(request.headers);
+    // ipAddress already extracted above for rate limiting
     const referrer = request.headers.get('referer') ?? undefined;
     const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
     const geoCountry =
