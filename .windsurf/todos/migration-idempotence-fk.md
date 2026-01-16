@@ -1,4 +1,0 @@
-- [ ] Guard foreign key creation on audience_members -> creator_profiles (skip if constraint exists).
-- [ ] Scan remaining ALTER TABLE/constraints in 0006 for similar guards.
-- [ ] Re-run drizzle:migrate on dev DB (empty allowed).
-- [ ] Decide long-term: keep edited migration or create forward idempotent migration to avoid touching history.

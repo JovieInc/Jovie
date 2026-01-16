@@ -7,6 +7,7 @@ export const CONTAINER_SIZES: Record<ContainerSize, string> = {
   lg: 'max-w-6xl',
   xl: 'max-w-7xl',
   full: 'max-w-none',
+  homepage: 'max-w-[1100px]',
 };
 
 export function getVariantConfigs(

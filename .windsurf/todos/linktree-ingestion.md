@@ -1,7 +1,0 @@
-- [x] Make migration idempotent (0006) and rerun migrations.
-- [ ] Investigate Linktree ingestion failing for https://linktr.ee/selenagomez.
-  - [x] Capture API response/status for /api/admin/creator-ingest.
-  - [ ] Check logs for “Admin ingestion failed” or fetch/duplicate errors.
-  - [ ] Verify DB state for creator_profiles/handle conflicts and missing columns/defaults.
-  - [ ] Propose fix based on error (URL validation, fetch failure, duplicate, merge error).
-  - [ ] Retest ingestion after fixes.
