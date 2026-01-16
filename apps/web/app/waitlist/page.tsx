@@ -24,7 +24,7 @@ import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
 
 export default function WaitlistPage() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedPlan = useMemo(() => {
@@ -78,6 +78,13 @@ export default function WaitlistPage() {
   // Load all persisted form state on mount
   useEffect(() => {
     try {
+      const storedSubmitted = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.submitted
+      );
+      if (storedSubmitted === 'true') {
+        setIsSubmitted(true);
+      }
+
       const storedStep = window.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.step
       );
@@ -222,6 +229,20 @@ export default function WaitlistPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    try {
+      const storedUserId = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.userId
+      );
+      if (storedUserId && storedUserId !== userId) {
+        clearWaitlistStorage();
+        setIsSubmitted(false);
+      }
+      if (userId) {
+        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, userId);
+      }
+    } catch {
+      // Ignore storage errors
+    }
     void (async () => {
       try {
         const response = await fetch('/api/waitlist', {
@@ -249,8 +270,20 @@ export default function WaitlistPage() {
             return;
           }
           clearWaitlistStorage();
+          try {
+            window.sessionStorage.setItem(
+              WAITLIST_STORAGE_KEYS.submitted,
+              'true'
+            );
+          } catch {
+            // Ignore storage errors
+          }
           setIsSubmitted(true);
+          return;
         }
+
+        clearWaitlistStorage();
+        setIsSubmitted(false);
       } catch {
         // Ignore fetch errors; page can still be used.
       }
@@ -436,6 +469,11 @@ export default function WaitlistPage() {
       }
 
       clearWaitlistStorage();
+      try {
+        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
+      } catch {
+        // Ignore storage errors
+      }
       setIsSubmitted(true);
     } catch (err) {
       console.error('Waitlist signup error:', err);
