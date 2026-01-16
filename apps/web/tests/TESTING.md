@@ -11,6 +11,7 @@
 ## Running Tests
 
 ### Unit Tests (Vitest)
+
 ```bash
 # Fast (local development)
 pnpm test
@@ -23,6 +24,7 @@ pnpm test:watch
 ```
 
 ### E2E Tests (Playwright)
+
 ```bash
 # Full E2E suite
 pnpm test:e2e
@@ -64,6 +66,7 @@ These run on main branch and PRs with `testing` label:
 ## Adding New Tests
 
 ### When to add to smoke
+
 Add to smoke **only if**:
 - Tests a critical user path (auth, homepage, core features)
 - Runs in < 30 seconds
@@ -71,6 +74,7 @@ Add to smoke **only if**:
 - Failure would block a production deploy
 
 ### When to add to full suite
+
 Add to full suite for:
 - Feature detail tests
 - Visual regression
@@ -90,6 +94,7 @@ Add to full suite for:
 ## Tagging
 
 Use `@smoke` tag for smoke-critical tests:
+
 ```typescript
 test.describe('My Tests @smoke', () => {
   // These run in smoke suite
@@ -98,7 +103,7 @@ test.describe('My Tests @smoke', () => {
 
 ## CI Pipeline
 
-```
+```text
 PR created
     │
     ├── ci-fast (typecheck, lint) ─────────────────┐
@@ -122,16 +127,19 @@ PR created
 ## Troubleshooting
 
 ### Tests timing out
+
 - Check if test is doing too much (should be < 30s)
 - Verify network mocks are in place
 - Consider moving to full suite if test is slow
 
 ### Flaky tests
+
 - Add to `tests/quarantine.json` with owner and exit criteria
 - Auto-unquarantined after 5 consecutive passes
 - Run `pnpm test:flaky` to detect flaky tests
 
 ### Smoke suite too slow
+
 - Target: < 10 min
 - If over budget, move tests to full suite
 - Consolidate redundant tests

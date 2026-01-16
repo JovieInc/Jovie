@@ -31,6 +31,11 @@ const describeErrorHandling = isMarketingBaseUrl
   ? test.describe.skip
   : test.describe;
 
+const MIN_CONTENT_LENGTH = {
+  homepage: 100,
+  criticalPage: 50,
+} as const;
+
 /**
  * Public Smoke Tests - No Authentication Required
  *
@@ -86,8 +91,8 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
       // Verify body has content (not blank page)
       const bodyContent = await page.locator('body').textContent();
       expect(
-        bodyContent && bodyContent.length > 100,
-        'Homepage body is empty or too short'
+        bodyContent && bodyContent.length > MIN_CONTENT_LENGTH.homepage,
+        `Homepage body content length is < MIN_CONTENT_LENGTH.homepage (${MIN_CONTENT_LENGTH.homepage})`
       ).toBe(true);
 
       // Verify main heading exists
@@ -278,8 +283,8 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
 
         const bodyContent = await page.locator('body').textContent();
         expect(
-          bodyContent && bodyContent.length > 50,
-          `Route ${route} should have meaningful content`
+          bodyContent && bodyContent.length > MIN_CONTENT_LENGTH.criticalPage,
+          `Route ${route} content length is < MIN_CONTENT_LENGTH.criticalPage (${MIN_CONTENT_LENGTH.criticalPage})`
         ).toBe(true);
       }
 

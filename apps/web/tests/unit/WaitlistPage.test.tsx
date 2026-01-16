@@ -58,8 +58,8 @@ vi.mock('@/components/waitlist/WaitlistSuccessView', () => ({
   WaitlistSuccessView: () => <div>Waitlist success</div>,
 }));
 
-import WaitlistPage from '@/app/waitlist/page';
 import { WAITLIST_STORAGE_KEYS } from '@/components/waitlist/types';
+import WaitlistPage from '../../app/waitlist/page';
 
 global.fetch = mockFetch as unknown as typeof fetch;
 

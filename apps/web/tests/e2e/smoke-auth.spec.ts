@@ -91,22 +91,25 @@ test.describe('Auth Smoke Tests @smoke', () => {
         const url = page.url();
         const isAuthPage = url.includes('/signin') || url.includes('/sign-in');
         const status = res?.status() ?? 0;
+        const isUnauthorized = status === 401 || status === 403;
 
-        // Either redirected to auth or got a valid response (no 5xx)
+        // Either redirected to auth or got an explicit unauthorized response.
         expect(
-          isAuthPage || status < 500,
-          `${route}: Should redirect to auth or respond without error`
+          isAuthPage || isUnauthorized,
+          `${route}: Should redirect to auth or return 401/403`
         ).toBe(true);
 
-        // If redirected to signin, verify it loaded
+        // If redirected to sign-in, verify it loaded; otherwise assert 401/403 explicitly.
         if (isAuthPage) {
-          await expect(page).toHaveURL(/\/signin/, {
+          await expect(page).toHaveURL(/\/sign-?in/, {
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
           expect(
             res?.ok(),
             `${route}: Sign-in page should respond OK`
           ).toBeTruthy();
+        } else {
+          expect([401, 403]).toContain(status);
         }
       }
 
