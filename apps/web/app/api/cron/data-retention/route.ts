@@ -11,6 +11,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
+import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -20,7 +21,7 @@ export const maxDuration = 300; // 5 minutes max for cleanup
  * Timing-safe comparison of cron secret to prevent timing attacks
  */
 function verifyCronSecret(provided: string | undefined): boolean {
-  const expected = process.env.CRON_SECRET;
+  const expected = env.CRON_SECRET;
   if (!expected || !provided) {
     return false;
   }
@@ -58,7 +59,7 @@ function verifyOrigin(request: NextRequest): boolean {
   }
 
   // In development, allow localhost
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     return true;
   }
 
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = authHeader?.replace('Bearer ', '');
 
-  if (!process.env.CRON_SECRET) {
+  if (!env.CRON_SECRET) {
     logger.error('[Data Retention Cron] CRON_SECRET not configured');
     return NextResponse.json({ error: 'Cron not configured' }, { status: 500 });
   }

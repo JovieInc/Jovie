@@ -381,10 +381,17 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const entitlements = await getCurrentUserEntitlements();
-    if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
+    if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 

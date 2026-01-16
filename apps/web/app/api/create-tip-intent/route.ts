@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { env } from '@/lib/env-server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
@@ -46,8 +47,6 @@ function amountToCents(amount: number): number {
   return Math.max(100, Math.min(50000, cents));
 }
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
 export async function POST(req: NextRequest) {
   try {
     // Require authentication for payment intents
@@ -74,7 +73,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!process.env.STRIPE_SECRET_KEY) {
+    if (!env.STRIPE_SECRET_KEY) {
       return NextResponse.json(
         { error: 'Stripe not configured' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -108,7 +107,7 @@ export async function POST(req: NextRequest) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
     // Convert to cents with overflow protection
     const amountInCents = amountToCents(amount);

@@ -8,6 +8,7 @@ import {
   socialLinks,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   createRateLimitHeaders,
@@ -23,8 +24,6 @@ import {
   getActionWeight,
   trimHistory,
 } from '../audience/lib/audience-utils';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
