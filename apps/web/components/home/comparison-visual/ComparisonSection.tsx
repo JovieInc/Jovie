@@ -1,25 +1,91 @@
+'use client';
+
+import { motion } from 'framer-motion';
+import { TrendingUp } from 'lucide-react';
 import { Container } from '@/components/site/Container';
 import { ComparisonCanvas } from './ComparisonCanvas';
 
 export function ComparisonSection() {
   return (
     <section
-      className='section-spacing-linear bg-base border-t border-subtle'
+      className='section-spacing-linear bg-base border-t border-subtle overflow-hidden'
       aria-label='Comparison: Wall of Links versus Jovie Profile'
     >
       <Container size='homepage'>
-        {/* Heading - above mockups */}
-        <div className='max-w-3xl mx-auto text-center mb-12'>
-          <h2 className='marketing-h2-linear text-primary-token mb-6'>
+        {/* Header */}
+        <div className='max-w-3xl mx-auto text-center mb-16'>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className='marketing-h2-linear text-primary-token mb-4'
+          >
             One action. The right one.
-          </h2>
-          <p className='marketing-lead-linear text-tertiary-token max-w-2xl mx-auto'>
-            Most link-in-bio traffic bounces. Jovie converts it.
-          </p>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className='marketing-lead-linear text-tertiary-token'
+          >
+            Stop losing visitors to decision fatigue
+          </motion.p>
         </div>
 
-        {/* Visual comparison */}
-        <ComparisonCanvas />
+        {/* Two-column comparison grid */}
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 max-w-5xl mx-auto'>
+          {/* Left - Traditional */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className='relative'
+          >
+            <ComparisonCanvas side='left' />
+
+            {/* Labels below */}
+            <div className='mt-8'>
+              <h3 className='text-lg font-semibold text-primary-token mb-1'>
+                Traditional Link Pages
+              </h3>
+              <p className='text-sm text-tertiary-token'>
+                Too many choices cause decision fatigue
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Right - Jovie */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className='relative'
+          >
+            <ComparisonCanvas side='right' />
+
+            {/* Labels below */}
+            <div className='mt-8'>
+              <div className='flex items-center gap-2 mb-3'>
+                <div className='inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-success-subtle border border-success/20'>
+                  <TrendingUp className='w-4 h-4 text-success' />
+                  <span className='text-sm font-medium text-success'>
+                    2–5× higher conversion
+                  </span>
+                </div>
+              </div>
+              <h3 className='text-lg font-semibold text-primary-token mb-1'>
+                Jovie Profile
+              </h3>
+              <p className='text-sm text-tertiary-token'>
+                Single-CTA pages outperform multi-link pages
+              </p>
+            </div>
+          </motion.div>
+        </div>
       </Container>
     </section>
   );
