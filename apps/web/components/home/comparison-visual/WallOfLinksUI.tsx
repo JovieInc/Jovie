@@ -17,7 +17,7 @@ export function WallOfLinksUI() {
         {/* Profile info */}
         <div className='mb-6'>
           <div className='flex flex-col items-center gap-3'>
-            <div className='w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500' />
+            <div className='w-16 h-16 rounded-full bg-linear-to-br from-blue-500 to-cyan-500' />
             <div className='text-sm font-medium text-secondary-token'>
               @artist
             </div>

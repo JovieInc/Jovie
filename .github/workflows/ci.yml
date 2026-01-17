@@ -674,7 +674,8 @@ jobs:
             # Run only critical test files - filter by filename pattern
             pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
             # Plus tests for files changed since preview (if preview branch exists)
-            if git rev-parse --verify origin/preview >/dev/null 2>&1; then
+            # Must fetch origin/preview first since checkout only fetches current ref
+            if git fetch origin preview --depth=1 2>/dev/null; then
               pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }}
             else
               echo "⚠️ origin/preview not found, skipping --changed tests"

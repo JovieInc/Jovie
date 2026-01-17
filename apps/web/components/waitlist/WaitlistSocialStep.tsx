@@ -70,6 +70,7 @@ export function WaitlistSocialStep({
         className='flex items-center justify-center gap-2'
         role='radiogroup'
         aria-label='Social platform'
+        tabIndex={0}
         onKeyDown={onPlatformKeyDown}
       >
         {SOCIAL_PLATFORM_OPTIONS.map((option, index) => (

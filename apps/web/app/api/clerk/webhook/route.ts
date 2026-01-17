@@ -43,7 +43,7 @@ function generateUsernameFromName(firstName: string | null): string {
   if (!firstName) return '';
 
   // Convert to lowercase and remove special characters
-  const cleaned = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleaned = firstName.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 
   // Ensure minimum length of 3 characters
   if (cleaned.length < 3) {
@@ -56,7 +56,7 @@ function generateUsernameFromName(firstName: string | null): string {
 
 function generateUsernameFromEmail(email: string): string {
   const localPart = email.split('@')[0];
-  const cleaned = localPart.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleaned = localPart.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 
   if (cleaned.length < 3) {
     return 'user' + generateRandomSuffix(3);

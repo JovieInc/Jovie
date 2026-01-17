@@ -65,10 +65,10 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
 
       // Track click (non-blocking)
       try {
-        track('listen_button_click', {
+        track('listen_click', {
           handle,
           linkType: 'listen',
-          target: dsp.key,
+          platform: dsp.key,
         });
       } catch (error) {
         console.error('[StaticListenInterface] Failed to track click:', error);

@@ -90,7 +90,7 @@ export function JovieProfileUI() {
         {/* Profile info */}
         <div className='mb-6'>
           <div className='flex flex-col items-center gap-3'>
-            <div className='w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500' />
+            <div className='w-16 h-16 rounded-full bg-linear-to-br from-purple-500 to-pink-500' />
             <div className='text-sm font-medium text-secondary-token'>
               @artist
             </div>

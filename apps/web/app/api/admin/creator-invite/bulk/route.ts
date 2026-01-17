@@ -400,8 +400,10 @@ export async function GET(request: Request) {
     const rawThreshold = searchParams.get('threshold');
     const rawLimit = searchParams.get('limit');
 
-    const parsedThreshold = rawThreshold ? parseInt(rawThreshold, 10) : 50;
-    const parsedLimit = rawLimit ? parseInt(rawLimit, 10) : 50;
+    const parsedThreshold = rawThreshold
+      ? Number.parseInt(rawThreshold, 10)
+      : 50;
+    const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
 
     // Validate parsed values are finite numbers within expected range
     const fitScoreThreshold =
