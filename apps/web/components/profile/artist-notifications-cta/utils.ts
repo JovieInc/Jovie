@@ -7,7 +7,7 @@ export function formatPhoneDigitsForDisplay(
   digits: string,
   dialCode: string
 ): string {
-  const normalized = digits.replace(/\D/g, '');
+  const normalized = digits.replaceAll(/\D/g, '');
   if (!normalized) return '';
 
   if (dialCode === '+1') {
@@ -31,8 +31,8 @@ export function formatPhoneDigitsForDisplay(
  * Builds an E.164 formatted phone number from national digits and dial code.
  */
 export function buildPhoneE164(phoneInput: string, dialCode: string): string {
-  const digitsOnly = phoneInput.replace(/[^\d]/g, '');
-  const dialDigits = dialCode.replace(/[^\d]/g, '');
+  const digitsOnly = phoneInput.replaceAll(/[^\d]/g, '');
+  const dialDigits = dialCode.replaceAll(/[^\d]/g, '');
   return `+${dialDigits}${digitsOnly}`;
 }
 
@@ -41,6 +41,6 @@ export function buildPhoneE164(phoneInput: string, dialCode: string): string {
  * E.164 allows max 15 digits total including country code.
  */
 export function getMaxNationalDigits(dialCode: string): number {
-  const dialDigits = dialCode.replace(/[^\d]/g, '');
+  const dialDigits = dialCode.replaceAll(/[^\d]/g, '');
   return Math.max(0, 15 - dialDigits.length);
 }

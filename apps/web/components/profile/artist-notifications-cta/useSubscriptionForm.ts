@@ -92,7 +92,7 @@ export function useSubscriptionForm({
 
   const handlePhoneChange = useCallback(
     (value: string) => {
-      const digitsOnly = value.replace(/[^\d]/g, '');
+      const digitsOnly = value.replaceAll(/[^\d]/g, '');
       const maxNationalDigits = getMaxNationalDigits(country.dialCode);
       setPhoneInput(digitsOnly.slice(0, maxNationalDigits));
       if (error) setError(null);
@@ -110,7 +110,7 @@ export function useSubscriptionForm({
 
   const validateCurrent = useCallback((): boolean => {
     if (channel === 'sms') {
-      const digitsOnly = phoneInput.replace(/[^\d]/g, '');
+      const digitsOnly = phoneInput.replaceAll(/[^\d]/g, '');
 
       if (!digitsOnly) {
         setError('Phone number is required');

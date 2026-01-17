@@ -61,6 +61,7 @@ export function WaitlistPrimaryGoalStep({
         className='grid grid-cols-1 gap-2'
         role='radiogroup'
         aria-label='Primary goal'
+        tabIndex={0}
         aria-describedby={
           fieldErrors.primaryGoal
             ? 'waitlist-primary-goal-hint waitlist-primary-goal-error'

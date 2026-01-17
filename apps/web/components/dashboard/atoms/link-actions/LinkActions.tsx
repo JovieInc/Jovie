@@ -77,6 +77,7 @@ export const LinkActions = memo(function LinkActions({
             id={menuId}
             role='menu'
             aria-label='Link actions menu'
+            tabIndex={-1}
             className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-sm shadow-lg focus-visible:outline-none'
             onKeyDown={handleKeyDown}
           >

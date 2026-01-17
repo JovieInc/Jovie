@@ -102,7 +102,7 @@ export async function GET(request: Request) {
     const transformedMatches = matches.map(match => ({
       ...match,
       confidenceScore: match.confidenceScore
-        ? parseFloat(match.confidenceScore)
+        ? Number.parseFloat(match.confidenceScore)
         : null,
     }));
 

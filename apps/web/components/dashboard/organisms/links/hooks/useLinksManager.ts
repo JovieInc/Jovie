@@ -384,12 +384,10 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       setAddingLink(null);
 
       // Non-blocking: enable tipping if Venmo was added
-      try {
-        if ((enriched as DetectedLink).platform.id === 'venmo') {
-          void fetch('/api/dashboard/tipping/enable', { method: 'POST' });
-        }
-      } catch {
-        // non-blocking
+      if ((enriched as DetectedLink).platform.id === 'venmo') {
+        fetch('/api/dashboard/tipping/enable', { method: 'POST' }).catch(() => {
+          // Non-blocking: ignore errors
+        });
       }
     },
     [links, linkIsVisible, idFor, onLinkAdded]
