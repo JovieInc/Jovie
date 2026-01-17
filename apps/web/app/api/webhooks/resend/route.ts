@@ -92,6 +92,15 @@ function verifySignature(
   secret: string
 ): boolean {
   try {
+    // Validate timestamp freshness (5-minute window per Svix guidelines)
+    const timestampMs = Number(timestamp) * 1000;
+    if (
+      Number.isNaN(timestampMs) ||
+      Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000
+    ) {
+      return false;
+    }
+
     // SVix signature format: v1,<base64-signature>
     const signatures = signature.split(' ');
     const signedContent = `${timestamp}.${payload}`;
@@ -200,10 +209,12 @@ async function processBounceOrComplaint(
     });
 
     if (!result.success) {
-      logger.error(`[Resend Webhook] Failed to add suppression for ${email}`, {
+      const emailMasked = `${email.slice(0, 3)}***@***`;
+      logger.error(`[Resend Webhook] Failed to add suppression`, {
         error: result.error,
         eventId,
         reason,
+        emailMasked,
       });
     } else if (!result.alreadyExists) {
       logger.info(`[Resend Webhook] Added suppression`, {
@@ -295,9 +306,23 @@ export async function POST(request: NextRequest) {
     const event = JSON.parse(body) as ResendWebhookPayload;
     const eventId = svixId;
 
-    // Check for duplicate event (idempotency)
+    // Atomic insert with conflict handling (prevents TOCTOU race condition)
+    await db
+      .insert(webhookEvents)
+      .values({
+        provider: 'resend',
+        eventType: event.type,
+        eventId,
+        payload: event as unknown as Record<string, unknown>,
+        processed: false,
+      })
+      .onConflictDoNothing({
+        target: [webhookEvents.provider, webhookEvents.eventId],
+      });
+
+    // Check if already processed (after atomic insert ensures row exists)
     const [existingEvent] = await db
-      .select({ id: webhookEvents.id, processed: webhookEvents.processed })
+      .select({ processed: webhookEvents.processed })
       .from(webhookEvents)
       .where(eq(webhookEvents.eventId, eventId))
       .limit(1);
@@ -308,17 +333,6 @@ export async function POST(request: NextRequest) {
         { received: true, status: 'already_processed' },
         { headers: NO_STORE_HEADERS }
       );
-    }
-
-    // Store the raw event
-    if (!existingEvent) {
-      await db.insert(webhookEvents).values({
-        provider: 'resend',
-        eventType: event.type,
-        eventId,
-        payload: event as unknown as Record<string, unknown>,
-        processed: false,
-      });
     }
 
     // Process based on event type

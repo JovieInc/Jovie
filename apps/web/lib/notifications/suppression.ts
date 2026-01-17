@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { and, eq, gt, isNull, lt, or } from 'drizzle-orm';
+import { and, count, eq, gt, isNotNull, isNull, lt, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -9,18 +9,14 @@ import {
   notificationDeliveryLog,
   type SuppressionMetadata,
 } from '@/lib/db/schema';
+import { suppressionReasonEnum } from '@/lib/db/schema/enums';
+import { logger } from '@/lib/utils/logger';
 
 /**
- * Suppression reason types
+ * Suppression reason types - derived from canonical enum to prevent drift
  */
 export type SuppressionReason =
-  | 'hard_bounce'
-  | 'soft_bounce'
-  | 'spam_complaint'
-  | 'invalid_address'
-  | 'user_request'
-  | 'abuse'
-  | 'legal';
+  (typeof suppressionReasonEnum.enumValues)[number];
 
 /**
  * Result of a suppression check
@@ -226,22 +222,40 @@ export async function logDelivery(params: {
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   // Compute recipient hash from email or phone
-  let recipientHash = 'unknown';
+  let recipientHash: string;
   if (params.recipientEmail) {
     recipientHash = hashEmail(params.recipientEmail);
   } else if (params.recipientPhone) {
     recipientHash = hashEmail(params.recipientPhone);
+  } else {
+    // No recipient identifier provided - log warning and use placeholder
+    logger.warn('[logDelivery] No recipient email or phone provided', {
+      channel: params.channel,
+      status: params.status,
+      notificationSubscriptionId: params.notificationSubscriptionId,
+    });
+    recipientHash = 'unknown';
   }
 
-  await db.insert(notificationDeliveryLog).values({
-    notificationSubscriptionId: params.notificationSubscriptionId,
-    channel: params.channel,
-    recipientHash,
-    status: params.status,
-    providerMessageId: params.providerMessageId,
-    errorMessage: params.errorMessage,
-    metadata: params.metadata ?? {},
-  });
+  try {
+    await db.insert(notificationDeliveryLog).values({
+      notificationSubscriptionId: params.notificationSubscriptionId,
+      channel: params.channel,
+      recipientHash,
+      status: params.status,
+      providerMessageId: params.providerMessageId,
+      errorMessage: params.errorMessage,
+      metadata: params.metadata ?? {},
+    });
+  } catch (error) {
+    // Log but don't throw - delivery logging is best-effort
+    logger.error('[logDelivery] Failed to insert delivery log', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      channel: params.channel,
+      status: params.status,
+      recipientHash,
+    });
+  }
 }
 
 /**
@@ -252,12 +266,16 @@ export async function logDelivery(params: {
 export async function getSuppressionStats(): Promise<
   Record<SuppressionReason, number>
 > {
+  // Use SQL aggregation instead of fetching all rows
   const results = await db
     .select({
       reason: emailSuppressions.reason,
+      count: count(),
     })
-    .from(emailSuppressions);
+    .from(emailSuppressions)
+    .groupBy(emailSuppressions.reason);
 
+  // Initialize counts with zeros for all valid reasons
   const counts: Record<SuppressionReason, number> = {
     hard_bounce: 0,
     soft_bounce: 0,
@@ -268,9 +286,10 @@ export async function getSuppressionStats(): Promise<
     legal: 0,
   };
 
+  // Map SQL results to counts object
   for (const row of results) {
     if (row.reason in counts) {
-      counts[row.reason as SuppressionReason]++;
+      counts[row.reason as SuppressionReason] = Number(row.count);
     }
   }
 
@@ -291,7 +310,8 @@ export async function cleanupExpiredSuppressions(): Promise<number> {
     .where(
       and(
         eq(emailSuppressions.reason, 'soft_bounce'),
-        lt(emailSuppressions.expiresAt!, now)
+        isNotNull(emailSuppressions.expiresAt),
+        lt(emailSuppressions.expiresAt, now)
       )
     )
     .returning({ id: emailSuppressions.id });

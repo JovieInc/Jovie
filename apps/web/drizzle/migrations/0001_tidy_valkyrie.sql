@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS "webhook_events" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-DROP INDEX IF EXISTS "audience_members_creator_profile_id_fingerprint_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "audience_members_creator_profile_id_fingerprint_unique";--> statement-breakpoint
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS "notification_delivery_log_subscription_idx" ON "noti
 CREATE INDEX IF NOT EXISTS "unsubscribe_tokens_token_hash_idx" ON "unsubscribe_tokens" USING btree ("token_hash");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "unsubscribe_tokens_expires_at_idx" ON "unsubscribe_tokens" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_events_provider_event_id_unique" ON "webhook_events" USING btree ("provider","event_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "webhook_events_unprocessed_idx" ON "webhook_events" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "webhook_events_unprocessed_idx" ON "webhook_events" USING btree ("created_at") WHERE NOT processed;--> statement-breakpoint
 DO $$
 BEGIN
   IF NOT EXISTS (
