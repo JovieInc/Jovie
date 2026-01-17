@@ -481,7 +481,6 @@ export function ReleasesEmptyState({
                     className='max-h-64 overflow-y-auto'
                   >
                     {results.map((artist, index) => (
-                      // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys
                       <li
                         key={artist.id}
                         id={`artist-result-${index}`}
@@ -496,6 +495,12 @@ export function ReleasesEmptyState({
                             : 'hover:bg-surface-2/50'
                         )}
                         onClick={() => handleArtistSelect(artist)}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            handleArtistSelect(artist);
+                          }
+                        }}
                         onMouseEnter={() =>
                           dispatch({
                             type: 'SET_ACTIVE_RESULT_INDEX',

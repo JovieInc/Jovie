@@ -38,6 +38,7 @@ const ServerEnvSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
+  RESEND_WEBHOOK_SECRET: z.string().optional(),
 
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
@@ -101,6 +102,7 @@ const ENV_KEYS = [
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
+  'RESEND_WEBHOOK_SECRET',
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
