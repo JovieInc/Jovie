@@ -674,7 +674,8 @@ jobs:
             # Always run critical tests on deploy path
             pnpm --filter=@jovie/web run test -- --testNamePattern="@critical" ${{ steps.quarantine.outputs.unit_excludes }}
             # Plus tests for files changed since preview (if preview branch exists)
-            if git rev-parse --verify origin/preview >/dev/null 2>&1; then
+            # Must fetch origin/preview first since checkout only fetches current ref
+            if git fetch origin preview --depth=1 2>/dev/null; then
               pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }}
             else
               echo "⚠️ origin/preview not found, skipping --changed tests"
