@@ -301,65 +301,15 @@ async function runMigrations() {
     const hasSchema = Boolean(schemaExistsResult.rows[0]?.has_schema);
     if (!hasSchema) return null;
 
+    // Probes detect schema artifacts to determine which migrations have been applied
+    // when the migration history table is missing. Sorted by idx descending so we
+    // return the highest applied migration index.
     const probes: Probe[] = [
       {
-        tag: '0029_auth_hardening',
-        idx: idxFor('0029_auth_hardening'),
+        tag: '0000_wandering_callisto',
+        idx: idxFor('0000_wandering_callisto'),
         existsQuery:
-          "SELECT (to_regclass('public.admin_audit_log') IS NOT NULL) AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='status') AS ok",
-      },
-      {
-        tag: '0028_click_events_analytics_idx',
-        idx: idxFor('0028_click_events_analytics_idx'),
-        existsQuery:
-          "SELECT (to_regclass('public.click_events_creator_profile_id_is_bot_created_at_idx') IS NOT NULL) AS ok",
-      },
-      {
-        tag: '0027_social_links_creator_profile_state_idx',
-        idx: idxFor('0027_social_links_creator_profile_state_idx'),
-        existsQuery:
-          "SELECT (to_regclass('public.social_links_creator_profile_state_idx') IS NOT NULL) AS ok",
-      },
-      {
-        tag: '0026_billing_hardening',
-        idx: idxFor('0026_billing_hardening'),
-        existsQuery:
-          "SELECT (to_regclass('public.billing_audit_log') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='billing_version') AS ok",
-      },
-      {
-        tag: '0025_dashboard_links_hardening',
-        idx: idxFor('0025_dashboard_links_hardening'),
-        existsQuery:
-          "SELECT (to_regclass('public.dashboard_idempotency_keys') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='social_links' AND column_name='version') AS ok",
-      },
-      {
-        tag: '0001_add_deleted_at_to_users',
-        idx: idxFor('0001_add_deleted_at_to_users'),
-        existsQuery:
-          "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='deleted_at') AS ok",
-      },
-      {
-        tag: '0002_add_claim_and_ingestion_columns',
-        idx: idxFor('0002_add_claim_and_ingestion_columns'),
-        existsQuery:
-          "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='creator_profiles' AND column_name='claim_token_expires_at') OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ingestion_jobs' AND column_name='max_attempts') AS ok",
-      },
-      {
-        tag: '0003_add_waitlist_entries',
-        idx: idxFor('0003_add_waitlist_entries'),
-        existsQuery:
-          "SELECT (to_regclass('public.waitlist_entries') IS NOT NULL) AS ok",
-      },
-      {
-        tag: '0004_add_creator_contacts',
-        idx: idxFor('0004_add_creator_contacts'),
-        existsQuery:
-          "SELECT (to_regclass('public.creator_contacts') IS NOT NULL) AS ok",
-      },
-      {
-        tag: '0000_initial_schema',
-        idx: idxFor('0000_initial_schema'),
-        existsQuery: "SELECT (to_regclass('public.users') IS NOT NULL) AS ok",
+          "SELECT (to_regclass('public.users') IS NOT NULL AND to_regclass('public.creator_profiles') IS NOT NULL) AS ok",
       },
     ]
       .filter((probe): probe is Probe & { idx: number } => probe.idx !== null)
@@ -521,7 +471,7 @@ async function runMigrations() {
         'Alternative (dev only): mark the conflicting migration as applied in drizzle.__drizzle_migrations (no migration file edits).'
       );
       log.info(
-        'For the specific error in this run: users.is_admin already exists but migration 0017_medical_anita_blake is not recorded.'
+        'Hint: Check if the schema already contains the change being applied.'
       );
     }
 
