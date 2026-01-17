@@ -61,7 +61,7 @@ import type {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
-const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F]/g;
+const CONTROL_CHAR_REGEX = /[\x00-\x1F\x7F]/g;
 
 const getHeader = (headers: Headers | undefined, key: string) =>
   headers?.get(key) ?? null;
