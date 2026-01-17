@@ -105,7 +105,7 @@ export function HeroSection({
             <div className='relative group'>
               {/* Background glow effect */}
               {showBackgroundEffects && (
-                <div className='absolute -inset-2 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-cyan-500/10 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-300' />
+                <div className='absolute -inset-2 bg-linear-to-r from-blue-500/10 via-purple-500/10 to-cyan-500/10 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-300' />
               )}
 
               {/* Content card */}

@@ -40,7 +40,6 @@ export interface ProfileShellProps {
   showBackButton?: boolean;
   showFooter?: boolean;
   showNotificationButton?: boolean;
-  forceNotificationsEnabled?: boolean;
   maxWidthClass?: string;
   backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
   showGradientBlurs?: boolean;
