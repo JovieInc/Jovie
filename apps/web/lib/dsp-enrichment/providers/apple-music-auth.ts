@@ -24,6 +24,56 @@ const APPLE_MUSIC_KEY_ID = process.env.APPLE_MUSIC_KEY_ID;
 const APPLE_MUSIC_TEAM_ID = process.env.APPLE_MUSIC_TEAM_ID;
 const APPLE_MUSIC_PRIVATE_KEY = process.env.APPLE_MUSIC_PRIVATE_KEY;
 
+// ============================================================================
+// Environment Validation (run once at module load)
+// ============================================================================
+
+/**
+ * Regex for Apple Key ID and Team ID (10 alphanumeric characters).
+ * Accepts both uppercase and lowercase letters.
+ */
+const APPLE_ID_REGEX = /^[A-Za-z0-9]{10}$/;
+
+/**
+ * Validate that environment variables have correct format.
+ * Called once at module initialization to catch configuration errors early.
+ *
+ * @throws Error if any configured value has invalid format
+ */
+function validateEnvFormat(): void {
+  // Only validate if credentials are configured
+  if (!APPLE_MUSIC_KEY_ID && !APPLE_MUSIC_TEAM_ID && !APPLE_MUSIC_PRIVATE_KEY) {
+    return; // Not configured - skip validation
+  }
+
+  if (APPLE_MUSIC_KEY_ID && !APPLE_ID_REGEX.test(APPLE_MUSIC_KEY_ID)) {
+    throw new Error(
+      `Invalid APPLE_MUSIC_KEY_ID format: expected 10 alphanumeric characters, got "${APPLE_MUSIC_KEY_ID.slice(0, 20)}${APPLE_MUSIC_KEY_ID.length > 20 ? '...' : ''}"`
+    );
+  }
+
+  if (APPLE_MUSIC_TEAM_ID && !APPLE_ID_REGEX.test(APPLE_MUSIC_TEAM_ID)) {
+    throw new Error(
+      `Invalid APPLE_MUSIC_TEAM_ID format: expected 10 alphanumeric characters, got "${APPLE_MUSIC_TEAM_ID.slice(0, 20)}${APPLE_MUSIC_TEAM_ID.length > 20 ? '...' : ''}"`
+    );
+  }
+
+  if (APPLE_MUSIC_PRIVATE_KEY) {
+    const normalizedKey = APPLE_MUSIC_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const hasPemHeader = normalizedKey.includes('-----BEGIN');
+    const hasPemFooter = normalizedKey.includes('-----END');
+
+    if (!hasPemHeader || !hasPemFooter) {
+      throw new Error(
+        'Invalid APPLE_MUSIC_PRIVATE_KEY format: expected PEM format with BEGIN/END markers'
+      );
+    }
+  }
+}
+
+// Validate environment format once at module load
+validateEnvFormat();
+
 /**
  * Token validity period in seconds.
  * Apple recommends max 6 months (15777000 seconds).

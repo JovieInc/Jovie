@@ -77,6 +77,7 @@ export interface LocalTrackData {
   title: string;
   isrc: string | null;
   upc?: string | null;
+  releaseDate?: string | Date | null;
 }
 
 /**
@@ -225,6 +226,49 @@ export function orchestrateMatching(
 }
 
 /**
+ * Parse a date value to a normalized timestamp.
+ * Invalid dates (including NaN from unparsable strings) return 0.
+ *
+ * @param date - Date value to parse
+ * @returns Normalized timestamp (0 for invalid/missing dates)
+ */
+function parseToTimestamp(date: string | Date | null | undefined): number {
+  if (!date) return 0;
+
+  const timestamp =
+    date instanceof Date ? date.getTime() : new Date(date).getTime();
+
+  // Check for NaN or invalid timestamps
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+/**
+ * Sort tracks by release date descending (most recent first).
+ * Tracks with valid dates come before tracks without dates.
+ * Invalid/unparsable dates are treated as missing (sorted last).
+ *
+ * @param tracks - Tracks to sort
+ * @returns New array sorted by release date
+ */
+function sortByReleaseDateDescending(
+  tracks: LocalTrackData[]
+): LocalTrackData[] {
+  return [...tracks].sort((a, b) => {
+    const dateA = parseToTimestamp(a.releaseDate);
+    const dateB = parseToTimestamp(b.releaseDate);
+
+    // Both have valid dates - sort descending
+    if (dateA && dateB) return dateB - dateA;
+    // Only A has date - A comes first
+    if (dateA && !dateB) return -1;
+    // Only B has date - B comes first
+    if (!dateA && dateB) return 1;
+    // Neither has date - maintain relative order
+    return 0;
+  });
+}
+
+/**
  * Select tracks for ISRC matching.
  *
  * Prioritizes recent releases and tracks with valid ISRCs.
@@ -241,14 +285,14 @@ export function selectTracksForMatching(
   // Filter to tracks with ISRCs
   const tracksWithIsrc = tracks.filter(t => t.isrc && t.isrc.trim().length > 0);
 
-  // If we have fewer than max, return all
+  // If we have fewer than max, return all (sorted by release date)
   if (tracksWithIsrc.length <= maxTracks) {
-    return tracksWithIsrc;
+    return sortByReleaseDateDescending(tracksWithIsrc);
   }
 
-  // Otherwise, take a sample prioritizing variety
-  // In a real implementation, we'd prioritize recent releases
-  return tracksWithIsrc.slice(0, maxTracks);
+  // Sort by release date and take the most recent tracks
+  const sorted = sortByReleaseDateDescending(tracksWithIsrc);
+  return sorted.slice(0, maxTracks);
 }
 
 /**
