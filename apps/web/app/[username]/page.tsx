@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
+import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
@@ -286,6 +287,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   return (
     <>
+      <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       {showClaimBanner && (
         <ClaimBanner
           claimToken={claimTokenParam!}
