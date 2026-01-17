@@ -1,35 +1,153 @@
-CREATE TYPE "public"."audience_device_type" AS ENUM('mobile', 'desktop', 'tablet', 'unknown');--> statement-breakpoint
-CREATE TYPE "public"."audience_intent_level" AS ENUM('high', 'medium', 'low');--> statement-breakpoint
-CREATE TYPE "public"."audience_member_type" AS ENUM('anonymous', 'email', 'sms', 'spotify', 'customer');--> statement-breakpoint
-CREATE TYPE "public"."claim_invite_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'bounced', 'failed', 'unsubscribed');--> statement-breakpoint
-CREATE TYPE "public"."contact_channel" AS ENUM('email', 'phone');--> statement-breakpoint
-CREATE TYPE "public"."contact_role" AS ENUM('bookings', 'management', 'press_pr', 'brand_partnerships', 'fan_general', 'other');--> statement-breakpoint
-CREATE TYPE "public"."creator_type" AS ENUM('artist', 'podcaster', 'influencer', 'creator');--> statement-breakpoint
-CREATE TYPE "public"."currency_code" AS ENUM('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK');--> statement-breakpoint
-CREATE TYPE "public"."discog_release_type" AS ENUM('single', 'ep', 'album', 'compilation', 'live', 'mixtape', 'other');--> statement-breakpoint
-CREATE TYPE "public"."dsp_match_status" AS ENUM('suggested', 'confirmed', 'rejected', 'auto_confirmed');--> statement-breakpoint
-CREATE TYPE "public"."ingestion_job_status" AS ENUM('pending', 'processing', 'succeeded', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."ingestion_source_type" AS ENUM('manual', 'admin', 'ingested');--> statement-breakpoint
-CREATE TYPE "public"."ingestion_status" AS ENUM('idle', 'pending', 'processing', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."link_type" AS ENUM('listen', 'social', 'tip', 'other');--> statement-breakpoint
-CREATE TYPE "public"."notification_channel" AS ENUM('email', 'sms', 'push');--> statement-breakpoint
-CREATE TYPE "public"."photo_status" AS ENUM('uploading', 'processing', 'ready', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."provider_kind" AS ENUM('music_streaming', 'video', 'social', 'retail', 'other');--> statement-breakpoint
-CREATE TYPE "public"."provider_link_owner_type" AS ENUM('release', 'track');--> statement-breakpoint
-CREATE TYPE "public"."release_notification_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled');--> statement-breakpoint
-CREATE TYPE "public"."release_notification_type" AS ENUM('preview', 'release_day');--> statement-breakpoint
-CREATE TYPE "public"."scraper_strategy" AS ENUM('http', 'browser', 'api');--> statement-breakpoint
-CREATE TYPE "public"."social_account_status" AS ENUM('suspected', 'confirmed', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."social_link_state" AS ENUM('active', 'suggested', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."social_suggestion_status" AS ENUM('pending', 'accepted', 'rejected', 'email_sent', 'expired');--> statement-breakpoint
-CREATE TYPE "public"."subscription_plan" AS ENUM('free', 'basic', 'premium', 'pro');--> statement-breakpoint
-CREATE TYPE "public"."subscription_status" AS ENUM('active', 'inactive', 'cancelled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid');--> statement-breakpoint
-CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');--> statement-breakpoint
-CREATE TYPE "public"."user_status" AS ENUM('active', 'pending', 'banned');--> statement-breakpoint
-CREATE TYPE "public"."user_status_lifecycle" AS ENUM('waitlist_pending', 'waitlist_approved', 'profile_claimed', 'onboarding_incomplete', 'active', 'suspended', 'banned');--> statement-breakpoint
-CREATE TYPE "public"."user_waitlist_approval" AS ENUM('pending', 'approved');--> statement-breakpoint
-CREATE TYPE "public"."waitlist_invite_status" AS ENUM('pending', 'sending', 'sent', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."waitlist_status" AS ENUM('new', 'invited', 'claimed');--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audience_device_type') THEN
+    CREATE TYPE "public"."audience_device_type" AS ENUM('mobile', 'desktop', 'tablet', 'unknown');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audience_intent_level') THEN
+    CREATE TYPE "public"."audience_intent_level" AS ENUM('high', 'medium', 'low');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audience_member_type') THEN
+    CREATE TYPE "public"."audience_member_type" AS ENUM('anonymous', 'email', 'sms', 'spotify', 'customer');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'claim_invite_status') THEN
+    CREATE TYPE "public"."claim_invite_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'bounced', 'failed', 'unsubscribed');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'contact_channel') THEN
+    CREATE TYPE "public"."contact_channel" AS ENUM('email', 'phone');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'contact_role') THEN
+    CREATE TYPE "public"."contact_role" AS ENUM('bookings', 'management', 'press_pr', 'brand_partnerships', 'fan_general', 'other');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'creator_type') THEN
+    CREATE TYPE "public"."creator_type" AS ENUM('artist', 'podcaster', 'influencer', 'creator');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'currency_code') THEN
+    CREATE TYPE "public"."currency_code" AS ENUM('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'discog_release_type') THEN
+    CREATE TYPE "public"."discog_release_type" AS ENUM('single', 'ep', 'album', 'compilation', 'live', 'mixtape', 'other');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'dsp_match_status') THEN
+    CREATE TYPE "public"."dsp_match_status" AS ENUM('suggested', 'confirmed', 'rejected', 'auto_confirmed');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_job_status') THEN
+    CREATE TYPE "public"."ingestion_job_status" AS ENUM('pending', 'processing', 'succeeded', 'failed');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_source_type') THEN
+    CREATE TYPE "public"."ingestion_source_type" AS ENUM('manual', 'admin', 'ingested');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_status') THEN
+    CREATE TYPE "public"."ingestion_status" AS ENUM('idle', 'pending', 'processing', 'failed');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'link_type') THEN
+    CREATE TYPE "public"."link_type" AS ENUM('listen', 'social', 'tip', 'other');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_channel') THEN
+    CREATE TYPE "public"."notification_channel" AS ENUM('email', 'sms', 'push');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'photo_status') THEN
+    CREATE TYPE "public"."photo_status" AS ENUM('uploading', 'processing', 'ready', 'failed');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'provider_kind') THEN
+    CREATE TYPE "public"."provider_kind" AS ENUM('music_streaming', 'video', 'social', 'retail', 'other');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'provider_link_owner_type') THEN
+    CREATE TYPE "public"."provider_link_owner_type" AS ENUM('release', 'track');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_notification_status') THEN
+    CREATE TYPE "public"."release_notification_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_notification_type') THEN
+    CREATE TYPE "public"."release_notification_type" AS ENUM('preview', 'release_day');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'scraper_strategy') THEN
+    CREATE TYPE "public"."scraper_strategy" AS ENUM('http', 'browser', 'api');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_account_status') THEN
+    CREATE TYPE "public"."social_account_status" AS ENUM('suspected', 'confirmed', 'rejected');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_link_state') THEN
+    CREATE TYPE "public"."social_link_state" AS ENUM('active', 'suggested', 'rejected');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_suggestion_status') THEN
+    CREATE TYPE "public"."social_suggestion_status" AS ENUM('pending', 'accepted', 'rejected', 'email_sent', 'expired');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_plan') THEN
+    CREATE TYPE "public"."subscription_plan" AS ENUM('free', 'basic', 'premium', 'pro');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') THEN
+    CREATE TYPE "public"."subscription_status" AS ENUM('active', 'inactive', 'cancelled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'theme_mode') THEN
+    CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status_lifecycle') THEN
+    CREATE TYPE "public"."user_status_lifecycle" AS ENUM('waitlist_pending', 'waitlist_approved', 'profile_claimed', 'onboarding_incomplete', 'active', 'suspended', 'banned');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitlist_invite_status') THEN
+    CREATE TYPE "public"."waitlist_invite_status" AS ENUM('pending', 'sending', 'sent', 'failed');
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitlist_status') THEN
+    CREATE TYPE "public"."waitlist_status" AS ENUM('new', 'invited', 'claimed');
+  END IF;
+END $$;--> statement-breakpoint
 CREATE TABLE "admin_audit_log" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"admin_user_id" uuid NOT NULL,
@@ -128,9 +246,7 @@ CREATE TABLE "users" (
 	"name" text,
 	"email" text,
 	"user_status" "user_status_lifecycle" NOT NULL,
-	"status" "user_status" DEFAULT 'active' NOT NULL,
 	"waitlist_entry_id" uuid,
-	"waitlist_approval" "user_waitlist_approval",
 	"is_admin" boolean DEFAULT false NOT NULL,
 	"is_pro" boolean DEFAULT false,
 	"stripe_customer_id" text,
@@ -649,66 +765,66 @@ ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_creator_profile_id_c
 ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_ingestion_owner_user_id_users_id_fk" FOREIGN KEY ("ingestion_owner_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "waitlist_invites" ADD CONSTRAINT "waitlist_invites_waitlist_entry_id_waitlist_entries_id_fk" FOREIGN KEY ("waitlist_entry_id") REFERENCES "public"."waitlist_entries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "waitlist_invites" ADD CONSTRAINT "waitlist_invites_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_admin_audit_log_admin_user_id" ON "admin_audit_log" USING btree ("admin_user_id");--> statement-breakpoint
-CREATE INDEX "idx_admin_audit_log_target_user_id" ON "admin_audit_log" USING btree ("target_user_id");--> statement-breakpoint
-CREATE INDEX "idx_admin_audit_log_created_at" ON "admin_audit_log" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX "idx_admin_audit_log_action" ON "admin_audit_log" USING btree ("action");--> statement-breakpoint
-CREATE INDEX "audience_members_creator_profile_id_fingerprint_idx" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
-CREATE UNIQUE INDEX "audience_members_creator_profile_id_fingerprint_unique" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
-CREATE INDEX "click_events_creator_profile_id_created_at_idx" ON "click_events" USING btree ("creator_profile_id","created_at");--> statement-breakpoint
-CREATE INDEX "click_events_creator_profile_id_is_bot_created_at_idx" ON "click_events" USING btree ("creator_profile_id","is_bot","created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "notification_subscriptions_creator_profile_id_email_unique" ON "notification_subscriptions" USING btree ("creator_profile_id","email");--> statement-breakpoint
-CREATE UNIQUE INDEX "notification_subscriptions_creator_profile_id_phone_unique" ON "notification_subscriptions" USING btree ("creator_profile_id","phone");--> statement-breakpoint
-CREATE INDEX "tips_creator_profile_id_idx" ON "tips" USING btree ("creator_profile_id");--> statement-breakpoint
-CREATE INDEX "idx_users_user_status" ON "users" USING btree ("user_status");--> statement-breakpoint
-CREATE INDEX "billing_audit_log_user_id_idx" ON "billing_audit_log" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "billing_audit_log_stripe_event_id_idx" ON "billing_audit_log" USING btree ("stripe_event_id");--> statement-breakpoint
-CREATE INDEX "billing_audit_log_created_at_idx" ON "billing_audit_log" USING btree ("created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "discog_releases_creator_slug_unique" ON "discog_releases" USING btree ("creator_profile_id","slug");--> statement-breakpoint
-CREATE UNIQUE INDEX "discog_releases_creator_upc_unique" ON "discog_releases" USING btree ("creator_profile_id","upc") WHERE upc IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "discog_releases_release_date_idx" ON "discog_releases" USING btree ("release_date");--> statement-breakpoint
-CREATE UNIQUE INDEX "discog_tracks_release_track_position_unique" ON "discog_tracks" USING btree ("release_id","disc_number","track_number");--> statement-breakpoint
-CREATE UNIQUE INDEX "discog_tracks_release_slug_unique" ON "discog_tracks" USING btree ("release_id","slug");--> statement-breakpoint
-CREATE UNIQUE INDEX "discog_tracks_isrc_unique" ON "discog_tracks" USING btree ("isrc") WHERE isrc IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "discog_tracks_release_id_idx" ON "discog_tracks" USING btree ("release_id");--> statement-breakpoint
-CREATE INDEX "discog_tracks_creator_profile_id_idx" ON "discog_tracks" USING btree ("creator_profile_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "provider_links_release_provider" ON "provider_links" USING btree ("provider_id","release_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "provider_links_track_provider" ON "provider_links" USING btree ("provider_id","track_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "provider_links_provider_external" ON "provider_links" USING btree ("provider_id","external_id") WHERE external_id IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "provider_links_release_id_idx" ON "provider_links" USING btree ("release_id");--> statement-breakpoint
-CREATE INDEX "provider_links_track_id_idx" ON "provider_links" USING btree ("track_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "smart_link_targets_slug_provider" ON "smart_link_targets" USING btree ("creator_profile_id","smart_link_slug","provider_id");--> statement-breakpoint
-CREATE INDEX "smart_link_targets_provider_link_idx" ON "smart_link_targets" USING btree ("provider_link_id");--> statement-breakpoint
-CREATE INDEX "smart_link_targets_release_id_idx" ON "smart_link_targets" USING btree ("release_id");--> statement-breakpoint
-CREATE INDEX "smart_link_targets_track_id_idx" ON "smart_link_targets" USING btree ("track_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "dsp_artist_enrichment_creator_provider_unique" ON "dsp_artist_enrichment" USING btree ("creator_profile_id","provider_id");--> statement-breakpoint
-CREATE INDEX "dsp_artist_enrichment_provider_idx" ON "dsp_artist_enrichment" USING btree ("provider_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "dsp_artist_matches_creator_provider_unique" ON "dsp_artist_matches" USING btree ("creator_profile_id","provider_id");--> statement-breakpoint
-CREATE INDEX "dsp_artist_matches_status_idx" ON "dsp_artist_matches" USING btree ("status","created_at");--> statement-breakpoint
-CREATE INDEX "dsp_artist_matches_confidence_idx" ON "dsp_artist_matches" USING btree ("confidence_score");--> statement-breakpoint
-CREATE UNIQUE INDEX "fan_release_notifications_dedup_key_unique" ON "fan_release_notifications" USING btree ("dedup_key");--> statement-breakpoint
-CREATE INDEX "fan_release_notifications_status_scheduled_idx" ON "fan_release_notifications" USING btree ("status","scheduled_for");--> statement-breakpoint
-CREATE INDEX "fan_release_notifications_release_idx" ON "fan_release_notifications" USING btree ("release_id");--> statement-breakpoint
-CREATE INDEX "fan_release_notifications_creator_idx" ON "fan_release_notifications" USING btree ("creator_profile_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "release_sync_status_creator_provider_unique" ON "release_sync_status" USING btree ("creator_profile_id","provider_id");--> statement-breakpoint
-CREATE INDEX "release_sync_status_next_sync_idx" ON "release_sync_status" USING btree ("next_scheduled_sync_at");--> statement-breakpoint
-CREATE INDEX "release_sync_status_failures_idx" ON "release_sync_status" USING btree ("consecutive_failures");--> statement-breakpoint
-CREATE UNIQUE INDEX "social_link_suggestions_dedup_key_unique" ON "social_link_suggestions" USING btree ("dedup_key");--> statement-breakpoint
-CREATE INDEX "social_link_suggestions_status_created_idx" ON "social_link_suggestions" USING btree ("status","created_at");--> statement-breakpoint
-CREATE INDEX "social_link_suggestions_creator_idx" ON "social_link_suggestions" USING btree ("creator_profile_id","status");--> statement-breakpoint
-CREATE INDEX "social_link_suggestions_expires_idx" ON "social_link_suggestions" USING btree ("expires_at") WHERE expires_at IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_ingestion_jobs_dedup_key_unique" ON "ingestion_jobs" USING btree ("dedup_key") WHERE dedup_key IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "idx_ingestion_jobs_status_run_at" ON "ingestion_jobs" USING btree ("status","run_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "dashboard_idempotency_keys_key_user_endpoint_unique" ON "dashboard_idempotency_keys" USING btree ("key","user_id","endpoint");--> statement-breakpoint
-CREATE INDEX "dashboard_idempotency_keys_expires_at_idx" ON "dashboard_idempotency_keys" USING btree ("expires_at");--> statement-breakpoint
-CREATE INDEX "social_links_creator_profile_state_idx" ON "social_links" USING btree ("creator_profile_id","state","created_at");--> statement-breakpoint
-CREATE INDEX "idx_creator_claim_invites_creator_profile_id" ON "creator_claim_invites" USING btree ("creator_profile_id");--> statement-breakpoint
-CREATE INDEX "idx_creator_claim_invites_status" ON "creator_claim_invites" USING btree ("status");--> statement-breakpoint
-CREATE INDEX "idx_creator_claim_invites_send_at" ON "creator_claim_invites" USING btree ("send_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_creator_claim_invites_profile_email_unique" ON "creator_claim_invites" USING btree ("creator_profile_id","email");--> statement-breakpoint
-CREATE INDEX "idx_creator_profiles_featured_with_name" ON "creator_profiles" USING btree ("is_public","is_featured","marketing_opt_out","display_name") WHERE is_public = true AND is_featured = true AND marketing_opt_out = false;--> statement-breakpoint
-CREATE UNIQUE INDEX "creator_profiles_username_normalized_unique" ON "creator_profiles" USING btree ("username_normalized") WHERE username_normalized IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_creator_profiles_one_claimed_per_user" ON "creator_profiles" USING btree ("user_id") WHERE is_claimed = true;--> statement-breakpoint
-CREATE INDEX "idx_creator_profiles_fit_score_unclaimed" ON "creator_profiles" USING btree ("fit_score","is_claimed","created_at") WHERE is_claimed = false AND fit_score IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_waitlist_invites_entry_id" ON "waitlist_invites" USING btree ("waitlist_entry_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_waitlist_invites_claim_token_unique" ON "waitlist_invites" USING btree ("claim_token");
+CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_admin_user_id" ON "admin_audit_log" USING btree ("admin_user_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_target_user_id" ON "admin_audit_log" USING btree ("target_user_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_created_at" ON "admin_audit_log" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_action" ON "admin_audit_log" USING btree ("action");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "audience_members_creator_profile_id_fingerprint_idx" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "audience_members_creator_profile_id_fingerprint_unique" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "click_events_creator_profile_id_created_at_idx" ON "click_events" USING btree ("creator_profile_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "click_events_creator_profile_id_is_bot_created_at_idx" ON "click_events" USING btree ("creator_profile_id","is_bot","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "notification_subscriptions_creator_profile_id_email_unique" ON "notification_subscriptions" USING btree ("creator_profile_id","email");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "notification_subscriptions_creator_profile_id_phone_unique" ON "notification_subscriptions" USING btree ("creator_profile_id","phone");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "tips_creator_profile_id_idx" ON "tips" USING btree ("creator_profile_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_users_user_status" ON "users" USING btree ("user_status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "billing_audit_log_user_id_idx" ON "billing_audit_log" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "billing_audit_log_stripe_event_id_idx" ON "billing_audit_log" USING btree ("stripe_event_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "billing_audit_log_created_at_idx" ON "billing_audit_log" USING btree ("created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "discog_releases_creator_slug_unique" ON "discog_releases" USING btree ("creator_profile_id","slug");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "discog_releases_creator_upc_unique" ON "discog_releases" USING btree ("creator_profile_id","upc") WHERE upc IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "discog_releases_release_date_idx" ON "discog_releases" USING btree ("release_date");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "discog_tracks_release_track_position_unique" ON "discog_tracks" USING btree ("release_id","disc_number","track_number");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "discog_tracks_release_slug_unique" ON "discog_tracks" USING btree ("release_id","slug");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "discog_tracks_isrc_unique" ON "discog_tracks" USING btree ("isrc") WHERE isrc IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "discog_tracks_release_id_idx" ON "discog_tracks" USING btree ("release_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "discog_tracks_creator_profile_id_idx" ON "discog_tracks" USING btree ("creator_profile_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "provider_links_release_provider" ON "provider_links" USING btree ("provider_id","release_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "provider_links_track_provider" ON "provider_links" USING btree ("provider_id","track_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "provider_links_provider_external" ON "provider_links" USING btree ("provider_id","external_id") WHERE external_id IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "provider_links_release_id_idx" ON "provider_links" USING btree ("release_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "provider_links_track_id_idx" ON "provider_links" USING btree ("track_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "smart_link_targets_slug_provider" ON "smart_link_targets" USING btree ("creator_profile_id","smart_link_slug","provider_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "smart_link_targets_provider_link_idx" ON "smart_link_targets" USING btree ("provider_link_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "smart_link_targets_release_id_idx" ON "smart_link_targets" USING btree ("release_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "smart_link_targets_track_id_idx" ON "smart_link_targets" USING btree ("track_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "dsp_artist_enrichment_creator_provider_unique" ON "dsp_artist_enrichment" USING btree ("creator_profile_id","provider_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "dsp_artist_enrichment_provider_idx" ON "dsp_artist_enrichment" USING btree ("provider_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "dsp_artist_matches_creator_provider_unique" ON "dsp_artist_matches" USING btree ("creator_profile_id","provider_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "dsp_artist_matches_status_idx" ON "dsp_artist_matches" USING btree ("status","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "dsp_artist_matches_confidence_idx" ON "dsp_artist_matches" USING btree ("confidence_score");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "fan_release_notifications_dedup_key_unique" ON "fan_release_notifications" USING btree ("dedup_key");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "fan_release_notifications_status_scheduled_idx" ON "fan_release_notifications" USING btree ("status","scheduled_for");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "fan_release_notifications_release_idx" ON "fan_release_notifications" USING btree ("release_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "fan_release_notifications_creator_idx" ON "fan_release_notifications" USING btree ("creator_profile_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "release_sync_status_creator_provider_unique" ON "release_sync_status" USING btree ("creator_profile_id","provider_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "release_sync_status_next_sync_idx" ON "release_sync_status" USING btree ("next_scheduled_sync_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "release_sync_status_failures_idx" ON "release_sync_status" USING btree ("consecutive_failures");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "social_link_suggestions_dedup_key_unique" ON "social_link_suggestions" USING btree ("dedup_key");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "social_link_suggestions_status_created_idx" ON "social_link_suggestions" USING btree ("status","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "social_link_suggestions_creator_idx" ON "social_link_suggestions" USING btree ("creator_profile_id","status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "social_link_suggestions_expires_idx" ON "social_link_suggestions" USING btree ("expires_at") WHERE expires_at IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_ingestion_jobs_dedup_key_unique" ON "ingestion_jobs" USING btree ("dedup_key") WHERE dedup_key IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_ingestion_jobs_status_run_at" ON "ingestion_jobs" USING btree ("status","run_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "dashboard_idempotency_keys_key_user_endpoint_unique" ON "dashboard_idempotency_keys" USING btree ("key","user_id","endpoint");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "dashboard_idempotency_keys_expires_at_idx" ON "dashboard_idempotency_keys" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "social_links_creator_profile_state_idx" ON "social_links" USING btree ("creator_profile_id","state","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_creator_claim_invites_creator_profile_id" ON "creator_claim_invites" USING btree ("creator_profile_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_creator_claim_invites_status" ON "creator_claim_invites" USING btree ("status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_creator_claim_invites_send_at" ON "creator_claim_invites" USING btree ("send_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_creator_claim_invites_profile_email_unique" ON "creator_claim_invites" USING btree ("creator_profile_id","email");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_creator_profiles_featured_with_name" ON "creator_profiles" USING btree ("is_public","is_featured","marketing_opt_out","display_name") WHERE is_public = true AND is_featured = true AND marketing_opt_out = false;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "creator_profiles_username_normalized_unique" ON "creator_profiles" USING btree ("username_normalized") WHERE username_normalized IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_creator_profiles_one_claimed_per_user" ON "creator_profiles" USING btree ("user_id") WHERE is_claimed = true;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_creator_profiles_fit_score_unclaimed" ON "creator_profiles" USING btree ("fit_score","is_claimed","created_at") WHERE is_claimed = false AND fit_score IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_waitlist_invites_entry_id" ON "waitlist_invites" USING btree ("waitlist_entry_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_waitlist_invites_claim_token_unique" ON "waitlist_invites" USING btree ("claim_token");

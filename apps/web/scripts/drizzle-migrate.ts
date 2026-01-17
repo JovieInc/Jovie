@@ -306,8 +306,8 @@ async function runMigrations() {
     // return the highest applied migration index.
     const probes: Probe[] = [
       {
-        tag: '0000_wandering_callisto',
-        idx: idxFor('0000_wandering_callisto'),
+        tag: '0000_sleepy_ted_forrester',
+        idx: idxFor('0000_sleepy_ted_forrester'),
         existsQuery:
           "SELECT (to_regclass('public.users') IS NOT NULL AND to_regclass('public.creator_profiles') IS NOT NULL) AS ok",
       },

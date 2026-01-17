@@ -1,5 +1,5 @@
 {
-  "id": "1a2e53ae-f02b-49ce-a8ac-4e1cfb7acea6",
+  "id": "1210ec3f-2f7c-47c5-b8e6-19a5131b9ee1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -901,24 +901,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "user_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
         "waitlist_entry_id": {
           "name": "waitlist_entry_id",
           "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "waitlist_approval": {
-          "name": "waitlist_approval",
-          "type": "user_waitlist_approval",
-          "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
         },
@@ -5262,11 +5247,6 @@
       "schema": "public",
       "values": ["system", "light", "dark"]
     },
-    "public.user_status": {
-      "name": "user_status",
-      "schema": "public",
-      "values": ["active", "pending", "banned"]
-    },
     "public.user_status_lifecycle": {
       "name": "user_status_lifecycle",
       "schema": "public",
@@ -5279,11 +5259,6 @@
         "suspended",
         "banned"
       ]
-    },
-    "public.user_waitlist_approval": {
-      "name": "user_waitlist_approval",
-      "schema": "public",
-      "values": ["pending", "approved"]
     },
     "public.waitlist_invite_status": {
       "name": "waitlist_invite_status",
