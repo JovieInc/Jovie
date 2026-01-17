@@ -102,12 +102,15 @@ export function SignInForm() {
               <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
             </div>
             {isClerkStalled ? (
-              <div className='rounded-[--radius-xl] border border-subtle bg-surface-0 px-4 py-3 text-[13px] text-secondary-token text-center'>
+              <output
+                aria-live='polite'
+                className='block rounded-[--radius-xl] border border-subtle bg-surface-0 px-4 py-3 text-[13px] text-secondary-token text-center'
+              >
                 <p>Hang tight — sign-in is taking longer than usual.</p>
                 <p className='mt-2'>
                   Refresh the page or try again in a minute.
                 </p>
-              </div>
+              </output>
             ) : null}
           </div>
         </CardContent>
