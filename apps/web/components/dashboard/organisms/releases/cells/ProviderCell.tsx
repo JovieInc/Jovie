@@ -315,11 +315,11 @@ export function ProviderCell({
           }
           onClick={() => {
             if (!provider?.path) return;
-            void handleCopyWithFeedback(
+            handleCopyWithFeedback(
               provider.path,
               `${release.title} – ${config.label}`,
               testId
-            );
+            ).catch(() => {});
           }}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
