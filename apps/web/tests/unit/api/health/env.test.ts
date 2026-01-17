@@ -25,7 +25,7 @@ vi.mock('@/lib/startup/environment-validator', () => ({
   isValidationCompleted: mockIsValidationCompleted,
 }));
 
-describe('GET /api/health/env', () => {
+describe('@critical GET /api/health/env', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();

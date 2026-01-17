@@ -58,7 +58,7 @@ import {
 } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
-describe('SubscriptionHandler', () => {
+describe('@critical SubscriptionHandler', () => {
   let handler: SubscriptionHandler;
 
   beforeEach(() => {

@@ -67,7 +67,7 @@ import {
 } from '@/lib/stripe/webhooks/handlers/checkout-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
-describe('CheckoutSessionHandler', () => {
+describe('@critical CheckoutSessionHandler', () => {
   let handler: CheckoutSessionHandler;
 
   beforeEach(() => {

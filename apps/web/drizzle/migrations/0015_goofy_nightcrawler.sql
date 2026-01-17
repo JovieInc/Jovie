@@ -1,1 +1,0 @@
-ALTER TABLE "notification_subscriptions" ADD COLUMN "city" text;

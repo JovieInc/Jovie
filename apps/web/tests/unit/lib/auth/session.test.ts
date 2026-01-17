@@ -29,7 +29,7 @@ vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: {},
 }));
 
-describe('session.ts', () => {
+describe('@critical session.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();

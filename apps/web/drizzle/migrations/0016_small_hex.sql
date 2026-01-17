@@ -1,1 +1,0 @@
-ALTER TABLE "waitlist_entries" ADD COLUMN "selected_plan" text;

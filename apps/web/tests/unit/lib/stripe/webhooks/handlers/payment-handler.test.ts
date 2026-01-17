@@ -67,7 +67,7 @@ import {
 } from '@/lib/stripe/webhooks/handlers/payment-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
-describe('PaymentHandler', () => {
+describe('@critical PaymentHandler', () => {
   let handler: PaymentHandler;
 
   beforeEach(() => {
