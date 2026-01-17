@@ -4,6 +4,10 @@ import {
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import {
+  isEmailSuppressed,
+  logDelivery,
+} from '@/lib/notifications/suppression';
 import type {
   EmailProvider,
   NotificationChannelResult,
@@ -79,6 +83,25 @@ export const sendNotification = async (
         continue;
       }
 
+      // Check global suppression list (bounces, complaints, etc.)
+      const suppressionCheck = await isEmailSuppressed(to);
+      if (suppressionCheck.suppressed) {
+        const detail = `Email suppressed: ${suppressionCheck.reason}`;
+        results.push(buildSkippedResult(channel, detail));
+
+        // Log the suppressed delivery for tracking
+        await logDelivery({
+          channel: 'email',
+          recipientEmail: to,
+          status: 'suppressed',
+          metadata: {
+            suppressionReason: suppressionCheck.reason,
+            notificationId: message.id,
+          },
+        });
+        continue;
+      }
+
       const respectPreferences =
         message.respectUserPreferences !== false &&
         message.category !== 'transactional';
@@ -99,6 +122,29 @@ export const sendNotification = async (
         headers: message.headers,
         from: message.from,
       });
+
+      // Log successful sends for delivery tracking
+      if (emailResult.status === 'sent') {
+        await logDelivery({
+          channel: 'email',
+          recipientEmail: to,
+          status: 'sent',
+          providerMessageId: emailResult.detail,
+          metadata: {
+            notificationId: message.id,
+          },
+        });
+      } else if (emailResult.status === 'error') {
+        await logDelivery({
+          channel: 'email',
+          recipientEmail: to,
+          status: 'failed',
+          errorMessage: emailResult.error,
+          metadata: {
+            notificationId: message.id,
+          },
+        });
+      }
 
       results.push(emailResult);
       continue;

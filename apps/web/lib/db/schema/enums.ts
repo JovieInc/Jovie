@@ -221,3 +221,24 @@ export const audienceIntentLevelEnum = pgEnum('audience_intent_level', [
   'medium',
   'low',
 ]);
+
+// Email Suppression Enums
+export const suppressionReasonEnum = pgEnum('suppression_reason', [
+  'hard_bounce',
+  'soft_bounce',
+  'spam_complaint',
+  'invalid_address',
+  'user_request',
+  'abuse',
+  'legal',
+]);
+
+export const deliveryStatusEnum = pgEnum('delivery_status', [
+  'pending',
+  'sent',
+  'delivered',
+  'bounced',
+  'complained',
+  'failed',
+  'suppressed',
+]);

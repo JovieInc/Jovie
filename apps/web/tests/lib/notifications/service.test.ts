@@ -27,6 +27,11 @@ vi.mock('@/lib/notifications/config', () => ({
   EMAIL_REPLY_TO: 'reply@example.com',
 }));
 
+vi.mock('@/lib/notifications/suppression', () => ({
+  isEmailSuppressed: vi.fn(),
+  logDelivery: vi.fn(),
+}));
+
 import {
   getNotificationPreferences,
   markNotificationDismissed,
@@ -36,6 +41,10 @@ import {
   sendNotification,
   setEmailProvider,
 } from '@/lib/notifications/service';
+import {
+  isEmailSuppressed,
+  logDelivery,
+} from '@/lib/notifications/suppression';
 import type {
   NotificationMessage,
   NotificationTarget,
@@ -52,6 +61,14 @@ describe('Notification Service', () => {
       dismissedNotificationIds: [],
       email: 'user@example.com',
     });
+
+    // Default mock for suppression check (not suppressed)
+    vi.mocked(isEmailSuppressed).mockResolvedValue({
+      suppressed: false,
+    });
+
+    // Default mock for delivery logging
+    vi.mocked(logDelivery).mockResolvedValue(undefined);
   });
 
   describe('sendNotification', () => {
@@ -254,6 +271,61 @@ describe('Notification Service', () => {
 
       // Should send despite marketing emails being disabled
       expect(result.delivered).toContain('email');
+    });
+
+    it('should skip suppressed emails', async () => {
+      vi.mocked(isEmailSuppressed).mockResolvedValue({
+        suppressed: true,
+        reason: 'hard_bounce',
+        source: 'webhook',
+      });
+
+      const result = await sendNotification(baseMessage, baseTarget);
+
+      expect(result.delivered).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped[0].detail).toContain('suppressed');
+      expect(result.skipped[0].detail).toContain('hard_bounce');
+    });
+
+    it('should log suppressed deliveries', async () => {
+      vi.mocked(isEmailSuppressed).mockResolvedValue({
+        suppressed: true,
+        reason: 'spam_complaint',
+        source: 'webhook',
+      });
+
+      await sendNotification(baseMessage, baseTarget);
+
+      expect(logDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'email',
+          status: 'suppressed',
+          recipientEmail: 'user@example.com',
+          metadata: expect.objectContaining({
+            suppressionReason: 'spam_complaint',
+          }),
+        })
+      );
+    });
+
+    it('should log successful deliveries', async () => {
+      await sendNotification(baseMessage, baseTarget);
+
+      expect(logDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'email',
+          status: 'sent',
+          recipientEmail: 'user@example.com',
+          providerMessageId: 'msg-123',
+        })
+      );
+    });
+
+    it('should check suppression with target email', async () => {
+      await sendNotification(baseMessage, baseTarget);
+
+      expect(isEmailSuppressed).toHaveBeenCalledWith('user@example.com');
     });
   });
 

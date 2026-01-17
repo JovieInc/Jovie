@@ -609,8 +609,8 @@ jobs:
     name: Unit Tests
     # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    # Unit tests run on all PRs (critical + changed) and push to main
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -621,22 +621,23 @@ jobs:
           fetch-depth: 0  # Full history for vitest --changed
 
       # Check if test-related changes require running this job
+      # For PRs: always run (critical tests are fast, ~8s)
+      # For push to main: only run if test-related paths changed
       - name: Check for relevant changes
         id: check_changes
         uses: ./.github/actions/check-path-changes
         with:
           job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          full-ci-label: ${{ github.event_name == 'pull_request' }}
           base-ref: ${{ github.base_ref }}
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
 
-      # Skip remaining steps if no relevant changes
+      # Skip remaining steps if no relevant changes (main branch only - PRs always run)
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping unit tests as no critical paths were changed."
-          echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
@@ -681,8 +682,10 @@ jobs:
               echo "⚠️ origin/preview not found, skipping --changed tests"
             fi
           elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running tests changed since ${{ github.base_ref }}"
-            # Ensure base ref is fetched
+            echo "🔍 PR: Running critical tests + tests changed since ${{ github.base_ref }}"
+            # First run critical tests (~8s)
+            pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
+            # Then run tests for changed files
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
             pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
