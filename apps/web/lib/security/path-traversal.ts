@@ -7,6 +7,8 @@
 
 import path from 'path';
 
+const CONTROL_CHARACTER_REGEX = /[\x00-\x1F\x80-\x9F]/g;
+
 /**
  * Validates that a file path is within an allowed base directory.
  * Prevents path traversal attacks like "../../../etc/passwd".
@@ -77,7 +79,7 @@ export function sanitizeFilename(filename: string): string {
       // Remove null bytes
       .replace(/\0/g, '')
       // Remove control characters
-      .replace(/[\x00-\x1f\x80-\x9f]/g, '')
+      .replace(CONTROL_CHARACTER_REGEX, '')
       // Remove other potentially dangerous characters
       .replace(/[<>:"|?*]/g, '')
       // Trim whitespace
