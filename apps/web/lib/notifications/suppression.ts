@@ -225,11 +225,13 @@ export async function logDelivery(params: {
   errorMessage?: string;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  const recipientHash = params.recipientEmail
-    ? hashEmail(params.recipientEmail)
-    : params.recipientPhone
-      ? hashEmail(params.recipientPhone)
-      : 'unknown';
+  // Compute recipient hash from email or phone
+  let recipientHash = 'unknown';
+  if (params.recipientEmail) {
+    recipientHash = hashEmail(params.recipientEmail);
+  } else if (params.recipientPhone) {
+    recipientHash = hashEmail(params.recipientPhone);
+  }
 
   await db.insert(notificationDeliveryLog).values({
     notificationSubscriptionId: params.notificationSubscriptionId,
