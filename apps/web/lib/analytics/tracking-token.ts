@@ -107,7 +107,7 @@ export function validateTrackingToken(
           valid: true,
           payload: {
             profileId,
-            timestamp: parseInt(parts[1], 10),
+            timestamp: Number.parseInt(parts[1], 10),
           },
         };
       }
@@ -122,9 +122,9 @@ export function validateTrackingToken(
   }
 
   const [profileId, timestampStr, signature] = parts;
-  const timestamp = parseInt(timestampStr, 10);
+  const timestamp = Number.parseInt(timestampStr, 10);
 
-  if (isNaN(timestamp)) {
+  if (Number.isNaN(timestamp)) {
     return { valid: false, error: 'Invalid timestamp' };
   }
 

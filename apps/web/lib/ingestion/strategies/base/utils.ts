@@ -17,7 +17,7 @@ export function sleep(ms: number): Promise<void> {
  * Escape special regex characters in a string.
  */
 export function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -33,13 +33,13 @@ export function decodeHtmlEntities(str: string): string {
 
   // Decode specific entities first, then ampersand last
   return str
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&'); // Must be last to avoid double-unescaping
+    .replaceAll(/&lt;/gi, '<')
+    .replaceAll(/&gt;/gi, '>')
+    .replaceAll(/&quot;/gi, '"')
+    .replaceAll(/&#39;/gi, "'")
+    .replaceAll(/&#x27;/gi, "'")
+    .replaceAll(/&nbsp;/gi, ' ')
+    .replaceAll(/&amp;/gi, '&'); // Must be last to avoid double-unescaping
 }
 
 /**

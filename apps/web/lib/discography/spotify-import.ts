@@ -275,7 +275,7 @@ async function importSingleRelease(
 
   // Sanitize UPC (alphanumeric only, max 20 chars)
   const sanitizedUpc = fullAlbum?.external_ids?.upc
-    ? fullAlbum.external_ids.upc.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)
+    ? fullAlbum.external_ids.upc.replaceAll(/[^a-zA-Z0-9]/g, '').slice(0, 20)
     : null;
 
   // Upsert the release with sanitized data
@@ -333,7 +333,7 @@ async function importSingleRelease(
 
       // Sanitize ISRC (alphanumeric only, max 12 chars)
       const sanitizedIsrc = track.external_ids?.isrc
-        ? track.external_ids.isrc.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)
+        ? track.external_ids.isrc.replaceAll(/[^a-zA-Z0-9]/g, '').slice(0, 12)
         : null;
 
       // Sanitize preview URL

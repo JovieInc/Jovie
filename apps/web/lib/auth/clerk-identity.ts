@@ -42,7 +42,7 @@ function deriveDisplayNameFromEmail(email: string): string {
   }
 
   const localPart = email.split('@').at(0) ?? '';
-  return localPart.trim().replace(/[._-]+/g, ' ');
+  return localPart.trim().replaceAll(/[._-]+/g, ' ');
 }
 
 export function resolveClerkIdentity(

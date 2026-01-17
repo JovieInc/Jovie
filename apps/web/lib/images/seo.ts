@@ -119,16 +119,16 @@ function cleanFilename(filename: string): string {
   return (
     filename
       // Remove file extension
-      .replace(/\.(jpg|jpeg|png|webp|avif|svg|gif)$/i, '')
+      .replaceAll(/\.(jpg|jpeg|png|webp|avif|svg|gif)$/gi, '')
       // Replace common separators with spaces
-      .replace(/[-_]/g, ' ')
+      .replaceAll(/[-_]/g, ' ')
       // Remove common image prefixes/suffixes
-      .replace(/^(img|image|photo|pic|picture)[\s-_]/i, '')
-      .replace(/[\s-_](img|image|photo|pic|picture)$/i, '')
+      .replaceAll(/^(img|image|photo|pic|picture)[\s-_]/i, '')
+      .replaceAll(/[\s-_](img|image|photo|pic|picture)$/i, '')
       // Capitalize words
-      .replace(/\b\w/g, l => l.toUpperCase())
+      .replaceAll(/\b\w/g, l => l.toUpperCase())
       // Clean up multiple spaces
-      .replace(/\s+/g, ' ')
+      .replaceAll(/\s+/g, ' ')
       .trim()
   );
 }
@@ -346,9 +346,9 @@ function slugify(text: string): string {
       .toLowerCase()
       .trim()
       // Replace spaces and special chars with hyphens
-      .replace(/[^a-z0-9]+/g, '-')
+      .replaceAll(/[^a-z0-9]+/g, '-')
       // Remove leading/trailing hyphens
-      .replace(/(^-+)|(-+$)/g, '')
+      .replaceAll(/(^-+)|(-+$)/g, '')
       // Limit length
       .substring(0, 50)
   );
