@@ -472,8 +472,8 @@ jobs:
   ci-public-profile-smoke:
     name: Public Profile Smoke
     needs: [deploy]
-    # Only run after successful deploy to main (production)
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Run after successful deploy to production
+    if: ${{ always() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -670,9 +670,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running critical tests + changed tests"
-            # Always run critical tests on deploy path
-            pnpm --filter=@jovie/web run test -- --testNamePattern="@critical" ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "🚀 Main branch: Running critical tests only (9 files, ~2s)"
+            # Run only critical test files - filter by filename pattern
+            pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
             # Plus tests for files changed since preview (if preview branch exists)
             # Must fetch origin/preview first since checkout only fetches current ref
             if git fetch origin preview --depth=1 2>/dev/null; then
@@ -1534,7 +1534,8 @@ jobs:
 
   deploy:
     needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required, ci-homepage-smoke] # Required smoke + homepage smoke must pass before deploy
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -1594,7 +1595,7 @@ jobs:
   canary-health-gate:
     name: Canary Health Gate (production)
     needs: [deploy]
-    if: ${{ needs.deploy.result == 'success' }}
+    if: ${{ always() && needs.deploy.result == 'success' }}
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       deployment_url: ${{ needs.deploy.outputs.deployment_url }}
@@ -1803,11 +1804,12 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  # Lighthouse CI - runs after production deploy
+  # Lighthouse CI - runs after production deploy to check performance on homepage + public profiles
   lighthouse-ci:
     name: Lighthouse CI (Production)
     needs: [deploy]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Run after successful deploy (tests homepage + /tim profile)
+    if: ${{ always() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
