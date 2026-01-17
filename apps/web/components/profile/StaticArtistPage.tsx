@@ -207,7 +207,6 @@ export function StaticArtistPage({
         showBackButton={showBackButton}
         showFooter={showFooter}
         showNotificationButton={true}
-        forceNotificationsEnabled={isPublicProfileMode}
       >
         <div>
           {mode === 'profile' ? (
