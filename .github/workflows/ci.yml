@@ -670,9 +670,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running critical tests + changed tests"
-            # Always run critical tests on deploy path
-            pnpm --filter=@jovie/web run test -- --testNamePattern="@critical" ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "🚀 Main branch: Running critical tests only (9 files, ~2s)"
+            # Run only critical test files - filter by filename pattern
+            pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
             # Plus tests for files changed since preview (if preview branch exists)
             if git rev-parse --verify origin/preview >/dev/null 2>&1; then
               pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }}
