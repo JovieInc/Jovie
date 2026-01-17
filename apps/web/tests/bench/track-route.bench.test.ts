@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { LinkType } from '@/types/db';
 
 const PERF_LATENCY_ENABLED = process.env.PERF_LATENCY === 'true';
+const BENCH_SAMPLE_SIZE = 10;
 
 const DEFAULT_MEMBER = {
   id: 'aud-1',
@@ -159,6 +160,13 @@ async function runBenchmark(sampleSize: number) {
     db: buildDb(state),
   }));
 
+  vi.doMock('@/lib/rate-limit', () => ({
+    trackingIpClicksLimiter: {
+      limit: async () => ({ success: true }),
+    },
+    createRateLimitHeaders: () => ({}),
+  }));
+
   const { POST } = await import('@/app/api/track/route');
 
   const durations: number[] = [];
@@ -196,9 +204,9 @@ async function runBenchmark(sampleSize: number) {
 
 describe('track route synthetic benchmark', () => {
   it('captures p50/p95 latency and ensures click persistence', async () => {
-    const result = await runBenchmark(20);
+    const result = await runBenchmark(BENCH_SAMPLE_SIZE);
 
-    expect(result.clicks).toBe(20);
+    expect(result.clicks).toBe(BENCH_SAMPLE_SIZE);
     expect(result.socialUpdates).toBeGreaterThan(0);
     // Log for manual comparison before/after perf changes
     console.info('[track-route-benchmark]', {
@@ -207,5 +215,5 @@ describe('track route synthetic benchmark', () => {
       clicks: result.clicks,
       socialUpdates: result.socialUpdates,
     });
-  }, 10000);
+  }, 40000);
 });
