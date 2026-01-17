@@ -215,7 +215,8 @@ CREATE TABLE "notification_subscriptions" (
 	"source" text,
 	"preferences" jsonb DEFAULT '{"releasePreview":true,"releaseDay":true}'::jsonb,
 	"unsubscribed_at" timestamp,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "notification_subscriptions_contact_required" CHECK (email IS NOT NULL OR phone IS NOT NULL)
 );
 --> statement-breakpoint
 CREATE TABLE "tips" (
@@ -769,7 +770,6 @@ CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_admin_user_id" ON "admin_audit_l
 CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_target_user_id" ON "admin_audit_log" USING btree ("target_user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_created_at" ON "admin_audit_log" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_admin_audit_log_action" ON "admin_audit_log" USING btree ("action");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "audience_members_creator_profile_id_fingerprint_idx" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "audience_members_creator_profile_id_fingerprint_unique" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "click_events_creator_profile_id_created_at_idx" ON "click_events" USING btree ("creator_profile_id","created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "click_events_creator_profile_id_is_bot_created_at_idx" ON "click_events" USING btree ("creator_profile_id","is_bot","created_at");--> statement-breakpoint
