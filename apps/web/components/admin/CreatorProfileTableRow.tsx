@@ -24,6 +24,7 @@ import {
   geistTableMenuSeparatorClass,
 } from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) =>
@@ -141,15 +142,21 @@ export function CreatorProfileTableRow({
     <tr
       className={getRowClassName(isChecked, isSelected)}
       onClick={() => onRowClick(profile.id)}
+      onKeyDown={event =>
+        handleActivationKeyDown(event, () => onRowClick(profile.id))
+      }
+      tabIndex={0}
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
         {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
+          onKeyDown={event =>
+            handleActivationKeyDown(event, () => event.stopPropagation())
+          }
         >
           <span
             className={cn(
@@ -225,10 +232,12 @@ export function CreatorProfileTableRow({
           : '—'}
       </td>
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       <td
         className='px-4 py-3 align-middle text-right'
         onClick={e => e.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, () => event.stopPropagation())
+        }
       >
         <div className='flex items-center justify-end gap-2'>
           {/* Icon action buttons - always visible on hover */}

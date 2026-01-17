@@ -4,6 +4,7 @@ import React from 'react';
 import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { AudienceMember } from '@/types';
 
 export interface AudienceLastSeenCellProps {
@@ -32,7 +33,6 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
       )}
     >
       <span className='line-clamp-1'>{formatTimeAgo(lastSeenAt)}</span>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       <div
@@ -41,6 +41,9 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
           isMenuOpen && 'opacity-100 pointer-events-auto'
         )}
         onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, () => event.stopPropagation())
+        }
       >
         <AudienceRowActionsMenu
           row={row}

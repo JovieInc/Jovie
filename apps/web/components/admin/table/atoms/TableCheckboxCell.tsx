@@ -3,6 +3,7 @@
 import { Checkbox } from '@jovie/ui';
 import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
@@ -116,11 +117,13 @@ export function TableCheckboxCell<TData = unknown>(
 
     return (
       // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container
-      // biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only
       // biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, () => event.stopPropagation())
+        }
       >
         <Checkbox
           aria-label='Select all rows'
@@ -137,11 +140,13 @@ export function TableCheckboxCell<TData = unknown>(
   if (row && typeof isChecked === 'boolean' && onToggleSelect) {
     return (
       // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container
-      // biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only
       // biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, () => event.stopPropagation())
+        }
       >
         <span
           className={cn(

@@ -9,6 +9,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 interface ReleasesEmptyStateState {
   searchQuery: string;
@@ -481,7 +482,6 @@ export function ReleasesEmptyState({
                     className='max-h-64 overflow-y-auto'
                   >
                     {results.map((artist, index) => (
-                      // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys
                       <li
                         key={artist.id}
                         id={`artist-result-${index}`}
@@ -496,6 +496,11 @@ export function ReleasesEmptyState({
                             : 'hover:bg-surface-2/50'
                         )}
                         onClick={() => handleArtistSelect(artist)}
+                        onKeyDown={event =>
+                          handleActivationKeyDown(event, () =>
+                            handleArtistSelect(artist)
+                          )
+                        }
                         onMouseEnter={() =>
                           dispatch({
                             type: 'SET_ACTIVE_RESULT_INDEX',

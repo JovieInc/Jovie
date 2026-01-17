@@ -3,6 +3,7 @@
 import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
 import { cn } from '@/lib/utils';
 import { formatLongDate } from '@/lib/utils/audience';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { AudienceMember } from '@/types';
 
 export interface AudienceCreatedAtCellProps {
@@ -28,7 +29,6 @@ export function AudienceCreatedAtCell({
       )}
     >
       <span className='line-clamp-1'>{formatLongDate(lastSeenAt)}</span>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
       <div
@@ -37,6 +37,9 @@ export function AudienceCreatedAtCell({
           isMenuOpen && 'opacity-100 pointer-events-auto'
         )}
         onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, () => event.stopPropagation())
+        }
       >
         <AudienceRowActionsMenu
           row={row}
