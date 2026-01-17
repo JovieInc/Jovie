@@ -69,7 +69,7 @@ function normalizeSpotifyUrl(url: string): string {
  * Generate a safe random handle for creator profiles
  */
 function safeRandomHandle(): string {
-  const token = randomUUID().replace(/-/g, '').slice(0, 12);
+  const token = randomUUID().replaceAll('-', '').slice(0, 12);
   return `c${token}`;
 }
 

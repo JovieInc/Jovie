@@ -131,6 +131,7 @@ export const UniversalLinkInput = forwardRef<
             id={autosuggestListId}
             role='listbox'
             aria-label='Platform suggestions'
+            tabIndex={-1}
             className='absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-lg'
             onMouseDown={event => {
               event.preventDefault();

@@ -93,7 +93,9 @@ export function useUserButton({
     user?.primaryEmailAddress?.emailAddress ||
     user?.emailAddresses?.[0]?.emailAddress;
 
-  const emailDerivedName = contactEmail?.split('@')[0]?.replace(/[._-]+/g, ' ');
+  const emailDerivedName = contactEmail
+    ?.split('@')[0]
+    ?.replaceAll(/[._-]+/g, ' ');
 
   const displayName =
     artist?.name ||
