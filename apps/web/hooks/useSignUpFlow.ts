@@ -11,6 +11,42 @@ import { isSignInSuggested, parseClerkError } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
+/**
+ * Wait for Clerk session to be fully propagated.
+ * Polls until session is active or timeout is reached.
+ *
+ * This replaces the previous fixed 500ms timeout with a more reliable
+ * polling mechanism that adapts to actual session readiness.
+ *
+ * @param maxWaitMs Maximum time to wait in milliseconds (default: 5000)
+ * @param initialIntervalMs Initial poll interval in milliseconds (default: 50)
+ * @returns Promise that resolves to true if session is ready, false if timed out
+ * @internal Exported for testing purposes
+ */
+export async function waitForSession(
+  maxWaitMs: number = 5000,
+  initialIntervalMs: number = 50
+): Promise<boolean> {
+  const startTime = Date.now();
+  let interval = initialIntervalMs;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    // Check if Clerk session is active via the global Clerk client
+    const clerk = (window as { Clerk?: { session?: { status?: string } } })
+      .Clerk;
+    if (clerk?.session?.status === 'active') {
+      return true;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, interval));
+    // Exponential backoff: increase interval up to 200ms for efficiency
+    interval = Math.min(interval * 1.5, 200);
+  }
+
+  // Timed out - return false but still allow navigation as fallback
+  return false;
+}
+
 // Re-export types for backwards compatibility
 export type { AuthMethod, LoadingState } from '@/lib/auth/types';
 // Workaround for eslint - use AuthMethod via re-export
@@ -129,7 +165,19 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           // This prevents race conditions where onboarding page loads before
           // the session is fully available, causing redirect loops
           base.setLoadingState({ type: 'completing' });
-          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Poll for session readiness instead of fixed timeout
+          // This adapts to actual propagation time and avoids unnecessary delays
+          const sessionReady = await waitForSession();
+
+          // Navigate even if timeout occurred - the session should be ready
+          // by the time the page loads, and the fresh_signup flag provides
+          // additional protection against redirect loops
+          if (!sessionReady) {
+            console.warn(
+              '[useSignUpFlow] Session polling timed out, proceeding with redirect'
+            );
+          }
 
           // Navigate to onboarding with fresh_signup flag for loop detection
           const redirectUrl = base.getRedirectUrl();
