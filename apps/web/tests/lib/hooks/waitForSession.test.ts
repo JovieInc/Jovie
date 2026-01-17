@@ -41,10 +41,12 @@ describe('waitForSession', () => {
 
     const promise = waitForSession(5000, 50);
 
-    // Advance timers to allow polling
-    await vi.advanceTimersByTimeAsync(200);
+    // Run timer advancement and promise concurrently for fake-timer consistency
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(200),
+    ]);
 
-    const result = await promise;
     expect(result).toBe(true);
     expect(pollCount).toBeGreaterThanOrEqual(3);
   });
