@@ -8,12 +8,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import {
-  themeModeEnum,
-  userStatusEnum,
-  userStatusLifecycleEnum,
-  userWaitlistApprovalEnum,
-} from './enums';
+import { themeModeEnum, userStatusLifecycleEnum } from './enums';
 
 // Users table
 export const users = pgTable(
@@ -24,15 +19,11 @@ export const users = pgTable(
     name: text('name'),
     email: text('email').unique(),
 
-    // NEW: Single source of truth for user lifecycle
+    // Single source of truth for user lifecycle
     userStatus: userStatusLifecycleEnum('user_status').notNull(),
 
-    // DEPRECATED (2026-01): Remove after migration 0036 deploys and code stabilizes (2-4 weeks). Use userStatus instead.
-    status: userStatusEnum('status').notNull().default('active'),
-    // DEPRECATED (2026-01): Historical data only. Do not write to this field.
+    // Historical waitlist entry reference (used by auth gate logic)
     waitlistEntryId: uuid('waitlist_entry_id'),
-    // DEPRECATED (2026-01): Remove after migration 0036 deploys and code stabilizes (2-4 weeks). Use userStatus instead.
-    waitlistApproval: userWaitlistApprovalEnum('waitlist_approval'),
 
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
@@ -46,14 +37,7 @@ export const users = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
-    // NEW: Primary index for user lifecycle state
     userStatusIdx: index('idx_users_user_status').on(table.userStatus),
-
-    // DEPRECATED: Legacy indexes (dropped in migration 0036)
-    // These are commented out because the indexes no longer exist in the database
-    // statusIdx: index('idx_users_status').on(table.status),
-    // waitlistEntryIdIdx: index('idx_users_waitlist_entry_id').on(table.waitlistEntryId),
-    // waitlistApprovalIdx: index('idx_users_waitlist_approval').on(table.waitlistApproval),
   })
 );
 

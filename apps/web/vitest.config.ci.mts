@@ -23,14 +23,14 @@ export default defineConfig({
     poolOptions: {
       forks: {
         minForks: 1,
-        // Use 50% of available CPUs in CI (typically 2-4), single fork locally for stability
+        // Use available CPUs in CI (up to 8 for faster execution), single fork locally for stability
         maxForks: process.env.CI
           ? Math.max(
               2,
               Math.floor(
                 process.env.VITEST_MAX_FORKS
                   ? parseInt(process.env.VITEST_MAX_FORKS)
-                  : 4
+                  : 8
               )
             )
           : 1,

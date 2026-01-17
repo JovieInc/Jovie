@@ -17,12 +17,6 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'failed',
 ]);
 
-export const userStatusEnum = pgEnum('user_status', [
-  'active',
-  'pending',
-  'banned',
-]);
-
 // Link & Social Enums
 export const linkTypeEnum = pgEnum('link_type', [
   'listen',
@@ -150,12 +144,6 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'sending',
   'sent',
   'failed',
-]);
-
-// User waitlist approval status (simpler than separate waitlistEntries table)
-export const userWaitlistApprovalEnum = pgEnum('user_waitlist_approval', [
-  'pending',
-  'approved',
 ]);
 
 // User status lifecycle enum - single source of truth for user state
