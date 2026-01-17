@@ -206,6 +206,7 @@ describe('validateMagicBytes', () => {
         0x00,
       ]);
       expect(validateMagicBytes(avifBuffer, 'image/avif')).toBe(true);
+      expect(validateMagicBytes(avifBuffer, 'image/avif-sequence')).toBe(true);
     });
 
     it('should reject invalid ISOBMFF without proper ftyp box', () => {
@@ -217,6 +218,9 @@ describe('validateMagicBytes', () => {
         false
       );
       expect(validateMagicBytes(invalidBuffer, 'image/heif-sequence')).toBe(
+        false
+      );
+      expect(validateMagicBytes(invalidBuffer, 'image/avif-sequence')).toBe(
         false
       );
     });

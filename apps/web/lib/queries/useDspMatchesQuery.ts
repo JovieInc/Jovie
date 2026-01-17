@@ -107,7 +107,8 @@ export function useDspMatchesQuery({
   enabled = true,
 }: UseDspMatchesQueryOptions) {
   return useQuery<DspMatch[]>({
-    queryKey: queryKeys.dspEnrichment.matches(profileId),
+    // Include status in cache key so different filters have separate caches
+    queryKey: queryKeys.dspEnrichment.matches(profileId, status),
     queryFn: ({ signal }) => fetchDspMatches(profileId, status, signal),
     enabled: enabled && !!profileId,
     // STANDARD_CACHE preset

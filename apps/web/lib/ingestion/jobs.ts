@@ -271,3 +271,63 @@ export async function enqueueLayloIngestionJob(params: {
 
   return inserted?.id ?? null;
 }
+
+/**
+ * Enqueue a DSP artist discovery job.
+ *
+ * Discovers matching artist profiles on other DSPs (like Apple Music)
+ * for a creator profile using ISRC-based matching.
+ *
+ * @param params - Job parameters
+ * @returns Job ID if created, null if deduplicated
+ */
+export async function enqueueDspArtistDiscoveryJob(params: {
+  creatorProfileId: string;
+  spotifyArtistId: string;
+  targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
+}): Promise<string | null> {
+  const dedupKey = `dsp_discovery:${params.creatorProfileId}:${Date.now()}`;
+
+  const payload = {
+    creatorProfileId: params.creatorProfileId,
+    spotifyArtistId: params.spotifyArtistId,
+    targetProviders: params.targetProviders ?? ['apple_music'],
+    dedupKey,
+  };
+
+  // Check for recent pending/processing jobs for this profile
+  const recentJob = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${params.creatorProfileId}`,
+        or(
+          eq(ingestionJobs.status, 'pending'),
+          eq(ingestionJobs.status, 'processing')
+        )
+      )
+    )
+    .limit(1);
+
+  // If there's already a pending/processing job, don't create another
+  if (recentJob.length > 0) {
+    return recentJob[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'dsp_artist_discovery',
+      payload,
+      dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 1, // Higher priority for user-triggered discovery
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
