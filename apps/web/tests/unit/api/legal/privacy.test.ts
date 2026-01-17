@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/utils/rate-limit', () => ({
   checkRateLimit: vi.fn().mockReturnValue(false),
@@ -17,14 +17,11 @@ vi.mock('fs', () => ({
   },
 }));
 
-describe('GET /api/legal/privacy', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
-  });
+// Static import - mocks are already set up above
+import { GET } from '@/app/api/legal/privacy/route';
 
+describe('GET /api/legal/privacy', () => {
   it('returns privacy policy content', async () => {
-    const { GET } = await import('@/app/api/legal/privacy/route');
     const response = await GET();
     const contentType = response.headers.get('Content-Type');
 
