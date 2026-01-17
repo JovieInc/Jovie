@@ -19,6 +19,7 @@ This research evaluates AI music generation platforms that function as de facto 
 - Produces full songs with vocals and instrumentation up to 8 minutes
 
 **Consumer Listening Interface:**
+
 | Feature | Description |
 |---------|-------------|
 | Explore Page | Trending songs, curated playlists, genre discovery |
@@ -56,6 +57,7 @@ This research evaluates AI music generation platforms that function as de facto 
 - Settled with Universal Music Group in October 2025
 
 **Consumer Listening Interface:**
+
 | Feature | Description |
 |---------|-------------|
 | Community Platform | Browse and discover creator songs |
@@ -96,6 +98,7 @@ Post-UMG settlement (Oct 2025), Udio became a "walled garden":
 - Unique selling point: built-in distribution to 40+ streaming platforms
 
 **Consumer Listening Interface:**
+
 | Feature | Description |
 |---------|-------------|
 | Genre Playlists | Boomy EDM, Boomy Ambient, Boomy LoFi, etc. |
@@ -137,6 +140,7 @@ Post-UMG settlement (Oct 2025), Udio became a "walled garden":
 - Artists contribute samples and earn royalties
 
 **Consumer Listening Interface:**
+
 | Feature | Description |
 |---------|-------------|
 | Mubert Play | Infinite AI soundtrack streams |
@@ -169,6 +173,7 @@ Post-UMG settlement (Oct 2025), Udio became a "walled garden":
 - Available on browser, Windows, and Mac
 
 **Consumer Listening Interface:**
+
 | Feature | Description |
 |---------|-------------|
 | Radio Stations | Playlists of AIVA-composed music |
@@ -195,21 +200,25 @@ Post-UMG settlement (Oct 2025), Udio became a "walled garden":
 ## Tier 3: Not Recommended
 
 ### Loudly
+
 - **Reason:** Creation-focused tool; distribution only to external platforms (Spotify, etc.)
 - No internal community listening interface
 - Users cannot browse/discover other creators' music on Loudly itself
 
 ### Soundraw
+
 - **Reason:** No internal community features
 - Focus on external distribution and licensing
 - No public song discovery interface
 
 ### Beatoven.ai
+
 - **Reason:** Explicitly prohibits streaming distribution
 - Creation tool only
 - License prevents Spotify/Apple Music distribution
 
 ### Stable Audio (Stability AI)
+
 - **Reason:** Pure generation tool
 - No community features or public song sharing
 - Focus on audio-to-audio transformation
