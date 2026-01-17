@@ -1,152 +1,152 @@
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audience_device_type') THEN
-    CREATE TYPE "public"."audience_device_type" AS ENUM('mobile', 'desktop', 'tablet', 'unknown');
-  END IF;
+  CREATE TYPE "public"."audience_device_type" AS ENUM('mobile', 'desktop', 'tablet', 'unknown');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audience_intent_level') THEN
-    CREATE TYPE "public"."audience_intent_level" AS ENUM('high', 'medium', 'low');
-  END IF;
+  CREATE TYPE "public"."audience_intent_level" AS ENUM('high', 'medium', 'low');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audience_member_type') THEN
-    CREATE TYPE "public"."audience_member_type" AS ENUM('anonymous', 'email', 'sms', 'spotify', 'customer');
-  END IF;
+  CREATE TYPE "public"."audience_member_type" AS ENUM('anonymous', 'email', 'sms', 'spotify', 'customer');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'claim_invite_status') THEN
-    CREATE TYPE "public"."claim_invite_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'bounced', 'failed', 'unsubscribed');
-  END IF;
+  CREATE TYPE "public"."claim_invite_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'bounced', 'failed', 'unsubscribed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'contact_channel') THEN
-    CREATE TYPE "public"."contact_channel" AS ENUM('email', 'phone');
-  END IF;
+  CREATE TYPE "public"."contact_channel" AS ENUM('email', 'phone');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'contact_role') THEN
-    CREATE TYPE "public"."contact_role" AS ENUM('bookings', 'management', 'press_pr', 'brand_partnerships', 'fan_general', 'other');
-  END IF;
+  CREATE TYPE "public"."contact_role" AS ENUM('bookings', 'management', 'press_pr', 'brand_partnerships', 'fan_general', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'creator_type') THEN
-    CREATE TYPE "public"."creator_type" AS ENUM('artist', 'podcaster', 'influencer', 'creator');
-  END IF;
+  CREATE TYPE "public"."creator_type" AS ENUM('artist', 'podcaster', 'influencer', 'creator');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'currency_code') THEN
-    CREATE TYPE "public"."currency_code" AS ENUM('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK');
-  END IF;
+  CREATE TYPE "public"."currency_code" AS ENUM('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'discog_release_type') THEN
-    CREATE TYPE "public"."discog_release_type" AS ENUM('single', 'ep', 'album', 'compilation', 'live', 'mixtape', 'other');
-  END IF;
+  CREATE TYPE "public"."discog_release_type" AS ENUM('single', 'ep', 'album', 'compilation', 'live', 'mixtape', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'dsp_match_status') THEN
-    CREATE TYPE "public"."dsp_match_status" AS ENUM('suggested', 'confirmed', 'rejected', 'auto_confirmed');
-  END IF;
+  CREATE TYPE "public"."dsp_match_status" AS ENUM('suggested', 'confirmed', 'rejected', 'auto_confirmed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_job_status') THEN
-    CREATE TYPE "public"."ingestion_job_status" AS ENUM('pending', 'processing', 'succeeded', 'failed');
-  END IF;
+  CREATE TYPE "public"."ingestion_job_status" AS ENUM('pending', 'processing', 'succeeded', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_source_type') THEN
-    CREATE TYPE "public"."ingestion_source_type" AS ENUM('manual', 'admin', 'ingested');
-  END IF;
+  CREATE TYPE "public"."ingestion_source_type" AS ENUM('manual', 'admin', 'ingested');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_status') THEN
-    CREATE TYPE "public"."ingestion_status" AS ENUM('idle', 'pending', 'processing', 'failed');
-  END IF;
+  CREATE TYPE "public"."ingestion_status" AS ENUM('idle', 'pending', 'processing', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'link_type') THEN
-    CREATE TYPE "public"."link_type" AS ENUM('listen', 'social', 'tip', 'other');
-  END IF;
+  CREATE TYPE "public"."link_type" AS ENUM('listen', 'social', 'tip', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_channel') THEN
-    CREATE TYPE "public"."notification_channel" AS ENUM('email', 'sms', 'push');
-  END IF;
+  CREATE TYPE "public"."notification_channel" AS ENUM('email', 'sms', 'push');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'photo_status') THEN
-    CREATE TYPE "public"."photo_status" AS ENUM('uploading', 'processing', 'ready', 'failed');
-  END IF;
+  CREATE TYPE "public"."photo_status" AS ENUM('uploading', 'processing', 'ready', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'provider_kind') THEN
-    CREATE TYPE "public"."provider_kind" AS ENUM('music_streaming', 'video', 'social', 'retail', 'other');
-  END IF;
+  CREATE TYPE "public"."provider_kind" AS ENUM('music_streaming', 'video', 'social', 'retail', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'provider_link_owner_type') THEN
-    CREATE TYPE "public"."provider_link_owner_type" AS ENUM('release', 'track');
-  END IF;
+  CREATE TYPE "public"."provider_link_owner_type" AS ENUM('release', 'track');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_notification_status') THEN
-    CREATE TYPE "public"."release_notification_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled');
-  END IF;
+  CREATE TYPE "public"."release_notification_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_notification_type') THEN
-    CREATE TYPE "public"."release_notification_type" AS ENUM('preview', 'release_day');
-  END IF;
+  CREATE TYPE "public"."release_notification_type" AS ENUM('preview', 'release_day');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'scraper_strategy') THEN
-    CREATE TYPE "public"."scraper_strategy" AS ENUM('http', 'browser', 'api');
-  END IF;
+  CREATE TYPE "public"."scraper_strategy" AS ENUM('http', 'browser', 'api');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_account_status') THEN
-    CREATE TYPE "public"."social_account_status" AS ENUM('suspected', 'confirmed', 'rejected');
-  END IF;
+  CREATE TYPE "public"."social_account_status" AS ENUM('suspected', 'confirmed', 'rejected');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_link_state') THEN
-    CREATE TYPE "public"."social_link_state" AS ENUM('active', 'suggested', 'rejected');
-  END IF;
+  CREATE TYPE "public"."social_link_state" AS ENUM('active', 'suggested', 'rejected');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_suggestion_status') THEN
-    CREATE TYPE "public"."social_suggestion_status" AS ENUM('pending', 'accepted', 'rejected', 'email_sent', 'expired');
-  END IF;
+  CREATE TYPE "public"."social_suggestion_status" AS ENUM('pending', 'accepted', 'rejected', 'email_sent', 'expired');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_plan') THEN
-    CREATE TYPE "public"."subscription_plan" AS ENUM('free', 'basic', 'premium', 'pro');
-  END IF;
+  CREATE TYPE "public"."subscription_plan" AS ENUM('free', 'basic', 'premium', 'pro');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') THEN
-    CREATE TYPE "public"."subscription_status" AS ENUM('active', 'inactive', 'cancelled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid');
-  END IF;
+  CREATE TYPE "public"."subscription_status" AS ENUM('active', 'inactive', 'cancelled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'theme_mode') THEN
-    CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');
-  END IF;
+  CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status_lifecycle') THEN
-    CREATE TYPE "public"."user_status_lifecycle" AS ENUM('waitlist_pending', 'waitlist_approved', 'profile_claimed', 'onboarding_incomplete', 'active', 'suspended', 'banned');
-  END IF;
+  CREATE TYPE "public"."user_status_lifecycle" AS ENUM('waitlist_pending', 'waitlist_approved', 'profile_claimed', 'onboarding_incomplete', 'active', 'suspended', 'banned');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitlist_invite_status') THEN
-    CREATE TYPE "public"."waitlist_invite_status" AS ENUM('pending', 'sending', 'sent', 'failed');
-  END IF;
+  CREATE TYPE "public"."waitlist_invite_status" AS ENUM('pending', 'sending', 'sent', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitlist_status') THEN
-    CREATE TYPE "public"."waitlist_status" AS ENUM('new', 'invited', 'claimed');
-  END IF;
+  CREATE TYPE "public"."waitlist_status" AS ENUM('new', 'invited', 'claimed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;--> statement-breakpoint
 CREATE TABLE "admin_audit_log" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
