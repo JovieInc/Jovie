@@ -15,6 +15,27 @@ import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 // ============================================================================
+// Validation
+// ============================================================================
+
+/**
+ * UUID v4 regex pattern for validation.
+ * Matches: xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx
+ */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate a UUID v4 string.
+ *
+ * @param id - String to validate
+ * @returns True if valid UUID v4
+ */
+function isValidUuid(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -71,25 +92,6 @@ export interface TriggerDiscoveryResponse {
   jobId: string;
   targetProviders: DspProviderId[];
   error?: string;
-}
-
-// ============================================================================
-// Validation
-// ============================================================================
-
-/**
- * UUID v4 validation regex.
- * Validates format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
- */
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/**
- * Validate that a string is a valid UUID v4.
- * Used to prevent invalid IDs in URL paths.
- */
-function isValidUuid(id: string): boolean {
-  return UUID_REGEX.test(id);
 }
 
 // ============================================================================
@@ -156,6 +158,11 @@ async function rejectDspMatch(
 async function triggerDspDiscovery(
   input: TriggerDiscoveryInput
 ): Promise<TriggerDiscoveryResponse> {
+  // Validate profileId before making API call
+  if (!isValidUuid(input.profileId)) {
+    throw new Error(`Invalid profile ID format: ${input.profileId}`);
+  }
+
   const response = await fetchWithTimeout<TriggerDiscoveryResponse>(
     '/api/dsp/discover',
     {

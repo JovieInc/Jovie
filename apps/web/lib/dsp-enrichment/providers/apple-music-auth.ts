@@ -24,6 +24,56 @@ const APPLE_MUSIC_KEY_ID = process.env.APPLE_MUSIC_KEY_ID;
 const APPLE_MUSIC_TEAM_ID = process.env.APPLE_MUSIC_TEAM_ID;
 const APPLE_MUSIC_PRIVATE_KEY = process.env.APPLE_MUSIC_PRIVATE_KEY;
 
+// ============================================================================
+// Environment Validation (run once at module load)
+// ============================================================================
+
+/**
+ * Regex for Apple Key ID and Team ID (10 alphanumeric characters).
+ * Accepts both uppercase and lowercase letters.
+ */
+const APPLE_ID_REGEX = /^[A-Za-z0-9]{10}$/;
+
+/**
+ * Validate that environment variables have correct format.
+ * Called once at module initialization to catch configuration errors early.
+ *
+ * @throws Error if any configured value has invalid format
+ */
+function validateEnvFormat(): void {
+  // Only validate if credentials are configured
+  if (!APPLE_MUSIC_KEY_ID && !APPLE_MUSIC_TEAM_ID && !APPLE_MUSIC_PRIVATE_KEY) {
+    return; // Not configured - skip validation
+  }
+
+  if (APPLE_MUSIC_KEY_ID && !APPLE_ID_REGEX.test(APPLE_MUSIC_KEY_ID)) {
+    throw new Error(
+      `Invalid APPLE_MUSIC_KEY_ID format: expected 10 alphanumeric characters, got "${APPLE_MUSIC_KEY_ID.slice(0, 20)}${APPLE_MUSIC_KEY_ID.length > 20 ? '...' : ''}"`
+    );
+  }
+
+  if (APPLE_MUSIC_TEAM_ID && !APPLE_ID_REGEX.test(APPLE_MUSIC_TEAM_ID)) {
+    throw new Error(
+      `Invalid APPLE_MUSIC_TEAM_ID format: expected 10 alphanumeric characters, got "${APPLE_MUSIC_TEAM_ID.slice(0, 20)}${APPLE_MUSIC_TEAM_ID.length > 20 ? '...' : ''}"`
+    );
+  }
+
+  if (APPLE_MUSIC_PRIVATE_KEY) {
+    const normalizedKey = APPLE_MUSIC_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const hasPemHeader = normalizedKey.includes('-----BEGIN');
+    const hasPemFooter = normalizedKey.includes('-----END');
+
+    if (!hasPemHeader || !hasPemFooter) {
+      throw new Error(
+        'Invalid APPLE_MUSIC_PRIVATE_KEY format: expected PEM format with BEGIN/END markers'
+      );
+    }
+  }
+}
+
+// Validate environment format once at module load
+validateEnvFormat();
+
 /**
  * Token validity period in seconds.
  * Apple recommends max 6 months (15777000 seconds).
@@ -58,35 +108,6 @@ let pendingTokenGeneration: Promise<string> | null = null;
 // ============================================================================
 
 /**
- * Validate environment variable format.
- * Apple Key ID and Team ID should be 10 alphanumeric characters.
- */
-function validateEnvFormat(): void {
-  const alphanumeric10Char = /^[A-Z0-9]{10}$/;
-
-  if (APPLE_MUSIC_KEY_ID && !alphanumeric10Char.test(APPLE_MUSIC_KEY_ID)) {
-    console.warn(
-      `${LOG_PREFIX} APPLE_MUSIC_KEY_ID should be 10 alphanumeric characters, got: ${APPLE_MUSIC_KEY_ID.length} chars`
-    );
-  }
-
-  if (APPLE_MUSIC_TEAM_ID && !alphanumeric10Char.test(APPLE_MUSIC_TEAM_ID)) {
-    console.warn(
-      `${LOG_PREFIX} APPLE_MUSIC_TEAM_ID should be 10 alphanumeric characters, got: ${APPLE_MUSIC_TEAM_ID.length} chars`
-    );
-  }
-
-  if (
-    APPLE_MUSIC_PRIVATE_KEY &&
-    !APPLE_MUSIC_PRIVATE_KEY.includes('BEGIN PRIVATE KEY')
-  ) {
-    console.warn(
-      `${LOG_PREFIX} APPLE_MUSIC_PRIVATE_KEY does not appear to be in PEM format`
-    );
-  }
-}
-
-/**
  * Generate a fresh Apple MusicKit developer token.
  *
  * @returns The signed JWT token
@@ -102,9 +123,6 @@ async function generateToken(): Promise<string> {
   if (!APPLE_MUSIC_PRIVATE_KEY) {
     throw new Error('APPLE_MUSIC_PRIVATE_KEY environment variable is not set');
   }
-
-  // Validate format on first generation
-  validateEnvFormat();
 
   // The private key may be stored with escaped newlines
   const privateKeyPem = APPLE_MUSIC_PRIVATE_KEY.replace(/\\n/g, '\n');

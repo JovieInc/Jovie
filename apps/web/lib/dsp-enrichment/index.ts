@@ -29,5 +29,57 @@ export type {
   MatchingResult,
 } from './matching';
 
-// All types from types.ts are safe for client
-export * from './types';
+// Types only (explicit exports - no runtime constants)
+export type {
+  // Provider API response types
+  AppleMusicAlbum,
+  AppleMusicArtist,
+  AppleMusicTrack,
+  // Matching algorithm types
+  ArtistMatchCandidate,
+  AutoConfirmThresholds,
+  ConfidenceWeights,
+  DeezerArtist,
+  DeezerTrack,
+  // Discovery job types
+  DiscographySyncPayload,
+  DiscographySyncResult,
+  DspArtistDiscoveryPayload,
+  DspArtistDiscoveryResult,
+  // Re-exported from DB schema
+  DspArtistEnrichment,
+  DspArtistMatch,
+  DspExternalUrls,
+  DspImageUrls,
+  DspMatchConfidenceBreakdown,
+  // Provider type aliases
+  DspMatchStatus,
+  DspProviderId,
+  DspTrackEnrichmentPayload,
+  DspTrackEnrichmentResult,
+  // Social link types
+  ExtractedSocialLink,
+  FanNotificationPreferences,
+  FanReleaseNotification,
+  IsrcMatchResult,
+  MusicBrainzArtist,
+  MusicBrainzRecording,
+  MusicBrainzRelation,
+  NewDspArtistEnrichment,
+  NewDspArtistMatch,
+  NewFanReleaseNotification,
+  NewReleaseSyncStatus,
+  NewSocialLinkSuggestion,
+  // Notification types
+  NotificationCategory,
+  NotificationGroup,
+  NotificationPreferences,
+  ReleaseNotificationStatus,
+  ReleaseNotificationType,
+  ReleaseSyncStatus,
+  ScoredArtistMatch,
+  SocialLinkSuggestion,
+  SocialPlatform,
+  SocialSuggestionConfidenceBreakdown,
+  SocialSuggestionStatus,
+} from './types';
