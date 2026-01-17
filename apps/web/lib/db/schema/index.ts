@@ -28,6 +28,8 @@ export * from './ingestion';
 export * from './links';
 // Creator Profiles
 export * from './profiles';
+// Suppression (Email Suppressions, Webhook Events, Delivery Logs)
+export * from './suppression';
 
 // Waitlist
 export * from './waitlist';
