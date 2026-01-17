@@ -15,6 +15,8 @@ import {
   type CircuitBreakerConfig,
 } from '@/lib/spotify/circuit-breaker';
 
+import type { DspProviderId } from './types';
+
 export type {
   CircuitBreakerConfig,
   CircuitBreakerStats,
@@ -93,7 +95,7 @@ export const musicBrainzCircuitBreaker = new CircuitBreaker(MUSICBRAINZ_CONFIG);
  * Get the circuit breaker for a specific DSP provider.
  */
 export function getCircuitBreakerForProvider(
-  providerId: string
+  providerId: DspProviderId
 ): CircuitBreaker | null {
   switch (providerId) {
     case 'apple_music':

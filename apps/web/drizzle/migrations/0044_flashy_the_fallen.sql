@@ -1,26 +1,22 @@
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'dsp_match_status') THEN
-    CREATE TYPE "public"."dsp_match_status" AS ENUM('suggested', 'confirmed', 'rejected', 'auto_confirmed');
-  END IF;
+DO $$ BEGIN
+  CREATE TYPE "public"."dsp_match_status" AS ENUM('suggested', 'confirmed', 'rejected', 'auto_confirmed');
+EXCEPTION
+  WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_notification_status') THEN
-    CREATE TYPE "public"."release_notification_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled');
-  END IF;
+DO $$ BEGIN
+  CREATE TYPE "public"."release_notification_status" AS ENUM('pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled');
+EXCEPTION
+  WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_notification_type') THEN
-    CREATE TYPE "public"."release_notification_type" AS ENUM('preview', 'release_day');
-  END IF;
+DO $$ BEGIN
+  CREATE TYPE "public"."release_notification_type" AS ENUM('preview', 'release_day');
+EXCEPTION
+  WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_suggestion_status') THEN
-    CREATE TYPE "public"."social_suggestion_status" AS ENUM('pending', 'accepted', 'rejected', 'email_sent', 'expired');
-  END IF;
+DO $$ BEGIN
+  CREATE TYPE "public"."social_suggestion_status" AS ENUM('pending', 'accepted', 'rejected', 'email_sent', 'expired');
+EXCEPTION
+  WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "dsp_artist_enrichment" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

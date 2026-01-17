@@ -77,6 +77,7 @@ export interface LocalTrackData {
   title: string;
   isrc: string | null;
   upc?: string | null;
+  /** Release date for prioritization (ISO string or Date) */
   releaseDate?: string | Date | null;
 }
 
@@ -125,7 +126,16 @@ export function convertAppleMusicToIsrcMatches(
     if (appleMusicTrack) {
       // Extract artist from relationships or attributes
       const artistData = appleMusicTrack.relationships?.artists?.data?.[0];
-      const artistId = artistData?.id ?? 'unknown';
+      const artistId = artistData?.id;
+
+      // Skip tracks without a valid artist ID - we can't aggregate without it
+      if (!artistId) {
+        console.warn(
+          `[convertAppleMusicToIsrcMatches] Skipping ISRC ${normalizedIsrc}: missing artist ID`
+        );
+        continue;
+      }
+
       const artistName =
         appleMusicTrack.attributes?.artistName ?? 'Unknown Artist';
 
@@ -285,13 +295,14 @@ export function selectTracksForMatching(
   // Filter to tracks with ISRCs
   const tracksWithIsrc = tracks.filter(t => t.isrc && t.isrc.trim().length > 0);
 
-  // If we have fewer than max, return all (sorted by release date)
+  // If we have fewer than max, return all (still sorted for consistency)
   if (tracksWithIsrc.length <= maxTracks) {
     return sortByReleaseDateDescending(tracksWithIsrc);
   }
 
-  // Sort by release date and take the most recent tracks
+  // Sort by release date descending to prioritize recent releases
   const sorted = sortByReleaseDateDescending(tracksWithIsrc);
+
   return sorted.slice(0, maxTracks);
 }
 

@@ -106,7 +106,7 @@ done
 # Check for CREATE INDEX CONCURRENTLY in migrations (not DROP or comments)
 # ONLY check NEW migrations - historical ones are grandfathered
 CONCURRENT_FILES=()
-for sql_file in "${NEW_MIGRATIONS[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]+"${NEW_MIGRATIONS[@]}"}"; do
   filename=$(basename "$sql_file")
   # Check for CREATE INDEX CONCURRENTLY (case insensitive, ignoring comments and DROP)
   if grep -i "CREATE[[:space:]]\+INDEX[[:space:]]\+CONCURRENTLY" "$sql_file" | grep -v "^[[:space:]]*--" >/dev/null 2>&1; then
@@ -118,7 +118,7 @@ done
 # Check for non-idempotent CREATE TYPE statements
 # ONLY check NEW migrations - historical ones are grandfathered
 NON_IDEMPOTENT_TYPE_FILES=()
-for sql_file in "${NEW_MIGRATIONS[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]+"${NEW_MIGRATIONS[@]}"}"; do
   filename=$(basename "$sql_file")
 
   # Look for CREATE TYPE statements (excluding comments)
@@ -152,7 +152,7 @@ done
 # Check for CREATE INDEX without IF NOT EXISTS
 # ONLY check NEW migrations - historical ones are grandfathered
 NON_IDEMPOTENT_INDEX_FILES=()
-for sql_file in "${NEW_MIGRATIONS[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]+"${NEW_MIGRATIONS[@]}"}"; do
   filename=$(basename "$sql_file")
   # Look for CREATE INDEX or CREATE UNIQUE INDEX without IF NOT EXISTS (ignoring comments)
   if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "CREATE[[:space:]]\+\(UNIQUE[[:space:]]\+\)\?INDEX" | grep -v -i "IF[[:space:]]\+NOT[[:space:]]\+EXISTS" >/dev/null 2>&1; then
@@ -164,7 +164,7 @@ done
 # Check for ALTER TYPE ADD VALUE without IF NOT EXISTS
 # ONLY check NEW migrations - historical ones are grandfathered
 NON_IDEMPOTENT_ALTER_TYPE_FILES=()
-for sql_file in "${NEW_MIGRATIONS[@]}"; do
+for sql_file in "${NEW_MIGRATIONS[@]+"${NEW_MIGRATIONS[@]}"}"; do
   filename=$(basename "$sql_file")
   # Look for ALTER TYPE ... ADD VALUE without IF NOT EXISTS (ignoring comments)
   if grep -Ev "^[[:space:]]*--" "$sql_file" | grep -i "ALTER[[:space:]]\+TYPE.*ADD[[:space:]]\+VALUE" | grep -v -i "IF[[:space:]]\+NOT[[:space:]]\+EXISTS" >/dev/null 2>&1; then

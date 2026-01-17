@@ -249,7 +249,7 @@ export const RATE_LIMITERS = {
   // DSP Enrichment Operations
   // ---------------------------------------------------------------------------
 
-  /** Apple Music ISRC lookup: 80 requests per minute (below 100/sec API limit) */
+  /** Apple Music ISRC lookup: 80 requests per minute (conservative limit for MusicKit API) */
   appleMusicLookup: {
     name: 'Apple Music Lookup',
     limit: 80,
@@ -258,7 +258,7 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** Apple Music bulk ISRC lookup: 20 batch requests per minute */
+  /** Apple Music bulk ISRC lookup: 20 batch requests per minute (each batch = up to 25 ISRCs) */
   appleMusicBulkIsrc: {
     name: 'Apple Music Bulk ISRC',
     limit: 20,
@@ -267,7 +267,7 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** Deezer lookup: 40 requests per minute (below 50/sec API limit) */
+  /** Deezer lookup: 40 requests per minute (conservative limit for Deezer API) */
   deezerLookup: {
     name: 'Deezer Lookup',
     limit: 40,

@@ -9,6 +9,7 @@
 
 import {
   act,
+  configure,
   fireEvent,
   render,
   renderHook,
@@ -16,6 +17,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Speed up waitFor calls with shorter timeout and interval
+configure({ asyncUtilTimeout: 100 });
 
 // Import components and hooks to test
 import { useCSVExport } from '@/components/admin/table/useCSVExport';

@@ -101,6 +101,14 @@ export interface TriggerDiscoveryResponse {
 async function confirmDspMatch(
   input: ConfirmDspMatchInput
 ): Promise<ConfirmDspMatchResponse> {
+  // Validate matchId format to prevent invalid URL paths
+  if (!isValidUuid(input.matchId)) {
+    throw new Error(`Invalid matchId format: ${input.matchId}`);
+  }
+  if (!isValidUuid(input.profileId)) {
+    throw new Error(`Invalid profileId format: ${input.profileId}`);
+  }
+
   const response = await fetchWithTimeout<ConfirmDspMatchResponse>(
     `/api/dsp/matches/${input.matchId}/confirm`,
     {
@@ -120,6 +128,14 @@ async function confirmDspMatch(
 async function rejectDspMatch(
   input: RejectDspMatchInput
 ): Promise<RejectDspMatchResponse> {
+  // Validate matchId format to prevent invalid URL paths
+  if (!isValidUuid(input.matchId)) {
+    throw new Error(`Invalid matchId format: ${input.matchId}`);
+  }
+  if (!isValidUuid(input.profileId)) {
+    throw new Error(`Invalid profileId format: ${input.profileId}`);
+  }
+
   const response = await fetchWithTimeout<RejectDspMatchResponse>(
     `/api/dsp/matches/${input.matchId}/reject`,
     {
@@ -188,9 +204,14 @@ export function useConfirmDspMatchMutation() {
     mutationFn: confirmDspMatch,
 
     onSuccess: (data, variables) => {
-      // Invalidate matches list (status changed)
+      // Invalidate ALL matches caches for this profile (regardless of status filter)
+      // Use partial key match to invalidate ['dsp-enrichment', 'matches', profileId, *]
       queryClient.invalidateQueries({
-        queryKey: queryKeys.dspEnrichment.matches(variables.profileId),
+        queryKey: [
+          ...queryKeys.dspEnrichment.all,
+          'matches',
+          variables.profileId,
+        ],
       });
 
       // Invalidate enrichment status (new job started)
@@ -233,9 +254,14 @@ export function useRejectDspMatchMutation() {
     mutationFn: rejectDspMatch,
 
     onSuccess: (_, variables) => {
-      // Invalidate matches list (status changed)
+      // Invalidate ALL matches caches for this profile (regardless of status filter)
+      // Use partial key match to invalidate ['dsp-enrichment', 'matches', profileId, *]
       queryClient.invalidateQueries({
-        queryKey: queryKeys.dspEnrichment.matches(variables.profileId),
+        queryKey: [
+          ...queryKeys.dspEnrichment.all,
+          'matches',
+          variables.profileId,
+        ],
       });
     },
 

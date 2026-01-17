@@ -86,6 +86,9 @@ const TOKEN_EXPIRY_SECONDS = 86400; // 24 hours
  */
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
+/** Log prefix for structured logging */
+const LOG_PREFIX = '[AppleMusicAuth]';
+
 // ============================================================================
 // Token Cache
 // ============================================================================
@@ -96,6 +99,9 @@ interface CachedToken {
 }
 
 let cachedToken: CachedToken | null = null;
+
+/** Pending token generation promise to prevent race conditions */
+let pendingTokenGeneration: Promise<string> | null = null;
 
 // ============================================================================
 // JWT Generation
@@ -147,7 +153,8 @@ async function generateToken(): Promise<string> {
  * Get a valid Apple MusicKit developer token.
  *
  * Returns a cached token if still valid, otherwise generates a new one.
- * Thread-safe through single-threaded Node.js execution.
+ * Uses a pending promise to prevent race conditions when multiple
+ * concurrent requests need a token refresh.
  *
  * @returns The developer token for MusicKit API requests
  * @throws Error if configuration is missing
@@ -160,17 +167,34 @@ export async function getAppleMusicToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  // Generate new token
-  const token = await generateToken();
-  const expiresAt = now + TOKEN_EXPIRY_SECONDS * 1000;
+  // If a token generation is already in progress, wait for it
+  // This prevents multiple concurrent token generations
+  if (pendingTokenGeneration) {
+    console.debug(`${LOG_PREFIX} Waiting for pending token generation`);
+    return pendingTokenGeneration;
+  }
 
-  cachedToken = { token, expiresAt };
+  // Start token generation and store the promise
+  pendingTokenGeneration = (async () => {
+    try {
+      const token = await generateToken();
+      const expiresAt = Date.now() + TOKEN_EXPIRY_SECONDS * 1000;
 
-  console.log('[Apple Music Auth] Generated new developer token', {
-    expiresAt: new Date(expiresAt).toISOString(),
-  });
+      cachedToken = { token, expiresAt };
 
-  return token;
+      console.info(`${LOG_PREFIX} Generated new developer token`, {
+        expiresAt: new Date(expiresAt).toISOString(),
+        expiresInMs: TOKEN_EXPIRY_SECONDS * 1000,
+      });
+
+      return token;
+    } finally {
+      // Clear pending promise when done (success or failure)
+      pendingTokenGeneration = null;
+    }
+  })();
+
+  return pendingTokenGeneration;
 }
 
 /**

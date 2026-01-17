@@ -116,8 +116,13 @@ export const queryKeys = {
   // DSP enrichment queries
   dspEnrichment: {
     all: ['dsp-enrichment'] as const,
-    matches: (profileId: string) =>
-      [...queryKeys.dspEnrichment.all, 'matches', profileId] as const,
+    matches: (profileId: string, status?: string) =>
+      [
+        ...queryKeys.dspEnrichment.all,
+        'matches',
+        profileId,
+        status ?? 'all',
+      ] as const,
     matchDetail: (matchId: string) =>
       [...queryKeys.dspEnrichment.all, 'match', matchId] as const,
     status: (profileId: string) =>

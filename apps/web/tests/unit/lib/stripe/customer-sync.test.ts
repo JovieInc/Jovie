@@ -79,10 +79,17 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn((strings, ...values) => ({ type: 'sql', strings, values })),
 }));
 
+// Import module once after mocks are set up (hoisted mocks ensure this works)
+import {
+  BILLING_FIELDS_CUSTOMER,
+  BILLING_FIELDS_FULL,
+  BILLING_FIELDS_STATUS,
+  fetchUserBillingData,
+} from '@/lib/stripe/customer-sync';
+
 describe('fetchUserBillingData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   describe('successful queries', () => {
@@ -105,10 +112,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_user_123',
@@ -140,10 +143,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData, BILLING_FIELDS_FULL } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_user_456',
         fields: BILLING_FIELDS_FULL,
@@ -174,10 +173,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_admin',
       });
@@ -206,10 +201,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_free',
@@ -241,10 +232,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData, BILLING_FIELDS_STATUS } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_status_user',
         fields: BILLING_FIELDS_STATUS,
@@ -273,10 +260,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData, BILLING_FIELDS_CUSTOMER } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_customer_user',
         fields: BILLING_FIELDS_CUSTOMER,
@@ -304,10 +287,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_custom_user',
         fields: ['id', 'isPro'] as const,
@@ -332,10 +311,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_single_field',
         fields: ['isPro'] as const,
@@ -356,10 +331,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'nonexistent_user',
       });
@@ -377,10 +348,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData, BILLING_FIELDS_STATUS } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       const result = await fetchUserBillingData({
         clerkUserId: 'nonexistent_status_user',
@@ -403,10 +370,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_db_error',
@@ -435,10 +398,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_timeout',
       });
@@ -458,10 +417,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData, BILLING_FIELDS_STATUS } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       await fetchUserBillingData({
         clerkUserId: 'clerk_error_with_fields',
@@ -512,10 +467,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_legacy_user',
       });
@@ -562,10 +513,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_legacy_user_2',
       });
@@ -604,10 +551,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_legacy_user_3',
       });
@@ -639,10 +582,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'nonexistent_legacy_user',
       });
@@ -661,10 +600,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_unrelated_error',
@@ -705,10 +640,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData, BILLING_FIELDS_STATUS } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_legacy_status',
         fields: BILLING_FIELDS_STATUS,
@@ -744,10 +675,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_null_email',
       });
@@ -775,10 +702,6 @@ describe('fetchUserBillingData', () => {
           }),
         }),
       });
-
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
 
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_null_ispro',
@@ -809,10 +732,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_with_date',
       });
@@ -841,10 +760,6 @@ describe('fetchUserBillingData', () => {
         }),
       });
 
-      const { fetchUserBillingData } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const result = await fetchUserBillingData({
         clerkUserId: 'clerk_high_version',
       });
@@ -856,9 +771,7 @@ describe('fetchUserBillingData', () => {
 });
 
 describe('field selection constants', () => {
-  it('BILLING_FIELDS_FULL contains all 8 fields', async () => {
-    const { BILLING_FIELDS_FULL } = await import('@/lib/stripe/customer-sync');
-
+  it('BILLING_FIELDS_FULL contains all 8 fields', () => {
     expect(BILLING_FIELDS_FULL).toContain('id');
     expect(BILLING_FIELDS_FULL).toContain('email');
     expect(BILLING_FIELDS_FULL).toContain('isAdmin');
@@ -870,11 +783,7 @@ describe('field selection constants', () => {
     expect(BILLING_FIELDS_FULL).toHaveLength(8);
   });
 
-  it('BILLING_FIELDS_STATUS contains 6 fields without email/isAdmin', async () => {
-    const { BILLING_FIELDS_STATUS } = await import(
-      '@/lib/stripe/customer-sync'
-    );
-
+  it('BILLING_FIELDS_STATUS contains 6 fields without email/isAdmin', () => {
     expect(BILLING_FIELDS_STATUS).toContain('id');
     expect(BILLING_FIELDS_STATUS).toContain('isPro');
     expect(BILLING_FIELDS_STATUS).toContain('stripeCustomerId');
@@ -886,11 +795,7 @@ describe('field selection constants', () => {
     expect(BILLING_FIELDS_STATUS).toHaveLength(6);
   });
 
-  it('BILLING_FIELDS_CUSTOMER contains 4 fields for Stripe operations', async () => {
-    const { BILLING_FIELDS_CUSTOMER } = await import(
-      '@/lib/stripe/customer-sync'
-    );
-
+  it('BILLING_FIELDS_CUSTOMER contains 4 fields for Stripe operations', () => {
     expect(BILLING_FIELDS_CUSTOMER).toContain('id');
     expect(BILLING_FIELDS_CUSTOMER).toContain('email');
     expect(BILLING_FIELDS_CUSTOMER).toContain('stripeCustomerId');
@@ -904,13 +809,11 @@ describe('field selection constants', () => {
 });
 
 describe('UserBillingFields type exports', () => {
-  it('exports UserBillingFieldKey type', async () => {
-    const module = await import('@/lib/stripe/customer-sync');
-
-    // These type exports should be available
-    expect(module).toHaveProperty('BILLING_FIELDS_FULL');
-    expect(module).toHaveProperty('BILLING_FIELDS_STATUS');
-    expect(module).toHaveProperty('BILLING_FIELDS_CUSTOMER');
-    expect(module).toHaveProperty('fetchUserBillingData');
+  it('exports expected functions and constants', () => {
+    // Verify exports are available (imported at top level)
+    expect(BILLING_FIELDS_FULL).toBeDefined();
+    expect(BILLING_FIELDS_STATUS).toBeDefined();
+    expect(BILLING_FIELDS_CUSTOMER).toBeDefined();
+    expect(fetchUserBillingData).toBeDefined();
   });
 });

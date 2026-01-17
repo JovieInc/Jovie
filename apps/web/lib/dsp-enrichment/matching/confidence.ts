@@ -51,14 +51,15 @@ export function calculateIsrcMatchScore(
 ): number {
   if (totalTracksChecked === 0) return 0;
 
-  // Calculate match ratio
+  // Calculate match ratio and clamp to [0, 1] to handle edge cases
   const ratio = matchingIsrcCount / totalTracksChecked;
+  const clampedRatio = Math.min(Math.max(ratio, 0), 1);
 
   // Apply a curve that rewards higher match rates
   // At 50% match rate, score is ~0.71
   // At 80% match rate, score is ~0.89
   // At 100% match rate, score is 1.0
-  return Math.sqrt(ratio);
+  return Math.sqrt(clampedRatio);
 }
 
 /**
@@ -113,9 +114,22 @@ export function calculateFollowerRatioScore(
   localFollowers: number | null | undefined,
   externalFollowers: number | null | undefined
 ): number {
-  // If either count is missing, return neutral score
-  if (!localFollowers || !externalFollowers) {
+  // If either count is null/undefined (truly missing), return neutral score
+  // Note: 0 is a valid value and should be processed
+  if (localFollowers === null || localFollowers === undefined) {
     return NEUTRAL_SCORE;
+  }
+  if (externalFollowers === null || externalFollowers === undefined) {
+    return NEUTRAL_SCORE;
+  }
+
+  // Handle zero counts explicitly to avoid division by zero
+  // If one is 0 and the other > 0, this represents a strong mismatch
+  if (localFollowers === 0 && externalFollowers === 0) {
+    return 1; // Both zero = perfect match
+  }
+  if (localFollowers === 0 || externalFollowers === 0) {
+    return MIN_FOLLOWER_RATIO_SCORE; // One zero, one non-zero = strong mismatch
   }
 
   // Calculate the ratio (always >= 1)
@@ -130,8 +144,8 @@ export function calculateFollowerRatioScore(
   if (ratio <= 1) return 1;
   if (ratio >= MAX_FOLLOWER_RATIO) return MIN_FOLLOWER_RATIO_SCORE;
 
-  // Logarithmic decay
-  return 1 - Math.log10(ratio);
+  // Logarithmic decay, with floor enforcement
+  return Math.max(MIN_FOLLOWER_RATIO_SCORE, 1 - Math.log10(ratio));
 }
 
 /**
