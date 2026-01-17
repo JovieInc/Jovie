@@ -217,10 +217,11 @@ export function AdminCreatorProfilesUnified({
           .map(([id]) => id)
       );
 
-      // Toggle all if different count
-      if (newSelectedIds.size === filteredProfiles.length) {
-        toggleSelectAll();
-      } else if (newSelectedIds.size === 0 && selectedIds.size > 0) {
+      // Toggle all if all selected or all deselected
+      if (
+        newSelectedIds.size === filteredProfiles.length ||
+        (newSelectedIds.size === 0 && selectedIds.size > 0)
+      ) {
         toggleSelectAll();
       }
     },
