@@ -9,7 +9,7 @@ on:
       coverage:
         description: 'Enable coverage report'
         required: false
-        default: 'true'
+        default: true
         type: boolean
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
 
       - name: Run full unit test suite
         run: |
-          if [ "${{ inputs.coverage || 'true' }}" = "true" ]; then
+          if [ "${{ inputs.coverage }}" != "false" ]; then
             pnpm --filter=@jovie/web run test -- --coverage
           else
             pnpm --filter=@jovie/web run test

@@ -673,10 +673,16 @@ jobs:
             echo "🚀 Main branch: Running critical tests + changed tests"
             # Always run critical tests on deploy path
             pnpm --filter=@jovie/web run test -- --testNamePattern="@critical" ${{ steps.quarantine.outputs.unit_excludes }}
-            # Plus tests for files changed since preview
-            pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }} || true
+            # Plus tests for files changed since preview (if preview branch exists)
+            if git rev-parse --verify origin/preview >/dev/null 2>&1; then
+              pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }}
+            else
+              echo "⚠️ origin/preview not found, skipping --changed tests"
+            fi
           elif [ -n "${{ github.base_ref }}" ]; then
             echo "🔍 PR: Running tests changed since ${{ github.base_ref }}"
+            # Ensure base ref is fetched
+            git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
             pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "📦 Full suite"
