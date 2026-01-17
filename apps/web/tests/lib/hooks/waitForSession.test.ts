@@ -154,9 +154,11 @@ describe('waitForSession', () => {
 
     const promise = waitForSession(5000, 50);
 
-    await vi.advanceTimersByTimeAsync(100);
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(100),
+    ]);
 
-    const result = await promise;
     expect(result).toBe(true);
   });
 });
