@@ -316,10 +316,14 @@ describe('Linktree Strategy', () => {
 
   describe('fetchLinktreeDocument', () => {
     beforeEach(() => {
+      vi.useFakeTimers();
       vi.stubGlobal('fetch', vi.fn());
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+      // Run any pending timers before cleanup to avoid unhandled rejections
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
       vi.unstubAllGlobals();
     });
 
@@ -330,10 +334,13 @@ describe('Linktree Strategy', () => {
     });
 
     it('throws ExtractionError on 404', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle all retry attempts
+      vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        url: 'https://linktr.ee/username',
+        headers: new Headers(),
       } as Response);
 
       await expect(
@@ -342,10 +349,13 @@ describe('Linktree Strategy', () => {
     });
 
     it('throws ExtractionError on 429 rate limit', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle all retry attempts
+      vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 429,
         statusText: 'Too Many Requests',
+        url: 'https://linktr.ee/username',
+        headers: new Headers(),
       } as Response);
 
       await expect(

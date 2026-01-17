@@ -23,7 +23,10 @@ describe('GET /api/cron/data-retention', () => {
     const request = new NextRequest(
       'http://localhost/api/cron/data-retention',
       {
-        headers: { Authorization: 'Bearer wrong-secret' },
+        headers: {
+          Authorization: 'Bearer wrong-secret',
+          'x-vercel-cron': '1',
+        },
       }
     );
 
@@ -48,7 +51,10 @@ describe('GET /api/cron/data-retention', () => {
     const request = new NextRequest(
       'http://localhost/api/cron/data-retention',
       {
-        headers: { Authorization: 'Bearer test-secret' },
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'x-vercel-cron': '1',
+        },
       }
     );
 

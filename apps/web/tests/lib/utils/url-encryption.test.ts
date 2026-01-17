@@ -88,18 +88,17 @@ describe('URL Encryption', () => {
       expect(decrypted).toBe(url);
     });
 
-    it('should handle base64 fallback when IV is empty', () => {
+    it('should throw error when encryption metadata is missing (legacy data)', () => {
       const url = 'https://example.com';
-      const base64Result: EncryptionResult = {
+      const legacyResult: EncryptionResult = {
         encrypted: Buffer.from(url).toString('base64'),
         iv: '',
         authTag: '',
         salt: '',
       };
 
-      const decrypted = decryptUrl(base64Result);
-
-      expect(decrypted).toBe(url);
+      // Legacy data without proper encryption metadata should throw an error
+      expect(() => decryptUrl(legacyResult)).toThrow('Failed to decrypt URL');
     });
 
     it('should throw error when encrypted payload is tampered', () => {
