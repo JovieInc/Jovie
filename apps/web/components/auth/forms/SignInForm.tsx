@@ -3,7 +3,8 @@
 import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
@@ -39,6 +40,7 @@ export function SignInForm() {
   const searchParams = useSearchParams();
   const [lastAuthMethod] = useLastAuthMethod();
   const hasHandledEmailParam = useRef(false);
+  const [isClerkStalled, setIsClerkStalled] = useState(false);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -68,16 +70,45 @@ export function SignInForm() {
     }
   }, [searchParams, setEmail, setStep]);
 
+  useEffect(() => {
+    if (isLoaded) {
+      setIsClerkStalled(false);
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setIsClerkStalled(true);
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [isLoaded]);
+
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
     return (
       <Card className='shadow-none border-0 bg-transparent p-0'>
         <CardContent className='space-y-3 p-0'>
-          <div className='animate-pulse space-y-4'>
-            <div className='h-6 w-48 mx-auto bg-subtle rounded' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
+          <div className='space-y-4'>
+            <div className='flex items-center justify-center gap-3 text-sm text-secondary-token'>
+              <LoadingSpinner size='sm' tone='muted' />
+              <span>Loading sign-in</span>
+            </div>
+            <div className='animate-pulse space-y-4'>
+              <div className='h-6 w-48 mx-auto bg-subtle rounded' />
+              <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
+              <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
+              <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
+            </div>
+            {isClerkStalled ? (
+              <div className='rounded-[--radius-xl] border border-subtle bg-surface-0 px-4 py-3 text-[13px] text-secondary-token text-center'>
+                <p>Hang tight — sign-in is taking longer than usual.</p>
+                <p className='mt-2'>
+                  Refresh the page or try again in a minute.
+                </p>
+              </div>
+            ) : null}
           </div>
         </CardContent>
       </Card>
