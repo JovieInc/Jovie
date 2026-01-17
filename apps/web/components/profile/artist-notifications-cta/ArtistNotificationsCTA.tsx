@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CountrySelector } from '@/components/profile/notifications';
 import { CTAButton } from '@/components/ui/CTAButton';
+import { track } from '@/lib/analytics';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
@@ -65,6 +66,24 @@ export function ArtistNotificationsCTA({
       openSubscription();
     }
   }, [autoOpen, notificationsEnabled, notificationsState, openSubscription]);
+
+  // Track subscribe CTA impression when form is shown
+  const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
+  const showsSubscribeForm =
+    notificationsEnabled &&
+    !(notificationsState === 'idle' && !autoOpen) &&
+    notificationsState !== 'success';
+
+  useEffect(() => {
+    if (showsSubscribeForm && !hasTrackedImpression) {
+      track('subscribe_impression', {
+        handle: artist.handle,
+        placement: 'profile_inline',
+        variant: variant,
+      });
+      setHasTrackedImpression(true);
+    }
+  }, [showsSubscribeForm, hasTrackedImpression, artist.handle, variant]);
 
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms

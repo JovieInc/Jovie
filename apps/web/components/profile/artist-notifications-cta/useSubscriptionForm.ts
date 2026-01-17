@@ -249,6 +249,13 @@ export function useSubscriptionForm({
   const handleSubscribe = useCallback(async () => {
     if (isSubmitting) return;
 
+    // Track button click intent (before validation)
+    track('subscribe_click', {
+      channel,
+      source: 'profile_inline',
+      handle: artist.handle,
+    });
+
     if (!validateCurrent()) {
       track('notifications_subscribe_error', {
         error_type: 'validation_error',
