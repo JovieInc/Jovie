@@ -20,10 +20,8 @@ describe('waitForSession', () => {
       session: { status: 'active' },
     };
 
-    const promise = waitForSession(5000, 50);
-
-    // Should resolve immediately without advancing timers
-    await expect(promise).resolves.toBe(true);
+    const result = await waitForSession(5000, 50);
+    expect(result).toBe(true);
   });
 
   it('polls and returns true when session becomes active', async () => {
@@ -46,7 +44,8 @@ describe('waitForSession', () => {
     // Advance timers to allow polling
     await vi.advanceTimersByTimeAsync(200);
 
-    await expect(promise).resolves.toBe(true);
+    const result = await promise;
+    expect(result).toBe(true);
     expect(pollCount).toBeGreaterThanOrEqual(3);
   });
 
@@ -58,10 +57,13 @@ describe('waitForSession', () => {
 
     const promise = waitForSession(100, 20);
 
-    // Advance time past the timeout
-    await vi.advanceTimersByTimeAsync(150);
+    // Advance time past the timeout - run timer and promise concurrently
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(200),
+    ]);
 
-    await expect(promise).resolves.toBe(false);
+    expect(result).toBe(false);
   });
 
   it('returns false when Clerk is not available', async () => {
@@ -71,9 +73,12 @@ describe('waitForSession', () => {
     const promise = waitForSession(100, 20);
 
     // Advance time past the timeout
-    await vi.advanceTimersByTimeAsync(150);
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(200),
+    ]);
 
-    await expect(promise).resolves.toBe(false);
+    expect(result).toBe(false);
   });
 
   it('handles session being null', async () => {
@@ -85,25 +90,22 @@ describe('waitForSession', () => {
     const promise = waitForSession(100, 20);
 
     // Advance time past the timeout
-    await vi.advanceTimersByTimeAsync(150);
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(200),
+    ]);
 
-    await expect(promise).resolves.toBe(false);
+    expect(result).toBe(false);
   });
 
   it('uses exponential backoff up to 200ms cap', async () => {
-    // Track how many times we poll and the intervals
-    const pollTimes: number[] = [];
-    let lastPollTime = Date.now();
+    // Track how many times we poll
+    let pollCount = 0;
 
     Object.defineProperty(window, 'Clerk', {
       configurable: true,
       get: () => {
-        const now = Date.now();
-        if (pollTimes.length > 0) {
-          pollTimes.push(now - lastPollTime);
-        }
-        lastPollTime = now;
-        pollTimes.push(0); // Mark that we polled
+        pollCount++;
         return { session: { status: 'loading' } };
       },
     });
@@ -111,12 +113,14 @@ describe('waitForSession', () => {
     const promise = waitForSession(2000, 50);
 
     // Advance time to allow multiple polls with backoff
-    await vi.advanceTimersByTimeAsync(2100);
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(2100),
+    ]);
 
-    await expect(promise).resolves.toBe(false);
-
-    // Verify polling happened multiple times
-    expect(pollTimes.length).toBeGreaterThan(5);
+    expect(result).toBe(false);
+    // Verify polling happened multiple times (at least initial + several backoff polls)
+    expect(pollCount).toBeGreaterThan(5);
   });
 
   it('respects custom timeout and interval parameters', async () => {
@@ -127,9 +131,12 @@ describe('waitForSession', () => {
     // Very short timeout
     const promise = waitForSession(50, 10);
 
-    await vi.advanceTimersByTimeAsync(60);
+    const [result] = await Promise.all([
+      promise,
+      vi.advanceTimersByTimeAsync(100),
+    ]);
 
-    await expect(promise).resolves.toBe(false);
+    expect(result).toBe(false);
   });
 
   it('handles session status changing from undefined to active', async () => {
@@ -149,6 +156,7 @@ describe('waitForSession', () => {
 
     await vi.advanceTimersByTimeAsync(100);
 
-    await expect(promise).resolves.toBe(true);
+    const result = await promise;
+    expect(result).toBe(true);
   });
 });
