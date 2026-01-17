@@ -472,8 +472,8 @@ jobs:
   ci-public-profile-smoke:
     name: Public Profile Smoke
     needs: [deploy]
-    # Only run after successful deploy to main (production)
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Run after successful deploy to production
+    if: ${{ always() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1534,7 +1534,8 @@ jobs:
 
   deploy:
     needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required, ci-homepage-smoke] # Required smoke + homepage smoke must pass before deploy
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -1594,7 +1595,7 @@ jobs:
   canary-health-gate:
     name: Canary Health Gate (production)
     needs: [deploy]
-    if: ${{ needs.deploy.result == 'success' }}
+    if: ${{ always() && needs.deploy.result == 'success' }}
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       deployment_url: ${{ needs.deploy.outputs.deployment_url }}
@@ -1803,11 +1804,12 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  # Lighthouse CI - runs after production deploy
+  # Lighthouse CI - runs after production deploy to check performance on homepage + public profiles
   lighthouse-ci:
     name: Lighthouse CI (Production)
     needs: [deploy]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Run after successful deploy (tests homepage + /tim profile)
+    if: ${{ always() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
