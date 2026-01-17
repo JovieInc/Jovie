@@ -101,6 +101,9 @@ export const creatorProfiles = pgTable(
     tidalId: text('tidal_id'),
     soundcloudId: text('soundcloud_id'),
     musicbrainzId: text('musicbrainz_id'), // MusicBrainz MBID
+    // AI music platform IDs
+    sunoId: text('suno_id'),
+    udioId: text('udio_id'),
     isPublic: boolean('is_public').default(true),
     isVerified: boolean('is_verified').default(false),
     isFeatured: boolean('is_featured').default(false),

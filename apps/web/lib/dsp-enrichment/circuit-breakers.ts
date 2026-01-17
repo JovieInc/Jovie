@@ -67,6 +67,28 @@ const MUSICBRAINZ_CONFIG: Partial<CircuitBreakerConfig> = {
   failureWindow: 120_000, // Count failures within 2 minutes
 };
 
+/**
+ * Suno circuit breaker configuration.
+ * AI music platform - API availability TBD, using conservative defaults.
+ */
+const SUNO_CONFIG: Partial<CircuitBreakerConfig> = {
+  failureThreshold: 5, // Open after 5 failures
+  resetTimeout: 30_000, // Try again after 30 seconds
+  successThreshold: 2, // Need 2 successes to close
+  failureWindow: 60_000, // Count failures within 1 minute
+};
+
+/**
+ * Udio circuit breaker configuration.
+ * AI music platform - API availability TBD, using conservative defaults.
+ */
+const UDIO_CONFIG: Partial<CircuitBreakerConfig> = {
+  failureThreshold: 5, // Open after 5 failures
+  resetTimeout: 30_000, // Try again after 30 seconds
+  successThreshold: 2, // Need 2 successes to close
+  failureWindow: 60_000, // Count failures within 1 minute
+};
+
 // ============================================================================
 // Circuit Breaker Instances
 // ============================================================================
@@ -87,6 +109,18 @@ export const deezerCircuitBreaker = new CircuitBreaker(DEEZER_CONFIG);
  */
 export const musicBrainzCircuitBreaker = new CircuitBreaker(MUSICBRAINZ_CONFIG);
 
+/**
+ * Global circuit breaker for Suno API calls.
+ * AI music platform - API implementation pending.
+ */
+export const sunoCircuitBreaker = new CircuitBreaker(SUNO_CONFIG);
+
+/**
+ * Global circuit breaker for Udio API calls.
+ * AI music platform - API implementation pending.
+ */
+export const udioCircuitBreaker = new CircuitBreaker(UDIO_CONFIG);
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -104,6 +138,10 @@ export function getCircuitBreakerForProvider(
       return deezerCircuitBreaker;
     case 'musicbrainz':
       return musicBrainzCircuitBreaker;
+    case 'suno':
+      return sunoCircuitBreaker;
+    case 'udio':
+      return udioCircuitBreaker;
     default:
       return null;
   }
@@ -117,6 +155,8 @@ export function getAllCircuitBreakerStats() {
     apple_music: appleMusicCircuitBreaker.getStats(),
     deezer: deezerCircuitBreaker.getStats(),
     musicbrainz: musicBrainzCircuitBreaker.getStats(),
+    suno: sunoCircuitBreaker.getStats(),
+    udio: udioCircuitBreaker.getStats(),
   };
 }
 
@@ -127,4 +167,6 @@ export function resetAllCircuitBreakers() {
   appleMusicCircuitBreaker.reset();
   deezerCircuitBreaker.reset();
   musicBrainzCircuitBreaker.reset();
+  sunoCircuitBreaker.reset();
+  udioCircuitBreaker.reset();
 }

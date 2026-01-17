@@ -40,7 +40,9 @@ export type DspProviderId =
   | 'tidal'
   | 'soundcloud'
   | 'amazon_music'
-  | 'musicbrainz';
+  | 'musicbrainz'
+  | 'suno'
+  | 'udio';
 
 /**
  * Match status for DSP artist matches
@@ -621,6 +623,8 @@ export const DSP_RATE_LIMITS = {
   apple_music_bulk_isrc: { requests: 20, window: 60 }, // 20 bulk lookups/min
   deezer: { requests: 40, window: 60 }, // 40/min
   musicbrainz: { requests: 1, window: 1 }, // 1/sec (be respectful)
+  suno: { requests: 30, window: 60 }, // 30/min (conservative, API TBD)
+  udio: { requests: 30, window: 60 }, // 30/min (conservative, API TBD)
   dsp_discovery: { requests: 10, window: 60 }, // 10 discoveries/min per user
   dsp_enrichment: { requests: 100, window: 3600 }, // 100 enrichments/hour global
 } as const;
