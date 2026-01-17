@@ -88,7 +88,6 @@ describe('ProfilePrimaryCTA', () => {
         socialLinks={[] as LegacySocialLink[]}
         contacts={[] as PublicContact[]}
         showNotificationButton
-        forceNotificationsEnabled
       >
         <ProfilePrimaryCTA
           artist={makeArtist()}

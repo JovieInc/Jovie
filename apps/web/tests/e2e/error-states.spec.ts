@@ -12,7 +12,7 @@ test.describe('Error states for API failures', () => {
       });
     });
 
-    await page.goto('/demo/notifications?preview=1');
+    await page.goto('/demo/notifications');
 
     await page.getByLabel('Email').fill('fan@example.com');
     await page.getByRole('button', { name: /turn on notifications/i }).click();
