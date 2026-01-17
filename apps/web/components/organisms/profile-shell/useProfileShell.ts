@@ -31,10 +31,9 @@ export function useProfileShell({
   artist,
   socialLinks,
   contacts = [],
-  forceNotificationsEnabled = false,
 }: Pick<
   ProfileShellProps,
-  'artist' | 'socialLinks' | 'contacts' | 'forceNotificationsEnabled'
+  'artist' | 'socialLinks' | 'contacts'
 >): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
@@ -43,16 +42,16 @@ export function useProfileShell({
 
   // Memoize extracted search params to avoid downstream re-renders
   // when unrelated URL parameters change
-  const { mode, source, forceNotifications } = useMemo(
+  const { mode, source } = useMemo(
     () => ({
       mode: searchParams?.get('mode') ?? 'profile',
       source: searchParams?.get('source') ?? null,
-      forceNotifications: searchParams?.get('preview') === '1',
     }),
     [searchParams]
   );
 
-  const notificationsEnabled = forceNotificationsEnabled || forceNotifications;
+  // Notifications CTA is always enabled (previously gated by preview=1 param)
+  const notificationsEnabled = true;
 
   useTipPageTracking({
     artistHandle: artist.handle,
@@ -108,7 +107,6 @@ export function useProfileShell({
       channel,
       hasStoredContacts,
       hydrationStatus,
-      notificationsEnabled,
       notificationsState,
       openSubscription,
       setChannel,
