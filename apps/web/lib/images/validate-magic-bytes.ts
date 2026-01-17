@@ -23,6 +23,7 @@ const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
   'image/heic-sequence': [],
   'image/heif-sequence': [],
   'image/avif': [],
+  'image/avif-sequence': [],
   'image/tiff': [
     [0x49, 0x49, 0x2a, 0x00], // Little-endian TIFF
     [0x4d, 0x4d, 0x00, 0x2a], // Big-endian TIFF
@@ -165,8 +166,11 @@ export function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
     return validateHeif(buffer);
   }
 
-  // Special handling for AVIF
-  if (normalizedMime === 'image/avif') {
+  // Special handling for AVIF formats
+  if (
+    normalizedMime === 'image/avif' ||
+    normalizedMime === 'image/avif-sequence'
+  ) {
     return validateAvif(buffer);
   }
 

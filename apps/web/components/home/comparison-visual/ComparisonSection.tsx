@@ -1,11 +1,39 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { TrendingUp } from 'lucide-react';
+import { useMemo } from 'react';
 import { Container } from '@/components/site/Container';
 import { ComparisonCanvas } from './ComparisonCanvas';
 
 export function ComparisonSection() {
+  const reducedMotion = useReducedMotion();
+
+  // Create variants that respect reduced motion preference
+  const fadeInUp = useMemo(
+    () => ({
+      initial: reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 },
+      whileInView: { opacity: 1, y: 0 },
+    }),
+    [reducedMotion]
+  );
+
+  const fadeInLeft = useMemo(
+    () => ({
+      initial: reducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 },
+      whileInView: { opacity: 1, x: 0 },
+    }),
+    [reducedMotion]
+  );
+
+  const fadeInRight = useMemo(
+    () => ({
+      initial: reducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 },
+      whileInView: { opacity: 1, x: 0 },
+    }),
+    [reducedMotion]
+  );
+
   return (
     <section
       className='section-spacing-linear bg-base border-t border-subtle overflow-hidden'
@@ -15,19 +43,20 @@ export function ComparisonSection() {
         {/* Header */}
         <div className='max-w-3xl mx-auto text-center mb-16'>
           <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            {...fadeInUp}
             viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: reducedMotion ? 0 : 0.5 }}
             className='marketing-h2-linear text-primary-token mb-4'
           >
             One action. The right one.
           </motion.h2>
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            {...fadeInUp}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.5,
+              delay: reducedMotion ? 0 : 0.1,
+            }}
             className='marketing-lead-linear text-tertiary-token'
           >
             Stop losing visitors to decision fatigue
@@ -38,10 +67,12 @@ export function ComparisonSection() {
         <div className='grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 max-w-5xl mx-auto'>
           {/* Left - Traditional */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            {...fadeInLeft}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.5,
+              delay: reducedMotion ? 0 : 0.2,
+            }}
             className='relative'
           >
             <ComparisonCanvas side='left' />
@@ -59,10 +90,12 @@ export function ComparisonSection() {
 
           {/* Right - Jovie */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            {...fadeInRight}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.5,
+              delay: reducedMotion ? 0 : 0.3,
+            }}
             className='relative'
           >
             <ComparisonCanvas side='right' />

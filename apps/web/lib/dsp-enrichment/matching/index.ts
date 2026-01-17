@@ -77,6 +77,8 @@ export interface LocalTrackData {
   title: string;
   isrc: string | null;
   upc?: string | null;
+  /** Release date for prioritization (ISO string or Date) */
+  releaseDate?: string | Date | null;
 }
 
 /**
@@ -124,7 +126,16 @@ export function convertAppleMusicToIsrcMatches(
     if (appleMusicTrack) {
       // Extract artist from relationships or attributes
       const artistData = appleMusicTrack.relationships?.artists?.data?.[0];
-      const artistId = artistData?.id ?? 'unknown';
+      const artistId = artistData?.id;
+
+      // Skip tracks without a valid artist ID - we can't aggregate without it
+      if (!artistId) {
+        console.warn(
+          `[convertAppleMusicToIsrcMatches] Skipping ISRC ${normalizedIsrc}: missing artist ID`
+        );
+        continue;
+      }
+
       const artistName =
         appleMusicTrack.attributes?.artistName ?? 'Unknown Artist';
 
@@ -241,14 +252,40 @@ export function selectTracksForMatching(
   // Filter to tracks with ISRCs
   const tracksWithIsrc = tracks.filter(t => t.isrc && t.isrc.trim().length > 0);
 
-  // If we have fewer than max, return all
+  // If we have fewer than max, return all (still sorted for consistency)
   if (tracksWithIsrc.length <= maxTracks) {
-    return tracksWithIsrc;
+    return sortByReleaseDateDescending(tracksWithIsrc);
   }
 
-  // Otherwise, take a sample prioritizing variety
-  // In a real implementation, we'd prioritize recent releases
-  return tracksWithIsrc.slice(0, maxTracks);
+  // Sort by release date descending to prioritize recent releases
+  const sorted = sortByReleaseDateDescending(tracksWithIsrc);
+
+  return sorted.slice(0, maxTracks);
+}
+
+/**
+ * Sort tracks by release date in descending order (most recent first).
+ * Tracks without release dates are placed at the end.
+ */
+function sortByReleaseDateDescending(
+  tracks: LocalTrackData[]
+): LocalTrackData[] {
+  return [...tracks].sort((a, b) => {
+    const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+    const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+
+    // Both have dates: sort descending (newer first)
+    if (dateA && dateB) {
+      return dateB - dateA;
+    }
+
+    // Tracks with dates come before tracks without
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+
+    // Neither has a date: maintain relative order
+    return 0;
+  });
 }
 
 /**

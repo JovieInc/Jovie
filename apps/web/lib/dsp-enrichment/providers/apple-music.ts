@@ -121,10 +121,12 @@ export class AppleMusicNotConfiguredError extends Error {
 
 /**
  * Make an authenticated request to the MusicKit API.
+ * Automatically retries once on 401 errors after refreshing the token.
  */
 async function musicKitRequest<T>(
   endpoint: string,
-  options: AppleMusicProviderOptions = {}
+  options: AppleMusicProviderOptions = {},
+  isRetry = false
 ): Promise<MusicKitResponse<T>> {
   if (!isAppleMusicConfigured()) {
     throw new AppleMusicNotConfiguredError();
@@ -152,6 +154,15 @@ async function musicKitRequest<T>(
     // Handle auth errors - clear token cache and retry once
     if (response.status === 401) {
       clearAppleMusicTokenCache();
+
+      // Retry once with fresh token
+      if (!isRetry) {
+        console.warn(
+          '[AppleMusicProvider] 401 received, retrying with fresh token'
+        );
+        return musicKitRequest<T>(endpoint, options, true);
+      }
+
       throw new AppleMusicError('Authentication failed', 401, 'UNAUTHORIZED');
     }
 
@@ -412,13 +423,15 @@ export function extractImageUrls(artwork?: {
  * Extract external URLs from an Apple Music artist.
  *
  * @param artist - Apple Music artist object
- * @returns Object with platform URLs
+ * @returns Object with platform URLs (null for missing or empty URLs)
  */
 export function extractExternalUrls(artist: AppleMusicArtist): {
-  apple_music: string;
+  apple_music: string | null;
 } {
+  const url = artist.attributes?.url;
   return {
-    apple_music: artist.attributes?.url ?? '',
+    // Return null for missing or empty URLs (not just nullish)
+    apple_music: url && url.trim() !== '' ? url : null,
   };
 }
 

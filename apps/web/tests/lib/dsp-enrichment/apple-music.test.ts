@@ -123,7 +123,7 @@ describe('Apple Music Provider', () => {
       });
     });
 
-    it('should return empty string when URL is not present', () => {
+    it('should return null when URL is not present', () => {
       const artist: AppleMusicArtist = {
         id: '123456',
         type: 'artists',
@@ -136,7 +136,7 @@ describe('Apple Music Provider', () => {
       const result = extractAppleMusicExternalUrls(artist);
 
       expect(result).toEqual({
-        apple_music: '',
+        apple_music: null,
       });
     });
   });

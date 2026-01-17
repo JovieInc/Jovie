@@ -98,34 +98,49 @@ export function aggregateIsrcMatches(
  * If we have UPC (album-level) matches, merge them into the
  * artist candidates to strengthen the match.
  *
+ * Note: This function is immutable - it returns new candidate objects
+ * rather than mutating the originals.
+ *
  * @param candidates - Existing artist match candidates
  * @param upcMatches - Map of UPC to external artist ID
- * @returns Updated candidates with UPC data merged
+ * @returns New candidates array with UPC data merged
  */
 export function mergeUpcMatches(
   candidates: ArtistMatchCandidate[],
   upcMatches: Map<string, { artistId: string; upc: string }>
 ): ArtistMatchCandidate[] {
-  // Create a lookup map for existing candidates
-  const candidateMap = new Map<string, ArtistMatchCandidate>();
-  for (const candidate of candidates) {
-    candidateMap.set(candidate.externalArtistId, candidate);
-  }
-
-  // Merge UPC matches
+  // Build a map of artistId -> UPCs to merge
+  const upcsByArtist = new Map<string, Set<string>>();
   for (const [upc, match] of upcMatches) {
-    const candidate = candidateMap.get(match.artistId);
-    if (candidate) {
-      // Add UPC to existing candidate
-      if (!candidate.matchingUpcs.includes(upc)) {
-        candidate.matchingUpcs.push(upc);
-      }
+    const existing = upcsByArtist.get(match.artistId);
+    if (existing) {
+      existing.add(upc);
+    } else {
+      upcsByArtist.set(match.artistId, new Set([upc]));
     }
-    // Note: We don't create new candidates from UPC matches alone
-    // UPCs strengthen existing ISRC-based candidates
   }
 
-  return candidates;
+  // Create new candidates with merged UPCs (immutable)
+  return candidates.map(candidate => {
+    const newUpcs = upcsByArtist.get(candidate.externalArtistId);
+    if (!newUpcs || newUpcs.size === 0) {
+      return candidate; // No changes needed
+    }
+
+    // Merge existing UPCs with new ones (deduplicated via Set)
+    const mergedUpcs = new Set(candidate.matchingUpcs);
+    for (const upc of newUpcs) {
+      mergedUpcs.add(upc);
+    }
+
+    // Return new candidate object with updated UPCs
+    return {
+      ...candidate,
+      matchingUpcs: Array.from(mergedUpcs),
+    };
+  });
+  // Note: We don't create new candidates from UPC matches alone
+  // UPCs strengthen existing ISRC-based candidates
 }
 
 /**
