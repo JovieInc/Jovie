@@ -396,7 +396,7 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to sync username from Clerk');
+      expect(result.error).toBe('Failed to sync from Clerk');
       expect(syncUsernameFromClerkEvent).toHaveBeenCalledWith(
         'user_123',
         'new-handle',
