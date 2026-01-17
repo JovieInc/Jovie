@@ -25,7 +25,6 @@ export function ProfileShell({
   showBackButton = false,
   showFooter = true,
   showNotificationButton = false,
-  forceNotificationsEnabled = false,
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
@@ -43,7 +42,6 @@ export function ProfileShell({
     artist,
     socialLinks,
     contacts,
-    forceNotificationsEnabled,
   });
 
   const {

@@ -15,7 +15,6 @@ type ArtistPageShellProps = {
   showFooter?: boolean;
   maxWidthClass?: string;
   showNotificationButton?: boolean;
-  forceNotificationsEnabled?: boolean;
 };
 
 // Using React.memo to prevent unnecessary re-renders when only children content changes
@@ -31,7 +30,6 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   showFooter = true,
   maxWidthClass = 'w-full max-w-md',
   showNotificationButton = false,
-  forceNotificationsEnabled,
 }: ArtistPageShellProps) {
   return (
     <ProfileShell
@@ -44,9 +42,6 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       showBackButton={showBackButton}
       showFooter={showFooter}
       showNotificationButton={showNotificationButton}
-      forceNotificationsEnabled={
-        forceNotificationsEnabled ?? showNotificationButton === false
-      }
       maxWidthClass={maxWidthClass}
       backgroundPattern='gradient'
       showGradientBlurs={true}
