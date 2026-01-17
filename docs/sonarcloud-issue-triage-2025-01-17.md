@@ -4,6 +4,7 @@
 
 - **Total BUGs addressed:** 17
 - **Code fixes applied:** 12
+- **Code smells fixed:** 12
 - **False positives to mark:** 6
 - **Security hotspots reviewed:** 26
 
@@ -39,6 +40,37 @@ Added `onKeyDown` handlers to elements with `onClick`:
 | File | Line | Status |
 |------|------|--------|
 | `apps/web/lib/utils/url-encryption.ts` | 79 | Fixed - Replaced `Math.random()` with `crypto.getRandomValues()` |
+
+---
+
+## Code Smells Fixed
+
+### S3735 - Remove void operator (3 issues)
+
+| File | Line | Fix |
+|------|------|-----|
+| `apps/web/components/site/MarketingHeader.tsx` | 40 | Renamed `isScrolled` to `_isScrolled` |
+| `apps/web/components/dashboard/organisms/releases/cells/ProviderCell.tsx` | 318 | Replaced `void` with `.catch()` |
+| `apps/web/components/dashboard/organisms/releases/cells/SmartLinkCell.tsx` | 44 | Replaced `void` with `.catch()` |
+
+### S7762 - Use element.remove() instead of removeChild (5 issues)
+
+| File | Line | Status |
+|------|------|--------|
+| `apps/web/components/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx` | 130 | Fixed |
+| `apps/web/hooks/useClipboard.ts` | 54 | Fixed |
+| `apps/web/lib/utils/download.ts` | 71 | Fixed |
+| `apps/web/lib/deep-links.ts` | 323 | Fixed |
+| `apps/web/components/dashboard/dashboard-nav/utils.ts` | 15 | Fixed |
+
+### S1871 - Merge duplicate branch conditions (4 issues)
+
+| File | Line | Fix |
+|------|------|-----|
+| `apps/web/app/api/dsp/enrichment/status/route.ts` | 176-183 | Merged confirmed/auto_confirmed/rejected cases |
+| `apps/web/lib/utils/platform-detection/detector.ts` | 143-150 | Merged instagram/twitter/tiktok cases |
+| `apps/web/app/api/health/env/route.ts` | 97-102 | Combined critical and errors conditions |
+| `apps/web/components/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx` | 221-225 | Combined selection toggle conditions |
 
 ---
 
@@ -95,6 +127,10 @@ The SonarCloud API token (`SONARCLOUD_TOKEN` in Doppler) has **read-only permiss
 After the next SonarCloud analysis on `main`:
 - S1082 issues should be resolved (11 → 0)
 - S1763 issue should be resolved (1 → 0)
+- S3735 issues should be resolved (3 → 0)
+- S7762 issues should be resolved (5 → 0)
+- S1871 issues should be resolved (4 → 0)
 - S6324 issues need manual marking (6 issues)
 
-Commit: `64f17aa72` on branch `chore/sync-claude-permissions`
+Branch: `chore/sync-claude-permissions`
+Commits: `64f17aa72`, `6314c2841`, `92cb39bdf`, `104a0f6d5`
