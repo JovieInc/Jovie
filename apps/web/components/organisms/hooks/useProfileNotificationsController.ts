@@ -95,7 +95,7 @@ function writeCachedStatus(
 }
 
 export function formatE164PhoneForDisplay(value: string): string {
-  const digits = value.replace(/\D/g, '');
+  const digits = value.replaceAll(/\D/g, '');
   if (!digits) return value;
 
   if (digits.startsWith('1') && digits.length === 11) {

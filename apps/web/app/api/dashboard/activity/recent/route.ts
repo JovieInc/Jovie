@@ -48,7 +48,7 @@ function safeDecodeLocationPart(value: string): string {
   const maybeEncoded = value.includes('%') || value.includes('+');
   if (!maybeEncoded) return value;
   try {
-    return decodeURIComponent(value.replace(/\+/g, ' '));
+    return decodeURIComponent(value.replaceAll('+', ' '));
   } catch {
     return value;
   }
@@ -80,7 +80,7 @@ function platformLabel(value: string | null): string {
   if (normalized === 'tiktok') return 'TikTok';
   if (normalized === 'instagram') return 'Instagram';
   if (normalized === 'spotify') return 'Spotify';
-  return titleCase(value.replace(/[_-]/g, ' '));
+  return titleCase(value.replaceAll(/[_-]/g, ' '));
 }
 
 function getClickPhrase(linkType: string, target: string | null): string {

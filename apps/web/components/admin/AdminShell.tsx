@@ -24,7 +24,9 @@ export function AdminShell({ children }: AdminShellProps) {
     const segments = adminIndex >= 0 ? parts.slice(adminIndex + 1) : [];
 
     const toTitle = (value: string): string =>
-      value.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+      value
+        .replaceAll('-', ' ')
+        .replaceAll(/\b\w/g, char => char.toUpperCase());
 
     const items = [{ label: 'Admin', href: '/admin' }];
 

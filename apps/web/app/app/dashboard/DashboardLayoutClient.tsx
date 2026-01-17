@@ -128,7 +128,7 @@ export default function DashboardLayoutClient({
     };
     const subs = getSubPaths();
     const toTitle = (s: string): string =>
-      s.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+      s.replaceAll('-', ' ').replaceAll(/\b\w/g, ch => ch.toUpperCase());
 
     // Build base breadcrumb item based on mode
     const getBaseBreadcrumb = (): DashboardBreadcrumbItem => {

@@ -71,7 +71,7 @@ export function useOtpInput({
 
   const updateValue = useCallback(
     (newValue: string, shouldBlurOnComplete = false) => {
-      const sanitized = newValue.replace(/\D/g, '').slice(0, OTP_LENGTH);
+      const sanitized = newValue.replaceAll(/\D/g, '').slice(0, OTP_LENGTH);
 
       if (sanitized.length > lastLengthRef.current) {
         if (sanitized.length === OTP_LENGTH) {
@@ -107,7 +107,7 @@ export function useOtpInput({
 
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
-      const digit = inputValue.replace(/\D/g, '').slice(-1);
+      const digit = inputValue.replaceAll(/\D/g, '').slice(-1);
 
       if (digit) {
         const chars = currentValue.split('');
@@ -131,11 +131,11 @@ export function useOtpInput({
         if (currentValue[index]) {
           const chars = currentValue.split('');
           chars[index] = '';
-          updateValue(chars.join('').replace(/\s/g, ''));
+          updateValue(chars.join('').replaceAll(/\s/g, ''));
         } else if (index > 0) {
           const chars = currentValue.split('');
           chars[index - 1] = '';
-          updateValue(chars.join('').replace(/\s/g, ''));
+          updateValue(chars.join('').replaceAll(/\s/g, ''));
           inputRefs.current[index - 1]?.focus();
         }
       } else if (event.key === 'ArrowLeft' && index > 0) {
@@ -159,7 +159,7 @@ export function useOtpInput({
       ) {
         const chars = currentValue.split('');
         chars[index - 1] = '';
-        updateValue(chars.join('').replace(/\s/g, ''));
+        updateValue(chars.join('').replaceAll(/\s/g, ''));
         inputRefs.current[index - 1]?.focus();
       }
     },
@@ -170,7 +170,7 @@ export function useOtpInput({
     (event: React.ClipboardEvent) => {
       event.preventDefault();
       const pastedData = event.clipboardData.getData('text');
-      const digits = pastedData.replace(/\D/g, '').slice(0, OTP_LENGTH);
+      const digits = pastedData.replaceAll(/\D/g, '').slice(0, OTP_LENGTH);
 
       if (digits) {
         updateValue(digits, digits.length === OTP_LENGTH);
@@ -188,9 +188,12 @@ export function useOtpInput({
   const handleAutofillChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = event.target.value;
-      updateValue(newValue, newValue.replace(/\D/g, '').length === OTP_LENGTH);
+      updateValue(
+        newValue,
+        newValue.replaceAll(/\D/g, '').length === OTP_LENGTH
+      );
 
-      const digits = newValue.replace(/\D/g, '');
+      const digits = newValue.replaceAll(/\D/g, '');
       if (digits.length < OTP_LENGTH && digits.length > 0) {
         inputRefs.current[digits.length]?.focus();
       }

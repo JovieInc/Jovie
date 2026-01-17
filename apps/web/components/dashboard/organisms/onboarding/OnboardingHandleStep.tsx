@@ -83,7 +83,7 @@ export function OnboardingHandleStep({
                 onHandleChange(
                   e.target.value
                     .toLowerCase()
-                    .replace(/\s+/g, '')
+                    .replaceAll(/\s+/g, '')
                     .replace(/^@+/, '')
                 )
               }

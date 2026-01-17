@@ -98,9 +98,9 @@ export function ProfileNavButton({
 
           <DropdownMenuItem
             onSelect={() => {
-              try {
-                void navigator.clipboard?.writeText(profileUrl);
-              } catch {}
+              navigator.clipboard?.writeText(profileUrl).catch(() => {
+                // clipboard access may fail in certain contexts
+              });
             }}
           >
             Copy profile link

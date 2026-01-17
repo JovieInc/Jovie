@@ -123,7 +123,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Helper to safely serialize JSON-LD with XSS protection
 const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replace(/</g, '\\u003c');
+  JSON.stringify(value).replaceAll('<', '\\u003c');
 
 // Pre-serialized JSON-LD structured data for static generation
 const WEBSITE_SCHEMA = jsonLd({

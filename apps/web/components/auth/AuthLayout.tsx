@@ -121,7 +121,7 @@ export function AuthLayout({
     <div
       className={cn(
         // Base layout - use dvh for mobile keyboard handling, fall back to vh
-        'min-h-[100dvh] supports-[height:100dvh]:min-h-[100dvh] flex flex-col items-center bg-[#f5f5f5] text-[#1f2023] dark:bg-[#090909] dark:text-[#e3e4e6] relative overflow-x-hidden',
+        'min-h-dvh supports-[height:100dvh]:min-h-dvh flex flex-col items-center bg-[#f5f5f5] text-[#1f2023] dark:bg-[#090909] dark:text-[#e3e4e6] relative overflow-x-hidden',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
