@@ -22,7 +22,7 @@ vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: {},
 }));
 
-describe('GET /api/health/auth', () => {
+describe('@critical GET /api/health/auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();

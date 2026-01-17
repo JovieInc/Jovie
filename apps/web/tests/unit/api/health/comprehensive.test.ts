@@ -42,7 +42,7 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 
-describe('GET /api/health/comprehensive', () => {
+describe('@critical GET /api/health/comprehensive', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();

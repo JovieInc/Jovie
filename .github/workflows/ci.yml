@@ -618,7 +618,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 2
+          fetch-depth: 0  # Full history for vitest --changed
 
       # Check if test-related changes require running this job
       - name: Check for relevant changes
@@ -668,7 +668,20 @@ jobs:
 
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "🚀 Main branch: Running critical tests + changed tests"
+            # Always run critical tests on deploy path
+            pnpm --filter=@jovie/web run test -- --testNamePattern="@critical" ${{ steps.quarantine.outputs.unit_excludes }}
+            # Plus tests for files changed since preview
+            pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }} || true
+          elif [ -n "${{ github.base_ref }}" ]; then
+            echo "🔍 PR: Running tests changed since ${{ github.base_ref }}"
+            pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
+          else
+            echo "📦 Full suite"
+            pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
+          fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}

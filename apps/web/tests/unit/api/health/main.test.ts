@@ -27,7 +27,7 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
-describe('GET /api/health', () => {
+describe('@critical GET /api/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();

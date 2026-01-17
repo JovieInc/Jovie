@@ -45,7 +45,7 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-describe('GET /api/health/db', () => {
+describe('@critical GET /api/health/db', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
