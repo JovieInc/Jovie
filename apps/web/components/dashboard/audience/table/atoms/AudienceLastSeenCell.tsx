@@ -42,7 +42,7 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
         )}
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
-          handleActivationKeyDown(event, () => event.stopPropagation())
+          handleActivationKeyDown(event, e => e.stopPropagation())
         }
       >
         <AudienceRowActionsMenu

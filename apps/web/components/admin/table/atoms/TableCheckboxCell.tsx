@@ -122,7 +122,7 @@ export function TableCheckboxCell<TData = unknown>(
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
-          handleActivationKeyDown(event, () => event.stopPropagation())
+          handleActivationKeyDown(event, e => e.stopPropagation())
         }
       >
         <Checkbox
@@ -145,7 +145,7 @@ export function TableCheckboxCell<TData = unknown>(
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
-          handleActivationKeyDown(event, () => event.stopPropagation())
+          handleActivationKeyDown(event, e => e.stopPropagation())
         }
       >
         <span

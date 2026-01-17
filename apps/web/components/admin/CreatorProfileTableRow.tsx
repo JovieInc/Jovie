@@ -143,7 +143,7 @@ export function CreatorProfileTableRow({
       className={getRowClassName(isChecked, isSelected)}
       onClick={() => onRowClick(profile.id)}
       onKeyDown={event =>
-        handleActivationKeyDown(event, () => onRowClick(profile.id))
+        handleActivationKeyDown(event, _e => onRowClick(profile.id))
       }
       tabIndex={0}
       aria-selected={isSelected}
@@ -155,7 +155,7 @@ export function CreatorProfileTableRow({
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
-            handleActivationKeyDown(event, () => event.stopPropagation())
+            handleActivationKeyDown(event, e => e.stopPropagation())
           }
         >
           <span
@@ -236,7 +236,7 @@ export function CreatorProfileTableRow({
         className='px-4 py-3 align-middle text-right'
         onClick={e => e.stopPropagation()}
         onKeyDown={event =>
-          handleActivationKeyDown(event, () => event.stopPropagation())
+          handleActivationKeyDown(event, e => e.stopPropagation())
         }
       >
         <div className='flex items-center justify-end gap-2'>
