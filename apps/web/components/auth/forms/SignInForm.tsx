@@ -3,9 +3,10 @@
 import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
+import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
@@ -40,7 +41,7 @@ export function SignInForm() {
   const searchParams = useSearchParams();
   const [lastAuthMethod] = useLastAuthMethod();
   const hasHandledEmailParam = useRef(false);
-  const [isClerkStalled, setIsClerkStalled] = useState(false);
+  const isClerkStalled = useLoadingStall(isLoaded);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -69,21 +70,6 @@ export function SignInForm() {
       setStep('email');
     }
   }, [searchParams, setEmail, setStep]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      setIsClerkStalled(false);
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setIsClerkStalled(true);
-    }, 4000);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [isLoaded]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {

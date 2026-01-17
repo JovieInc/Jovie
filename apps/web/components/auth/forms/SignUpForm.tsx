@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
+import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
 import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
@@ -42,7 +43,7 @@ export function SignUpForm() {
   const [lastAuthMethod] = useLastAuthMethod();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isClerkStalled, setIsClerkStalled] = useState(false);
+  const isClerkStalled = useLoadingStall(isLoaded);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -95,21 +96,6 @@ export function SignUpForm() {
       }
     };
   }, [shouldSuggestSignIn, email, router, buildSignInUrl]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      setIsClerkStalled(false);
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setIsClerkStalled(true);
-    }, 4000);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [isLoaded]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
