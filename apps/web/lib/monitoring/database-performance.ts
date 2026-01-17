@@ -181,27 +181,16 @@ class DatabasePerformanceMonitor {
    * Get connection pool statistics
    */
   async getConnectionStats(): Promise<ConnectionPoolMetrics> {
-    try {
-      // This would depend on your connection pool implementation
-      // For Neon/postgres.js, we might not have direct access to these stats
-      // This is a placeholder for when such metrics become available
-      return {
-        totalConnections: 10,
-        idleConnections: 5,
-        activeConnections: 5,
-        waitingConnections: 0,
-        maxConnections: 20,
-      };
-    } catch (error) {
-      console.error('Failed to get connection stats:', error);
-      return {
-        totalConnections: 0,
-        idleConnections: 0,
-        activeConnections: 0,
-        waitingConnections: 0,
-        maxConnections: 0,
-      };
-    }
+    // This would depend on your connection pool implementation
+    // For Neon/postgres.js, we might not have direct access to these stats
+    // This is a placeholder for when such metrics become available
+    return {
+      totalConnections: 10,
+      idleConnections: 5,
+      activeConnections: 5,
+      waitingConnections: 0,
+      maxConnections: 20,
+    };
   }
 
   /**
