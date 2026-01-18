@@ -71,11 +71,16 @@ export const buildContentSecurityPolicy = ({
       'https://api.stripe.com',
       'https://*.ingest.sentry.io',
       'wss://*.clerk.com', // Clerk WebSocket connections
-      'https://jov.ie', // Monitoring endpoint
+      'wss://clerk.jov.ie', // Clerk proxy WebSocket
+      'wss://clerk.meetjovie.com', // Clerk proxy WebSocket
+      'https://jov.ie',
+      'https://app.jov.ie',
+      'https://meetjovie.com',
+      'https://app.meetjovie.com',
       'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
     ].join(' '),
     "font-src 'self' data:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://clerk.jov.ie https://clerk.meetjovie.com https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];
