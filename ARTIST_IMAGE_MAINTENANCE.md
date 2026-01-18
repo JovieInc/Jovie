@@ -176,7 +176,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ensure-valid-artist-images
         env:
