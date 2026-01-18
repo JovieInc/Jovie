@@ -84,8 +84,8 @@ function runRuntimeValidations(
   const warnings: string[] = [];
   const critical: string[] = [];
 
-  const vercelEnv =
-    process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+  // Use parsed env values for consistency with validation rules
+  const vercelEnv = env.VERCEL_ENV || env.NODE_ENV || 'development';
 
   // Run all validation rules and categorize results
   RUNTIME_VALIDATION_RULES.forEach(rule => {
