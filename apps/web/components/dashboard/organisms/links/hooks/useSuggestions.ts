@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { trimTrailingSlashes } from '@/lib/utils/string-utils';
 
 /**
  * Extended suggestion link type with additional metadata for AI-ingested suggestions
@@ -96,7 +97,7 @@ function getSuggestionIdentity(
   // Simple extraction - look for @-prefixed segments or path segments
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-    const path = parsed.pathname.replace(/\/+$/, '');
+    const path = trimTrailingSlashes(parsed.pathname);
     const segments = path.split('/').filter(Boolean);
     const first = segments[0] ?? '';
 

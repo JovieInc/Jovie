@@ -8,6 +8,10 @@ import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/org
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { PROFILE_URL } from '@/constants/app';
+import {
+  trimLeadingSlashes,
+  trimTrailingSlashes,
+} from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -52,8 +56,8 @@ export function DashboardOverview({
 
   const profileUrl = (() => {
     if (!artist.handle) return undefined;
-    const base = PROFILE_URL.replace(/\/+$/, '');
-    const path = artist.handle.replace(/^\/+/, '');
+    const base = trimTrailingSlashes(PROFILE_URL);
+    const path = trimLeadingSlashes(artist.handle);
     return `${base}/${path}`;
   })();
 

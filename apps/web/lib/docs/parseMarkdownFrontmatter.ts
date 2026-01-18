@@ -8,7 +8,8 @@ const FRONTMATTER_REGEX = /^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/;
 export function parseMarkdownFrontmatter(
   raw: string
 ): MarkdownFrontmatterResult {
-  const match = raw.match(FRONTMATTER_REGEX);
+  const safeRaw = raw.slice(0, 100000);
+  const match = safeRaw.match(FRONTMATTER_REGEX);
   if (!match) {
     return {
       content: raw,

@@ -372,7 +372,8 @@ export function extractLinktree(html: string): ExtractionResult {
 
   // Clean up display name (remove " | Linktree" suffix if present)
   if (displayName) {
-    displayName = displayName
+    const safeDisplayName = displayName.slice(0, 200);
+    displayName = safeDisplayName
       .replace(/\s*\|\s*Linktree$/i, '')
       .replace(/\s*-\s*Linktree$/i, '')
       .trim();

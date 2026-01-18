@@ -29,7 +29,8 @@ export interface BlogPostSummary extends BlogPostMetadata {
 const DEFAULT_AUTHOR = 'Jovie';
 
 function createExcerpt(content: string): string {
-  const blocks = content
+  const safeContent = content.slice(0, 20000);
+  const blocks = safeContent
     .split(/\n\s*\n/)
     .map(block => block.trim())
     .filter(Boolean);

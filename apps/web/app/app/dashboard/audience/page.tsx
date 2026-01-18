@@ -4,6 +4,10 @@ import { DashboardAudienceClient } from '@/components/dashboard/organisms/Dashbo
 import { APP_URL } from '@/constants/app';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { audienceSearchParams } from '@/lib/nuqs';
+import {
+  trimLeadingSlashes,
+  trimTrailingSlashes,
+} from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
 import { getAudienceServerData } from './audience-data';
@@ -35,7 +39,7 @@ export default async function AudiencePage({
 
     const profileUrl =
       artist?.handle && artist.handle.length > 0
-        ? `${APP_URL.replace(/\/+$/, '')}/${artist.handle.replace(/^\/+/, '')}`
+        ? `${trimTrailingSlashes(APP_URL)}/${trimLeadingSlashes(artist.handle)}`
         : undefined;
 
     // Parse search params using nuqs for type-safe URL state
