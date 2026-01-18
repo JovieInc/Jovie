@@ -1,133 +1,12 @@
 import 'server-only';
 import { z } from 'zod';
 import { publicEnv } from '@/lib/env-public';
-import {
-  getDatabaseUrlErrorMessage,
-  isDatabaseUrlValid,
-} from './utils/database-url-validator';
+import { ENV_KEYS, ServerEnvSchema } from './env-server-schema';
+import { RUNTIME_VALIDATION_RULES } from './env-validation-rules';
 
 // Server-side environment variables
 // This module must never be imported in client-side code.
 // The `server-only` import above enforces that constraint at build time.
-
-// Custom DATABASE_URL validator using shared validation logic
-const databaseUrlValidator = z.string().optional().refine(isDatabaseUrlValid, {
-  message: getDatabaseUrlErrorMessage(),
-});
-
-const ServerEnvSchema = z.object({
-  // Runtime environment
-  NODE_ENV: z
-    .enum(['development', 'production', 'test'])
-    .optional()
-    .default('development'),
-  VITEST: z.string().optional(),
-  VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
-
-  // Clerk server-side configuration
-  CLERK_SECRET_KEY: z.string().optional(),
-  CLERK_WEBHOOK_SECRET: z.string().optional(),
-
-  // Cloudinary configuration
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
-  CLOUDINARY_UPLOAD_FOLDER: z.string().optional(),
-  CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
-
-  // Email / notifications
-  RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().email().optional(),
-  RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
-  RESEND_WEBHOOK_SECRET: z.string().optional(),
-
-  // Database configuration (required at runtime, but optional during build)
-  DATABASE_URL: databaseUrlValidator,
-
-  // Server or build-time envs (may be undefined locally)
-  SPOTIFY_CLIENT_ID: z.string().optional(),
-  SPOTIFY_CLIENT_SECRET: z.string().optional(),
-
-  // Stripe server-side configuration
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
-
-  // Stripe price IDs for introductory pricing
-  STRIPE_PRICE_INTRO_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_INTRO_YEARLY: z.string().optional(),
-
-  // Stripe price IDs for standard pricing (inactive)
-  STRIPE_PRICE_STANDARD_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_STANDARD_YEARLY: z.string().optional(),
-  INGESTION_CRON_SECRET: z.string().optional(),
-
-  // Statsig server-side
-  STATSIG_SERVER_API_KEY: z.string().optional(),
-
-  // URL encryption (required in production/preview)
-  URL_ENCRYPTION_KEY: z.string().optional(),
-
-  // Cron job authentication
-  CRON_SECRET: z.string().optional(),
-
-  // Security keys
-  METADATA_HASH_KEY: z.string().optional(),
-  CONTACT_OBFUSCATION_KEY: z.string().optional(),
-  PII_ENCRYPTION_KEY: z.string().optional(),
-
-  // HUD (internal kiosk display)
-  HUD_KIOSK_TOKEN: z.string().optional(),
-  HUD_STARTUP_NAME: z.string().optional(),
-  HUD_STARTUP_LOGO_URL: z.string().url().optional(),
-  HUD_GITHUB_TOKEN: z.string().optional(),
-  HUD_GITHUB_OWNER: z.string().optional(),
-  HUD_GITHUB_REPO: z.string().optional(),
-  HUD_GITHUB_WORKFLOW: z.string().optional(),
-});
-
-/**
- * List of environment variable keys to extract from process.env.
- * Single source of truth for server environment configuration.
- */
-const ENV_KEYS = [
-  'NODE_ENV',
-  'VITEST',
-  'VERCEL_ENV',
-  'CLERK_SECRET_KEY',
-  'CLERK_WEBHOOK_SECRET',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-  'CLOUDINARY_UPLOAD_FOLDER',
-  'CLOUDINARY_UPLOAD_PRESET',
-  'RESEND_API_KEY',
-  'RESEND_FROM_EMAIL',
-  'RESEND_REPLY_TO_EMAIL',
-  'RESEND_WEBHOOK_SECRET',
-  'DATABASE_URL',
-  'SPOTIFY_CLIENT_ID',
-  'SPOTIFY_CLIENT_SECRET',
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET',
-  'STRIPE_TIP_WEBHOOK_SECRET',
-  'STRIPE_PRICE_INTRO_MONTHLY',
-  'STRIPE_PRICE_INTRO_YEARLY',
-  'STRIPE_PRICE_STANDARD_MONTHLY',
-  'STRIPE_PRICE_STANDARD_YEARLY',
-  'INGESTION_CRON_SECRET',
-  'STATSIG_SERVER_API_KEY',
-  'URL_ENCRYPTION_KEY',
-  'CRON_SECRET',
-  'METADATA_HASH_KEY',
-  'CONTACT_OBFUSCATION_KEY',
-  'PII_ENCRYPTION_KEY',
-  'HUD_KIOSK_TOKEN',
-  'HUD_STARTUP_NAME',
-  'HUD_STARTUP_LOGO_URL',
-  'HUD_GITHUB_TOKEN',
-  'HUD_GITHUB_OWNER',
-  'HUD_GITHUB_REPO',
-  'HUD_GITHUB_WORKFLOW',
-] as const;
 
 /**
  * Extract environment variables from process.env based on ENV_KEYS.
@@ -166,119 +45,96 @@ export interface EnvironmentValidationResult {
 }
 
 /**
- * Validate environment configuration at startup
- * Returns detailed validation results for different environments
+ * Process schema validation errors into categorized issues
  */
-export function validateEnvironment(
-  context: 'runtime' | 'build' = 'runtime'
-): EnvironmentValidationResult {
-  const errors: string[] = [];
+function processSchemaErrors(
+  result: ReturnType<typeof ServerEnvSchema.safeParse>,
+  context: 'runtime' | 'build'
+): Pick<EnvironmentValidationResult, 'warnings' | 'critical'> {
   const warnings: string[] = [];
   const critical: string[] = [];
-
-  // Re-run the schema validation to get fresh errors
-  const result = ServerEnvSchema.safeParse(rawServerEnv);
 
   if (!result.success) {
     const fieldErrors = result.error.flatten().fieldErrors;
 
-    Object.entries(fieldErrors).forEach(([field, fieldErrors]) => {
-      if (fieldErrors) {
-        fieldErrors.forEach(error => {
+    Object.entries(fieldErrors).forEach(([field, errors]) => {
+      if (errors) {
+        errors.forEach((error: string) => {
+          const message = `${field}: ${error}`;
           if (field === 'DATABASE_URL' && context === 'runtime') {
-            critical.push(`${field}: ${error}`);
+            critical.push(message);
           } else {
-            warnings.push(`${field}: ${error}`);
+            warnings.push(message);
           }
         });
       }
     });
   }
 
-  // Additional runtime-specific validations
-  if (context === 'runtime') {
-    // Check for critical runtime dependencies
-    if (!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-      critical.push(
-        'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required for authentication'
-      );
-    }
+  return { warnings, critical };
+}
 
-    if (!env.DATABASE_URL) {
-      critical.push('DATABASE_URL is required for database operations');
-    }
+/**
+ * Run runtime validation rules and categorize issues
+ */
+function runRuntimeValidations(
+  env: Record<keyof z.infer<typeof ServerEnvSchema>, string | undefined>
+): Pick<EnvironmentValidationResult, 'errors' | 'warnings' | 'critical'> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const critical: string[] = [];
 
-    // Validate specific formats
-    if (
-      publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_')
-    ) {
-      errors.push('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY should start with pk_');
-    }
+  const vercelEnv =
+    process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 
-    if (env.STRIPE_SECRET_KEY && !env.STRIPE_SECRET_KEY.startsWith('sk_')) {
-      errors.push('STRIPE_SECRET_KEY should start with sk_');
-    }
-
-    if (
-      publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY &&
-      !publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.startsWith('pk_')
-    ) {
-      errors.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY should start with pk_');
-    }
-
-    // Check for missing environment pairs
-    const hasStripePublic = !!publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    const hasStripeSecret = !!env.STRIPE_SECRET_KEY;
-
-    if (hasStripePublic && !hasStripeSecret) {
-      warnings.push(
-        'STRIPE_SECRET_KEY is missing but NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is set'
-      );
-    }
-    if (hasStripeSecret && !hasStripePublic) {
-      warnings.push(
-        'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing but STRIPE_SECRET_KEY is set'
-      );
-    }
-
-    // Check for Cloudinary configuration consistency
-    const cloudinaryKeys = [
-      env.CLOUDINARY_API_KEY,
-      env.CLOUDINARY_API_SECRET,
-      publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-    ];
-    const cloudinaryKeysPresent = cloudinaryKeys.filter(Boolean).length;
-
-    if (cloudinaryKeysPresent > 0 && cloudinaryKeysPresent < 3) {
-      warnings.push(
-        'Incomplete Cloudinary configuration - need all of API_KEY, API_SECRET, and CLOUD_NAME'
-      );
-    }
-
-    // Check for URL encryption key in production/preview
-    const vercelEnv =
-      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
-    if (vercelEnv === 'production' || vercelEnv === 'preview') {
-      if (!env.URL_ENCRYPTION_KEY) {
-        critical.push(
-          'URL_ENCRYPTION_KEY is required in production/preview for secure link wrapping. Generate with: openssl rand -base64 32'
-        );
-      } else if (
-        env.URL_ENCRYPTION_KEY === 'default-key-change-in-production-32-chars'
-      ) {
-        critical.push(
-          'URL_ENCRYPTION_KEY is using the default value. Generate a secure key with: openssl rand -base64 32'
-        );
+  // Run all validation rules and categorize results
+  RUNTIME_VALIDATION_RULES.forEach(rule => {
+    const issue = rule({ server: env, vercelEnv });
+    if (issue) {
+      switch (issue.type) {
+        case 'error':
+          errors.push(issue.message);
+          break;
+        case 'warning':
+          warnings.push(issue.message);
+          break;
+        case 'critical':
+          critical.push(issue.message);
+          break;
       }
     }
+  });
+
+  return { errors, warnings, critical };
+}
+
+/**
+ * Validate environment configuration at startup
+ * Returns detailed validation results for different environments
+ */
+export function validateEnvironment(
+  context: 'runtime' | 'build' = 'runtime'
+): EnvironmentValidationResult {
+  const result = ServerEnvSchema.safeParse(rawServerEnv);
+  const schemaIssues = processSchemaErrors(result, context);
+
+  if (context === 'runtime') {
+    const runtimeIssues = runRuntimeValidations(env);
+    return {
+      valid:
+        runtimeIssues.critical.length === 0 &&
+        runtimeIssues.errors.length === 0,
+      errors: runtimeIssues.errors,
+      warnings: [...schemaIssues.warnings, ...runtimeIssues.warnings],
+      critical: [...schemaIssues.critical, ...runtimeIssues.critical],
+    };
   }
 
   return {
-    valid: critical.length === 0 && errors.length === 0,
-    errors,
-    warnings,
-    critical,
+    valid: schemaIssues.critical.length === 0,
+    errors: [],
+    warnings: schemaIssues.warnings,
+    critical: schemaIssues.critical,
   };
 }
 
