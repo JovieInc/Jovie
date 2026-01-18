@@ -30,7 +30,9 @@ vi.mock('@/lib/db', () => ({
       }),
     }),
     select: vi.fn().mockReturnValue({
-      from: vi.fn().mockResolvedValue([]),
+      from: vi.fn().mockReturnValue({
+        groupBy: vi.fn().mockResolvedValue([]),
+      }),
     }),
   },
 }));
@@ -289,14 +291,13 @@ describe('Suppression Service', () => {
   describe('getSuppressionStats', () => {
     it('should return counts by reason', async () => {
       vi.mocked(db.select).mockReturnValue({
-        from: vi
-          .fn()
-          .mockResolvedValue([
-            { reason: 'hard_bounce' },
-            { reason: 'hard_bounce' },
-            { reason: 'spam_complaint' },
-            { reason: 'user_request' },
+        from: vi.fn().mockReturnValue({
+          groupBy: vi.fn().mockResolvedValue([
+            { reason: 'hard_bounce', count: 2 },
+            { reason: 'spam_complaint', count: 1 },
+            { reason: 'user_request', count: 1 },
           ]),
+        }),
       } as never);
 
       const stats = await getSuppressionStats();
@@ -309,7 +310,9 @@ describe('Suppression Service', () => {
 
     it('should return zero counts when no suppressions', async () => {
       vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockResolvedValue([]),
+        from: vi.fn().mockReturnValue({
+          groupBy: vi.fn().mockResolvedValue([]),
+        }),
       } as never);
 
       const stats = await getSuppressionStats();

@@ -13,6 +13,10 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/redis', () => ({
+  redis: null,
+}));
+
 describe('Admin Roles', () => {
   beforeEach(() => {
     // Clear cache before each test
