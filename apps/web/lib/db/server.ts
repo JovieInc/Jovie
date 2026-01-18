@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 /**
  * Server-safe utilities for dashboard actions.

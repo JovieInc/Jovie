@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import type { StatsigFlagName } from '@/lib/flags';
 import { checkStatsigGateForUser } from '@/lib/statsig/server';

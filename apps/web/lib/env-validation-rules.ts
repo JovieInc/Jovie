@@ -1,3 +1,4 @@
+import 'server-only';
 import type { z } from 'zod';
 import { publicEnv } from '@/lib/env-public';
 import type { ServerEnvSchema } from './env-server-schema';

@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { isAdmin } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
