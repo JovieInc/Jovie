@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 /**
  * Reusable loading skeleton for settings pages.
  * Reduces duplication across settings loading.tsx files.
@@ -134,10 +136,15 @@ export function FormSettingsLoading({
 }: {
   inputCount?: number;
 }) {
+  const inputKeys = useMemo(
+    () => Array.from({ length: inputCount }, (_, i) => `form-input-${i}`),
+    [inputCount]
+  );
+
   return (
     <SettingsLoadingSkeleton>
-      {Array.from({ length: inputCount }).map((_, i) => (
-        <InputSkeleton key={`input-${i}`} />
+      {inputKeys.map(key => (
+        <InputSkeleton key={key} />
       ))}
       <ButtonSkeleton />
     </SettingsLoadingSkeleton>

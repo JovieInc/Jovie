@@ -2,6 +2,7 @@
 
 import { motion, type Variants } from 'framer-motion';
 import Image from 'next/image';
+import { useMemo } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 type EmptyStateType = 'no-venmo' | 'pending-metrics';
@@ -122,6 +123,11 @@ export function TippingMetricsSkeleton({
   className = '',
   rows = 3,
 }: TippingSkeletonProps) {
+  const rowKeys = useMemo(
+    () => Array.from({ length: rows }, (_, i) => `tipping-row-${i}`),
+    [rows]
+  );
+
   return (
     <div className={`space-y-6 ${className}`} aria-hidden='true'>
       {/* Header skeleton */}
@@ -181,8 +187,8 @@ export function TippingMetricsSkeleton({
           </div>
 
           {/* Table rows */}
-          {Array.from({ length: rows }).map((_, index) => (
-            <div key={index} className='grid grid-cols-3 gap-4 py-2'>
+          {rowKeys.map(key => (
+            <div key={key} className='grid grid-cols-3 gap-4 py-2'>
               <LoadingSkeleton height='h-5' width='w-full' rounded='sm' />
               <LoadingSkeleton height='h-5' width='w-full' rounded='sm' />
               <LoadingSkeleton height='h-5' width='w-full' rounded='sm' />

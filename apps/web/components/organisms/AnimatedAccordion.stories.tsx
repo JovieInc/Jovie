@@ -110,7 +110,7 @@ export const FAQExample: Story = {
       <div className='w-96 space-y-2'>
         {faqs.map((faq, index) => (
           <div
-            key={index}
+            key={faq.q}
             className='border border-subtle rounded-lg overflow-hidden'
           >
             <button

@@ -38,10 +38,10 @@ export function WhatYouGetSection() {
           </h2>
 
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto'>
-            {features.map((feature, index) => {
+            {features.map(feature => {
               const Icon = feature.icon;
               return (
-                <div key={index} className='flex items-start gap-3'>
+                <div key={feature.title} className='flex items-start gap-3'>
                   {/* Linear 16px icon variant with accent color */}
                   <div className='flex items-center justify-center w-4 h-4 shrink-0 mt-1'>
                     <Icon className={`w-4 h-4 ${feature.iconColor}`} />
