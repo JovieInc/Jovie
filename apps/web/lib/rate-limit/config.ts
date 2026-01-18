@@ -11,12 +11,12 @@ import type { RateLimitConfig } from './types';
 // Environment-configurable limits
 // ============================================================================
 
-const TRACKING_CLICKS_PER_HOUR = parseInt(
+const TRACKING_CLICKS_PER_HOUR = Number.parseInt(
   process.env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR ?? '10000',
   10
 );
 
-const TRACKING_VISITS_PER_HOUR = parseInt(
+const TRACKING_VISITS_PER_HOUR = Number.parseInt(
   process.env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR ?? '50000',
   10
 );
@@ -316,7 +316,7 @@ export function parseWindowToMs(window: string): number {
     throw new Error(`Invalid window format: ${window}`);
   }
 
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   const unit = match[2];
 
   const multipliers: Record<string, number> = {

@@ -669,6 +669,27 @@ body {
   background-color: var(--color-bg-base);
 }
 
+/* Safe utilities with hardcoded fallbacks for critical above-the-fold content (ENG-001) */
+@utility bg-base-safe {
+  background-color: #f6f6f6;
+  background-color: var(--color-bg-base, #f6f6f6);
+}
+
+@utility text-primary-safe {
+  color: #0c0c0c;
+  color: var(--color-text-primary-token, #0c0c0c);
+}
+
+:root.dark .bg-base-safe {
+  background-color: #090909;
+  background-color: var(--color-bg-base, #090909);
+}
+
+:root.dark .text-primary-safe {
+  color: #f4f4f5;
+  color: var(--color-text-primary-token, #f4f4f5);
+}
+
 /* Enhanced border utilities */
 @utility border-subtle {
   border-color: var(--color-border-subtle);

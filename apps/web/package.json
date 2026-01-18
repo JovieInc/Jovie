@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "doppler run -- next dev",
     "dev:local": "next dev",
+    "validate-env": "tsx scripts/validate-env.ts",
     "build": "next build",
+    "build:validate": "npm run validate-env && next build",
     "start": "next start",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
