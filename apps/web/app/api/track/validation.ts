@@ -1,7 +1,13 @@
 import type { LinkType } from '@/types/db';
 
 // Valid link types enum for validation
-const VALID_LINK_TYPES = ['listen', 'social', 'tip', 'other'] as const;
+// Typed with LinkType[] so compiler errors if values drift from the type
+const VALID_LINK_TYPES = [
+  'listen',
+  'social',
+  'tip',
+  'other',
+] as const satisfies readonly LinkType[];
 
 // Username validation regex
 // (alphanumeric, underscore, hyphen, 3-30 chars)
@@ -105,11 +111,18 @@ export function validateTarget(target: string): ValidationError | null {
 
   const looksLikeUrl = target.includes('://') || target.startsWith('www.');
 
-  if (looksLikeUrl && !isValidURL(target)) {
-    return {
-      error: 'Invalid target URL format',
-      status: 400,
-    };
+  if (looksLikeUrl) {
+    // Normalize www. URLs by prepending https:// for validation
+    const normalizedTarget = target.startsWith('www.')
+      ? `https://${target}`
+      : target;
+
+    if (!isValidURL(normalizedTarget)) {
+      return {
+        error: 'Invalid target URL format',
+        status: 400,
+      };
+    }
   }
 
   return null;
