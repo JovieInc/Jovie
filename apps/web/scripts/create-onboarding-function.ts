@@ -58,11 +58,17 @@ async function main() {
         PERFORM set_config('app.clerk_user_id', p_clerk_user_id, true);
 
         -- Upsert user (by clerk_id)
-        INSERT INTO users (clerk_id, email)
-        VALUES (p_clerk_user_id, p_email)
+        -- Include user_status since it's NOT NULL with no default
+        INSERT INTO users (clerk_id, email, user_status)
+        VALUES (p_clerk_user_id, p_email, 'active')
         ON CONFLICT (clerk_id)
         DO UPDATE SET
           email = EXCLUDED.email,
+          user_status = CASE
+            WHEN users.user_status IN ('waitlist_pending', 'waitlist_approved', 'onboarding_incomplete')
+            THEN 'active'
+            ELSE users.user_status
+          END,
           updated_at = now()
         RETURNING id INTO v_user_id;
 
