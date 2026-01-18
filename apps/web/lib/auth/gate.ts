@@ -7,6 +7,8 @@ import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 import { syncEmailFromClerk } from './clerk-sync';
+import { resolveProfileState } from './profile-state-resolver';
+import { checkUserStatus } from './status-checker';
 
 /**
  * Centralized user state enum for auth gating decisions.
@@ -56,26 +58,6 @@ export interface AuthGateResult {
     email: string | null;
     errorCode?: string;
   };
-}
-
-/**
- * Determines if a creator profile is considered "complete" for access purposes.
- * A complete profile has: username, display name, is public, and has completed onboarding.
- */
-function isProfileComplete(profile: {
-  username: string | null;
-  usernameNormalized: string | null;
-  displayName: string | null;
-  isPublic: boolean | null;
-  onboardingCompletedAt: Date | null;
-}): boolean {
-  const hasHandle =
-    Boolean(profile.usernameNormalized) && Boolean(profile.username);
-  const hasName = Boolean(profile.displayName?.trim());
-  const isPublic = profile.isPublic !== false;
-  const hasCompleted = Boolean(profile.onboardingCompletedAt);
-
-  return hasHandle && hasName && isPublic && hasCompleted;
 }
 
 /**
@@ -292,26 +274,18 @@ export async function resolveUserState(
     });
   }
 
-  // Handle soft-deleted users
-  if (dbUser?.deletedAt) {
+  // Check if user is blocked (banned, suspended, or deleted)
+  const statusCheck = checkUserStatus(
+    dbUser?.userStatus ?? null,
+    dbUser?.deletedAt ?? null
+  );
+  if (statusCheck.isBlocked && statusCheck.blockedState) {
     return {
-      state: UserState.BANNED,
+      state: statusCheck.blockedState,
       clerkUserId,
-      dbUserId: dbUser.id,
+      dbUserId: dbUser?.id ?? null,
       profileId: null,
-      redirectTo: '/banned',
-      context: baseContext,
-    };
-  }
-
-  // Handle explicitly banned or suspended users
-  if (dbUser?.userStatus === 'banned' || dbUser?.userStatus === 'suspended') {
-    return {
-      state: UserState.BANNED,
-      clerkUserId,
-      dbUserId: dbUser.id,
-      profileId: null,
-      redirectTo: '/banned',
+      redirectTo: statusCheck.redirectTo,
       context: baseContext,
     };
   }
@@ -427,37 +401,15 @@ export async function resolveUserState(
     )
     .limit(1);
 
-  // No profile or incomplete profile
-  if (!profile) {
-    return {
-      state: UserState.NEEDS_ONBOARDING,
-      clerkUserId,
-      dbUserId,
-      profileId: null,
-      redirectTo: '/onboarding?fresh_signup=true',
-      context: { ...baseContext, email },
-    };
-  }
+  // Resolve user state based on profile status
+  const profileState = resolveProfileState(profile);
 
-  // Profile exists but is incomplete
-  if (!isProfileComplete(profile)) {
-    return {
-      state: UserState.NEEDS_ONBOARDING,
-      clerkUserId,
-      dbUserId,
-      profileId: profile.id,
-      redirectTo: '/onboarding?fresh_signup=true',
-      context: { ...baseContext, email },
-    };
-  }
-
-  // 5. Fully active user
   return {
-    state: UserState.ACTIVE,
+    state: profileState.state,
     clerkUserId,
     dbUserId,
-    profileId: profile.id,
-    redirectTo: null,
+    profileId: profileState.profileId,
+    redirectTo: profileState.redirectTo,
     context: {
       isAdmin: dbUser?.isAdmin ?? false,
       isPro: dbUser?.isPro ?? false,
