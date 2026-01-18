@@ -65,7 +65,7 @@ async function main() {
         DO UPDATE SET
           email = EXCLUDED.email,
           user_status = CASE
-            WHEN users.user_status IN ('waitlist_pending', 'waitlist_approved', 'onboarding_incomplete')
+            WHEN users.user_status IN ('waitlist_pending', 'waitlist_approved', 'onboarding_incomplete', 'profile_claimed')
             THEN 'active'
             ELSE users.user_status
           END,

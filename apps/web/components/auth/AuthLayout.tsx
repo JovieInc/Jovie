@@ -212,7 +212,7 @@ export function AuthLayout({
         ref={formRef}
         id='auth-form'
         className={cn(
-          'w-full max-w-[18rem] relative z-10',
+          'w-full max-w-[448px] relative z-10',
           // Smooth scroll target
           'scroll-mt-4'
         )}
