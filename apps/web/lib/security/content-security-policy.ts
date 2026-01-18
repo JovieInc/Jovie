@@ -1,3 +1,5 @@
+import { CSP_REPORT_GROUP, getCspReportUri } from './csp-reporting';
+
 export const SCRIPT_NONCE_HEADER = 'x-nonce';
 
 type BuildCspOptions = {
@@ -5,11 +7,15 @@ type BuildCspOptions = {
   isDev?: boolean;
 };
 
-export const buildContentSecurityPolicy = ({
+/**
+ * Builds the array of CSP directives (without report directives).
+ * This is the core policy shared by both enforcing and report-only modes.
+ */
+const buildCspDirectives = ({
   nonce,
   isDev = process.env.NODE_ENV === 'development',
-}: BuildCspOptions): string => {
-  const directives = [
+}: BuildCspOptions): string[] => {
+  return [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
@@ -84,6 +90,38 @@ export const buildContentSecurityPolicy = ({
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];
+};
+
+/**
+ * Builds the enforcing Content-Security-Policy header value.
+ * This is the main CSP that blocks resources violating the policy.
+ */
+export const buildContentSecurityPolicy = (
+  options: BuildCspOptions
+): string => {
+  const directives = buildCspDirectives(options);
+  return directives.join('; ');
+};
+
+/**
+ * Builds the Content-Security-Policy-Report-Only header value.
+ * This CSP reports violations to Sentry without blocking resources.
+ * Useful for monitoring and identifying issues before enforcement.
+ */
+export const buildContentSecurityPolicyReportOnly = (
+  options: BuildCspOptions
+): string | null => {
+  const reportUri = getCspReportUri();
+  if (!reportUri) {
+    // No reporting configured - skip report-only header
+    return null;
+  }
+
+  const directives = buildCspDirectives(options);
+
+  // Add reporting directives
+  directives.push(`report-uri ${reportUri}`);
+  directives.push(`report-to ${CSP_REPORT_GROUP}`);
 
   return directives.join('; ');
 };
