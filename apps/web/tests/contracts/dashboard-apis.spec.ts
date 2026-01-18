@@ -7,6 +7,22 @@ const PROFILE_ID = '123e4567-e89b-12d3-a456-426614174000';
 
 type QueryRows = Array<Record<string, unknown>>;
 
+// Hoist mocks to avoid module resets
+const mockWithDbSession = vi.fn();
+const mockWithDbSessionTx = vi.fn();
+const mockGetUserDashboardAnalytics = vi.fn();
+const mockDashboardLinksRateLimit = vi.fn();
+const mockInvalidateSocialLinksCache = vi.fn();
+const mockComputeLinkConfidence = vi.fn();
+const mockMaybeSetProfileAvatarFromLinks = vi.fn();
+const mockCaptureError = vi.fn();
+const mockCaptureException = vi.fn();
+const mockClerkClient = vi.fn();
+const mockSyncCanonicalUsername = vi.fn();
+
+let dbSelectResponses: QueryRows[] = [];
+let dbSelectCallIndex = 0;
+
 function createQueryResult(rows: QueryRows) {
   const promise = Promise.resolve(rows);
   const chain = () => createQueryResult(rows);
@@ -42,6 +58,71 @@ function createSelectQueue(responses: QueryRows[]) {
   };
 }
 
+vi.mock('@/lib/auth/session', () => ({
+  withDbSession: (...args: any[]) => mockWithDbSession(...args),
+  withDbSessionTx: (...args: any[]) => mockWithDbSessionTx(...args),
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: () => {
+      const rows = dbSelectResponses[dbSelectCallIndex] ?? [];
+      dbSelectCallIndex += 1;
+      return createQueryResult(rows);
+    },
+    insert: () => createQueryResult([]),
+    update: () => createQueryResult([]),
+    delete: () => createQueryResult([]),
+    execute: async () => ({ rows: [] }),
+  },
+  and: vi.fn(),
+  eq: vi.fn(),
+}));
+
+vi.mock('@/lib/db/queries/analytics', () => ({
+  getUserDashboardAnalytics: (...args: any[]) =>
+    mockGetUserDashboardAnalytics(...args),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  dashboardLinksRateLimit: {
+    limit: (...args: any[]) => mockDashboardLinksRateLimit(...args),
+  },
+  createRateLimitHeaders: () => ({}),
+}));
+
+vi.mock('@/lib/cache', () => ({
+  invalidateSocialLinksCache: (...args: any[]) =>
+    mockInvalidateSocialLinksCache(...args),
+}));
+
+vi.mock('@/lib/ingestion/confidence', () => ({
+  computeLinkConfidence: (...args: any[]) => mockComputeLinkConfidence(...args),
+}));
+
+vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
+  maybeSetProfileAvatarFromLinks: (...args: any[]) =>
+    mockMaybeSetProfileAvatarFromLinks(...args),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: (...args: any[]) => mockCaptureError(...args),
+}));
+
+vi.mock('@sentry/nextjs', () => ({
+  captureException: (...args: any[]) => mockCaptureException(...args),
+}));
+
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: (...args: any[]) => mockClerkClient(...args),
+}));
+
+vi.mock('@/lib/username/sync', () => ({
+  syncCanonicalUsernameFromApp: (...args: any[]) =>
+    mockSyncCanonicalUsername(...args),
+  UsernameValidationError: class extends Error {},
+}));
+
 function mockSession({
   unauthorized = false,
   tx,
@@ -49,74 +130,40 @@ function mockSession({
   unauthorized?: boolean;
   tx?: unknown;
 } = {}) {
-  vi.doMock('@/lib/auth/session', () => ({
-    withDbSession: async (callback: (userId: string) => Promise<unknown>) => {
+  mockWithDbSession.mockImplementation(
+    async (callback: (userId: string) => Promise<unknown>) => {
       if (unauthorized) throw new Error('Unauthorized');
       return callback(TEST_USER_ID);
-    },
-    withDbSessionTx: async (
+    }
+  );
+  mockWithDbSessionTx.mockImplementation(
+    async (
       callback: (transaction: unknown, userId: string) => Promise<unknown>
     ) => {
       if (unauthorized) throw new Error('Unauthorized');
       return callback(tx ?? {}, TEST_USER_ID);
-    },
-  }));
+    }
+  );
 }
 
 function mockDb(selectResponses: QueryRows[] = []) {
-  const nextSelect = createSelectQueue(selectResponses);
-  const db = {
-    select: nextSelect,
-    insert: () => createQueryResult([]),
-    update: () => createQueryResult([]),
-    delete: () => createQueryResult([]),
-    execute: async () => ({ rows: [] }),
-  };
-
-  vi.doMock('@/lib/db', () => ({
-    db,
-    and: vi.fn(),
-    eq: vi.fn(),
-  }));
-
-  return db;
+  dbSelectResponses = selectResponses;
+  dbSelectCallIndex = 0;
 }
 
 function mockSocialLinkDependencies() {
-  vi.doMock('@/lib/rate-limit', () => ({
-    dashboardLinksRateLimit: {
-      limit: vi.fn().mockResolvedValue({
-        success: true,
-        limit: 30,
-        remaining: 29,
-        reset: Date.now() + 1000,
-      }),
-    },
-    createRateLimitHeaders: () => ({}),
-  }));
-
-  vi.doMock('@/lib/cache', () => ({
-    invalidateSocialLinksCache: vi.fn().mockResolvedValue(undefined),
-  }));
-
-  vi.doMock('@/lib/ingestion/confidence', () => ({
-    computeLinkConfidence: () => ({
-      state: 'active' as const,
-      confidence: 0.97,
-    }),
-  }));
-
-  vi.doMock('@/lib/ingestion/magic-profile-avatar', () => ({
-    maybeSetProfileAvatarFromLinks: vi.fn().mockResolvedValue(undefined),
-  }));
-
-  vi.doMock('@/lib/error-tracking', () => ({
-    captureError: vi.fn(),
-  }));
-
-  vi.doMock('@sentry/nextjs', () => ({
-    captureException: vi.fn(),
-  }));
+  mockDashboardLinksRateLimit.mockResolvedValue({
+    success: true,
+    limit: 30,
+    remaining: 29,
+    reset: Date.now() + 1000,
+  });
+  mockInvalidateSocialLinksCache.mockResolvedValue(undefined);
+  mockComputeLinkConfidence.mockReturnValue({
+    state: 'active' as const,
+    confidence: 0.97,
+  });
+  mockMaybeSetProfileAvatarFromLinks.mockResolvedValue(undefined);
 }
 
 function expectStatusOk(response: Response, body: unknown) {
@@ -129,23 +176,21 @@ function expectStatusOk(response: Response, body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.resetModules();
+  dbSelectResponses = [];
+  dbSelectCallIndex = 0;
 });
 
 describe('Dashboard API contracts', () => {
   describe('Analytics', () => {
     it('returns analytics payload with normalized arrays', async () => {
       mockSession();
-
-      vi.doMock('@/lib/db/queries/analytics', () => ({
-        getUserDashboardAnalytics: vi.fn().mockResolvedValue({
-          profile_views: 42,
-          unique_users: 21,
-          top_cities: [{ city: 'Austin', count: 3 }],
-          top_countries: undefined,
-          top_referrers: null,
-        }),
-      }));
+      mockGetUserDashboardAnalytics.mockResolvedValue({
+        profile_views: 42,
+        unique_users: 21,
+        top_cities: [{ city: 'Austin', count: 3 }],
+        top_countries: undefined,
+        top_referrers: null,
+      });
 
       const { GET } = await import('@/app/api/dashboard/analytics/route');
       const response = await GET(

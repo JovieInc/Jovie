@@ -7,6 +7,10 @@ import { defineConfig } from 'vitest/config';
 // standard configuration while using the optimized defaults locally.
 dotenv.config({ path: '.env.test' });
 
+// Detect CI environment - reduce memory usage by using fewer threads
+const isCI = process.env.CI === 'true';
+const maxThreads = isCI ? 2 : 4; // Use 2 threads in CI to reduce memory pressure
+
 /**
  * Optimized Vitest Configuration for Fast Test Execution
  *
@@ -44,9 +48,9 @@ export default defineConfig({
     pool: 'threads', // Use threads instead of forks for better performance
     poolOptions: {
       threads: {
-        // Optimize thread pool
+        // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
         minThreads: 1,
-        maxThreads: 4,
+        maxThreads,
         useAtomics: true,
       },
     },
