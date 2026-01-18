@@ -1,4 +1,10 @@
 import { clsx } from 'clsx';
+import { useMemo } from 'react';
+
+// Generate stable keys for skeleton items to avoid array index key warnings
+function generateSkeletonKeys(prefix: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
+}
 
 interface LoadingSkeletonProps {
   className?: string;
@@ -107,6 +113,12 @@ export function LoadingSkeleton({
     full: 'rounded-full',
   };
 
+  // Generate stable keys for multi-line skeletons
+  const lineKeys = useMemo(
+    () => generateSkeletonKeys('skeleton-line', lines),
+    [lines]
+  );
+
   if (lines === 1) {
     return (
       <div
@@ -124,9 +136,9 @@ export function LoadingSkeleton({
 
   return (
     <div className='space-y-2' aria-hidden='true'>
-      {Array.from({ length: lines }).map((_, index) => (
+      {lineKeys.map((key, index) => (
         <div
-          key={index}
+          key={key}
           className={clsx(
             'skeleton motion-reduce:animate-none',
             roundedClasses[rounded],
@@ -181,6 +193,8 @@ export function ButtonSkeleton() {
   );
 }
 
+const SOCIAL_BAR_SKELETON_KEYS = generateSkeletonKeys('social-link', 4);
+
 export function SocialBarSkeleton() {
   return (
     // biome-ignore lint/a11y/useSemanticElements: Navigation skeleton placeholder
@@ -189,11 +203,11 @@ export function SocialBarSkeleton() {
       aria-label='Loading social media links'
       role='navigation'
     >
-      {Array.from({ length: 4 }).map((_, index) => (
+      {SOCIAL_BAR_SKELETON_KEYS.map((key, index) => (
         // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
         // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
         <div
-          key={index}
+          key={key}
           className='h-12 w-12 rounded-full skeleton motion-reduce:animate-none'
           aria-label={`Loading social link ${index + 1}`}
           role='button'
@@ -241,12 +255,17 @@ export function CardSkeleton() {
 }
 
 export function ListSkeleton({ items = 3 }: { items?: number }) {
+  const itemKeys = useMemo(
+    () => generateSkeletonKeys('list-item', items),
+    [items]
+  );
+
   return (
     // biome-ignore lint/a11y/useSemanticElements: skeleton placeholder for list, semantic list element not appropriate
     <div className='space-y-4' aria-label='Loading list items' role='list'>
-      {Array.from({ length: items }).map((_, index) => (
+      {itemKeys.map(key => (
         <div
-          key={index}
+          key={key}
           className='flex items-center space-x-3 p-3 border border-subtle rounded-md'
         >
           <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
@@ -268,33 +287,55 @@ export function TableSkeleton({
   rows?: number;
   columns?: number;
 }) {
+  const headerKeys = useMemo(
+    () => generateSkeletonKeys('table-header', columns),
+    [columns]
+  );
+  const rowKeys = useMemo(
+    () => generateSkeletonKeys('table-row', rows),
+    [rows]
+  );
+  const cellKeys = useMemo(
+    () =>
+      rowKeys.flatMap((rowKey, rowIndex) =>
+        Array.from(
+          { length: columns },
+          (_, colIndex) => `${rowKey}-col-${colIndex}`
+        )
+      ),
+    [rowKeys, columns]
+  );
+
   return (
     <div className='w-full overflow-hidden border border-subtle rounded-lg'>
       {/* Header */}
       <div className='flex border-b border-subtle bg-surface-1'>
-        {Array.from({ length: columns }).map((_, index) => (
-          <div key={`header-${index}`} className='flex-1 p-3'>
+        {headerKeys.map(key => (
+          <div key={key} className='flex-1 p-3'>
             <div className='h-5 rounded-sm skeleton motion-reduce:animate-none' />
           </div>
         ))}
       </div>
 
       {/* Rows */}
-      {Array.from({ length: rows }).map((_, rowIndex) => (
+      {rowKeys.map((rowKey, rowIndex) => (
         <div
-          key={`row-${rowIndex}`}
+          key={rowKey}
           className='flex border-b border-subtle last:border-b-0'
         >
-          {Array.from({ length: columns }).map((_, colIndex) => (
-            <div key={`cell-${rowIndex}-${colIndex}`} className='flex-1 p-3'>
-              <div
-                className={clsx(
-                  'h-4 rounded-sm skeleton motion-reduce:animate-none',
-                  colIndex === 0 ? 'w-3/4' : 'w-full'
-                )}
-              />
-            </div>
-          ))}
+          {Array.from({ length: columns }, (_, colIndex) => {
+            const cellKey = cellKeys[rowIndex * columns + colIndex];
+            return (
+              <div key={cellKey} className='flex-1 p-3'>
+                <div
+                  className={clsx(
+                    'h-4 rounded-sm skeleton motion-reduce:animate-none',
+                    colIndex === 0 ? 'w-3/4' : 'w-full'
+                  )}
+                />
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
