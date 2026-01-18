@@ -1116,7 +1116,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: 20
+          node-version: 24
           package-manager-cache: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
@@ -1491,7 +1491,7 @@ jobs:
 
       - name: Run Homepage Smoke Test against production
         run: |
-          CI=true BASE_URL=https://meetjovie.com pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
