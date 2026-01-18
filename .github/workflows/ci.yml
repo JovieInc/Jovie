@@ -672,13 +672,13 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running critical tests only (9 files, ~2s)"
-            # Run only critical test files - filter by filename pattern
+            # Run only *.critical.test.ts files - glob pattern for fast feedback
             # Full test suite runs in nightly CI, not on every main push
-            pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} "**/*.critical.test.ts"
           elif [ -n "${{ github.base_ref }}" ]; then
             echo "🔍 PR: Running critical tests + tests changed since ${{ github.base_ref }}"
             # First run critical tests (~8s)
-            pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} "**/*.critical.test.ts"
             # Then run tests for changed files
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
             pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
