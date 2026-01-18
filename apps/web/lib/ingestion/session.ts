@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { type IsolationLevel, validateClerkUserId } from '@/lib/auth/session';
