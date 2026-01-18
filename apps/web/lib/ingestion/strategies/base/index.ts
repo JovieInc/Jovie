@@ -22,6 +22,17 @@ export {
 } from './constants';
 // Fetch
 export { fetchDocument } from './fetch';
+// Handle Extraction
+export {
+  buildCanonicalUrl,
+  extractHandle,
+  type HandleExtractionResult,
+} from './handle-extractor';
+// Host Validation
+export {
+  isCanonicalHostValid,
+  isValidHost,
+} from './host-validator';
 // Parsing
 export {
   extractHrefs,
@@ -50,3 +61,12 @@ export {
 } from './utils';
 // Validation
 export { isPlatformUrl, isUrlSafe, validatePlatformUrl } from './validation';
+// Validation Pipeline (modular validators)
+export {
+  isUrlSafe as checkUrlSafety,
+  type ValidationResult,
+  validateHttpsProtocol,
+  validateNotProtocolRelative,
+  validateScheme,
+  validateUrlSafety,
+} from './validation-pipeline';
