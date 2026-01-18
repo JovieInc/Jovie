@@ -141,6 +141,7 @@ describe('CopyToClipboardButton', () => {
     const mockTextarea = {
       focus: vi.fn(),
       select: vi.fn(),
+      remove: vi.fn(), // Hook uses textarea.remove()
       value: '',
       style: {},
     };
@@ -198,7 +199,7 @@ describe('CopyToClipboardButton', () => {
     expect(mockTextarea.select).toHaveBeenCalled();
     expect(mockExecCommand).toHaveBeenCalledWith('copy');
     expect(mockAppendChild).toHaveBeenCalledWith(mockTextarea);
-    expect(mockRemoveChild).toHaveBeenCalledWith(mockTextarea);
+    expect(mockTextarea.remove).toHaveBeenCalled(); // Hook uses textarea.remove()
     expect(track).toHaveBeenCalledWith('profile_copy_url_click', {
       status: 'success',
     });
@@ -211,6 +212,7 @@ describe('CopyToClipboardButton', () => {
     const mockTextarea = {
       focus: vi.fn(),
       select: vi.fn(),
+      remove: vi.fn(), // Hook uses textarea.remove()
       value: '',
       style: {},
     };
@@ -280,6 +282,7 @@ describe('CopyToClipboardButton', () => {
     const mockTextarea = {
       focus: vi.fn(),
       select: vi.fn(),
+      remove: vi.fn(), // Hook uses textarea.remove()
       value: '',
       style: {},
     };
