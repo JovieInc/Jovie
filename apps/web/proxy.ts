@@ -364,11 +364,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (!userState.needsOnboarding && pathname === '/onboarding') {
         // Active user trying to access onboarding → redirect to dashboard
         res = NextResponse.redirect(new URL('/', req.url));
-      } else if (
-        pathname === '/' ||
-        pathname === '/signin' ||
-        pathname === '/signup'
-      ) {
+      } else if (pathname === '/signin' || pathname === '/signup') {
         // Fully authenticated user hitting auth pages → redirect to dashboard
         res = NextResponse.redirect(new URL('/', req.url));
       } else {
