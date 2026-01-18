@@ -210,7 +210,14 @@ const ORGANIZATION_SCHEMA = jsonLd({
 
 export default function HomePage() {
   return (
-    <div className='relative min-h-screen bg-base text-primary-token'>
+    <div
+      className='relative min-h-screen bg-base text-primary-token'
+      style={{
+        // Inline fallbacks prevent blank/black flash before CSS loads (ENG-001)
+        backgroundColor: 'var(--color-bg-base, #f6f6f6)',
+        color: 'var(--color-text-primary-token, #0c0c0c)',
+      }}
+    >
       {/* Structured Data */}
       <script
         type='application/ld+json'

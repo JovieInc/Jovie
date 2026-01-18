@@ -340,10 +340,24 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname !== '/onboarding' &&
         !pathname.startsWith('/api/')
       ) {
-        // User needs onboarding - rewrite to onboarding page
-        res = NextResponse.rewrite(new URL('/onboarding', req.url), {
-          request: { headers: requestHeaders },
-        });
+        // ENG-002: Check for recent onboarding completion cookie to prevent redirect loop
+        // This cookie is set after completing onboarding to bypass the race condition
+        // where the DB query might see stale data before transaction is fully visible
+        const onboardingJustCompleted =
+          req.cookies.get('jovie_onboarding_complete')?.value === '1';
+
+        if (onboardingJustCompleted) {
+          // User just completed onboarding - let them through to dashboard
+          // The cookie will expire in 30s, and by then DB will have fresh data
+          res = NextResponse.next({ request: { headers: requestHeaders } });
+          // Clear the cookie since it's a one-time bypass
+          res.cookies.delete('jovie_onboarding_complete');
+        } else {
+          // User needs onboarding - rewrite to onboarding page
+          res = NextResponse.rewrite(new URL('/onboarding', req.url), {
+            request: { headers: requestHeaders },
+          });
+        }
       } else if (!userState.needsWaitlist && pathname === '/waitlist') {
         // Active user trying to access waitlist → redirect to dashboard
         res = NextResponse.redirect(new URL('/', req.url));

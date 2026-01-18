@@ -196,6 +196,71 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
         maxDiffPixelRatio: 0.05,
       });
     });
+
+    // ENG-001: Below-the-fold visibility tests
+    test('below-the-fold sections render with correct background (light mode)', async ({
+      page,
+    }) => {
+      await page.goto('/', { timeout: 30000 });
+      await page.waitForLoadState('networkidle');
+
+      // Force light mode
+      await page.evaluate(() => {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('jovie-theme', 'light');
+      });
+      await page.waitForTimeout(500);
+
+      // Scroll to below-the-fold content
+      await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+      await page.waitForTimeout(300);
+
+      // Take screenshot of below-the-fold area
+      await expect(page).toHaveScreenshot('homepage-below-fold-light.png', {
+        fullPage: false,
+        maxDiffPixelRatio: 0.05,
+      });
+
+      // Verify sections are not blank (have visible background, not pure black)
+      const mainDiv = page.locator('main > div').first();
+      const bgColor = await mainDiv.evaluate(
+        el => window.getComputedStyle(el).backgroundColor
+      );
+      // In light mode, background should not be pure black
+      expect(bgColor).not.toBe('rgb(0, 0, 0)');
+    });
+
+    test('below-the-fold sections render with correct background (dark mode)', async ({
+      page,
+    }) => {
+      await page.goto('/', { timeout: 30000 });
+      await page.waitForLoadState('networkidle');
+
+      // Force dark mode
+      await page.evaluate(() => {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('jovie-theme', 'dark');
+      });
+      await page.waitForTimeout(500);
+
+      // Scroll to below-the-fold content
+      await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+      await page.waitForTimeout(300);
+
+      // Take screenshot
+      await expect(page).toHaveScreenshot('homepage-below-fold-dark.png', {
+        fullPage: false,
+        maxDiffPixelRatio: 0.05,
+      });
+
+      // Verify text is light colored in dark mode (not black)
+      const mainDiv = page.locator('main > div').first();
+      const textColor = await mainDiv.evaluate(
+        el => window.getComputedStyle(el).color
+      );
+      // Text should be light in dark mode, not black
+      expect(textColor).not.toBe('rgb(0, 0, 0)');
+    });
   });
 
   test.describe('Accessibility', () => {
@@ -255,6 +320,40 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       }
 
       expect(criticalViolations).toEqual([]);
+    });
+
+    // ENG-001: Below-the-fold contrast check
+    test('below-the-fold sections meet contrast requirements', async ({
+      page,
+    }) => {
+      await page.goto('/', { timeout: 30000 });
+      await page.waitForLoadState('networkidle');
+
+      // Scroll to ensure all sections are loaded
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.waitForTimeout(500);
+      await page.evaluate(() => window.scrollTo(0, 0));
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2aa'])
+        .include('section')
+        .analyze();
+
+      // Filter for color-contrast violations specifically
+      const contrastViolations = results.violations.filter(
+        v => v.id === 'color-contrast'
+      );
+
+      if (contrastViolations.length > 0) {
+        console.log('Contrast violations in sections:');
+        contrastViolations.forEach(v => {
+          console.log(
+            `  ${v.nodes.length} element(s) with insufficient contrast`
+          );
+        });
+      }
+
+      expect(contrastViolations).toEqual([]);
     });
 
     test('homepage has proper heading hierarchy', async ({ page }) => {
