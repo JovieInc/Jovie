@@ -4,7 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
@@ -471,6 +471,18 @@ export async function completeOnboarding({
     }
 
     if (redirectToDashboard) {
+      // ENG-002: Set completion cookie to prevent redirect loop race condition
+      // The proxy checks this cookie and bypasses needsOnboarding check for 30s
+      // This handles the race between transaction commit and proxy's DB read
+      const cookieStore = await cookies();
+      cookieStore.set('jovie_onboarding_complete', '1', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30, // 30 seconds - enough time to bypass proxy check
+        path: '/',
+      });
+
       // Invalidate dashboard data cache to prevent stale data causing redirect loops
       // This ensures the app layout gets fresh data showing onboarding is complete
       revalidatePath('/app', 'layout');

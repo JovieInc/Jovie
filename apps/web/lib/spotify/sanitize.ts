@@ -272,7 +272,7 @@ export function sanitizeSpotifyUrl(
 export function sanitizeFollowerCount(
   count: number | undefined | null
 ): number {
-  if (count === undefined || count === null || isNaN(count)) {
+  if (count === undefined || count === null || Number.isNaN(count)) {
     return 0;
   }
   return Math.max(0, Math.floor(count));
@@ -288,7 +288,11 @@ export function sanitizeFollowerCount(
 export function sanitizePopularity(
   popularity: number | undefined | null
 ): number {
-  if (popularity === undefined || popularity === null || isNaN(popularity)) {
+  if (
+    popularity === undefined ||
+    popularity === null ||
+    Number.isNaN(popularity)
+  ) {
     return 0;
   }
   return Math.min(100, Math.max(0, Math.floor(popularity)));
