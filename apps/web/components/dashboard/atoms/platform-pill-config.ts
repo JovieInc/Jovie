@@ -128,7 +128,7 @@ export function getIconChipStyle(
   iconFg: string,
   isTikTok: boolean,
   state: PlatformPillState
-): CSSProperties | undefined {
+): CSSProperties {
   if (!isTikTok || state === 'loading') {
     return { color: iconFg };
   }

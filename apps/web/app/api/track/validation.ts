@@ -59,7 +59,14 @@ export function validateRequiredFields(body: {
 /**
  * Validate handle format
  */
-export function validateHandle(handle: string): ValidationError | null {
+export function validateHandle(handle: unknown): ValidationError | null {
+  if (typeof handle !== 'string') {
+    return {
+      error: 'Handle must be a string',
+      status: 400,
+    };
+  }
+
   if (!USERNAME_REGEX.test(handle)) {
     return {
       error:
