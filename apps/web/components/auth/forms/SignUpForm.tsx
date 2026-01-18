@@ -4,12 +4,12 @@ import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
 import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
+import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
@@ -99,42 +99,7 @@ export function SignUpForm() {
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
-    return (
-      <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-3 p-0'>
-          <div className='space-y-4'>
-            <div className='flex items-center justify-center gap-3 text-sm text-secondary-token'>
-              <LoadingSpinner size='sm' tone='muted' />
-              <span>Loading sign-up</span>
-            </div>
-            <div className='animate-pulse space-y-4'>
-              <div className='h-6 w-48 mx-auto bg-subtle rounded' />
-              <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-              <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-              <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            </div>
-            {isClerkStalled ? (
-              <output
-                aria-live='polite'
-                className='block rounded-[--radius-xl] border border-subtle bg-surface-0 px-4 py-3 text-[13px] text-secondary-token text-center'
-              >
-                <p>Hang tight — sign-up is taking longer than usual.</p>
-                <p className='mt-2'>
-                  Refresh the page or try again in a minute.
-                </p>
-                <button
-                  type='button'
-                  className='mt-3 inline-flex items-center justify-center rounded-[--radius-xl] border border-subtle px-3 py-1.5 text-[13px] font-medium text-primary-token hover:bg-surface-1 transition-colors'
-                  onClick={() => window.location.reload()}
-                >
-                  Retry now
-                </button>
-              </output>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <AuthLoadingState mode='signup' isStalled={isClerkStalled} />;
   }
 
   const handleEmailClick = () => {
