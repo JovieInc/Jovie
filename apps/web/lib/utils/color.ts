@@ -10,7 +10,7 @@
  */
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '');
-  const bigint = parseInt(h, 16);
+  const bigint = Number.parseInt(h, 16);
   return {
     r: (bigint >> 16) & 255,
     g: (bigint >> 8) & 255,

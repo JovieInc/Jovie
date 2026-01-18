@@ -306,7 +306,7 @@ class SpotifyClientManager {
     const retryAfter = response.headers.get('Retry-After');
     const error = spotifyApiError(errorDetails, errorCode);
     if (retryAfter) {
-      Object.assign(error, { retryAfter: parseInt(retryAfter, 10) });
+      Object.assign(error, { retryAfter: Number.parseInt(retryAfter, 10) });
     }
 
     throw error;

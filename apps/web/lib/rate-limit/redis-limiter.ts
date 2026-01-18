@@ -25,7 +25,7 @@ function toUpstashWindow(
     throw new Error(`Invalid window format: ${window}`);
   }
 
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   const unit = match[2];
 
   // Upstash uses 'ms' for milliseconds, 's' for seconds, 'm' for minutes, etc.

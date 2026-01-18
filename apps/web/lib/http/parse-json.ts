@@ -103,7 +103,7 @@ export async function parseJsonBody<T = unknown>(
 
   // Check Content-Length header first for early rejection
   const contentLength = request.headers.get('content-length');
-  if (contentLength && parseInt(contentLength, 10) > maxBodySize) {
+  if (contentLength && Number.parseInt(contentLength, 10) > maxBodySize) {
     console.warn(`[${options.route}] Request body too large`, {
       contentLength,
       maxBodySize,
