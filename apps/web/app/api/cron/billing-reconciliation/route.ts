@@ -14,7 +14,10 @@
 
 import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { handleOrphanedSubscription } from '@/lib/billing/reconciliation/orphaned-subscription-handler';
+import { fixStatusMismatch } from '@/lib/billing/reconciliation/status-mismatch-fixer';
+import { retrieveSubscriptionSafely } from '@/lib/billing/reconciliation/subscription-error-classifier';
+import { detectStatusMismatch } from '@/lib/billing/reconciliation/subscription-status-resolver';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
@@ -25,19 +28,6 @@ import { logger } from '@/lib/utils/logger';
 // Pagination settings
 const BATCH_SIZE = 100;
 const MAX_BATCHES = 50; // Safety limit: process max 5000 users per run
-
-/**
- * Safely extract customer ID from Stripe objects
- * Handles both string IDs and expanded customer objects
- */
-function getCustomerId(
-  customer: string | Stripe.Customer | Stripe.DeletedCustomer | null
-): string | null {
-  if (!customer) return null;
-  if (typeof customer === 'string') return customer;
-  if ('id' in customer && typeof customer.id === 'string') return customer.id;
-  return null;
-}
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
@@ -185,99 +175,64 @@ async function reconcileUsersWithSubscriptions(
       try {
         if (!user.stripeSubscriptionId) continue;
 
-        // Fetch subscription from Stripe
-        let subscription;
-        try {
-          subscription = await stripe.subscriptions.retrieve(
-            user.stripeSubscriptionId
-          );
-        } catch (stripeError) {
-          // Subscription not found in Stripe - might be deleted
-          const errorMessage =
-            stripeError instanceof Error
-              ? stripeError.message
-              : String(stripeError);
+        // Step 1: Retrieve subscription from Stripe with error handling
+        const { subscription, error: retrievalError } =
+          await retrieveSubscriptionSafely(stripe, user.stripeSubscriptionId);
 
-          if (errorMessage.includes('No such subscription')) {
-            // Subscription was deleted in Stripe but DB still has it
+        if (retrievalError) {
+          // Step 2: Handle subscription not found (orphaned)
+          if (retrievalError.type === 'not_found') {
             stats.orphanedSubscriptions++;
             stats.mismatches++;
 
-            if (user.isPro) {
-              // User is marked as Pro but subscription is gone - downgrade
-              const result = await updateUserBillingStatus({
-                clerkUserId: user.clerkId,
-                isPro: false,
-                stripeSubscriptionId: null,
-                eventType: 'reconciliation_fix',
-                source: 'reconciliation',
-                metadata: {
-                  reason: 'subscription_not_found_in_stripe',
-                  previousSubscriptionId: user.stripeSubscriptionId,
-                },
-              });
+            const result = await handleOrphanedSubscription(db, {
+              id: user.id,
+              clerkId: user.clerkId,
+              isPro: user.isPro ?? false,
+              stripeSubscriptionId: user.stripeSubscriptionId,
+            });
 
-              if (result.success) {
-                stats.fixed++;
-              } else {
-                stats.errors++;
-                errors.push(`Failed to fix user ${user.id}: ${result.error}`);
-              }
-            } else {
-              // Just clear the orphaned subscription ID
-              await db
-                .update(users)
-                .set({
-                  stripeSubscriptionId: null,
-                  billingUpdatedAt: new Date(),
-                  billingVersion: drizzleSql`${users.billingVersion} + 1`,
-                })
-                .where(eq(users.id, user.id));
+            if (result.success) {
               stats.fixed++;
+            } else {
+              stats.errors++;
+              errors.push(`Failed to fix user ${user.id}: ${result.error}`);
             }
             continue;
           }
 
-          // Other Stripe error - log and continue
+          // Other Stripe errors - log and continue
           stats.errors++;
-          errors.push(`Stripe error for user ${user.id}: ${errorMessage}`);
+          errors.push(
+            `Stripe error for user ${user.id}: ${retrievalError.message}`
+          );
           continue;
         }
 
-        // Determine expected Pro status from Stripe
-        const shouldBePro =
-          subscription.status === 'active' ||
-          subscription.status === 'trialing';
+        if (!subscription) continue;
 
-        // Check for mismatch
-        if (user.isPro !== shouldBePro) {
+        // Step 3: Check for status mismatch (treat null isPro as false)
+        const currentIsPro = user.isPro ?? false;
+        const mismatchResult = detectStatusMismatch(currentIsPro, subscription);
+
+        if (mismatchResult.hasMismatch) {
           stats.mismatches++;
 
-          // Fix the mismatch
-          const customerId = getCustomerId(subscription.customer);
-          const result = await updateUserBillingStatus({
-            clerkUserId: user.clerkId,
-            isPro: shouldBePro,
-            stripeSubscriptionId: shouldBePro ? subscription.id : null,
-            stripeCustomerId: customerId ?? undefined,
-            eventType: 'reconciliation_fix',
-            source: 'reconciliation',
-            metadata: {
-              reason: 'status_mismatch',
-              dbIsPro: user.isPro,
-              stripeStatus: subscription.status,
-              expectedIsPro: shouldBePro,
-            },
-          });
+          // Step 4: Fix the mismatch
+          const fixResult = await fixStatusMismatch(
+            { ...user, isPro: currentIsPro },
+            subscription,
+            mismatchResult.expectedIsPro
+          );
 
-          if (result.success) {
+          if (fixResult.success) {
             stats.fixed++;
             logger.info(
-              `[billing-reconciliation] Fixed user ${user.id}: isPro ${user.isPro} -> ${shouldBePro}`
+              `[billing-reconciliation] Fixed user ${user.id}: isPro ${user.isPro} -> ${mismatchResult.expectedIsPro}`
             );
           } else {
             stats.errors++;
-            errors.push(`Failed to fix user ${user.id}: ${result.error}`);
+            errors.push(`Failed to fix user ${user.id}: ${fixResult.error}`);
           }
         }
       } catch (error) {
