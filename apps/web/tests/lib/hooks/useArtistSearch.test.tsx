@@ -8,27 +8,26 @@ import { useArtistSearchQuery } from '@/lib/queries';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Create wrapper with QueryClient for testing
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        gcTime: 0,
-      },
+// Single QueryClient instance shared across all tests (cleared between tests)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      gcTime: 0,
     },
-  });
+  },
+});
 
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  };
+function TestWrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 }
 
 describe('useArtistSearchQuery', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    queryClient.clear();
   });
 
   afterEach(() => {
@@ -37,7 +36,7 @@ describe('useArtistSearchQuery', () => {
 
   it('should start with idle state', () => {
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     expect(result.current.state).toBe('idle');
@@ -49,7 +48,7 @@ describe('useArtistSearchQuery', () => {
   it('should not search for queries shorter than minQueryLength', () => {
     const { result } = renderHook(
       () => useArtistSearchQuery({ minQueryLength: 2 }),
-      { wrapper: createWrapper() }
+      { wrapper: TestWrapper }
     );
 
     act(() => {
@@ -68,7 +67,7 @@ describe('useArtistSearchQuery', () => {
     mockFetch.mockReturnValue(fetchPromise);
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {
@@ -109,7 +108,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {
@@ -131,7 +130,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {
@@ -153,7 +152,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {
@@ -175,7 +174,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {
@@ -204,7 +203,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {
@@ -231,7 +230,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     const { result } = renderHook(() => useArtistSearchQuery({ limit: 10 }), {
-      wrapper: createWrapper(),
+      wrapper: TestWrapper,
     });
 
     act(() => {

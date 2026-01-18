@@ -673,14 +673,8 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running critical tests only (9 files, ~2s)"
             # Run only critical test files - filter by filename pattern
+            # Full test suite runs in nightly CI, not on every main push
             pnpm --filter=@jovie/web run test -- "critical" ${{ steps.quarantine.outputs.unit_excludes }}
-            # Plus tests for files changed since preview (if preview branch exists)
-            # Must fetch origin/preview first since checkout only fetches current ref
-            if git fetch origin preview --depth=1 2>/dev/null; then
-              pnpm --filter=@jovie/web run test -- --changed origin/preview ${{ steps.quarantine.outputs.unit_excludes }}
-            else
-              echo "⚠️ origin/preview not found, skipping --changed tests"
-            fi
           elif [ -n "${{ github.base_ref }}" ]; then
             echo "🔍 PR: Running critical tests + tests changed since ${{ github.base_ref }}"
             # First run critical tests (~8s)
