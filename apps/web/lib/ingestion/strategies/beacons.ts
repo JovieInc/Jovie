@@ -391,8 +391,9 @@ export function extractBeacons(html: string): ExtractionResult {
  * Cleans up Beacons display name by removing platform suffixes.
  */
 function cleanBeaconsDisplayName(name: string): string {
+  const safeName = name.slice(0, 200);
   return (
-    name
+    safeName
       // Handle " | Beacons" and variations
       .replace(/\s*\|\s*Beacons(?:\.ai)?$/i, '')
       // Handle " - Beacons.ai" and variations

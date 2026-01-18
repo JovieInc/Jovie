@@ -57,7 +57,8 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 }
 
 export function slugify(text: string): string {
-  return text
+  const safeText = text.slice(0, 200);
+  return safeText
     .toLowerCase()
     .trim()
     .replace(/[^\w\s-]/g, '')

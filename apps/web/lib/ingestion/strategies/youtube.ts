@@ -22,6 +22,7 @@ const CHANNEL_PATTERNS = [
   /^https:\/\/(www\.)?youtube\.com\/c\/[^/?#]+/i,
   /^https:\/\/(www\.)?youtube\.com\/@[^/?#]+/i,
 ];
+const MAX_URL_LENGTH = 2048;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -38,6 +39,9 @@ function getPath(value: unknown, keys: string[]): unknown {
 
 export function isYouTubeChannelUrl(url: string): boolean {
   try {
+    if (url.length > MAX_URL_LENGTH) {
+      return false;
+    }
     const normalized = normalizeUrl(url);
     return CHANNEL_PATTERNS.some(rx => rx.test(normalized));
   } catch {
@@ -47,6 +51,9 @@ export function isYouTubeChannelUrl(url: string): boolean {
 
 export function validateYouTubeChannelUrl(url: string): string | null {
   try {
+    if (url.length > MAX_URL_LENGTH) {
+      return null;
+    }
     const candidate = normalizeUrl(url);
     if (!CHANNEL_PATTERNS.some(rx => rx.test(candidate))) {
       return null;

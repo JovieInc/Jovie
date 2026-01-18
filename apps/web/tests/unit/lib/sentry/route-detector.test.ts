@@ -330,6 +330,11 @@ describe('hasDynamicSegments', () => {
     expect(hasDynamicSegments('/app')).toBe(false);
     expect(hasDynamicSegments('/artists/featured')).toBe(false);
   });
+
+  it('handles very long pathnames safely', () => {
+    const longSegment = 'a'.repeat(5000);
+    expect(hasDynamicSegments(`/[${longSegment}]`)).toBe(true);
+  });
 });
 
 // ============================================================================
@@ -345,6 +350,11 @@ describe('isRouteGroupPath', () => {
   it('should return false for non-route-group paths', () => {
     expect(isRouteGroupPath('/app')).toBe(false);
     expect(isRouteGroupPath('/artists')).toBe(false);
+  });
+
+  it('handles very long route-group paths safely', () => {
+    const longSegment = 'a'.repeat(5000);
+    expect(isRouteGroupPath(`/(${longSegment})/about`)).toBe(true);
   });
 });
 

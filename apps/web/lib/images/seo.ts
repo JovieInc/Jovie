@@ -341,8 +341,9 @@ function getImageExtension(url: string): string | null {
  * Create URL-safe slug from text
  */
 function slugify(text: string): string {
+  const safeText = text.slice(0, 200);
   return (
-    text
+    safeText
       .toLowerCase()
       .trim()
       // Replace spaces and special chars with hyphens

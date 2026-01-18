@@ -9,6 +9,7 @@ import {
   canonicalIdentity,
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
+import { trimTrailingSlashes } from '@/lib/utils/string-utils';
 
 /**
  * Link section types for categorizing links in the UI
@@ -49,14 +50,19 @@ export function compactUrlDisplay(platformId: string, url: string): string {
   if (!trimmed) return '';
 
   const withScheme = (() => {
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (
+      trimmed.toLowerCase().startsWith('http://') ||
+      trimmed.toLowerCase().startsWith('https://')
+    ) {
+      return trimmed;
+    }
     return `https://${trimmed}`;
   })();
 
   try {
     const parsed = new URL(withScheme);
     const host = parsed.hostname.replace(/^www\./, '');
-    const path = parsed.pathname.replace(/\/+$/, '');
+    const path = trimTrailingSlashes(parsed.pathname);
     const segments = path.split('/').filter(Boolean);
     const first = segments[0] ?? '';
     const second = segments[1] ?? '';
@@ -102,7 +108,12 @@ export function compactUrlDisplay(platformId: string, url: string): string {
 
     return host;
   } catch {
-    const withoutScheme = trimmed.replace(/^https?:\/\//, '');
+    const lowered = trimmed.toLowerCase();
+    const withoutScheme = lowered.startsWith('https://')
+      ? trimmed.slice(8)
+      : lowered.startsWith('http://')
+        ? trimmed.slice(7)
+        : trimmed;
     const beforePath = withoutScheme.split('/')[0];
     return beforePath || trimmed;
   }

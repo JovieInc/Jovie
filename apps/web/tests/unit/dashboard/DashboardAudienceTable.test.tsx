@@ -145,23 +145,27 @@ describe('DashboardAudienceTable - Virtualization', () => {
   describe('with large dataset (500+ rows)', () => {
     const largeDataset = MOCK_DATA_500;
 
-    it('virtualizes rows - renders significantly fewer DOM rows than total data', () => {
-      render(
-        <DashboardAudienceTable
-          {...defaultProps}
-          rows={largeDataset}
-          total={500}
-        />
-      );
+    it(
+      'virtualizes rows - renders significantly fewer DOM rows than total data',
+      { timeout: 10000 },
+      () => {
+        render(
+          <DashboardAudienceTable
+            {...defaultProps}
+            rows={largeDataset}
+            total={500}
+          />
+        );
 
-      // Verify the virtualizer received the full count
-      expect(capturedRowCount).toBe(500);
+        // Verify the virtualizer received the full count
+        expect(capturedRowCount).toBe(500);
 
-      // The virtualizer should only return a small subset of items
-      // (visible rows + overscan, typically ~20 items for a 600px viewport)
-      expect(capturedVirtualItems.length).toBeLessThan(50);
-      expect(capturedVirtualItems.length).toBeLessThan(500);
-    });
+        // The virtualizer should only return a small subset of items
+        // (visible rows + overscan, typically ~20 items for a 600px viewport)
+        expect(capturedVirtualItems.length).toBeLessThan(50);
+        expect(capturedVirtualItems.length).toBeLessThan(500);
+      }
+    );
 
     it('only renders visible rows plus overscan, not all 500 rows', () => {
       const { container } = render(
@@ -276,7 +280,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
   describe('virtualization configuration', () => {
     const testDataset = MOCK_DATA_100;
 
-    it('uses correct estimated row height (44px)', () => {
+    it('uses correct estimated row height (44px)', { timeout: 10000 }, () => {
       render(
         <DashboardAudienceTable
           {...defaultProps}

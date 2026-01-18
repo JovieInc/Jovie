@@ -67,6 +67,8 @@ const TRACKING_PARAMS = [
   'source',
 ];
 
+const MAX_URL_LENGTH = 2048;
+
 /**
  * Dangerous URL schemes that should be rejected
  */
@@ -197,14 +199,19 @@ function canonicalizeTwitterDomain(parsedUrl: URL): void {
  */
 export function normalizeUrl(url: string): string {
   try {
-    const lowered = url.trim().toLowerCase();
+    const trimmed = url.trim();
+    if (trimmed.length > MAX_URL_LENGTH) {
+      return trimmed;
+    }
+
+    const lowered = trimmed.toLowerCase();
 
     if (isUnsafeUrl(lowered)) {
       throw new Error('Unsafe URL');
     }
 
     // Normalize stray spaces around dots
-    url = url.replace(/\s*\.\s*/g, '.');
+    url = trimmed.replace(/\s*\.\s*/g, '.');
 
     // Fix common domain misspellings
     url = fixDomainMisspellings(url);
