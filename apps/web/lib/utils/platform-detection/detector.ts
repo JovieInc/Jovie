@@ -141,11 +141,8 @@ export function canonicalIdentity(
     switch (link.platform.id) {
       case 'instagram':
       case 'twitter':
-        // x.com and twitter.com both map here; username is first segment
-        if (parts[0])
-          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
-        break;
       case 'tiktok':
+        // x.com/twitter.com and tiktok.com; username is first segment
         if (parts[0])
           return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
         break;

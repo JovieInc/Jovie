@@ -41,11 +41,11 @@ export function SmartLinkCell({ release, onCopy }: SmartLinkCellProps) {
       data-testid={smartLinkTestId}
       data-url={`${getBaseUrl()}${release.smartLinkPath}`}
       onClick={() =>
-        void handleCopyWithFeedback(
+        handleCopyWithFeedback(
           release.smartLinkPath,
           `${release.title} smart link`,
           smartLinkTestId
-        )
+        ).catch(() => {})
       }
       className={cn(
         'inline-flex items-center text-xs transition-colors',

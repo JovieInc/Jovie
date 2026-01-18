@@ -197,7 +197,6 @@
         "vercel list *",
         "vercel inspect *",
         "vercel logs *",
-        "pnpm drizzle:check *",
         "pnpm drizzle-kit generate *",
         "timeout * pnpm *",
         "curl *",

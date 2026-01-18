@@ -127,7 +127,7 @@ export function DashboardAudienceTableUnified({
             link.download = `${(member.displayName || 'contact').replaceAll(/[^a-z0-9]/gi, '_')}.vcf`;
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+            link.remove();
             URL.revokeObjectURL(url);
             toast.success('Contact exported as vCard');
           },

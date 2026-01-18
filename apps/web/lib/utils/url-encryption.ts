@@ -68,15 +68,17 @@ export function simpleDecryptUrl(encrypted: string): string {
 }
 
 /**
- * Generates a secure random short ID
+ * Generates a cryptographically secure random short ID
  */
 export function generateShortId(length: number = 12): string {
   const chars =
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
+  const randomValues = new Uint32Array(length);
+  crypto.getRandomValues(randomValues);
 
+  let result = '';
   for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(randomValues[i] % chars.length);
   }
 
   return result;

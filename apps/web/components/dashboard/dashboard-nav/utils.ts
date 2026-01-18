@@ -12,7 +12,7 @@ export function fallbackCopy(text: string): boolean {
     textarea.focus();
     textarea.select();
     const successful = document.execCommand('copy');
-    document.body.removeChild(textarea);
+    textarea.remove();
     return successful;
   } catch {
     return false;

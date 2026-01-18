@@ -31,13 +31,11 @@ export function MarketingHeader({
   const pathname = usePathname();
 
   // Use the shared throttled scroll hook
-  const { isScrolled } = useThrottledScroll({
+  // Note: _isScrolled available for future scroll-aware styling
+  const { isScrolled: _isScrolled } = useThrottledScroll({
     threshold: scrollThresholdPx,
     wait: PACER_TIMING.SCROLL_THROTTLE_MS,
   });
-
-  // Note: isScrolled available for future enhancements
-  void isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';
   const hidePricingLink = pathname === '/';
 
