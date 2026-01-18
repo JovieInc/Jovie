@@ -50,16 +50,24 @@ vi.mock('@/lib/db/schema', () => ({
   waitlistEntries: {},
 }));
 
+// Import module once at the top to avoid re-importing in each test
+import {
+  canAccessApp,
+  canAccessOnboarding,
+  getRedirectForState,
+  getWaitlistAccess,
+  requiresRedirect,
+  resolveUserState,
+  UserState,
+} from '@/lib/auth/gate';
+
 describe('gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   describe('UserState enum', () => {
-    it('exports all expected user states', async () => {
-      const { UserState } = await import('@/lib/auth/gate');
-
+    it('exports all expected user states', () => {
       expect(UserState.UNAUTHENTICATED).toBe('UNAUTHENTICATED');
       expect(UserState.NEEDS_DB_USER).toBe('NEEDS_DB_USER');
       expect(UserState.NEEDS_WAITLIST_SUBMISSION).toBe(
@@ -77,7 +85,6 @@ describe('gate.ts', () => {
     it('returns UNAUTHENTICATED when no Clerk session exists', async () => {
       mockCachedAuth.mockResolvedValue({ userId: null });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.UNAUTHENTICATED);
@@ -109,7 +116,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.BANNED);
@@ -138,7 +144,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.BANNED);
@@ -167,7 +172,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.BANNED);
@@ -206,7 +210,6 @@ describe('gate.ts', () => {
           }),
         });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
@@ -256,7 +259,6 @@ describe('gate.ts', () => {
           }),
         });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
@@ -305,7 +307,6 @@ describe('gate.ts', () => {
           }),
         });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.state).toBe(UserState.ACTIVE);
@@ -356,7 +357,6 @@ describe('gate.ts', () => {
           }),
         });
 
-      const { resolveUserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState();
 
       expect(result.context.isAdmin).toBe(true);
@@ -379,7 +379,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { resolveUserState, UserState } = await import('@/lib/auth/gate');
       const result = await resolveUserState({ createDbUserIfMissing: false });
 
       expect(result.state).toBe(UserState.NEEDS_DB_USER);
@@ -388,11 +387,7 @@ describe('gate.ts', () => {
   });
 
   describe('getRedirectForState', () => {
-    it('returns correct redirect for each state', async () => {
-      const { getRedirectForState, UserState } = await import(
-        '@/lib/auth/gate'
-      );
-
+    it('returns correct redirect for each state', () => {
       expect(getRedirectForState(UserState.UNAUTHENTICATED)).toBe('/signin');
       expect(getRedirectForState(UserState.NEEDS_DB_USER)).toBe(
         '/onboarding?fresh_signup=true'
@@ -414,8 +409,6 @@ describe('gate.ts', () => {
 
   describe('canAccessApp', () => {
     it('returns true only for ACTIVE state', async () => {
-      const { canAccessApp, UserState } = await import('@/lib/auth/gate');
-
       expect(canAccessApp(UserState.ACTIVE)).toBe(true);
       expect(canAccessApp(UserState.UNAUTHENTICATED)).toBe(false);
       expect(canAccessApp(UserState.NEEDS_DB_USER)).toBe(false);
@@ -428,11 +421,7 @@ describe('gate.ts', () => {
   });
 
   describe('canAccessOnboarding', () => {
-    it('returns true for NEEDS_ONBOARDING and ACTIVE states', async () => {
-      const { canAccessOnboarding, UserState } = await import(
-        '@/lib/auth/gate'
-      );
-
+    it('returns true for NEEDS_ONBOARDING and ACTIVE states', () => {
       expect(canAccessOnboarding(UserState.NEEDS_ONBOARDING)).toBe(true);
       expect(canAccessOnboarding(UserState.ACTIVE)).toBe(true);
       expect(canAccessOnboarding(UserState.UNAUTHENTICATED)).toBe(false);
@@ -443,8 +432,6 @@ describe('gate.ts', () => {
 
   describe('requiresRedirect', () => {
     it('returns false only for ACTIVE state', async () => {
-      const { requiresRedirect, UserState } = await import('@/lib/auth/gate');
-
       expect(requiresRedirect(UserState.ACTIVE)).toBe(false);
       expect(requiresRedirect(UserState.UNAUTHENTICATED)).toBe(true);
       expect(requiresRedirect(UserState.NEEDS_DB_USER)).toBe(true);
@@ -466,7 +453,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { getWaitlistAccess } = await import('@/lib/auth/gate');
       const result = await getWaitlistAccess('test@example.com');
 
       expect(result.entryId).toBeNull();
@@ -487,7 +473,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { getWaitlistAccess } = await import('@/lib/auth/gate');
       const result = await getWaitlistAccess('Test@Example.com');
 
       expect(result.entryId).toBe('waitlist-123');
@@ -505,7 +490,6 @@ describe('gate.ts', () => {
         }),
       });
 
-      const { getWaitlistAccess } = await import('@/lib/auth/gate');
       await getWaitlistAccess('  TEST@EXAMPLE.COM  ');
 
       // Verify the normalized value is passed into Drizzle eq()
