@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/components/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
 
@@ -212,7 +213,7 @@ export function AuthLayout({
         ref={formRef}
         id='auth-form'
         className={cn(
-          'w-full max-w-[448px] relative z-10',
+          `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10`,
           // Smooth scroll target
           'scroll-mt-4'
         )}
