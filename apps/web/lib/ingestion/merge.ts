@@ -210,7 +210,7 @@ export async function normalizeAndMergeExtraction(
   // Step 3: Process avatar if needed
   const hostedAvatarUrl = await processAvatarIfNeeded(
     profile,
-    extraction.avatarUrl
+    extraction.avatarUrl ?? null
   );
 
   // Step 4: Apply profile enrichment (respects user locks)
