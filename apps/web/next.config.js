@@ -140,7 +140,18 @@ const nextConfig = {
     ];
   },
   async redirects() {
+    // VIP username aliases (case-insensitive handling)
+    // Add both lowercase and mixed-case variants for each alias
+    const vipUsernameRedirects = [
+      // Tim White → Tim
+      { source: '/timwhite', destination: '/tim', permanent: true },
+      { source: '/TimWhite', destination: '/tim', permanent: true },
+      { source: '/Timwhite', destination: '/tim', permanent: true },
+      { source: '/TIMWHITE', destination: '/tim', permanent: true },
+    ];
+
     return [
+      // Legal page redirects
       {
         source: '/privacy',
         destination: '/legal/privacy',
@@ -151,6 +162,8 @@ const nextConfig = {
         destination: '/legal/terms',
         permanent: true,
       },
+      // VIP username redirects
+      ...vipUsernameRedirects,
     ];
   },
   experimental: {
