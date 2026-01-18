@@ -8,7 +8,7 @@ import {
   canonicalIdentity,
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
-import { sectionOf } from '../utils';
+import { type LinkSection, sectionOf } from '../utils/link-categorization';
 
 /**
  * Result of duplicate detection.
@@ -19,7 +19,7 @@ export interface DuplicateDetectionResult<T extends DetectedLink> {
   /** The duplicate link, or null if not found */
   duplicate: T | null;
   /** Section of the duplicate link, or null if not found */
-  duplicateSection: 'social' | 'dsp' | 'earnings' | null;
+  duplicateSection: LinkSection | null;
   /** Whether the duplicate is in a different section */
   hasCrossSectionDuplicate: boolean;
 }
@@ -36,7 +36,7 @@ export interface DuplicateDetectionResult<T extends DetectedLink> {
 export function findDuplicate<T extends DetectedLink>(
   link: DetectedLink,
   existingLinks: T[],
-  currentSection: 'social' | 'dsp' | 'earnings'
+  currentSection: LinkSection
 ): DuplicateDetectionResult<T> {
   const canonicalId = canonicalIdentity({
     platform: link.platform,

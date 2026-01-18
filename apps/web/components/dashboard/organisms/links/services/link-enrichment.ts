@@ -8,7 +8,7 @@
  */
 
 import type { DetectedLink } from '@/lib/utils/platform-detection';
-import { sectionOf } from '../utils';
+import { type LinkSection, sectionOf } from '../utils/link-categorization';
 
 /**
  * Enriches a link with default values and platform-specific adjustments.
@@ -46,7 +46,7 @@ export function enrichLink<T extends DetectedLink>(link: DetectedLink): T {
 export function getSections<T extends DetectedLink>(
   link: T
 ): {
-  section: 'social' | 'dsp' | 'earnings';
+  section: LinkSection;
   otherSection: 'social' | 'dsp' | null;
 } {
   const section = sectionOf(link);

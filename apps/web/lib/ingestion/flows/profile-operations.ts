@@ -17,7 +17,7 @@ import { isValidHandle } from '@/lib/ingestion/strategies/linktree';
 export interface ExistingProfileCheck {
   existing: {
     id: string;
-    isClaimed: boolean;
+    isClaimed: boolean | null;
     usernameNormalized: string;
     avatarUrl: string | null;
     displayName: string | null;

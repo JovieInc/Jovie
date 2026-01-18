@@ -6,7 +6,7 @@
 
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
-import { sectionOf } from '../utils';
+import { type LinkSection, sectionOf } from '../utils/link-categorization';
 
 /**
  * Checks if a link is visible.
@@ -29,7 +29,7 @@ export function isLinkVisible<T extends DetectedLink>(link: T): boolean {
  */
 export function countVisibleInSection<T extends DetectedLink>(
   links: T[],
-  section: 'social' | 'dsp' | 'earnings'
+  section: LinkSection
 ): number {
   return links.filter(
     link => sectionOf(link as T) === section && isLinkVisible(link as T)
@@ -48,7 +48,7 @@ export function countVisibleInSection<T extends DetectedLink>(
  */
 export function shouldLinkBeVisible<T extends DetectedLink>(
   links: T[],
-  section: 'social' | 'dsp' | 'earnings'
+  section: LinkSection
 ): boolean {
   if (section !== 'social') {
     return true; // No visibility limit for non-social sections

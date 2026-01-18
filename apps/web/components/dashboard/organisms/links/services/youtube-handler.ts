@@ -4,6 +4,8 @@
  * Handles YouTube-specific logic for cross-category placement (social + dsp).
  */
 
+import type { LinkSection } from '../utils/link-categorization';
+
 /**
  * Result of YouTube cross-category check.
  */
@@ -74,8 +76,8 @@ export function checkYouTubeCrossCategory(
 export function shouldMergeYouTubeDuplicate(
   platformId: string,
   duplicateIndex: number,
-  duplicateSection: 'social' | 'dsp' | 'earnings' | null,
-  currentSection: 'social' | 'dsp' | 'earnings',
+  duplicateSection: LinkSection | null,
+  currentSection: LinkSection,
   hasCrossSectionDuplicate: boolean
 ): boolean {
   if (platformId !== 'youtube') {
