@@ -681,10 +681,10 @@ jobs:
             cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} "**/*.critical.test.ts"
             # Then run tests for changed files
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-            pnpm --filter=@jovie/web run test --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "📦 Full suite"
-            pnpm --filter=@jovie/web run test ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
