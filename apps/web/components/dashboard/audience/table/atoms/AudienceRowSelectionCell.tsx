@@ -2,7 +2,6 @@
 
 import { Checkbox } from '@jovie/ui';
 import { cn } from '@/lib/utils';
-import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 export interface AudienceRowSelectionCellProps {
   rowNumber: number;
@@ -31,9 +30,7 @@ export function AudienceRowSelectionCell({
       <div
         className='contents'
         onClick={event => event.stopPropagation()}
-        onKeyDown={event =>
-          handleActivationKeyDown(event, e => e.stopPropagation())
-        }
+        onKeyDown={event => event.stopPropagation()}
       >
         <span
           className={cn(
