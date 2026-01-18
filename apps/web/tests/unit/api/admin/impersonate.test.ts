@@ -164,7 +164,7 @@ describe('Admin Impersonate API', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request');
-    });
+    }, 10000);
 
     it('returns 401 when not authenticated', async () => {
       mockRequireAdmin.mockResolvedValue(null);

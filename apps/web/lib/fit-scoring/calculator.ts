@@ -33,6 +33,12 @@ export const SCORE_WEIGHTS = {
   GENRE_MATCH: 5,
 } as const;
 
+const SPOTIFY_POPULARITY_THRESHOLDS = [
+  { min: 60, score: SCORE_WEIGHTS.SPOTIFY_POPULARITY_MAX },
+  { min: 40, score: 10 },
+  { min: 20, score: 5 },
+];
+
 /** Platforms considered as "link-in-bio" products */
 export const LINK_IN_BIO_PLATFORMS = new Set([
   'linktree',
@@ -135,15 +141,8 @@ export interface FitScoreResult {
   breakdown: FitScoreBreakdown;
 }
 
-/**
- * Calculate the fit score for a creator profile.
- *
- * @param input - Available data about the creator
- * @returns Calculated score and detailed breakdown
- */
-export function calculateFitScore(input: FitScoreInput): FitScoreResult {
-  const now = new Date();
-  const breakdown: FitScoreBreakdown = {
+function createInitialBreakdown(now: Date): FitScoreBreakdown {
+  return {
     usesLinkInBio: 0,
     paidTier: 0,
     usesMusicTools: 0,
@@ -156,14 +155,81 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
       version: FIT_SCORE_VERSION,
     },
   };
+}
+
+function getLinkInBioScore(platform?: string | null) {
+  if (!platform) return 0;
+  return LINK_IN_BIO_PLATFORMS.has(platform.toLowerCase())
+    ? SCORE_WEIGHTS.USES_LINK_IN_BIO
+    : 0;
+}
+
+function getMusicToolsDetected(platforms?: string[]) {
+  if (!platforms?.length) return [];
+  return platforms.filter(platform =>
+    MUSIC_TOOL_PLATFORMS.has(platform.toLowerCase())
+  );
+}
+
+function getSpotifyPopularityScore(popularity?: number | null) {
+  if (!popularity || popularity <= 0) return 0;
+  const matchedThreshold = SPOTIFY_POPULARITY_THRESHOLDS.find(
+    ({ min }) => popularity >= min
+  );
+  return matchedThreshold?.score ?? 0;
+}
+
+function getReleaseRecencyScore(
+  latestReleaseDate: Date | null | undefined,
+  now: Date
+) {
+  if (!latestReleaseDate) return 0;
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+  if (latestReleaseDate >= sixMonthsAgo) {
+    return SCORE_WEIGHTS.RELEASE_RECENCY_6MO;
+  }
+
+  if (latestReleaseDate >= oneYearAgo) {
+    return SCORE_WEIGHTS.RELEASE_RECENCY_1YR;
+  }
+
+  return 0;
+}
+
+function getMatchedGenres(genres?: string[] | null) {
+  if (!genres?.length) return [];
+  return genres.filter(genre => TARGET_GENRES.has(genre.toLowerCase().trim()));
+}
+
+function getFitScoreTotal(breakdown: FitScoreBreakdown) {
+  return (
+    breakdown.usesLinkInBio +
+    breakdown.paidTier +
+    breakdown.usesMusicTools +
+    breakdown.hasSpotify +
+    breakdown.spotifyPopularity +
+    breakdown.releaseRecency +
+    breakdown.genreMatch
+  );
+}
+
+/**
+ * Calculate the fit score for a creator profile.
+ *
+ * @param input - Available data about the creator
+ * @returns Calculated score and detailed breakdown
+ */
+export function calculateFitScore(input: FitScoreInput): FitScoreResult {
+  const now = new Date();
+  const breakdown = createInitialBreakdown(now);
 
   // 1. Uses link-in-bio product (+15)
-  if (
-    input.ingestionSourcePlatform &&
-    LINK_IN_BIO_PLATFORMS.has(input.ingestionSourcePlatform.toLowerCase())
-  ) {
-    breakdown.usesLinkInBio = SCORE_WEIGHTS.USES_LINK_IN_BIO;
-  }
+  breakdown.usesLinkInBio = getLinkInBioScore(input.ingestionSourcePlatform);
 
   // 2. Paid tier on link-in-bio (+20)
   if (input.hasPaidTier) {
@@ -171,17 +237,10 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
   }
 
   // 3. Uses music-specific tools (+10)
-  const musicToolsDetected: string[] = [];
-  if (input.socialLinkPlatforms) {
-    for (const platform of input.socialLinkPlatforms) {
-      if (MUSIC_TOOL_PLATFORMS.has(platform.toLowerCase())) {
-        musicToolsDetected.push(platform);
-      }
-    }
-    if (musicToolsDetected.length > 0) {
-      breakdown.usesMusicTools = SCORE_WEIGHTS.USES_MUSIC_TOOLS;
-      breakdown.meta!.musicToolsDetected = musicToolsDetected;
-    }
+  const musicToolsDetected = getMusicToolsDetected(input.socialLinkPlatforms);
+  if (musicToolsDetected.length > 0) {
+    breakdown.usesMusicTools = SCORE_WEIGHTS.USES_MUSIC_TOOLS;
+    breakdown.meta!.musicToolsDetected = musicToolsDetected;
   }
 
   // 4. Has Spotify profile (+15)
@@ -195,59 +254,28 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
   // 20-39: 5 points (emerging)
   // 40-59: 10 points (established)
   // 60+: 15 points (significant)
-  if (input.spotifyPopularity != null && input.spotifyPopularity > 0) {
-    if (input.spotifyPopularity >= 60) {
-      breakdown.spotifyPopularity = 15;
-    } else if (input.spotifyPopularity >= 40) {
-      breakdown.spotifyPopularity = 10;
-    } else if (input.spotifyPopularity >= 20) {
-      breakdown.spotifyPopularity = 5;
-    }
-    // 0-19 gets 0 points
-  }
+  breakdown.spotifyPopularity = getSpotifyPopularityScore(
+    input.spotifyPopularity
+  );
 
   // 6. Release recency (0-10)
   if (input.latestReleaseDate) {
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const oneYearAgo = new Date(now);
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
     breakdown.meta!.latestReleaseDate = input.latestReleaseDate.toISOString();
-
-    if (input.latestReleaseDate >= sixMonthsAgo) {
-      breakdown.releaseRecency = SCORE_WEIGHTS.RELEASE_RECENCY_6MO;
-    } else if (input.latestReleaseDate >= oneYearAgo) {
-      breakdown.releaseRecency = SCORE_WEIGHTS.RELEASE_RECENCY_1YR;
-    }
-    // Older than 1 year gets 0 points
   }
+  breakdown.releaseRecency = getReleaseRecencyScore(
+    input.latestReleaseDate,
+    now
+  );
 
   // 7. Genre match (+5)
-  if (input.genres && input.genres.length > 0) {
-    const matchedGenres: string[] = [];
-    for (const genre of input.genres) {
-      const normalizedGenre = genre.toLowerCase().trim();
-      if (TARGET_GENRES.has(normalizedGenre)) {
-        matchedGenres.push(genre);
-      }
-    }
-    if (matchedGenres.length > 0) {
-      breakdown.genreMatch = SCORE_WEIGHTS.GENRE_MATCH;
-      breakdown.meta!.matchedGenres = matchedGenres;
-    }
+  const matchedGenres = getMatchedGenres(input.genres);
+  if (matchedGenres.length > 0) {
+    breakdown.genreMatch = SCORE_WEIGHTS.GENRE_MATCH;
+    breakdown.meta!.matchedGenres = matchedGenres;
   }
 
   // Calculate total score
-  const score =
-    breakdown.usesLinkInBio +
-    breakdown.paidTier +
-    breakdown.usesMusicTools +
-    breakdown.hasSpotify +
-    breakdown.spotifyPopularity +
-    breakdown.releaseRecency +
-    breakdown.genreMatch;
+  const score = getFitScoreTotal(breakdown);
 
   return { score, breakdown };
 }
