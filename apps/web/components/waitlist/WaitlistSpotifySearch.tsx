@@ -361,7 +361,6 @@ export function WaitlistSpotifySearch({
               className='max-h-64 overflow-y-auto'
             >
               {results.map((artist, index) => (
-                // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys
                 <li
                   key={artist.id}
                   id={`spotify-result-${index}`}
@@ -376,6 +375,12 @@ export function WaitlistSpotifySearch({
                       : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
                   )}
                   onClick={() => handleArtistSelect(artist)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleArtistSelect(artist);
+                    }
+                  }}
                   onMouseEnter={() => setActiveIndex(index)}
                 >
                   <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025] overflow-hidden shrink-0 relative'>
@@ -429,7 +434,6 @@ export function WaitlistSpotifySearch({
           )}
 
           {/* Always-visible "Manually add URL" option */}
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys */}
           <div
             role='option'
             id={`spotify-result-${manualAddIndex}`}
@@ -442,6 +446,12 @@ export function WaitlistSpotifySearch({
                 : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
             )}
             onClick={handleManualAddClick}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleManualAddClick();
+              }
+            }}
             onMouseEnter={() => setActiveIndex(manualAddIndex)}
           >
             <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025] flex items-center justify-center'>
