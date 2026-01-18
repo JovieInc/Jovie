@@ -58,8 +58,8 @@ export interface UrlValidationResult {
  * Returns null if the input is not a valid decimal IP.
  */
 function decimalToIp(decimal: string): string | null {
-  const num = parseInt(decimal, 10);
-  if (isNaN(num) || num < 0 || num > 4294967295) {
+  const num = Number.parseInt(decimal, 10);
+  if (Number.isNaN(num) || num < 0 || num > 4294967295) {
     return null;
   }
   return [
