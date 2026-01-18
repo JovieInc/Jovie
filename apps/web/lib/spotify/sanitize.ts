@@ -288,7 +288,11 @@ export function sanitizeFollowerCount(
 export function sanitizePopularity(
   popularity: number | undefined | null
 ): number {
-  if (popularity === undefined || popularity === null || Number.isNaN(popularity)) {
+  if (
+    popularity === undefined ||
+    popularity === null ||
+    Number.isNaN(popularity)
+  ) {
     return 0;
   }
   return Math.min(100, Math.max(0, Math.floor(popularity)));
