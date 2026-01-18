@@ -49,9 +49,7 @@ export function AuthLoadingState({ mode, isStalled }: AuthLoadingStateProps) {
               className='block rounded-[--radius-xl] border border-subtle bg-surface-0 px-4 py-3 text-[13px] text-secondary-token text-center'
             >
               <p>Hang tight — {labels.stall}.</p>
-              <p className='mt-2'>
-                Refresh the page or try again in a minute.
-              </p>
+              <p className='mt-2'>Refresh the page or try again in a minute.</p>
               <button
                 type='button'
                 className='mt-3 inline-flex items-center justify-center rounded-[--radius-xl] border border-subtle px-3 py-1.5 text-[13px] font-medium text-primary-token hover:bg-surface-1 transition-colors'
