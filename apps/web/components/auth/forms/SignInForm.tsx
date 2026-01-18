@@ -96,6 +96,13 @@ export function SignInForm() {
                 <p className='mt-2'>
                   Refresh the page or try again in a minute.
                 </p>
+                <button
+                  type='button'
+                  className='mt-3 inline-flex items-center justify-center rounded-[--radius-xl] border border-subtle px-3 py-1.5 text-[13px] font-medium text-primary-token hover:bg-surface-1 transition-colors'
+                  onClick={() => window.location.reload()}
+                >
+                  Retry now
+                </button>
               </output>
             ) : null}
           </div>
