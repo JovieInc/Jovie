@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
 
@@ -46,12 +46,17 @@ describe('AvatarUploadable Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
     // jsdom lacks createObjectURL; mock for preview logic
     // @ts-expect-error partial URL mock
     global.URL = {
       createObjectURL: vi.fn(() => 'blob:preview'),
       revokeObjectURL: vi.fn(),
     };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Display Mode (Non-uploadable)', () => {
