@@ -13,8 +13,14 @@ import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { getUserState } from '@/lib/auth/proxy-state';
 import {
   buildContentSecurityPolicy,
+  buildContentSecurityPolicyReportOnly,
   SCRIPT_NONCE_HEADER,
 } from '@/lib/security/content-security-policy';
+import {
+  buildReportingEndpointsHeader,
+  buildReportToHeader,
+  getCspReportUri,
+} from '@/lib/security/csp-reporting';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
@@ -129,10 +135,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
   try {
     // Start performance timing
     const startTime = Date.now();
+
     const nonce = generateNonce();
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
     const contentSecurityPolicy = buildContentSecurityPolicy({ nonce });
+    const contentSecurityPolicyReportOnly =
+      buildContentSecurityPolicyReportOnly({ nonce });
+    const cspReportUri = getCspReportUri();
 
     // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
@@ -278,6 +288,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathname === '/signup/sso-callback' ||
       pathname === '/signin/sso-callback';
 
+    // Detect RSC prefetch requests - these should NOT trigger redirects
+    // RSC prefetch happens when Link components preload routes in the background
+    // Redirecting prefetch requests causes "too many redirects" errors
+    const isRSCPrefetch =
+      req.headers.get('RSC') === '1' ||
+      req.headers.get('Next-Router-Prefetch') === '1' ||
+      req.nextUrl.searchParams.has('_rsc');
+
     const normalizeRedirectPath = (path: string): string => {
       // No longer need to add /app prefix - paths are clean
       // Legacy /app/* paths are already redirected in domain routing above
@@ -286,10 +304,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
     // Let SSO callback routes complete without middleware interference
     // The AuthenticateWithRedirectCallback component will handle routing based on user state
-    if (userId && isAuthPath && !isAuthCallbackPath) {
+    // Skip redirects for RSC prefetch requests to avoid "too many redirects" errors
+    if (userId && isAuthPath && !isAuthCallbackPath && !isRSCPrefetch) {
       // Check complete user state to determine where authenticated user should go
       const userState = await getUserState(userId);
-
       const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
 
       // If user needs waitlist/onboarding, send them there (ignore redirect_url)
@@ -358,14 +376,28 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             request: { headers: requestHeaders },
           });
         }
-      } else if (!userState.needsWaitlist && pathname === '/waitlist') {
+      } else if (
+        !userState.needsWaitlist &&
+        pathname === '/waitlist' &&
+        !isRSCPrefetch
+      ) {
         // Active user trying to access waitlist → redirect to dashboard
+        // Skip for RSC prefetch to avoid "too many redirects" errors
         res = NextResponse.redirect(new URL('/', req.url));
-      } else if (!userState.needsOnboarding && pathname === '/onboarding') {
+      } else if (
+        !userState.needsOnboarding &&
+        pathname === '/onboarding' &&
+        !isRSCPrefetch
+      ) {
         // Active user trying to access onboarding → redirect to dashboard
+        // Skip for RSC prefetch to avoid "too many redirects" errors
         res = NextResponse.redirect(new URL('/', req.url));
-      } else if (pathname === '/signin' || pathname === '/signup') {
+      } else if (
+        (pathname === '/signin' || pathname === '/signup') &&
+        !isRSCPrefetch
+      ) {
         // Fully authenticated user hitting auth pages → redirect to dashboard
+        // Skip for RSC prefetch to avoid "too many redirects" errors
         res = NextResponse.redirect(new URL('/', req.url));
       } else {
         // All other paths - user is authenticated and on correct page
@@ -432,6 +464,19 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const duration = Date.now() - startTime;
     res.headers.set('Server-Timing', `middleware;dur=${duration}`);
     res.headers.set('Content-Security-Policy', contentSecurityPolicy);
+
+    // Add CSP violation reporting headers (report-only mode)
+    if (contentSecurityPolicyReportOnly && cspReportUri) {
+      res.headers.set(
+        'Content-Security-Policy-Report-Only',
+        contentSecurityPolicyReportOnly
+      );
+      res.headers.set('Report-To', buildReportToHeader(cspReportUri));
+      res.headers.set(
+        'Reporting-Endpoints',
+        buildReportingEndpointsHeader(cspReportUri)
+      );
+    }
 
     // Add performance monitoring for API routes
     if (pathname.startsWith('/api/')) {
