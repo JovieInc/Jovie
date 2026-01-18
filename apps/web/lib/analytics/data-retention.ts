@@ -23,8 +23,8 @@ const DEFAULT_RETENTION_DAYS = 90;
 export function getRetentionDays(): number {
   const envValue = process.env.ANALYTICS_RETENTION_DAYS;
   if (envValue) {
-    const parsed = parseInt(envValue, 10);
-    if (!isNaN(parsed) && parsed > 0) {
+    const parsed = Number.parseInt(envValue, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) {
       return parsed;
     }
   }

@@ -128,10 +128,10 @@ function parseToken(tokenString: string): ImpersonationValidation {
     signature,
   ] = parts;
 
-  const issuedAt = parseInt(issuedAtStr, 10);
-  const expiresAt = parseInt(expiresAtStr, 10);
+  const issuedAt = Number.parseInt(issuedAtStr, 10);
+  const expiresAt = Number.parseInt(expiresAtStr, 10);
 
-  if (isNaN(issuedAt) || isNaN(expiresAt)) {
+  if (Number.isNaN(issuedAt) || Number.isNaN(expiresAt)) {
     return { valid: false, error: 'Invalid timestamp' };
   }
 
