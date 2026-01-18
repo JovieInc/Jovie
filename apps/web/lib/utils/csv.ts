@@ -126,7 +126,7 @@ export function formatDateValue(
   date: Date,
   format: 'iso' | 'locale' = 'iso'
 ): string {
-  if (!(date instanceof Date) || isNaN(date.getTime())) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return '';
   }
 

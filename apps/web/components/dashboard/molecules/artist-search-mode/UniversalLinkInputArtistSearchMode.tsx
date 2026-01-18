@@ -4,6 +4,7 @@ import Image from 'next/image';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 import type { ArtistSearchModeProps } from './types';
 import { useArtistSearchMode } from './useArtistSearchMode';
@@ -190,12 +191,11 @@ export function UniversalLinkInputArtistSearchMode({
                       : 'hover:bg-surface-2/50'
                   )}
                   onClick={() => handleArtistSelect(artist)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleArtistSelect(artist);
-                    }
-                  }}
+                  onKeyDown={event =>
+                    handleActivationKeyDown(event, () =>
+                      handleArtistSelect(artist)
+                    )
+                  }
                   onMouseEnter={() => setActiveResultIndex(index)}
                 >
                   <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>

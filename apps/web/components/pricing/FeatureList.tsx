@@ -38,8 +38,12 @@ export function FeatureList({ features, title }: FeatureListProps) {
         initial='hidden'
         animate='show'
       >
-        {features.map((feature, index) => (
-          <motion.li key={index} className='flex items-start' variants={item}>
+        {features.map(feature => (
+          <motion.li
+            key={feature.title}
+            className='flex items-start'
+            variants={item}
+          >
             <svg
               className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5'
               fill='none'

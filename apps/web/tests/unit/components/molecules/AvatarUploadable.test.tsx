@@ -1,9 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
-
-vi.useFakeTimers();
 
 // Mock analytics tracking
 vi.mock('@/lib/analytics', () => ({
@@ -54,10 +52,6 @@ describe('AvatarUploadable Component', () => {
       createObjectURL: vi.fn(() => 'blob:preview'),
       revokeObjectURL: vi.fn(),
     };
-  });
-
-  afterAll(() => {
-    vi.useRealTimers();
   });
 
   describe('Display Mode (Non-uploadable)', () => {

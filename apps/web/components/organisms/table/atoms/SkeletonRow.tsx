@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { cn, layoutStability, presets } from '../table.styles';
 import { SkeletonCell } from './SkeletonCell';
 
@@ -40,15 +41,20 @@ export function SkeletonRow({
   height = layoutStability.skeletonRowHeight,
   className,
 }: SkeletonRowProps) {
+  const columnKeys = useMemo(
+    () => Array.from({ length: columns }, (_, i) => `skeleton-col-${i}`),
+    [columns]
+  );
+
   return (
     <tr
       className={cn(presets.tableRow, 'pointer-events-none', className)}
       style={{ height }}
     >
-      {Array.from({ length: columns }).map((_, index) => {
+      {columnKeys.map((key, index) => {
         const config = columnConfig?.[index];
         return (
-          <td key={index} className={presets.tableCell}>
+          <td key={key} className={presets.tableCell}>
             <SkeletonCell
               width={config?.width}
               variant={config?.variant || 'text'}

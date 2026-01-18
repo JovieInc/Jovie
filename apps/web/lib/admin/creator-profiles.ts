@@ -254,7 +254,7 @@ export async function getAdminCreatorProfiles(
             ? rawValue
             : rawValue != null
               ? Number(rawValue)
-              : NaN;
+              : Number.NaN;
 
         if (!Number.isNaN(parsedValue)) {
           const clamped = Math.min(1, Math.max(0, parsedValue));

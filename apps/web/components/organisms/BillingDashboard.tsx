@@ -126,30 +126,26 @@ export function BillingDashboard() {
 
         <div className='space-y-4'>
           {billingInfo?.isPro ? (
-            <>
-              <div>
-                <h4 className='mb-2 text-sm font-medium text-foreground'>
-                  Manage Subscription
-                </h4>
-                <p className='mb-3 text-sm text-muted-foreground'>
-                  Update payment methods, view invoices, or cancel your
-                  subscription
-                </p>
-                <BillingPortalLink />
-              </div>
-            </>
+            <div>
+              <h4 className='mb-2 text-sm font-medium text-foreground'>
+                Manage Subscription
+              </h4>
+              <p className='mb-3 text-sm text-muted-foreground'>
+                Update payment methods, view invoices, or cancel your
+                subscription
+              </p>
+              <BillingPortalLink />
+            </div>
           ) : (
-            <>
-              <div>
-                <h4 className='mb-2 text-sm font-medium text-foreground'>
-                  Upgrade to Standard
-                </h4>
-                <p className='mb-3 text-sm text-muted-foreground'>
-                  Remove Jovie branding from your profile
-                </p>
-                <UpgradeButton priceId={defaultPriceId} />
-              </div>
-            </>
+            <div>
+              <h4 className='mb-2 text-sm font-medium text-foreground'>
+                Upgrade to Standard
+              </h4>
+              <p className='mb-3 text-sm text-muted-foreground'>
+                Remove Jovie branding from your profile
+              </p>
+              <UpgradeButton priceId={defaultPriceId} />
+            </div>
           )}
         </div>
       </div>
