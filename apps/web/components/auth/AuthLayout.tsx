@@ -126,7 +126,9 @@ export function AuthLayout({
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
         // Use smaller top padding when keyboard is visible
-        isKeyboardVisible ? 'pt-8 pb-4' : 'pt-[60px] pb-12',
+        isKeyboardVisible
+          ? 'pt-8 pb-4'
+          : 'pt-10 sm:pt-12 md:pt-16 lg:pt-32 xl:pt-36 2xl:pt-40 pb-12',
         // Safe area insets for notched devices (iPhone X+, Android with notches)
         'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
         'pl-[max(1rem,env(safe-area-inset-left))]',
