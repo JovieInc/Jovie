@@ -52,21 +52,13 @@ export function OnboardingHandleStep({
 
       <div className='w-full max-w-md space-y-6'>
         <form className='space-y-4' onSubmit={onSubmit}>
-          <label
-            className='text-sm font-medium text-secondary-token'
-            htmlFor='handle-input'
-          >
-            @handle
-          </label>
           <div
             className={[
               'w-full flex items-center gap-2 rounded-[6px] border bg-white dark:bg-[#0f1011] px-4 py-3',
               'focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]',
               stateError || handleValidation.error
                 ? 'border-error'
-                : !stateError && handleValidation.available
-                  ? 'border-success'
-                  : 'border-[#d7d9de] dark:border-[#2c2e33]',
+                : 'border-[#d7d9de] dark:border-[#2c2e33]',
             ].join(' ')}
           >
             <span className='text-sm text-secondary-token whitespace-nowrap'>
@@ -162,11 +154,8 @@ export function OnboardingHandleStep({
                 <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
                   Checking…
                 </div>
-              ) : handleValidation.clientValid && handleValidation.available ? (
-                <div className='text-success text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                  Available
-                </div>
-              ) : handleValidation.error ? (
+              ) : handleValidation.clientValid &&
+                handleValidation.available ? null : handleValidation.error ? (
                 <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
                   Not available
                 </div>
