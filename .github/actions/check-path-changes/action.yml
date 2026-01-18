@@ -70,7 +70,8 @@ runs:
             PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|package.*\.json|turbo\.json)'
             ;;
           "test")
-            PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|apps/web/vitest\.config\.|package.*\.json)'
+            # Note: vitest.config.* excluded to prevent full test suite runs on config-only changes
+            PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
             ;;
           "e2e")
             PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'

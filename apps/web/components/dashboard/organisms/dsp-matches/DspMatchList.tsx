@@ -48,26 +48,32 @@ const STATUS_FILTERS: Array<{ value: FilterStatus; label: string }> = [
 export function DspMatchList({ profileId, className }: DspMatchListProps) {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('suggested');
 
-  // Fetch matches
+  // Fetch ALL matches for accurate status counts
   const {
-    data: matches = [],
+    data: allMatches = [],
     isLoading,
     error,
   } = useDspMatchesQuery({
     profileId,
-    status: statusFilter === 'all' ? undefined : statusFilter,
+    // No status filter - fetch all matches for accurate counts
   });
+
+  // Filter matches client-side based on selected status
+  const displayMatches = useMemo(() => {
+    if (statusFilter === 'all') {
+      return allMatches;
+    }
+    return allMatches.filter(match => match.status === statusFilter);
+  }, [allMatches, statusFilter]);
 
   // Mutations
   const confirmMutation = useConfirmDspMatchMutation();
   const rejectMutation = useRejectDspMatchMutation();
 
-  // Status counts for filter badges
+  // Status counts from all matches for accurate badge numbers
   const statusCounts = useMemo(() => {
-    // For accurate counts, we'd need to fetch all matches
-    // For now, just show count of current filtered results
-    return countMatchesByStatus(matches);
-  }, [matches]);
+    return countMatchesByStatus(allMatches);
+  }, [allMatches]);
 
   // Handlers
   const handleConfirm = useCallback(
@@ -87,13 +93,13 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
   // Group matches by provider for better organization
   const _groupedMatches = useMemo(() => {
     const groups = new Map<DspProviderId, DspMatch[]>();
-    for (const match of matches) {
+    for (const match of displayMatches) {
       const existing = groups.get(match.providerId) ?? [];
       existing.push(match);
       groups.set(match.providerId, existing);
     }
     return groups;
-  }, [matches]);
+  }, [displayMatches]);
 
   if (error) {
     return (
@@ -121,7 +127,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
         {STATUS_FILTERS.map(filter => {
           const count =
             filter.value === 'all'
-              ? matches.length
+              ? allMatches.length
               : (statusCounts[filter.value as DspMatchStatus] ?? 0);
           const isActive = statusFilter === filter.value;
 
@@ -178,14 +184,14 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
       )}
 
       {/* Empty State */}
-      {!isLoading && matches.length === 0 && (
+      {!isLoading && displayMatches.length === 0 && (
         <DspMatchEmptyState status={statusFilter} />
       )}
 
       {/* Match List */}
-      {!isLoading && matches.length > 0 && (
+      {!isLoading && displayMatches.length > 0 && (
         <div className='space-y-3'>
-          {matches.map(match => (
+          {displayMatches.map(match => (
             <DspMatchCard
               key={match.id}
               matchId={match.id}
