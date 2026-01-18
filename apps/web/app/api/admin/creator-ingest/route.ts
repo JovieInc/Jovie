@@ -16,6 +16,16 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
+import {
+  detectFullExtractionPlatform,
+  fetchFullExtractionProfile,
+  resolveFullExtractionContext,
+} from '@/lib/ingestion/flows/full-extraction-flow';
+import {
+  checkExistingProfile,
+  findAvailableHandle,
+  markReingestFailure,
+} from '@/lib/ingestion/flows/profile-operations';
 import { maybeCopyIngestionAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
   enqueueFollowupIngestionJobs,
@@ -24,20 +34,8 @@ import {
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import {
-  extractLaylo,
-  extractLayloHandle,
-  fetchLayloProfile,
-  isLayloUrl,
-  normalizeLayloHandle,
-  validateLayloUrl,
-} from '@/lib/ingestion/strategies/laylo';
-import {
-  extractLinktree,
-  extractLinktreeHandle,
-  fetchLinktreeDocument,
   isValidHandle,
   normalizeHandle,
-  validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
@@ -93,34 +91,6 @@ function generateClaimToken(): {
     claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
   );
   return { claimToken, claimTokenExpiresAt };
-}
-
-async function findAvailableHandle(
-  tx: DbType,
-  baseHandle: string
-): Promise<string | null> {
-  const MAX_LEN = 30;
-  const normalizedBase = baseHandle.slice(0, MAX_LEN);
-  const maxAttempts = 20;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    const suffix = i === 0 ? '' : `-${i}`;
-    const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
-    const candidate = `${trimmedBase}${suffix}`;
-    if (!isValidHandle(candidate)) continue;
-
-    const [existing] = await tx
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, candidate))
-      .limit(1);
-
-    if (!existing) {
-      return candidate;
-    }
-  }
-
-  return null;
 }
 
 /**
@@ -519,141 +489,6 @@ async function processProfileExtraction(
   return { mergeError };
 }
 
-type FullExtractionContext =
-  | {
-      ok: true;
-      validatedUrl: string;
-      handle: string;
-    }
-  | {
-      ok: false;
-      response: NextResponse;
-    };
-
-function resolveFullExtractionContext(
-  inputUrl: string,
-  isLayloProfile: boolean,
-  linktreeValidatedUrl: string | null
-): FullExtractionContext {
-  const validatedUrl = isLayloProfile
-    ? validateLayloUrl(inputUrl)
-    : linktreeValidatedUrl;
-
-  if (!validatedUrl) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          error: 'Invalid profile URL',
-          details: isLayloProfile
-            ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
-            : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  const rawHandle = isLayloProfile
-    ? extractLayloHandle(validatedUrl)
-    : extractLinktreeHandle(validatedUrl);
-
-  if (!rawHandle) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: 'Unable to parse profile handle from URL.' },
-        { status: 422, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  const handle = isLayloProfile
-    ? normalizeLayloHandle(rawHandle)
-    : normalizeHandle(rawHandle);
-
-  if (!isValidHandle(handle)) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          error: 'Invalid handle format',
-          details:
-            'Handle must be 1-30 characters, alphanumeric and underscores only',
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  return { ok: true, validatedUrl, handle };
-}
-
-async function checkExistingProfile(usernameNormalized: string) {
-  return withSystemIngestionSession(async tx => {
-    const [existing] = await tx
-      .select({
-        id: creatorProfiles.id,
-        isClaimed: creatorProfiles.isClaimed,
-        usernameNormalized: creatorProfiles.usernameNormalized,
-        avatarUrl: creatorProfiles.avatarUrl,
-        displayName: creatorProfiles.displayName,
-        avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-        displayNameLocked: creatorProfiles.displayNameLocked,
-        claimToken: creatorProfiles.claimToken,
-        claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
-      })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-      .limit(1);
-
-    const isReingest = !!existing && !existing.isClaimed;
-
-    const finalHandle = existing
-      ? existing.isClaimed
-        ? await findAvailableHandle(tx, usernameNormalized)
-        : existing.usernameNormalized
-      : usernameNormalized;
-
-    if (isReingest && existing) {
-      await IngestionStatusManager.markProcessing(tx, existing.id);
-    }
-
-    return { existing, isReingest, finalHandle };
-  });
-}
-
-async function fetchFullExtractionProfile(
-  isLayloProfile: boolean,
-  validatedUrl: string,
-  handle: string
-) {
-  if (isLayloProfile) {
-    const { profile: layloProfile, user } = await fetchLayloProfile(handle);
-    return extractLaylo(layloProfile, user);
-  }
-
-  const html = await fetchLinktreeDocument(validatedUrl);
-  return extractLinktree(html);
-}
-
-async function markReingestFailure(
-  existingCheck: Awaited<ReturnType<typeof checkExistingProfile>>,
-  errorMessage: string
-) {
-  if (!existingCheck.isReingest || !existingCheck.existing) {
-    return;
-  }
-
-  await withSystemIngestionSession(async tx => {
-    await IngestionStatusManager.markIdleOrFailed(
-      tx,
-      existingCheck.existing!.id,
-      errorMessage
-    );
-  });
-}
-
 async function resolveHostedAvatarUrl(
   handle: string,
   extraction: { avatarUrl?: string | null; links: Array<{ url?: string }> }
@@ -945,15 +780,14 @@ export async function POST(request: Request) {
     const normalizedUrl = detected.normalizedUrl;
 
     // Check if this is a full-extraction platform (Linktree/Laylo)
-    const isLayloProfile = isLayloUrl(inputUrl);
-    const linktreeValidatedUrl = validateLinktreeUrl(inputUrl);
-    const isLinktreeProfile = linktreeValidatedUrl !== null;
+    const { isLinktree, isLaylo, linktreeValidatedUrl } =
+      detectFullExtractionPlatform(inputUrl);
 
     // For full-extraction platforms, use existing logic
-    if (isLinktreeProfile || isLayloProfile) {
+    if (isLinktree || isLaylo) {
       const context = resolveFullExtractionContext(
         inputUrl,
-        isLayloProfile,
+        isLaylo,
         linktreeValidatedUrl
       );
 
@@ -988,7 +822,7 @@ export async function POST(request: Request) {
       let extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
       try {
         extraction = await fetchFullExtractionProfile(
-          isLayloProfile,
+          isLaylo,
           validatedUrl,
           handle
         );
@@ -1001,7 +835,7 @@ export async function POST(request: Request) {
         logger.error('Profile fetch failed', {
           url: validatedUrl,
           error: errorMessage,
-          platform: isLayloProfile ? 'laylo' : 'linktree',
+          platform: isLaylo ? 'laylo' : 'linktree',
         });
 
         await markReingestFailure(existingCheck, errorMessage);
