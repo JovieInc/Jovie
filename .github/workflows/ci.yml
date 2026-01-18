@@ -1196,7 +1196,6 @@ jobs:
       - ci-e2e-migrate
       - ci-e2e-tests
       - ci-pr-vercel-preview
-      - ci-lighthouse-pr
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
