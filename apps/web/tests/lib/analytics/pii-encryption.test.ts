@@ -3,7 +3,7 @@
  * Validates AES-256-GCM encryption for personally identifiable information
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   decryptEmail,
   decryptIP,
@@ -19,6 +19,23 @@ import {
   isPIIEncryptionEnabled,
   maskIPForFingerprint,
 } from '@/lib/utils/pii-encryption';
+
+// Set up encryption key once for all tests (except isPIIEncryptionEnabled tests)
+const TEST_ENCRYPTION_KEY = 'test-key-for-encryption-32-chars!';
+let originalEnvKey: string | undefined;
+
+beforeAll(() => {
+  originalEnvKey = process.env.PII_ENCRYPTION_KEY;
+  process.env.PII_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
+});
+
+afterAll(() => {
+  if (originalEnvKey) {
+    process.env.PII_ENCRYPTION_KEY = originalEnvKey;
+  } else {
+    delete process.env.PII_ENCRYPTION_KEY;
+  }
+});
 
 describe('PII Encryption', () => {
   describe('isPIIEncryptionEnabled', () => {
@@ -48,10 +65,6 @@ describe('PII Encryption', () => {
   });
 
   describe('encryptPII and decryptPII', () => {
-    beforeEach(() => {
-      process.env.PII_ENCRYPTION_KEY = 'test-key-for-encryption-32-chars!';
-    });
-
     it('should encrypt and decrypt a string correctly', () => {
       const originalValue = 'test@example.com';
 
@@ -98,10 +111,6 @@ describe('PII Encryption', () => {
   });
 
   describe('Email encryption helpers', () => {
-    beforeEach(() => {
-      process.env.PII_ENCRYPTION_KEY = 'test-key-for-encryption-32-chars!';
-    });
-
     it('should encrypt and decrypt email addresses', () => {
       const email = 'user@example.com';
 
@@ -114,10 +123,6 @@ describe('PII Encryption', () => {
   });
 
   describe('Phone encryption helpers', () => {
-    beforeEach(() => {
-      process.env.PII_ENCRYPTION_KEY = 'test-key-for-encryption-32-chars!';
-    });
-
     it('should encrypt and decrypt phone numbers', () => {
       const phone = '+1-555-123-4567';
 
@@ -130,10 +135,6 @@ describe('PII Encryption', () => {
   });
 
   describe('IP encryption helpers', () => {
-    beforeEach(() => {
-      process.env.PII_ENCRYPTION_KEY = 'test-key-for-encryption-32-chars!';
-    });
-
     it('should encrypt and decrypt IPv4 addresses', () => {
       const ip = '192.168.1.100';
 
@@ -214,10 +215,6 @@ describe('PII Encryption', () => {
   });
 
   describe('Batch encryption helpers', () => {
-    beforeEach(() => {
-      process.env.PII_ENCRYPTION_KEY = 'test-key-for-encryption-32-chars!';
-    });
-
     it('should encrypt multiple fields at once', () => {
       const data = {
         email: 'user@example.com',
