@@ -68,7 +68,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
     link.click();
 
     // Cleanup anchor element
-    document.body.removeChild(link);
+    link.remove();
   } finally {
     // Revoke object URL to free memory
     // Use setTimeout to ensure download starts before revoking

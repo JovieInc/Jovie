@@ -94,10 +94,10 @@ export async function GET(request: Request) {
     let status: 'ok' | 'warning' | 'error' = 'ok';
     let ok = true;
 
-    if (currentValidation.critical.length > 0) {
-      status = 'error';
-      ok = false;
-    } else if (currentValidation.errors.length > 0) {
+    if (
+      currentValidation.critical.length > 0 ||
+      currentValidation.errors.length > 0
+    ) {
       status = 'error';
       ok = false;
     } else if (currentValidation.warnings.length > 0) {
