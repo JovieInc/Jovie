@@ -122,6 +122,7 @@ export function validateEnvironment(
     const runtimeIssues = runRuntimeValidations(env);
     return {
       valid:
+        schemaIssues.critical.length === 0 &&
         runtimeIssues.critical.length === 0 &&
         runtimeIssues.errors.length === 0,
       errors: runtimeIssues.errors,

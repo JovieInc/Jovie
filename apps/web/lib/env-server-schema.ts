@@ -126,4 +126,4 @@ export const ENV_KEYS = [
   'HUD_GITHUB_OWNER',
   'HUD_GITHUB_REPO',
   'HUD_GITHUB_WORKFLOW',
-] as const;
+] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

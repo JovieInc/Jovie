@@ -204,7 +204,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         {/* Icon - always visible */}
         <span
           className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-          style={{ ...iconChipStyle }}
+          style={iconChipStyle}
           aria-hidden='true'
         >
           <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
