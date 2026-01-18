@@ -16,6 +16,7 @@ import {
   useArtistSearchQuery,
 } from '@/lib/queries/useArtistSearchQuery';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { FormErrors } from './types';
 
 interface WaitlistSpotifySearchProps {
@@ -375,12 +376,11 @@ export function WaitlistSpotifySearch({
                       : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
                   )}
                   onClick={() => handleArtistSelect(artist)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleArtistSelect(artist);
-                    }
-                  }}
+                  onKeyDown={event =>
+                    handleActivationKeyDown(event, () =>
+                      handleArtistSelect(artist)
+                    )
+                  }
                   onMouseEnter={() => setActiveIndex(index)}
                 >
                   <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025] overflow-hidden shrink-0 relative'>
@@ -446,12 +446,9 @@ export function WaitlistSpotifySearch({
                 : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
             )}
             onClick={handleManualAddClick}
-            onKeyDown={event => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                handleManualAddClick();
-              }
-            }}
+            onKeyDown={event =>
+              handleActivationKeyDown(event, () => handleManualAddClick())
+            }
             onMouseEnter={() => setActiveIndex(manualAddIndex)}
           >
             <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025] flex items-center justify-center'>

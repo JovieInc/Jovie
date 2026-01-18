@@ -9,6 +9,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 interface ReleasesEmptyStateState {
   searchQuery: string;
@@ -495,12 +496,11 @@ export function ReleasesEmptyState({
                             : 'hover:bg-surface-2/50'
                         )}
                         onClick={() => handleArtistSelect(artist)}
-                        onKeyDown={event => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            handleArtistSelect(artist);
-                          }
-                        }}
+                        onKeyDown={event =>
+                          handleActivationKeyDown(event, () =>
+                            handleArtistSelect(artist)
+                          )
+                        }
                         onMouseEnter={() =>
                           dispatch({
                             type: 'SET_ACTIVE_RESULT_INDEX',
