@@ -3,7 +3,12 @@
 import * as React from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
-import { hexToRgba, isBrandDark } from '@/lib/utils/color';
+import {
+  getBorderColors,
+  getIconChipStyle,
+  getIconForegroundColor,
+  getWrapperStyle,
+} from './platform-pill-config';
 
 export type PlatformPillState =
   | 'connected'
@@ -91,81 +96,28 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       [iconMeta]
     );
 
-    const borderColors = React.useMemo(() => {
-      /**
-       * Helper to generate border colors for a specific state color.
-       * Eliminates duplication for ready/error states.
-       */
-      const createStateBorder = (colorHex: string) => {
-        const baseAlpha = tone === 'faded' ? 0.35 : 0.55;
-        return {
-          base: hexToRgba(colorHex, baseAlpha),
-          hover: hexToRgba(colorHex, 0.65),
-        };
-      };
-
-      if (state === 'ready') {
-        return createStateBorder('#22c55e');
-      }
-      if (state === 'error') {
-        return createStateBorder('#ef4444');
-      }
-
-      const baseAlpha = tone === 'faded' ? 0.45 : 0.65;
-      const hoverAlpha = tone === 'faded' ? 0.65 : 0.85;
-      return {
-        base: hexToRgba(brandHex, baseAlpha),
-        hover: hexToRgba(brandHex, hoverAlpha),
-      };
-    }, [brandHex, state, tone]);
-
     const isTikTok = platformIcon.toLowerCase() === 'tiktok';
-    const tikTokGradient = 'linear-gradient(135deg, #25F4EE, #FE2C55)';
 
-    const wrapperStyle: React.CSSProperties = React.useMemo(() => {
-      const cssVars: React.CSSProperties = {
-        '--pill-border': borderColors.base,
-        '--pill-border-hover': borderColors.hover,
-        '--pill-bg-hover': hexToRgba(brandHex, 0.08),
-      } as React.CSSProperties;
+    // Use config-based styling functions
+    const borderColors = React.useMemo(
+      () => getBorderColors(state, tone, brandHex),
+      [state, tone, brandHex]
+    );
 
-      if (!isTikTok || state === 'ready' || state === 'error') {
-        return cssVars;
-      }
+    const wrapperStyle = React.useMemo(
+      () => getWrapperStyle(borderColors, brandHex, isTikTok, state),
+      [borderColors, brandHex, isTikTok, state]
+    );
 
-      const surface = 'var(--color-bg-surface-1, rgba(246, 247, 248, 0.92))';
-      return {
-        ...cssVars,
-        borderColor: 'transparent',
-        backgroundImage: `linear-gradient(${surface}, ${surface}), ${tikTokGradient}`,
-        backgroundOrigin: 'border-box',
-        backgroundClip: 'padding-box, border-box',
-      };
-    }, [
-      borderColors.base,
-      borderColors.hover,
-      brandHex,
-      isTikTok,
-      state,
-      tikTokGradient,
-    ]);
+    const iconFg = React.useMemo(
+      () => getIconForegroundColor(brandHex, state),
+      [brandHex, state]
+    );
 
-    const iconFg = React.useMemo(() => {
-      if (state === 'loading') return '#6b7280';
-      const isTooDark = isBrandDark(brandHex);
-      return isTooDark ? '#9ca3af' : brandHex;
-    }, [brandHex, state]);
-
-    const iconChipStyle: React.CSSProperties | undefined = React.useMemo(() => {
-      if (!isTikTok || state === 'loading') {
-        return { color: iconFg };
-      }
-
-      return {
-        backgroundImage: tikTokGradient,
-        color: '#ffffff',
-      };
-    }, [iconFg, isTikTok, state, tikTokGradient]);
+    const iconChipStyle = React.useMemo(
+      () => getIconChipStyle(iconFg, isTikTok, state),
+      [iconFg, isTikTok, state]
+    );
 
     const handleKeyDown = React.useCallback(
       (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -252,7 +204,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         {/* Icon - always visible */}
         <span
           className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-          style={{ ...iconChipStyle }}
+          style={iconChipStyle}
           aria-hidden='true'
         >
           <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />

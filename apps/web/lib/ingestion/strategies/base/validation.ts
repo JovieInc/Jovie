@@ -5,8 +5,10 @@
  */
 
 import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { buildCanonicalUrl, extractHandle } from './handle-extractor';
+import { isCanonicalHostValid, isValidHost } from './host-validator';
 import type { StrategyConfig } from './types';
-import { isValidHandle } from './utils';
+import { isUrlSafe as checkUrlSafety } from './validation-pipeline';
 
 /**
  * Validates URL safety before processing.
@@ -16,27 +18,7 @@ import { isValidHandle } from './utils';
  * @returns True if URL is safe to process
  */
 export function isUrlSafe(url: string): boolean {
-  const candidate = url.trim();
-
-  // Reject dangerous or unsupported schemes early
-  if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
-    return false;
-  }
-
-  // Reject protocol-relative URLs to avoid inheriting caller context
-  if (candidate.startsWith('//')) {
-    return false;
-  }
-
-  // Check original URL protocol - require HTTPS
-  try {
-    const parsed = new URL(
-      candidate.startsWith('http') ? candidate : `https://${candidate}`
-    );
-    return parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
+  return checkUrlSafety(url);
 }
 
 /**
@@ -82,6 +64,7 @@ function createInvalidResult(): {
 
 /**
  * Validates that a URL belongs to a specific platform.
+ * Uses modular validation pipeline to reduce cognitive complexity.
  */
 export function validatePlatformUrl(
   url: string,
@@ -89,59 +72,42 @@ export function validatePlatformUrl(
 ): { valid: boolean; normalized: string | null; handle: string | null } {
   try {
     const candidate = url.trim();
-    const canonicalHost = config.canonicalHost.toLowerCase();
 
-    // Reject dangerous or unsupported schemes early
-    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
+    // Step 1: Validate URL safety (scheme, protocol-relative, HTTPS)
+    if (!checkUrlSafety(candidate)) {
       return createInvalidResult();
     }
 
-    // Reject protocol-relative URLs to avoid inheriting caller context
-    if (candidate.startsWith('//')) {
+    // Step 2: Validate canonical host configuration
+    if (!isCanonicalHostValid(config)) {
       return createInvalidResult();
     }
 
-    // Check original URL protocol before normalization (normalizeUrl converts http to https)
-    const originalParsed = new URL(
-      candidate.startsWith('http') ? candidate : `https://${candidate}`
-    );
-    if (originalParsed.protocol !== 'https:') {
-      return createInvalidResult();
-    }
-
+    // Step 3: Normalize and parse URL
     const normalized = normalizeUrl(candidate);
     const parsed = new URL(normalized);
 
-    // Must be HTTPS (after normalization, should always be true if original was https)
-    if (parsed.protocol !== 'https:') {
+    // Step 4: Validate host against allowed list
+    if (!isValidHost(parsed.hostname, config)) {
       return createInvalidResult();
     }
 
-    // Ensure canonical host is an allowed host to avoid misconfiguration
-    if (!config.validHosts.has(canonicalHost)) {
+    // Step 5: Extract and validate handle
+    const handleResult = extractHandle(parsed.pathname);
+    if (!handleResult.success || !handleResult.handle) {
       return createInvalidResult();
     }
 
-    // Must be a valid host
-    if (!config.validHosts.has(parsed.hostname.toLowerCase())) {
-      return createInvalidResult();
-    }
-
-    // Extract handle from path
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    if (parts.length === 0) {
-      return createInvalidResult();
-    }
-
-    const rawHandle = parts[0].replace(/^@/, '').toLowerCase();
-    if (!isValidHandle(rawHandle)) {
-      return createInvalidResult();
-    }
+    // Step 6: Build canonical URL
+    const canonicalUrl = buildCanonicalUrl(
+      config.canonicalHost.toLowerCase(),
+      handleResult.handle
+    );
 
     return {
       valid: true,
-      normalized: `https://${canonicalHost}/${rawHandle}`,
-      handle: rawHandle,
+      normalized: canonicalUrl,
+      handle: handleResult.handle,
     };
   } catch {
     return createInvalidResult();
