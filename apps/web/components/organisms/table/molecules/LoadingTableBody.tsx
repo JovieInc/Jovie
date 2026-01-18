@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { SkeletonRow } from '../atoms/SkeletonRow';
 
 interface LoadingTableBodyProps {
@@ -55,11 +56,16 @@ export function LoadingTableBody({
   columnConfig,
   rowHeight,
 }: LoadingTableBodyProps) {
+  const rowKeys = useMemo(
+    () => Array.from({ length: rows }, (_, i) => `loading-row-${i}`),
+    [rows]
+  );
+
   return (
     <tbody>
-      {Array.from({ length: rows }).map((_, index) => (
+      {rowKeys.map(key => (
         <SkeletonRow
-          key={index}
+          key={key}
           columns={columns}
           columnConfig={columnConfig}
           height={rowHeight}

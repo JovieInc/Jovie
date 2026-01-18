@@ -320,7 +320,7 @@ export function openDeepLink(
         iframe.style.display = 'none';
         iframe.src = deepLink.nativeUrl;
         document.body.appendChild(iframe);
-        setTimeout(() => document.body.removeChild(iframe), 100);
+        setTimeout(() => iframe.remove(), 100);
       } else {
         // For Android and others, use window.location
         window.location.href = deepLink.nativeUrl;

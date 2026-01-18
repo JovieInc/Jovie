@@ -28,8 +28,8 @@ export function ProblemSection() {
           </h2>
 
           <div className='space-y-8'>
-            {benefits.map((benefit, index) => (
-              <div key={index} className='flex items-start gap-4'>
+            {benefits.map(benefit => (
+              <div key={benefit.title} className='flex items-start gap-4'>
                 {/* Icon - Linear 24px treatment */}
                 <div className='flex items-center justify-center w-6 h-6 shrink-0'>
                   <CheckCircle2 className='w-5 h-5 text-success' />

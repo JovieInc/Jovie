@@ -174,11 +174,8 @@ export async function GET(request: Request) {
           break;
         case 'confirmed':
         case 'auto_confirmed':
-          phase = 'complete'; // For now, mark as complete (enrichment comes later)
-          progress = 100;
-          break;
         case 'rejected':
-          phase = 'complete';
+          phase = 'complete'; // Confirmed, auto-confirmed, or rejected = complete
           progress = 100;
           break;
         default:

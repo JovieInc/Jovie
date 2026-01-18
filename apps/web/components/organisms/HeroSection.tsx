@@ -50,18 +50,22 @@ export function HeroSection({
     if (!highlightText || typeof headline !== 'string') {
       return headline;
     }
-    return headline.split(highlightText).reduce((acc, part, index, array) => {
-      if (index === array.length - 1) {
-        return [...acc, part];
+    const parts = headline.split(highlightText);
+    const result: ReactNode[] = [];
+
+    for (let i = 0; i < parts.length; i++) {
+      result.push(parts[i]);
+      if (i < parts.length - 1) {
+        // Use stable key based on position in headline
+        result.push(
+          <GradientText key={`gradient-at-${i}`} variant={gradientVariant}>
+            {highlightText}
+          </GradientText>
+        );
       }
-      return [
-        ...acc,
-        part,
-        <GradientText key={index} variant={gradientVariant}>
-          {highlightText}
-        </GradientText>,
-      ];
-    }, [] as ReactNode[]);
+    }
+
+    return result;
   }, [headline, highlightText, gradientVariant]);
 
   return (
