@@ -13,7 +13,6 @@ import { useOtpInput } from './useOtpInput';
  * - Paste support
  * - Full keyboard accessibility
  * - Haptic feedback on mobile
- * - Success animation on completion
  *
  * No longer depends on Clerk Elements - fully custom implementation.
  */
@@ -36,7 +35,6 @@ export function OtpInput({
   const {
     currentValue,
     focusedIndex,
-    isComplete,
     inputRefs,
     autofillInputRef,
     containerRef,
@@ -129,7 +127,6 @@ export function OtpInput({
                   ? 'border-subtle ring-2 ring-[rgb(var(--focus-ring))]/30 scale-105'
                   : 'border-subtle',
                 error && 'border-destructive',
-                isComplete && digit && 'border-success',
                 disabled && 'opacity-50 cursor-not-allowed',
                 'active:scale-95 active:bg-surface-1'
               )}
@@ -187,16 +184,6 @@ export function OtpInput({
           );
         })}
       </fieldset>
-
-      {/* Success overlay */}
-      {isComplete && (
-        <div
-          className='absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in-0 zoom-in-95 duration-200'
-          aria-hidden='true'
-        >
-          <div className='absolute inset-0 bg-success-subtle rounded-[6px]' />
-        </div>
-      )}
     </div>
   );
 }
