@@ -497,7 +497,7 @@ jobs:
 
       - name: Run Public Profile Smoke Test against production
         run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
