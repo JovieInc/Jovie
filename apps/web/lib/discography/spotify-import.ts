@@ -17,6 +17,16 @@ import {
   sanitizeText,
 } from '@/lib/spotify/sanitize';
 import { spotifyArtistIdSchema } from '@/lib/validation/schemas/spotify';
+
+import {
+  parseArtistCredits,
+  parseMainArtists,
+  type SpotifyArtistInput,
+} from './artist-parser';
+import {
+  processReleaseArtistCredits,
+  processTrackArtistCredits,
+} from './artist-queries';
 import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
@@ -313,6 +323,20 @@ async function importSingleRelease(
     isPrimary: true,
   });
 
+  // Process release-level artist credits
+  // Convert Spotify artists to the format expected by the parser
+  const releaseArtistInputs: SpotifyArtistInput[] = album.artists.map(a => ({
+    id: a.id,
+    name: sanitizeName(a.name),
+    images: fullAlbum?.images,
+  }));
+
+  const releaseArtistCredits = parseMainArtists(releaseArtistInputs);
+  await processReleaseArtistCredits(release.id, releaseArtistCredits, {
+    deleteExisting: true,
+    sourceType: 'ingested',
+  });
+
   // Import tracks if we have full album data
   if (fullAlbum?.tracks?.items) {
     let hasExplicit = false;
@@ -368,6 +392,23 @@ async function importSingleRelease(
         externalId: track.id,
         sourceType: 'ingested',
         isPrimary: true,
+      });
+
+      // Process track-level artist credits
+      // Parse from both the Spotify artists array and the track title (for feat., remix, etc.)
+      const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
+        id: a.id,
+        name: sanitizeName(a.name),
+      }));
+
+      const trackArtistCredits = parseArtistCredits(
+        track.name, // Original title (before sanitization) for feat/remix parsing
+        trackArtistInputs
+      );
+
+      await processTrackArtistCredits(createdTrack.id, trackArtistCredits, {
+        deleteExisting: true,
+        sourceType: 'ingested',
       });
     }
 

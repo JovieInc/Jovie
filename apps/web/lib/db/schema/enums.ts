@@ -242,3 +242,28 @@ export const deliveryStatusEnum = pgEnum('delivery_status', [
   'failed',
   'suppressed',
 ]);
+
+// Multi-Artist Support Enums (DDEX/MusicBrainz aligned)
+export const artistTypeEnum = pgEnum('artist_type', [
+  'person',
+  'group',
+  'orchestra',
+  'choir',
+  'character',
+  'other',
+]);
+
+export const artistRoleEnum = pgEnum('artist_role', [
+  'main_artist',
+  'featured_artist',
+  'remixer',
+  'producer',
+  'co_producer',
+  'composer',
+  'lyricist',
+  'arranger',
+  'conductor',
+  'vs',
+  'with',
+  'other',
+]);
