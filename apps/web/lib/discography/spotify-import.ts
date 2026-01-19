@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import {
   buildSpotifyAlbumUrl,
+  buildSpotifyTrackUrl,
   generateReleaseSlug,
   getBestSpotifyImage,
   getSpotifyAlbums,
@@ -341,7 +342,7 @@ async function importSingleRelease(
         ? sanitizeSpotifyPreviewUrl(track.preview_url)
         : null;
 
-      await upsertTrack({
+      const createdTrack = await upsertTrack({
         releaseId: release.id,
         creatorProfileId,
         title: sanitizedTrackTitle,
@@ -357,6 +358,16 @@ async function importSingleRelease(
           spotifyId: track.id,
           spotifyUri: track.uri,
         },
+      });
+
+      // Create Spotify provider link for the track
+      await upsertProviderLink({
+        trackId: createdTrack.id,
+        providerId: 'spotify',
+        url: buildSpotifyTrackUrl(track.id),
+        externalId: track.id,
+        sourceType: 'ingested',
+        isPrimary: true,
       });
     }
 
