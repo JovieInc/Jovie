@@ -207,3 +207,51 @@ See the main table system documentation at:
 **Commit**: Deduplicate admin/table components - remove 24 duplicate files
 **Branch**: refactor/deduplicate-ui-components
 **Date**: January 13, 2026
+
+---
+
+## Header & Row Height Unification (January 19, 2026)
+
+### UnifiedTableHeader Removed
+
+The `organisms/UnifiedTableHeader.tsx` file in the admin folder has been deleted as it was dead code:
+- It was **never imported or used** anywhere in the codebase
+- All admin tables already use `UnifiedTable` from `@/components/organisms/table`
+- `UnifiedTable` internally uses `TableHeaderCell` from the molecules folder
+
+### Row Heights Standardized
+
+All tables now use the `TABLE_ROW_HEIGHTS` constants from `@/lib/constants/layout`:
+
+| Table | Previous | Current | Justification |
+|-------|----------|---------|---------------|
+| `ActivityTableUnified` | `60` (hardcoded) | `TABLE_ROW_HEIGHTS.TALL` | Multi-line content (action + timestamp) |
+| `AdminUsersTableUnified` | `60` (hardcoded) | `TABLE_ROW_HEIGHTS.TALL` | Multi-line content (name + email) |
+| `AdminWaitlistTableUnified` | `52` (hardcoded) | `TABLE_ROW_HEIGHTS.STANDARD` | Default admin table |
+| `AdminCreatorProfilesUnified` | `52` (hardcoded) | `TABLE_ROW_HEIGHTS.STANDARD` | Default admin table |
+| `DashboardAudienceTableUnified` | `44` (hardcoded) | `TABLE_ROW_HEIGHTS.COMPACT` | High-density CRM view |
+| `ReleaseTable` | Already using constant | `TABLE_ROW_HEIGHTS.STANDARD` | ✓ |
+
+### Row Height Constants
+
+```typescript
+export const TABLE_ROW_HEIGHTS = {
+  COMPACT: 44, // High-density views (e.g., Audience CRM)
+  STANDARD: 52, // Default for most tables
+  TALL: 60, // Tables with multi-line content
+} as const;
+```
+
+### Bulk Actions Parity Decision
+
+**Current state:**
+- Admin tables (Users, Waitlist, Creators) use `TableBulkActionsToolbar` with `useRowSelection`
+- Dashboard tables (Audience, Release) do **not** expose bulk selection UI
+
+**Decision:** Dashboard tables do not need bulk selection at this time.
+- The Audience table is primarily for viewing/CRM purposes, not bulk operations
+- The Release table is read-only progress tracking
+- If bulk selection is needed in the future, wire `useRowSelection` + `TableBulkActionsToolbar` into those pages
+
+**Branch**: claude/unify-header-styling-fidY3
+**Date**: January 19, 2026

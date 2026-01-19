@@ -31,7 +31,7 @@ import {
 } from '@/components/organisms/table';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -692,7 +692,7 @@ export function AdminCreatorProfilesUnified({
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
-              rowHeight={52}
+              rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
               minWidth='960px'
               className='text-[13px]'
             />

@@ -18,6 +18,7 @@ import {
   useRowSelection,
 } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import {
@@ -298,7 +299,7 @@ export function AdminWaitlistTableUnified({
       getRowId={row => row.id}
       getRowClassName={getRowClassName}
       enableVirtualization={true}
-      rowHeight={52}
+      rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       minWidth='1100px'
       className='text-[13px]'
       rowSelection={rowSelection}

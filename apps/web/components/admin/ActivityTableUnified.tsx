@@ -5,6 +5,7 @@ import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { UnifiedTable } from '@/components/organisms/table';
+import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
@@ -127,7 +128,7 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
             getRowId={row => row.id}
             getRowClassName={getRowClassName}
             enableVirtualization={true}
-            rowHeight={60}
+            rowHeight={TABLE_ROW_HEIGHTS.TALL}
             minWidth='800px'
             className='text-[13px] border-0'
           />

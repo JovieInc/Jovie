@@ -25,6 +25,7 @@ import {
   convertContextMenuItems,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
@@ -453,7 +454,7 @@ export function DashboardAudienceTableUnified({
                 }
                 getRowId={row => row.id}
                 enableVirtualization={true}
-                rowHeight={44}
+                rowHeight={TABLE_ROW_HEIGHTS.COMPACT}
                 minWidth='960px'
                 className='text-[13px]'
                 getRowClassName={getRowClassName}
