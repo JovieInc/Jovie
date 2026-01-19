@@ -9,8 +9,6 @@ dotenv.config({ path: '.env.test' });
 
 // Detect CI environment - reduce memory usage by using fewer threads
 const isCI = process.env.CI === 'true';
-// Keep thread count conservative to avoid memory pressure in constrained runners.
-const maxThreads = isCI ? 2 : 2;
 const maxForks = isCI ? 1 : 2;
 
 /**
