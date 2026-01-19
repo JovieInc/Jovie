@@ -45,14 +45,14 @@ export default defineConfig({
     ],
 
     // Performance/stability optimizations
-    // Use vmThreads and recycle workers to avoid heap OOMs.
-    pool: 'vmThreads',
+    // Use threads, but recycle workers once heap grows too large.
+    pool: 'threads',
     poolOptions: {
-      vmThreads: {
+      threads: {
         minThreads: 1,
         maxThreads,
-        // Recycle workers once they cross this threshold to avoid heap OOMs in long runs.
-        memoryLimit: '1GB',
+        // Tinypool expects bytes (heapUsed). Recycling prevents long-run OOMs.
+        maxMemoryLimitBeforeRecycle: 1024 * 1024 * 1024,
         useAtomics: true,
       },
     },
