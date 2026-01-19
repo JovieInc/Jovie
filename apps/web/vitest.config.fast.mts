@@ -9,7 +9,7 @@ dotenv.config({ path: '.env.test' });
 
 // Detect CI environment - reduce memory usage by using fewer threads
 const isCI = process.env.CI === 'true';
-const maxThreads = isCI ? 2 : 2;
+const maxThreads = isCI ? 2 : 4; // Use 2 threads in CI to reduce memory pressure
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
@@ -44,17 +44,13 @@ export default defineConfig({
       '.next/**',
     ],
 
-    // Performance/stability optimizations
-    // Use threads, but recycle workers once heap grows too large.
-    pool: 'threads',
+    // Performance optimizations
+    pool: 'threads', // Use threads instead of forks for better performance
     poolOptions: {
       threads: {
+        // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
         minThreads: 1,
         maxThreads,
-        // Force worker recycling between tasks to avoid long-run memory growth.
-        isolateWorkers: true,
-        // Tinypool expects bytes (heapUsed). Recycling prevents long-run OOMs.
-        maxMemoryLimitBeforeRecycle: 1024 * 1024 * 1024,
         useAtomics: true,
       },
     },
