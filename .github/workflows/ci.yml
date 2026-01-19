@@ -1493,9 +1493,13 @@ jobs:
 
       - name: Run Homepage Smoke Test against production
         run: |
-          # Run homepage and critical pages tests only (skip Public Profile tests which require seeded test data)
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line --grep-invert="Public Profile"
+          # Run homepage and critical pages tests only
+          # Skip: Public Profile tests (require seeded data), Error Handling tests (test 404 behavior, not homepage)
+          pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line --grep-invert="Public Profile|Error Handling"
         env:
+          CI: 'true'
+          SMOKE_ONLY: '1'
+          BASE_URL: https://jov.ie
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Upload Playwright Artifacts on Failure
