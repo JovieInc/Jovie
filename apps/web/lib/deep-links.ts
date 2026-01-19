@@ -165,6 +165,14 @@ export interface DeepLinkResult {
 }
 
 /**
+ * Map of detected platform strings to PlatformInfo platform values.
+ */
+const PLATFORM_MAP: Record<string, PlatformInfo['platform']> = {
+  ios: 'ios',
+  android: 'android',
+};
+
+/**
  * Detects the current platform
  */
 export function detectPlatform(userAgent?: string): PlatformInfo {
@@ -175,13 +183,38 @@ export function detectPlatform(userAgent?: string): PlatformInfo {
 
   return {
     platform:
-      detectedPlatform === 'ios'
-        ? 'ios'
-        : detectedPlatform === 'android'
-          ? 'android'
-          : 'desktop',
+      detectedPlatform != null
+        ? (PLATFORM_MAP[detectedPlatform] ?? 'desktop')
+        : 'desktop',
     userAgent: ua,
   };
+}
+
+/**
+ * Replaces placeholder tokens in a URL template with actual values.
+ */
+function applyPlaceholders(
+  template: string,
+  username: string | null | undefined,
+  id: string | null | undefined
+): string {
+  return template
+    .replace('{username}', username ?? '')
+    .replace('{userId}', id ?? '')
+    .replace('{artistId}', id ?? '')
+    .replace('{channelId}', id ?? '');
+}
+
+/**
+ * Gets the native scheme for a platform from the config.
+ */
+function getNativeScheme(
+  config: DeepLinkConfig,
+  platform: PlatformInfo['platform']
+): string | undefined {
+  if (platform === 'ios') return config.iosScheme;
+  if (platform === 'android') return config.androidScheme;
+  return undefined;
 }
 
 /**
@@ -198,48 +231,31 @@ export function createDeepLink(
   const username = config.extractUsername?.(originalUrl);
   const id = config.extractId?.(originalUrl);
 
-  let nativeUrl: string | null = null;
-  let fallbackUrl = originalUrl; // Default to original URL
+  // Check if we have valid extracted data to work with
+  const hasValidData =
+    (config.extractId && id) || (config.extractUsername && username);
 
   // Construct native URL based on platform
-  if (platformInfo.platform === 'ios' && config.iosScheme) {
-    if ((config.extractId && id) || (config.extractUsername && username)) {
-      nativeUrl = config.iosScheme
-        .replace('{username}', username || '')
-        .replace('{userId}', id || '')
-        .replace('{artistId}', id || '')
-        .replace('{channelId}', id || '');
-    }
-  } else if (platformInfo.platform === 'android' && config.androidScheme) {
-    if ((config.extractId && id) || (config.extractUsername && username)) {
-      nativeUrl = config.androidScheme
-        .replace('{username}', username || '')
-        .replace('{userId}', id || '')
-        .replace('{artistId}', id || '')
-        .replace('{channelId}', id || '');
-    }
+  let nativeUrl: string | null = null;
+  const nativeScheme = getNativeScheme(config, platformInfo.platform);
+  if (nativeScheme && hasValidData) {
+    nativeUrl = applyPlaceholders(nativeScheme, username, id);
   }
 
   // Construct fallback URL
-  if (config.webFallback) {
-    if ((config.extractId && id) || (config.extractUsername && username)) {
-      fallbackUrl = config.webFallback
-        .replace('{username}', username || '')
-        .replace('{userId}', id || '')
-        .replace('{artistId}', id || '')
-        .replace('{channelId}', id || '');
-    }
+  let fallbackUrl = originalUrl;
+  if (config.webFallback && hasValidData) {
+    fallbackUrl = applyPlaceholders(config.webFallback, username, id);
   }
 
   // Use universal link for iOS if available and no native scheme
-  if (platformInfo.platform === 'ios' && config.universalLink && !nativeUrl) {
-    if ((config.extractId && id) || (config.extractUsername && username)) {
-      nativeUrl = config.universalLink
-        .replace('{username}', username || '')
-        .replace('{userId}', id || '')
-        .replace('{artistId}', id || '')
-        .replace('{channelId}', id || '');
-    }
+  if (
+    platformInfo.platform === 'ios' &&
+    config.universalLink &&
+    !nativeUrl &&
+    hasValidData
+  ) {
+    nativeUrl = applyPlaceholders(config.universalLink, username, id);
   }
 
   return {
