@@ -53,10 +53,7 @@ export function CopyLinkInput({
   };
 
   return (
-    <div
-      className={cn('flex items-center gap-1', className)}
-      data-testid={testId}
-    >
+    <div className={cn('relative', className)} data-testid={testId}>
       <input
         ref={inputRef}
         type='text'
@@ -65,7 +62,7 @@ export function CopyLinkInput({
         onClick={handleInputClick}
         aria-label='URL to copy'
         className={cn(
-          'flex-1 min-w-0 bg-surface-1 border border-subtle rounded-md px-2 py-1',
+          'w-full bg-surface-1 border border-subtle rounded-md pl-2 pr-8 py-1',
           'text-xs font-mono text-secondary-token truncate',
           'cursor-text focus:outline-none focus:ring-1 focus:ring-ring',
           'transition-colors',
@@ -80,11 +77,10 @@ export function CopyLinkInput({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : 'Copy to clipboard'}
         className={cn(
-          'shrink-0 p-1.5 rounded-md border border-subtle',
-          'text-secondary-token hover:text-primary-token hover:bg-surface-2',
+          'absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded',
+          'text-tertiary-token hover:text-primary-token hover:bg-surface-2',
           'transition-colors',
-          isCopied &&
-            'text-green-600 border-green-300 bg-green-50 dark:text-green-400 dark:border-green-700 dark:bg-green-900/20'
+          isCopied && 'text-green-600 dark:text-green-400'
         )}
       >
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>

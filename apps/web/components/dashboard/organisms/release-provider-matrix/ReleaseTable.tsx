@@ -124,7 +124,7 @@ export function ReleaseTable({
             <span className='text-xs text-tertiary-token'>TBD</span>
           );
         },
-        size: 80,
+        size: 70,
         enableSorting: true,
       }),
 
@@ -135,7 +135,7 @@ export function ReleaseTable({
         cell: ({ row }) => (
           <SmartLinkCell release={row.original} onCopy={onCopy} />
         ),
-        size: 140,
+        size: 180,
       }),
     ];
 
@@ -171,7 +171,7 @@ export function ReleaseTable({
             isAddingUrl={isAddingUrl}
           />
         ),
-        size: 140,
+        size: 100,
       });
     });
 
@@ -189,7 +189,7 @@ export function ReleaseTable({
           </div>
         );
       },
-      size: 100,
+      size: 60,
     });
 
     return [...baseColumns, ...providerColumns, actionsColumn];
@@ -253,7 +253,9 @@ export function ReleaseTable({
   };
 
   // Calculate dynamic min width based on column count
-  const minWidth = `${800 + primaryProviders.length * 140}px`;
+  // Base: Release(220) + Released(70) + SmartLink(180) + Actions(60) = 530
+  // + Provider columns (100 each)
+  const minWidth = `${530 + primaryProviders.length * 100}px`;
 
   return (
     <UnifiedTable
