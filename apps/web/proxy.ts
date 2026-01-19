@@ -295,8 +295,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Detect RSC prefetch requests - these should NOT trigger redirects
     // RSC prefetch happens when Link components preload routes in the background
     // Redirecting prefetch requests causes "too many redirects" errors
+    // Note: RSC header alone indicates RSC navigation, not prefetch
+    // Only Next-Router-Prefetch='1' or _rsc param indicates actual prefetch
     const isRSCPrefetch =
-      req.headers.get('RSC') === '1' ||
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
 

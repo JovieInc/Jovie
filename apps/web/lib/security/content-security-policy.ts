@@ -1,3 +1,4 @@
+import { isDevelopment } from '@/lib/utils/platform-detection/environment';
 import { CSP_REPORT_GROUP, getCspReportUri } from './csp-reporting';
 
 export const SCRIPT_NONCE_HEADER = 'x-nonce';
@@ -13,7 +14,7 @@ type BuildCspOptions = {
  */
 const buildCspDirectives = ({
   nonce,
-  isDev = process.env.NODE_ENV === 'development',
+  isDev = isDevelopment(),
 }: BuildCspOptions): string[] => {
   return [
     "default-src 'self'",
@@ -116,8 +117,10 @@ interface BuildCspReportOnlyOptions extends BuildCspOptions {
 export const buildContentSecurityPolicyReportOnly = (
   options: BuildCspReportOnlyOptions
 ): string | null => {
-  // Use provided reportUri or fall back to fetching it
-  const reportUri = options.reportUri ?? getCspReportUri();
+  // Use provided reportUri if explicitly set (including null to disable),
+  // otherwise fall back to fetching it
+  const reportUri =
+    options.reportUri !== undefined ? options.reportUri : getCspReportUri();
   if (!reportUri) {
     // No reporting configured - skip report-only header
     return null;
