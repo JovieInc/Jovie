@@ -476,30 +476,25 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
 // =============================================================================
 
 /**
+ * Lookup map for user state redirects.
+ */
+const STATE_REDIRECT_MAP: Record<UserState, string | null> = {
+  [UserState.UNAUTHENTICATED]: '/signin',
+  [UserState.NEEDS_DB_USER]: '/onboarding?fresh_signup=true',
+  [UserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
+  [UserState.WAITLIST_PENDING]: '/waitlist',
+  [UserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
+  [UserState.BANNED]: '/banned',
+  [UserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
+  [UserState.ACTIVE]: null,
+};
+
+/**
  * Returns redirect paths for each user state.
  * Used by routes to determine where to redirect users based on their state.
  */
 export function getRedirectForState(state: UserState): string | null {
-  switch (state) {
-    case UserState.UNAUTHENTICATED:
-      return '/signin';
-    case UserState.NEEDS_DB_USER:
-      return '/onboarding?fresh_signup=true';
-    case UserState.NEEDS_WAITLIST_SUBMISSION:
-      return '/waitlist';
-    case UserState.WAITLIST_PENDING:
-      return '/waitlist';
-    case UserState.NEEDS_ONBOARDING:
-      return '/onboarding?fresh_signup=true';
-    case UserState.BANNED:
-      return '/banned';
-    case UserState.USER_CREATION_FAILED:
-      return '/error/user-creation-failed';
-    case UserState.ACTIVE:
-      return null;
-    default:
-      return null;
-  }
+  return STATE_REDIRECT_MAP[state] ?? null;
 }
 
 /**

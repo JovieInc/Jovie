@@ -45,6 +45,30 @@ function deriveDisplayNameFromEmail(email: string): string {
   return localPart.trim().replace(/[._-]+/g, ' ');
 }
 
+/**
+ * Display name candidate with its source identifier.
+ */
+type DisplayNameCandidate = {
+  value: string | null;
+  source: ClerkDisplayNameSource;
+};
+
+/**
+ * Resolve display name from candidates using priority order.
+ * Returns the first non-empty candidate.
+ */
+function resolveDisplayName(candidates: DisplayNameCandidate[]): {
+  displayName: string | null;
+  source: ClerkDisplayNameSource;
+} {
+  for (const candidate of candidates) {
+    if (candidate.value) {
+      return { displayName: candidate.value, source: candidate.source };
+    }
+  }
+  return { displayName: null, source: null };
+}
+
 export function resolveClerkIdentity(
   user: ClerkUserIdentityInput | null | undefined
 ): ClerkResolvedIdentity {
@@ -64,30 +88,23 @@ export function resolveClerkIdentity(
 
   const nameFromParts = [firstName, lastName].filter(Boolean).join(' ').trim();
   const username = (user?.username ?? '').trim();
-
   const derivedFromEmail = email ? deriveDisplayNameFromEmail(email) : null;
 
-  const displayName =
-    privateMetadataFullName ||
-    fullName ||
-    nameFromParts ||
-    firstName ||
-    username ||
-    derivedFromEmail;
+  // Priority-ordered candidates for display name resolution
+  const candidates: DisplayNameCandidate[] = [
+    {
+      value: privateMetadataFullName || null,
+      source: 'private_metadata_full_name',
+    },
+    { value: fullName || null, source: 'clerk_full_name' },
+    { value: nameFromParts || null, source: 'clerk_name_parts' },
+    { value: firstName || null, source: 'clerk_first_name' },
+    { value: username || null, source: 'clerk_username' },
+    { value: derivedFromEmail, source: 'email_local_part' },
+  ];
 
-  const displayNameSource: ClerkDisplayNameSource = privateMetadataFullName
-    ? 'private_metadata_full_name'
-    : fullName
-      ? 'clerk_full_name'
-      : nameFromParts
-        ? 'clerk_name_parts'
-        : firstName
-          ? 'clerk_first_name'
-          : username
-            ? 'clerk_username'
-            : derivedFromEmail
-              ? 'email_local_part'
-              : null;
+  const { displayName, source: displayNameSource } =
+    resolveDisplayName(candidates);
 
   // Upgrade OAuth provider avatar URLs to high resolution
   // Google OAuth returns 96x96 by default, we upgrade to 512x512
@@ -95,7 +112,7 @@ export function resolveClerkIdentity(
 
   return {
     email,
-    displayName: displayName || null,
+    displayName,
     avatarUrl,
     displayNameSource,
   };
