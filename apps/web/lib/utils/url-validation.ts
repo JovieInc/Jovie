@@ -131,75 +131,96 @@ function createValidationError(error: string): UrlValidationResult {
 }
 
 /**
+ * Internal domain suffixes that are not allowed.
+ */
+const INTERNAL_DOMAIN_SUFFIXES = [
+  '.internal',
+  '.local',
+  '.localhost',
+  '.localdomain',
+];
+
+/**
+ * Cloud metadata endpoints to block (SSRF protection).
+ */
+const METADATA_PATTERNS = ['169.254.169.254', 'metadata.google.internal'];
+
+/**
+ * Validation rule with check function and error message.
+ */
+type ValidationRule = {
+  check: (hostname: string, protocol: string) => boolean;
+  error: string | ((protocol: string) => string);
+};
+
+/**
+ * Table-driven validation rules for parsed URLs.
+ * Each rule returns true if validation FAILS.
+ */
+const URL_VALIDATION_RULES: ValidationRule[] = [
+  {
+    check: (_, protocol) => DANGEROUS_PROTOCOLS.includes(protocol),
+    error: protocol =>
+      `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
+  },
+  {
+    check: (_, protocol) => protocol !== 'http:' && protocol !== 'https:',
+    error: protocol =>
+      `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
+  },
+  {
+    check: hostname => isPrivateHostname(hostname),
+    error: 'URLs pointing to internal/private addresses are not allowed',
+  },
+  {
+    check: hostname => isPrivateIp(hostname),
+    error: 'URLs pointing to internal/private IP addresses are not allowed',
+  },
+  {
+    check: hostname =>
+      INTERNAL_DOMAIN_SUFFIXES.some(suffix => hostname.endsWith(suffix)),
+    error: 'URLs pointing to internal domains are not allowed',
+  },
+  {
+    check: hostname =>
+      METADATA_PATTERNS.includes(hostname) || hostname.includes('metadata'),
+    error: 'URLs pointing to cloud metadata endpoints are not allowed',
+  },
+];
+
+/**
  * Validate a URL for use as a social link
  * Returns an error message if invalid, undefined if valid
  */
 export function validateSocialLinkUrl(url: string): UrlValidationResult {
-  let error: string | undefined;
-
   // Check length
   if (url.length > MAX_URL_LENGTH) {
-    error = `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`;
+    return createValidationError(
+      `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`
+    );
   }
 
   // Parse the URL
-  let parsed: URL | undefined;
-  if (!error) {
-    try {
-      parsed = new URL(url);
-    } catch {
-      error = 'Invalid URL format';
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return createValidationError('Invalid URL format');
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Run table-driven validation rules
+  for (const rule of URL_VALIDATION_RULES) {
+    if (rule.check(hostname, protocol)) {
+      const errorMsg =
+        typeof rule.error === 'function' ? rule.error(protocol) : rule.error;
+      return createValidationError(errorMsg);
     }
   }
 
-  if (!error && parsed) {
-    const protocol = parsed.protocol.toLowerCase();
-
-    // Check for dangerous protocols
-    if (DANGEROUS_PROTOCOLS.includes(protocol)) {
-      error = `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`;
-    }
-
-    // Only allow http and https
-    if (!error && protocol !== 'http:' && protocol !== 'https:') {
-      error = `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`;
-    }
-
-    // Check for private/internal hostnames
-    const hostname = parsed.hostname.toLowerCase();
-    if (!error && isPrivateHostname(hostname)) {
-      error = 'URLs pointing to internal/private addresses are not allowed';
-    }
-
-    // Check for IP addresses that are private
-    // This catches cases where someone uses an IP directly
-    if (!error && isPrivateIp(hostname)) {
-      error = 'URLs pointing to internal/private IP addresses are not allowed';
-    }
-
-    // Check for common internal domains
-    if (
-      !error &&
-      (hostname.endsWith('.internal') ||
-        hostname.endsWith('.local') ||
-        hostname.endsWith('.localhost') ||
-        hostname.endsWith('.localdomain'))
-    ) {
-      error = 'URLs pointing to internal domains are not allowed';
-    }
-
-    // Check for metadata endpoints (cloud provider security)
-    if (
-      !error &&
-      (hostname === '169.254.169.254' || // AWS/GCP/Azure metadata
-        hostname === 'metadata.google.internal' ||
-        hostname.includes('metadata'))
-    ) {
-      error = 'URLs pointing to cloud metadata endpoints are not allowed';
-    }
-  }
-
-  return error ? createValidationError(error) : { valid: true };
+  return { valid: true };
 }
 
 /**
