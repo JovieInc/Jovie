@@ -112,7 +112,7 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-surface-1/80 backdrop-blur',
+    'bg-surface-1',
     borders.header
   ),
   stickyGroupHeader: cn(

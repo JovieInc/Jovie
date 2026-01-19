@@ -43,7 +43,7 @@ export function AdminCreatorsTableHeader({
   headerActions,
 }: AdminCreatorsTableHeaderProps) {
   const headerCellClass = cn(
-    'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+    'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1',
     headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
   );
 

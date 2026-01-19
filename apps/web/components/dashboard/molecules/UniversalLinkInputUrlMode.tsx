@@ -67,7 +67,7 @@ export function UniversalLinkInputUrlMode({
       <div
         className={cn(
           'relative flex w-full items-center gap-2 rounded-full border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
-          'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+          'focus-within:ring-2 focus-within:ring-accent',
           disabled && 'opacity-50'
         )}
       >

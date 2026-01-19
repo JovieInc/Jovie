@@ -353,7 +353,7 @@ export function AdminCreatorProfilesWithSidebar({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex bg-surface-0 border-subtle'
+        className='hidden md:flex bg-surface-2 border-subtle'
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <ContactSidebar

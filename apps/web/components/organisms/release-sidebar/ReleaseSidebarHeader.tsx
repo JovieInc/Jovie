@@ -6,7 +6,8 @@
  * Header section of the release sidebar with action buttons
  */
 
-import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -28,6 +29,13 @@ export function ReleaseSidebarHeader({
   onCopySmartLink,
 }: ReleaseSidebarHeaderProps) {
   const showActions = hasRelease && release?.smartLinkPath;
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopySmartLink = useCallback(() => {
+    onCopySmartLink();
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  }, [onCopySmartLink]);
 
   // Define actions based on pattern from ContactSidebarHeader:
   // Primary: Close + Copy
@@ -49,9 +57,11 @@ export function ReleaseSidebarHeader({
     // Copy smart link - primary action
     primaryActions.push({
       id: 'copy',
-      label: 'Copy smart link',
+      label: isCopied ? 'Copied!' : 'Copy smart link',
       icon: Copy,
-      onClick: onCopySmartLink,
+      activeIcon: Check,
+      isActive: isCopied,
+      onClick: handleCopySmartLink,
     });
 
     // Refresh - overflow action

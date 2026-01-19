@@ -1,7 +1,6 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link as LinkIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
@@ -116,19 +115,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   const hasAnyLinks = links.length > 0;
 
-  const focusLinkInput = useCallback(() => {
-    const input = linkInputRef.current?.getInputElement();
-    if (input) {
-      input.focus();
-      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    containerRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }, []);
-
   // Hint state for drag-and-drop validation messages
   const [hint, setHint] = useState<string | null>(null);
 
@@ -207,17 +193,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       <div className='mx-auto w-full max-w-3xl'>
         {!hasAnyLinks && (
           <EmptyState
-            icon={<LinkIcon className='h-6 w-6' aria-hidden='true' />}
             heading='Add your first link'
             description='Start with your most important link — music, socials, or a landing page.'
-            action={{
-              label: 'Add link',
-              onClick: focusLinkInput,
-            }}
-            secondaryAction={{
-              label: 'Learn about links',
-              href: '/support',
-            }}
             size='sm'
             className='mt-3 w-full'
           />
