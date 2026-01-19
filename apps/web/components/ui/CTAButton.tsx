@@ -44,11 +44,12 @@ export const CTAButton = React.forwardRef<
 
     const isDisabled = props.disabled || isLoading;
 
+    // Determine button state for data attribute
     const dataState = isLoading
       ? 'loading'
       : isSuccess
         ? 'success'
-        : props.disabled
+        : isDisabled
           ? 'disabled'
           : 'idle';
 

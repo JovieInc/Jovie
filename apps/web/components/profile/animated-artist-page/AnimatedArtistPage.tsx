@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
+import { getContentMotionProps } from './motion-helpers';
 import type { AnimatedArtistPageProps } from './types';
 import { useAnimatedArtistPage } from './useAnimatedArtistPage';
 import { extractVenmoUsername, findVenmoLink, TIP_AMOUNTS } from './utils';
@@ -41,6 +42,8 @@ export function AnimatedArtistPage({
     pageVariants,
   } = useAnimatedArtistPage();
 
+  const contentMotion = getContentMotionProps(prefersReducedMotion);
+
   const renderContent = () => {
     switch (mode) {
       case 'listen':
@@ -57,17 +60,7 @@ export function AnimatedArtistPage({
       case 'tip':
         if (!tippingEnabled) {
           return (
-            <motion.div
-              initial={
-                prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }
-              }
-              animate={
-                prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
-              }
-              transition={
-                prefersReducedMotion ? { duration: 0 } : { duration: 0.6 }
-              }
-            >
+            <motion.div {...contentMotion}>
               <div className='space-y-4 text-center'>
                 <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl'>
                   <p className='text-secondary-token' role='alert'>
@@ -85,17 +78,7 @@ export function AnimatedArtistPage({
         const venmoUsername = extractVenmoUsername(venmoLink);
 
         return (
-          <motion.div
-            initial={
-              prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }
-            }
-            animate={
-              prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
-            }
-            transition={
-              prefersReducedMotion ? { duration: 0 } : { duration: 0.6 }
-            }
-          >
+          <motion.div {...contentMotion}>
             <main className='space-y-4' aria-labelledby='tipping-title'>
               <h1 id='tipping-title' className='sr-only'>
                 Tip {artist.name}
@@ -123,17 +106,7 @@ export function AnimatedArtistPage({
 
       default:
         return (
-          <motion.div
-            initial={
-              prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }
-            }
-            animate={
-              prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
-            }
-            transition={
-              prefersReducedMotion ? { duration: 0 } : { duration: 0.6 }
-            }
-          >
+          <motion.div {...contentMotion}>
             <div className='space-y-4'>
               <ArtistNotificationsCTA artist={artist} variant='button' />
             </div>

@@ -33,6 +33,15 @@ const SOURCE_BONUS = 0.15;
 const ACTIVE_THRESHOLD = 0.7;
 const SUGGESTED_THRESHOLD = 0.3;
 
+/**
+ * Determines the link state based on confidence score thresholds.
+ */
+function determineLinkState(confidence: number): SocialLinkState {
+  if (confidence >= ACTIVE_THRESHOLD) return 'active';
+  if (confidence >= SUGGESTED_THRESHOLD) return 'suggested';
+  return 'rejected';
+}
+
 export interface ConfidenceInput {
   sourceType: IngestionSourceType;
   signals?: Array<ConfidenceSignal | string>;
@@ -109,12 +118,5 @@ export function computeLinkConfidence(input: ConfidenceInput): {
 
   const clamped = Math.min(1, Math.max(0, Number(score.toFixed(2))));
 
-  const state: SocialLinkState =
-    clamped >= ACTIVE_THRESHOLD
-      ? 'active'
-      : clamped >= SUGGESTED_THRESHOLD
-        ? 'suggested'
-        : 'rejected';
-
-  return { confidence: clamped, state };
+  return { confidence: clamped, state: determineLinkState(clamped) };
 }
