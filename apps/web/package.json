@@ -218,7 +218,7 @@
     "plop": "^4.0.2",
     "postcss": "^8",
     "shadcn": "^3.6.2",
-    "storybook": "^10.1.10",
+    "storybook": "^10.1.11",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.20.5",
     "typescript": "^5",
