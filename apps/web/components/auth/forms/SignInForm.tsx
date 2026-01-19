@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
-import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AUTH_STORAGE_KEYS, sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
@@ -49,11 +49,9 @@ export function SignInForm() {
       const redirectUrl = new URL(window.location.href).searchParams.get(
         'redirect_url'
       );
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
-        window.sessionStorage.setItem(
-          AUTH_STORAGE_KEYS.REDIRECT_URL,
-          redirectUrl
-        );
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
+        window.sessionStorage.setItem(AUTH_STORAGE_KEYS.REDIRECT_URL, sanitized);
       }
     } catch {
       // Ignore errors
