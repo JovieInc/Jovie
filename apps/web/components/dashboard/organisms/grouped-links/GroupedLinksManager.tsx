@@ -9,7 +9,6 @@ import {
 } from '@/components/dashboard/molecules/universal-link-input';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { cn } from '@/lib/utils';
-import '@/lib/utils/color';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import {
   type SuggestedLink,
@@ -109,9 +108,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       handleAcceptSuggestionFromHook,
       handleDismissSuggestionFromHook,
     });
-
-  // Memoized pill label builder
-  const memoizedBuildPillLabel = useCallback(buildPillLabel, []);
 
   const existingPlatforms = useMemo(
     () => new Set(links.map(l => l.platform.id)),
@@ -240,7 +236,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             openMenuId={openMenuId}
             onAnyMenuOpen={handleAnyMenuOpen}
             lastAddedId={lastAddedId}
-            buildPillLabel={memoizedBuildPillLabel}
+            buildPillLabel={buildPillLabel}
             addingLink={addingLink}
             pendingPreview={pendingPreview}
             onAddPendingPreview={handleAddPendingPreview}
