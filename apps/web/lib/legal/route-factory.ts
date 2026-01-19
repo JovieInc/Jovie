@@ -16,7 +16,12 @@ export function createLegalDocumentRoute(
 ) {
   return async function GET() {
     try {
-      const filePath = path.join(process.cwd(), 'content', 'legal', docFilename);
+      const filePath = path.join(
+        process.cwd(),
+        'content',
+        'legal',
+        docFilename
+      );
       const fileContents = fs.readFileSync(filePath, 'utf8');
 
       const processedContent = await remark().use(html).process(fileContents);
