@@ -103,15 +103,21 @@ export const buildContentSecurityPolicy = (
   return directives.join('; ');
 };
 
+interface BuildCspReportOnlyOptions extends BuildCspOptions {
+  /** Pre-computed report URI to avoid duplicate calls to getCspReportUri */
+  reportUri?: string | null;
+}
+
 /**
  * Builds the Content-Security-Policy-Report-Only header value.
  * This CSP reports violations to Sentry without blocking resources.
  * Useful for monitoring and identifying issues before enforcement.
  */
 export const buildContentSecurityPolicyReportOnly = (
-  options: BuildCspOptions
+  options: BuildCspReportOnlyOptions
 ): string | null => {
-  const reportUri = getCspReportUri();
+  // Use provided reportUri or fall back to fetching it
+  const reportUri = options.reportUri ?? getCspReportUri();
   if (!reportUri) {
     // No reporting configured - skip report-only header
     return null;

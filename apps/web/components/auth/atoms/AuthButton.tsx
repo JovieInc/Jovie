@@ -11,7 +11,7 @@ const authButtonVariants = cva(
     'w-full rounded-[6px] flex items-center justify-center gap-2',
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]',
-    // Mobile-optimized height (min 48px for touch targets)
+    // Mobile-optimized height (min 44px for touch targets)
     'h-11 sm:h-11 min-h-[44px]',
     // Touch-optimized transitions
     'transition-all duration-150 ease-out',

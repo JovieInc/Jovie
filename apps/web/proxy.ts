@@ -140,9 +140,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
     const contentSecurityPolicy = buildContentSecurityPolicy({ nonce });
-    const contentSecurityPolicyReportOnly =
-      buildContentSecurityPolicyReportOnly({ nonce });
+    // Compute CSP report URI once and pass to report-only builder
     const cspReportUri = getCspReportUri();
+    const contentSecurityPolicyReportOnly =
+      buildContentSecurityPolicyReportOnly({
+        nonce,
+        reportUri: cspReportUri,
+      });
 
     // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
