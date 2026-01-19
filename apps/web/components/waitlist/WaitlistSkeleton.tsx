@@ -4,7 +4,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 export function WaitlistSkeleton() {
   return (
     <div className='min-h-screen flex flex-col items-center bg-base px-4 pt-[18vh] sm:pt-[20vh] pb-24'>
-      {/* Logo */}
+      {/* Logo placeholder */}
       <div className='mb-6 h-12 w-12' aria-hidden='true' />
 
       {/* Form skeleton */}
@@ -17,6 +17,7 @@ export function WaitlistSkeleton() {
         <LoadingSkeleton height='h-12' />
       </div>
 
+      {/* Progress indicator */}
       <div
         className={`w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex items-center justify-between mt-6`}
       >
