@@ -16,11 +16,11 @@ export function AudienceDeviceCell({
   const deviceIndicator = getDeviceIndicator(deviceType);
 
   return (
-    <div className={cn('text-sm', className)}>
+    <div className={cn('text-xs', className)}>
       {deviceIndicator ? (
         <Icon
           name={deviceIndicator.iconName}
-          className='h-4 w-4 text-secondary-token'
+          className='h-3.5 w-3.5 text-secondary-token'
           aria-label={deviceIndicator.label}
           role='img'
         />

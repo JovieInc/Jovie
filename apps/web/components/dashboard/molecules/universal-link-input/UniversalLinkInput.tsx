@@ -9,6 +9,8 @@
 
 import { forwardRef, useImperativeHandle } from 'react';
 
+import { cn } from '@/lib/utils';
+
 import { UniversalLinkInputArtistSearchMode } from '../artist-search-mode';
 import { UniversalLinkInputUrlMode } from '../UniversalLinkInputUrlMode';
 import type { UniversalLinkInputProps } from './types';
@@ -41,7 +43,6 @@ export const UniversalLinkInput = forwardRef<
     const {
       url,
       searchMode,
-      autosuggestOpen: _autosuggestOpen,
       activeSuggestionIndex,
       autosuggestListId,
       urlInputRef,
@@ -99,6 +100,7 @@ export const UniversalLinkInput = forwardRef<
           onPlatformSelect={handlePlatformSelect}
           onArtistSearchSelect={handleArtistSearchSelect}
           onRestoreFocus={focusInput}
+          isDropdownOpen={shouldShowAutosuggest}
           onFocus={() => {
             const trimmed = url.trim();
             const nextOpen =
@@ -132,7 +134,7 @@ export const UniversalLinkInput = forwardRef<
             role='listbox'
             aria-label='Platform suggestions'
             tabIndex={-1}
-            className='absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-lg'
+            className='absolute left-0 right-0 top-full z-50 overflow-hidden rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-lg'
             onMouseDown={event => {
               event.preventDefault();
             }}
@@ -146,12 +148,10 @@ export const UniversalLinkInput = forwardRef<
                   role='option'
                   aria-selected={active}
                   type='button'
-                  className={
-                    'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition ' +
-                    (active
-                      ? 'bg-surface-2 text-primary-token'
-                      : 'text-primary-token hover:bg-surface-2')
-                  }
+                  className={cn(
+                    'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-primary-token transition',
+                    active ? 'bg-surface-2' : 'hover:bg-surface-2'
+                  )}
                   onMouseEnter={() => setActiveSuggestionIndex(index)}
                   onClick={() => commitPlatformSelection(option)}
                 >
