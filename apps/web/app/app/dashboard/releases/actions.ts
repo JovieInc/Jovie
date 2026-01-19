@@ -40,6 +40,7 @@ function buildProviderLabels() {
 async function requireProfile(): Promise<{
   id: string;
   spotifyId: string | null;
+  handle: string;
 }> {
   const data = await getDashboardData();
 
@@ -54,6 +55,8 @@ async function requireProfile(): Promise<{
   return {
     id: data.selectedProfile.id,
     spotifyId: data.selectedProfile.spotifyId ?? null,
+    handle:
+      data.selectedProfile.usernameNormalized ?? data.selectedProfile.username,
   };
 }
 
@@ -63,10 +66,11 @@ async function requireProfile(): Promise<{
 function mapReleaseToViewModel(
   release: ReleaseWithProviders,
   providerLabels: Record<ProviderKey, string>,
-  profileId: string
+  profileId: string,
+  profileHandle: string
 ): ReleaseViewModel {
-  // Build slug for smart link (profileId--releaseId format)
-  const slug = `${release.slug}--${profileId}`;
+  // Use the new short URL format: /{handle}/{slug}
+  const slug = release.slug;
 
   return {
     profileId,
@@ -75,7 +79,7 @@ function mapReleaseToViewModel(
     releaseDate: release.releaseDate?.toISOString(),
     artworkUrl: release.artworkUrl ?? undefined,
     slug,
-    smartLinkPath: buildSmartLinkPath(slug),
+    smartLinkPath: buildSmartLinkPath(profileHandle, slug),
     providers: Object.entries(providerLabels).map(([key, label]) => {
       const providerKey = key as ProviderKey;
       const match = release.providerLinks.find(
@@ -92,7 +96,7 @@ function mapReleaseToViewModel(
         url,
         source,
         updatedAt,
-        path: url ? buildSmartLinkPath(slug, providerKey) : '',
+        path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
         isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
       };
     }),
@@ -112,7 +116,7 @@ export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
   const releases = await getReleasesFromDb(profile.id);
 
   return releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profile.id)
+    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
   );
 }
 
@@ -231,7 +235,12 @@ export async function saveProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
     revalidatePath('/app/dashboard/releases');
-    return mapReleaseToViewModel(release, providerLabels, profile.id);
+    return mapReleaseToViewModel(
+      release,
+      providerLabels,
+      profile.id,
+      profile.handle
+    );
   } catch (error) {
     // Re-throw with user-friendly message
     const message =
@@ -284,7 +293,12 @@ export async function resetProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
     revalidatePath('/app/dashboard/releases');
-    return mapReleaseToViewModel(release, providerLabels, profile.id);
+    return mapReleaseToViewModel(
+      release,
+      providerLabels,
+      profile.id,
+      profile.handle
+    );
   } catch (error) {
     // Re-throw with user-friendly message
     const message =
@@ -440,7 +454,7 @@ export async function connectSpotifyArtist(params: {
 
   // Map releases to view models
   const releases = result.releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profile.id)
+    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
   );
 
   if (result.success) {

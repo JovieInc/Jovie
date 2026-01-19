@@ -16,6 +16,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import {
   artistRoleEnum,
   artistTypeEnum,
+  contentSlugTypeEnum,
   discogReleaseTypeEnum,
   ingestionSourceTypeEnum,
   providerKindEnum,
@@ -223,6 +224,44 @@ export const smartLinkTargets = pgTable(
   })
 );
 
+// Content slug redirects table (for tracking old slugs when users edit them)
+export const contentSlugRedirects = pgTable(
+  'content_slug_redirects',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    oldSlug: text('old_slug').notNull(),
+    contentType: contentSlugTypeEnum('content_type').notNull(),
+    releaseId: uuid('release_id').references(() => discogReleases.id, {
+      onDelete: 'cascade',
+    }),
+    trackId: uuid('track_id').references(() => discogTracks.id, {
+      onDelete: 'cascade',
+    }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Unique old slug per creator (prevents reusing old slugs)
+    creatorOldSlugUnique: uniqueIndex(
+      'content_slug_redirects_creator_old_slug'
+    ).on(table.creatorProfileId, table.oldSlug),
+    // Index for fast lookup by old slug
+    oldSlugIndex: index('content_slug_redirects_old_slug_idx').on(
+      table.oldSlug
+    ),
+    // Ensure content reference matches content type
+    contentConstraint: check(
+      'content_slug_redirects_content_match',
+      drizzleSql`
+        (content_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL)
+        OR (content_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL)
+      `
+    ),
+  })
+);
+
 // ============================================================================
 // Multi-Artist Support Tables
 // ============================================================================
@@ -394,6 +433,11 @@ export const selectProviderLinkSchema = createSelectSchema(providerLinks);
 export const insertSmartLinkTargetSchema = createInsertSchema(smartLinkTargets);
 export const selectSmartLinkTargetSchema = createSelectSchema(smartLinkTargets);
 
+export const insertContentSlugRedirectSchema =
+  createInsertSchema(contentSlugRedirects);
+export const selectContentSlugRedirectSchema =
+  createSelectSchema(contentSlugRedirects);
+
 // Types
 export type Provider = typeof providers.$inferSelect;
 export type NewProvider = typeof providers.$inferInsert;
@@ -409,6 +453,9 @@ export type NewProviderLink = typeof providerLinks.$inferInsert;
 
 export type SmartLinkTarget = typeof smartLinkTargets.$inferSelect;
 export type NewSmartLinkTarget = typeof smartLinkTargets.$inferInsert;
+
+export type ContentSlugRedirect = typeof contentSlugRedirects.$inferSelect;
+export type NewContentSlugRedirect = typeof contentSlugRedirects.$inferInsert;
 
 // Multi-Artist Support Schemas
 export const insertArtistSchema = createInsertSchema(artists);

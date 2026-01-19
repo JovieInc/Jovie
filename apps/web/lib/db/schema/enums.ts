@@ -267,3 +267,9 @@ export const artistRoleEnum = pgEnum('artist_role', [
   'with',
   'other',
 ]);
+
+// Content Slug Enums
+export const contentSlugTypeEnum = pgEnum('content_slug_type', [
+  'release',
+  'track',
+]);

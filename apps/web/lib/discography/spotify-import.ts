@@ -1,8 +1,10 @@
 import * as Sentry from '@sentry/nextjs';
+import { and, eq, inArray } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { discogReleases, discogTracks, providerLinks } from '@/lib/db/schema';
 import {
   buildSpotifyAlbumUrl,
   buildSpotifyTrackUrl,
-  generateReleaseSlug,
   getBestSpotifyImage,
   getSpotifyAlbums,
   getSpotifyArtistAlbums,
@@ -35,6 +37,7 @@ import {
   upsertRelease,
   upsertTrack,
 } from './queries';
+import { generateUniqueSlug } from './slug';
 
 // ============================================================================
 // Constants
@@ -255,8 +258,32 @@ async function importSingleRelease(
   // Sanitize album name before use
   const sanitizedTitle = sanitizeName(album.name);
 
-  // Generate slug from sanitized title and Spotify ID
-  const slug = generateReleaseSlug(sanitizedTitle, album.id);
+  // If this album was previously imported, preserve its slug for stability.
+  const [existingRelease] = await db
+    .select({
+      id: discogReleases.id,
+      slug: discogReleases.slug,
+    })
+    .from(providerLinks)
+    .innerJoin(discogReleases, eq(discogReleases.id, providerLinks.releaseId))
+    .where(
+      and(
+        eq(providerLinks.ownerType, 'release'),
+        eq(providerLinks.providerId, 'spotify'),
+        eq(providerLinks.externalId, album.id)
+      )
+    )
+    .limit(1);
+
+  // Generate clean slug from title (no more Spotify ID suffix!)
+  const slug =
+    existingRelease?.slug ??
+    (await generateUniqueSlug(
+      creatorProfileId,
+      sanitizedTitle,
+      'release',
+      existingRelease?.id
+    ));
 
   // Determine release type
   // Spotify doesn't distinguish EPs, so we infer from track count
@@ -347,6 +374,38 @@ async function importSingleRelease(
       MAX_TRACKS_PER_RELEASE
     );
 
+    // Pre-fetch any existing track slugs by Spotify ID so re-imports don't churn slugs.
+    const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
+    const existingTracksBySpotifyId = new Map<
+      string,
+      { id: string; slug: string }
+    >();
+    if (spotifyTrackIds.length > 0) {
+      const rows = await db
+        .select({
+          id: discogTracks.id,
+          slug: discogTracks.slug,
+          spotifyTrackId: providerLinks.externalId,
+        })
+        .from(providerLinks)
+        .innerJoin(discogTracks, eq(discogTracks.id, providerLinks.trackId))
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'track'),
+            eq(providerLinks.providerId, 'spotify'),
+            inArray(providerLinks.externalId, spotifyTrackIds)
+          )
+        );
+
+      for (const row of rows) {
+        if (!row.spotifyTrackId) continue;
+        existingTracksBySpotifyId.set(row.spotifyTrackId, {
+          id: row.id,
+          slug: row.slug,
+        });
+      }
+    }
+
     for (const track of tracksToImport) {
       if (track.explicit) {
         hasExplicit = true;
@@ -354,11 +413,27 @@ async function importSingleRelease(
 
       // Sanitize track title
       const sanitizedTrackTitle = sanitizeName(track.name);
-      const trackSlug = generateReleaseSlug(sanitizedTrackTitle, track.id);
+      const existingTrack = track.id
+        ? existingTracksBySpotifyId.get(track.id)
+        : undefined;
 
-      // Sanitize ISRC (alphanumeric only, max 12 chars)
+      // Generate clean slug for track (no more Spotify ID suffix!)
+      // Preserve existing slug for stable URLs across re-imports.
+      const trackSlug =
+        existingTrack?.slug ??
+        (await generateUniqueSlug(
+          creatorProfileId,
+          sanitizedTrackTitle,
+          'track',
+          existingTrack?.id
+        ));
+
+      // Sanitize ISRC (alphanumeric only, max 12 chars, uppercase for consistency)
       const sanitizedIsrc = track.external_ids?.isrc
-        ? track.external_ids.isrc.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)
+        ? track.external_ids.isrc
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .slice(0, 12)
+            .toUpperCase()
         : null;
 
       // Sanitize preview URL
