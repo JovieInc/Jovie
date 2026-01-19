@@ -37,7 +37,9 @@ export const AUTH_CLASSES = {
  * @param url - The URL to sanitize
  * @returns The sanitized URL, or null if invalid
  */
-export function sanitizeRedirectUrl(url: string | null | undefined): string | null {
+export function sanitizeRedirectUrl(
+  url: string | null | undefined
+): string | null {
   if (!url) return null;
   if (!url.startsWith('/') || url.startsWith('//')) return null;
 

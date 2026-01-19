@@ -53,7 +53,10 @@ export function SignUpForm() {
       );
       const sanitized = sanitizeRedirectUrl(redirectUrl);
       if (sanitized) {
-        window.sessionStorage.setItem(AUTH_STORAGE_KEYS.REDIRECT_URL, sanitized);
+        window.sessionStorage.setItem(
+          AUTH_STORAGE_KEYS.REDIRECT_URL,
+          sanitized
+        );
       }
     } catch {
       // Ignore errors
