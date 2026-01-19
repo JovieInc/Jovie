@@ -12,6 +12,7 @@ import {
   isRateLimited,
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { AuthMethod, LoadingState } from '@/lib/auth/types';
 
 // Re-export types for backwards compatibility
@@ -103,8 +104,9 @@ export function useAuthFlowBase(
         const stored = window.sessionStorage.getItem(
           AUTH_REDIRECT_URL_STORAGE_KEY
         );
-        if (stored?.startsWith('/') && !stored.startsWith('//')) {
-          return stored;
+        const sanitized = sanitizeRedirectUrl(stored);
+        if (sanitized) {
+          return sanitized;
         }
       } catch {
         // Ignore sessionStorage errors
@@ -121,11 +123,9 @@ export function useAuthFlowBase(
       const redirectUrl = new URL(window.location.href).searchParams.get(
         'redirect_url'
       );
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
-        window.sessionStorage.setItem(
-          AUTH_REDIRECT_URL_STORAGE_KEY,
-          redirectUrl
-        );
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
+        window.sessionStorage.setItem(AUTH_REDIRECT_URL_STORAGE_KEY, sanitized);
       }
     } catch {
       // Ignore errors

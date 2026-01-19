@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
-import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AUTH_STORAGE_KEYS, sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
@@ -51,10 +51,11 @@ export function SignUpForm() {
       const redirectUrl = new URL(window.location.href).searchParams.get(
         'redirect_url'
       );
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
         window.sessionStorage.setItem(
           AUTH_STORAGE_KEYS.REDIRECT_URL,
-          redirectUrl
+          sanitized
         );
       }
     } catch {
@@ -70,10 +71,11 @@ export function SignUpForm() {
       if (emailToPass) {
         signInUrl.searchParams.set('email', emailToPass);
       }
-      // Preserve original redirect URL
+      // Preserve original redirect URL (sanitized to strip hash fragments)
       const redirectUrl = searchParams.get('redirect_url');
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
-        signInUrl.searchParams.set('redirect_url', redirectUrl);
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
+        signInUrl.searchParams.set('redirect_url', sanitized);
       }
       return signInUrl.pathname + signInUrl.search;
     },
