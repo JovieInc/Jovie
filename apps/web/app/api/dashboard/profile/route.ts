@@ -204,11 +204,18 @@ async function handleTestProfileUpdate({
   displayNameForUserUpdate?: string;
   avatarUrl?: string;
 }) {
-  const clerk = await clerkClient();
+  let clerk: Awaited<ReturnType<typeof clerkClient>> | null = null;
+  try {
+    clerk = await clerkClient();
+  } catch {
+    // In test mode, Clerk may be intentionally unconfigured/mocked.
+    clerk = null;
+  }
+
   if (usernameUpdate) {
     await syncCanonicalUsernameFromApp(clerkUserId, usernameUpdate);
   }
-  if (displayNameForUserUpdate) {
+  if (displayNameForUserUpdate && clerk?.users?.updateUser) {
     const nameParts = displayNameForUserUpdate.split(' ');
     const firstName = nameParts.shift() ?? displayNameForUserUpdate;
     const lastName = nameParts.join(' ').trim();
@@ -217,7 +224,7 @@ async function handleTestProfileUpdate({
       lastName: lastName || undefined,
     });
   }
-  if (avatarUrl) {
+  if (avatarUrl && clerk?.users?.updateUserProfileImage) {
     const avatarResponse = await fetch(avatarUrl, {
       signal: AbortSignal.timeout(10000),
     });
