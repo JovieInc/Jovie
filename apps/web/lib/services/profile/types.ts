@@ -55,6 +55,8 @@ export type ProfileData = Pick<
   | 'settings'
   | 'theme'
   | 'profileViews'
+  | 'genres'
+  | 'spotifyPopularity'
   | 'createdAt'
   | 'updatedAt'
 >;
