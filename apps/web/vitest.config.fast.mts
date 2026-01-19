@@ -52,8 +52,6 @@ export default defineConfig({
         // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
         minThreads: 1,
         maxThreads,
-        // Ensure worker threads have sufficient heap for large suites.
-        execArgv: ['--max-old-space-size=2048'],
         useAtomics: true,
       },
     },
