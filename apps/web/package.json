@@ -119,7 +119,7 @@
     "@statsig/session-replay": "^3.30.0",
     "@statsig/web-analytics": "^3.31.0",
     "@stripe/stripe-js": "^7.8.0",
-    "@tanstack/react-pacer": "^0.19.1",
+    "@tanstack/react-pacer": "^0.19.3",
     "@tanstack/react-query": "^5.90.16",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.13",
