@@ -23,12 +23,20 @@ async function handleUserUpdated(
   const user = event.data;
 
   try {
+    const errors: Array<{ step: 'username' | 'email'; error: string }> = [];
+
     // Sync username
-    await syncUsernameFromClerkEvent(
-      user.id,
-      user.username ?? null,
-      user.private_metadata
-    );
+    try {
+      await syncUsernameFromClerkEvent(
+        user.id,
+        user.username ?? null,
+        user.private_metadata
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      errors.push({ step: 'username', error: errorMessage });
+    }
 
     // Sync email if primary email changed (only verified emails)
     const primaryEmail = user.email_addresses?.find(
@@ -38,7 +46,29 @@ async function handleUserUpdated(
     )?.email_address;
 
     if (primaryEmail) {
-      await syncEmailFromClerkByClerkId(user.id, primaryEmail);
+      const emailResult = await syncEmailFromClerkByClerkId(
+        user.id,
+        primaryEmail
+      );
+      if (!emailResult.success) {
+        errors.push({
+          step: 'email',
+          error: emailResult.error ?? 'Unknown error',
+        });
+      }
+    }
+
+    if (errors.length > 0) {
+      const details = errors.map(e => `${e.step}=${e.error}`).join('; ');
+      const message = `Partial Clerk sync failure for user.updated (userId=${user.id}, username=${user.username ?? 'null'}): ${details}`;
+
+      logger.error(message);
+
+      return {
+        success: false,
+        error: 'Failed to sync from Clerk',
+        message,
+      };
     }
 
     return {

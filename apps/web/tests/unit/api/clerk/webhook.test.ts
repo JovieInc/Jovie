@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/clerk/webhook/route';
+
+let POST: typeof import('@/app/api/clerk/webhook/route').POST;
+let headersFn: typeof import('next/headers').headers;
+let WebhookCtor: typeof import('svix').Webhook;
 
 // Mock dependencies
 const mockUpdateUser = vi.fn();
@@ -12,6 +15,11 @@ const mockClerkClient = {
 
 const syncMocks = vi.hoisted(() => ({
   syncUsernameFromClerkEvent: vi.fn(),
+}));
+
+const clerkSyncMocks = vi.hoisted(() => ({
+  syncAllClerkMetadata: vi.fn(),
+  syncEmailFromClerkByClerkId: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -26,10 +34,8 @@ vi.mock('svix', () => ({
   Webhook: vi.fn(),
 }));
 
+vi.mock('@/lib/auth/clerk-sync', () => clerkSyncMocks);
 vi.mock('@/lib/username/sync', () => syncMocks);
-
-const { headers } = await import('next/headers');
-const { Webhook } = await import('svix');
 const { syncUsernameFromClerkEvent } = syncMocks;
 
 describe('/api/clerk/webhook', () => {
@@ -37,14 +43,24 @@ describe('/api/clerk/webhook', () => {
     verify: vi.fn(),
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Set required environment variable
     process.env.CLERK_WEBHOOK_SECRET = 'test_webhook_secret';
 
+    clerkSyncMocks.syncAllClerkMetadata.mockResolvedValue(undefined);
+
+    // Reset module cache so env-server picks up env changes
+    vi.resetModules();
+
+    // Import mocks after reset so our references match the route import
+    ({ headers: headersFn } = await import('next/headers'));
+    ({ Webhook: WebhookCtor } = await import('svix'));
+    ({ POST } = await import('@/app/api/clerk/webhook/route'));
+
     // Mock headers
-    vi.mocked(headers).mockResolvedValue(
+    vi.mocked(headersFn).mockResolvedValue(
       new Map([
         ['svix-id', 'svix_123'],
         ['svix-timestamp', '1234567890'],
@@ -53,7 +69,7 @@ describe('/api/clerk/webhook', () => {
     );
 
     // Mock webhook verification
-    vi.mocked(Webhook).mockImplementation(() => mockWebhook as any);
+    vi.mocked(WebhookCtor).mockImplementation(() => mockWebhook as any);
   });
 
   describe('user.created event', () => {
@@ -233,7 +249,7 @@ describe('/api/clerk/webhook', () => {
 
   describe('webhook security', () => {
     it('should reject requests with missing headers', async () => {
-      vi.mocked(headers).mockResolvedValue(new Map() as any);
+      vi.mocked(headersFn).mockResolvedValue(new Map() as any);
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -272,9 +288,21 @@ describe('/api/clerk/webhook', () => {
     });
 
     it('should return error when webhook secret is missing', async () => {
-      // Mock missing webhook secret
-      const originalEnv = process.env.CLERK_WEBHOOK_SECRET;
+      // Re-import route after clearing the env so env-server sees it missing
       delete process.env.CLERK_WEBHOOK_SECRET;
+
+      vi.resetModules();
+      ({ headers: headersFn } = await import('next/headers'));
+      ({ Webhook: WebhookCtor } = await import('svix'));
+      ({ POST } = await import('@/app/api/clerk/webhook/route'));
+
+      vi.mocked(headersFn).mockResolvedValue(
+        new Map([
+          ['svix-id', 'svix_123'],
+          ['svix-timestamp', '1234567890'],
+          ['svix-signature', 'signature_123'],
+        ]) as any
+      );
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -289,11 +317,6 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(500);
       expect(result.error).toBe('Webhook secret not configured');
-
-      // Restore environment
-      if (originalEnv) {
-        process.env.CLERK_WEBHOOK_SECRET = originalEnv;
-      }
     });
   });
 

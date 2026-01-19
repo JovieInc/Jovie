@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { getClerkHandler } from '@/lib/auth/clerk-webhook/registry';
 import type { ClerkWebhookEvent } from '@/lib/auth/clerk-webhook/types';
+import { env } from '@/lib/env-server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * Verify the webhook signature and extract the event.
@@ -31,7 +31,7 @@ async function verifyWebhook(
   }
 
   const body = await request.text();
-  const webhook_secret = process.env.CLERK_WEBHOOK_SECRET;
+  const webhook_secret = env.CLERK_WEBHOOK_SECRET;
 
   if (!webhook_secret) {
     logger.error('Missing CLERK_WEBHOOK_SECRET environment variable');
