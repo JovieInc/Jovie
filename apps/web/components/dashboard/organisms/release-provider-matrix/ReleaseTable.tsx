@@ -8,6 +8,7 @@ import {
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import {
   ProviderCell,
   ReleaseCell,
@@ -21,6 +22,23 @@ import {
 } from '@/components/organisms/table';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+
+/**
+ * Maps ProviderKey (discography) to DspProviderId (for icons).
+ * Returns null for providers without DSP icons (bandcamp, beatport).
+ */
+const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  youtube: 'youtube_music',
+  soundcloud: 'soundcloud',
+  deezer: 'deezer',
+  tidal: 'tidal',
+  amazon_music: 'amazon_music',
+  bandcamp: null,
+  beatport: null,
+};
 
 interface ProviderConfig {
   label: string;
@@ -122,16 +140,22 @@ export function ReleaseTable({
     ];
 
     // Dynamically add provider columns
-    const providerColumns = primaryProviders.map(provider =>
-      columnHelper.display({
+    const providerColumns = primaryProviders.map(provider => {
+      const dspId = PROVIDER_TO_DSP[provider];
+
+      return columnHelper.display({
         id: provider,
         header: () => (
           <div className='flex items-center gap-2'>
-            <span
-              className='h-2 w-2 shrink-0 rounded-full'
-              style={{ backgroundColor: providerConfig[provider].accent }}
-              aria-hidden='true'
-            />
+            {dspId ? (
+              <DspProviderIcon provider={dspId} size='sm' />
+            ) : (
+              <span
+                className='h-4 w-4 shrink-0 rounded-full'
+                style={{ backgroundColor: providerConfig[provider].accent }}
+                aria-hidden='true'
+              />
+            )}
             <span className='line-clamp-1'>
               {providerConfig[provider].label}
             </span>
@@ -148,8 +172,8 @@ export function ReleaseTable({
           />
         ),
         size: 140,
-      })
-    );
+      });
+    });
 
     // Actions column with ellipsis menu
     const actionsColumn = columnHelper.display({
@@ -222,7 +246,6 @@ export function ReleaseTable({
         destructive: true,
         onClick: () => {
           // TODO: Implement delete functionality
-          console.log('Delete release:', release.id);
         },
         disabled: true, // Placeholder for future deletion feature
       },

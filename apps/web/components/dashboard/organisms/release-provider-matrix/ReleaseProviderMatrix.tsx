@@ -230,6 +230,7 @@ export function ReleaseProviderMatrix({
         mode='admin'
         isOpen={isSidebarOpen}
         providerConfig={providerConfig}
+        artistName={artistName}
         onClose={closeEditor}
         onRefresh={handleSync}
         onAddDspLink={handleAddUrl}
