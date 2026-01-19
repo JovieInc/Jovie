@@ -15,6 +15,13 @@
       "when": 1768673713215,
       "tag": "0001_tidy_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1737252000000,
+      "tag": "0002_create_profile_with_user_function",
+      "breakpoints": true
     }
   ]
 }
