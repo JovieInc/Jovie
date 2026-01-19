@@ -43,6 +43,8 @@ export interface EmptyStateProps {
   action?: PrimaryAction;
   secondaryAction?: SecondaryAction;
   variant?: EmptyStateVariant;
+  /** Button size - use 'sm' for less padding */
+  size?: 'default' | 'sm';
   className?: string;
   testId?: string;
 }
@@ -93,6 +95,7 @@ export function EmptyState({
   action,
   secondaryAction,
   variant = 'default',
+  size = 'default',
   className,
   testId,
 }: EmptyStateProps) {
@@ -108,6 +111,7 @@ export function EmptyState({
         <Button
           asChild
           variant={action.variant ?? 'primary'}
+          size={size === 'sm' ? 'sm' : 'default'}
           className='mt-2 w-full max-w-xs sm:w-auto'
         >
           <Link
@@ -125,6 +129,7 @@ export function EmptyState({
     return (
       <Button
         variant={action.variant ?? 'primary'}
+        size={size === 'sm' ? 'sm' : 'default'}
         onClick={action.onClick}
         aria-label={action.ariaLabel ?? action.label}
         className='mt-2 w-full max-w-xs sm:w-auto'

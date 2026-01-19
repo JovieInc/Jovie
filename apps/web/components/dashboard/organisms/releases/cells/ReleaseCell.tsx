@@ -26,7 +26,7 @@ export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
   return (
     <div className='flex items-center gap-3'>
       {/* Artwork thumbnail */}
-      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm'>
         {release.artworkUrl ? (
           <Image
             src={release.artworkUrl}

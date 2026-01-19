@@ -8,6 +8,7 @@
 
 import {
   Button,
+  Kbd,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -44,12 +45,8 @@ export function ThemeToggle({
       shortcutDisplay
         ? () => (
             <TooltipContent side='top' align='center'>
-              <div className='flex items-center gap-2 text-xs font-semibold leading-none'>
-                <span>Toggle theme</span>
-                <kbd className='rounded-md border border-subtle bg-surface-1 px-1.5 text-[10px] tracking-tight'>
-                  {shortcutDisplay}
-                </kbd>
-              </div>
+              <span>Toggle theme</span>
+              <Kbd variant='tooltip'>{shortcutDisplay}</Kbd>
             </TooltipContent>
           )
         : null,

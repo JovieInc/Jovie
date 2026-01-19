@@ -195,3 +195,7 @@ export {
   TooltipProvider,
   TooltipTrigger,
 } from './atoms/tooltip';
+
+// Tooltip Shortcut (helper for label + keyboard shortcut pattern)
+export type { TooltipShortcutProps } from './atoms/tooltip-shortcut';
+export { TooltipShortcut } from './atoms/tooltip-shortcut';

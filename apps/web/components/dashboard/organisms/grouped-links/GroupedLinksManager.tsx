@@ -222,7 +222,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               label: 'Learn about links',
               href: '/support',
             }}
-            className='mt-3 w-full rounded-2xl border border-dashed border-subtle bg-surface-1/40'
+            size='sm'
+            className='mt-3 w-full'
           />
         )}
 
