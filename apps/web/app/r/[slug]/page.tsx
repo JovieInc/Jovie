@@ -1,13 +1,18 @@
 /**
  * Release Smart Link Landing Page (/r/[slug])
  *
- * Public-facing page that shows release artwork, title, and streaming platform buttons.
- * When a `?dsp=` query param is present, redirects directly to that provider.
+ * LEGACY ROUTE: This route handles the old URL format ({releaseSlug}--{profileId}).
+ * New URLs use the format /{handle}/{slug} instead.
+ *
+ * This route will:
+ * 1. Check if the slug is in legacy format (contains '--')
+ * 2. If legacy, redirect to the new canonical URL
+ * 3. Otherwise, render the landing page (for backwards compatibility)
  */
 
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { UNKNOWN_ARTIST } from '@/constants/app';
 import { db } from '@/lib/db';
@@ -151,7 +156,7 @@ export default async function ReleaseSmartLinkPage({
     notFound();
   }
 
-  // Parse the slug
+  // Parse the slug (legacy format: {releaseSlug}--{profileId})
   const parsed = parseSmartLinkSlug(slug);
   if (!parsed) {
     notFound();
@@ -164,6 +169,22 @@ export default async function ReleaseSmartLinkPage({
   if (!data) {
     notFound();
   }
+
+  // REDIRECT TO NEW URL FORMAT
+  // Look up the creator's handle and redirect to the new canonical URL
+  const [creatorForRedirect] = await db
+    .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (creatorForRedirect) {
+    // Build new URL with query params preserved
+    const newPath = `/${creatorForRedirect.usernameNormalized}/${data.release.slug}`;
+    const newUrl = dsp ? `${newPath}?dsp=${encodeURIComponent(dsp)}` : newPath;
+    permanentRedirect(newUrl);
+  }
+  // If creator not found, fall through to render the page (shouldn't happen)
 
   const { release, providerLinks: links, creator } = data;
 

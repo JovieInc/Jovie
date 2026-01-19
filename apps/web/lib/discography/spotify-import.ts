@@ -2,7 +2,6 @@ import * as Sentry from '@sentry/nextjs';
 import {
   buildSpotifyAlbumUrl,
   buildSpotifyTrackUrl,
-  generateReleaseSlug,
   getBestSpotifyImage,
   getSpotifyAlbums,
   getSpotifyArtistAlbums,
@@ -25,6 +24,7 @@ import {
   upsertRelease,
   upsertTrack,
 } from './queries';
+import { generateUniqueSlug } from './slug';
 
 // ============================================================================
 // Constants
@@ -245,8 +245,12 @@ async function importSingleRelease(
   // Sanitize album name before use
   const sanitizedTitle = sanitizeName(album.name);
 
-  // Generate slug from sanitized title and Spotify ID
-  const slug = generateReleaseSlug(sanitizedTitle, album.id);
+  // Generate clean slug from title (no more Spotify ID suffix!)
+  const slug = await generateUniqueSlug(
+    creatorProfileId,
+    sanitizedTitle,
+    'release'
+  );
 
   // Determine release type
   // Spotify doesn't distinguish EPs, so we infer from track count
@@ -330,7 +334,12 @@ async function importSingleRelease(
 
       // Sanitize track title
       const sanitizedTrackTitle = sanitizeName(track.name);
-      const trackSlug = generateReleaseSlug(sanitizedTrackTitle, track.id);
+      // Generate clean slug for track (no more Spotify ID suffix!)
+      const trackSlug = await generateUniqueSlug(
+        creatorProfileId,
+        sanitizedTrackTitle,
+        'track'
+      );
 
       // Sanitize ISRC (alphanumeric only, max 12 chars)
       const sanitizedIsrc = track.external_ids?.isrc

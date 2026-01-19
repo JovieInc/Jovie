@@ -242,3 +242,9 @@ export const deliveryStatusEnum = pgEnum('delivery_status', [
   'failed',
   'suppressed',
 ]);
+
+// Content Slug Enums
+export const contentSlugTypeEnum = pgEnum('content_slug_type', [
+  'release',
+  'track',
+]);
