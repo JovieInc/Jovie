@@ -45,10 +45,10 @@ export default defineConfig({
     ],
 
     // Performance/stability optimizations
-    // Use threads, but recycle workers to avoid heap OOMs.
-    pool: 'threads',
+    // Use vmThreads and recycle workers to avoid heap OOMs.
+    pool: 'vmThreads',
     poolOptions: {
-      threads: {
+      vmThreads: {
         minThreads: 1,
         maxThreads,
         // Recycle workers once they cross this threshold to avoid heap OOMs in long runs.
