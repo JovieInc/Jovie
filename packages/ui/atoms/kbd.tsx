@@ -19,8 +19,8 @@ const Kbd = React.forwardRef<HTMLSpanElement, KbdProps>(
       className={cn(
         'inline-flex items-center justify-center rounded-[5px] px-1.5 py-0.5 font-sans text-[11px] font-medium',
         variant === 'tooltip'
-          ? // Tooltip variant: solid badge for contrast on dark tooltip (Linear-style)
-            'border border-white/20 bg-white/15 text-white'
+          ? // Tooltip variant: theme-aware for proper contrast
+            'border border-black/15 bg-black/10 text-neutral-700 dark:border-white/20 dark:bg-white/15 dark:text-white'
           : // Default variant: for use outside tooltips
             'border border-[var(--accents-3)] bg-surface-1 text-secondary-token shadow-[0_1px_0_rgba(255,255,255,0.08)] dark:bg-[var(--accents-1)] dark:border-[var(--accents-4)]',
         className

@@ -11,12 +11,10 @@ import Image from 'next/image';
 
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
-import { formatReleaseDateShort } from './utils';
-
 interface ReleaseArtworkProps {
   artworkUrl: string | null | undefined;
   title: string;
-  releaseDate: string | undefined;
+  artistName?: string | null;
   canUploadArtwork: boolean;
   onArtworkUpload?: (file: File) => Promise<string>;
 }
@@ -24,7 +22,7 @@ interface ReleaseArtworkProps {
 export function ReleaseArtwork({
   artworkUrl,
   title,
-  releaseDate,
+  artistName,
   canUploadArtwork,
   onArtworkUpload,
 }: ReleaseArtworkProps) {
@@ -65,9 +63,11 @@ export function ReleaseArtwork({
       )}
       <div className='min-w-0 flex-1'>
         <div className='text-sm font-medium truncate'>{title}</div>
-        <div className='text-xs text-sidebar-muted truncate'>
-          {formatReleaseDateShort(releaseDate)}
-        </div>
+        {artistName && (
+          <div className='text-xs text-sidebar-muted truncate'>
+            {artistName}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -25,6 +25,8 @@ export interface ReleaseSidebarProps {
   mode: ReleaseSidebarMode;
   isOpen: boolean;
   providerConfig: Record<ProviderKey, { label: string; accent: string }>;
+  /** Artist name to display in the sidebar header */
+  artistName?: string | null;
   onClose?: () => void;
   onRefresh?: () => void;
   onReleaseChange?: (release: Release) => void;

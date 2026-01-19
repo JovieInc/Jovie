@@ -1,5 +1,6 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
+import { cache } from 'react';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { redis } from '@/lib/redis';
@@ -8,6 +9,10 @@ import { redis } from '@/lib/redis';
  * Redis-based distributed cache for admin role checks
  * Primary: Redis (1 minute TTL, distributed across instances)
  * Fallback: In-memory Map (when Redis unavailable)
+ *
+ * Additionally uses React's cache() for request-level deduplication to ensure
+ * consistent admin status within a single request (prevents race conditions
+ * where sidebar and layout might see different values).
  */
 const REDIS_CACHE_TTL_SECONDS = 60; // 1 minute (reduced from 5 for faster revocation)
 const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute fallback
@@ -20,13 +25,39 @@ const fallbackCache = new Map<
 >();
 
 /**
+ * Query the database for admin role status.
+ * Extracted for reuse in both Redis and memory cache paths.
+ * @internal
+ */
+async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
+  try {
+    const [user] = await db
+      .select({ isAdmin: users.isAdmin })
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1);
+
+    return user?.isAdmin ?? false;
+  } catch (error) {
+    console.error('[admin/roles] Failed to check admin status:', error);
+    // Fail closed - deny access on error
+    return false;
+  }
+}
+
+/**
  * Check if a user has admin role based on database verification.
  * Results are cached for 1 minute (distributed via Redis, or in-memory fallback).
+ *
+ * Uses React's cache() for request-level deduplication to ensure all components
+ * in the same request see the same admin status.
  *
  * @param userId - Clerk user ID
  * @returns Promise<boolean> - True if user has admin role
  */
-export async function isAdmin(userId: string): Promise<boolean> {
+export const isAdmin = cache(async function isAdmin(
+  userId: string
+): Promise<boolean> {
   if (!userId) return false;
 
   const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
@@ -76,28 +107,7 @@ export async function isAdmin(userId: string): Promise<boolean> {
   });
 
   return isUserAdmin;
-}
-
-/**
- * Query the database for admin role status.
- * Extracted for reuse in both Redis and memory cache paths.
- * @internal
- */
-async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
-  try {
-    const [user] = await db
-      .select({ isAdmin: users.isAdmin })
-      .from(users)
-      .where(eq(users.clerkId, userId))
-      .limit(1);
-
-    return user?.isAdmin ?? false;
-  } catch (error) {
-    console.error('[admin/roles] Failed to check admin status:', error);
-    // Fail closed - deny access on error
-    return false;
-  }
-}
+});
 
 /**
  * Invalidate the admin role cache for a specific user.
