@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface SmartLinkCellProps {
   release: ReleaseViewModel;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
+  /** @deprecated Not used - clipboard write happens in CopyLinkInput */
+  onCopy?: (path: string, label: string, testId: string) => Promise<string>;
 }
 
 /**
@@ -17,18 +19,20 @@ interface SmartLinkCellProps {
  * - Shows full smart link URL in input-style container
  * - Copy button with visual feedback
  * - Click to select URL text
+ *
+ * Note: Clipboard write is handled by CopyLinkInput component.
+ * This component only shows the toast notification.
  */
-export function SmartLinkCell({ release, onCopy }: SmartLinkCellProps) {
+export function SmartLinkCell({ release }: SmartLinkCellProps) {
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
   const smartLinkTestId = `smart-link-copy-${release.id}`;
 
-  const handleCopy = useCallback(() => {
-    void onCopy(
-      release.smartLinkPath,
-      `${release.title} smart link`,
-      smartLinkTestId
-    );
-  }, [onCopy, release.smartLinkPath, release.title, smartLinkTestId]);
+  // Show toast on copy - clipboard write is handled by CopyLinkInput
+  const handleCopySuccess = useCallback(() => {
+    toast.success(`${release.title} smart link copied`, {
+      id: smartLinkTestId,
+    });
+  }, [release.title, smartLinkTestId]);
 
   return (
     /* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noNoninteractiveElementInteractions lint/a11y/noStaticElementInteractions: stopPropagation prevents row click from firing */
@@ -36,7 +40,7 @@ export function SmartLinkCell({ release, onCopy }: SmartLinkCellProps) {
       <CopyLinkInput
         url={smartLinkUrl}
         size='sm'
-        onCopy={handleCopy}
+        onCopy={handleCopySuccess}
         testId={smartLinkTestId}
       />
     </div>

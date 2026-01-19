@@ -10,7 +10,7 @@
  * - Visual feedback on copy (green highlight)
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +21,7 @@ export interface CopyLinkInputProps {
   size?: 'sm' | 'md';
   /** Additional CSS classes */
   className?: string;
-  /** Callback when copy succeeds */
+  /** Callback when copy succeeds (does not need to write to clipboard) */
   onCopy?: () => void;
   /** Test ID for the component */
   testId?: string;
@@ -36,13 +36,30 @@ export function CopyLinkInput({
 }: CopyLinkInputProps) {
   const [isCopied, setIsCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(url);
       setIsCopied(true);
       onCopy?.();
-      setTimeout(() => setIsCopied(false), 2000);
+
+      // Clear any existing timeout before setting a new one
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+      copyResetTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
     }
