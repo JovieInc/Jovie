@@ -7,15 +7,11 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import {
-  createBillingPortalSession,
-  createCheckoutSession,
-  stripe,
-} from '@/lib/stripe/client';
-import {
-  getActivePriceIds,
-  getPriceMappingDetails,
-  PRICE_MAPPINGS,
-} from '@/lib/stripe/config';
+  checkExistingPlanSubscription,
+  getCheckoutErrorResponse,
+} from '@/lib/stripe/checkout-helpers';
+import { createCheckoutSession } from '@/lib/stripe/client';
+import { getActivePriceIds, getPriceMappingDetails } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -74,48 +70,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (priceDetails?.plan) {
-      const planPriceIds = Object.values(PRICE_MAPPINGS)
-        .filter(mapping => mapping.plan === priceDetails.plan)
-        .map(mapping => mapping.priceId);
-
-      const activeSubscriptionStatuses = new Set([
-        'active',
-        'trialing',
-        'past_due',
-        'unpaid',
-      ]);
-
-      const existingSubscriptions = await stripe.subscriptions.list({
-        customer: customerResult.customerId,
-        status: 'all',
-        limit: 25,
-      });
-
-      const alreadySubscribedToPlan = existingSubscriptions.data.some(
-        subscription =>
-          activeSubscriptionStatuses.has(subscription.status) &&
-          subscription.items.data.some(item => {
-            const itemPriceId = item.price?.id;
-            return (
-              typeof itemPriceId === 'string' &&
-              planPriceIds.includes(itemPriceId)
-            );
-          })
+      const subscriptionCheck = await checkExistingPlanSubscription(
+        customerResult.customerId,
+        priceDetails.plan
       );
 
-      if (alreadySubscribedToPlan) {
-        const baseUrl =
-          publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const returnUrl = `${baseUrl}/app/dashboard`;
-        const portalSession = await createBillingPortalSession({
-          customerId: customerResult.customerId,
-          returnUrl,
-        });
-
+      if (subscriptionCheck.alreadySubscribed) {
         return NextResponse.json(
           {
-            sessionId: portalSession.id,
-            url: portalSession.url,
+            sessionId: subscriptionCheck.portalSession.id,
+            url: subscriptionCheck.portalSession.url,
             alreadySubscribed: true,
           },
           { headers: NO_STORE_HEADERS }
@@ -162,16 +126,11 @@ export async function POST(request: NextRequest) {
 
     // Return appropriate error based on the error type
     if (error instanceof Error) {
-      if (error.message.includes('customer')) {
+      const knownError = getCheckoutErrorResponse(error);
+      if (knownError) {
         return NextResponse.json(
-          { error: 'Customer setup failed' },
-          { status: 500, headers: NO_STORE_HEADERS }
-        );
-      }
-      if (error.message.includes('price')) {
-        return NextResponse.json(
-          { error: 'Invalid pricing configuration' },
-          { status: 400, headers: NO_STORE_HEADERS }
+          { error: knownError.message },
+          { status: knownError.status, headers: NO_STORE_HEADERS }
         );
       }
     }
