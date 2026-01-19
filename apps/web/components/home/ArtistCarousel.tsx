@@ -24,9 +24,9 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
   }
 
   return (
-    <section className='relative w-full bg-linear-to-r from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950 dark:via-purple-950 dark:to-pink-950 py-16'>
+    <section className='relative w-full max-w-full overflow-hidden bg-linear-to-r from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950 dark:via-purple-950 dark:to-pink-950 py-16'>
       {/* Full-width horizontal scroll container */}
-      <div className='relative overflow-x-auto overflow-y-hidden'>
+      <div className='relative w-full overflow-x-auto overflow-y-hidden'>
         {/* Artist images row */}
         <div className='flex space-x-6 px-4 sm:px-6 lg:px-8 py-8 min-w-max'>
           {artists.map(artist => (

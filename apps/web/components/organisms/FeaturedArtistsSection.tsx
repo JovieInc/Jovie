@@ -29,7 +29,7 @@ export function FeaturedCreatorsSection({
   return (
     <section
       aria-label='Featured creators'
-      className={`relative py-6 md:py-10 ${className}`}
+      className={`relative py-6 md:py-10 max-w-full overflow-hidden ${className}`}
       data-testid='featured-creators'
     >
       <div className='container mx-auto px-4'>
