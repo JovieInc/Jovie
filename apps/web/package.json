@@ -115,7 +115,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10",
-    "@statsig/react-bindings": "^3.30.0",
+    "@statsig/react-bindings": "^3.31.2",
     "@statsig/session-replay": "^3.30.0",
     "@statsig/web-analytics": "^3.31.0",
     "@stripe/stripe-js": "^7.8.0",
