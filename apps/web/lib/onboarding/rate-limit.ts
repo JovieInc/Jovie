@@ -8,6 +8,7 @@
 import {
   createOnboardingError,
   OnboardingErrorCode,
+  onboardingErrorToError,
 } from '@/lib/errors/onboarding';
 import {
   checkOnboardingRateLimit,
@@ -49,7 +50,7 @@ export async function enforceOnboardingRateLimit({
         ? `Too many onboarding attempts from this network. Please try again in ${timeRemaining}.`
         : `Too many onboarding attempts. Please try again in ${timeRemaining}.`
     );
-    throw error;
+    throw onboardingErrorToError(error);
   }
 }
 
@@ -73,7 +74,7 @@ export async function enforceHandleCheckRateLimit(ip: string): Promise<void> {
       OnboardingErrorCode.RATE_LIMITED,
       'Too many handle checks. Please wait a moment before trying again.'
     );
-    throw error;
+    throw onboardingErrorToError(error);
   }
 }
 
@@ -91,6 +92,6 @@ export async function enforceGeneralRateLimit(
       OnboardingErrorCode.RATE_LIMITED,
       'Too many requests. Please wait a moment before trying again.'
     );
-    throw error;
+    throw onboardingErrorToError(error);
   }
 }
