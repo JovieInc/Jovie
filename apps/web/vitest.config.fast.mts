@@ -51,6 +51,8 @@ export default defineConfig({
       threads: {
         minThreads: 1,
         maxThreads,
+        // Force worker recycling between tasks to avoid long-run memory growth.
+        isolateWorkers: true,
         // Tinypool expects bytes (heapUsed). Recycling prevents long-run OOMs.
         maxMemoryLimitBeforeRecycle: 1024 * 1024 * 1024,
         useAtomics: true,
