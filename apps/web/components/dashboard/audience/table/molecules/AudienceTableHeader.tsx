@@ -92,7 +92,7 @@ export function AudienceTableHeader({
   return (
     <thead
       className={cn(
-        'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
+        'sticky top-0 z-20 bg-surface-1',
         headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
       )}
     >

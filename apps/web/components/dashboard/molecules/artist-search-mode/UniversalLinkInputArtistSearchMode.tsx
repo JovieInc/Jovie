@@ -34,7 +34,6 @@ export function UniversalLinkInputArtistSearchMode({
     error,
     resultsListRef,
     searchPlatform,
-    brandHex,
     iconColor,
     iconBg,
     handleSearchInputChange,
@@ -56,8 +55,9 @@ export function UniversalLinkInputArtistSearchMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 rounded-full border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
-          'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          'focus-within:ring-2 focus-within:ring-accent',
+          showResults ? 'rounded-t-3xl border-b-0' : 'rounded-full',
           disabled && 'opacity-50'
         )}
       >
@@ -120,10 +120,7 @@ export function UniversalLinkInputArtistSearchMode({
       </div>
 
       {showResults && (
-        <div
-          className='absolute z-50 w-full mt-1 rounded-lg border border-subtle bg-surface-1 shadow-lg overflow-hidden'
-          style={{ borderColor: `${brandHex}30` }}
-        >
+        <div className='absolute z-50 w-full rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-lg overflow-hidden'>
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
               {ARTIST_SEARCH_LOADING_KEYS.map(key => (

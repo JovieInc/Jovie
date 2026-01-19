@@ -31,6 +31,20 @@ import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
+function getSrDescription(
+  isEmpty: boolean,
+  mode: 'members' | 'subscribers'
+): string {
+  if (isEmpty) {
+    return mode === 'members'
+      ? 'Track visitors and grow your fan base'
+      : 'Build a subscriber base for notifications';
+  }
+  return mode === 'members'
+    ? 'Every visitor, anonymous or identified, lives in this table.'
+    : 'Notification signups from your notification modal.';
+}
+
 export function DashboardAudienceTableUnified({
   mode,
   rows,
@@ -144,9 +158,8 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.display({
         id: 'select',
         header: () => null,
-        cell: ({ row, table }) => {
-          const rowIndex = row.index;
-          const rowNumber = (page - 1) * pageSize + rowIndex + 1;
+        cell: ({ row }) => {
+          const rowNumber = (page - 1) * pageSize + row.index + 1;
           return (
             <AudienceRowSelectionCell
               rowNumber={rowNumber}
@@ -278,9 +291,8 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.display({
         id: 'select',
         header: () => null,
-        cell: ({ row, table }) => {
-          const rowIndex = row.index;
-          const rowNumber = (page - 1) * pageSize + rowIndex + 1;
+        cell: ({ row }) => {
+          const rowNumber = (page - 1) * pageSize + row.index + 1;
           return (
             <AudienceRowSelectionCell
               rowNumber={rowNumber}
@@ -404,26 +416,20 @@ export function DashboardAudienceTableUnified({
 
   return (
     <div
-      className='flex h-full min-h-0 flex-col'
+      className='flex h-full min-h-0 flex-row'
       data-testid='dashboard-audience-table'
     >
-      <h1 className='sr-only'>
-        {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-      </h1>
-      <p className='sr-only'>
-        {rows.length === 0
-          ? mode === 'members'
-            ? 'Track visitors and grow your fan base'
-            : 'Build a subscriber base for notifications'
-          : mode === 'members'
-            ? 'Every visitor, anonymous or identified, lives in this table.'
-            : 'Notification signups from your notification modal.'}
-      </p>
+      {/* Main table content */}
+      <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
+        <h1 className='sr-only'>
+          {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+        </h1>
+        <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
 
-      <div className='flex-1 min-h-0 overflow-hidden'>
-        <div className='flex h-full min-h-0 flex-col bg-surface-1'>
-          {rows.length === 0 ? (
-            <div className='flex-1 min-h-0 overflow-auto pb-14'>
+        <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+          {/* Scrollable content area */}
+          <div className='flex-1 min-h-0 overflow-auto'>
+            {rows.length === 0 ? (
               <EmptyState
                 icon={emptyStateIcon}
                 heading={emptyStateHeading}
@@ -431,9 +437,7 @@ export function DashboardAudienceTableUnified({
                 action={emptyStatePrimaryAction}
                 secondaryAction={emptyStateSecondaryAction}
               />
-            </div>
-          ) : (
-            <div className='flex-1 min-h-0 overflow-hidden'>
+            ) : (
               <UnifiedTable
                 data={rows}
                 columns={columns}
@@ -456,11 +460,11 @@ export function DashboardAudienceTableUnified({
                 onRowClick={row => setSelectedMember(row)}
                 getContextMenuItems={getContextMenuItems}
               />
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Always render pagination, even when empty */}
-          <div className='sticky bottom-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/90 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+          {/* Footer - direct flex child anchored to bottom */}
+          <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
             <span className='tracking-wide'>{paginationLabel()}</span>
             <div className='flex items-center gap-3'>
               <AdminPageSizeSelect
@@ -490,18 +494,20 @@ export function DashboardAudienceTableUnified({
             </div>
           </div>
         </div>
+
+        <div className='sr-only' aria-live='polite' aria-atomic='true'>
+          {paginationLabel()}
+          {selectedCount > 0 &&
+            `${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+        </div>
       </div>
 
+      {/* Right sidebar - sibling in flex-row */}
       <AudienceMemberSidebar
         member={selectedMember}
         isOpen={Boolean(selectedMember)}
         onClose={() => setSelectedMember(null)}
       />
-      <div className='sr-only' aria-live='polite' aria-atomic='true'>
-        {paginationLabel()}
-        {selectedCount > 0 &&
-          `${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
-      </div>
     </div>
   );
 }

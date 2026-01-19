@@ -65,7 +65,7 @@ export function ReleaseProviderMatrix({
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
       {/* Main content area */}
-      <div className='flex h-full min-h-0 flex-1 flex-col'>
+      <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
         <div className='shrink-0 border-b border-subtle'>
           <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6'>
@@ -93,135 +93,134 @@ export function ReleaseProviderMatrix({
                 </span>
               )}
               {isConnected && (
-                <Button
-                  variant='outline'
-                  size='sm'
+                <button
+                  type='button'
                   disabled={isSyncing}
                   onClick={handleSync}
                   data-testid='sync-spotify-button'
-                  className='rounded-lg border-subtle hover:bg-base'
+                  className='inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-1.5 text-sm text-secondary-token transition-colors hover:bg-base hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
                   aria-label='Sync releases from Spotify'
                   aria-busy={isSyncing}
                 >
                   <Icon
                     name={isSyncing ? 'Loader2' : 'RefreshCw'}
                     className={cn(
-                      'h-3.5 w-3.5',
+                      'h-4 w-4',
                       isSyncing && 'animate-spin motion-reduce:animate-none'
                     )}
                     aria-hidden='true'
                   />
                   <span>{isSyncing ? 'Syncing...' : 'Sync from Spotify'}</span>
-                </Button>
+                </button>
               )}
             </div>
           </div>
         </div>
 
-        <div className='flex-1 min-h-0 overflow-hidden'>
-          <div className='flex h-full min-h-0 flex-col bg-base'>
-            <div className='flex-1 min-h-0 overflow-auto'>
-              {showEmptyState && (
-                <ReleasesEmptyState
-                  onConnected={handleArtistConnected}
-                  onImportStart={handleImportStart}
-                />
-              )}
+        <div className='flex-1 min-h-0 flex flex-col bg-base'>
+          {/* Scrollable content area */}
+          <div className='flex-1 min-h-0 overflow-auto'>
+            {showEmptyState && (
+              <ReleasesEmptyState
+                onConnected={handleArtistConnected}
+                onImportStart={handleImportStart}
+              />
+            )}
 
-              {showImportingState && (
-                <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
-                  <div className='flex h-16 w-16 items-center justify-center rounded-full bg-[#1DB954]/10'>
-                    <Icon
-                      name='Loader2'
-                      className='h-8 w-8 text-[#1DB954] animate-spin'
-                      aria-hidden='true'
-                    />
-                  </div>
-                  <h3 className='mt-4 text-lg font-semibold text-primary-token'>
-                    We&apos;re importing your music
-                  </h3>
-                  <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                    {artistName
-                      ? `Fetching releases from ${artistName}'s Spotify profile...`
-                      : 'Fetching releases from Spotify...'}
-                  </p>
+            {showImportingState && (
+              <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-full bg-[#1DB954]/10'>
+                  <Icon
+                    name='Loader2'
+                    className='h-8 w-8 text-[#1DB954] animate-spin'
+                    aria-hidden='true'
+                  />
                 </div>
-              )}
+                <h3 className='mt-4 text-lg font-semibold text-primary-token'>
+                  We&apos;re importing your music
+                </h3>
+                <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+                  {artistName
+                    ? `Fetching releases from ${artistName}'s Spotify profile...`
+                    : 'Fetching releases from Spotify...'}
+                </p>
+              </div>
+            )}
 
-              {showReleasesTable && (
-                <ReleaseTable
-                  releases={rows}
-                  primaryProviders={primaryProviders}
-                  providerConfig={providerConfig}
-                  artistName={artistName}
-                  onCopy={handleCopy}
-                  onEdit={openEditor}
-                  onAddUrl={handleAddUrl}
-                  onSync={handleSync}
-                  isAddingUrl={isSaving}
-                  isSyncing={isSyncing}
-                />
-              )}
+            {showReleasesTable && (
+              <ReleaseTable
+                releases={rows}
+                primaryProviders={primaryProviders}
+                providerConfig={providerConfig}
+                artistName={artistName}
+                onCopy={handleCopy}
+                onEdit={openEditor}
+                onAddUrl={handleAddUrl}
+                onSync={handleSync}
+                isAddingUrl={isSaving}
+                isSyncing={isSyncing}
+              />
+            )}
 
-              {/* Show "No releases" state when connected but no releases and not importing */}
-              {isConnected && rows.length === 0 && !isImporting && (
-                <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
-                  <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
-                    <Icon
-                      name='Disc3'
-                      className='h-8 w-8 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  </div>
-                  <h3 className='mt-4 text-lg font-semibold text-primary-token'>
-                    No releases yet
-                  </h3>
-                  <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                    Sync your releases from Spotify to start generating smart
-                    links for your releases.
-                  </p>
-                  <Button
-                    variant='primary'
-                    size='sm'
-                    disabled={isSyncing}
-                    onClick={handleSync}
-                    className='mt-4 inline-flex items-center gap-2'
-                    data-testid='sync-spotify-empty-state'
-                  >
-                    <Icon
-                      name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                      className={cn(
-                        'h-4 w-4',
-                        isSyncing && 'animate-spin motion-reduce:animate-none'
-                      )}
-                      aria-hidden='true'
-                    />
-                    {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                  </Button>
+            {/* Show "No releases" state when connected but no releases and not importing */}
+            {isConnected && rows.length === 0 && !isImporting && (
+              <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+                  <Icon
+                    name='Disc3'
+                    className='h-8 w-8 text-tertiary-token'
+                    aria-hidden='true'
+                  />
                 </div>
-              )}
-            </div>
-
-            {rows.length > 0 && (
-              <div className='sticky bottom-0 z-20 flex items-center justify-between border-t border-subtle bg-base/75 px-4 py-3 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
-                <span>
-                  {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
-                  {totalOverrides > 0 && (
-                    <span className='ml-1.5 text-tertiary-token'>
-                      ({totalOverrides} manual{' '}
-                      {totalOverrides === 1 ? 'override' : 'overrides'})
-                    </span>
-                  )}
-                </span>
-                <div className='flex items-center gap-2'>
-                  <span className='text-tertiary-token'>
-                    Showing {primaryProviders.length} of{' '}
-                    {Object.keys(providerConfig).length} providers
-                  </span>
-                </div>
+                <h3 className='mt-4 text-lg font-semibold text-primary-token'>
+                  No releases yet
+                </h3>
+                <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+                  Sync your releases from Spotify to start generating smart
+                  links for your releases.
+                </p>
+                <Button
+                  variant='primary'
+                  size='sm'
+                  disabled={isSyncing}
+                  onClick={handleSync}
+                  className='mt-4 inline-flex items-center gap-2'
+                  data-testid='sync-spotify-empty-state'
+                >
+                  <Icon
+                    name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                    className={cn(
+                      'h-4 w-4',
+                      isSyncing && 'animate-spin motion-reduce:animate-none'
+                    )}
+                    aria-hidden='true'
+                  />
+                  {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+                </Button>
               </div>
             )}
           </div>
+
+          {/* Footer - direct flex child anchored to bottom */}
+          {rows.length > 0 && (
+            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-3 text-xs text-secondary-token sm:px-6'>
+              <span>
+                {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
+                {totalOverrides > 0 && (
+                  <span className='ml-1.5 text-tertiary-token'>
+                    ({totalOverrides} manual{' '}
+                    {totalOverrides === 1 ? 'override' : 'overrides'})
+                  </span>
+                )}
+              </span>
+              <div className='flex items-center gap-2'>
+                <span className='text-tertiary-token'>
+                  Showing {primaryProviders.length} of{' '}
+                  {Object.keys(providerConfig).length} providers
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -6,11 +6,16 @@ import { MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderAction {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Icon to show when isActive is true (e.g., Check icon after copy) */
+  activeIcon?: LucideIcon;
+  /** When true, shows activeIcon instead of icon */
+  isActive?: boolean;
   onClick?: () => void;
   asChild?: boolean;
   href?: string;
@@ -44,7 +49,10 @@ export function DrawerHeaderActions({
     <div className='flex items-center gap-1'>
       {/* Primary actions - always visible */}
       {displayActions.map(action => {
-        const Icon = action.icon;
+        const Icon =
+          action.isActive && action.activeIcon
+            ? action.activeIcon
+            : action.icon;
 
         if (action.href) {
           return (
@@ -57,11 +65,14 @@ export function DrawerHeaderActions({
               aria-label={action.label}
             >
               <Link href={action.href}>
-                <Icon className='h-4 w-4' />
+                <Icon className='h-3.5 w-3.5' />
               </Link>
             </Button>
           );
         }
+
+        const DefaultIcon = action.icon;
+        const ActiveIcon = action.activeIcon;
 
         return (
           <Button
@@ -69,10 +80,34 @@ export function DrawerHeaderActions({
             size='icon'
             variant='ghost'
             onClick={action.onClick}
-            className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+            className={cn(
+              'h-8 w-8 rounded-md transition-colors hover:bg-surface-2',
+              action.isActive
+                ? 'text-green-600 hover:text-green-600 dark:text-green-400 dark:hover:text-green-400'
+                : 'text-tertiary-token hover:text-primary-token'
+            )}
             aria-label={action.label}
           >
-            <Icon className='h-4 w-4' />
+            <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+              <DefaultIcon
+                className={cn(
+                  'absolute h-3.5 w-3.5 transition-all duration-150',
+                  action.isActive
+                    ? 'scale-50 opacity-0'
+                    : 'scale-100 opacity-100'
+                )}
+              />
+              {ActiveIcon && (
+                <ActiveIcon
+                  className={cn(
+                    'absolute h-3.5 w-3.5 transition-all duration-150',
+                    action.isActive
+                      ? 'scale-100 opacity-100'
+                      : 'scale-50 opacity-0'
+                  )}
+                />
+              )}
+            </span>
           </Button>
         );
       })}
@@ -86,7 +121,7 @@ export function DrawerHeaderActions({
             className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
             aria-label='More actions'
           >
-            <MoreVertical className='h-4 w-4' />
+            <MoreVertical className='h-3.5 w-3.5' />
           </Button>
         </TableActionMenu>
       )}

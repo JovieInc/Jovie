@@ -68,7 +68,7 @@ function AuthShellInner({
 
       <SidebarInset>
         <div className='mt-2 mb-2 mr-2 ml-0 h-full'>
-          <main className='flex-1 min-h-0 overflow-hidden border border-subtle rounded-md bg-base h-full'>
+          <main className='flex-1 min-h-0 min-w-0 overflow-hidden border border-subtle rounded-md bg-base h-full'>
             <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>
               <DashboardHeader
                 breadcrumbs={breadcrumbs}
@@ -83,7 +83,9 @@ function AuthShellInner({
                 }
               />
               {isTableRoute ? (
-                <div className='flex-1 min-h-0 overflow-hidden'>{children}</div>
+                <div className='flex-1 min-h-0 min-w-0 overflow-hidden'>
+                  {children}
+                </div>
               ) : (
                 <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
                   {children}

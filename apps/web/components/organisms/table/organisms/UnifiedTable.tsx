@@ -12,7 +12,13 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
 import {
@@ -136,6 +142,22 @@ export interface UnifiedTableProps<TData> {
     getGroupKey: (row: TData) => string;
     getGroupLabel: (key: string) => string;
   };
+
+  /**
+   * Enable keyboard navigation (arrow keys to move, Enter to select)
+   * @default true when onRowClick is provided
+   */
+  enableKeyboardNavigation?: boolean;
+
+  /**
+   * Currently focused row index (controlled)
+   */
+  focusedRowIndex?: number;
+
+  /**
+   * Callback when focused row changes via keyboard
+   */
+  onFocusedRowChange?: (index: number) => void;
 }
 
 /**
@@ -195,8 +217,32 @@ export function UnifiedTable<TData>({
   minWidth = '960px',
   skeletonRows = 20,
   groupingConfig,
+  enableKeyboardNavigation,
+  focusedRowIndex: controlledFocusedIndex,
+  onFocusedRowChange,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+
+  // Internal focused row state (uncontrolled mode)
+  const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(-1);
+
+  // Use controlled or uncontrolled focus
+  const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
+  const setFocusedIndex = useCallback(
+    (index: number) => {
+      if (onFocusedRowChange) {
+        onFocusedRowChange(index);
+      } else {
+        setInternalFocusedIndex(index);
+      }
+    },
+    [onFocusedRowChange]
+  );
+
+  // Auto-enable keyboard nav when onRowClick is provided
+  const shouldEnableKeyboardNav =
+    enableKeyboardNavigation ?? Boolean(onRowClick);
 
   // Auto-enable virtualization for 20+ rows
   const shouldVirtualize =
@@ -256,6 +302,46 @@ export function UnifiedTable<TData>({
     shouldVirtualize && virtualRows.length > 0
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
+      if (!shouldEnableKeyboardNav) return;
+
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault();
+          if (rowIndex < rows.length - 1) {
+            const nextIndex = rowIndex + 1;
+            setFocusedIndex(nextIndex);
+            rowRefs.current.get(nextIndex)?.focus();
+          }
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          if (rowIndex > 0) {
+            const prevIndex = rowIndex - 1;
+            setFocusedIndex(prevIndex);
+            rowRefs.current.get(prevIndex)?.focus();
+          }
+          break;
+        case 'Enter':
+        case ' ':
+          event.preventDefault();
+          onRowClick?.(rowData);
+          break;
+      }
+    },
+    [shouldEnableKeyboardNav, rows.length, setFocusedIndex, onRowClick]
+  );
+
+  // Scroll focused row into view when it changes
+  useEffect(() => {
+    if (focusedIndex >= 0 && shouldEnableKeyboardNav) {
+      const rowElement = rowRefs.current.get(focusedIndex);
+      rowElement?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [focusedIndex, shouldEnableKeyboardNav]);
 
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
@@ -404,12 +490,28 @@ export function UnifiedTable<TData>({
                   const rowElement = (
                     <tr
                       key={row.id}
+                      ref={el => {
+                        if (el) {
+                          rowRefs.current.set(index, el);
+                        } else {
+                          rowRefs.current.delete(index);
+                        }
+                      }}
+                      tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
                       className={cn(
                         presets.tableRow,
                         onRowClick && 'cursor-pointer',
+                        shouldEnableKeyboardNav &&
+                          'focus:outline-none focus:bg-surface-2',
+                        focusedIndex === index && 'bg-surface-2',
                         getRowClassName?.(rowData, index)
                       )}
-                      onClick={() => onRowClick?.(rowData)}
+                      onClick={() => {
+                        onRowClick?.(rowData);
+                        setFocusedIndex(index);
+                      }}
+                      onKeyDown={e => handleKeyDown(e, index, rowData)}
+                      onFocus={() => setFocusedIndex(index)}
                       onContextMenu={e => onRowContextMenu?.(rowData, e)}
                     >
                       {row.getVisibleCells().map(cell => (
@@ -525,16 +627,34 @@ export function UnifiedTable<TData>({
             const rowElement = (
               <tr
                 key={row.id}
-                ref={
-                  shouldVirtualize ? rowVirtualizer.measureElement : undefined
-                }
+                ref={el => {
+                  // Store ref for keyboard navigation
+                  if (el) {
+                    rowRefs.current.set(rowIndex, el);
+                  } else {
+                    rowRefs.current.delete(rowIndex);
+                  }
+                  // Also handle virtualization measurement
+                  if (shouldVirtualize && el) {
+                    rowVirtualizer.measureElement(el);
+                  }
+                }}
                 data-index={rowIndex}
+                tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
                 className={cn(
                   presets.tableRow,
                   onRowClick && 'cursor-pointer',
+                  shouldEnableKeyboardNav &&
+                    'focus:outline-none focus:bg-surface-2',
+                  focusedIndex === rowIndex && 'bg-surface-2',
                   getRowClassName?.(rowData, rowIndex)
                 )}
-                onClick={() => onRowClick?.(rowData)}
+                onClick={() => {
+                  onRowClick?.(rowData);
+                  setFocusedIndex(rowIndex);
+                }}
+                onKeyDown={e => handleKeyDown(e, rowIndex, rowData)}
+                onFocus={() => setFocusedIndex(rowIndex)}
                 onContextMenu={e => onRowContextMenu?.(rowData, e)}
                 style={
                   shouldVirtualize && virtualItem

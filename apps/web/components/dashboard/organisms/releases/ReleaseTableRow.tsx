@@ -294,11 +294,22 @@ export function ReleaseTableRow({
                   'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
               )}
             >
-              <Icon
-                name={isCopied ? 'Check' : 'Link'}
-                className='mr-1 h-3.5 w-3.5'
-                aria-hidden='true'
-              />
+              <span className='relative mr-1 flex h-3.5 w-3.5 items-center justify-center'>
+                <Icon
+                  name='Link'
+                  className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+                    isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+                  }`}
+                  aria-hidden='true'
+                />
+                <Icon
+                  name='Check'
+                  className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+                    isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+                  }`}
+                  aria-hidden='true'
+                />
+              </span>
               <span className='line-clamp-1'>
                 {isCopied ? 'Copied!' : 'Copy link'}
               </span>
@@ -353,16 +364,27 @@ export function ReleaseTableRow({
                       : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
                   )}
                 >
-                  <Icon
-                    name={isCopied ? 'Check' : 'Copy'}
-                    className={cn(
-                      'h-3.5 w-3.5 transition-opacity',
-                      isCopied
-                        ? 'opacity-100'
-                        : 'opacity-0 group-hover/btn:opacity-100'
-                    )}
-                    aria-hidden='true'
-                  />
+                  <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+                    <Icon
+                      name='Copy'
+                      className={cn(
+                        'absolute h-3.5 w-3.5 transition-all duration-150',
+                        isCopied
+                          ? 'scale-50 opacity-0'
+                          : 'scale-100 opacity-0 group-hover/btn:opacity-100'
+                      )}
+                      aria-hidden='true'
+                    />
+                    <Icon
+                      name='Check'
+                      className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+                        isCopied
+                          ? 'scale-100 opacity-100'
+                          : 'scale-50 opacity-0'
+                      }`}
+                      aria-hidden='true'
+                    />
+                  </span>
                   <span className='line-clamp-1'>
                     {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
                   </span>
@@ -375,24 +397,42 @@ export function ReleaseTableRow({
                   isSaving={isAddingUrl}
                 />
               ) : (
-                <button
-                  type='button'
-                  className='inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-                  onClick={() =>
-                    void handleCopyWithFeedback(
-                      release.smartLinkPath,
-                      `${release.title} smart link`,
-                      `not-found-copy-${release.id}-${providerKey}`
-                    )
-                  }
-                >
-                  <Icon
-                    name='Copy'
-                    className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100'
-                    aria-hidden='true'
-                  />
-                  <span className='line-clamp-1'>Not found</span>
-                </button>
+                (() => {
+                  const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
+                  const isNotFoundCopied = copiedId === notFoundTestId;
+                  return (
+                    <button
+                      type='button'
+                      className={cn(
+                        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+                        isNotFoundCopied
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+                      )}
+                      onClick={() =>
+                        void handleCopyWithFeedback(
+                          release.smartLinkPath,
+                          `${release.title} smart link`,
+                          notFoundTestId
+                        )
+                      }
+                    >
+                      <Icon
+                        name={isNotFoundCopied ? 'Check' : 'Copy'}
+                        className={cn(
+                          'h-3.5 w-3.5 transition-opacity',
+                          isNotFoundCopied
+                            ? 'opacity-100'
+                            : 'opacity-0 group-hover/btn:opacity-100'
+                        )}
+                        aria-hidden='true'
+                      />
+                      <span className='line-clamp-1'>
+                        {isNotFoundCopied ? 'Copied!' : 'Not found'}
+                      </span>
+                    </button>
+                  );
+                })()
               )}
             </div>
           </td>

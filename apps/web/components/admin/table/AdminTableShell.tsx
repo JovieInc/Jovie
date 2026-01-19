@@ -65,7 +65,7 @@ export function AdminTableShell({
         {toolbar ? (
           <div
             className={cn(
-              'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+              'sticky top-0 z-30 border-b border-subtle bg-surface-1',
               headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
             )}
           >

@@ -45,12 +45,10 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   const secondaryLabel = getSecondaryLabel();
 
   return (
-    <div className={cn('text-sm text-primary-token', className)}>
-      <div className='font-semibold line-clamp-1'>
-        {displayName || 'Visitor'}
-      </div>
+    <div className={cn('text-xs text-primary-token', className)}>
+      <div className='font-medium line-clamp-1'>{displayName || 'Visitor'}</div>
       {secondaryLabel && (
-        <div className='text-xs text-secondary-token line-clamp-1'>
+        <div className='text-[11px] text-secondary-token line-clamp-1'>
           {secondaryLabel}
         </div>
       )}

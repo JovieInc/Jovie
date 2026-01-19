@@ -14,6 +14,19 @@ import {
 } from './universalLinkInput.constants';
 import { type CursorPosition } from './useInputFocusController';
 
+function getLinkDetectionStatus(
+  detectedLink: DetectedLink | null,
+  url: string
+): string {
+  if (!detectedLink) {
+    return url ? 'No valid link detected. Please enter a valid URL.' : '';
+  }
+  if (detectedLink.isValid) {
+    return `${detectedLink.platform.name} link detected. Title set automatically based on your profile and URL. You can now add this link.`;
+  }
+  return `Invalid ${detectedLink.platform.name} link. ${detectedLink.error || 'Please check the URL.'}`;
+}
+
 interface UniversalLinkInputUrlModeProps {
   url: string;
   placeholder: string;
@@ -28,6 +41,8 @@ interface UniversalLinkInputUrlModeProps {
   onRestoreFocus: (cursor?: CursorPosition) => void;
   onFocus?: (event: React.FocusEvent<HTMLInputElement>) => void;
   onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
+  /** When true, changes border radius to connect seamlessly with dropdown below */
+  isDropdownOpen?: boolean;
   comboboxAria?: {
     role?: 'combobox';
     ariaExpanded?: boolean;
@@ -51,6 +66,7 @@ export function UniversalLinkInputUrlMode({
   onRestoreFocus,
   onFocus,
   onBlur,
+  isDropdownOpen = false,
   comboboxAria,
 }: UniversalLinkInputUrlModeProps) {
   const currentPlatformIcon = detectedLink?.platform.icon || 'globe';
@@ -58,7 +74,7 @@ export function UniversalLinkInputUrlMode({
     ? `#${detectedLink.platform.color}`
     : '#6b7280';
 
-  const isDarkBrand = isBrandDark(brandColor.toString());
+  const isDarkBrand = isBrandDark(brandColor);
   const iconColor = isDarkBrand ? '#ffffff' : brandColor;
   const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandColor}15`;
 
@@ -66,8 +82,9 @@ export function UniversalLinkInputUrlMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 rounded-full border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
-          'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          'focus-within:ring-2 focus-within:ring-accent',
+          isDropdownOpen ? 'rounded-t-3xl border-b-0' : 'rounded-full',
           disabled && 'opacity-50'
         )}
       >
@@ -137,13 +154,7 @@ export function UniversalLinkInputUrlMode({
       </div>
 
       <div id='link-detection-status' className='sr-only' aria-live='polite'>
-        {detectedLink
-          ? detectedLink.isValid
-            ? `${detectedLink.platform.name} link detected. Title set automatically based on your profile and URL. You can now add this link.`
-            : `Invalid ${detectedLink.platform.name} link. ${detectedLink.error || 'Please check the URL.'}`
-          : url
-            ? 'No valid link detected. Please enter a valid URL.'
-            : ''}
+        {getLinkDetectionStatus(detectedLink, url)}
       </div>
 
       {url && !detectedLink?.isValid && (

@@ -40,24 +40,38 @@ export function SmartLinkCell({ release, onCopy }: SmartLinkCellProps) {
       size='sm'
       data-testid={smartLinkTestId}
       data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-      onClick={() =>
+      onClick={e => {
+        e.stopPropagation(); // Prevent row click from opening sidebar
         handleCopyWithFeedback(
           release.smartLinkPath,
           `${release.title} smart link`,
           smartLinkTestId
-        ).catch(() => {})
-      }
+        ).catch(() => {});
+      }}
       className={cn(
         'inline-flex items-center text-xs transition-colors',
         isCopied &&
           'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30'
       )}
     >
-      <Icon
-        name={isCopied ? 'Check' : 'Link'}
-        className='mr-1 h-3.5 w-3.5'
-        aria-hidden='true'
-      />
+      <span className='relative mr-1 flex h-3.5 w-3.5 items-center justify-center'>
+        <Icon
+          name='Link'
+          className={cn(
+            'absolute h-3.5 w-3.5 transition-all duration-150',
+            isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+          )}
+          aria-hidden='true'
+        />
+        <Icon
+          name='Check'
+          className={cn(
+            'absolute h-3.5 w-3.5 transition-all duration-150',
+            isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+          )}
+          aria-hidden='true'
+        />
+      </span>
       <span className='line-clamp-1'>{isCopied ? 'Copied!' : 'Copy link'}</span>
     </Button>
   );

@@ -44,7 +44,7 @@ export function ArtistInfo({
           size={avatarSizeMap[avatarSize]}
           priority
           verified={false}
-          className='ring-0 shadow-none bg-white/80 dark:bg-black/20'
+          className='ring-0 shadow-none'
         />
       </div>
 
