@@ -85,6 +85,7 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
       .select({
         displayName: creatorProfiles.displayName,
         username: creatorProfiles.username,
+        usernameNormalized: creatorProfiles.usernameNormalized,
         avatarUrl: creatorProfiles.avatarUrl,
       })
       .from(creatorProfiles)
@@ -116,8 +117,10 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
     creator: creator ?? {
       displayName: null,
       username: UNKNOWN_ARTIST,
+      usernameNormalized: null,
       avatarUrl: null,
     },
+    creatorHandle: creator?.usernameNormalized ?? null,
   };
 });
 
@@ -128,14 +131,15 @@ function pickProviderUrl(
   providerLinksData: { providerId: string; url: string }[],
   forcedProvider?: ProviderKey | null
 ): string | null {
-  const providerOrder: ProviderKey[] = forcedProvider
-    ? [
-        forcedProvider,
-        ...PRIMARY_PROVIDER_KEYS.filter(key => key !== forcedProvider),
-      ]
-    : PRIMARY_PROVIDER_KEYS;
+  // When a provider is explicitly requested (?dsp=), do not fall back to others.
+  if (forcedProvider) {
+    return (
+      providerLinksData.find(link => link.providerId === forcedProvider)?.url ??
+      null
+    );
+  }
 
-  for (const key of providerOrder) {
+  for (const key of PRIMARY_PROVIDER_KEYS) {
     const match = providerLinksData.find(link => link.providerId === key);
     if (match?.url) return match.url;
   }
@@ -172,15 +176,9 @@ export default async function ReleaseSmartLinkPage({
 
   // REDIRECT TO NEW URL FORMAT
   // Look up the creator's handle and redirect to the new canonical URL
-  const [creatorForRedirect] = await db
-    .select({ usernameNormalized: creatorProfiles.usernameNormalized })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-
-  if (creatorForRedirect) {
+  if (data.creatorHandle) {
     // Build new URL with query params preserved
-    const newPath = `/${creatorForRedirect.usernameNormalized}/${data.release.slug}`;
+    const newPath = `/${data.creatorHandle}/${data.release.slug}`;
     const newUrl = dsp ? `${newPath}?dsp=${encodeURIComponent(dsp)}` : newPath;
     permanentRedirect(newUrl);
   }

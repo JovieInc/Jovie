@@ -187,14 +187,12 @@ function pickProviderUrl(
   links: Array<{ providerId: string; url: string }>,
   forcedProvider?: ProviderKey | null
 ): string | null {
-  const providerOrder: ProviderKey[] = forcedProvider
-    ? [
-        forcedProvider,
-        ...PRIMARY_PROVIDER_KEYS.filter(key => key !== forcedProvider),
-      ]
-    : PRIMARY_PROVIDER_KEYS;
+  // When a provider is explicitly requested (?dsp=), do not fall back to others.
+  if (forcedProvider) {
+    return links.find(link => link.providerId === forcedProvider)?.url ?? null;
+  }
 
-  for (const key of providerOrder) {
+  for (const key of PRIMARY_PROVIDER_KEYS) {
     const match = links.find(link => link.providerId === key);
     if (match?.url) return match.url;
   }
@@ -232,8 +230,9 @@ export default async function ContentSmartLinkPage({
     const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
     if (redirectInfo) {
       // Permanent redirect to the new slug
+      const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
       permanentRedirect(
-        `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`
+        `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
       );
     }
     notFound();

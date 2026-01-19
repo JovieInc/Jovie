@@ -305,26 +305,31 @@ export async function updateSlugWithRedirect(params: {
     throw new Error(`Slug "${sanitizedSlug}" is already in use`);
   }
 
-  // Create redirect for old slug
-  await createSlugRedirect({
-    creatorProfileId,
-    oldSlug: currentSlug,
-    contentType,
-    contentId,
+  // Create redirect + update slug atomically to avoid partial state.
+  return await db.transaction(async tx => {
+    await tx
+      .insert(contentSlugRedirects)
+      .values({
+        creatorProfileId,
+        oldSlug: currentSlug,
+        contentType,
+        releaseId: contentType === 'release' ? contentId : null,
+        trackId: contentType === 'track' ? contentId : null,
+      })
+      .onConflictDoNothing(); // Ignore if redirect already exists
+
+    if (contentType === 'release') {
+      await tx
+        .update(discogReleases)
+        .set({ slug: sanitizedSlug, updatedAt: new Date() })
+        .where(eq(discogReleases.id, contentId));
+    } else {
+      await tx
+        .update(discogTracks)
+        .set({ slug: sanitizedSlug, updatedAt: new Date() })
+        .where(eq(discogTracks.id, contentId));
+    }
+
+    return sanitizedSlug;
   });
-
-  // Update the content's slug
-  if (contentType === 'release') {
-    await db
-      .update(discogReleases)
-      .set({ slug: sanitizedSlug, updatedAt: new Date() })
-      .where(eq(discogReleases.id, contentId));
-  } else {
-    await db
-      .update(discogTracks)
-      .set({ slug: sanitizedSlug, updatedAt: new Date() })
-      .where(eq(discogTracks.id, contentId));
-  }
-
-  return sanitizedSlug;
 }

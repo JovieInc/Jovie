@@ -22,6 +22,7 @@ export function ReleaseSidebar({
   mode,
   isOpen,
   providerConfig,
+  artistName,
   onClose,
   onRefresh,
   onReleaseChange,
@@ -86,7 +87,7 @@ export function ReleaseSidebar({
               <ReleaseArtwork
                 artworkUrl={release.artworkUrl}
                 title={release.title}
-                releaseDate={release.releaseDate}
+                artistName={artistName}
                 canUploadArtwork={canUploadArtwork}
                 onArtworkUpload={
                   canUploadArtwork ? handleArtworkUpload : undefined
@@ -118,7 +119,7 @@ export function ReleaseSidebar({
                 onNewLinkKeyDown={handleNewLinkKeyDown}
               />
 
-              {isEditable && onSave && release && (
+              {isEditable && onSave && (
                 <div className='pt-2 flex justify-end'>
                   <Button
                     type='button'

@@ -1,5 +1,5 @@
 {
-  "id": "9b50ab47-5575-4cf4-b497-1439e530fae0",
+  "id": "fce6a683-8fd9-47ec-bca1-3bbf2f5d54e9",
   "prevId": "5ef786d7-c864-4510-a389-e44d76c5874d",
   "version": "7",
   "dialect": "postgresql",
@@ -1207,8 +1207,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.content_slug_redirects": {
-      "name": "content_slug_redirects",
+    "public.artists": {
+      "name": "artists",
       "schema": "",
       "columns": {
         "id": {
@@ -1222,32 +1222,89 @@
           "name": "creator_profile_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "old_slug": {
-          "name": "old_slug",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "content_type": {
-          "name": "content_type",
-          "type": "content_slug_type",
-          "typeSchema": "public",
+        "name_normalized": {
+          "name": "name_normalized",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "release_id": {
-          "name": "release_id",
-          "type": "uuid",
+        "sort_name": {
+          "name": "sort_name",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "track_id": {
-          "name": "track_id",
-          "type": "uuid",
+        "disambiguation": {
+          "name": "disambiguation",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "artist_type": {
+          "name": "artist_type",
+          "type": "artist_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'person'"
+        },
+        "spotify_id": {
+          "name": "spotify_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apple_music_id": {
+          "name": "apple_music_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "musicbrainz_id": {
+          "name": "musicbrainz_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deezer_id": {
+          "name": "deezer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_auto_created": {
+          "name": "is_auto_created",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "match_confidence": {
+          "name": "match_confidence",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
         "created_at": {
           "name": "created_at",
@@ -1255,35 +1312,100 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
-        "content_slug_redirects_creator_old_slug": {
-          "name": "content_slug_redirects_creator_old_slug",
+        "artists_spotify_id_unique": {
+          "name": "artists_spotify_id_unique",
           "columns": [
             {
-              "expression": "creator_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "old_slug",
+              "expression": "spotify_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
+          "where": "spotify_id IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "content_slug_redirects_old_slug_idx": {
-          "name": "content_slug_redirects_old_slug_idx",
+        "artists_apple_music_id_unique": {
+          "name": "artists_apple_music_id_unique",
           "columns": [
             {
-              "expression": "old_slug",
+              "expression": "apple_music_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "apple_music_id IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artists_musicbrainz_id_unique": {
+          "name": "artists_musicbrainz_id_unique",
+          "columns": [
+            {
+              "expression": "musicbrainz_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "musicbrainz_id IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artists_deezer_id_unique": {
+          "name": "artists_deezer_id_unique",
+          "columns": [
+            {
+              "expression": "deezer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "deezer_id IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artists_name_normalized_idx": {
+          "name": "artists_name_normalized_idx",
+          "columns": [
+            {
+              "expression": "name_normalized",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artists_creator_profile_id_idx": {
+          "name": "artists_creator_profile_id_idx",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1296,43 +1418,20 @@
         }
       },
       "foreignKeys": {
-        "content_slug_redirects_creator_profile_id_creator_profiles_id_fk": {
-          "name": "content_slug_redirects_creator_profile_id_creator_profiles_id_fk",
-          "tableFrom": "content_slug_redirects",
+        "artists_creator_profile_id_creator_profiles_id_fk": {
+          "name": "artists_creator_profile_id_creator_profiles_id_fk",
+          "tableFrom": "artists",
           "tableTo": "creator_profiles",
           "columnsFrom": ["creator_profile_id"],
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "content_slug_redirects_release_id_discog_releases_id_fk": {
-          "name": "content_slug_redirects_release_id_discog_releases_id_fk",
-          "tableFrom": "content_slug_redirects",
-          "tableTo": "discog_releases",
-          "columnsFrom": ["release_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "content_slug_redirects_track_id_discog_tracks_id_fk": {
-          "name": "content_slug_redirects_track_id_discog_tracks_id_fk",
-          "tableFrom": "content_slug_redirects",
-          "tableTo": "discog_tracks",
-          "columnsFrom": ["track_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "content_slug_redirects_content_match": {
-          "name": "content_slug_redirects_content_match",
-          "value": "\n        (content_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL)\n        OR (content_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL)\n      "
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.discog_releases": {
@@ -2036,6 +2135,170 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.release_artists": {
+      "name": "release_artists",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "release_id": {
+          "name": "release_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artist_id": {
+          "name": "artist_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "artist_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_name": {
+          "name": "credit_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "join_phrase": {
+          "name": "join_phrase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "ingestion_source_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'ingested'"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "release_artists_release_artist_role": {
+          "name": "release_artists_release_artist_role",
+          "columns": [
+            {
+              "expression": "release_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "artist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "release_artists_artist_id_idx": {
+          "name": "release_artists_artist_id_idx",
+          "columns": [
+            {
+              "expression": "artist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "release_artists_release_id_idx": {
+          "name": "release_artists_release_id_idx",
+          "columns": [
+            {
+              "expression": "release_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "release_artists_release_id_discog_releases_id_fk": {
+          "name": "release_artists_release_id_discog_releases_id_fk",
+          "tableFrom": "release_artists",
+          "tableTo": "discog_releases",
+          "columnsFrom": ["release_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "release_artists_artist_id_artists_id_fk": {
+          "name": "release_artists_artist_id_artists_id_fk",
+          "tableFrom": "release_artists",
+          "tableTo": "artists",
+          "columnsFrom": ["artist_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.smart_link_targets": {
       "name": "smart_link_targets",
       "schema": "",
@@ -2255,6 +2518,170 @@
           "value": "\n        (release_id IS NOT NULL AND track_id IS NULL)\n        OR (track_id IS NOT NULL AND release_id IS NULL)\n      "
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.track_artists": {
+      "name": "track_artists",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "track_id": {
+          "name": "track_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artist_id": {
+          "name": "artist_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "artist_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_name": {
+          "name": "credit_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "join_phrase": {
+          "name": "join_phrase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "ingestion_source_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'ingested'"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "track_artists_track_artist_role": {
+          "name": "track_artists_track_artist_role",
+          "columns": [
+            {
+              "expression": "track_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "artist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "track_artists_artist_id_idx": {
+          "name": "track_artists_artist_id_idx",
+          "columns": [
+            {
+              "expression": "artist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "track_artists_track_id_idx": {
+          "name": "track_artists_track_id_idx",
+          "columns": [
+            {
+              "expression": "track_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "track_artists_track_id_discog_tracks_id_fk": {
+          "name": "track_artists_track_id_discog_tracks_id_fk",
+          "tableFrom": "track_artists",
+          "tableTo": "discog_tracks",
+          "columnsFrom": ["track_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "track_artists_artist_id_artists_id_fk": {
+          "name": "track_artists_artist_id_artists_id_fk",
+          "tableFrom": "track_artists",
+          "tableTo": "artists",
+          "columnsFrom": ["artist_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.dsp_artist_enrichment": {
@@ -5739,6 +6166,29 @@
     }
   },
   "enums": {
+    "public.artist_role": {
+      "name": "artist_role",
+      "schema": "public",
+      "values": [
+        "main_artist",
+        "featured_artist",
+        "remixer",
+        "producer",
+        "co_producer",
+        "composer",
+        "lyricist",
+        "arranger",
+        "conductor",
+        "vs",
+        "with",
+        "other"
+      ]
+    },
+    "public.artist_type": {
+      "name": "artist_type",
+      "schema": "public",
+      "values": ["person", "group", "orchestra", "choir", "character", "other"]
+    },
     "public.audience_device_type": {
       "name": "audience_device_type",
       "schema": "public",
@@ -5783,11 +6233,6 @@
         "fan_general",
         "other"
       ]
-    },
-    "public.content_slug_type": {
-      "name": "content_slug_type",
-      "schema": "public",
-      "values": ["release", "track"]
     },
     "public.creator_type": {
       "name": "creator_type",
