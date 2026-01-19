@@ -9,7 +9,8 @@ dotenv.config({ path: '.env.test' });
 
 // Detect CI environment - reduce memory usage by using fewer threads
 const isCI = process.env.CI === 'true';
-const maxThreads = isCI ? 2 : 4; // Use 2 threads in CI to reduce memory pressure
+// Keep thread count conservative to avoid memory pressure in constrained runners.
+const maxThreads = isCI ? 2 : 2;
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
@@ -51,6 +52,8 @@ export default defineConfig({
         // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
         minThreads: 1,
         maxThreads,
+        // Ensure worker threads have sufficient heap for large suites.
+        execArgv: ['--max-old-space-size=2048'],
         useAtomics: true,
       },
     },
