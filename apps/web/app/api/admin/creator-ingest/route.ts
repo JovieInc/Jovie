@@ -1,9 +1,9 @@
 import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
-import { and, eq, max } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
-import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   calculateAndStoreFitScore,
@@ -26,6 +26,12 @@ import {
   findAvailableHandle,
   markReingestFailure,
 } from '@/lib/ingestion/flows/profile-operations';
+import {
+  createNewSocialProfile,
+  generateClaimToken,
+  handleExistingUnclaimedProfile,
+  type SocialPlatformContext,
+} from '@/lib/ingestion/flows/social-platform-flow';
 import { maybeCopyIngestionAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
   enqueueFollowupIngestionJobs,
@@ -41,114 +47,6 @@ import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { normalizeUrl } from '@/lib/utils/platform-detection/normalizer';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
-
-// Default claim token expiration: 30 days
-const CLAIM_TOKEN_EXPIRY_DAYS = 30;
-
-// Music platforms that should have empty link display text by default
-const MUSIC_PLATFORMS = [
-  'spotify',
-  'apple_music',
-  'soundcloud',
-  'tidal',
-] as const;
-
-/**
- * Determine the display text for a social link based on platform type.
- * Music platforms get empty display text (unless a specific name is provided),
- * while other platforms use the platform name.
- *
- * @param platformId - Platform identifier (e.g., 'spotify', 'instagram')
- * @param platformName - Default platform name to use
- * @param customName - Optional custom name (e.g., Spotify artist name)
- * @returns Display text for the link
- */
-function getLinkDisplayText(
-  platformId: string,
-  platformName: string,
-  customName?: string | null
-): string {
-  if (customName) return customName;
-  const isMusicPlatform = MUSIC_PLATFORMS.includes(
-    platformId as (typeof MUSIC_PLATFORMS)[number]
-  );
-  return isMusicPlatform ? '' : platformName;
-}
-
-/**
- * Generate a claim token with expiration date.
- * Claim tokens allow creators to claim unclaimed profiles.
- *
- * @returns Object with claimToken UUID and claimTokenExpiresAt date
- */
-function generateClaimToken(): {
-  claimToken: string;
-  claimTokenExpiresAt: Date;
-} {
-  const claimToken = randomUUID();
-  const claimTokenExpiresAt = new Date();
-  claimTokenExpiresAt.setDate(
-    claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-  );
-  return { claimToken, claimTokenExpiresAt };
-}
-
-/**
- * Idempotently add a social link to a creator profile.
- * Checks if the link already exists, and if not, computes the next sortOrder.
- * Returns true if a new link was added, false if it already existed.
- */
-async function addSocialLinkIdempotent(
-  tx: DbType,
-  creatorProfileId: string,
-  platform: string,
-  url: string,
-  title: string
-): Promise<boolean> {
-  // Check if link already exists
-  const [existingLink] = await tx
-    .select({ id: socialLinks.id })
-    .from(socialLinks)
-    .where(
-      and(
-        eq(socialLinks.creatorProfileId, creatorProfileId),
-        eq(socialLinks.platform, platform),
-        eq(socialLinks.url, url)
-      )
-    )
-    .limit(1);
-
-  if (existingLink) {
-    // Link already exists, skip insertion
-    return false;
-  }
-
-  // Compute next sortOrder (max + 1, or 0 if no links exist)
-  const [result] = await tx
-    .select({ maxOrder: max(socialLinks.sortOrder) })
-    .from(socialLinks)
-    .where(eq(socialLinks.creatorProfileId, creatorProfileId));
-
-  const nextSortOrder =
-    result?.maxOrder !== null && result?.maxOrder !== undefined
-      ? result.maxOrder + 1
-      : 0;
-
-  // Insert the new link
-  await tx.insert(socialLinks).values({
-    creatorProfileId,
-    platform,
-    platformType: platform,
-    url,
-    displayText: title,
-    sortOrder: nextSortOrder,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return true;
-}
 
 export const runtime = 'nodejs';
 
@@ -880,6 +778,16 @@ export async function POST(request: Request) {
     const { handle, normalizedHandle } = handleResult;
     const spotifyArtistName = await fetchSpotifyArtistName(handle, platformId);
 
+    // Build context for social platform flow
+    const socialContext: SocialPlatformContext = {
+      handle,
+      normalizedHandle,
+      platformId,
+      platformName: detected.platform.name,
+      normalizedUrl,
+      spotifyArtistName,
+    };
+
     return await withSystemIngestionSession(async tx => {
       // Check for existing profile
       const [existing] = await tx
@@ -908,174 +816,11 @@ export async function POST(request: Request) {
         finalHandle = altHandle;
       } else if (existing && !existing.isClaimed) {
         // Profile exists but unclaimed - add the link to existing profile
-        const linkDisplayText = getLinkDisplayText(
-          platformId,
-          detected.platform.name,
-          spotifyArtistName
-        );
-        try {
-          // Add the social link to existing profile (idempotent)
-          const linkAdded = await addSocialLinkIdempotent(
-            tx,
-            existing.id,
-            platformId,
-            normalizedUrl,
-            linkDisplayText
-          );
-
-          if (linkAdded) {
-            logger.info('Added link to existing unclaimed profile', {
-              profileId: existing.id,
-              platform: platformId,
-              url: normalizedUrl,
-            });
-          } else {
-            logger.info('Link already exists on unclaimed profile', {
-              profileId: existing.id,
-              platform: platformId,
-              url: normalizedUrl,
-            });
-          }
-
-          return NextResponse.json(
-            {
-              ok: true,
-              profile: {
-                id: existing.id,
-                username: existing.usernameNormalized,
-                usernameNormalized: existing.usernameNormalized,
-              },
-              links: linkAdded ? 1 : 0,
-              note: linkAdded
-                ? 'Added link to existing unclaimed profile'
-                : 'Link already exists on profile',
-            },
-            { status: 200, headers: { 'Cache-Control': 'no-store' } }
-          );
-        } catch (linkError) {
-          logger.warn('Failed to add link to existing profile', {
-            profileId: existing.id,
-            error: linkError,
-          });
-          // Continue to return success since profile exists
-          return NextResponse.json(
-            {
-              ok: true,
-              profile: {
-                id: existing.id,
-                username: existing.usernameNormalized,
-                usernameNormalized: existing.usernameNormalized,
-              },
-              links: 0,
-              warning: 'Profile exists but failed to add link',
-            },
-            { status: 200, headers: { 'Cache-Control': 'no-store' } }
-          );
-        }
+        return handleExistingUnclaimedProfile(tx, existing, socialContext);
       }
 
-      // Generate claim token
-      const { claimToken, claimTokenExpiresAt } = generateClaimToken();
-
-      // For Spotify artist IDs, use the fetched artist name if available
-      const displayName =
-        spotifyArtistName ||
-        (handle.startsWith('artist-') && platformId === 'spotify'
-          ? detected.platform.name
-          : handle);
-
-      // Create new profile
-      const [created] = await tx
-        .insert(creatorProfiles)
-        .values({
-          creatorType: 'creator',
-          username: finalHandle,
-          usernameNormalized: finalHandle,
-          displayName: displayName, // Use original handle casing as display name
-          avatarUrl: null,
-          isPublic: true,
-          isVerified: false,
-          isFeatured: false,
-          marketingOptOut: false,
-          isClaimed: false,
-          claimToken,
-          claimTokenExpiresAt,
-          settings: {},
-          theme: {},
-          ingestionStatus: 'idle',
-          ingestionSourcePlatform: platformId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-          claimToken: creatorProfiles.claimToken,
-        });
-
-      if (!created) {
-        return NextResponse.json(
-          { error: 'Failed to create creator profile' },
-          { status: 500, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      // Add the social link (idempotent, though new profile shouldn't have duplicates)
-      const linkDisplayText = getLinkDisplayText(
-        platformId,
-        detected.platform.name,
-        spotifyArtistName
-      );
-      try {
-        await addSocialLinkIdempotent(
-          tx,
-          created.id,
-          platformId,
-          normalizedUrl,
-          linkDisplayText
-        );
-      } catch (linkError) {
-        logger.warn('Failed to add link to new profile', {
-          profileId: created.id,
-          error: linkError,
-        });
-      }
-
-      // Calculate fit score for the new profile
-      try {
-        await calculateAndStoreFitScore(tx, created.id);
-      } catch (fitScoreError) {
-        logger.warn('Fit score calculation failed', {
-          profileId: created.id,
-          error:
-            fitScoreError instanceof Error
-              ? fitScoreError.message
-              : 'Unknown error',
-        });
-      }
-
-      logger.info('Creator profile created from social URL', {
-        profileId: created.id,
-        handle: created.username,
-        platform: platformId,
-        sourceUrl: normalizedUrl,
-      });
-
-      return NextResponse.json(
-        {
-          ok: true,
-          profile: {
-            id: created.id,
-            username: created.username,
-            usernameNormalized: created.usernameNormalized,
-            claimToken: created.claimToken,
-          },
-          links: 1,
-          platform: detected.platform.name,
-        },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
-      );
+      // Create new profile with the social link
+      return createNewSocialProfile(tx, finalHandle, socialContext);
     });
   } catch (error) {
     const errorMessage =

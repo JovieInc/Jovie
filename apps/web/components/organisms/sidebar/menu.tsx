@@ -100,21 +100,15 @@ export const SidebarMenuButton = React.forwardRef<
       return button;
     }
 
-    if (typeof tooltip === 'string') {
-      tooltip = {
-        children: tooltip,
-      };
-    }
+    const tooltipLabel =
+      typeof tooltip === 'string' ? tooltip : tooltip.children;
 
     return (
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent
-          side='right'
-          align='center'
-          hidden={isMobile}
-          {...tooltip}
-        />
+        <TooltipContent side='right' align='center' hidden={isMobile}>
+          <span>{tooltipLabel}</span>
+        </TooltipContent>
       </Tooltip>
     );
   }

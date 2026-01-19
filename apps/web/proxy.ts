@@ -68,11 +68,11 @@ function isDevOrPreview(hostname: string): boolean {
 /**
  * Get the dashboard URL based on environment.
  * In production on app.jov.ie, dashboard is at '/'.
- * In dev/preview, dashboard is at '/app/dashboard'.
+ * In dev/preview, dashboard is at '/app'.
  */
 function getDashboardUrl(hostname: string): string {
   if (isDevOrPreview(hostname) && !isAppSubdomain(hostname)) {
-    return '/app/dashboard';
+    return '/app';
   }
   return '/';
 }

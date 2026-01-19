@@ -133,7 +133,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             {isInSettings ? (
               // Settings: Back button to dashboard
               <Link
-                href='/app/dashboard'
+                href='/app'
                 aria-label='Back to dashboard'
                 className={cn(
                   'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
@@ -148,7 +148,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             ) : (
               // Dashboard & Admin: Just logo
               <Link
-                href={isAdmin ? '/app/admin' : '/app/dashboard'}
+                href={isAdmin ? '/app/admin' : '/app'}
                 aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
                 className={cn(
                   'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
@@ -310,7 +310,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             <div className='relative pb-0 p-2'>
               <div className='flex items-center gap-2 py-1'>
                 <Link
-                  href={isAdmin ? '/app/admin' : '/app/dashboard'}
+                  href={isAdmin ? '/app/admin' : '/app'}
                   aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
                   className='flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 >

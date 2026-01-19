@@ -65,7 +65,7 @@ export function DashboardSidebar({
         <div className='group/toggle flex items-center gap-2 px-2 py-1'>
           {isInSettings ? (
             <Link
-              href='/app/dashboard'
+              href='/app'
               aria-label='Back'
               className={cn(
                 'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
@@ -79,7 +79,7 @@ export function DashboardSidebar({
             </Link>
           ) : (
             <Link
-              href='/app/dashboard'
+              href='/app'
               aria-label='Go to dashboard'
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'

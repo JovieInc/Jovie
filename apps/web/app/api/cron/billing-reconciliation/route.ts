@@ -12,12 +12,15 @@
  * Schedule: Every hour (configured in vercel.json)
  */
 
-import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { handleOrphanedSubscription } from '@/lib/billing/reconciliation/orphaned-subscription-handler';
-import { fixStatusMismatch } from '@/lib/billing/reconciliation/status-mismatch-fixer';
-import { retrieveSubscriptionSafely } from '@/lib/billing/reconciliation/subscription-error-classifier';
-import { detectStatusMismatch } from '@/lib/billing/reconciliation/subscription-status-resolver';
+import {
+  BATCH_SIZE,
+  fetchUserBatch,
+  processSingleUser,
+  type ReconciliationStats,
+  updateStatsFromResult,
+} from '@/lib/billing/reconciliation/batch-processor';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
@@ -25,9 +28,8 @@ import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
-// Pagination settings
-const BATCH_SIZE = 100;
-const MAX_BATCHES = 50; // Safety limit: process max 5000 users per run
+// Safety limit: process max 5000 users per run
+const MAX_BATCHES = 50;
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
@@ -36,15 +38,6 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
-
-interface ReconciliationStats {
-  usersChecked: number;
-  mismatches: number;
-  fixed: number;
-  errors: number;
-  orphanedSubscriptions: number;
-  staleCustomers: number;
-}
 
 interface ReconciliationResult {
   success: boolean;
@@ -142,99 +135,19 @@ async function reconcileUsersWithSubscriptions(
   let lastUserId: string | null = null;
   let batchCount = 0;
 
-  // Process users in batches with cursor-based pagination
   while (batchCount < MAX_BATCHES) {
     batchCount++;
 
-    // Build query with cursor
-    const usersWithSubscriptions = await db
-      .select({
-        id: users.id,
-        clerkId: users.clerkId,
-        isPro: users.isPro,
-        stripeSubscriptionId: users.stripeSubscriptionId,
-        stripeCustomerId: users.stripeCustomerId,
-      })
-      .from(users)
-      .where(
-        lastUserId
-          ? drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.id} > ${lastUserId}`
-          : isNotNull(users.stripeSubscriptionId)
-      )
-      .orderBy(users.id)
-      .limit(BATCH_SIZE);
+    const batch = await fetchUserBatch(db, lastUserId);
+    if (batch.length === 0) break;
 
-    if (usersWithSubscriptions.length === 0) {
-      break; // No more users to process
-    }
-
-    for (const user of usersWithSubscriptions) {
+    for (const user of batch) {
       stats.usersChecked++;
       lastUserId = user.id;
 
       try {
-        if (!user.stripeSubscriptionId) continue;
-
-        // Step 1: Retrieve subscription from Stripe with error handling
-        const { subscription, error: retrievalError } =
-          await retrieveSubscriptionSafely(stripe, user.stripeSubscriptionId);
-
-        if (retrievalError) {
-          // Step 2: Handle subscription not found (orphaned)
-          if (retrievalError.type === 'not_found') {
-            stats.orphanedSubscriptions++;
-            stats.mismatches++;
-
-            const result = await handleOrphanedSubscription(db, {
-              id: user.id,
-              clerkId: user.clerkId,
-              isPro: user.isPro ?? false,
-              stripeSubscriptionId: user.stripeSubscriptionId,
-            });
-
-            if (result.success) {
-              stats.fixed++;
-            } else {
-              stats.errors++;
-              errors.push(`Failed to fix user ${user.id}: ${result.error}`);
-            }
-            continue;
-          }
-
-          // Other Stripe errors - log and continue
-          stats.errors++;
-          errors.push(
-            `Stripe error for user ${user.id}: ${retrievalError.message}`
-          );
-          continue;
-        }
-
-        if (!subscription) continue;
-
-        // Step 3: Check for status mismatch (treat null isPro as false)
-        const currentIsPro = user.isPro ?? false;
-        const mismatchResult = detectStatusMismatch(currentIsPro, subscription);
-
-        if (mismatchResult.hasMismatch) {
-          stats.mismatches++;
-
-          // Step 4: Fix the mismatch
-          const fixResult = await fixStatusMismatch(
-            { ...user, isPro: currentIsPro },
-            subscription,
-            mismatchResult.expectedIsPro
-          );
-
-          if (fixResult.success) {
-            stats.fixed++;
-            logger.info(
-              `[billing-reconciliation] Fixed user ${user.id}: isPro ${user.isPro} -> ${mismatchResult.expectedIsPro}`
-            );
-          } else {
-            stats.errors++;
-            errors.push(`Failed to fix user ${user.id}: ${fixResult.error}`);
-          }
-        }
+        const result = await processSingleUser(db, stripe, user);
+        updateStatsFromResult(stats, errors, user.id, result);
       } catch (error) {
         stats.errors++;
         const message = error instanceof Error ? error.message : String(error);
@@ -242,10 +155,7 @@ async function reconcileUsersWithSubscriptions(
       }
     }
 
-    // If we got fewer than BATCH_SIZE, we're done
-    if (usersWithSubscriptions.length < BATCH_SIZE) {
-      break;
-    }
+    if (batch.length < BATCH_SIZE) break;
   }
 
   if (batchCount >= MAX_BATCHES) {
