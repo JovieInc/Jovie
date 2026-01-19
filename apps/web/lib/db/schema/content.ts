@@ -2,6 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  decimal,
   index,
   integer,
   jsonb,
@@ -13,6 +14,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import {
+  artistRoleEnum,
+  artistTypeEnum,
   discogReleaseTypeEnum,
   ingestionSourceTypeEnum,
   providerKindEnum,
@@ -220,6 +223,161 @@ export const smartLinkTargets = pgTable(
   })
 );
 
+// ============================================================================
+// Multi-Artist Support Tables
+// ============================================================================
+
+/**
+ * Canonical artist registry - stores all artists (both Jovie users and collaborators)
+ *
+ * This table serves as a registry of all artists in the system:
+ * - Artists with Jovie accounts have a `creatorProfileId` reference
+ * - Collaborators discovered during import are auto-created without accounts
+ * - External IDs (Spotify, Apple Music, etc.) enable cross-platform matching
+ */
+export const artists = pgTable(
+  'artists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // Links to Jovie account if artist is a user (nullable for external collaborators)
+    creatorProfileId: uuid('creator_profile_id').references(
+      () => creatorProfiles.id,
+      { onDelete: 'set null' }
+    ),
+    name: text('name').notNull(),
+    nameNormalized: text('name_normalized').notNull(), // lowercase, no special chars
+    sortName: text('sort_name'), // "Beatles, The" for sorting
+    disambiguation: text('disambiguation'), // "UK electronic producer"
+    artistType: artistTypeEnum('artist_type').default('person'),
+
+    // External platform IDs for cross-platform matching
+    spotifyId: text('spotify_id'),
+    appleMusicId: text('apple_music_id'),
+    musicbrainzId: text('musicbrainz_id'),
+    deezerId: text('deezer_id'),
+
+    // Profile data
+    imageUrl: text('image_url'),
+
+    // Auto-creation tracking
+    isAutoCreated: boolean('is_auto_created').default(false).notNull(),
+    matchConfidence: decimal('match_confidence', { precision: 5, scale: 4 }), // 0.0000-1.0000
+
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Unique external IDs (partial indexes - only when not null)
+    spotifyIdUnique: uniqueIndex('artists_spotify_id_unique')
+      .on(table.spotifyId)
+      .where(drizzleSql`spotify_id IS NOT NULL`),
+    appleMusicIdUnique: uniqueIndex('artists_apple_music_id_unique')
+      .on(table.appleMusicId)
+      .where(drizzleSql`apple_music_id IS NOT NULL`),
+    musicbrainzIdUnique: uniqueIndex('artists_musicbrainz_id_unique')
+      .on(table.musicbrainzId)
+      .where(drizzleSql`musicbrainz_id IS NOT NULL`),
+    deezerIdUnique: uniqueIndex('artists_deezer_id_unique')
+      .on(table.deezerId)
+      .where(drizzleSql`deezer_id IS NOT NULL`),
+
+    // Search & lookup indexes
+    nameNormalizedIndex: index('artists_name_normalized_idx').on(
+      table.nameNormalized
+    ),
+    creatorProfileIndex: index('artists_creator_profile_id_idx').on(
+      table.creatorProfileId
+    ),
+  })
+);
+
+/**
+ * Track-Artist junction table - links tracks to artists with roles
+ *
+ * Supports multiple artists per track with different roles:
+ * - main_artist: Primary credited artist
+ * - featured_artist: "feat." credit
+ * - remixer: "(X Remix)" credit
+ * - producer, composer, etc.
+ */
+export const trackArtists = pgTable(
+  'track_artists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    trackId: uuid('track_id')
+      .notNull()
+      .references(() => discogTracks.id, { onDelete: 'cascade' }),
+    artistId: uuid('artist_id')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    role: artistRoleEnum('role').notNull(),
+
+    // Display customization
+    creditName: text('credit_name'), // Display name override (e.g., stage name)
+    joinPhrase: text('join_phrase'), // " feat. ", " & ", " x ", etc.
+    position: integer('position').default(0).notNull(), // Order in credit list
+
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    sourceType: ingestionSourceTypeEnum('source_type').default('ingested'),
+
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Prevent duplicate artist-role on same track
+    trackArtistRoleUnique: uniqueIndex('track_artists_track_artist_role').on(
+      table.trackId,
+      table.artistId,
+      table.role
+    ),
+    artistIndex: index('track_artists_artist_id_idx').on(table.artistId),
+    trackIndex: index('track_artists_track_id_idx').on(table.trackId),
+  })
+);
+
+/**
+ * Release-Artist junction table - links releases to artists with roles
+ *
+ * Similar to track_artists but at the release level for album credits.
+ */
+export const releaseArtists = pgTable(
+  'release_artists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id')
+      .notNull()
+      .references(() => discogReleases.id, { onDelete: 'cascade' }),
+    artistId: uuid('artist_id')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    role: artistRoleEnum('role').notNull(),
+
+    // Display customization
+    creditName: text('credit_name'),
+    joinPhrase: text('join_phrase'),
+    position: integer('position').default(0).notNull(),
+
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    sourceType: ingestionSourceTypeEnum('source_type').default('ingested'),
+
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Prevent duplicate artist-role on same release
+    releaseArtistRoleUnique: uniqueIndex(
+      'release_artists_release_artist_role'
+    ).on(table.releaseId, table.artistId, table.role),
+    artistIndex: index('release_artists_artist_id_idx').on(table.artistId),
+    releaseIndex: index('release_artists_release_id_idx').on(table.releaseId),
+  })
+);
+
+// ============================================================================
+// Schema Validations
+// ============================================================================
+
 // Schema validations
 export const insertProviderSchema = createInsertSchema(providers);
 export const selectProviderSchema = createSelectSchema(providers);
@@ -251,3 +409,27 @@ export type NewProviderLink = typeof providerLinks.$inferInsert;
 
 export type SmartLinkTarget = typeof smartLinkTargets.$inferSelect;
 export type NewSmartLinkTarget = typeof smartLinkTargets.$inferInsert;
+
+// Multi-Artist Support Schemas
+export const insertArtistSchema = createInsertSchema(artists);
+export const selectArtistSchema = createSelectSchema(artists);
+
+export const insertTrackArtistSchema = createInsertSchema(trackArtists);
+export const selectTrackArtistSchema = createSelectSchema(trackArtists);
+
+export const insertReleaseArtistSchema = createInsertSchema(releaseArtists);
+export const selectReleaseArtistSchema = createSelectSchema(releaseArtists);
+
+// Multi-Artist Support Types
+export type Artist = typeof artists.$inferSelect;
+export type NewArtist = typeof artists.$inferInsert;
+
+export type TrackArtist = typeof trackArtists.$inferSelect;
+export type NewTrackArtist = typeof trackArtists.$inferInsert;
+
+export type ReleaseArtist = typeof releaseArtists.$inferSelect;
+export type NewReleaseArtist = typeof releaseArtists.$inferInsert;
+
+// Enum value types (for type-safe use in queries and functions)
+export type ArtistRole = (typeof artistRoleEnum.enumValues)[number];
+export type ArtistType = (typeof artistTypeEnum.enumValues)[number];

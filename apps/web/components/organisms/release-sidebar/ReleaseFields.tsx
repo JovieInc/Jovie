@@ -7,7 +7,9 @@
  */
 
 import { Input, Label } from '@jovie/ui';
-import React from 'react';
+
+import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 import { formatReleaseDate } from './utils';
 
@@ -26,6 +28,8 @@ export function ReleaseFields({
   isEditable,
   onTitleChange,
 }: ReleaseFieldsProps) {
+  const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
+
   return (
     <div className='space-y-3'>
       {/* Title field */}
@@ -34,9 +38,7 @@ export function ReleaseFields({
         {isEditable ? (
           <Input
             value={title}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              onTitleChange(event.target.value)
-            }
+            onChange={event => onTitleChange(event.target.value)}
             placeholder='Release title'
           />
         ) : (
@@ -60,14 +62,10 @@ export function ReleaseFields({
         </div>
       </div>
 
-      {/* Smart link field (read-only) */}
+      {/* Smart link field with copy functionality */}
       <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
         <Label className='text-xs text-sidebar-muted'>Smart link</Label>
-        <div className='min-h-9 flex items-center text-sm'>
-          <span className='truncate text-sidebar-muted font-mono text-xs'>
-            {smartLinkPath}
-          </span>
-        </div>
+        <CopyLinkInput url={smartLinkUrl} size='sm' />
       </div>
     </div>
   );

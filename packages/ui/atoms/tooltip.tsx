@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
  * Should be rendered at app-level to provide tooltip context.
  */
 const TooltipProvider = ({
-  delayDuration = 700,
+  delayDuration = 1000,
   skipDelayDuration = 300,
   ...props
 }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Provider>) => (
@@ -84,9 +84,13 @@ const TooltipContent = React.forwardRef<
         data-testid={testId}
         className={cn(
           // Base layout + spacing
-          'z-50 inline-flex select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium leading-tight',
-          // Always-dark surface for consistent visibility (Linear-style)
-          'max-w-xs border border-white/[0.06] bg-[#1c1c1c] text-white shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
+          'z-50 inline-flex select-none items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium leading-tight',
+          // Theme-aware surface with subtle border
+          'max-w-xs border shadow-lg',
+          // Light mode: light bg, dark text
+          'border-black/10 bg-white text-neutral-900',
+          // Dark mode: dark bg, light text
+          'dark:border-white/10 dark:bg-neutral-900 dark:text-white',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
@@ -112,7 +116,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-[#1c1c1c]'
+            className='fill-white dark:fill-neutral-900'
             data-testid='tooltip-arrow'
           />
         )}

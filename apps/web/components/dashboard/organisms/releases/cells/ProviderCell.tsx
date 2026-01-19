@@ -159,9 +159,11 @@ function AddProviderUrlPopover({
             className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
             aria-hidden='true'
           />
-          <span className='line-clamp-1 group-hover/add:hidden'>Not found</span>
+          <span className='line-clamp-1 text-tertiary-token/50 group-hover/add:hidden'>
+            —
+          </span>
           <span className='line-clamp-1 hidden group-hover/add:inline'>
-            Click to add
+            Add link
           </span>
         </button>
       </PopoverTrigger>
@@ -380,8 +382,8 @@ export function ProviderCell({
           isSaving={isAddingUrl}
         />
       ) : (
-        <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token'>
-          Not found
+        <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token/50'>
+          —
         </span>
       )}
     </div>
