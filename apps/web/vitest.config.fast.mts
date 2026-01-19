@@ -11,6 +11,7 @@ dotenv.config({ path: '.env.test' });
 const isCI = process.env.CI === 'true';
 // Keep thread count conservative to avoid memory pressure in constrained runners.
 const maxThreads = isCI ? 2 : 2;
+const maxForks = isCI ? 1 : 2;
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
@@ -45,14 +46,13 @@ export default defineConfig({
       '.next/**',
     ],
 
-    // Performance optimizations
-    pool: 'threads', // Use threads instead of forks for better performance
+    // Performance/stability optimizations
+    // Use forks to avoid thread-worker heap OOMs in constrained environments.
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
-        minThreads: 1,
-        maxThreads,
-        useAtomics: true,
+      forks: {
+        minForks: 1,
+        maxForks,
       },
     },
 
