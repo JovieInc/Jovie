@@ -107,11 +107,13 @@ describe('DashboardOverview', () => {
     expect(screen.getByText('Add a music link')).toBeInTheDocument();
     expect(screen.getByText('Add social links')).toBeInTheDocument();
 
-    // Completed tasks should NOT have CTA links (Claim →, Add →)
-    // Only the "Add →" link for social links should be present
+    // Completed tasks should NOT have CTA links (Claim →)
     expect(
       screen.queryByRole('link', { name: /Claim →/i })
     ).not.toBeInTheDocument();
+
+    // Only the "Add →" link for social links should be present (incomplete task)
+    expect(screen.getByRole('link', { name: /Add →/i })).toBeInTheDocument();
 
     // Progress indicator reflects 2/3
     expect(screen.getByText('2 of 3 complete')).toBeInTheDocument();
