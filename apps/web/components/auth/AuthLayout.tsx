@@ -25,7 +25,6 @@ interface AuthLayoutProps {
   footerLinkHref?: string;
   showFooterPrompt?: boolean;
   showFormTitle?: boolean;
-  showLegalLinks?: boolean;
   logoSpinDelayMs?: number;
   showSkipLink?: boolean;
   showLogo?: boolean;
@@ -45,7 +44,6 @@ export function AuthLayout({
   footerLinkHref = '/waitlist',
   showFooterPrompt = true,
   showFormTitle = true,
-  showLegalLinks = false,
   logoSpinDelayMs,
   showSkipLink = true,
   showLogo = true,
@@ -127,9 +125,7 @@ export function AuthLayout({
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
         // Use smaller top padding when keyboard is visible
-        isKeyboardVisible
-          ? 'pt-8 pb-4'
-          : 'pt-10 sm:pt-12 md:pt-16 lg:pt-32 xl:pt-36 2xl:pt-40 pb-12',
+        isKeyboardVisible ? 'pt-8 pb-4' : 'pt-[18vh] sm:pt-[20vh] pb-12',
         // Safe area insets for notched devices (iPhone X+, Android with notches)
         'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
         'pl-[max(1rem,env(safe-area-inset-left))]',
@@ -232,32 +228,6 @@ export function AuthLayout({
             {footerLinkText}
           </Link>
         </p>
-      )}
-
-      {/* Legal links - hide when keyboard is visible, with safe area support */}
-      {showLegalLinks && !isKeyboardVisible && (
-        <nav
-          className={cn(
-            'absolute flex gap-4 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799]',
-            // Position with safe area inset support
-            'bottom-[max(1rem,env(safe-area-inset-bottom))]',
-            'animate-in fade-in-0 duration-200'
-          )}
-          aria-label='Legal'
-        >
-          <Link
-            href='/legal/terms'
-            className={`hover:text-[#1f2023] dark:hover:text-[#e3e4e6] transition-colors no-underline ${LINK_FOCUS_CLASSES}`}
-          >
-            Terms
-          </Link>
-          <Link
-            href='/legal/privacy'
-            className={`hover:text-[#1f2023] dark:hover:text-[#e3e4e6] transition-colors no-underline ${LINK_FOCUS_CLASSES}`}
-          >
-            Privacy Policy
-          </Link>
-        </nav>
       )}
 
       {logoSpinDelayMs ? (

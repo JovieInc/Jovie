@@ -26,8 +26,8 @@ const authInputClasses = cn(
   'rounded-[6px]',
   // Focus ring
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]',
-  // Mobile-optimized sizing - min 46px height for touch targets
-  'h-[46px] min-h-[46px]',
+  // Mobile-optimized sizing - min 44px height for touch targets
+  'h-[44px] min-h-[44px]',
   // Typography
   'text-[13px] leading-5',
   // Touch optimizations
