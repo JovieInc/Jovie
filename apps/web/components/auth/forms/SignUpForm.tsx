@@ -107,10 +107,6 @@ export function SignUpForm() {
     setStep('email');
   };
 
-  const handleBack = () => {
-    goBack();
-  };
-
   return (
     <Card className='shadow-none border-0 bg-transparent p-0'>
       <CardContent className='space-y-3 p-0'>
@@ -140,7 +136,7 @@ export function SignUpForm() {
               onSubmit={startEmailFlow}
               isLoading={loadingState.type === 'submitting'}
               error={error}
-              onBack={handleBack}
+              onBack={goBack}
               mode='signup'
             />
           </AccessibleStepWrapper>
@@ -166,7 +162,7 @@ export function SignUpForm() {
               isCompleting={loadingState.type === 'completing'}
               isResending={loadingState.type === 'resending'}
               error={error}
-              onBack={handleBack}
+              onBack={goBack}
               mode='signup'
             />
           </AccessibleStepWrapper>

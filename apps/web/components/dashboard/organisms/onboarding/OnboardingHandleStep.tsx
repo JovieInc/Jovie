@@ -40,9 +40,9 @@ export function OnboardingHandleStep({
   onSubmit,
 }: OnboardingHandleStepProps) {
   return (
-    <div className='flex flex-col items-center justify-center h-full space-y-8'>
-      <div className='text-center space-y-3 max-w-xl px-4'>
-        <h1 className='text-lg font-medium text-primary-token text-center'>
+    <div className='flex flex-col items-center justify-center h-full space-y-5'>
+      <div className='text-center space-y-2 max-w-xl px-4'>
+        <h1 className='text-lg font-normal text-primary-token text-center'>
           {title}
         </h1>
         {prompt ? (
@@ -54,11 +54,11 @@ export function OnboardingHandleStep({
         <form className='space-y-4' onSubmit={onSubmit}>
           <div
             className={[
-              'w-full flex items-center gap-2 rounded-[6px] border bg-white dark:bg-[#0f1011] px-4 py-3',
+              'w-full flex items-center gap-2 rounded-[6px] border bg-white dark:bg-[#0f1011] px-4 py-2.5',
               'focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]',
               stateError || handleValidation.error
                 ? 'border-error'
-                : 'border-[#d7d9de] dark:border-[#2c2e33]',
+                : 'border-gray-200 dark:border-[#1f2123]',
             ].join(' ')}
           >
             <span className='text-sm text-secondary-token whitespace-nowrap'>

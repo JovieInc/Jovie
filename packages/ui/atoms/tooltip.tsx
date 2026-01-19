@@ -48,7 +48,7 @@ TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 interface TooltipContentProps
   extends React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> {
   /**
-   * Whether to show the arrow pointer. Defaults to true.
+   * Whether to show the arrow pointer. Defaults to false for cleaner Linear-style appearance.
    */
   showArrow?: boolean;
   /**
@@ -59,8 +59,8 @@ interface TooltipContentProps
 }
 
 /**
- * Tooltip content with Tailwind v4 tokens, dark mode support, and accessibility features.
- * Includes reduced motion support and Apple-level polish.
+ * Tooltip content with always-dark Linear-style appearance.
+ * Includes reduced motion support and accessibility features.
  */
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
@@ -69,8 +69,8 @@ const TooltipContent = React.forwardRef<
   (
     {
       className,
-      sideOffset = 8,
-      showArrow = true,
+      sideOffset = 6,
+      showArrow = false,
       children,
       testId = 'tooltip-content',
       ...props
@@ -84,13 +84,12 @@ const TooltipContent = React.forwardRef<
         data-testid={testId}
         className={cn(
           // Base layout + spacing
-          'z-50 inline-flex select-none items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-xs font-medium leading-tight',
-          // Ephemeral surface: subtle border and shadow
-          'max-w-xs border border-black/10 bg-white text-gray-900 shadow-[0_12px_40px_rgba(0,0,0,0.15)]',
-          'dark:border-white/10 dark:bg-black dark:text-white dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]',
+          'z-50 inline-flex select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium leading-tight',
+          // Always-dark surface for consistent visibility (Linear-style)
+          'max-w-xs border border-white/[0.06] bg-[#1c1c1c] text-white shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
-          'data-[state=closed]:animate-out data-[state=closed]:duration-120 data-[state=closed]:ease-in',
+          'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
           'fade-in-0 data-[state=closed]:fade-out-0',
           'data-[side=bottom]:slide-in-from-top-1',
           'data-[side=left]:slide-in-from-right-1',
@@ -113,10 +112,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className={cn(
-              'fill-white dark:fill-black',
-              'drop-shadow-[0_10px_30px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)]'
-            )}
+            className='fill-[#1c1c1c]'
             data-testid='tooltip-arrow'
           />
         )}

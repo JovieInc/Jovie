@@ -48,12 +48,7 @@ type SidebarShortcutHintProps = {
 
 export function SidebarShortcutHint({ className }: SidebarShortcutHintProps) {
   return (
-    <Kbd
-      className={cn(
-        'inline-flex items-center rounded border border-sidebar-border bg-sidebar/40 px-1.5 py-0.5 text-[10px] font-medium text-sidebar-muted',
-        className
-      )}
-    >
+    <Kbd variant='tooltip' className={className}>
       ⌘/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}
     </Kbd>
   );

@@ -100,10 +100,11 @@ export default function DashboardLayoutClient({
 
   // Build a simple breadcrumb from the current path
   const crumbs = useMemo(() => {
-    const parts = (pathname || '/app/dashboard').split('/').filter(Boolean);
+    const parts = (pathname || '/app').split('/').filter(Boolean);
     const dashboardIndex = parts.indexOf('dashboard');
     const adminIndex = parts.indexOf('admin');
     const settingsIndex = parts.indexOf('settings');
+    const appIndex = parts.indexOf('app');
 
     // Determine the mode based on which section is active
     const getMode = (): 'dashboard' | 'admin' | 'settings' => {
@@ -124,6 +125,10 @@ export default function DashboardLayoutClient({
       if (mode === 'settings' && settingsIndex >= 0) {
         return parts.slice(settingsIndex + 1);
       }
+      // Handle /app root - no sub-paths
+      if (mode === 'dashboard' && appIndex >= 0 && dashboardIndex < 0) {
+        return [];
+      }
       return [];
     };
     const subs = getSubPaths();
@@ -135,7 +140,7 @@ export default function DashboardLayoutClient({
       if (mode === 'admin') return { label: 'Admin', href: '/app/admin' };
       if (mode === 'settings')
         return { label: 'Settings', href: '/app/settings' };
-      return { label: 'Dashboard', href: '/app/dashboard' };
+      return { label: 'Dashboard', href: '/app' };
     };
     const items: DashboardBreadcrumbItem[] = [getBaseBreadcrumb()];
 

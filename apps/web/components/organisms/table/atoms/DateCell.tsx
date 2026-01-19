@@ -11,10 +11,16 @@ interface DateCellProps {
   date: Date | null;
 
   /**
-   * Date format options
+   * Date format options for the cell display
    * @default { year: 'numeric', month: 'short', day: 'numeric' }
    */
   formatOptions?: Intl.DateTimeFormatOptions;
+
+  /**
+   * Date format options for the tooltip
+   * @default { year: 'numeric', month: 'long', day: 'numeric' }
+   */
+  tooltipFormatOptions?: Intl.DateTimeFormatOptions;
 
   /**
    * Locale for date formatting
@@ -52,6 +58,11 @@ export const DateCell = React.memo(function DateCell({
     month: 'short',
     day: 'numeric',
   },
+  tooltipFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  },
   locale = 'en-US',
   className,
 }: DateCellProps) {
@@ -62,16 +73,10 @@ export const DateCell = React.memo(function DateCell({
   // Format user-friendly date
   const formatted = new Intl.DateTimeFormat(locale, formatOptions).format(date);
 
-  // Format full timestamp for tooltip
-  const fullTimestamp = new Intl.DateTimeFormat(locale, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZoneName: 'short',
-  }).format(date);
+  // Format full date for tooltip
+  const fullDate = new Intl.DateTimeFormat(locale, tooltipFormatOptions).format(
+    date
+  );
 
   return (
     <Tooltip>
@@ -83,7 +88,7 @@ export const DateCell = React.memo(function DateCell({
         </span>
       </TooltipTrigger>
       <TooltipContent side='top' className='text-xs'>
-        {fullTimestamp}
+        {fullDate}
       </TooltipContent>
     </Tooltip>
   );

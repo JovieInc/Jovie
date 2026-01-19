@@ -9,7 +9,11 @@ import {
   canonicalIdentity,
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
-import { trimTrailingSlashes } from '@/lib/utils/string-utils';
+import {
+  findPlatformHandler,
+  parseUrlSafe,
+  stripUrlScheme,
+} from './link-display-utils.handlers';
 
 /**
  * Link section types for categorizing links in the UI
@@ -49,74 +53,11 @@ export function compactUrlDisplay(platformId: string, url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return '';
 
-  const withScheme = (() => {
-    if (
-      trimmed.toLowerCase().startsWith('http://') ||
-      trimmed.toLowerCase().startsWith('https://')
-    ) {
-      return trimmed;
-    }
-    return `https://${trimmed}`;
-  })();
+  const urlData = parseUrlSafe(trimmed);
+  if (!urlData) return stripUrlScheme(trimmed);
 
-  try {
-    const parsed = new URL(withScheme);
-    const host = parsed.hostname.replace(/^www\./, '');
-    const path = trimTrailingSlashes(parsed.pathname);
-    const segments = path.split('/').filter(Boolean);
-    const first = segments[0] ?? '';
-    const second = segments[1] ?? '';
-
-    const atOr = (value: string): string =>
-      value.startsWith('@') ? value : `@${value}`;
-
-    if (platformId === 'tiktok') {
-      if (!first) return host;
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (
-      platformId === 'instagram' ||
-      platformId === 'twitter' ||
-      platformId === 'x' ||
-      platformId === 'venmo'
-    ) {
-      if (!first) return host;
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (platformId === 'snapchat') {
-      if (!first) return host;
-      if (first === 'add' && second) return atOr(second);
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (platformId === 'youtube') {
-      if (first.startsWith('@')) return first;
-      if (
-        (first === 'channel' || first === 'c' || first === 'user') &&
-        second
-      ) {
-        return atOr(second);
-      }
-      return first ? first : host;
-    }
-
-    if (platformId === 'website') {
-      return host;
-    }
-
-    return host;
-  } catch {
-    const lowered = trimmed.toLowerCase();
-    const withoutScheme = lowered.startsWith('https://')
-      ? trimmed.slice(8)
-      : lowered.startsWith('http://')
-        ? trimmed.slice(7)
-        : trimmed;
-    const beforePath = withoutScheme.split('/')[0];
-    return beforePath || trimmed;
-  }
+  const handler = findPlatformHandler(platformId);
+  return handler ? handler.format(urlData) : urlData.host;
 }
 
 /**

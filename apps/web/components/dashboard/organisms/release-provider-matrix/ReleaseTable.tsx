@@ -93,12 +93,20 @@ export function ReleaseTable({
         cell: ({ getValue }) => {
           const date = getValue();
           return date ? (
-            <DateCell date={new Date(date)} />
+            <DateCell
+              date={new Date(date)}
+              formatOptions={{ year: 'numeric' }}
+              tooltipFormatOptions={{
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }}
+            />
           ) : (
             <span className='text-xs text-tertiary-token'>TBD</span>
           );
         },
-        size: 120,
+        size: 80,
         enableSorting: true,
       }),
 

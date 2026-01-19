@@ -1,8 +1,19 @@
 'use client';
 
 import * as React from 'react';
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
-import { cn } from '@/lib/utils';
+import { getPlatformIcon } from '@/components/atoms/SocialIcon';
+import {
+  CollapsedContent,
+  ExpandedContent,
+  PillIcon,
+  PillShimmer,
+  TrailingContent,
+} from './PlatformPill.parts';
+import {
+  getPillA11yProps,
+  getPillClassNames,
+  getPillTitle,
+} from './PlatformPill.utils';
 import {
   getBorderColors,
   getIconChipStyle,
@@ -130,135 +141,55 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       [isInteractive, onClick]
     );
 
-    const hasSecondary = Boolean(
-      secondaryText && secondaryText.trim().length > 0
+    // Compute class names and a11y props using extracted utilities
+    const pillClassName = getPillClassNames({
+      collapsed,
+      defaultExpanded,
+      stackable,
+      isInteractive,
+      tone,
+      state,
+      className,
+    });
+
+    const a11yProps = getPillA11yProps(
+      isInteractive,
+      collapsed,
+      platformName,
+      primaryText
     );
 
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: Interactive pill with keyboard support
-      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Dynamic role based on interactivity
       // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Interactive pill with keyboard support
       <div
         ref={ref}
-        role={isInteractive ? 'button' : undefined}
-        tabIndex={isInteractive ? 0 : undefined}
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
-        title={
-          collapsed
-            ? platformName === primaryText
-              ? primaryText
-              : `${platformName}: ${primaryText}`
-            : undefined
-        }
-        className={cn(
-          'group/pill relative inline-flex items-center rounded-full border text-xs font-medium',
-          'border-(--pill-border) hover:border-(--pill-border-hover)',
-          'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
-          'text-secondary-token hover:text-primary-token',
-          'transition-all duration-200',
-          // Collapsed: starts as icon circle, expands on hover
-          collapsed && 'h-7 justify-center px-2',
-          collapsed && !defaultExpanded && 'w-7 p-0',
-          collapsed && defaultExpanded && 'w-auto gap-1',
-          // Expanded: full width with padding
-          !collapsed && 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]',
-          // Stackable: negative margin for avatar-style overlap, last item has higher z-index
-          stackable && '-ml-2 first:ml-0',
-          stackable && 'last:z-10',
-          // Hover brings pill to front when stacked
-          stackable && 'hover:z-20',
-          isInteractive &&
-            'hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)',
-          isInteractive
-            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-(--pill-bg-hover)'
-            : 'cursor-default',
-          tone === 'faded' &&
-            'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',
-          state === 'hidden' && 'opacity-60',
-          state === 'loading' && 'animate-pulse motion-reduce:animate-none',
-          className
-        )}
+        title={getPillTitle(collapsed, platformName, primaryText)}
+        className={pillClassName}
         style={wrapperStyle}
         data-testid={testId}
-        aria-label={
-          isInteractive
-            ? collapsed
-              ? `${platformName}: ${primaryText}`
-              : `Select ${platformName}`
-            : undefined
-        }
+        {...a11yProps}
       >
-        {showShimmer ? (
-          <span
-            aria-hidden='true'
-            className='pointer-events-none absolute inset-0 animate-shimmer motion-reduce:animate-none opacity-30 dark:opacity-20'
-            style={{
-              backgroundImage:
-                'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)',
-              backgroundSize: '200% 100%',
-            }}
-          />
-        ) : null}
+        <PillShimmer show={showShimmer} />
+        <PillIcon platformIcon={platformIcon} style={iconChipStyle} />
 
-        {/* Icon - always visible */}
-        <span
-          className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-          style={iconChipStyle}
-          aria-hidden='true'
-        >
-          <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
-        </span>
-
-        {/* Content - visible in expanded mode, or on hover/defaultExpanded in collapsed mode */}
         {collapsed ? (
-          // Collapsed mode: text hidden unless defaultExpanded or on hover
-          <span
-            className={cn(
-              'whitespace-nowrap overflow-hidden transition-all duration-200',
-              !defaultExpanded &&
-                'w-0 opacity-0 group-hover/pill:w-auto group-hover/pill:opacity-100',
-              defaultExpanded && 'w-auto opacity-100'
-            )}
-          >
-            {primaryText}
-          </span>
+          <CollapsedContent
+            defaultExpanded={defaultExpanded}
+            primaryText={primaryText}
+          />
         ) : (
-          // Expanded mode: full layout with all features
-          <div className='flex items-center gap-1.5 overflow-hidden flex-1 min-w-0'>
-            <div className='min-w-0 flex-1'>
-              <span className={cn(primaryText.length > 40 && 'truncate')}>
-                {primaryText}
-              </span>
-              {hasSecondary ? (
-                <span
-                  className={cn(
-                    'ml-2 text-[10px] text-tertiary-token/80',
-                    secondaryText && secondaryText.length > 40 && 'truncate'
-                  )}
-                >
-                  {secondaryText}
-                </span>
-              ) : null}
-            </div>
-
-            {badgeText ? (
-              <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
-                {badgeText}
-              </span>
-            ) : null}
-
-            {suffix ? (
-              <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
-                {suffix}
-              </span>
-            ) : null}
-          </div>
+          <ExpandedContent
+            primaryText={primaryText}
+            secondaryText={secondaryText}
+            badgeText={badgeText}
+            suffix={suffix}
+          />
         )}
 
-        {trailing && !collapsed ? (
-          <div className='relative ml-1 shrink-0'>{trailing}</div>
-        ) : null}
+        <TrailingContent collapsed={collapsed}>{trailing}</TrailingContent>
       </div>
     );
   }

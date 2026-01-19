@@ -65,6 +65,18 @@ function isDevOrPreview(hostname: string): boolean {
   );
 }
 
+/**
+ * Get the dashboard URL based on environment.
+ * In production on app.jov.ie, dashboard is at '/'.
+ * In dev/preview, dashboard is at '/app'.
+ */
+function getDashboardUrl(hostname: string): string {
+  if (isDevOrPreview(hostname) && !isAppSubdomain(hostname)) {
+    return '/app';
+  }
+  return '/';
+}
+
 const EU_EEA_UK = [
   'AT',
   'BE',
@@ -323,7 +335,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         res = NextResponse.redirect(new URL(redirectUrl, req.url));
       } else {
         // Fully active user, no redirect_url - go to dashboard
-        res = NextResponse.redirect(new URL('/', req.url));
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -380,7 +394,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       ) {
         // Active user trying to access waitlist → redirect to dashboard
         // Skip for RSC prefetch to avoid "too many redirects" errors
-        res = NextResponse.redirect(new URL('/', req.url));
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
       } else if (
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
@@ -388,14 +404,18 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       ) {
         // Active user trying to access onboarding → redirect to dashboard
         // Skip for RSC prefetch to avoid "too many redirects" errors
-        res = NextResponse.redirect(new URL('/', req.url));
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
       } else if (
         (pathname === '/signin' || pathname === '/signup') &&
         !isRSCPrefetch
       ) {
         // Fully authenticated user hitting auth pages → redirect to dashboard
         // Skip for RSC prefetch to avoid "too many redirects" errors
-        res = NextResponse.redirect(new URL('/', req.url));
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
       } else {
         // All other paths - user is authenticated and on correct page
         res = NextResponse.next({ request: { headers: requestHeaders } });

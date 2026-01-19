@@ -60,10 +60,10 @@ export function DashboardNav(_props: DashboardNavProps) {
         const tooltip = shortcut
           ? {
               children: (
-                <div className='flex items-center gap-2'>
+                <>
                   <span>{item.name}</span>
-                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
-                </div>
+                  <Kbd variant='tooltip'>{shortcut}</Kbd>
+                </>
               ),
             }
           : item.name;
