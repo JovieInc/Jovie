@@ -155,6 +155,7 @@ export default async function RootLayout({
     <head>
       <script
         nonce={nonce}
+        suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for theme script injection
         dangerouslySetInnerHTML={{
           __html: `
@@ -202,6 +203,7 @@ export default async function RootLayout({
       <script
         type='application/ld+json'
         nonce={nonce}
+        suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
