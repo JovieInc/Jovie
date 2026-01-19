@@ -4,14 +4,13 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { DspMatchCard } from '@/components/dashboard/molecules/DspMatchCard';
-import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
+import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import {
   useConfirmDspMatchMutation,
   useRejectDspMatchMutation,
 } from '@/lib/queries/useDspEnrichmentMutations';
 import {
   countMatchesByStatus,
-  type DspMatch,
   useDspMatchesQuery,
 } from '@/lib/queries/useDspMatchesQuery';
 import { cn } from '@/lib/utils';
@@ -89,17 +88,6 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
     },
     [rejectMutation, profileId]
   );
-
-  // Group matches by provider for better organization
-  const _groupedMatches = useMemo(() => {
-    const groups = new Map<DspProviderId, DspMatch[]>();
-    for (const match of displayMatches) {
-      const existing = groups.get(match.providerId) ?? [];
-      existing.push(match);
-      groups.set(match.providerId, existing);
-    }
-    return groups;
-  }, [displayMatches]);
 
   if (error) {
     return (
