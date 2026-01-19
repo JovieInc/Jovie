@@ -20,8 +20,8 @@ interface AuthInputProps
 }
 
 const authInputClasses = cn(
-  // Base styling
-  'border border-[#d7d9de] bg-white text-[#1f2023] dark:border-[#2c2e33] dark:bg-[#0f1011] dark:text-white',
+  // Base styling - subtle borders for premium feel
+  'border border-gray-200 bg-white text-[#1f2023] dark:border-[#1f2123] dark:bg-[#0f1011] dark:text-white',
   'placeholder:text-[#9aa0a6] dark:placeholder:text-[#595a5c]',
   'rounded-[6px]',
   // Focus ring
