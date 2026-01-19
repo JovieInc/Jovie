@@ -173,17 +173,12 @@ const URL_VALIDATION_RULES: ValidationRule[] = [
     error: 'URLs pointing to internal/private addresses are not allowed',
   },
   {
-    check: hostname => isPrivateIp(hostname),
-    error: 'URLs pointing to internal/private IP addresses are not allowed',
-  },
-  {
     check: hostname =>
       INTERNAL_DOMAIN_SUFFIXES.some(suffix => hostname.endsWith(suffix)),
     error: 'URLs pointing to internal domains are not allowed',
   },
   {
-    check: hostname =>
-      METADATA_PATTERNS.includes(hostname) || hostname.includes('metadata'),
+    check: hostname => METADATA_PATTERNS.includes(hostname),
     error: 'URLs pointing to cloud metadata endpoints are not allowed',
   },
 ];
