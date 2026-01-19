@@ -296,12 +296,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
 
-    const normalizeRedirectPath = (path: string): string => {
-      // No longer need to add /app prefix - paths are clean
-      // Legacy /app/* paths are already redirected in domain routing above
-      return path;
-    };
-
     // Let SSO callback routes complete without middleware interference
     // The AuthenticateWithRedirectCallback component will handle routing based on user state
     // Skip redirects for RSC prefetch requests to avoid "too many redirects" errors
@@ -321,9 +315,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !redirectUrl.startsWith('//')
       ) {
         // User is fully active - honor redirect_url for things like /claim/token
-        res = NextResponse.redirect(
-          new URL(normalizeRedirectPath(redirectUrl), req.url)
-        );
+        res = NextResponse.redirect(new URL(redirectUrl, req.url));
       } else {
         // Fully active user, no redirect_url - go to dashboard
         res = NextResponse.redirect(new URL('/', req.url));

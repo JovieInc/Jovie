@@ -49,7 +49,7 @@ body {
 
 @layer base {
   :root {
-    --font-geist-sans: "Geist Sans";
+    --font-inter: "Inter Variable";
 
     /* Safe area inset custom properties for iOS device support */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -71,7 +71,7 @@ body {
 
 @theme {
   --font-sans:
-    var(--font-geist-sans), "Geist Sans", -apple-system, BlinkMacSystemFont,
+    var(--font-inter), "Inter Variable", -apple-system, BlinkMacSystemFont,
     "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
 
   --color-gray-50: #f9fafb;

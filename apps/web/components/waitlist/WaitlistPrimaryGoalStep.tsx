@@ -86,7 +86,7 @@ export function WaitlistPrimaryGoalStep({
               tabIndex={isTabStop ? 0 : -1}
               onClick={() => onSelect(option.value)}
               variant={isSelected ? 'primary' : 'secondary'}
-              className='w-full h-12 justify-center rounded-[6px] text-base sm:text-sm leading-5'
+              className='w-full h-11 justify-center rounded-[6px] text-[13px] leading-5'
               disabled={isSubmitting}
             >
               {option.label}

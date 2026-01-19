@@ -190,6 +190,26 @@ export function SignUpForm() {
             )}
           </p>
         )}
+
+        {step === 'method' && (
+          <p className='mt-6 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center'>
+            By signing up, you agree to our{' '}
+            <Link
+              href='/legal/terms'
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+            >
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link
+              href='/legal/privacy'
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        )}
       </CardContent>
     </Card>
   );
