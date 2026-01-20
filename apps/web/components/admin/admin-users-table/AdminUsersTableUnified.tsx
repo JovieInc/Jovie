@@ -34,12 +34,7 @@ const columnHelper = createColumnHelper<AdminUserRow>();
 export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const { users, page, pageSize, total, search, sort } = props;
 
-  const {
-    router,
-    openMenuUserId: _openMenuUserId,
-    setOpenMenuUserId: _setOpenMenuUserId,
-    pagination,
-  } = useAdminUsersTable(props);
+  const { router, pagination } = useAdminUsersTable(props);
 
   const {
     totalPages,
@@ -284,9 +279,9 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     ]
   );
 
-  // Get row className
+  // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group hover:bg-base dark:hover:bg-surface-2';
+    return 'group hover:bg-surface-2/50';
   }, []);
 
   return (
@@ -405,7 +400,6 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
             getRowClassName={getRowClassName}
             getContextMenuItems={getContextMenuItems}
             enableVirtualization={true}
-            rowHeight={60}
             minWidth='960px'
             className='text-[13px]'
           />
