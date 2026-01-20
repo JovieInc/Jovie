@@ -168,14 +168,14 @@ importers:
         specifier: ^10
         version: 10.32.1(@opentelemetry/context-async-hooks@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.103.0(@swc/core@1.15.3(@swc/helpers@0.5.18))(esbuild@0.27.2))
       '@statsig/react-bindings':
-        specifier: ^3.30.0
-        version: 3.30.2(react@18.3.1)
+        specifier: ^3.31.2
+        version: 3.31.2(react@18.3.1)
       '@statsig/session-replay':
-        specifier: ^3.30.0
-        version: 3.30.2
+        specifier: ^3.31.2
+        version: 3.31.2
       '@statsig/web-analytics':
-        specifier: ^3.31.0
-        version: 3.31.0
+        specifier: ^3.31.2
+        version: 3.31.2
       '@stripe/stripe-js':
         specifier: ^7.8.0
         version: 7.9.0
@@ -3455,28 +3455,22 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
-  '@statsig/client-core@3.30.2':
-    resolution: {integrity: sha512-F3u1+LDml6IFz/tMbSYI0pEOMR13OHM71lLJ3RuoWpK2KpCwfsHpt7kBmUKJxUXZ05CP/jWgmhG/ROj7eqDCPQ==}
+  '@statsig/client-core@3.31.2':
+    resolution: {integrity: sha512-Tfa3JC0fJJL0Pd13Le9ZxqZp1QD8XKQ9pyPaBeyhpB6QWzr6qqGusGFaSmmCJXu9ViN672Lgg87/43mANg2LBw==}
 
-  '@statsig/client-core@3.31.0':
-    resolution: {integrity: sha512-SuxQD6TmVszPG7FoMKwTk/uyBuVFk7XnxI3T/E0uyb7PL7GNjONtfsoh+NqBBVUJVse0CUeSFfgJPoZy1ZOslQ==}
+  '@statsig/js-client@3.31.2':
+    resolution: {integrity: sha512-uEIt2Zg0NTgIhg4jaMQYtdttrTDgQRtlk4E8N6cNBcq2i/Igea1DzVYD7RyEV9oiq3InHDOfuuP+p+w5oO+qeA==}
 
-  '@statsig/js-client@3.30.2':
-    resolution: {integrity: sha512-Cjs4uzyAxt1sw44oa6qSNWuZdO11jmgrpOVBC2NajtpA55GBmAfjZ3vQdXizUffUZMRmFiEpGwxi9zmjFEG7Sw==}
-
-  '@statsig/js-client@3.31.0':
-    resolution: {integrity: sha512-LFa5E0LjT6sTfZv3sNGoyRLSZ1078+agdgOA+Vm1ecjG+KbSOfBLTW7hMwimrJ29slRwbYDzbtKaPJo/R37N2g==}
-
-  '@statsig/react-bindings@3.30.2':
-    resolution: {integrity: sha512-tICFOSpKXaZBiuR+nJrI17hCVOFm0d//dXt41auw9Mhkbn43GwwEdBR8LjUiwxvQ6zVvWshjRUkYi13miBnh4g==}
+  '@statsig/react-bindings@3.31.2':
+    resolution: {integrity: sha512-27QFh5CBr/1keZSI7e7fYkaTESrbrM80wgOoLKeZSZ+xUBvP5kC1+UUzX+exIW62svWSf3lnWta2L1LzOapiXQ==}
     peerDependencies:
       react: ^16.6.3 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  '@statsig/session-replay@3.30.2':
-    resolution: {integrity: sha512-GTWFAnT6NqQzbFpqj9ojvBn42R8VlFXadwqP40fxOjwqboPIJrJ1NAAD+BzehTXoUnMi2vGviqsStgHNGrJ3TA==}
+  '@statsig/session-replay@3.31.2':
+    resolution: {integrity: sha512-7Y9NUgUemcLrJ7RPcUkILGLP/0eCvi+lD5vdbZ/vnTC1TUAYibH51yP7V+uVYSokHI9fqRSPbTglfFoRVKBhQQ==}
 
-  '@statsig/web-analytics@3.31.0':
-    resolution: {integrity: sha512-CmDzhKWuEWOkPmok6RC0K8Gq0C9SUTwYuIpExAxbHuf+GD+YAOHhWDnKnWKFaN9mBaTRcIvciX0hT/W+cGD0ug==}
+  '@statsig/web-analytics@3.31.2':
+    resolution: {integrity: sha512-9Y1I9s+7IK6YYK4E7hfSH/82zk2na3TDAKB3E6P6o9Z/E96vCRbfMETKyJKofPweEg35Asec/qcT9rpbDuuurw==}
 
   '@storybook/addon-a11y@10.1.11':
     resolution: {integrity: sha512-3sr6HmcDgW1+TQAV9QtWBE3HlGyfFXVZY3RECTNLNH6fRC+rYQCItisvQIVxQpyftLSQ8EAMN9JQzs495MjWNg==}
@@ -13892,34 +13886,28 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
-  '@statsig/client-core@3.30.2': {}
+  '@statsig/client-core@3.31.2': {}
 
-  '@statsig/client-core@3.31.0': {}
-
-  '@statsig/js-client@3.30.2':
+  '@statsig/js-client@3.31.2':
     dependencies:
-      '@statsig/client-core': 3.30.2
+      '@statsig/client-core': 3.31.2
 
-  '@statsig/js-client@3.31.0':
+  '@statsig/react-bindings@3.31.2(react@18.3.1)':
     dependencies:
-      '@statsig/client-core': 3.31.0
-
-  '@statsig/react-bindings@3.30.2(react@18.3.1)':
-    dependencies:
-      '@statsig/client-core': 3.30.2
-      '@statsig/js-client': 3.30.2
+      '@statsig/client-core': 3.31.2
+      '@statsig/js-client': 3.31.2
       react: 18.3.1
 
-  '@statsig/session-replay@3.30.2':
+  '@statsig/session-replay@3.31.2':
     dependencies:
       '@rrweb/record': 2.0.0-alpha.17
-      '@statsig/client-core': 3.30.2
+      '@statsig/client-core': 3.31.2
       rrweb: 2.0.0-alpha.17
 
-  '@statsig/web-analytics@3.31.0':
+  '@statsig/web-analytics@3.31.2':
     dependencies:
-      '@statsig/client-core': 3.31.0
-      '@statsig/js-client': 3.31.0
+      '@statsig/client-core': 3.31.2
+      '@statsig/js-client': 3.31.2
       web-vitals: 5.0.3
 
   '@storybook/addon-a11y@10.1.11(storybook@10.1.11(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(utf-8-validate@5.0.10))':
