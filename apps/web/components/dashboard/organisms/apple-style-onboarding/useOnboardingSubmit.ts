@@ -6,6 +6,7 @@ import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
 import {
   extractErrorCode,
+  getErrorMessage,
   isDatabaseError,
   mapErrorToUserMessage,
 } from './errors';
@@ -115,7 +116,8 @@ export function useOnboardingSubmit({
         goToNextStep();
       } catch (error) {
         // Handle Next.js redirect special case
-        if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+        const errMsg = getErrorMessage(error);
+        if (errMsg === 'NEXT_REDIRECT') {
           setState(prev => ({
             ...prev,
             step: 'complete',
@@ -125,8 +127,6 @@ export function useOnboardingSubmit({
           return;
         }
 
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
         const errorCode = extractErrorCode(error);
 
         // Handle database errors with retry suggestion
@@ -145,7 +145,7 @@ export function useOnboardingSubmit({
           track('onboarding_error', {
             user_id: userId,
             handle: resolvedHandle,
-            error_message: errorMessage,
+            error_message: errMsg,
             error_code: 'DATABASE_ERROR',
             error_step: 'submission',
             timestamp: new Date().toISOString(),
@@ -157,7 +157,7 @@ export function useOnboardingSubmit({
         track('onboarding_error', {
           user_id: userId,
           handle: resolvedHandle,
-          error_message: errorMessage,
+          error_message: errMsg,
           error_code: errorCode,
           error_step: 'submission',
           timestamp: new Date().toISOString(),
