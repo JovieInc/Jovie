@@ -278,9 +278,8 @@ export function useProfileEditor(
 
       const lastSaved = lastProfileSavedRef.current;
       if (
-        lastSaved &&
-        lastSaved.displayName === displayName &&
-        lastSaved.username === username
+        lastSaved?.displayName === displayName &&
+        lastSaved?.username === username
       ) {
         return;
       }

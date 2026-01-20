@@ -97,7 +97,7 @@ export function useUniversalLinkInput({
   const syncPreview = useCallback(() => {
     const callback = onPreviewChangeRef.current;
     if (!callback) return;
-    if (!detectedLink || !detectedLink.isValid) {
+    if (!detectedLink?.isValid) {
       callback(null, false);
       return;
     }
@@ -135,7 +135,7 @@ export function useUniversalLinkInput({
   );
 
   const handleAdd = useCallback(() => {
-    if (!detectedLink || !detectedLink.isValid) return;
+    if (!detectedLink?.isValid) return;
 
     const linkToAdd = { ...detectedLink };
     onAdd(linkToAdd);

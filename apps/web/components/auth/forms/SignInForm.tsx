@@ -65,7 +65,7 @@ export function SignInForm() {
   useEffect(() => {
     if (hasHandledEmailParam.current) return;
     const emailParam = searchParams.get('email');
-    if (emailParam && emailParam.includes('@')) {
+    if (emailParam?.includes('@')) {
       hasHandledEmailParam.current = true;
       setEmail(emailParam);
       setStep('email');

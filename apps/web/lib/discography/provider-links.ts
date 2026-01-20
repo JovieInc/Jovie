@@ -55,7 +55,7 @@ const DEFAULT_APPLE_STOREFRONT = 'us';
 
 function buildSearchQuery(track: TrackDescriptor): string {
   const parts = [track.isrc, track.artistName, track.title]
-    .filter((value): value is string => Boolean(value && value.trim()))
+    .filter((value): value is string => Boolean(value?.trim()))
     .map(value => value.trim());
 
   return encodeURIComponent(parts.join(' '));

@@ -145,11 +145,10 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
 
     // Determine if profile is complete
     const hasCompleteProfile = Boolean(
-      profile &&
-        profile.onboardingCompletedAt &&
-        profile.username &&
-        profile.displayName &&
-        profile.isPublic !== false
+      profile?.onboardingCompletedAt &&
+        profile?.username &&
+        profile?.displayName &&
+        profile?.isPublic !== false
     );
 
     // Map userStatus lifecycle enum to Clerk's simpler status

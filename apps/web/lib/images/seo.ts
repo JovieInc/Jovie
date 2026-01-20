@@ -68,7 +68,7 @@ export function generateSEOAltText(
   const { artistName, type, description, fallback } = context;
 
   // If we have a description, use it
-  if (description && description.trim()) {
+  if (description?.trim()) {
     return description.trim();
   }
 
@@ -119,12 +119,12 @@ function cleanFilename(filename: string): string {
   return (
     filename
       // Remove file extension
-      .replaceAll(/\.(jpg|jpeg|png|webp|avif|svg|gif)$/i, '')
+      .replaceAll(/\.(jpg|jpeg|png|webp|avif|svg|gif)$/gi, '')
       // Replace common separators with spaces
       .replaceAll(/[-_]/g, ' ')
       // Remove common image prefixes/suffixes
-      .replaceAll(/^(img|image|photo|pic|picture)[\s-_]/i, '')
-      .replaceAll(/[\s-_](img|image|photo|pic|picture)$/i, '')
+      .replaceAll(/^(img|image|photo|pic|picture)[\s-_]/gi, '')
+      .replaceAll(/[\s-_](img|image|photo|pic|picture)$/gi, '')
       // Capitalize words
       .replaceAll(/\b\w/g, l => l.toUpperCase())
       // Clean up multiple spaces

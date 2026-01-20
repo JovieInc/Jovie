@@ -78,8 +78,7 @@ export function useAvatarUpload({
     const url = URL.createObjectURL(file);
     setPreviewUrl(prev => {
       if (
-        prev &&
-        prev.startsWith('blob:') &&
+        prev?.startsWith('blob:') &&
         typeof URL.revokeObjectURL === 'function'
       ) {
         URL.revokeObjectURL(prev);
@@ -92,8 +91,7 @@ export function useAvatarUpload({
   useEffect(
     () => () => {
       if (
-        previewUrl &&
-        previewUrl.startsWith('blob:') &&
+        previewUrl?.startsWith('blob:') &&
         typeof URL !== 'undefined' &&
         typeof URL.revokeObjectURL === 'function'
       ) {

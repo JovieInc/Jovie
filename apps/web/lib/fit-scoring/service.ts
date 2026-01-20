@@ -300,7 +300,7 @@ export async function updatePaidTierScore(
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
 
-  if (!profile || !profile.fitScoreBreakdown) {
+  if (!profile?.fitScoreBreakdown) {
     // No existing score, do a full calculation
     await calculateAndStoreFitScore(db, creatorProfileId);
     return;
