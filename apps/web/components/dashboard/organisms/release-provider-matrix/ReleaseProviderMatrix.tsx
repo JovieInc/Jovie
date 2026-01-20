@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Copy } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
@@ -103,13 +103,17 @@ export function ReleaseProviderMatrix({
   // Connect to tableMeta for drawer toggle button
   const { setTableMeta } = useTableMeta();
 
+  // Use ref to avoid infinite loop - rows array reference changes each render
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+
   useEffect(() => {
     // Toggle function: close if open, open first release if closed
     const toggle = () => {
       if (editingRelease) {
         closeEditor();
-      } else if (rows.length > 0) {
-        openEditor(rows[0]);
+      } else if (rowsRef.current.length > 0) {
+        openEditor(rowsRef.current[0]);
       }
     };
 
@@ -120,7 +124,7 @@ export function ReleaseProviderMatrix({
     });
   }, [
     editingRelease,
-    rows,
+    rows.length,
     closeEditor,
     openEditor,
     isSidebarOpen,
