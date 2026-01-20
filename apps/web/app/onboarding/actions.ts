@@ -470,22 +470,25 @@ export async function completeOnboarding({
       // Continue with onboarding - metadata sync is not critical
     }
 
-    if (redirectToDashboard) {
-      // ENG-002: Set completion cookie to prevent redirect loop race condition
-      // The proxy checks this cookie and bypasses needsOnboarding check for 30s
-      // This handles the race between transaction commit and proxy's DB read
-      const cookieStore = await cookies();
-      cookieStore.set('jovie_onboarding_complete', '1', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 30, // 30 seconds - enough time to bypass proxy check
-        path: '/',
-      });
+    // ENG-002: Set completion cookie to prevent redirect loop race condition
+    // The proxy checks this cookie and bypasses needsOnboarding check for 30s
+    // This handles the race between transaction commit and proxy's DB read
+    // IMPORTANT: Always set this cookie on success, even when redirectToDashboard=false,
+    // because the user will navigate to dashboard after seeing the completion step
+    const cookieStore = await cookies();
+    cookieStore.set('jovie_onboarding_complete', '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
+      path: '/',
+    });
 
-      // Invalidate dashboard data cache to prevent stale data causing redirect loops
-      // This ensures the app layout gets fresh data showing onboarding is complete
-      revalidatePath('/app', 'layout');
+    // Invalidate dashboard data cache to prevent stale data causing redirect loops
+    // This ensures the app layout gets fresh data showing onboarding is complete
+    revalidatePath('/app', 'layout');
+
+    if (redirectToDashboard) {
       redirect('/app/dashboard');
     }
 
