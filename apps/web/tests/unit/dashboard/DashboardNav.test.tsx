@@ -7,7 +7,7 @@ import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
-const mockUsePathname = vi.fn(() => '/');
+const mockUsePathname = vi.fn(() => '/app');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
@@ -93,7 +93,7 @@ describe('DashboardNav', () => {
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    const overviewLink = container.querySelector('[href="/"]');
+    const overviewLink = container.querySelector('[href="/app"]');
     expect(overviewLink).toBeDefined();
     expect(overviewLink?.className).toContain('justify-center');
   });
@@ -114,7 +114,7 @@ describe('DashboardNav', () => {
   });
 
   it('renders with different pathname', () => {
-    mockUsePathname.mockReturnValueOnce('/profile');
+    mockUsePathname.mockReturnValueOnce('/app/dashboard/profile');
 
     const { getByRole } = renderDashboardNav();
 
