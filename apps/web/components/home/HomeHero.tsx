@@ -7,7 +7,7 @@ import { HeroSection } from '@/components/organisms/HeroSection';
 import { FEATURE_FLAGS, useFeatureFlagWithLoading } from '@/lib/analytics';
 import { ClaimHandleForm } from './ClaimHandleForm';
 
-export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
+export function HomeHero({ subtitle }: Readonly<{ subtitle?: ReactNode }>) {
   const { enabled: showClaimHandle, loading } = useFeatureFlagWithLoading(
     FEATURE_FLAGS.CLAIM_HANDLE,
     false

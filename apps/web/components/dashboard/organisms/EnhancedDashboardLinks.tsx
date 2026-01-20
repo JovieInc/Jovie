@@ -47,9 +47,9 @@ const GroupedLinksManager = dynamic(
 
 export function EnhancedDashboardLinks({
   initialLinks,
-}: {
+}: Readonly<{
   initialLinks: ProfileSocialLink[];
-}) {
+}>) {
   // Feature gate for suggestions
   const linkIngestionGate = useFeatureGate(STATSIG_FLAGS.LINK_INGESTION);
   const suggestionsEnabled = linkIngestionGate?.value ?? false;

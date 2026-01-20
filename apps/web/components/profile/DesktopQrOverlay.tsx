@@ -11,7 +11,7 @@ interface DesktopQrOverlayProps {
   handle: string;
 }
 
-export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
+export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [dismissed, setDismissed] = useState(false);
   const [url, setUrl] = useState('');
