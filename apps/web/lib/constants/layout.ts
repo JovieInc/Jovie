@@ -14,15 +14,14 @@ export const SIDEBAR_WIDTH = 320; // px
 /**
  * Standard table row heights
  *
- * Different tables may use different row heights based on their content:
- * - COMPACT: High-density views (e.g., Audience CRM with many rows)
- * - STANDARD: Default for most tables
- * - TALL: Tables with multi-line content (e.g., Activity log with descriptions)
+ * All tables now use COMPACT (44px) as the standard for visual consistency.
+ * - COMPACT/STANDARD: 44px - unified row height for all tables
+ * - TALL: 60px - deprecated, kept for backwards compatibility
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 44, // Audience table (high-density exception)
-  STANDARD: 52, // Default for most tables
-  TALL: 60, // Activity table (multi-line content exception)
+  COMPACT: 44, // Unified standard row height
+  STANDARD: 44, // Same as COMPACT - all tables use 44px
+  TALL: 60, // Deprecated - remove after full migration
 } as const;
 
 /**
