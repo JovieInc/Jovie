@@ -13,14 +13,14 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
+import {
+  dropdownMenuContentClasses,
+  MENU_ITEM_BASE,
+  MENU_ITEM_DESTRUCTIVE,
+} from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
-import {
-  geistTableMenuContentClass,
-  geistTableMenuDestructiveItemClass,
-  geistTableMenuItemClass,
-} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
 
 export type LinkPillState =
@@ -143,7 +143,7 @@ export function LinkPill({
               ref={setFloatingRef}
               tabIndex={-1}
               style={floatingStyles}
-              className={cn('z-100 min-w-[176px]', geistTableMenuContentClass)}
+              className={cn('z-100 min-w-[176px]', dropdownMenuContentClasses)}
               {...getFloatingProps()}
             >
               {menuItems.map((item, index) => (
@@ -156,11 +156,9 @@ export function LinkPill({
                     item.onSelect();
                   }}
                   className={cn(
-                    geistTableMenuItemClass,
+                    MENU_ITEM_BASE,
                     'w-full text-left active:scale-[0.98]',
-                    item.variant === 'destructive'
-                      ? geistTableMenuDestructiveItemClass
-                      : null
+                    item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                   )}
                   {...getItemProps()}
                 >

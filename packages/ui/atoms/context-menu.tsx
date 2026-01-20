@@ -4,25 +4,17 @@ import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
 import * as React from 'react';
 
+import {
+  CHECKBOX_RADIO_ITEM_BASE,
+  CONTEXT_TRANSFORM_ORIGIN,
+  contextMenuContentClasses,
+  MENU_ITEM_BASE,
+  MENU_LABEL_BASE,
+  MENU_SEPARATOR_BASE,
+  MENU_SHORTCUT_BASE,
+  subMenuContentClasses,
+} from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
-
-const glassBaseTransitions =
-  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ';
-
-const glassPositioning =
-  'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 ' +
-  'data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ' +
-  'origin-[--radix-context-menu-content-transform-origin]';
-
-const contentBaseClasses =
-  'z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-[10rem] overflow-y-auto overflow-x-hidden rounded-xl border border-subtle bg-surface-1 p-2 text-primary-token shadow-[0_12px_40px_rgba(0,0,0,0.12)] ring-1 ring-black/5 dark:shadow-[0_18px_60px_rgba(0,0,0,0.55)] dark:ring-white/5 ' +
-  glassBaseTransitions +
-  glassPositioning;
-
-const subContentBaseClasses =
-  'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-subtle bg-surface-1 p-2 text-primary-token shadow-[0_12px_40px_rgba(0,0,0,0.12)] ring-1 ring-black/5 dark:shadow-[0_18px_60px_rgba(0,0,0,0.55)] dark:ring-white/5 ' +
-  glassBaseTransitions +
-  glassPositioning;
 
 const ContextMenu = ContextMenuPrimitive.Root;
 
@@ -44,11 +36,7 @@ const ContextMenuSubTrigger = React.forwardRef<
 >(({ className, inset, children, ...props }, ref) => (
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
-    className={cn(
-      'flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none text-secondary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1) [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
-      inset && 'pl-10',
-      className
-    )}
+    className={cn(MENU_ITEM_BASE, inset && 'pl-10', className)}
     {...props}
   >
     {children}
@@ -69,7 +57,7 @@ const ContextMenuSubContent = React.forwardRef<
   const content = (
     <ContextMenuPrimitive.SubContent
       ref={ref}
-      className={cn(subContentBaseClasses, className)}
+      className={cn(subMenuContentClasses, CONTEXT_TRANSFORM_ORIGIN, className)}
       {...props}
     />
   );
@@ -98,7 +86,7 @@ const ContextMenuContent = React.forwardRef<
   const content = (
     <ContextMenuPrimitive.Content
       ref={ref}
-      className={cn(contentBaseClasses, className)}
+      className={cn(contextMenuContentClasses, className)}
       {...props}
     />
   );
@@ -123,11 +111,7 @@ const ContextMenuItem = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Item
     ref={ref}
-    className={cn(
-      'relative flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-surface-2 hover:text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1) [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
-      inset && 'pl-10',
-      className
-    )}
+    className={cn(MENU_ITEM_BASE, inset && 'pl-10', className)}
     {...props}
   />
 ));
@@ -139,10 +123,7 @@ const ContextMenuCheckboxItem = React.forwardRef<
 >(({ className, children, checked, ...props }, ref) => (
   <ContextMenuPrimitive.CheckboxItem
     ref={ref}
-    className={cn(
-      'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-10 pr-3 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-surface-2 hover:text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1)',
-      className
-    )}
+    className={cn(CHECKBOX_RADIO_ITEM_BASE, className)}
     checked={checked}
     {...props}
   >
@@ -163,10 +144,7 @@ const ContextMenuRadioItem = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <ContextMenuPrimitive.RadioItem
     ref={ref}
-    className={cn(
-      'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-10 pr-3 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-surface-2 hover:text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1)',
-      className
-    )}
+    className={cn(CHECKBOX_RADIO_ITEM_BASE, className)}
     {...props}
   >
     <span className='absolute left-2 flex h-3.5 w-3.5 items-center justify-center'>
@@ -187,11 +165,7 @@ const ContextMenuLabel = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Label
     ref={ref}
-    className={cn(
-      'px-3 py-1 text-xs font-semibold uppercase tracking-wide text-tertiary-token/80',
-      inset && 'pl-10',
-      className
-    )}
+    className={cn(MENU_LABEL_BASE, inset && 'pl-10', className)}
     {...props}
   />
 ));
@@ -203,7 +177,7 @@ const ContextMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Separator
     ref={ref}
-    className={cn('-mx-1 my-1 h-px bg-(--color-border-subtle)/70', className)}
+    className={cn(MENU_SEPARATOR_BASE, className)}
     {...props}
   />
 ));
@@ -213,15 +187,7 @@ const ContextMenuShortcut = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span
-      className={cn(
-        'ml-auto text-[10px] tracking-[0.35em] text-tertiary-token/70',
-        className
-      )}
-      {...props}
-    />
-  );
+  return <span className={cn(MENU_SHORTCUT_BASE, className)} {...props} />;
 };
 ContextMenuShortcut.displayName = 'ContextMenuShortcut';
 

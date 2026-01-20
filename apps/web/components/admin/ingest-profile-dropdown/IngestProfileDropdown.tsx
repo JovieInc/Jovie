@@ -39,8 +39,8 @@ export function IngestProfileDropdown({
           Ingest Profile
         </Button>
       </PopoverTrigger>
-      <PopoverContent align='end' className='w-80 p-0'>
-        <div className='p-4 space-y-4'>
+      <PopoverContent align='end' className='w-80'>
+        <div className='space-y-4'>
           <div className='flex items-center justify-between'>
             <div>
               <p className='text-sm font-semibold text-primary-token'>

@@ -7,6 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
 import Link from 'next/link';
 import { type ReactNode, useCallback, useState } from 'react';
@@ -17,12 +18,6 @@ import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-me
 import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import {
-  geistTableMenuContentClass,
-  geistTableMenuDestructiveItemClass,
-  geistTableMenuItemClass,
-  geistTableMenuSeparatorClass,
-} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -52,7 +47,7 @@ const renderContextMenuItem = ({
 }) => {
   if (href) {
     return (
-      <ContextMenuItem asChild className={geistTableMenuItemClass}>
+      <ContextMenuItem asChild>
         <Link
           href={href}
           target='_blank'
@@ -69,10 +64,7 @@ const renderContextMenuItem = ({
     <ContextMenuItem
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        geistTableMenuItemClass,
-        destructive && geistTableMenuDestructiveItemClass
-      )}
+      className={cn(destructive && MENU_ITEM_DESTRUCTIVE)}
     >
       {children}
     </ContextMenuItem>
@@ -288,7 +280,7 @@ export function CreatorProfileTableRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
-      <ContextMenuContent className={geistTableMenuContentClass}>
+      <ContextMenuContent>
         <CreatorActionsMenuContent
           profile={profile}
           status={verificationStatus}
@@ -304,9 +296,7 @@ export function CreatorProfileTableRow({
           copySuccess={copySuccess}
           onCopyClaimLink={handleCopyClaimLink}
           renderItem={renderContextMenuItem}
-          renderSeparator={() => (
-            <ContextMenuSeparator className={geistTableMenuSeparatorClass} />
-          )}
+          renderSeparator={() => <ContextMenuSeparator />}
         />
       </ContextMenuContent>
     </ContextMenu>
