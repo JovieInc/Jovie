@@ -18,6 +18,7 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
+  configurable: true,
   writable: true,
   value: vi.fn().mockImplementation(query => ({
     matches: false,
@@ -33,6 +34,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock window.scrollTo
 Object.defineProperty(window, 'scrollTo', {
+  configurable: true,
   writable: true,
   value: vi.fn(),
 });

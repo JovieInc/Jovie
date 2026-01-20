@@ -54,12 +54,12 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use VM pool with a memory limit to mitigate long-run memory growth.
-    pool: 'vmThreads',
+    // Use VM forks pool with a memory limit to mitigate long-run memory growth.
+    pool: 'vmForks',
     poolOptions: {
-      vmThreads: {
-        minThreads: 1,
-        maxThreads,
+      vmForks: {
+        minForks: 1,
+        maxForks: maxThreads,
         isolate: true,
         // If you see memory leaks, lower this; if you see OOM, raise it.
         memoryLimit: '1024MB',
