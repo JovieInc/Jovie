@@ -56,7 +56,7 @@ export async function GET(
   const { isrc } = await params;
 
   // Normalize ISRC: remove dashes and uppercase
-  const normalizedIsrc = isrc.replace(/-/g, '').toUpperCase();
+  const normalizedIsrc = isrc.replaceAll('-', '').toUpperCase();
 
   // Validate ISRC format
   if (!ISRC_PATTERN.test(normalizedIsrc)) {

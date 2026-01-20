@@ -327,13 +327,13 @@ export function generateUsernameSuggestions(
   artistName?: string
 ): string[] {
   const suggestions: string[] = [];
-  const base = baseUsername.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const base = baseUsername.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
 
   if (artistName) {
     const artistSlug = artistName
       .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
+      .replaceAll(/[^a-z0-9-]/g, '-')
+      .replaceAll(/-+/g, '-')
       .replace(/(^-)|(-$)/g, '');
 
     if (artistSlug) {

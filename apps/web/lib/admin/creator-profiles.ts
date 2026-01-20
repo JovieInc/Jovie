@@ -77,7 +77,7 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   const limited = trimmed.slice(0, 100);
 
   // Allow basic handle-like characters and spaces; drop anything else
-  const sanitized = limited.replace(/[^a-zA-Z0-9_\-\s]/g, '');
+  const sanitized = limited.replaceAll(/[^a-zA-Z0-9_\-\s]/g, '');
 
   if (sanitized.length === 0) return undefined;
 

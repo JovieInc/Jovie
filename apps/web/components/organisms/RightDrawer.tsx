@@ -29,7 +29,7 @@ export function RightDrawer({
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}
-      onKeyDown={onKeyDown}
+      onKeyDown={isOpen ? onKeyDown : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
         'bg-surface-1 border-l border-subtle',

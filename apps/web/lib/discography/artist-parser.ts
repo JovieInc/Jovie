@@ -101,8 +101,8 @@ const AND_PATTERN = /\s+(?:&|and|\s+x\s+)\s+/i;
 export function normalizeArtistName(name: string): string {
   return name
     .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[^\w\s'-]/g, '')
+    .replaceAll(/\s+/g, ' ')
+    .replaceAll(/[^\w\s'-]/g, '')
     .trim();
 }
 
@@ -112,7 +112,7 @@ export function normalizeArtistName(name: string): string {
  * - Remove duplicate spaces
  */
 function cleanArtistName(name: string): string {
-  return name.replace(/\s+/g, ' ').trim();
+  return name.replaceAll(/\s+/g, ' ').trim();
 }
 
 /**
@@ -467,13 +467,13 @@ export function cleanTrackTitle(title: string): string {
   return (
     title
       // Remove featured credits
-      .replace(/[\(\[]?\s*(?:feat\.?|ft\.?|featuring)\s+[^)\]]+[\)\]]?/gi, '')
+      .replaceAll(/[\(\[]?\s*(?:feat\.?|ft\.?|featuring)\s+[^)\]]+[\)\]]?/gi, '')
       // Remove remix credits
       .replace(REMIX_PATTERN, '')
       // Remove "with" credits
-      .replace(/[\(\[]?\s*with\s+[^)\]]+[\)\]]?/gi, '')
+      .replaceAll(/[\(\[]?\s*with\s+[^)\]]+[\)\]]?/gi, '')
       // Clean up whitespace and trailing punctuation
-      .replace(/\s+/g, ' ')
+      .replaceAll(/\s+/g, ' ')
       .replace(/\s*[-–]\s*$/, '')
       .trim()
   );

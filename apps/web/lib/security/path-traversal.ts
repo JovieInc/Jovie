@@ -73,15 +73,15 @@ export function sanitizeFilename(filename: string): string {
   return (
     filename
       // Remove path separators
-      .replace(/[\/\\]/g, '')
+      .replaceAll(/[\/\\]/g, '')
       // Remove parent directory references
-      .replace(/\.\./g, '')
+      .replaceAll(/\.\./g, '')
       // Remove null bytes
-      .replace(/\0/g, '')
+      .replaceAll(/\0/g, '')
       // Remove control characters
-      .replace(CONTROL_CHARACTER_REGEX, '')
+      .replaceAll(CONTROL_CHARACTER_REGEX, '')
       // Remove other potentially dangerous characters
-      .replace(/[<>:"|?*]/g, '')
+      .replaceAll(/[<>:"|?*]/g, '')
       // Trim whitespace
       .trim()
       // Limit length

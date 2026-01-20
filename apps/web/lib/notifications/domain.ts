@@ -73,14 +73,14 @@ const sanitizeCity = (raw: string | null | undefined) => {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  const cleaned = trimmed.replace(CONTROL_CHAR_REGEX, '').replace(/\s+/g, ' ');
+  const cleaned = trimmed.replace(CONTROL_CHAR_REGEX, '').replaceAll(/\s+/g, ' ');
   return cleaned || null;
 };
 
 const sanitizeCountryCode = (raw: string | null | undefined) => {
   if (!raw) return null;
   const trimmed = raw.trim().slice(0, 2).toUpperCase();
-  const normalized = trimmed.replace(/[^A-Z]/g, '');
+  const normalized = trimmed.replaceAll(/[^A-Z]/g, '');
   return normalized.length === 2 ? normalized : null;
 };
 

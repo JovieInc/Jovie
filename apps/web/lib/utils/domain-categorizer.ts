@@ -294,9 +294,9 @@ export function containsSensitiveKeywords(text: string): boolean {
 export function sanitizeForCrawlers(text: string): string {
   // Replace sensitive keywords with generic terms
   return text
-    .replace(/\b(porn|adult|xxx|nsfw|sex)\b/gi, 'content')
-    .replace(/\b(casino|gambling|bet)\b/gi, 'gaming')
-    .replace(/\b(crypto|bitcoin|ethereum)\b/gi, 'digital')
-    .replace(/\b(trading|forex)\b/gi, 'investment')
-    .replace(/\b(loan|cash advance)\b/gi, 'financial');
+    .replaceAll(/\b(porn|adult|xxx|nsfw|sex)\b/gi, 'content')
+    .replaceAll(/\b(casino|gambling|bet)\b/gi, 'gaming')
+    .replaceAll(/\b(crypto|bitcoin|ethereum)\b/gi, 'digital')
+    .replaceAll(/\b(trading|forex)\b/gi, 'investment')
+    .replaceAll(/\b(loan|cash advance)\b/gi, 'financial');
 }

@@ -26,7 +26,7 @@ export function normalizeSubscriptionPhone(
   if (!trimmed) return null;
   if (trimmed.length > PHONE_MAX_LENGTH) return null;
 
-  let normalized = trimmed.replace(/(?!^\+)[^\d]/g, '');
+  let normalized = trimmed.replaceAll(/(?!^\+)[^\d]/g, '');
 
   if (normalized.startsWith('00')) {
     normalized = `+${normalized.slice(2)}`;
@@ -36,7 +36,7 @@ export function normalizeSubscriptionPhone(
     normalized = `+${normalized}`;
   }
 
-  normalized = `+${normalized.slice(1).replace(/\D/g, '')}`;
+  normalized = `+${normalized.slice(1).replaceAll(/\D/g, '')}`;
 
   if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
     return null;
