@@ -43,7 +43,8 @@ export function isYouTubeChannelUrl(url: string): boolean {
       return false;
     }
     const normalized = normalizeUrl(url);
-    return CHANNEL_PATTERNS.some(rx => rx.test(normalized));
+    const httpsNormalized = normalized.replace(/^http:\/\//i, 'https://');
+    return CHANNEL_PATTERNS.some(rx => rx.test(httpsNormalized));
   } catch {
     return false;
   }

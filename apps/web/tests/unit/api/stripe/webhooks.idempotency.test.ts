@@ -13,8 +13,6 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
-
 describe('/api/stripe/webhooks - Idempotency Handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,10 +22,6 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
   });
 
   it('skips processing for duplicate events', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_duplicate',
       type: 'checkout.session.completed',
@@ -44,6 +38,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );

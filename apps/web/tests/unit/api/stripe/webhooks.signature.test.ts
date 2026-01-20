@@ -11,8 +11,6 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
-
 describe('/api/stripe/webhooks - Signature Verification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -22,8 +20,6 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
   });
 
   it('returns 400 when signature header is missing', async () => {
-    vi.mocked(headers).mockResolvedValue(new Map() as any);
-
     const request = new NextRequest(
       'http://localhost:3000/api/stripe/webhooks',
       {
@@ -39,10 +35,6 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
   });
 
   it('returns 400 when signature is invalid', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_invalid']]) as any
-    );
-
     mockConstructEvent.mockImplementation(() => {
       throw new Error('Invalid signature');
     });
@@ -51,6 +43,7 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_invalid' },
         body: 'test-body',
       }
     );
