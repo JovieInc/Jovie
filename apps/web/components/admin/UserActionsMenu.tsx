@@ -12,11 +12,6 @@ import { Copy, ExternalLink, MoreVertical } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import type { AdminUserRow } from '@/lib/admin/users';
-import {
-  geistTableMenuContentClass,
-  geistTableMenuItemClass,
-  geistTableMenuSeparatorClass,
-} from '@/lib/ui/geist-table-menu';
 
 interface UserActionsMenuProps {
   user: AdminUserRow;
@@ -77,32 +72,21 @@ export function UserActionsMenu({
           <MoreVertical className='h-4 w-4' />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align='end'
-        sideOffset={8}
-        className={geistTableMenuContentClass}
-      >
-        <DropdownMenuItem
-          onClick={handleCopyClerkId}
-          className={geistTableMenuItemClass}
-        >
+      <DropdownMenuContent align='end' sideOffset={8}>
+        <DropdownMenuItem onClick={handleCopyClerkId}>
           <Copy className='h-4 w-4' />
           {copySuccess ? 'Copied!' : 'Copy Clerk user ID'}
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          disabled={!user.email}
-          onClick={handleCopyEmail}
-          className={geistTableMenuItemClass}
-        >
+        <DropdownMenuItem disabled={!user.email} onClick={handleCopyEmail}>
           <Copy className='h-4 w-4' />
           Copy email
         </DropdownMenuItem>
 
         {clerkConsoleUrl ? (
           <>
-            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
-            <DropdownMenuItem asChild className={geistTableMenuItemClass}>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
               <a
                 href={clerkConsoleUrl}
                 target='_blank'

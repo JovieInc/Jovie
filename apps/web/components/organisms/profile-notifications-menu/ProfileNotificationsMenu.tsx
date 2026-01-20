@@ -123,11 +123,7 @@ export function ProfileNotificationsMenu({
             />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align='end'
-          className='w-72 rounded-xl border border-border bg-popover shadow-lg backdrop-blur'
-          sideOffset={8}
-        >
+        <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
           <DropdownMenuLabel className='text-sm font-semibold text-foreground'>
             Manage notifications
           </DropdownMenuLabel>

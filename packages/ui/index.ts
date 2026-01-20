@@ -1,3 +1,5 @@
+// Dropdown Style Constants (for custom floating menus)
+
 // Alert Dialog
 export {
   AlertDialog,
@@ -12,11 +14,9 @@ export {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './atoms/alert-dialog';
-
 // Badge
 export type { BadgeProps } from './atoms/badge';
 export { Badge, badgeVariants } from './atoms/badge';
-
 // Button
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
@@ -136,11 +136,9 @@ export { Input, inputVariants } from './atoms/input';
 // Keyboard (Kbd)
 export type { KbdProps } from './atoms/kbd';
 export { Kbd } from './atoms/kbd';
-
 // Label
 export type { LabelProps } from './atoms/label';
 export { Label, labelVariants } from './atoms/label';
-
 // Popover
 export {
   Popover,
@@ -148,10 +146,8 @@ export {
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';
-
 // Radio Group
 export { RadioGroup, RadioGroupItem } from './atoms/radio-group';
-
 // Select
 export {
   Select,
@@ -165,10 +161,8 @@ export {
   SelectTrigger,
   SelectValue,
 } from './atoms/select';
-
 // Separator
 export { Separator } from './atoms/separator';
-
 // Sheet
 export type { SheetContentProps } from './atoms/sheet';
 export {
@@ -183,10 +177,8 @@ export {
   SheetTitle,
   SheetTrigger,
 } from './atoms/sheet';
-
 // Switch
 export { Switch } from './atoms/switch';
-
 // Tooltip
 export type { TooltipContentProps } from './atoms/tooltip';
 export {
@@ -195,7 +187,23 @@ export {
   TooltipProvider,
   TooltipTrigger,
 } from './atoms/tooltip';
-
 // Tooltip Shortcut (helper for label + keyboard shortcut pattern)
 export type { TooltipShortcutProps } from './atoms/tooltip-shortcut';
 export { TooltipShortcut } from './atoms/tooltip-shortcut';
+export {
+  CHECKBOX_RADIO_ITEM_BASE,
+  contextMenuContentClasses,
+  DROPDOWN_CONTENT_BASE,
+  DROPDOWN_SHADOW,
+  DROPDOWN_SLIDE_ANIMATIONS,
+  DROPDOWN_TRANSITIONS,
+  dropdownMenuContentClasses,
+  MENU_ITEM_BASE,
+  MENU_ITEM_DESTRUCTIVE,
+  MENU_LABEL_BASE,
+  MENU_SEPARATOR_BASE,
+  MENU_SHORTCUT_BASE,
+  popoverContentClasses,
+  selectContentClasses,
+  subMenuContentClasses,
+} from './lib/dropdown-styles';

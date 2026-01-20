@@ -12,11 +12,6 @@ import { Copy, MoreHorizontal } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import {
-  geistTableMenuContentClass,
-  geistTableMenuItemClass,
-  geistTableMenuSeparatorClass,
-} from '@/lib/ui/geist-table-menu';
 import type { AudienceMember } from '@/types';
 
 interface AudienceRowActionsMenuProps {
@@ -85,34 +80,20 @@ export function AudienceRowActionsMenu({
           <MoreHorizontal className='h-4 w-4' />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align='end'
-        sideOffset={8}
-        className={geistTableMenuContentClass}
-      >
-        <DropdownMenuItem
-          disabled={!hasEmail}
-          onClick={handleCopyEmail}
-          className={geistTableMenuItemClass}
-        >
+      <DropdownMenuContent align='end' sideOffset={8}>
+        <DropdownMenuItem disabled={!hasEmail} onClick={handleCopyEmail}>
           <Copy className='h-4 w-4' />
           {copySuccess ? 'Copied!' : 'Copy email'}
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          disabled={!hasPhone}
-          onClick={handleCopyPhone}
-          className={geistTableMenuItemClass}
-        >
+        <DropdownMenuItem disabled={!hasPhone} onClick={handleCopyPhone}>
           <Copy className='h-4 w-4' />
           Copy phone
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+        <DropdownMenuSeparator />
 
-        <DropdownMenuItem disabled className={geistTableMenuItemClass}>
-          Copy ID (coming soon)
-        </DropdownMenuItem>
+        <DropdownMenuItem disabled>Copy ID (coming soon)</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
