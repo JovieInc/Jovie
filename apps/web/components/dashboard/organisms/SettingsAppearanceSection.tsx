@@ -2,33 +2,18 @@
 
 import { useTheme } from 'next-themes';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useThemeMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 export function SettingsAppearanceSection() {
   const { theme, setTheme } = useTheme();
+  const { updateTheme, isPending } = useThemeMutation();
 
-  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    // Update local state immediately for instant feedback
     setTheme(newTheme);
-
-    try {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            theme: { preference: newTheme },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to save theme preference');
-      }
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-    }
+    // Persist to server with automatic error handling and toast
+    updateTheme(newTheme);
   };
 
   const themeOptions = [
@@ -64,9 +49,11 @@ export function SettingsAppearanceSection() {
               onClick={() =>
                 handleThemeChange(option.value as 'light' | 'dark' | 'system')
               }
+              disabled={isPending}
               className={cn(
                 'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',
                 'hover:translate-y-[-2px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base',
+                'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none',
                 theme === option.value
                   ? 'border-accent/70 bg-surface-2'
                   : 'border-subtle hover:border-accent/50'
