@@ -116,6 +116,7 @@ export function TableCheckboxCell<TData = unknown>(
         : headerCheckboxState;
 
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
@@ -138,6 +139,7 @@ export function TableCheckboxCell<TData = unknown>(
   // Row cell
   if (row && typeof isChecked === 'boolean' && onToggleSelect) {
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}

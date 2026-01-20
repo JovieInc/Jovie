@@ -35,6 +35,7 @@ export function SmartLinkCell({ release }: SmartLinkCellProps) {
   }, [release.title, smartLinkTestId]);
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for copy input
     <div
       className='contents'
       onClick={e => e.stopPropagation()}

@@ -25,6 +25,7 @@ export function AudienceRowSelectionCell({
         className
       )}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox */}
       <div
         className='contents'
         onClick={event => event.stopPropagation()}

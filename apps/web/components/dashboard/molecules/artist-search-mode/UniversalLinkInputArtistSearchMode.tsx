@@ -165,14 +165,14 @@ export function UniversalLinkInputArtistSearchMode({
           )}
 
           {results.length > 0 && (
-            <ul
+            <div
               ref={resultsListRef}
               id='artist-search-results'
               role='listbox'
               className='max-h-64 overflow-y-auto'
             >
               {results.map((artist, index) => (
-                <li
+                <div
                   key={artist.id}
                   id={`artist-result-${index}`}
                   role='option'
@@ -240,9 +240,9 @@ export function UniversalLinkInputArtistSearchMode({
                       </svg>
                     </div>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}

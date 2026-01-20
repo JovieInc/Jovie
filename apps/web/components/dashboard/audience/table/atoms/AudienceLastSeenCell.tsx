@@ -33,6 +33,7 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
       )}
     >
       <span className='line-clamp-1'>{formatTimeAgo(lastSeenAt)}</span>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for menu */}
       <div
         className={cn(
           'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',

@@ -92,7 +92,7 @@ export function ReleasesEmptyState({
   const [isPending, startTransition] = useTransition();
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const resultsListRef = useRef<HTMLUListElement>(null);
+  const resultsListRef = useRef<HTMLDivElement>(null);
 
   const {
     results,
@@ -474,14 +474,14 @@ export function ReleasesEmptyState({
                 )}
 
                 {results.length > 0 && (
-                  <ul
+                  <div
                     ref={resultsListRef}
                     id='artist-search-results'
                     role='listbox'
                     className='max-h-64 overflow-y-auto'
                   >
                     {results.map((artist, index) => (
-                      <li
+                      <div
                         key={artist.id}
                         id={`artist-result-${index}`}
                         role='option'
@@ -553,9 +553,9 @@ export function ReleasesEmptyState({
                             </svg>
                           </div>
                         )}
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </div>
             )}
