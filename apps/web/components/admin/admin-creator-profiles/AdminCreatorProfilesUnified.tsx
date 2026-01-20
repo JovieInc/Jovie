@@ -5,7 +5,14 @@ import {
   createColumnHelper,
   type RowSelectionState,
 } from '@tanstack/react-table';
-import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  Copy,
+  Star,
+  Trash2,
+  UserCircle2,
+  XCircle,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -615,7 +622,7 @@ export function AdminCreatorProfilesUnified({
     toggleSelectAll();
   }, [toggleSelectAll]);
 
-  // Get row className based on selection state
+  // Get row className based on selection state - uses unified tokens
   const getRowClassName = useCallback(
     (profile: AdminCreatorProfileRow) => {
       const isChecked = selectedIds.has(profile.id);
@@ -624,10 +631,10 @@ export function AdminCreatorProfilesUnified({
       return cn(
         'group',
         isChecked
-          ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+          ? 'bg-surface-2/70 hover:bg-surface-2'
           : isSelected
-            ? 'bg-base dark:bg-surface-2'
-            : 'hover:bg-base dark:hover:bg-surface-2'
+            ? 'bg-surface-2'
+            : 'hover:bg-surface-2/50'
       );
     },
     [selectedIds, selectedId]
@@ -681,8 +688,14 @@ export function AdminCreatorProfilesUnified({
               columns={columns}
               isLoading={false}
               emptyState={
-                <div className='px-4 py-10 text-center text-sm text-secondary-token'>
-                  No creator profiles found.
+                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                  <UserCircle2 className='h-6 w-6' />
+                  <div>
+                    <div className='font-medium'>No creator profiles found</div>
+                    <div className='text-xs'>
+                      Creator profiles will appear here once created.
+                    </div>
+                  </div>
                 </div>
               }
               rowSelection={rowSelection}
@@ -692,7 +705,6 @@ export function AdminCreatorProfilesUnified({
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
-              rowHeight={52}
               minWidth='960px'
               className='text-[13px]'
             />

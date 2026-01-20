@@ -266,9 +266,6 @@ export function ReleaseTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={row => row.id}
-      getRowClassName={(_, index) =>
-        index !== releases.length - 1 ? 'border-b border-subtle' : ''
-      }
       enableVirtualization={false} // Low row count, no need for virtualization
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       minWidth={minWidth}

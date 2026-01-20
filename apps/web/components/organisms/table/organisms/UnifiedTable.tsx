@@ -205,7 +205,7 @@ export function UnifiedTable<TData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 52,
+  rowHeight = 44,
   overscan = 5,
   renderRow,
   getRowId,

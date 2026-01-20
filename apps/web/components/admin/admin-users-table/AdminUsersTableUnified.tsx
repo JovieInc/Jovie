@@ -284,9 +284,9 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     ]
   );
 
-  // Get row className
+  // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group hover:bg-base dark:hover:bg-surface-2';
+    return 'group hover:bg-surface-2/50';
   }, []);
 
   return (
@@ -405,7 +405,6 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
             getRowClassName={getRowClassName}
             getContextMenuItems={getContextMenuItems}
             enableVirtualization={true}
-            rowHeight={60}
             minWidth='960px'
             className='text-[13px]'
           />

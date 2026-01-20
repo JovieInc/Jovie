@@ -121,9 +121,8 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
             }
             getRowId={row => row.id}
             enableVirtualization={true}
-            rowHeight={60}
-            minWidth='800px'
-            className='text-[13px] border-0'
+            minWidth='960px'
+            className='text-[13px]'
           />
         </div>
       </CardContent>
