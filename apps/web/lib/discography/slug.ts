@@ -36,7 +36,7 @@ export function generateBaseSlug(
       // Collapse multiple hyphens
       .replace(/-+/g, '-')
       // Remove leading/trailing hyphens
-      .replace(/^-|-$/g, '')
+      .replace(/(^-)|(-$)/g, '')
       // Truncate to max length
       .slice(0, maxLength)
   );

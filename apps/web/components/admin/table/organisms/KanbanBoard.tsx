@@ -191,13 +191,15 @@ function KanbanColumn<TData>({
       </div>
 
       {/* Column Content */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop requires mouse event handlers */}
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop requires mouse event handlers */}
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drop zone requires drag event handlers */}
+      {/* biome-ignore lint/a11y/useSemanticElements: Kanban column requires div for layout */}
       <div
         ref={containerRef}
         className='flex-1 overflow-y-auto p-3'
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        role='group'
+        aria-label={`${column.title} column items`}
       >
         {column.items.length === 0 ? (
           <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
@@ -215,8 +217,8 @@ function KanbanColumn<TData>({
             {rowVirtualizer.getVirtualItems().map(virtualRow => {
               const item = column.items[virtualRow.index];
               return (
-                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
-                // biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop card
+                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-and-drop requires onDragStart
+                // biome-ignore lint/a11y/useSemanticElements: Virtualized list requires div for absolute positioning
                 <div
                   key={getItemId(item)}
                   data-index={virtualRow.index}
@@ -235,6 +237,7 @@ function KanbanColumn<TData>({
                     e.dataTransfer.setData('itemId', getItemId(item));
                     e.dataTransfer.setData('columnId', column.id);
                   }}
+                  role='listitem'
                 >
                   {renderCard(item, virtualRow.index)}
                 </div>
@@ -242,10 +245,11 @@ function KanbanColumn<TData>({
             })}
           </div>
         ) : (
-          <div className='space-y-3'>
+          // biome-ignore lint/a11y/useSemanticElements: Consistent with virtualized list pattern
+          <div className='space-y-3' role='list'>
             {column.items.map((item, index) => (
-              // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
-              // biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop card
+              // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-and-drop requires onDragStart
+              // biome-ignore lint/a11y/useSemanticElements: Consistent with virtualized list pattern
               <div
                 key={getItemId(item)}
                 draggable={Boolean(onItemMove)}
@@ -258,6 +262,7 @@ function KanbanColumn<TData>({
                   onItemMove &&
                     'cursor-move transition-opacity hover:opacity-80'
                 )}
+                role='listitem'
               >
                 {renderCard(item, index)}
               </div>

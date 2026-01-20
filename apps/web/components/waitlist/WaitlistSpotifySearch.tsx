@@ -54,7 +54,7 @@ export function WaitlistSpotifySearch({
   );
 
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const resultsListRef = useRef<HTMLUListElement>(null);
+  const resultsListRef = useRef<HTMLDivElement>(null);
 
   const { results, state, search, clear } = useArtistSearchQuery({
     debounceMs: 300,
@@ -354,18 +354,16 @@ export function WaitlistSpotifySearch({
 
           {/* Artist results */}
           {results.length > 0 && (
-            <ul
+            <div
               ref={resultsListRef}
               id='spotify-search-results'
-              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: listbox role on ul is correct for ARIA combobox pattern
               role='listbox'
               className='max-h-64 overflow-y-auto'
             >
               {results.map((artist, index) => (
-                <li
+                <div
                   key={artist.id}
                   id={`spotify-result-${index}`}
-                  // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: option role on li is correct for ARIA listbox pattern
                   role='option'
                   tabIndex={-1}
                   aria-selected={index === activeIndex}
@@ -428,9 +426,9 @@ export function WaitlistSpotifySearch({
                       </svg>
                     </div>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
 
           {/* Always-visible "Manually add URL" option */}

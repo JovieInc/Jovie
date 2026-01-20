@@ -3,40 +3,22 @@
 import { useCallback, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { useNotificationSettingsMutation } from '@/lib/queries';
 
 export function SettingsNotificationsSection() {
   const [marketingEmails, setMarketingEmails] = useState(true);
-  const [isMarketingSaving, setIsMarketingSaving] = useState(false);
+  const { updateNotifications, isPending } = useNotificationSettingsMutation();
 
-  const handleMarketingToggle = useCallback(async (enabled: boolean) => {
-    setIsMarketingSaving(true);
-    try {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            settings: {
-              marketing_emails: enabled,
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update marketing preferences');
-      }
-
+  const handleMarketingToggle = useCallback(
+    (enabled: boolean) => {
+      // Optimistically update local state
       setMarketingEmails(enabled);
-    } catch (error) {
-      console.error('Failed to update marketing preferences:', error);
-      setMarketingEmails(!enabled);
-    } finally {
-      setIsMarketingSaving(false);
-    }
-  }, []);
+
+      // Persist to server with automatic error handling and toast
+      updateNotifications({ marketing_emails: enabled });
+    },
+    [updateNotifications]
+  );
 
   return (
     <DashboardCard variant='settings'>
@@ -47,7 +29,7 @@ export function SettingsNotificationsSection() {
         onCheckedChange={enabled => {
           void handleMarketingToggle(enabled);
         }}
-        disabled={isMarketingSaving}
+        disabled={isPending}
         ariaLabel='Toggle marketing emails'
       />
     </DashboardCard>

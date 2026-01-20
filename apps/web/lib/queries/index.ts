@@ -55,11 +55,18 @@ export {
   FetchError,
   fetchWithTimeout,
 } from './fetch';
-
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
 // Query key factories
 export { type QueryKeys, queryKeys } from './keys';
+// Mutation utilities
+export {
+  createMutationCallbacks,
+  getErrorMessage,
+  handleMutationError,
+  handleMutationSuccess,
+  type MutationCallbackOptions,
+} from './mutation-utils';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
 
@@ -120,6 +127,21 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Settings mutations
+export {
+  type SettingsUpdateInput,
+  useNotificationSettingsMutation,
+  useThemeMutation,
+  useUpdateSettingsMutation,
+} from './useSettingsMutation';
+// Social links mutations
+export {
+  type AcceptSuggestionInput,
+  type DismissSuggestionInput,
+  useAcceptSuggestionMutation,
+  useDismissSuggestionMutation,
+  useSuggestionMutations,
+} from './useSocialLinksMutation';
 export {
   type SuggestionsQueryResult,
   type UseSuggestionsQueryOptions,
