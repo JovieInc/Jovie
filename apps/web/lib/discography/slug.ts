@@ -28,15 +28,15 @@ export function generateBaseSlug(
       .toLowerCase()
       // Normalize unicode characters (é → e, ñ → n, etc.)
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replaceAll(/[\u0300-\u036f]/g, '')
       // Remove special characters except spaces and hyphens
-      .replace(/[^a-z0-9\s-]/g, '')
+      .replaceAll(/[^a-z0-9\s-]/g, '')
       // Replace spaces with hyphens
-      .replace(/\s+/g, '-')
+      .replaceAll(/\s+/g, '-')
       // Collapse multiple hyphens
-      .replace(/-+/g, '-')
+      .replaceAll(/-+/g, '-')
       // Remove leading/trailing hyphens
-      .replace(/(^-)|(-$)/g, '')
+      .replaceAll(/(^-)|(-$)/g, '')
       // Truncate to max length
       .slice(0, maxLength)
   );

@@ -158,11 +158,11 @@ export function normalizeArtistName(name: string): string {
     .toLowerCase()
     // Normalize Unicode (NFD decomposition then remove diacritics)
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replaceAll(/[\u0300-\u036f]/g, '')
     // Remove special characters except spaces
-    .replace(/[^\w\s]/g, '')
+    .replaceAll(/[^\w\s]/g, '')
     // Replace multiple spaces with single space
-    .replace(/\s+/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     // Trim whitespace
     .trim();
 

@@ -17,7 +17,7 @@ import type { RateLimitConfig } from './types';
 function toUpstashWindow(
   window: string
 ): Parameters<typeof Ratelimit.slidingWindow>[1] {
-  const normalized = window.replace(/\s+/g, '');
+  const normalized = window.replaceAll(/\s+/g, '');
 
   // Map our format to Upstash format
   const match = normalized.match(/^(\d+)(s|m|h|d)$/);

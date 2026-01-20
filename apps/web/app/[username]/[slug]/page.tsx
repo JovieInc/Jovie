@@ -51,7 +51,7 @@ function generateMusicStructuredData(
   }
 ) {
   const artistName = creator.displayName ?? creator.username;
-  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.title.toLowerCase().replace(/\s+/g, '-')}`;
+  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.title.toLowerCase().replaceAll(/\s+/g, '-')}`;
   const artistUrl = `${PROFILE_URL}/${creator.usernameNormalized}`;
 
   // Build sameAs array from provider links

@@ -139,8 +139,8 @@ export function isUnsafeUrl(url: string): boolean {
  */
 function fixDomainMisspellings(url: string): string {
   for (const [misspelled, correct] of Object.entries(DOMAIN_MISSPELLINGS)) {
-    const regex = new RegExp(misspelled.replace('.', '\\.'), 'gi');
-    url = url.replace(regex, correct);
+    const regex = new RegExp(misspelled.replaceAll('.', '\\.'), 'gi');
+    url = url.replaceAll(regex, correct);
   }
   return url;
 }
@@ -150,7 +150,7 @@ function fixDomainMisspellings(url: string): string {
  */
 function fixMissingDots(url: string): string {
   for (const [pattern, replacement] of DOT_FIX_PATTERNS) {
-    url = url.replace(pattern, replacement);
+    url = url.replaceAll(pattern, replacement);
   }
   return url;
 }
@@ -211,13 +211,13 @@ export function normalizeUrl(url: string): string {
     }
 
     // Normalize stray spaces around dots
-    url = trimmed.replace(/\s*\.\s*/g, '.');
+    url = trimmed.replaceAll(/\s*\.\s*/g, '.');
 
     // Fix common domain misspellings
     url = fixDomainMisspellings(url);
 
     // Comma instead of dot before common TLDs (e.g., youtube,com)
-    url = url.replace(/,(?=\s*(com|net|tv|be|gg|me)\b)/gi, '.');
+    url = url.replaceAll(/,(?=\s*(com|net|tv|be|gg|me)\b)/gi, '.');
 
     // Fix missing dots before TLDs
     url = fixMissingDots(url);
