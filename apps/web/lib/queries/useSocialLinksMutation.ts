@@ -38,6 +38,8 @@ interface SuggestionActionResponse {
     platformType: string;
     url: string;
     state: string;
+    sortOrder?: number;
+    isActive?: boolean;
     [key: string]: unknown;
   };
   success?: boolean;
@@ -47,31 +49,41 @@ interface SuggestionActionResponse {
 /**
  * Accept a link suggestion via PATCH.
  */
-async function acceptSuggestion(input: AcceptSuggestionInput): Promise<SuggestionActionResponse> {
-  return fetchWithTimeout<SuggestionActionResponse>('/api/dashboard/social-links', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      profileId: input.profileId,
-      linkId: input.linkId,
-      action: 'accept',
-    }),
-  });
+async function acceptSuggestion(
+  input: AcceptSuggestionInput
+): Promise<SuggestionActionResponse> {
+  return fetchWithTimeout<SuggestionActionResponse>(
+    '/api/dashboard/social-links',
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: input.profileId,
+        linkId: input.linkId,
+        action: 'accept',
+      }),
+    }
+  );
 }
 
 /**
  * Dismiss a link suggestion via PATCH.
  */
-async function dismissSuggestion(input: DismissSuggestionInput): Promise<SuggestionActionResponse> {
-  return fetchWithTimeout<SuggestionActionResponse>('/api/dashboard/social-links', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      profileId: input.profileId,
-      linkId: input.linkId,
-      action: 'dismiss',
-    }),
-  });
+async function dismissSuggestion(
+  input: DismissSuggestionInput
+): Promise<SuggestionActionResponse> {
+  return fetchWithTimeout<SuggestionActionResponse>(
+    '/api/dashboard/social-links',
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: input.profileId,
+        linkId: input.linkId,
+        action: 'dismiss',
+      }),
+    }
+  );
 }
 
 /**
@@ -115,7 +127,7 @@ export function useAcceptSuggestionMutation(profileId: string | undefined) {
       }
     },
 
-    onError: (error) => {
+    onError: error => {
       handleMutationError(error, 'Failed to accept link');
     },
   });
@@ -157,7 +169,7 @@ export function useDismissSuggestionMutation(profileId: string | undefined) {
       }
     },
 
-    onError: (error) => {
+    onError: error => {
       handleMutationError(error, 'Failed to dismiss suggestion');
     },
   });

@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { STANDARD_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
@@ -59,7 +58,10 @@ export function useBillingStatusQuery() {
   return useQuery<BillingStatusData>({
     queryKey: queryKeys.billing.status(),
     queryFn: fetchBillingStatus,
-    // Use STANDARD_CACHE preset for consistent caching behavior
-    ...STANDARD_CACHE,
+    // STANDARD_CACHE values inlined for type compatibility
+    staleTime: 5 * 60 * 1000, // 5 min
+    gcTime: 30 * 60 * 1000, // 30 min
+    refetchOnMount: true,
+    refetchOnWindowFocus: process.env.NODE_ENV === 'production',
   });
 }

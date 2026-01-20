@@ -164,7 +164,18 @@ export function useSuggestionSync({
           {
             onSuccess: data => {
               if (data.link) {
-                const [detected] = convertDbLinksToLinkItems([data.link]);
+                // Add default values for required ProfileSocialLink fields
+                const linkWithDefaults = {
+                  ...data.link,
+                  sortOrder: data.link.sortOrder ?? 0,
+                  isActive: data.link.isActive ?? true,
+                  state:
+                    (data.link.state as 'active' | 'suggested' | 'rejected') ??
+                    'active',
+                };
+                const [detected] = convertDbLinksToLinkItems([
+                  linkWithDefaults,
+                ]);
                 setSuggestedLinks(prev =>
                   prev.filter(s => s.suggestionId !== suggestionId)
                 );

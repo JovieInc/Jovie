@@ -38,10 +38,10 @@ interface SettingsUpdateResponse {
   error?: string;
 }
 
-const updateSettings = createMutationFn<SettingsUpdateInput, SettingsUpdateResponse>(
-  '/api/dashboard/profile',
-  'PUT'
-);
+const updateSettings = createMutationFn<
+  SettingsUpdateInput,
+  SettingsUpdateResponse
+>('/api/dashboard/profile', 'PUT');
 
 /**
  * Hook for updating user settings (theme, notifications, etc.)
@@ -144,7 +144,9 @@ export function useNotificationSettingsMutation() {
   const mutation = useUpdateSettingsMutation();
 
   return {
-    updateNotifications: (settings: SettingsUpdateInput['updates']['settings']) => {
+    updateNotifications: (
+      settings: SettingsUpdateInput['updates']['settings']
+    ) => {
       mutation.mutate({ updates: { settings } });
     },
     isPending: mutation.isPending,

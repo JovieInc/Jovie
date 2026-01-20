@@ -17,8 +17,10 @@ export function getErrorMessage(error: unknown, fallback: string): string {
     if (error.status === 401) return 'Please sign in to continue';
     if (error.status === 403) return 'You do not have permission to do this';
     if (error.status === 404) return 'The requested resource was not found';
-    if (error.status === 409) return 'This was modified elsewhere. Please refresh.';
-    if (error.status === 429) return 'Too many requests. Please try again later.';
+    if (error.status === 409)
+      return 'This was modified elsewhere. Please refresh.';
+    if (error.status === 429)
+      return 'Too many requests. Please try again later.';
     if (error.status >= 500) return 'Something went wrong. Please try again.';
   }
 
@@ -38,7 +40,10 @@ export function getErrorMessage(error: unknown, fallback: string): string {
  *   onError: (error) => handleMutationError(error, 'Failed to update profile'),
  * });
  */
-export function handleMutationError(error: unknown, fallbackMessage: string): void {
+export function handleMutationError(
+  error: unknown,
+  fallbackMessage: string
+): void {
   const message = getErrorMessage(error, fallbackMessage);
   toast.error(message);
 
