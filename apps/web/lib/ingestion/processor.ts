@@ -79,6 +79,17 @@ export async function processJob(
       return processSendClaimInviteJob(tx, job.payload);
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(tx, job.payload);
+    case 'dsp_track_enrichment':
+      // Track enrichment logic will be implemented in a future PR
+      // For now, return success to avoid blocking the queue
+      console.log(
+        '[DSP Track Enrichment] Job enqueued, processor not yet implemented:',
+        job.payload
+      );
+      return {
+        success: true,
+        message: 'Track enrichment pending implementation',
+      };
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }
