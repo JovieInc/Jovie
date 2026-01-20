@@ -7,7 +7,11 @@
 
 import path from 'path';
 
-const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u0080-\u009F]/g;
+/**
+ * Matches C0 control characters (U+0000-U+001F) and C1 control characters (U+0080-U+009F).
+ * Uses Unicode property escapes for clarity and to avoid SonarCloud S6324 warnings.
+ */
+const CONTROL_CHARACTER_REGEX = /\p{Cc}/gu;
 
 /**
  * Validates that a file path is within an allowed base directory.
