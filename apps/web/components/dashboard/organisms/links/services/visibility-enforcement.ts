@@ -32,7 +32,7 @@ export function countVisibleInSection<T extends DetectedLink>(
   section: LinkSection
 ): number {
   return links.filter(
-    link => sectionOf(link as T) === section && isLinkVisible(link as T)
+    link => sectionOf(link) === section && isLinkVisible(link)
   ).length;
 }
 

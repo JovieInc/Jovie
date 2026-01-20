@@ -46,14 +46,14 @@ export function findDuplicate<T extends DetectedLink>(
   const duplicateIndex = existingLinks.findIndex(
     existing =>
       canonicalIdentity({
-        platform: (existing as DetectedLink).platform,
-        normalizedUrl: (existing as DetectedLink).normalizedUrl,
+        platform: existing.platform,
+        normalizedUrl: existing.normalizedUrl,
       }) === canonicalId
   );
 
   const duplicate =
     duplicateIndex !== -1 ? existingLinks[duplicateIndex] : null;
-  const duplicateSection = duplicate ? sectionOf(duplicate as T) : null;
+  const duplicateSection = duplicate ? sectionOf(duplicate) : null;
 
   const hasCrossSectionDuplicate =
     link.platform.id === 'youtube' &&
