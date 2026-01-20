@@ -4,7 +4,8 @@ const EMAIL_REGEX =
 const EMAIL_MAX_LENGTH = 254;
 const PHONE_MAX_LENGTH = 32;
 
-const CONTROL_OR_SPACE_REGEX = /[\s\u0000-\u001F\u007F]/g;
+/** Matches whitespace and C0/C1 control characters using Unicode property escapes */
+const CONTROL_OR_SPACE_REGEX = /[\s\p{Cc}]/gu;
 
 export function normalizeSubscriptionEmail(
   raw: string | null | undefined
