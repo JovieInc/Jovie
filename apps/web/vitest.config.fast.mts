@@ -54,14 +54,15 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use forks pool to prevent JS heap OOM in worker threads (mirrors CI stability)
-    pool: 'forks',
+    // Use VM pool with a memory limit to mitigate long-run memory growth.
+    pool: 'vmThreads',
     poolOptions: {
-      forks: {
-        minForks: 1,
-        maxForks: maxThreads,
-        // Force isolated workers to avoid memory growth across many test files.
+      vmThreads: {
+        minThreads: 1,
+        maxThreads,
         isolate: true,
+        // If you see memory leaks, lower this; if you see OOM, raise it.
+        memoryLimit: '1024MB',
       },
     },
 
