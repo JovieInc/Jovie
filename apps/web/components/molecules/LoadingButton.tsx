@@ -30,12 +30,14 @@ export function LoadingButton({
   const defaultSpinnerTone: LoadingSpinnerTone =
     variant === 'primary' ? 'inverse' : 'primary';
 
-  const effectiveTone: LoadingSpinnerTone =
-    spinnerVariant === 'light'
-      ? 'inverse'
-      : spinnerVariant === 'dark'
-        ? 'primary'
-        : defaultSpinnerTone;
+  let effectiveTone: LoadingSpinnerTone;
+  if (spinnerVariant === 'light') {
+    effectiveTone = 'inverse';
+  } else if (spinnerVariant === 'dark') {
+    effectiveTone = 'primary';
+  } else {
+    effectiveTone = defaultSpinnerTone;
+  }
   const normalizedSpinnerSize: 'sm' | 'md' | 'lg' =
     spinnerSize === 'xs' ? 'sm' : (spinnerSize ?? 'sm');
 

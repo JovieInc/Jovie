@@ -29,6 +29,15 @@ export interface TableToolbarProps {
  *
  * Can be used with sticky positioning by adding 'sticky top-0 z-20' via className
  */
+function getSelectionState(
+  selectedCount: number,
+  totalCount: number
+): boolean | 'indeterminate' {
+  if (selectedCount === 0) return false;
+  if (selectedCount === totalCount) return true;
+  return 'indeterminate';
+}
+
 export function TableToolbar({
   selectedCount = 0,
   totalCount,
@@ -51,13 +60,7 @@ export function TableToolbar({
       <div className='flex items-center gap-2'>
         {onSelectAll && onDeselectAll && (
           <Checkbox
-            checked={
-              selectedCount === 0
-                ? false
-                : selectedCount === totalCount
-                  ? true
-                  : 'indeterminate'
-            }
+            checked={getSelectionState(selectedCount, totalCount)}
             onCheckedChange={checked => {
               checked ? onSelectAll() : onDeselectAll();
             }}

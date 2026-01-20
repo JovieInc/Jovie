@@ -171,12 +171,14 @@ export async function lookupAppleMusicByIsrc(
     if (!match || typeof match.trackViewUrl !== 'string') return null;
 
     const rawTrackId = match.trackId;
-    const trackId =
-      typeof rawTrackId === 'number'
-        ? String(rawTrackId)
-        : typeof rawTrackId === 'string'
-          ? rawTrackId
-          : null;
+    let trackId: string | null;
+    if (typeof rawTrackId === 'number') {
+      trackId = String(rawTrackId);
+    } else if (typeof rawTrackId === 'string') {
+      trackId = rawTrackId;
+    } else {
+      trackId = null;
+    }
 
     const canonicalUrl = match.trackViewUrl.replace(
       'itunes.apple.com',

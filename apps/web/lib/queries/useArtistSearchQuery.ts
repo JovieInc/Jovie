@@ -220,15 +220,18 @@ export function useArtistSearchQuery(
     setIsPending(false);
   }, [asyncDebouncer]);
 
+  // Extract error message from query error
+  let errorMessage: string | null = null;
+  if (queryError instanceof Error) {
+    errorMessage = queryError.message;
+  } else if (queryError) {
+    errorMessage = String(queryError);
+  }
+
   return {
     results: data ?? [],
     state,
-    error:
-      queryError instanceof Error
-        ? queryError.message
-        : queryError
-          ? String(queryError)
-          : null,
+    error: errorMessage,
     search,
     searchImmediate,
     clear,

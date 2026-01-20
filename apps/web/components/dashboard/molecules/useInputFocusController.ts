@@ -14,12 +14,14 @@ export function useInputFocusController<T extends HTMLInputElement>() {
 
       if (cursor === null) return;
 
-      const position =
-        cursor === 'end'
-          ? element.value.length
-          : cursor === 'start'
-            ? 0
-            : cursor;
+      let position: number;
+      if (cursor === 'end') {
+        position = element.value.length;
+      } else if (cursor === 'start') {
+        position = 0;
+      } else {
+        position = cursor;
+      }
 
       try {
         element.setSelectionRange(position, position);

@@ -53,7 +53,9 @@ function _getSeverity(ratio: number, isLargeText: boolean) {
   const required = isLargeText ? 3 : 4.5;
   if (ratio >= required) return 'pass';
   if (ratio < 1.5) return 'major';
-  if (ratio < 3) return isLargeText ? 'moderate' : 'major';
+  if (ratio < 3) {
+    return isLargeText ? 'moderate' : 'major';
+  }
   return 'minor';
 }
 
@@ -165,6 +167,15 @@ async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
                   : '');
             }
 
+            let severity: 'minor' | 'moderate' | 'major';
+            if (ratio >= 3) {
+              severity = 'minor';
+            } else if (isLargeText) {
+              severity = 'moderate';
+            } else {
+              severity = 'major';
+            }
+
             results.push({
               page: route,
               location: location,
@@ -175,8 +186,7 @@ async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
               backgroundColor: bg,
               contrastRatio: ratio.toFixed(2),
               requiredRatio: required,
-              severity:
-                ratio < 3 ? (isLargeText ? 'moderate' : 'major') : 'minor',
+              severity,
               suggestedFix: `Increase contrast to at least ${required}:1`,
             });
           }
