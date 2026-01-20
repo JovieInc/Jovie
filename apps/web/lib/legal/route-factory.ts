@@ -1,4 +1,4 @@
-import fs from 'fs';
+import { readFile } from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
 import { remark } from 'remark';
@@ -17,7 +17,7 @@ export function createLegalDocumentRoute(
   return async function GET() {
     try {
       const filePath = path.join(process.cwd(), 'docs', docFilename);
-      const fileContents = fs.readFileSync(filePath, 'utf8');
+      const fileContents = await readFile(filePath, 'utf8');
 
       const processedContent = await remark().use(html).process(fileContents);
       const contentHtml = processedContent.toString();
@@ -25,6 +25,8 @@ export function createLegalDocumentRoute(
       return new NextResponse(contentHtml, {
         headers: {
           'Content-Type': 'text/html',
+          'Cache-Control':
+            'public, s-maxage=3600, stale-while-revalidate=86400',
         },
       });
     } catch (error) {

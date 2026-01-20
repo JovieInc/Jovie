@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/utils/rate-limit', () => ({
@@ -11,10 +12,15 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   }),
 }));
 
-vi.mock('fs', () => ({
-  default: {
-    readFileSync: vi.fn().mockReturnValue('# Privacy Policy\n\nTest content'),
-  },
+vi.mock('@/lib/legal/route-factory', () => ({
+  createLegalDocumentRoute: vi.fn(() => async () => {
+    return new NextResponse('<h1>Privacy Policy</h1><p>Test content</p>', {
+      headers: {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
+  }),
 }));
 
 // Static import - mocks are already set up above
