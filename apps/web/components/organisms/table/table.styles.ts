@@ -31,6 +31,12 @@ export const selection = {
   hover: 'hover:bg-surface-2/50',
 } as const;
 
+// Icon Colors (use CSS variables where possible)
+export const iconColors = {
+  // Sort indicator - matches tertiary-token but slightly more visible
+  sortIndicator: 'text-tertiary-token',
+} as const;
+
 // Z-Index Layers
 export const zIndex = {
   toolbar: 'z-30',

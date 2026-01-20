@@ -1,10 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useState } from 'react';
+import { Copy } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
+import {
+  TableBulkActionsToolbar,
+  useRowSelection,
+} from '@/components/organisms/table';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
@@ -38,6 +43,39 @@ export function ReleaseProviderMatrix({
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
+  // Row selection
+  const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const { selectedIds, selectedCount, clearSelection, setSelection } =
+    useRowSelection(rowIds);
+
+  // Bulk actions
+  const bulkActions = useMemo(() => {
+    const selectedReleases = rows.filter(r => selectedIds.has(r.id));
+
+    return [
+      {
+        label: 'Copy Smart Links',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const links = selectedReleases
+            .map(r => `${window.location.origin}${r.smartLinkPath}`)
+            .join('\n');
+          navigator.clipboard.writeText(links);
+          clearSelection();
+        },
+      },
+      {
+        label: 'Copy Titles',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const titles = selectedReleases.map(r => r.title).join('\n');
+          navigator.clipboard.writeText(titles);
+          clearSelection();
+        },
+      },
+    ];
+  }, [rows, selectedIds, clearSelection]);
+
   const handleArtistConnected = (
     newReleases: ReleaseViewModel[],
     newArtistName: string
@@ -67,7 +105,7 @@ export function ReleaseProviderMatrix({
       {/* Main content area */}
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
-        <div className='shrink-0 border-b border-subtle'>
+        <div className='sticky top-0 z-10 shrink-0 border-b border-subtle bg-base'>
           <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6'>
             <div className='flex items-center gap-3'>
               <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
@@ -148,18 +186,27 @@ export function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <ReleaseTable
-                releases={rows}
-                primaryProviders={primaryProviders}
-                providerConfig={providerConfig}
-                artistName={artistName}
-                onCopy={handleCopy}
-                onEdit={openEditor}
-                onAddUrl={handleAddUrl}
-                onSync={handleSync}
-                isAddingUrl={isSaving}
-                isSyncing={isSyncing}
-              />
+              <>
+                <TableBulkActionsToolbar
+                  selectedCount={selectedCount}
+                  onClearSelection={clearSelection}
+                  actions={bulkActions}
+                />
+                <ReleaseTable
+                  releases={rows}
+                  primaryProviders={primaryProviders}
+                  providerConfig={providerConfig}
+                  artistName={artistName}
+                  onCopy={handleCopy}
+                  onEdit={openEditor}
+                  onAddUrl={handleAddUrl}
+                  onSync={handleSync}
+                  isAddingUrl={isSaving}
+                  isSyncing={isSyncing}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelection}
+                />
+              </>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}

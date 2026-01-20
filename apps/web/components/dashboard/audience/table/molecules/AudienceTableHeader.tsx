@@ -173,7 +173,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/50 px-2.5 py-0.5 text-xs font-medium text-secondary-token transition-all duration-150 whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

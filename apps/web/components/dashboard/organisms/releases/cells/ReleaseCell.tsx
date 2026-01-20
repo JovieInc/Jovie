@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Image from 'next/image';
 import { Icon } from '@/components/atoms/Icon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -49,9 +49,16 @@ export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
       {/* Title and metadata */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
-            {release.title}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
+                {release.title}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side='top' align='start'>
+              {release.title}
+            </TooltipContent>
+          </Tooltip>
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'

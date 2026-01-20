@@ -11,10 +11,15 @@ import {
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
   DisplayMenuDropdown,
+  ExportCSVButton,
   TableBulkActionsToolbar,
   useRowSelection,
   type ViewMode,
 } from '@/components/organisms/table';
+import {
+  WAITLIST_CSV_FILENAME_PREFIX,
+  waitlistCSVColumns,
+} from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
@@ -230,6 +235,13 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                 <span className='hidden sm:inline'> entries</span>
               </div>
               <div className='flex items-center gap-2'>
+                <ExportCSVButton<WaitlistEntryRow>
+                  getData={() => entries}
+                  columns={waitlistCSVColumns}
+                  filename={WAITLIST_CSV_FILENAME_PREFIX}
+                  disabled={entries.length === 0}
+                  ariaLabel='Export waitlist to CSV file'
+                />
                 <DisplayMenuDropdown
                   viewMode={viewMode}
                   availableViewModes={['list', 'board']}

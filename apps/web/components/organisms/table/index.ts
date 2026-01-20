@@ -47,8 +47,14 @@ export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
 export { TableCell } from './atoms/TableCell';
-export type { TableCheckboxCellProps } from './atoms/TableCheckboxCell';
+export type {
+  TableCheckboxCellLegacyProps,
+  TableCheckboxCellProps,
+  TableCheckboxCellTanStackProps,
+} from './atoms/TableCheckboxCell';
 export { TableCheckboxCell } from './atoms/TableCheckboxCell';
+export type { TableCountBadgeProps } from './atoms/TableCountBadge';
+export { TableCountBadge } from './atoms/TableCountBadge';
 export type { TableEmptyStateProps } from './atoms/TableEmptyState';
 export { TableEmptyState } from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
@@ -85,6 +91,13 @@ export type { TablePaginationFooterProps } from './molecules/TablePaginationFoot
 export { TablePaginationFooter } from './molecules/TablePaginationFooter';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
+export type { TableStandardFooterProps } from './molecules/TableStandardFooter';
+export { TableStandardFooter } from './molecules/TableStandardFooter';
+export type {
+  BulkAction as TableStandardToolbarBulkAction,
+  TableStandardToolbarProps,
+} from './molecules/TableStandardToolbar';
+export { TableStandardToolbar } from './molecules/TableStandardToolbar';
 
 // =============================================================================
 // Organisms

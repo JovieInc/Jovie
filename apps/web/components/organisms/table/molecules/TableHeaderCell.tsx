@@ -3,7 +3,7 @@
 import type { Header } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
-import { cn } from '../table.styles';
+import { cn, iconColors } from '../table.styles';
 
 interface TableHeaderCellProps<TData> {
   header: Header<TData, unknown>;
@@ -64,8 +64,7 @@ export function TableHeaderCell<TData>({
           {sortDirection && (
             <Icon
               name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
-              className='shrink-0'
-              style={{ color: 'lch(62.6% 1.35 272 / 1)' }}
+              className={cn('shrink-0', iconColors.sortIndicator)}
               ariaLabel={
                 sortDirection === 'asc'
                   ? 'Sorted ascending'
