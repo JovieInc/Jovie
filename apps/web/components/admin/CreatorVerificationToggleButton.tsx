@@ -32,7 +32,9 @@ export function CreatorVerificationToggleButton({
 
   const getIcon = () => {
     if (isSuccess) {
-      return <Check size={14} aria-hidden='true' className='text-primary-token' />;
+      return (
+        <Check size={14} aria-hidden='true' className='text-primary-token' />
+      );
     }
     if (isError) {
       return <X size={14} aria-hidden='true' className='text-destructive' />;

@@ -136,7 +136,9 @@ export function useWaitlistColumns({
               </Tooltip>
             );
           }
-          return <span className='text-secondary-token'>{entry.heardAbout}</span>;
+          return (
+            <span className='text-secondary-token'>{entry.heardAbout}</span>
+          );
         },
         width: 'w-[160px]',
         hideOnMobile: true,

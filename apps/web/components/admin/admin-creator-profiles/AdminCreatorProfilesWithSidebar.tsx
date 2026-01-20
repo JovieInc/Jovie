@@ -293,7 +293,9 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle verification',
                               result.error
                             );
-                            const errorSuffix = result.error ? `: ${result.error}` : '';
+                            const errorSuffix = result.error
+                              ? `: ${result.error}`
+                              : '';
                             notifications.error(
                               `Failed to update verification status${errorSuffix}`
                             );
@@ -309,7 +311,9 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle featured',
                               result.error
                             );
-                            const errorSuffix = result.error ? `: ${result.error}` : '';
+                            const errorSuffix = result.error
+                              ? `: ${result.error}`
+                              : '';
                             notifications.error(
                               `Failed to update featured status${errorSuffix}`
                             );
@@ -325,7 +329,9 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle marketing',
                               result.error
                             );
-                            const errorSuffix = result.error ? `: ${result.error}` : '';
+                            const errorSuffix = result.error
+                              ? `: ${result.error}`
+                              : '';
                             notifications.error(
                               `Failed to update marketing preferences${errorSuffix}`
                             );

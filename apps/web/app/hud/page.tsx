@@ -179,7 +179,9 @@ export default async function HudPage({
                       if (metrics.deployments.current?.branch) {
                         return `Branch ${metrics.deployments.current.branch}`;
                       }
-                      if (metrics.deployments.availability === 'not_configured') {
+                      if (
+                        metrics.deployments.availability === 'not_configured'
+                      ) {
                         return 'Deploy not configured';
                       }
                       return metrics.deployments.errorMessage ?? '—';

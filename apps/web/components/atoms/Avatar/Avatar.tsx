@@ -174,7 +174,8 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   // Map avatar size to a sensible badge size
   const getBadgeSize = (): 'sm' | 'md' | 'lg' => {
     if (size === 'xs' || size === 'sm') return 'sm';
-    if (size === 'md' || size === 'lg' || size === 'xl' || size === '2xl') return 'md';
+    if (size === 'md' || size === 'lg' || size === 'xl' || size === '2xl')
+      return 'md';
     return 'lg';
   };
   const badgeSize = getBadgeSize();
