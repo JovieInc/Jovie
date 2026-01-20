@@ -68,13 +68,14 @@ const REMIX_PATTERN =
  * Matches: "(feat. X)", "(ft. X)", "(featuring X)", "feat. X", "ft. X"
  */
 const FEATURED_PATTERN =
-  /(?:[\(\[]?\s*(?:feat\.?|ft\.?|featuring)\s+([^)\]]+?)[\)\]]?)/gi;
+  /(?:[\(\[]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[\)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+))/gi;
 
 /**
  * Pattern to match "with" credits
  * Matches: "(with X)", "with X"
  */
-const WITH_PATTERN = /(?:[\(\[]?\s*with\s+([^)\]]+?)[\)\]]?)/gi;
+const WITH_PATTERN =
+  /(?:[\(\[]\s*\bwith\b\s+([^)\]]+?)\s*[\)\]])|(?:\bwith\s+([^\(\)\[\]]+))/gi;
 
 /**
  * Pattern to match "vs" credits in artist names
@@ -221,7 +222,7 @@ export function extractFeatured(title: string): ParsedArtistCredit[] {
   FEATURED_PATTERN.lastIndex = 0;
 
   while ((match = FEATURED_PATTERN.exec(title)) !== null) {
-    const featuredPart = match[1];
+    const featuredPart = match[1] ?? match[2];
     if (!featuredPart) continue;
 
     // Handle multiple featured artists
@@ -254,7 +255,7 @@ export function extractWith(title: string): ParsedArtistCredit[] {
   WITH_PATTERN.lastIndex = 0;
 
   while ((match = WITH_PATTERN.exec(title)) !== null) {
-    const withPart = match[1];
+    const withPart = match[1] ?? match[2];
     if (!withPart) continue;
 
     const artistNames = splitByConjunction(withPart);
@@ -501,7 +502,7 @@ export function cleanTrackTitle(title: string): string {
     title
       // Remove featured credits
       .replaceAll(
-        /[\(\[]?\s*(?:feat\.?|ft\.?|featuring)\s+[^)\]]+[\)\]]?/gi,
+        /[\(\[]?\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+[^)\]]+[\)\]]?/gi,
         ''
       )
       // Remove remix credits
