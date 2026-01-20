@@ -38,7 +38,7 @@ export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
             <motion.button
               onClick={onUpgrade}
               disabled={isLoading}
-              className='inline-flex items-center justify-center rounded-md px-6 py-3 text-base font-medium transition-all duration-200 cursor-pointer bg-black text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-white dark:text-black dark:hover:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed'
+              className='inline-flex items-center justify-center rounded-md px-6 py-3 text-base font-medium transition-all duration-200 cursor-pointer bg-black text-white hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:hover:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed'
               whileHover={{ scale: BUTTON_HOVER_SCALE }}
               whileTap={{ scale: BUTTON_TAP_SCALE }}
             >
