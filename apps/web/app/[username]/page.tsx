@@ -387,12 +387,14 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         id='musicgroup-schema'
         type='application/ld+json'
         strategy='afterInteractive'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
         dangerouslySetInnerHTML={{ __html: JSON.stringify(musicGroupSchema) }}
       />
       <Script
         id='breadcrumb-schema'
         type='application/ld+json'
         strategy='afterInteractive'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
 
