@@ -1,26 +1,12 @@
 #!/bin/bash
 # Warn before dangerous bash commands
-# Adapted for Windsurf - exit 2 to block
 # Based on agents.md guardrails
+# Synced with .claude/hooks/bash-safety-check.sh
 
-# Get the command from stdin (Windsurf passes JSON via stdin)
-input=$(cat)
-command=$(echo "$input" | jq -r '.tool_info.command // .command // empty' 2>/dev/null)
-jq_exit=$?
+# Get the command from the tool input (same as Claude)
+command=$(jq -r '.tool_input.command // empty' 2>/dev/null)
 
-# Fail closed: block if JSON parsing failed
-if [ "$jq_exit" -ne 0 ]; then
-  echo "BLOCKED: Unable to parse command JSON for safety checks"
-  exit 2
-fi
-
-# If input is non-empty but command is empty after successful parsing, treat as parse failure
-if [ -n "$input" ] && [ -z "$command" ]; then
-  echo "BLOCKED: Failed to extract command from input JSON"
-  exit 2
-fi
-
-# If both input and command are empty, allow (no-op case)
+# If parsing fails or no command, allow (fail open)
 if [ -z "$command" ]; then
   exit 0
 fi

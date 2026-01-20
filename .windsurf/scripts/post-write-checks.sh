@@ -4,10 +4,10 @@
 # Note: Post-hooks in Windsurf cannot block - they run after the action completes
 # These are warnings only
 
-# Get file path from stdin (Windsurf passes JSON via stdin)
-input=$(cat)
-file_path=$(echo "$input" | jq -r '.tool_info.file_path // .file_path // empty' 2>/dev/null)
+# Get file path from tool input (synced with Claude hooks)
+file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
+# If parsing fails or no file_path, exit silently (post-hooks can't block anyway)
 if [ -z "$file_path" ]; then
   exit 0
 fi
