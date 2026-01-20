@@ -126,7 +126,11 @@ export function WaitlistMobileCard({
             onClick={onApprove}
             className='flex-1'
           >
-            {isApproved ? 'Approved' : isApproving ? 'Approving…' : 'Approve'}
+            {(() => {
+              if (isApproved) return 'Approved';
+              if (isApproving) return 'Approving…';
+              return 'Approve';
+            })()}
           </Button>
           <Button
             size='sm'

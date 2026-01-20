@@ -199,71 +199,79 @@ function KanbanColumn<TData>({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
-        {column.items.length === 0 ? (
-          <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
-            <div className='text-sm text-tertiary-token'>
-              {emptyState ?? 'No items'}
-            </div>
-          </div>
-        ) : enableVirtualization ? (
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map(virtualRow => {
-              const item = column.items[virtualRow.index];
-              return (
+        {(() => {
+          if (column.items.length === 0) {
+            return (
+              <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
+                <div className='text-sm text-tertiary-token'>
+                  {emptyState ?? 'No items'}
+                </div>
+              </div>
+            );
+          }
+          if (enableVirtualization) {
+            return (
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                  const item = column.items[virtualRow.index];
+                  return (
+                    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
+                    // biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop card
+                    <div
+                      key={getItemId(item)}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      className='mb-3'
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      draggable={Boolean(onItemMove)}
+                      onDragStart={e => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('itemId', getItemId(item));
+                        e.dataTransfer.setData('columnId', column.id);
+                      }}
+                    >
+                      {renderCard(item, virtualRow.index)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+          return (
+            <div className='space-y-3'>
+              {column.items.map((item, index) => (
                 // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
                 // biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop card
                 <div
                   key={getItemId(item)}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  className='mb-3'
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
                   draggable={Boolean(onItemMove)}
                   onDragStart={e => {
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('itemId', getItemId(item));
                     e.dataTransfer.setData('columnId', column.id);
                   }}
+                  className={cn(
+                    onItemMove &&
+                      'cursor-move transition-opacity hover:opacity-80'
+                  )}
                 >
-                  {renderCard(item, virtualRow.index)}
+                  {renderCard(item, index)}
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className='space-y-3'>
-            {column.items.map((item, index) => (
-              // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
-              // biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop card
-              <div
-                key={getItemId(item)}
-                draggable={Boolean(onItemMove)}
-                onDragStart={e => {
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('itemId', getItemId(item));
-                  e.dataTransfer.setData('columnId', column.id);
-                }}
-                className={cn(
-                  onItemMove &&
-                    'cursor-move transition-opacity hover:opacity-80'
-                )}
-              >
-                {renderCard(item, index)}
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

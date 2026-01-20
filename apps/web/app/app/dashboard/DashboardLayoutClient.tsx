@@ -210,7 +210,7 @@ export default function DashboardLayoutClient({
       <PendingClaimHandler />
 
       <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
+        <TableMetaContext.Provider value={useMemo(() => ({ tableMeta, setTableMeta }), [tableMeta])}>
           <DashboardLayoutInner
             crumbs={crumbs}
             useFullWidth={useFullWidth}

@@ -60,11 +60,12 @@ export function DefaultStatusBanner({
   // Runway display
   const runwayLabel =
     isUnavailable || runwayMonths === null ? null : runwayMonths.toFixed(1);
-  const runwayCopy = isUnavailable
-    ? 'Runway: —'
-    : runwayMonths == null
-      ? 'Runway: unlimited at current burn'
-      : `Runway: ${runwayLabel} months`;
+  const getRunwayCopy = (): string => {
+    if (isUnavailable) return 'Runway: —';
+    if (runwayMonths == null) return 'Runway: unlimited at current burn';
+    return `Runway: ${runwayLabel} months`;
+  };
+  const runwayCopy = getRunwayCopy();
 
   // MRR growth display
   const growthLabel = isUnavailable

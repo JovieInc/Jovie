@@ -8,7 +8,7 @@
  * Authorization: Requires CRON_SECRET header
  */
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { env } from '@/lib/env-server';

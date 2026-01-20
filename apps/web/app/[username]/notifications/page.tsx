@@ -19,12 +19,13 @@ export default function NotificationsPage() {
   const params = useParams();
   const rawUsername = (params as Record<string, unknown> | null | undefined)
     ?.username;
-  const username =
-    typeof rawUsername === 'string'
-      ? rawUsername
-      : Array.isArray(rawUsername)
-        ? String(rawUsername[0] ?? '')
-        : '';
+
+  const resolveUsername = (): string => {
+    if (typeof rawUsername === 'string') return rawUsername;
+    if (Array.isArray(rawUsername)) return String(rawUsername[0] ?? '');
+    return '';
+  };
+  const username = resolveUsername();
 
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

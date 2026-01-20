@@ -105,11 +105,12 @@ async function runDatabaseCheck() {
 
   try {
     const health = await checkDbHealth();
-    const status: CheckStatus = health.healthy
-      ? health.latency && health.latency > 500
-        ? 'warning'
-        : 'ok'
-      : 'error';
+    const resolveHealthStatus = (): CheckStatus => {
+      if (!health.healthy) return 'error';
+      if (health.latency && health.latency > 500) return 'warning';
+      return 'ok';
+    };
+    const status: CheckStatus = resolveHealthStatus();
 
     return {
       status,
@@ -149,8 +150,12 @@ function summarizeStatuses(statuses: CheckStatus[]) {
   const warningChecks = statuses.filter(status => status === 'warning').length;
   const failedChecks = statuses.filter(status => status === 'error').length;
 
-  const overallStatus: CheckStatus =
-    failedChecks > 0 ? 'error' : warningChecks > 0 ? 'warning' : 'ok';
+  const resolveOverallStatus = (): CheckStatus => {
+    if (failedChecks > 0) return 'error';
+    if (warningChecks > 0) return 'warning';
+    return 'ok';
+  };
+  const overallStatus: CheckStatus = resolveOverallStatus();
 
   return {
     totalChecks,

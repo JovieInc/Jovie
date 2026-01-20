@@ -30,11 +30,16 @@ export function CreatorVerificationToggleButton({
       'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
   );
 
-  const icon = isSuccess ? (
-    <Check size={14} aria-hidden='true' className='text-primary-token' />
-  ) : isError ? (
-    <X size={14} aria-hidden='true' className='text-destructive' />
-  ) : null;
+  const getIcon = () => {
+    if (isSuccess) {
+      return <Check size={14} aria-hidden='true' className='text-primary-token' />;
+    }
+    if (isError) {
+      return <X size={14} aria-hidden='true' className='text-destructive' />;
+    }
+    return null;
+  };
+  const icon = getIcon();
 
   const handleClick = useCallback(() => {
     void onToggle();

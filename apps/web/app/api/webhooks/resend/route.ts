@@ -18,7 +18,7 @@
  * - All events are logged for delivery tracking
  */
 
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';

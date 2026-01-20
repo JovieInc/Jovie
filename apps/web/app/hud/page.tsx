@@ -175,11 +175,15 @@ export default async function HudPage({
                     tone={deploymentsTone}
                   />
                   <div className='text-right text-lg text-white/50'>
-                    {metrics.deployments.current?.branch
-                      ? `Branch ${metrics.deployments.current.branch}`
-                      : metrics.deployments.availability === 'not_configured'
-                        ? 'Deploy not configured'
-                        : (metrics.deployments.errorMessage ?? '—')}
+                    {(() => {
+                      if (metrics.deployments.current?.branch) {
+                        return `Branch ${metrics.deployments.current.branch}`;
+                      }
+                      if (metrics.deployments.availability === 'not_configured') {
+                        return 'Deploy not configured';
+                      }
+                      return metrics.deployments.errorMessage ?? '—';
+                    })()}
                   </div>
                 </div>
               </div>

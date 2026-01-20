@@ -75,7 +75,7 @@ async function uploadRemoteAvatar(params: {
       const contentType =
         source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ??
         null;
-      if (!contentType || !contentType.startsWith('image/')) {
+      if (!contentType?.startsWith('image/')) {
         lastError = new Error(`Invalid content type: ${contentType}`);
         console.warn('[AVATAR_UPLOAD] Invalid content type:', contentType);
         // Don't retry for invalid content type - it won't change
@@ -151,7 +151,7 @@ function profileIsPublishable(
   if (!profile) return false;
   const hasHandle =
     Boolean(profile.username) && Boolean(profile.usernameNormalized);
-  const hasName = Boolean(profile.displayName && profile.displayName.trim());
+  const hasName = Boolean(profile.displayName?.trim());
   const isPublic = profile.isPublic !== false;
   const hasCompleted = Boolean(profile.onboardingCompletedAt);
 

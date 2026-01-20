@@ -1,7 +1,7 @@
-import fs from 'fs';
+import fs from 'node:fs';
+import path from 'node:path';
 import DOMPurify from 'isomorphic-dompurify';
 import type { Metadata } from 'next';
-import path from 'path';
 import { remark } from 'remark';
 import html from 'remark-html';
 import { Container } from '@/components/site/Container';

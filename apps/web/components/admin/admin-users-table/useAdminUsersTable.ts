@@ -104,11 +104,11 @@ export function useAdminUsersTable({
     router.push(createSortHref(columnId as UserSortableColumnKey));
   };
 
-  const sortColumn = sort
-    ? sort.startsWith('-')
-      ? sort.slice(1)
-      : sort
-    : null;
+  const getSortColumn = (): string | null => {
+    if (!sort) return null;
+    return sort.startsWith('-') ? sort.slice(1) : sort;
+  };
+  const sortColumn = getSortColumn();
   const sortDirection = sort ? (sort.startsWith('-') ? 'desc' : 'asc') : null;
 
   return {

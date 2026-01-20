@@ -136,24 +136,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle other HTTP methods
-export async function GET() {
+// Handle other HTTP methods - shared handler for unsupported methods
+function methodNotAllowed() {
   return NextResponse.json(
     { error: 'Method not allowed' },
     { status: 405, headers: NO_STORE_HEADERS }
   );
 }
 
-export async function PUT() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
-  );
-}
-
-export async function DELETE() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
-  );
-}
+export const GET = methodNotAllowed;
+export const PUT = methodNotAllowed;
+export const DELETE = methodNotAllowed;

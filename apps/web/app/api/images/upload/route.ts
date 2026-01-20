@@ -443,7 +443,7 @@ export async function POST(request: NextRequest) {
         );
 
         // Validate that we got real URLs back
-        if (!avatarUrl || !avatarUrl.startsWith('https://')) {
+        if (!avatarUrl?.startsWith('https://')) {
           throw new Error('Invalid blob URL returned from storage');
         }
 
