@@ -30,7 +30,7 @@ interface UseArtistSearchModeReturn {
   error: string | null;
 
   // Refs
-  resultsListRef: React.RefObject<HTMLUListElement>;
+  resultsListRef: React.RefObject<HTMLDivElement>;
 
   // Platform styling
   searchPlatform: (typeof ARTIST_SEARCH_PLATFORMS)[number] | undefined;
@@ -62,7 +62,7 @@ export function useArtistSearchMode({
   const [showResults, setShowResults] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(-1);
 
-  const resultsListRef = useRef<HTMLUListElement>(null);
+  const resultsListRef = useRef<HTMLDivElement>(null);
 
   const { results, state, error, search, clear } = useArtistSearchQuery({
     debounceMs: 300,

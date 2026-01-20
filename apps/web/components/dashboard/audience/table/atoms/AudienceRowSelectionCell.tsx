@@ -25,12 +25,12 @@ export function AudienceRowSelectionCell({
         className
       )}
     >
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox */}
       <div
         className='contents'
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
+        role='presentation'
       >
         <span
           className={cn(
