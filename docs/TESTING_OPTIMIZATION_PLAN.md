@@ -159,7 +159,7 @@ Each PR should update the "Progress Tracking" section with:
 **Last Updated**: 2026-01-04
 **Next Review**: After Phase 1 completion
 **Owner**: Test Optimization Team
-=======
+
 ## Progress (JOV-297)
 - Removed the database performance test suite at `apps/web/tests/lib/database-performance.test.ts` so monitoring-only instrumentation no longer runs in the application test harness.
 - Confirmed database monitoring utilities remain part of the production monitoring surface via `apps/web/lib/monitoring/database-performance` and related exports.
@@ -174,4 +174,3 @@ Each PR should update the "Progress Tracking" section with:
 - Keep monitoring instrumentation documented and discoverable for observability teams, not as part of the app test matrix.
 - Add guardrails in future test plans to prevent monitoring-focused suites from re-entering the main test pipeline unless they validate user-facing behavior.
 - When introducing new monitoring features, record them alongside their alerting runbooks rather than test suites to avoid confusing operational coverage with product verification.
->>>>>>> bab376c0e (chore(tests): remove database performance monitoring suite)
