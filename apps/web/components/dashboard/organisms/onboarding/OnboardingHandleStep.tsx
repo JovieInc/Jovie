@@ -26,6 +26,119 @@ interface OnboardingHandleStepProps {
   onSubmit: (e?: React.FormEvent) => void;
 }
 
+/** Error icon (X in circle) */
+function ErrorIcon() {
+  return (
+    <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-5 w-5'>
+      <circle
+        cx='10'
+        cy='10'
+        r='9'
+        stroke='currentColor'
+        className='text-error'
+        strokeWidth='2'
+      />
+      <path
+        d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
+        stroke='currentColor'
+        className='text-error'
+        strokeWidth='2'
+        strokeLinecap='round'
+      />
+    </svg>
+  );
+}
+
+/** Success icon (checkmark in circle) */
+function SuccessIcon() {
+  return (
+    <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-5 w-5'>
+      <circle
+        cx='10'
+        cy='10'
+        r='9'
+        stroke='currentColor'
+        className='text-success'
+        strokeWidth='2'
+      />
+      <path
+        d='M6 10.2l2.6 2.6L14 7.4'
+        stroke='currentColor'
+        className='text-success'
+        strokeWidth='2'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
+    </svg>
+  );
+}
+
+/** Determine which validation status icon to show */
+function ValidationStatusIcon({
+  checking,
+  hasError,
+  isValid,
+}: {
+  checking: boolean;
+  hasError: boolean;
+  isValid: boolean;
+}) {
+  if (checking) {
+    return <LoadingSpinner size='sm' className='text-secondary-token' />;
+  }
+  if (hasError) {
+    return <ErrorIcon />;
+  }
+  if (isValid) {
+    return <SuccessIcon />;
+  }
+  return null;
+}
+
+/** Determine validation status message to display */
+function ValidationStatusMessage({
+  handleInput,
+  stateError,
+  checking,
+  clientValid,
+  available,
+  error,
+}: {
+  handleInput: string;
+  stateError: string | null;
+  checking: boolean;
+  clientValid: boolean;
+  available: boolean;
+  error: string | null;
+}) {
+  if (!handleInput || stateError) return null;
+
+  if (checking) {
+    return (
+      <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
+        Checking…
+      </div>
+    );
+  }
+
+  if (clientValid && available) return null;
+
+  if (error) {
+    return (
+      <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+        Not available
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/** Get input container border class */
+function getInputBorderClass(hasError: boolean): string {
+  return hasError ? 'border-error' : 'border-gray-200 dark:border-[#1f2123]';
+}
+
 export function OnboardingHandleStep({
   title,
   prompt,
@@ -39,15 +152,21 @@ export function OnboardingHandleStep({
   onHandleChange,
   onSubmit,
 }: OnboardingHandleStepProps) {
+  const hasError = Boolean(stateError || handleValidation.error);
+  const isValid =
+    Boolean(handleInput) &&
+    handleValidation.clientValid &&
+    handleValidation.available;
+
   return (
     <div className='flex flex-col items-center justify-center h-full space-y-5'>
       <div className='text-center space-y-2 max-w-xl px-4'>
         <h1 className='text-lg font-normal text-primary-token text-center'>
           {title}
         </h1>
-        {prompt ? (
+        {prompt && (
           <p className='text-sm text-secondary-token text-center'>{prompt}</p>
-        ) : null}
+        )}
       </div>
 
       <div className='w-full max-w-md space-y-6'>
@@ -56,9 +175,7 @@ export function OnboardingHandleStep({
             className={[
               'w-full flex items-center gap-2 rounded-[6px] border bg-white dark:bg-[#0f1011] px-4 py-2.5',
               'focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]',
-              stateError || handleValidation.error
-                ? 'border-error'
-                : 'border-gray-200 dark:border-[#1f2123]',
+              getInputBorderClass(hasError),
             ].join(' ')}
           >
             <span className='text-sm text-secondary-token whitespace-nowrap'>
@@ -88,58 +205,11 @@ export function OnboardingHandleStep({
               className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
             />
             <div className='h-5 w-5 flex items-center justify-center'>
-              {handleValidation.checking ? (
-                <LoadingSpinner size='sm' className='text-secondary-token' />
-              ) : stateError || handleValidation.error ? (
-                <svg
-                  viewBox='0 0 20 20'
-                  fill='none'
-                  aria-hidden='true'
-                  className='h-5 w-5'
-                >
-                  <circle
-                    cx='10'
-                    cy='10'
-                    r='9'
-                    stroke='currentColor'
-                    className='text-error'
-                    strokeWidth='2'
-                  />
-                  <path
-                    d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
-                    stroke='currentColor'
-                    className='text-error'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                  />
-                </svg>
-              ) : handleInput &&
-                handleValidation.clientValid &&
-                handleValidation.available ? (
-                <svg
-                  viewBox='0 0 20 20'
-                  fill='none'
-                  aria-hidden='true'
-                  className='h-5 w-5'
-                >
-                  <circle
-                    cx='10'
-                    cy='10'
-                    r='9'
-                    stroke='currentColor'
-                    className='text-success'
-                    strokeWidth='2'
-                  />
-                  <path
-                    d='M6 10.2l2.6 2.6L14 7.4'
-                    stroke='currentColor'
-                    className='text-success'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                  />
-                </svg>
-              ) : null}
+              <ValidationStatusIcon
+                checking={handleValidation.checking}
+                hasError={hasError}
+                isValid={isValid}
+              />
             </div>
           </div>
 
@@ -149,18 +219,14 @@ export function OnboardingHandleStep({
             role='status'
             aria-live='polite'
           >
-            {handleInput && !stateError ? (
-              handleValidation.checking ? (
-                <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                  Checking…
-                </div>
-              ) : handleValidation.clientValid &&
-                handleValidation.available ? null : handleValidation.error ? (
-                <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
-                  Not available
-                </div>
-              ) : null
-            ) : null}
+            <ValidationStatusMessage
+              handleInput={handleInput}
+              stateError={stateError}
+              checking={handleValidation.checking}
+              clientValid={handleValidation.clientValid}
+              available={handleValidation.available}
+              error={handleValidation.error}
+            />
           </div>
 
           <AuthButton
