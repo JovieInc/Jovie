@@ -1,9 +1,9 @@
 /**
  * Stripe Webhooks Tests - Idempotency Handling
  */
+import './webhooks.test-utils';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
   mockConstructEvent,
   mockGetHandler,
@@ -12,6 +12,8 @@ import {
   mockWithTransaction,
   setSkipProcessing,
 } from './webhooks.test-utils';
+
+const { POST } = await import('@/app/api/stripe/webhooks/route');
 
 describe('/api/stripe/webhooks - Idempotency Handling', () => {
   beforeEach(() => {
