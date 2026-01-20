@@ -9,6 +9,11 @@ export interface SortableHeaderButtonProps {
   className?: string;
 }
 
+function getSortIndicator(direction?: 'asc' | 'desc'): string {
+  if (!direction) return '⇅';
+  return direction === 'asc' ? '▴' : '▾';
+}
+
 export function SortableHeaderButton({
   label,
   direction,
@@ -34,7 +39,7 @@ export function SortableHeaderButton({
         )}
         aria-hidden='true'
       >
-        {direction ? (direction === 'asc' ? '▴' : '▾') : '⇅'}
+        {getSortIndicator(direction)}
       </span>
     </button>
   );

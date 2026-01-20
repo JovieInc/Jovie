@@ -249,12 +249,14 @@ export async function getAdminCreatorProfiles(
 
       for (const row of confidenceRows) {
         const rawValue = row.averageConfidence;
-        const parsedValue =
-          typeof rawValue === 'number'
-            ? rawValue
-            : rawValue != null
-              ? Number(rawValue)
-              : Number.NaN;
+        let parsedValue: number;
+        if (typeof rawValue === 'number') {
+          parsedValue = rawValue;
+        } else if (rawValue != null) {
+          parsedValue = Number(rawValue);
+        } else {
+          parsedValue = Number.NaN;
+        }
 
         if (!Number.isNaN(parsedValue)) {
           const clamped = Math.min(1, Math.max(0, parsedValue));

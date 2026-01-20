@@ -19,15 +19,25 @@ const webServerCommand = process.env.DATABASE_URL
   ? 'pnpm run dev:local'
   : 'doppler run -- pnpm run dev:local';
 
+function getRetries(): number {
+  if (!isCI) return 0;
+  return isSmokeOnly ? 1 : 2;
+}
+
+function getWorkers(): number | undefined {
+  if (!isCI) return undefined;
+  return isSmokeOnly ? 8 : 4;
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: isCI,
   // Smoke tests: fewer retries for faster feedback; full suite: more resilience
-  retries: isCI ? (isSmokeOnly ? 1 : 2) : 0,
+  retries: getRetries(),
   // Smoke tests: more parallelism since tests are faster
   // Increased from 6 to 8 for smoke - tests are I/O-bound, not CPU-bound
-  workers: isCI ? (isSmokeOnly ? 8 : 4) : undefined,
+  workers: getWorkers(),
   reporter: isCI
     ? [
         ['line'],
