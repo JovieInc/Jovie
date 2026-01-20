@@ -435,6 +435,10 @@ describe('Dashboard API contracts', () => {
       mockSession();
       mockDb();
 
+      // Ensure route module is re-evaluated after applying mocks.
+      // This test runs after a previous test that imports the same route.
+      vi.resetModules();
+
       vi.doMock('@clerk/nextjs/server', () => ({
         clerkClient: vi.fn().mockResolvedValue({
           users: {
