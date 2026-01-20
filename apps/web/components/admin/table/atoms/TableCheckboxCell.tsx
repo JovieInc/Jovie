@@ -116,14 +116,13 @@ export function TableCheckboxCell<TData = unknown>(
         : headerCheckboxState;
 
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container
-      // biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
+        role='presentation'
       >
         <Checkbox
           aria-label='Select all rows'
@@ -139,14 +138,13 @@ export function TableCheckboxCell<TData = unknown>(
   // Row cell
   if (row && typeof isChecked === 'boolean' && onToggleSelect) {
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container
-      // biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
+        role='presentation'
       >
         <span
           className={cn(

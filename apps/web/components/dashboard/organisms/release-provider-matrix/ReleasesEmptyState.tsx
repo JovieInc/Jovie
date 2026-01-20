@@ -477,7 +477,6 @@ export function ReleasesEmptyState({
                   <ul
                     ref={resultsListRef}
                     id='artist-search-results'
-                    // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: listbox role on ul is correct for ARIA combobox pattern
                     role='listbox'
                     className='max-h-64 overflow-y-auto'
                   >
@@ -485,7 +484,6 @@ export function ReleasesEmptyState({
                       <li
                         key={artist.id}
                         id={`artist-result-${index}`}
-                        // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: option role on li is correct for ARIA listbox pattern
                         role='option'
                         tabIndex={-1}
                         aria-selected={index === formState.activeResultIndex}

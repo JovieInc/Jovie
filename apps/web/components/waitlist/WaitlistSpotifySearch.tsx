@@ -357,7 +357,6 @@ export function WaitlistSpotifySearch({
             <ul
               ref={resultsListRef}
               id='spotify-search-results'
-              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: listbox role on ul is correct for ARIA combobox pattern
               role='listbox'
               className='max-h-64 overflow-y-auto'
             >
@@ -365,7 +364,6 @@ export function WaitlistSpotifySearch({
                 <li
                   key={artist.id}
                   id={`spotify-result-${index}`}
-                  // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: option role on li is correct for ARIA listbox pattern
                   role='option'
                   tabIndex={-1}
                   aria-selected={index === activeIndex}

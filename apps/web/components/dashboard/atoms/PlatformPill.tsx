@@ -160,8 +160,6 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     );
 
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: Interactive pill with keyboard support
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Interactive pill with keyboard support
       <div
         ref={ref}
         onClick={isInteractive ? onClick : undefined}

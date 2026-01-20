@@ -56,12 +56,11 @@ export function ContextMenuSubmenu({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Submenu requires hover handlers
-    // biome-ignore lint/a11y/noStaticElementInteractions: Submenu requires hover handlers
     <div
       className='relative'
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
+      role='presentation'
     >
       {/* Submenu Trigger */}
       <button

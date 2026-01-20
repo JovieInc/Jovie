@@ -29,8 +29,6 @@ export function AudienceCreatedAtCell({
       )}
     >
       <span className='line-clamp-1'>{formatLongDate(lastSeenAt)}</span>
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
       <div
         className={cn(
           'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
@@ -40,6 +38,7 @@ export function AudienceCreatedAtCell({
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
+        role='presentation'
       >
         <AudienceRowActionsMenu
           row={row}

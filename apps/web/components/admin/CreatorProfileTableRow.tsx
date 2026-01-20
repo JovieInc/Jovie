@@ -141,14 +141,13 @@ export function CreatorProfileTableRow({
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
             handleActivationKeyDown(event, e => e.stopPropagation())
           }
+          role='presentation'
         >
           <span
             className={cn(

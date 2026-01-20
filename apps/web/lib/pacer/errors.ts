@@ -71,7 +71,7 @@ export function getHttpStatusCode(err: unknown): number | undefined {
   if (!(err instanceof Error)) return undefined;
 
   const match = err.message.match(/HTTP\s*(\d{3})/i);
-  return match ? parseInt(match[1], 10) : undefined;
+  return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
 export type PacerErrorType =
