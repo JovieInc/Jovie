@@ -2,15 +2,8 @@
 # Cascade hook: Auto-format edited files with biome
 # Runs after each code edit made by Cascade
 
-# Read JSON from stdin
-input=$(cat)
-
-# Extract file path using jq (or fallback to grep/sed if jq unavailable)
-if command -v jq &> /dev/null; then
-    file_path=$(echo "$input" | jq -r '.tool_info.file_path // empty')
-else
-    file_path=$(echo "$input" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)".*/\1/')
-fi
+# Extract file path from tool input (synced with Claude hooks)
+file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # Exit if no file path
 if [ -z "$file_path" ]; then

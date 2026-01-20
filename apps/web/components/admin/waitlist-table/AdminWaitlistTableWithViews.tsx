@@ -2,6 +2,7 @@
 
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import {
   KanbanBoard,
@@ -188,7 +189,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
         if (!response.ok || !payload?.success) {
           console.error('Failed to update waitlist status:', payload?.error);
-          // TODO: Show error toast to user
+          toast.error('Failed to update status', {
+            description: payload?.error ?? 'Please try again',
+          });
           return;
         }
 
@@ -196,7 +199,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         // No need to manually update state here
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
-        // TODO: Show error toast to user
+        toast.error('Failed to update status', {
+          description: 'A network error occurred. Please try again.',
+        });
       }
     },
     []
