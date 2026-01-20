@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 
 // ============================================================================
 // Request Schema
@@ -89,6 +90,8 @@ export async function POST(
         id: dspArtistMatches.id,
         creatorProfileId: dspArtistMatches.creatorProfileId,
         status: dspArtistMatches.status,
+        providerId: dspArtistMatches.providerId,
+        externalArtistId: dspArtistMatches.externalArtistId,
       })
       .from(dspArtistMatches)
       .where(eq(dspArtistMatches.id, matchId))
@@ -127,7 +130,26 @@ export async function POST(
       })
       .where(eq(dspArtistMatches.id, matchId));
 
-    // TODO: Enqueue track enrichment job after confirmation
+    // Enqueue track enrichment job to add DSP links to tracks
+    if (match.externalArtistId) {
+      try {
+        await enqueueDspTrackEnrichmentJob({
+          creatorProfileId: profileId,
+          matchId,
+          providerId: match.providerId as
+            | 'apple_music'
+            | 'deezer'
+            | 'musicbrainz',
+          externalArtistId: match.externalArtistId,
+        });
+      } catch (enrichmentError) {
+        // Log but don't fail the confirmation - enrichment can be retried
+        console.error(
+          '[DSP Match Confirm] Failed to enqueue enrichment job:',
+          enrichmentError
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,
