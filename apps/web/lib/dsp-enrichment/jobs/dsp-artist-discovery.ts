@@ -112,6 +112,8 @@ async function fetchLocalArtist(
       id: creatorProfiles.id,
       displayName: creatorProfiles.displayName,
       usernameNormalized: creatorProfiles.usernameNormalized,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      genres: creatorProfiles.genres,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
@@ -125,9 +127,8 @@ async function fetchLocalArtist(
     id: profile.id,
     name: profile.displayName ?? profile.usernameNormalized ?? 'Unknown Artist',
     spotifyId: spotifyArtistId,
-    // TODO: Fetch followers and genres from Spotify data when available
-    followers: null,
-    genres: null,
+    followers: profile.spotifyFollowers ?? null,
+    genres: profile.genres ?? null,
   };
 }
 
