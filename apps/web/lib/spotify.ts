@@ -444,9 +444,9 @@ export function getBestSpotifyImage(images: SpotifyImage[]): string | null {
 export function generateReleaseSlug(title: string, spotifyId: string): string {
   const slugified = title
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
+    .replaceAll(/[^a-z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/-+/g, '-')
     .slice(0, 50);
 
   // Append short ID for uniqueness

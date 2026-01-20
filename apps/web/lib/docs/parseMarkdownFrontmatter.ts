@@ -32,7 +32,7 @@ export function parseMarkdownFrontmatter(
 
     if (!key) return;
 
-    data[key] = value.replace(/(^['"])|(["']$)/g, '');
+    data[key] = value.replaceAll(/(^['"])|(["']$)/g, '');
   });
 
   return {

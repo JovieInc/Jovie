@@ -6,5 +6,5 @@
  * constructing LIKE patterns such as `%${value}%`.
  */
 export function escapeLikePattern(input: string): string {
-  return input.replace(/[%_\\]/g, char => `\\${char}`);
+  return input.replaceAll(/[%_\\]/g, char => `\\${char}`);
 }
