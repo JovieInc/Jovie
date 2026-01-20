@@ -54,13 +54,18 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    pool: 'threads', // Use threads instead of forks for better performance
+    // Use forks pool to prevent JS heap OOM in worker threads (mirrors CI stability)
+    pool: 'forks',
     poolOptions: {
       threads: {
         // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
         minThreads: 1,
         maxThreads,
         useAtomics: true,
+      },
+      forks: {
+        minForks: 1,
+        maxForks: maxThreads,
       },
     },
 
