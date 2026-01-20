@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       summary.status = 'degraded';
       summary.database = 'unavailable';
       return NextResponse.json(summary, {
-        status: 200,
+        status: 503, // Service Unavailable - allows monitoring to detect issues
         headers: NO_STORE_HEADERS,
       });
     }
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     summary.status = 'degraded';
     summary.database = 'error';
     return NextResponse.json(summary, {
-      status: 200,
+      status: 503, // Service Unavailable - allows monitoring to detect issues
       headers: NO_STORE_HEADERS,
     });
   }
