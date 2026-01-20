@@ -5,7 +5,10 @@ import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface RightDrawerProps
-  extends Omit<React.HTMLAttributes<HTMLElement>, 'children' | 'className'> {
+  extends Omit<
+    React.HTMLAttributes<HTMLElement>,
+    'children' | 'className' | 'onKeyDown'
+  > {
   isOpen: boolean;
   width: number;
   children: React.ReactNode;

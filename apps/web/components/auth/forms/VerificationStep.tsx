@@ -139,7 +139,8 @@ export function VerificationStep({
               Please check your inbox at{' '}
               <span className='text-[#1f2023] dark:text-[#e3e4e6] font-[450] break-all'>
                 {email}
-              </span>.
+              </span>
+              .
             </>
           )}
           {!email && <>Codes expire after 10 minutes.</>}

@@ -174,7 +174,9 @@ export function AuthLayout({
           tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
         >
           <span
-            className={shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'}
+            className={
+              shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
+            }
           >
             <BrandLogo size={48} tone='auto' priority />
           </span>
@@ -220,7 +222,6 @@ export function AuthLayout({
           </Link>
         </p>
       )}
-
     </div>
   );
 }

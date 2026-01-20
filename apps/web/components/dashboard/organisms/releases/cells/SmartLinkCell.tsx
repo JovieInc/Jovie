@@ -35,18 +35,12 @@ export function SmartLinkCell({ release }: SmartLinkCellProps) {
   }, [release.title, smartLinkTestId]);
 
   return (
-    <div
-      className='contents'
-      onClick={e => e.stopPropagation()}
-      onKeyDown={e => e.stopPropagation()}
-      role='presentation'
-    >
-      <CopyLinkInput
-        url={smartLinkUrl}
-        size='sm'
-        onCopy={handleCopySuccess}
-        testId={smartLinkTestId}
-      />
-    </div>
+    <CopyLinkInput
+      url={smartLinkUrl}
+      size='sm'
+      stopPropagation
+      onCopy={handleCopySuccess}
+      testId={smartLinkTestId}
+    />
   );
 }
