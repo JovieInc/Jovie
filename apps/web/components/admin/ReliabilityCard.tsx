@@ -1,8 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
-// TODO: extend reliability metrics with additional system health data.
-
 interface ReliabilityCardProps {
   summary: AdminReliabilitySummary;
 }
