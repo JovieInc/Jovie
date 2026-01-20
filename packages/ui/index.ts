@@ -1,5 +1,3 @@
-// Dropdown Style Constants (for custom floating menus)
-
 // Alert Dialog
 export {
   AlertDialog,

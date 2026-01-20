@@ -45,6 +45,18 @@ import {
   isSubmenu,
 } from './common-dropdown-types';
 
+/** Renders an icon component, handling both function components and JSX elements */
+function renderIcon(
+  IconComponent: React.ComponentType<{ className?: string }> | React.ReactNode,
+  className: string
+): React.ReactNode {
+  if (!IconComponent) return null;
+  if (typeof IconComponent === 'function') {
+    return <IconComponent className={className} />;
+  }
+  return IconComponent;
+}
+
 /**
  * CommonDropdown - Unified dropdown component supporting multiple variants
  *
@@ -381,12 +393,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
           item.className
         )}
       >
-        {IconComponent &&
-          (typeof IconComponent === 'function' ? (
-            <IconComponent className='h-3.5 w-3.5' />
-          ) : (
-            IconComponent
-          ))}
+        {renderIcon(IconComponent, 'h-3.5 w-3.5')}
         <span className='flex-1'>{item.label}</span>
         {item.badge && (
           <span
@@ -407,12 +414,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         {item.shortcut && (
           <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
         )}
-        {IconAfterComponent &&
-          (typeof IconAfterComponent === 'function' ? (
-            <IconAfterComponent className='ml-auto h-3.5 w-3.5' />
-          ) : (
-            IconAfterComponent
-          ))}
+        {renderIcon(IconAfterComponent, 'ml-auto h-3.5 w-3.5')}
       </MenuItem>
     );
   }
@@ -489,12 +491,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
                   <Circle className='h-2 w-2 fill-current' />
                 </ItemIndicator>
               </span>
-              {IconComponent &&
-                (typeof IconComponent === 'function' ? (
-                  <IconComponent className='h-3.5 w-3.5' />
-                ) : (
-                  IconComponent
-                ))}
+              {renderIcon(IconComponent, 'h-3.5 w-3.5')}
               {radioItem.label}
             </RadioItem>
           );
@@ -508,50 +505,38 @@ export function CommonDropdown(props: CommonDropdownProps) {
     item: CommonDropdownSubmenu,
     isContextMenu: boolean
   ): React.ReactNode {
-    if (isContextMenu) {
-      const IconComponent = item.icon;
-
-      return (
-        <ContextMenuPrimitive.Sub key={item.id}>
-          <ContextMenuPrimitive.SubTrigger
-            disabled={item.disabled}
-            className={cn(MENU_ITEM_BASE, item.className)}
-          >
-            {IconComponent && <IconComponent className='h-3.5 w-3.5' />}
-            {item.label}
-            <ChevronRight className='ml-auto' />
-          </ContextMenuPrimitive.SubTrigger>
-          <ContextMenuPrimitive.Portal>
-            <ContextMenuPrimitive.SubContent
-              className={cn(subMenuContentClasses, CONTEXT_TRANSFORM_ORIGIN)}
-            >
-              {renderItems(item.items, true)}
-            </ContextMenuPrimitive.SubContent>
-          </ContextMenuPrimitive.Portal>
-        </ContextMenuPrimitive.Sub>
-      );
-    }
-
-    const IconComponent = item.icon;
+    const Sub = isContextMenu
+      ? ContextMenuPrimitive.Sub
+      : DropdownMenuPrimitive.Sub;
+    const SubTrigger = isContextMenu
+      ? ContextMenuPrimitive.SubTrigger
+      : DropdownMenuPrimitive.SubTrigger;
+    const Portal = isContextMenu
+      ? ContextMenuPrimitive.Portal
+      : DropdownMenuPrimitive.Portal;
+    const SubContent = isContextMenu
+      ? ContextMenuPrimitive.SubContent
+      : DropdownMenuPrimitive.SubContent;
+    const transformOrigin = isContextMenu
+      ? CONTEXT_TRANSFORM_ORIGIN
+      : DROPDOWN_TRANSFORM_ORIGIN;
 
     return (
-      <DropdownMenuPrimitive.Sub key={item.id}>
-        <DropdownMenuPrimitive.SubTrigger
+      <Sub key={item.id}>
+        <SubTrigger
           disabled={item.disabled}
           className={cn(MENU_ITEM_BASE, item.className)}
         >
-          {IconComponent && <IconComponent className='h-3.5 w-3.5' />}
+          {renderIcon(item.icon, 'h-3.5 w-3.5')}
           {item.label}
           <ChevronRight className='ml-auto' />
-        </DropdownMenuPrimitive.SubTrigger>
-        <DropdownMenuPrimitive.Portal>
-          <DropdownMenuPrimitive.SubContent
-            className={cn(subMenuContentClasses, DROPDOWN_TRANSFORM_ORIGIN)}
-          >
-            {renderItems(item.items, false)}
-          </DropdownMenuPrimitive.SubContent>
-        </DropdownMenuPrimitive.Portal>
-      </DropdownMenuPrimitive.Sub>
+        </SubTrigger>
+        <Portal>
+          <SubContent className={cn(subMenuContentClasses, transformOrigin)}>
+            {renderItems(item.items, isContextMenu)}
+          </SubContent>
+        </Portal>
+      </Sub>
     );
   }
 }
