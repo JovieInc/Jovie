@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
 import { remark } from 'remark';
@@ -16,13 +16,21 @@ export function createLegalDocumentRoute(
 ) {
   return async function GET() {
     try {
-      const filePath = path.join(
-        process.cwd(),
-        'content',
-        'legal',
-        docFilename
-      );
-      const fileContents = fs.readFileSync(filePath, 'utf8');
+      const sanitizedFilename = path.basename(docFilename);
+      if (sanitizedFilename !== docFilename) {
+        throw new Error('Invalid document filename');
+      }
+
+      const legalDir = path.resolve(process.cwd(), 'content', 'legal');
+      const filePath = path.resolve(legalDir, sanitizedFilename);
+      const legalDirWithSep = legalDir.endsWith(path.sep)
+        ? legalDir
+        : `${legalDir}${path.sep}`;
+      if (!filePath.startsWith(legalDirWithSep)) {
+        throw new Error('Invalid document path');
+      }
+
+      const fileContents = await fs.readFile(filePath, 'utf8');
 
       const processedContent = await remark().use(html).process(fileContents);
       const contentHtml = processedContent.toString();
