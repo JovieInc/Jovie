@@ -105,8 +105,8 @@ export function SocialIcon({
         viewBox='0 0 24 24'
         aria-hidden={ariaHidden}
         aria-label={ariaLabel}
-        role={ariaLabel ? 'img' : undefined}
       >
+        <title>{ariaLabel ?? platform}</title>
         <path d={icon.path} />
       </svg>
     );

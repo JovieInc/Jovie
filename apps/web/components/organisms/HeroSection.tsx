@@ -77,7 +77,7 @@ export function HeroSection({
       <Container className='relative flex max-w-4xl flex-col items-center text-center'>
         {/* Icon/Emoji */}
         {icon && (
-          <div className='mb-8 text-6xl' role='img'>
+          <div className='mb-8 text-6xl' aria-hidden='true'>
             {icon}
           </div>
         )}

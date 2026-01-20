@@ -194,12 +194,12 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
             BORDER_RING,
             'shadow-sm transition-colors duration-200'
           )}
-          role='img'
-          aria-label={alt}
           aria-busy='false'
         >
+          <span className='sr-only'>{alt}</span>
           <span
             className={cn('font-medium leading-none select-none', textSize)}
+            aria-hidden='true'
           >
             {initials}
           </span>
@@ -224,14 +224,11 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           BORDER_RING,
           'shadow-sm transition-colors duration-200'
         )}
-        role='img'
-        aria-label={alt}
         aria-busy={!isLoaded}
       >
         <Image
           src={src}
-          alt=''
-          aria-hidden='true'
+          alt={alt}
           width={width}
           height={height}
           priority={priority}

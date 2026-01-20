@@ -55,15 +55,16 @@ export function QRCode({
   if (hasError) {
     return (
       <div
-        role='img'
-        aria-label={`${label} unavailable`}
         className={cn(
           'flex items-center justify-center rounded bg-gray-100 text-gray-500',
           className
         )}
         style={{ width: size, height: size }}
       >
-        <span className='text-xs'>QR code unavailable</span>
+        <span className='sr-only'>{`${label} unavailable`}</span>
+        <span className='text-xs' aria-hidden='true'>
+          QR code unavailable
+        </span>
       </div>
     );
   }

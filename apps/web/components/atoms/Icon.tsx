@@ -170,7 +170,6 @@ export function Icon({
     <LucideIcon
       className={cn(className)}
       aria-hidden={shouldHide}
-      role={ariaLabel && !shouldHide ? 'img' : undefined}
       aria-label={ariaLabel}
       {...props}
     />

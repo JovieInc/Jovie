@@ -158,9 +158,9 @@ export function ProfileSkeleton() {
     <div className='flex flex-col items-center space-y-4 text-center'>
       <div
         className='h-32 w-32 rounded-full skeleton motion-reduce:animate-none'
-        aria-label='Loading artist profile image'
-        role='img'
+        aria-hidden='true'
       />
+      <span className='sr-only'>Loading artist profile image</span>
       <div className='space-y-2'>
         {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA props needed for loading skeleton accessibility */}
         {/* biome-ignore lint/a11y/useValidAriaRole: role=text is valid for loading state */}
@@ -183,12 +183,11 @@ export function ProfileSkeleton() {
 
 export function ButtonSkeleton() {
   return (
-    // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
-    // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
-    <div
+    <button
+      type='button'
+      disabled
       className='h-12 w-full max-w-sm rounded-lg skeleton motion-reduce:animate-none'
       aria-label='Loading action button'
-      role='button'
     />
   );
 }
@@ -197,23 +196,20 @@ const SOCIAL_BAR_SKELETON_KEYS = generateSkeletonKeys('social-link', 4);
 
 export function SocialBarSkeleton() {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: Navigation skeleton placeholder
-    <div
+    <nav
       className='flex flex-wrap justify-center gap-4'
       aria-label='Loading social media links'
-      role='navigation'
     >
       {SOCIAL_BAR_SKELETON_KEYS.map((key, index) => (
-        // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
-        // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
-        <div
+        <button
+          type='button'
+          disabled
           key={key}
           className='h-12 w-12 rounded-full skeleton motion-reduce:animate-none'
           aria-label={`Loading social link ${index + 1}`}
-          role='button'
         />
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -261,22 +257,20 @@ export function ListSkeleton({ items = 3 }: { items?: number }) {
   );
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: skeleton placeholder for list, semantic list element not appropriate
-    <div className='space-y-4' aria-label='Loading list items' role='list'>
+    <ul className='space-y-4 list-none p-0 m-0' aria-label='Loading list items'>
       {itemKeys.map(key => (
-        <div
-          key={key}
-          className='flex items-center space-x-3 p-3 border border-subtle rounded-md'
-        >
-          <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
-          <div className='space-y-1 flex-1'>
-            <div className='h-4 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
-            <div className='h-3 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
+        <li key={key}>
+          <div className='flex items-center space-x-3 p-3 border border-subtle rounded-md'>
+            <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
+            <div className='space-y-1 flex-1'>
+              <div className='h-4 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='h-3 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
+            </div>
+            <div className='h-8 w-8 rounded-md skeleton motion-reduce:animate-none' />
           </div>
-          <div className='h-8 w-8 rounded-md skeleton motion-reduce:animate-none' />
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

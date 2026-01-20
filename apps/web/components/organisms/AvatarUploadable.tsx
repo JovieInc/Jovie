@@ -153,21 +153,6 @@ export const AvatarUploadable = React.memo(
       }
     }, [uploadable, onUpload, isUploading]);
 
-    const handleKeyDown = useCallback(
-      (e: React.KeyboardEvent) => {
-        if (
-          uploadable &&
-          onUpload &&
-          !isUploading &&
-          (e.key === 'Enter' || e.key === ' ')
-        ) {
-          e.preventDefault();
-          fileInputRef.current?.click();
-        }
-      },
-      [uploadable, onUpload, isUploading]
-    );
-
     useEffect(() => {
       if (isUploading && progress > 0) {
         track('avatar_upload_progress', { progress });
@@ -182,54 +167,76 @@ export const AvatarUploadable = React.memo(
       uploadStatus === 'success' || uploadStatus === 'error' ? 100 : progress;
 
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Role is dynamically 'button' or 'presentation'
-      // biome-ignore lint/a11y/noStaticElementInteractions: Role is dynamically 'button' when interactive
-      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label only present when role='button'
+      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-and-drop target for avatar uploads
+      // biome-ignore lint/a11y/noStaticElementInteractions: Drag events are required on container element
       <div
         ref={mergedRef}
-        className={cn(
-          'relative group/avatar outline-none',
-          isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
-          className
-        )}
+        className={className}
         onDragEnter={canUpload ? handleDragEnter : undefined}
         onDragLeave={canUpload ? handleDragLeave : undefined}
         onDragOver={canUpload ? handleDragOver : undefined}
         onDrop={canUpload ? handleDrop : undefined}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        tabIndex={isInteractive ? 0 : undefined}
-        role={isInteractive ? 'button' : 'presentation'}
-        aria-label={isInteractive ? 'Upload profile photo' : undefined}
-        aria-disabled={isInteractive ? !isInteractive : undefined}
-        aria-busy={isUploading || undefined}
       >
-        <Avatar
-          src={previewUrl ?? src}
-          className={cn(
-            'transition-all duration-200 ease-out',
-            isInteractive &&
-              'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
-            isDragOver && 'scale-105',
-            isUploading && 'opacity-80'
-          )}
-          {...avatarProps}
-        />
+        {canUpload ? (
+          <button
+            type='button'
+            className={cn(
+              'relative group/avatar outline-none',
+              isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default'
+            )}
+            onClick={handleClick}
+            disabled={!isInteractive}
+            aria-label='Upload profile photo'
+            aria-busy={isUploading || undefined}
+          >
+            <Avatar
+              src={previewUrl ?? src}
+              className={cn(
+                'transition-all duration-200 ease-out',
+                isInteractive &&
+                  'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
+                isDragOver && 'scale-105',
+                isUploading && 'opacity-80'
+              )}
+              {...avatarProps}
+            />
 
-        {isInteractive && showHoverOverlay && !isDragOver && (
-          <AvatarUploadOverlay iconSize={numericSize * 0.3} />
-        )}
+            {isInteractive && showHoverOverlay && !isDragOver && (
+              <AvatarUploadOverlay iconSize={numericSize * 0.3} />
+            )}
 
-        {isDragOver && (
-          <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
-        )}
+            {isDragOver && (
+              <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
+            )}
 
-        {showProgress && (
-          <AvatarProgressRing
-            progress={Math.min(100, Math.max(0, currentProgress))}
-            size={numericSize}
-            status={uploadStatus}
-          />
+            {showProgress && (
+              <AvatarProgressRing
+                progress={Math.min(100, Math.max(0, currentProgress))}
+                size={numericSize}
+                status={uploadStatus}
+              />
+            )}
+          </button>
+        ) : (
+          <div className='relative group/avatar outline-none cursor-default'>
+            <Avatar
+              src={previewUrl ?? src}
+              className={cn(
+                'transition-all duration-200 ease-out',
+                isDragOver && 'scale-105',
+                isUploading && 'opacity-80'
+              )}
+              {...avatarProps}
+            />
+
+            {showProgress && (
+              <AvatarProgressRing
+                progress={Math.min(100, Math.max(0, currentProgress))}
+                size={numericSize}
+                status={uploadStatus}
+              />
+            )}
+          </div>
         )}
 
         {canUpload && (

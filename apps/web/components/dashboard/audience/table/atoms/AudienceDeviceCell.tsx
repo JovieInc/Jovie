@@ -21,8 +21,7 @@ export function AudienceDeviceCell({
         <Icon
           name={deviceIndicator.iconName}
           className='h-3.5 w-3.5 text-secondary-token'
-          aria-label={deviceIndicator.label}
-          role='img'
+          ariaLabel={deviceIndicator.label}
         />
       ) : (
         <span className='text-secondary-token'>—</span>
