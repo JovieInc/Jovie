@@ -34,10 +34,8 @@ describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
       />
     );
 
-    const container = screen.getByRole('img');
-    expect(container).toBeInTheDocument();
-    expect(container).not.toHaveAttribute('tabIndex');
-    expect(container).not.toHaveAttribute('role', 'button');
+    expect(screen.getByAltText('User avatar')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('does not show hover overlay when not uploadable', () => {
@@ -83,7 +81,7 @@ describe('AvatarUploadable - Upload Mode', () => {
     const container = screen.getByRole('button');
     expect(container).toBeInTheDocument();
     expect(container).toHaveAttribute('aria-label', 'Upload profile photo');
-    expect(container).toHaveAttribute('tabIndex', '0');
+    expect(container).not.toBeDisabled();
   });
 
   it('shows file input for upload', () => {

@@ -4,12 +4,15 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSuggestions } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
-import { track } from '@/lib/analytics';
+import * as analytics from '@/lib/analytics';
 import { createMockSuggestion } from './useSuggestions.test-utils';
 
 describe('useSuggestions - handleDismiss', () => {
+  let trackSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    trackSpy = vi.spyOn(analytics, 'track');
   });
 
   afterEach(() => {
@@ -55,15 +58,18 @@ describe('useSuggestions - handleDismiss', () => {
         await result.current.handleDismiss(suggestion);
       });
 
-      expect(track).toHaveBeenCalledWith('dashboard_link_suggestion_dismiss', {
-        platform: 'instagram',
-        sourcePlatform: 'facebook',
-        sourceType: 'linktree',
-        confidence: 0.7,
-        hasIdentity: true,
-      });
+      expect(trackSpy).toHaveBeenCalledWith(
+        'dashboard_link_suggestion_dismiss',
+        {
+          platform: 'instagram',
+          sourcePlatform: 'facebook',
+          sourceType: 'linktree',
+          confidence: 0.7,
+          hasIdentity: true,
+        }
+      );
 
-      expect(track).toHaveBeenCalledWith('link_suggestion_dismissed', {
+      expect(trackSpy).toHaveBeenCalledWith('link_suggestion_dismissed', {
         platformId: 'instagram',
         sourcePlatform: 'facebook',
         sourceType: 'linktree',

@@ -38,7 +38,7 @@ describe('Avatar Component', () => {
       const image = screen.getByTestId('avatar-image');
       expect(image).toBeInTheDocument();
       expect(image).toHaveAttribute('src', 'https://example.com/avatar.jpg');
-      expect(image).toHaveAttribute('alt', '');
+      expect(image).toHaveAttribute('alt', 'User avatar');
     });
 
     it('applies correct ARIA attributes', () => {
@@ -50,8 +50,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveAttribute('aria-label', 'User avatar');
+      expect(screen.getByAltText('User avatar')).toBeInTheDocument();
     });
 
     it('applies correct size classes', () => {
@@ -64,7 +63,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      let container = screen.getByLabelText('User avatar');
+      const image = screen.getByTestId('avatar-image');
+      let container = image.parentElement as HTMLElement;
       expect(container).toHaveClass('size-8');
 
       rerender(
@@ -76,7 +76,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      container = screen.getByLabelText('User avatar');
+      container = screen.getByTestId('avatar-image')
+        .parentElement as HTMLElement;
       expect(container).toHaveClass('size-16');
     });
 
@@ -90,7 +91,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      let container = screen.getByLabelText('User avatar');
+      const image = screen.getByTestId('avatar-image');
+      let container = image.parentElement as HTMLElement;
       expect(container).toHaveClass('rounded-sm');
 
       rerender(
@@ -102,7 +104,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      container = screen.getByLabelText('User avatar');
+      container = screen.getByTestId('avatar-image')
+        .parentElement as HTMLElement;
       expect(container).toHaveClass('rounded-full');
     });
   });
@@ -165,7 +168,7 @@ describe('Avatar Component', () => {
   });
 
   describe('Accessibility', () => {
-    it('has correct role attribute', () => {
+    it('exposes the image alt text', () => {
       render(
         <Avatar
           src='https://example.com/avatar.jpg'
@@ -174,11 +177,11 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveAttribute('role', 'img');
+      const image = screen.getByAltText('User avatar');
+      expect(image).toBeInTheDocument();
     });
 
-    it('has correct aria-label', () => {
+    it('uses the provided alt text', () => {
       render(
         <Avatar
           src='https://example.com/avatar.jpg'
@@ -187,11 +190,9 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('Profile picture of John Doe');
-      expect(container).toHaveAttribute(
-        'aria-label',
-        'Profile picture of John Doe'
-      );
+      expect(
+        screen.getByAltText('Profile picture of John Doe')
+      ).toBeInTheDocument();
     });
 
     it('fallback initials are not selectable', () => {
@@ -213,8 +214,9 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container.parentElement).toHaveClass('custom-avatar-class');
+      const image = screen.getByTestId('avatar-image');
+      const wrapper = image.parentElement?.parentElement as HTMLElement;
+      expect(wrapper).toHaveClass('custom-avatar-class');
     });
 
     it('accepts custom style props', () => {
@@ -229,8 +231,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      const wrapper = container.parentElement;
+      const image = screen.getByTestId('avatar-image');
+      const wrapper = image.parentElement?.parentElement as HTMLElement;
       // Check that style attribute exists and contains our custom styles
       expect(wrapper).toHaveAttribute('style');
       const style = wrapper?.getAttribute('style');
@@ -285,7 +287,7 @@ describe('Avatar Component', () => {
       // After load, image should have opacity-100 class
       expect(image).toHaveClass('opacity-100');
 
-      const container = screen.getByLabelText('User avatar');
+      const container = image.parentElement as HTMLElement;
       expect(container).toHaveAttribute('aria-busy', 'false');
     });
   });

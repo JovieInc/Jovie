@@ -13,8 +13,6 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
-
 describe('/api/stripe/webhooks - Error Propagation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,10 +22,6 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
   });
 
   it('returns 500 when handler throws an error', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_error',
       type: 'checkout.session.completed',
@@ -55,6 +49,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -66,10 +61,6 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
   });
 
   it('returns 500 when handler returns an error result', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_error_result',
       type: 'checkout.session.completed',
@@ -101,6 +92,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -121,10 +113,6 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
   });
 
   it('does not treat skipped results as errors', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_skipped',
       type: 'checkout.session.completed',
@@ -156,6 +144,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );

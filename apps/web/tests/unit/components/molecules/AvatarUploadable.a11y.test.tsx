@@ -98,6 +98,7 @@ describe('AvatarUploadable - Accessibility', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('tabIndex', '0');
+    button.focus();
+    expect(button).toHaveFocus();
   });
 });
