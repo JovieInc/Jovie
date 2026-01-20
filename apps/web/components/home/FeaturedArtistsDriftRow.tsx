@@ -82,7 +82,7 @@ export function FeaturedArtistsDriftRow({
     throttler.maybeExecute();
 
     window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', onScrollOrResize);
