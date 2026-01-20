@@ -7,9 +7,8 @@ import { defineConfig } from 'vitest/config';
 // standard configuration while using the optimized defaults locally.
 dotenv.config({ path: '.env.test' });
 
-// Detect CI environment - use forks pool for better memory isolation
+// Detect CI environment
 const isCI = process.env.CI === 'true';
-const maxWorkers = isCI ? 2 : 4; // Use 2 workers in CI to reduce memory pressure
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
@@ -45,26 +44,19 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use forks in CI for better memory isolation, threads locally for speed
-    pool: isCI ? 'forks' : 'threads',
+    // Use forks for better memory isolation
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        // Optimize thread pool for local development
-        minThreads: 1,
-        maxThreads: maxWorkers,
-        useAtomics: true,
-      },
       forks: {
-        // Use forks in CI for better memory isolation
-        minForks: 1,
-        maxForks: maxWorkers,
         isolate: true,
+        singleFork: false,
       },
     },
-
-    // Aggressive timeouts to catch slow tests
-    testTimeout: 5000, // 5s instead of 30s
-    hookTimeout: 2000, // 2s for setup/teardown
+    maxWorkers: process.env.CI ? 2 : undefined,
+    minWorkers: 1,
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    teardownTimeout: 5000,
 
     // Disable coverage for speed (enable separately if needed)
     coverage: {
@@ -76,14 +68,7 @@ export default defineConfig({
     isolate: true,
 
     // Reduce reporter overhead
-    reporters: [
-      [
-        'default',
-        {
-          summary: false,
-        },
-      ],
-    ],
+    reporters: isCI ? ['basic'] : ['default'],
 
     // Optimize file watching
     watch: false,
