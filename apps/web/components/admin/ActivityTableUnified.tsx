@@ -9,6 +9,7 @@ import type {
   AdminActivityItem,
   AdminActivityStatus,
 } from '@/lib/admin/overview';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
 const statusVariant: Record<
   AdminActivityStatus,
@@ -121,7 +122,7 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
             }
             getRowId={row => row.id}
             enableVirtualization={true}
-            minWidth='960px'
+            minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
             className='text-[13px]'
           />
         </div>
