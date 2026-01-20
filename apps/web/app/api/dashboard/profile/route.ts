@@ -309,44 +309,188 @@ export async function GET() {
   }
 }
 
+function addAvatarCacheBust(
+  updatedProfile: (typeof creatorProfiles)['$inferSelect']
+) {
+  const responseProfile = { ...updatedProfile };
+  if (responseProfile.avatarUrl) {
+    const url = new URL(responseProfile.avatarUrl);
+    url.searchParams.set('v', Date.now().toString());
+    responseProfile.avatarUrl = url.toString();
+  }
+  return responseProfile;
+}
+
+async function parseProfileUpdateRequest(req: Request) {
+  const parsedBody = await parseJsonBody<{
+    updates?: Record<string, unknown>;
+  } | null>(req, {
+    route: 'PUT /api/dashboard/profile',
+    headers: NO_STORE_HEADERS,
+  });
+  if (!parsedBody.ok) {
+    return parsedBody.response;
+  }
+  const updates = parsedBody.data?.updates ?? {};
+  const updatesValidation = validateUpdatesPayload(updates);
+  if (!updatesValidation.ok) {
+    return updatesValidation.response;
+  }
+
+  const parsedUpdatesResult = parseProfileUpdates(updatesValidation.updates);
+  if (!parsedUpdatesResult.ok) {
+    return parsedUpdatesResult.response;
+  }
+
+  const parsedUpdates: ProfileUpdateInput = parsedUpdatesResult.parsed;
+  const context = buildProfileUpdateContext(parsedUpdates);
+
+  return {
+    parsedUpdates,
+    ...context,
+  } as const;
+}
+
+async function guardUsernameUpdate(
+  clerkUserId: string,
+  usernameUpdate: string | undefined
+) {
+  if (!usernameUpdate) return null;
+
+  try {
+    await syncCanonicalUsernameFromApp(clerkUserId, usernameUpdate);
+    return null;
+  } catch (error) {
+    if (error instanceof UsernameValidationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    throw error;
+  }
+}
+
+async function syncClerkProfile({
+  clerkUserId,
+  clerkUpdates,
+  avatarUrl,
+}: {
+  clerkUserId: string;
+  clerkUpdates: Record<string, unknown>;
+  avatarUrl: string | undefined;
+}): Promise<boolean> {
+  let clerkSyncFailed = false;
+  try {
+    if (Object.keys(clerkUpdates).length > 0) {
+      const clerk = await clerkClient();
+      await clerk.users.updateUser(clerkUserId, clerkUpdates);
+    }
+
+    if (avatarUrl) {
+      const avatarResponse = await fetch(avatarUrl, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!avatarResponse.ok) {
+        throw new Error(`Avatar fetch failed: ${avatarResponse.status}`);
+      }
+
+      const contentType = avatarResponse.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) {
+        throw new Error(`Invalid content type: ${contentType}`);
+      }
+
+      const arrayBuffer = await avatarResponse.arrayBuffer();
+      if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
+        throw new Error('Avatar file size exceeds 5MB limit');
+      }
+
+      const blob = new Blob([arrayBuffer], { type: contentType });
+
+      const clerk = await clerkClient();
+      await clerk.users.updateUserProfileImage(clerkUserId, {
+        file: blob,
+      });
+    }
+  } catch (error) {
+    clerkSyncFailed = true;
+    logger.error('Failed to sync profile updates with Clerk:', {
+      error: error instanceof Error ? error.message : error,
+      userId: clerkUserId,
+      hasAvatarUrl: !!avatarUrl,
+    });
+  }
+
+  return clerkSyncFailed;
+}
+
+async function updateProfileRecords({
+  clerkUserId,
+  dbProfileUpdates,
+  displayNameForUserUpdate,
+}: {
+  clerkUserId: string;
+  dbProfileUpdates: Record<string, unknown>;
+  displayNameForUserUpdate: string | undefined;
+}) {
+  const user = await getUserByClerkId(db, clerkUserId);
+  if (!user) {
+    return NextResponse.json(
+      { error: 'User not found' },
+      { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const [updatedProfile] = await db
+    .update(creatorProfiles)
+    .set({ ...dbProfileUpdates, updatedAt: new Date() })
+    .where(eq(creatorProfiles.userId, user.id))
+    .returning();
+
+  if (displayNameForUserUpdate) {
+    await db
+      .update(users)
+      .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+  }
+
+  if (!updatedProfile) {
+    return NextResponse.json(
+      { error: 'Profile not found' },
+      { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return updatedProfile;
+}
+
+async function finalizeProfileResponse({
+  updatedProfile,
+  clerkUserId,
+}: {
+  updatedProfile: (typeof creatorProfiles)['$inferSelect'];
+  clerkUserId: string;
+}) {
+  await invalidateProfileCache(updatedProfile.usernameNormalized);
+
+  trackServerEvent('dashboard_profile_updated', undefined, clerkUserId).catch(
+    error => logger.warn('Analytics tracking failed:', error)
+  );
+}
+
 export async function PUT(req: Request) {
   try {
     return await withDbSession(async clerkUserId => {
-      const parsedBody = await parseJsonBody<{
-        updates?: Record<string, unknown>;
-      } | null>(req, {
-        route: 'PUT /api/dashboard/profile',
-        headers: NO_STORE_HEADERS,
-      });
-      if (!parsedBody.ok) {
-        return parsedBody.response;
-      }
-      const body = parsedBody.data;
+      const parsedRequest = await parseProfileUpdateRequest(req);
+      if (parsedRequest instanceof NextResponse) return parsedRequest;
 
-      const updates = body?.updates ?? {};
-      const updatesValidation = validateUpdatesPayload(updates);
-      if (!updatesValidation.ok) {
-        return updatesValidation.response;
-      }
-
-      const parsedUpdatesResult = parseProfileUpdates(
-        updatesValidation.updates
-      );
-      if (!parsedUpdatesResult.ok) {
-        return parsedUpdatesResult.response;
-      }
-
-      const parsedUpdates: ProfileUpdateInput = parsedUpdatesResult.parsed;
       const {
         dbProfileUpdates,
         displayNameForUserUpdate,
         avatarUrl,
         usernameUpdate,
-      } = buildProfileUpdateContext(parsedUpdates);
+      } = parsedRequest;
 
-      const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
-
-      // Test-friendly fast path to avoid Drizzle type mismatches in mocked env
       if (process.env.NODE_ENV === 'test') {
         return handleTestProfileUpdate({
           clerkUserId,
@@ -356,114 +500,32 @@ export async function PUT(req: Request) {
         });
       }
 
-      if (usernameUpdate) {
-        try {
-          await syncCanonicalUsernameFromApp(clerkUserId, usernameUpdate);
-        } catch (error) {
-          if (error instanceof UsernameValidationError) {
-            return NextResponse.json(
-              { error: error.message },
-              { status: 400, headers: NO_STORE_HEADERS }
-            );
-          }
-          throw error;
-        }
-      }
+      const usernameGuard = await guardUsernameUpdate(
+        clerkUserId,
+        usernameUpdate
+      );
+      if (usernameGuard instanceof NextResponse) return usernameGuard;
 
-      // Clerk sync - handle failures gracefully
-      let clerkSyncFailed = false;
-      try {
-        if (Object.keys(clerkUpdates).length > 0) {
-          const clerk = await clerkClient();
-          await clerk.users.updateUser(clerkUserId, clerkUpdates);
-        }
+      const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
+      const clerkSyncFailed = await syncClerkProfile({
+        clerkUserId,
+        clerkUpdates,
+        avatarUrl,
+      });
 
-        if (avatarUrl) {
-          // Add timeout for avatar fetch to prevent hanging
-          const avatarResponse = await fetch(avatarUrl, {
-            signal: AbortSignal.timeout(10000), // 10 second timeout
-          });
-          if (!avatarResponse.ok) {
-            throw new Error(`Avatar fetch failed: ${avatarResponse.status}`);
-          }
+      const updatedProfile = await updateProfileRecords({
+        clerkUserId,
+        dbProfileUpdates,
+        displayNameForUserUpdate,
+      });
+      if (updatedProfile instanceof NextResponse) return updatedProfile;
 
-          const contentType = avatarResponse.headers.get('content-type') || '';
-          // Validate content type is an image
-          if (!contentType.startsWith('image/')) {
-            throw new Error(`Invalid content type: ${contentType}`);
-          }
+      await finalizeProfileResponse({
+        updatedProfile,
+        clerkUserId,
+      });
 
-          const arrayBuffer = await avatarResponse.arrayBuffer();
-          // Validate file size (max 5MB)
-          if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
-            throw new Error('Avatar file size exceeds 5MB limit');
-          }
-
-          const blob = new Blob([arrayBuffer], { type: contentType });
-
-          const clerk = await clerkClient();
-          await clerk.users.updateUserProfileImage(clerkUserId, {
-            file: blob,
-          });
-        }
-      } catch (error) {
-        clerkSyncFailed = true;
-        logger.error('Failed to sync profile updates with Clerk:', {
-          error: error instanceof Error ? error.message : error,
-          userId: clerkUserId,
-          hasAvatarUrl: !!avatarUrl,
-        });
-        // Don't fail the entire request - avatar is still stored in our DB
-      }
-
-      // Get user to verify they exist and get internal ID
-      const user = await getUserByClerkId(db, clerkUserId);
-      if (!user) {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      // Update the user's profile
-      const updateResult = await db
-        .update(creatorProfiles)
-        .set({ ...dbProfileUpdates, updatedAt: new Date() })
-        .where(eq(creatorProfiles.userId, user.id))
-        .returning();
-      const [updatedProfile] = updateResult;
-
-      if (displayNameForUserUpdate) {
-        await db
-          .update(users)
-          .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-          .where(eq(users.id, user.id));
-      }
-
-      if (!updatedProfile) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      // Cache invalidation - must complete before response
-      await invalidateProfileCache(updatedProfile.usernameNormalized);
-
-      // Analytics tracking (non-blocking)
-      trackServerEvent(
-        'dashboard_profile_updated',
-        undefined,
-        clerkUserId
-      ).catch(error => logger.warn('Analytics tracking failed:', error));
-
-      // Add cache-busting query parameter to avatar URL if present
-      const responseProfile = { ...updatedProfile };
-      if (responseProfile.avatarUrl) {
-        const url = new URL(responseProfile.avatarUrl);
-        url.searchParams.set('v', Date.now().toString());
-        responseProfile.avatarUrl = url.toString();
-      }
+      const responseProfile = addAvatarCacheBust(updatedProfile);
 
       return NextResponse.json(
         {
