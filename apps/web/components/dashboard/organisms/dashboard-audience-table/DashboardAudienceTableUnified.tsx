@@ -406,10 +406,11 @@ export function DashboardAudienceTableUnified({
     href: '/support',
   };
 
+  // Row className - uses unified hover token
   const getRowClassName = React.useCallback(
     (row: AudienceMember) => {
       const isSelected = selectedMember?.id === row.id;
-      return isSelected ? 'bg-surface-2' : '';
+      return isSelected ? 'bg-surface-2' : 'hover:bg-surface-2/50';
     },
     [selectedMember]
   );
