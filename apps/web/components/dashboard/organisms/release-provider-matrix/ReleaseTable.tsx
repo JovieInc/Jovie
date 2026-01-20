@@ -92,21 +92,36 @@ export function ReleaseTable({
 
   // Row selection - use external selection if provided, otherwise use internal
   const rowIds = useMemo(() => releases.map(r => r.id), [releases]);
+  const rowIdSet = useMemo(() => new Set(rowIds), [rowIds]);
   const internalSelection = useRowSelection(rowIds);
 
   const selectedIds = externalSelectedIds ?? internalSelection.selectedIds;
 
-  // Compute header checkbox state based on selection
-  const headerCheckboxState = (() => {
+  // Compute visible selected (intersection of selectedIds and current rowIds)
+  const visibleSelectedCount = useMemo(() => {
+    let count = 0;
+    for (const id of selectedIds) {
+      if (rowIdSet.has(id)) count++;
+    }
+    return count;
+  }, [selectedIds, rowIdSet]);
+
+  // Compute header checkbox state based on visible selection
+  const headerCheckboxState = useMemo(() => {
     // Use internal state if no external selection provided
     if (externalSelectedIds === undefined) {
       return internalSelection.headerCheckboxState;
     }
-    // Compute from external selection
-    if (selectedIds.size === 0) return false;
-    if (selectedIds.size === releases.length) return true;
+    // Compute from visible selection
+    if (visibleSelectedCount === 0) return false;
+    if (visibleSelectedCount === rowIds.length) return true;
     return 'indeterminate';
-  })();
+  }, [
+    externalSelectedIds,
+    internalSelection.headerCheckboxState,
+    visibleSelectedCount,
+    rowIds.length,
+  ]);
 
   const toggleSelect = (id: string) => {
     if (onSelectionChange) {
@@ -124,10 +139,21 @@ export function ReleaseTable({
 
   const toggleSelectAll = () => {
     if (onSelectionChange) {
-      if (selectedIds.size === releases.length) {
-        onSelectionChange(new Set());
+      // Check if all visible rows are selected
+      if (visibleSelectedCount === rowIds.length) {
+        // Deselect all visible rows (preserve non-visible selections)
+        const newSet = new Set(selectedIds);
+        for (const id of rowIds) {
+          newSet.delete(id);
+        }
+        onSelectionChange(newSet);
       } else {
-        onSelectionChange(new Set(releases.map(r => r.id)));
+        // Select all visible rows (preserve existing selections)
+        const newSet = new Set(selectedIds);
+        for (const id of rowIds) {
+          newSet.add(id);
+        }
+        onSelectionChange(newSet);
       }
     } else {
       internalSelection.toggleSelectAll();
@@ -299,6 +325,12 @@ export function ReleaseTable({
     isAddingUrl,
     headerCheckboxState,
     selectedIds,
+    rowIds,
+    bulkActions,
+    onClearSelection,
+    releases.length,
+    isSyncing,
+    onSync,
   ]);
 
   // Context menu items for right-click

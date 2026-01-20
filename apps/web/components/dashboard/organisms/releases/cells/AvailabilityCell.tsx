@@ -103,13 +103,18 @@ export function AvailabilityCell({
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
-      await onCopy(path, label, testId);
-      setCopiedTestId(testId);
-
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
+      try {
+        await onCopy(path, label, testId);
+        setCopiedTestId(testId);
+      } catch {
+        // Still show brief feedback even on failure
+        setCopiedTestId(testId);
+      } finally {
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
       }
-      copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
     },
     [onCopy]
   );
@@ -169,6 +174,9 @@ export function AvailabilityCell({
       <PopoverTrigger asChild>
         <button
           type='button'
+          aria-label='Show provider availability details'
+          aria-haspopup='dialog'
+          aria-expanded={open}
           className='inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-surface-2'
         >
           {/* Compact provider icons */}

@@ -39,10 +39,10 @@ export function TableBulkActionsToolbar({
         className
       )}
     >
-      {/* Selected count */}
+      {/* Selected count - totalCount is unused since this toolbar only renders when selectedCount > 0 */}
       <TableCountBadge
         selectedCount={selectedCount}
-        totalCount={selectedCount}
+        totalCount={0}
         variant='text'
       />
 

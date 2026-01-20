@@ -39,7 +39,8 @@ export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
   const titleElement = (
     <span
       ref={titleRef}
-      className='line-clamp-1 text-sm font-semibold text-primary-token'
+      tabIndex={isTruncated ? 0 : undefined}
+      className='line-clamp-1 text-sm font-semibold text-primary-token rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
     >
       {release.title}
     </span>

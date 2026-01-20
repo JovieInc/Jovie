@@ -196,7 +196,9 @@ export function TableCheckboxCell<TData = unknown>(
           )}
         >
           <Checkbox
-            aria-label={`Select row ${rowNumber}`}
+            aria-label={
+              rowNumber !== undefined ? `Select row ${rowNumber}` : 'Select row'
+            }
             checked={isChecked}
             onCheckedChange={onToggleSelect}
             className={CHECKBOX_STYLES}
