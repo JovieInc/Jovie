@@ -2,6 +2,7 @@
 
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Image from 'next/image';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -15,13 +16,34 @@ interface ReleaseCellProps {
  *
  * Shows:
  * - Album artwork thumbnail (40x40px)
- * - Release title with optional "edited" badge if manual overrides exist
+ * - Release title with tooltip (only when truncated)
+ * - Optional "edited" badge if manual overrides exist
  * - Artist name if provided
  */
 export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
   const manualOverrideCount = release.providers.filter(
     provider => provider.source === 'manual'
   ).length;
+
+  // Check if title is truncated
+  useEffect(() => {
+    const el = titleRef.current;
+    if (el) {
+      setIsTruncated(el.scrollWidth > el.clientWidth);
+    }
+  }, [release.title]);
+
+  const titleElement = (
+    <span
+      ref={titleRef}
+      className='line-clamp-1 text-sm font-semibold text-primary-token'
+    >
+      {release.title}
+    </span>
+  );
 
   return (
     <div className='flex items-center gap-3'>
@@ -49,16 +71,16 @@ export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
       {/* Title and metadata */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
+          {isTruncated ? (
+            <Tooltip>
+              <TooltipTrigger asChild>{titleElement}</TooltipTrigger>
+              <TooltipContent side='top' align='start'>
                 {release.title}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side='top' align='start'>
-              {release.title}
-            </TooltipContent>
-          </Tooltip>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            titleElement
+          )}
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'

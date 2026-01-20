@@ -40,8 +40,6 @@ export interface TableStandardToolbarProps {
   exportComponent?: ReactNode;
   /** Additional actions shown when no items selected */
   primaryActions?: ReactNode;
-  /** Unit label for count (default: "item") */
-  countLabel?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -79,7 +77,6 @@ export function TableStandardToolbar({
   searchComponent,
   exportComponent,
   primaryActions,
-  countLabel: _countLabel = 'item',
   className,
 }: TableStandardToolbarProps) {
   const hasSelection = selectedCount > 0;

@@ -75,6 +75,11 @@ export { DisplayMenuDropdown } from './molecules/DisplayMenuDropdown';
 export type { ExportCSVButtonProps } from './molecules/ExportCSVButton';
 export { ExportCSVButton } from './molecules/ExportCSVButton';
 export { GroupedTableBody } from './molecules/GroupedTableBody';
+export type {
+  BulkAction as HeaderBulkAction,
+  HeaderBulkActionsProps,
+} from './molecules/HeaderBulkActions';
+export { HeaderBulkActions } from './molecules/HeaderBulkActions';
 export { LoadingTableBody } from './molecules/LoadingTableBody';
 export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
 export { SocialLinksCell } from './molecules/SocialLinksCell';

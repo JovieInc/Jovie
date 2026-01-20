@@ -5,6 +5,10 @@ import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
+// Shared checkbox styling for consistent appearance
+const CHECKBOX_STYLES =
+  'h-4 w-4 border-2 border-subtle rounded-[4px] data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white data-[state=indeterminate]:border-blue-600 data-[state=indeterminate]:bg-blue-600 data-[state=indeterminate]:text-white';
+
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
   checked: boolean;
@@ -135,15 +139,13 @@ export function TableCheckboxCell<TData = unknown>(
 
   // Header cell
   if (table && headerCheckboxState !== undefined && onToggleSelectAll) {
-    // Convert boolean to 'checked'/'unchecked' format
-    const getNormalizedState = ():
-      | 'checked'
-      | 'unchecked'
-      | 'indeterminate' => {
-      if (typeof headerCheckboxState !== 'boolean') return headerCheckboxState;
-      return headerCheckboxState ? 'checked' : 'unchecked';
-    };
-    const normalizedState = getNormalizedState();
+    // Normalize boolean to 'checked'/'unchecked' format
+    const normalizedState =
+      typeof headerCheckboxState === 'boolean'
+        ? headerCheckboxState
+          ? 'checked'
+          : 'unchecked'
+        : headerCheckboxState;
 
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
@@ -160,7 +162,7 @@ export function TableCheckboxCell<TData = unknown>(
           checked={normalizedState === 'checked'}
           indeterminate={normalizedState === 'indeterminate'}
           onCheckedChange={onToggleSelectAll}
-          className='border-2 border-tertiary-token/50 data-[state=checked]:border-primary/70 data-[state=checked]:bg-primary/70 data-[state=checked]:text-primary-foreground'
+          className={CHECKBOX_STYLES}
         />
       </div>
     );
@@ -197,7 +199,7 @@ export function TableCheckboxCell<TData = unknown>(
             aria-label={`Select row ${rowNumber}`}
             checked={isChecked}
             onCheckedChange={onToggleSelect}
-            className='border-2 border-tertiary-token/50 data-[state=checked]:border-primary/70 data-[state=checked]:bg-primary/70 data-[state=checked]:text-primary-foreground'
+            className={CHECKBOX_STYLES}
           />
         </div>
       </div>
