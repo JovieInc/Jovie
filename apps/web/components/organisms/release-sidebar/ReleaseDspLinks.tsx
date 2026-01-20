@@ -16,11 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { ExternalLink, Plus, X } from 'lucide-react';
+import { Copy, ExternalLink, Plus, X } from 'lucide-react';
 import React from 'react';
 
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { ProviderKey } from '@/lib/discography/types';
+import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
@@ -42,16 +43,17 @@ interface ReleaseDspLinksProps {
   onNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-const PROVIDER_ICONS: Record<ProviderKey, string> = {
+// Maps ProviderKey to DspProviderId for icons
+const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
-  youtube: 'youtube',
+  youtube: 'youtube_music',
   soundcloud: 'soundcloud',
   deezer: 'deezer',
   tidal: 'tidal',
   amazon_music: 'amazon_music',
-  bandcamp: 'bandcamp',
-  beatport: 'beatport',
+  bandcamp: null,
+  beatport: null,
 };
 
 export function ReleaseDspLinks({
@@ -70,8 +72,6 @@ export function ReleaseDspLinks({
   onRemoveLink,
   onNewLinkKeyDown,
 }: ReleaseDspLinksProps) {
-  const hasNoLinks = release.providers.length === 0 && !isAddingLink;
-
   // Get list of providers that don't have links yet (for the add dropdown)
   const availableProviders = Object.entries(providerConfig).filter(
     ([key]) => !release.providers.find(p => p.key === key)
@@ -96,62 +96,98 @@ export function ReleaseDspLinks({
         )}
       </div>
 
-      {hasNoLinks && (
-        <p className='text-xs text-sidebar-muted'>
-          No DSP links yet. {isEditable ? 'Use the + button to add one.' : ''}
-        </p>
-      )}
-
+      {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='flex flex-wrap gap-2'>
-          {release.providers.map((provider, index) => {
+        <div className='space-y-0.5'>
+          {release.providers.map(provider => {
             const config = providerConfig[provider.key];
-            const platformIcon = PROVIDER_ICONS[provider.key] || provider.key;
+            const dspId = PROVIDER_TO_DSP[provider.key];
             const isManual = provider.source === 'manual';
 
-            const ariaLabel = `Open ${config?.label || provider.key} link`;
-
             return (
-              <PlatformPill
-                key={`${provider.key}-${index}`}
-                platformIcon={platformIcon}
-                platformName={config?.label || provider.key}
-                primaryText={config?.label || provider.key}
-                secondaryText={isManual ? 'Custom' : 'Detected'}
-                tone={isManual ? 'default' : 'faded'}
-                testId={`release-dsp-pill-${provider.key}-${index}`}
-                onClick={() => {
-                  window.open(provider.url, '_blank', 'noopener,noreferrer');
-                }}
-                trailing={
-                  <div className='flex items-center gap-1'>
-                    <ExternalLink
-                      className='h-3.5 w-3.5 text-tertiary-token'
-                      aria-hidden
+              <div
+                key={provider.key}
+                className='group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-sidebar-surface-hover transition-colors'
+              >
+                {/* Left: Icon + Name */}
+                <div className='flex items-center gap-2 min-w-0'>
+                  {dspId ? (
+                    <DspProviderIcon provider={dspId} size='sm' />
+                  ) : (
+                    <span
+                      className='h-4 w-4 rounded-full shrink-0'
+                      style={{ backgroundColor: config?.accent }}
                     />
-                    {isEditable && (
-                      <button
-                        type='button'
-                        className='inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-50'
-                        aria-label={`Remove ${ariaLabel}`}
-                        disabled={isRemovingDspLink === provider.key}
-                        onClick={event => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          void onRemoveLink(provider.key);
-                        }}
-                      >
-                        <X className='h-3 w-3' aria-hidden />
-                      </button>
-                    )}
-                  </div>
-                }
-                className='border-sidebar-border bg-sidebar-surface text-sidebar-foreground hover:bg-sidebar-surface-hover'
-              />
+                  )}
+                  <span className='text-sm text-sidebar-foreground truncate'>
+                    {config?.label || provider.key}
+                  </span>
+                  {isManual && (
+                    <span className='text-[10px] text-sidebar-muted shrink-0'>
+                      Custom
+                    </span>
+                  )}
+                </div>
+
+                {/* Right: Actions (visible on hover) */}
+                <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0'>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      window.open(provider.url, '_blank', 'noopener,noreferrer')
+                    }
+                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors'
+                    title='Open'
+                    aria-label={`Open ${config?.label || provider.key}`}
+                  >
+                    <ExternalLink className='h-3.5 w-3.5' />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => navigator.clipboard.writeText(provider.url)}
+                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors'
+                    title='Copy link'
+                    aria-label={`Copy ${config?.label || provider.key} link`}
+                  >
+                    <Copy className='h-3.5 w-3.5' />
+                  </button>
+                  {isEditable && (
+                    <button
+                      type='button'
+                      onClick={() => void onRemoveLink(provider.key)}
+                      disabled={isRemovingDspLink === provider.key}
+                      className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors disabled:opacity-50'
+                      title='Remove'
+                      aria-label={`Remove ${config?.label || provider.key}`}
+                    >
+                      <X className='h-3.5 w-3.5' />
+                    </button>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>
       )}
+
+      {/* Empty state - editable: show add button */}
+      {release.providers.length === 0 &&
+        isEditable &&
+        availableProviders.length > 0 && (
+          <button
+            type='button'
+            onClick={() => onSetIsAddingLink(true)}
+            className='w-full py-3 text-sm text-sidebar-muted hover:text-sidebar-foreground text-center border border-dashed border-sidebar-border rounded-md hover:border-sidebar-foreground/50 transition-colors'
+          >
+            + Add a DSP link
+          </button>
+        )}
+
+      {/* Empty state - non-editable: show message */}
+      {release.providers.length === 0 &&
+        (!isEditable || availableProviders.length === 0) && (
+          <p className='text-xs text-sidebar-muted py-2'>No DSP links yet.</p>
+        )}
 
       {isEditable && isAddingLink && (
         <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border bg-sidebar-surface p-3'>

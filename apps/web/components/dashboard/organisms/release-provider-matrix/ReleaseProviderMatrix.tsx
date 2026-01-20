@@ -6,9 +6,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import { useRowSelection } from '@/components/organisms/table';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
@@ -97,6 +99,17 @@ export function ReleaseProviderMatrix({
   const showReleasesTable = rows.length > 0;
 
   const isSidebarOpen = Boolean(editingRelease);
+
+  // Connect to tableMeta for drawer toggle button
+  const { setTableMeta } = useTableMeta();
+
+  useEffect(() => {
+    setTableMeta({
+      rowCount: rows.length,
+      toggle: isSidebarOpen ? closeEditor : null,
+      rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+  }, [isSidebarOpen, rows.length, closeEditor, setTableMeta]);
 
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useHeaderActions();
