@@ -42,7 +42,7 @@ export function DashboardErrorFallback({
           <button
             type='button'
             onClick={resetErrorBoundary}
-            className='inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors'
+            className='inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors'
           >
             <RefreshCcw className='h-4 w-4' aria-hidden='true' />
             Reload dashboard
@@ -51,7 +51,7 @@ export function DashboardErrorFallback({
           <button
             type='button'
             onClick={() => router.push('/')}
-            className='inline-flex items-center gap-2 rounded-md bg-secondary px-5 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 transition-colors'
+            className='inline-flex items-center gap-2 rounded-md bg-secondary px-5 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 transition-colors'
           >
             <Home className='h-4 w-4' aria-hidden='true' />
             Go home

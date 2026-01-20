@@ -503,7 +503,7 @@ export function UnifiedTable<TData>({
                         presets.tableRow,
                         onRowClick && 'cursor-pointer',
                         shouldEnableKeyboardNav &&
-                          'focus:outline-none focus:bg-surface-2',
+                          'focus-visible:outline-none focus-visible:bg-surface-2',
                         focusedIndex === index && 'bg-surface-2',
                         getRowClassName?.(rowData, index)
                       )}
@@ -646,7 +646,7 @@ export function UnifiedTable<TData>({
                   presets.tableRow,
                   onRowClick && 'cursor-pointer',
                   shouldEnableKeyboardNav &&
-                    'focus:outline-none focus:bg-surface-2',
+                    'focus-visible:outline-none focus-visible:bg-surface-2',
                   focusedIndex === rowIndex && 'bg-surface-2',
                   getRowClassName?.(rowData, rowIndex)
                 )}

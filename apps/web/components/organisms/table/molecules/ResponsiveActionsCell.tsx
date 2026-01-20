@@ -169,7 +169,7 @@ export function ResponsiveActionsCell({
                   disabled={action.disabled}
                   className={cn(
                     action.destructive &&
-                      'text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400'
+                      'text-red-600 focus-visible:text-red-600 dark:text-red-400 dark:focus-visible:text-red-400'
                   )}
                 >
                   {action.icon && (

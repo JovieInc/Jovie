@@ -185,13 +185,13 @@ export const CHECKBOX_RADIO_ITEM_BASE =
   'focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1)';
 
 /**
- * Select item base (uses focus:bg-accent for compatibility)
+ * Select item base (uses focus-visible:bg-accent for keyboard navigation)
  */
 export const SELECT_ITEM_BASE =
   'relative flex w-full cursor-default select-none items-center rounded-lg py-2 pl-10 pr-3 text-sm outline-none ' +
   'transition-colors duration-150 ease-out ' +
   'text-secondary-token ' +
-  'focus:bg-surface-2 focus:text-primary-token ' +
+  'focus-visible:bg-surface-2 focus-visible:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50';
 
 // ============================================================================
@@ -227,7 +227,7 @@ export const SELECT_TRIGGER_BASE =
   'flex h-10 w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3 py-2 ' +
   'text-sm text-primary-token ring-offset-background ' +
   'placeholder:text-tertiary-token ' +
-  'focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';
 
