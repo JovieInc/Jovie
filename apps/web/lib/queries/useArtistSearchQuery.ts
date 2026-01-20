@@ -161,7 +161,7 @@ export function useArtistSearchQuery(
     if (queryError) {
       return 'error';
     }
-    if (data && data.length === 0) {
+    if (data?.length === 0) {
       return 'empty';
     }
     if (data && data.length > 0) {

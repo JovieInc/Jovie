@@ -98,7 +98,7 @@ export function useArtistSearchMode({
       });
 
       const link = detectPlatform(artist.url, creatorName);
-      if (link && link.isValid) {
+      if (link?.isValid) {
         const enrichedLink = {
           ...link,
           suggestedTitle: artist.name,

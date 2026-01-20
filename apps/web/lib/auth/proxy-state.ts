@@ -55,7 +55,7 @@ export async function getUserState(
       .limit(1);
 
     // No DB user → needs waitlist/signup
-    if (!result || !result.dbUserId) {
+    if (!result?.dbUserId) {
       return { needsWaitlist: true, needsOnboarding: false, isActive: false };
     }
 
