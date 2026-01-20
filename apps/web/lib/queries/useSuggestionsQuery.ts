@@ -4,10 +4,11 @@
  * Suggestions Query Hook
  *
  * TanStack Query hook for fetching and polling social link suggestions.
- * Supports dynamic polling intervals for auto-refresh mode.
+ * Supports dynamic polling intervals with exponential backoff.
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useCallback, useRef } from 'react';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import { queryKeys } from './keys';
 
@@ -15,6 +16,18 @@ export interface SuggestionsQueryResult {
   links: ProfileSocialLink[];
   maxVersion: number;
 }
+
+/** Polling interval configuration */
+const POLLING_CONFIG = {
+  /** Initial polling interval in ms */
+  initialInterval: 2000,
+  /** Maximum polling interval in ms */
+  maxInterval: 30000,
+  /** Multiplier for exponential backoff */
+  backoffMultiplier: 1.5,
+  /** Number of unchanged responses before backing off */
+  stableCountThreshold: 3,
+} as const;
 
 async function fetchSuggestions(
   profileId: string,
@@ -50,39 +63,104 @@ async function fetchSuggestions(
 export interface UseSuggestionsQueryOptions {
   profileId: string | undefined;
   enabled?: boolean;
-  /** Polling interval in ms. Set to false to disable polling. */
-  refetchInterval?: number | false;
+  /**
+   * Polling behavior configuration.
+   * - number: Fixed polling interval in ms
+   * - false: Disable polling
+   * - 'adaptive': Use exponential backoff (default)
+   */
+  refetchInterval?: number | false | 'adaptive';
+  /** Force fast polling mode (resets backoff). Useful after user actions. */
+  fastPolling?: boolean;
 }
 
 /**
- * Query hook for fetching social link suggestions with optional polling.
+ * Query hook for fetching social link suggestions with adaptive polling.
+ *
+ * Features exponential backoff: starts polling quickly, then slows down
+ * when data stops changing to reduce unnecessary requests.
  *
  * @example
  * ```tsx
- * // Basic usage with default polling
+ * // Basic usage with adaptive polling (default)
  * const { data, isLoading } = useSuggestionsQuery({
  *   profileId,
  *   enabled: true,
  * });
  *
- * // With dynamic polling interval
+ * // Force fast polling after user action
  * const { data } = useSuggestionsQuery({
  *   profileId,
  *   enabled: true,
- *   refetchInterval: autoRefreshMode ? 2000 : 4500,
+ *   fastPolling: autoRefreshMode,
+ * });
+ *
+ * // Fixed interval polling
+ * const { data } = useSuggestionsQuery({
+ *   profileId,
+ *   refetchInterval: 5000,
  * });
  * ```
  */
 export function useSuggestionsQuery({
   profileId,
   enabled = true,
-  refetchInterval = 4500,
+  refetchInterval = 'adaptive',
+  fastPolling = false,
 }: UseSuggestionsQueryOptions) {
+  // Track consecutive unchanged responses for backoff
+  const stableCountRef = useRef(0);
+  const currentIntervalRef = useRef<number>(POLLING_CONFIG.initialInterval);
+  const lastVersionRef = useRef<number | null>(null);
+
+  // Reset backoff when fast polling is requested
+  if (fastPolling) {
+    stableCountRef.current = 0;
+    currentIntervalRef.current = POLLING_CONFIG.initialInterval;
+  }
+
+  // Calculate adaptive interval based on data stability
+  const getAdaptiveInterval = useCallback(
+    (data: SuggestionsQueryResult | undefined): number => {
+      if (!data) {
+        return POLLING_CONFIG.initialInterval;
+      }
+
+      // Check if data has changed
+      if (
+        lastVersionRef.current !== null &&
+        data.maxVersion === lastVersionRef.current
+      ) {
+        stableCountRef.current++;
+      } else {
+        // Data changed, reset backoff
+        stableCountRef.current = 0;
+        currentIntervalRef.current = POLLING_CONFIG.initialInterval;
+      }
+
+      lastVersionRef.current = data.maxVersion;
+
+      // Apply backoff if data has been stable
+      if (stableCountRef.current >= POLLING_CONFIG.stableCountThreshold) {
+        currentIntervalRef.current = Math.min(
+          currentIntervalRef.current * POLLING_CONFIG.backoffMultiplier,
+          POLLING_CONFIG.maxInterval
+        );
+      }
+
+      return currentIntervalRef.current;
+    },
+    []
+  );
+
   return useQuery<SuggestionsQueryResult>({
     queryKey: queryKeys.suggestions.list(profileId ?? ''),
     queryFn: ({ signal }) => fetchSuggestions(profileId!, signal),
     enabled: enabled && !!profileId,
-    refetchInterval,
+    refetchInterval:
+      refetchInterval === 'adaptive'
+        ? query => getAdaptiveInterval(query.state.data)
+        : refetchInterval,
     // Don't refetch on window focus since we're already polling
     refetchOnWindowFocus: false,
     staleTime: 1 * 60 * 1000, // 1 min
