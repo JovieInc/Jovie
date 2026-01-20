@@ -20,6 +20,27 @@ import {
   convertDbLinksToSuggestions,
 } from '../utils/link-transformers';
 
+type AcceptSuggestionResponse = ReturnType<
+  ReturnType<typeof useAcceptSuggestionMutation>['mutateAsync']
+>;
+
+function convertAcceptedLinkToLinkItem(
+  data: Awaited<AcceptSuggestionResponse>
+): LinkItem | null {
+  if (!data.link) return null;
+
+  // Add default values for required ProfileSocialLink fields
+  const linkWithDefaults = {
+    ...data.link,
+    sortOrder: data.link.sortOrder ?? 0,
+    isActive: data.link.isActive ?? true,
+    state: (data.link.state as 'active' | 'suggested' | 'rejected') ?? 'active',
+  };
+
+  const [detected] = convertDbLinksToLinkItems([linkWithDefaults]);
+  return detected ?? null;
+}
+
 /**
  * Options for the useSuggestionSync hook
  */
@@ -158,41 +179,25 @@ export function useSuggestionSync({
         return null;
       }
 
-      return new Promise(resolve => {
-        acceptMutation.mutate(
-          { profileId, linkId: suggestionId },
-          {
-            onSuccess: data => {
-              if (data.link) {
-                // Add default values for required ProfileSocialLink fields
-                const linkWithDefaults = {
-                  ...data.link,
-                  sortOrder: data.link.sortOrder ?? 0,
-                  isActive: data.link.isActive ?? true,
-                  state:
-                    (data.link.state as 'active' | 'suggested' | 'rejected') ??
-                    'active',
-                };
-                const [detected] = convertDbLinksToLinkItems([
-                  linkWithDefaults,
-                ]);
-                setSuggestedLinks(prev =>
-                  prev.filter(s => s.suggestionId !== suggestionId)
-                );
-                if (detected) {
-                  setLinks(prev => [...prev, detected]);
-                }
-                resolve(detected ?? null);
-              } else {
-                resolve(null);
-              }
-            },
-            onError: () => {
-              resolve(null);
-            },
-          }
+      try {
+        const data = await acceptMutation.mutateAsync({
+          profileId,
+          linkId: suggestionId,
+        });
+
+        if (!data.link) return null;
+
+        const detected = convertAcceptedLinkToLinkItem(data);
+        setSuggestedLinks(prev =>
+          prev.filter(s => s.suggestionId !== suggestionId)
         );
-      });
+        if (detected) {
+          setLinks(prev => [...prev, detected]);
+        }
+        return detected;
+      } catch {
+        return null;
+      }
     },
     [profileId, acceptMutation, setLinks, setSuggestedLinks]
   );
@@ -207,26 +212,17 @@ export function useSuggestionSync({
         return;
       }
 
-      if (!suggestion.suggestionId) {
-        return;
-      }
+      const suggestionId = suggestion.suggestionId;
+      if (!suggestionId) return;
 
-      return new Promise(resolve => {
-        dismissMutation.mutate(
-          { profileId, linkId: suggestion.suggestionId! },
-          {
-            onSuccess: () => {
-              setSuggestedLinks(prev =>
-                prev.filter(s => s.suggestionId !== suggestion.suggestionId)
-              );
-              resolve();
-            },
-            onError: () => {
-              resolve();
-            },
-          }
+      try {
+        await dismissMutation.mutateAsync({ profileId, linkId: suggestionId });
+        setSuggestedLinks(prev =>
+          prev.filter(s => s.suggestionId !== suggestionId)
         );
-      });
+      } catch {
+        // Errors/toasts are handled by the mutation hook.
+      }
     },
     [profileId, dismissMutation, setSuggestedLinks]
   );

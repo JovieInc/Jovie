@@ -128,6 +128,28 @@ function getBestImageUrl(
   return sorted[0]?.url;
 }
 
+function appendUniqueCredits(
+  existingCredits: ParsedArtistCredit[],
+  nextCredits: ParsedArtistCredit[],
+  startPosition: number
+): number {
+  const existingNormalized = new Set(
+    existingCredits.map(a => normalizeArtistName(a.name))
+  );
+
+  let nextPosition = startPosition;
+  for (const credit of nextCredits) {
+    const normalized = normalizeArtistName(credit.name);
+    if (existingNormalized.has(normalized)) continue;
+
+    existingNormalized.add(normalized);
+    credit.position = nextPosition++;
+    existingCredits.push(credit);
+  }
+
+  return nextPosition;
+}
+
 // ============================================================================
 // Main Parser Functions
 // ============================================================================
@@ -278,6 +300,60 @@ export function splitByConjunction(artistString: string): string[] {
 export function parseMainArtists(
   spotifyArtists: SpotifyArtistInput[]
 ): ParsedArtistCredit[] {
+  function createCredit({
+    name,
+    role,
+    joinPhrase,
+    position,
+    isPrimary,
+    spotifyId,
+    imageUrl,
+  }: {
+    name: string;
+    role: ArtistRole;
+    joinPhrase: string | null;
+    position: number;
+    isPrimary: boolean;
+    spotifyId?: string;
+    imageUrl?: string;
+  }): ParsedArtistCredit {
+    return {
+      name,
+      role,
+      joinPhrase,
+      position,
+      isPrimary,
+      spotifyId,
+      imageUrl,
+    };
+  }
+
+  function splitVsName(name: string): string[] | null {
+    if (!VS_PATTERN.test(name)) return null;
+    return name
+      .split(VS_PATTERN)
+      .map(p => p.trim())
+      .filter(Boolean);
+  }
+
+  function splitMainConjunctionName(name: string): string[] | null {
+    if (!AND_PATTERN.test(name)) return null;
+
+    // If this is the first artist in the list AND the name has conjunction,
+    // we might want to split. But be conservative - many bands have "&" in names
+    // Only split if it looks like "Name & Name" not "The Name & The Something Band"
+    const parts = name
+      .split(AND_PATTERN)
+      .map(p => p.trim())
+      .filter(Boolean);
+
+    // Only split if both parts are reasonably short (likely separate artists)
+    if (parts.length === 2 && parts.every(p => p.length < 30)) {
+      return parts;
+    }
+    return null;
+  }
+
   const credits: ParsedArtistCredit[] = [];
   let position = 0;
 
@@ -288,39 +364,36 @@ export function parseMainArtists(
     const artistName = artist.name;
     const imageUrl = getBestImageUrl(artist.images);
 
-    // Check for "vs" pattern in artist name
-    if (VS_PATTERN.test(artistName)) {
-      const parts = artistName.split(VS_PATTERN);
-      for (let j = 0; j < parts.length; j++) {
-        const part = parts[j]?.trim();
+    const vsParts = splitVsName(artistName);
+    if (vsParts) {
+      for (let j = 0; j < vsParts.length; j++) {
+        const part = vsParts[j];
         if (!part) continue;
 
-        credits.push({
-          name: part,
-          role: j === 0 ? 'main_artist' : 'vs',
-          joinPhrase: j === 0 ? null : ' vs ',
-          position: position++,
-          isPrimary: j === 0 && i === 0,
-          // Only first artist gets the Spotify ID
-          spotifyId: j === 0 ? artist.id : undefined,
-          imageUrl: j === 0 ? imageUrl : undefined,
-        });
+        credits.push(
+          createCredit({
+            name: part,
+            role: j === 0 ? 'main_artist' : 'vs',
+            joinPhrase: j === 0 ? null : ' vs ',
+            position: position++,
+            isPrimary: j === 0 && i === 0,
+            // Only first artist gets the Spotify ID
+            spotifyId: j === 0 ? artist.id : undefined,
+            imageUrl: j === 0 ? imageUrl : undefined,
+          })
+        );
       }
+      continue;
     }
-    // Check for "&" / "and" pattern (but be careful - some artist names legitimately include these)
-    else if (AND_PATTERN.test(artistName)) {
-      // If this is the first artist in the list AND the name has conjunction,
-      // we might want to split. But be conservative - many bands have "&" in names
-      // Only split if it looks like "Name & Name" not "The Name & The Something Band"
-      const parts = artistName.split(AND_PATTERN);
 
-      // Only split if both parts are reasonably short (likely separate artists)
-      if (parts.length === 2 && parts.every(p => p && p.length < 30)) {
-        for (let j = 0; j < parts.length; j++) {
-          const part = parts[j]?.trim();
-          if (!part) continue;
+    const conjunctionParts = splitMainConjunctionName(artistName);
+    if (conjunctionParts) {
+      for (let j = 0; j < conjunctionParts.length; j++) {
+        const part = conjunctionParts[j];
+        if (!part) continue;
 
-          credits.push({
+        credits.push(
+          createCredit({
             name: part,
             role: 'main_artist',
             joinPhrase: j === 0 ? null : ' & ',
@@ -328,23 +401,15 @@ export function parseMainArtists(
             isPrimary: j === 0 && i === 0,
             spotifyId: j === 0 ? artist.id : undefined,
             imageUrl: j === 0 ? imageUrl : undefined,
-          });
-        }
-      } else {
-        // Keep as single artist
-        credits.push({
-          name: artistName,
-          role: 'main_artist',
-          joinPhrase: credits.length === 0 ? null : ', ',
-          position: position++,
-          isPrimary: i === 0,
-          spotifyId: artist.id,
-          imageUrl,
-        });
+          })
+        );
       }
-    } else {
-      // Single artist, no splitting needed
-      credits.push({
+      continue;
+    }
+
+    // Keep as single artist
+    credits.push(
+      createCredit({
         name: artistName,
         role: 'main_artist',
         joinPhrase: credits.length === 0 ? null : ', ',
@@ -352,8 +417,8 @@ export function parseMainArtists(
         isPrimary: i === 0,
         spotifyId: artist.id,
         imageUrl,
-      });
-    }
+      })
+    );
   }
 
   return credits;
@@ -384,57 +449,20 @@ export function parseArtistCredits(
   trackTitle: string,
   spotifyArtists: SpotifyArtistInput[]
 ): ParsedArtistCredit[] {
-  const allCredits: ParsedArtistCredit[] = [];
+  const allCredits = parseMainArtists(spotifyArtists);
 
-  // 1. Parse main artists from Spotify array
-  const mainArtists = parseMainArtists(spotifyArtists);
-  allCredits.push(...mainArtists);
-
-  // 2. Extract featured artists from title
-  const featured = extractFeatured(trackTitle);
-
-  // Dedupe against main artists (sometimes Spotify includes featured artists in the array)
-  const mainNormalized = new Set(
-    mainArtists.map(a => normalizeArtistName(a.name))
-  );
-  const uniqueFeatured = featured.filter(
-    f => !mainNormalized.has(normalizeArtistName(f.name))
-  );
-
-  // Update positions to continue from main artists
   let nextPosition = allCredits.length;
-  for (const f of uniqueFeatured) {
-    f.position = nextPosition++;
-    allCredits.push(f);
-  }
-
-  // 3. Extract "with" credits from title
-  const withCredits = extractWith(trackTitle);
-  const existingNormalized = new Set(
-    allCredits.map(a => normalizeArtistName(a.name))
+  nextPosition = appendUniqueCredits(
+    allCredits,
+    extractFeatured(trackTitle),
+    nextPosition
   );
-  const uniqueWith = withCredits.filter(
-    w => !existingNormalized.has(normalizeArtistName(w.name))
+  nextPosition = appendUniqueCredits(
+    allCredits,
+    extractWith(trackTitle),
+    nextPosition
   );
-
-  for (const w of uniqueWith) {
-    w.position = nextPosition++;
-    allCredits.push(w);
-  }
-
-  // 4. Extract remixers from title
-  const remixers = extractRemixers(trackTitle);
-  const allNormalized = new Set(
-    allCredits.map(a => normalizeArtistName(a.name))
-  );
-  const uniqueRemixers = remixers.filter(
-    r => !allNormalized.has(normalizeArtistName(r.name))
-  );
-
-  for (const r of uniqueRemixers) {
-    r.position = nextPosition++;
-    allCredits.push(r);
-  }
+  appendUniqueCredits(allCredits, extractRemixers(trackTitle), nextPosition);
 
   return allCredits;
 }
@@ -444,13 +472,18 @@ export function parseArtistCredits(
  */
 export function isRemix(title: string): boolean {
   const lowerTitle = title.toLowerCase();
+
+  const bracketPatterns = [
+    /[\(\[].*remix.*[\)\]]/i,
+    /[\(\[].*rmx.*[\)\]]/i,
+    /[\(\[].*rework.*[\)\]]/i,
+    /[\(\[].*bootleg.*[\)\]]/i,
+    /[\(\[].*edit.*[\)\]]/i,
+    /[\(\[].*flip.*[\)\]]/i,
+  ];
+
   return (
-    /[\(\[].*remix.*[\)\]]/i.test(title) ||
-    /[\(\[].*rmx.*[\)\]]/i.test(title) ||
-    /[\(\[].*rework.*[\)\]]/i.test(title) ||
-    /[\(\[].*bootleg.*[\)\]]/i.test(title) ||
-    /[\(\[].*edit.*[\)\]]/i.test(title) ||
-    /[\(\[].*flip.*[\)\]]/i.test(title) ||
+    bracketPatterns.some(pattern => pattern.test(title)) ||
     lowerTitle.includes('remix') ||
     lowerTitle.includes('remixed by')
   );
