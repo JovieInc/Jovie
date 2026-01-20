@@ -6,7 +6,7 @@
  * Header section of the release sidebar with action buttons
  */
 
-import { Check, Copy, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, Hash, RefreshCw, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -85,12 +85,24 @@ export function ReleaseSidebarHeader({
       icon: ExternalLink,
       href: release!.smartLinkPath,
     });
+
+    // Copy release ID - overflow action
+    overflowActions.push({
+      id: 'copy-id',
+      label: 'Copy release ID',
+      icon: Hash,
+      onClick: () => {
+        if (release?.id) {
+          navigator.clipboard.writeText(release.id);
+        }
+      },
+    });
   }
 
   return (
-    <div className='flex items-center justify-between border-b border-sidebar-border px-3 py-2'>
-      <p className='text-xs text-sidebar-muted'>
-        {hasRelease ? `ID: ${release?.id}` : 'No release selected'}
+    <div className='flex items-center justify-between px-3 py-2'>
+      <p className='text-xs font-medium text-sidebar-foreground truncate'>
+        {hasRelease ? 'Release details' : 'No release selected'}
       </p>
       <DrawerHeaderActions
         primaryActions={primaryActions}

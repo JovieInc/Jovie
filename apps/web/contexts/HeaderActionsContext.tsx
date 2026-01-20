@@ -11,6 +11,9 @@ import {
 export interface HeaderActionsContextValue {
   headerActions: ReactNode;
   setHeaderActions: (actions: ReactNode) => void;
+  /** Badge/pill shown after breadcrumb (left side of header) */
+  headerBadge: ReactNode;
+  setHeaderBadge: (badge: ReactNode) => void;
 }
 
 const HeaderActionsContext = createContext<
@@ -50,10 +53,11 @@ export function HeaderActionsProvider({
   children,
 }: HeaderActionsProviderProps) {
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
+  const [headerBadge, setHeaderBadge] = useState<ReactNode>(null);
 
   const value = useMemo(
-    () => ({ headerActions, setHeaderActions }),
-    [headerActions]
+    () => ({ headerActions, setHeaderActions, headerBadge, setHeaderBadge }),
+    [headerActions, headerBadge]
   );
 
   return (
