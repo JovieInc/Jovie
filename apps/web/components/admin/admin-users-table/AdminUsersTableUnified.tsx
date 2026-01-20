@@ -34,12 +34,7 @@ const columnHelper = createColumnHelper<AdminUserRow>();
 export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const { users, page, pageSize, total, search, sort } = props;
 
-  const {
-    router,
-    openMenuUserId: _openMenuUserId,
-    setOpenMenuUserId: _setOpenMenuUserId,
-    pagination,
-  } = useAdminUsersTable(props);
+  const { router, pagination } = useAdminUsersTable(props);
 
   const {
     totalPages,

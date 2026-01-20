@@ -36,7 +36,6 @@ import {
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
@@ -86,11 +85,8 @@ export function AdminCreatorProfilesUnified({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
-  const {
-    profiles,
-    statuses: _verificationStatuses,
-    toggleVerification,
-  } = useCreatorVerification(initialProfiles);
+  const { profiles, toggleVerification } =
+    useCreatorVerification(initialProfiles);
 
   const {
     profiles: profilesWithActions,
@@ -100,12 +96,8 @@ export function AdminCreatorProfilesUnified({
   } = useCreatorActions(profiles);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [_openMenuProfileId, _setOpenMenuProfileId] = useState<string | null>(
-    null
-  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const _isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<
     (typeof profilesWithActions)[number] | null
