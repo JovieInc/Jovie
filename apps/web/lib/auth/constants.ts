@@ -27,3 +27,26 @@ export const AUTH_CLASSES = {
   oauthButtonMobile:
     'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150',
 } as const;
+
+/**
+ * Validates and sanitizes a redirect URL.
+ * - Must start with "/" (relative path)
+ * - Must not start with "//" (protocol-relative URL)
+ * - Strips hash fragments to prevent malformed redirects (e.g., /signin#/reset-password)
+ *
+ * @param url - The URL to sanitize
+ * @returns The sanitized URL, or null if invalid
+ */
+export function sanitizeRedirectUrl(
+  url: string | null | undefined
+): string | null {
+  if (!url) return null;
+  if (!url.startsWith('/') || url.startsWith('//')) return null;
+
+  // Strip hash fragment to prevent malformed URLs like /signin#/reset-password
+  const hashIndex = url.indexOf('#');
+  const cleanUrl = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+
+  // Ensure something meaningful remains after stripping
+  return cleanUrl && cleanUrl !== '/' ? cleanUrl : null;
+}

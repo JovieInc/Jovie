@@ -82,7 +82,7 @@ export function FeaturedArtistsDriftRow({
     throttler.maybeExecute();
 
     window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', onScrollOrResize);
@@ -92,7 +92,7 @@ export function FeaturedArtistsDriftRow({
   }, [prefersReducedMotion, throttler]);
 
   return (
-    <div className='relative w-full'>
+    <div className='relative w-full max-w-full overflow-hidden'>
       <div
         ref={containerRef}
         className='w-full overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'

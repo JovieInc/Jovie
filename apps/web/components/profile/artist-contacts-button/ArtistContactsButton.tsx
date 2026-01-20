@@ -80,22 +80,19 @@ export function ArtistContactsButton({
           <FileText className='h-4 w-4' aria-hidden='true' />
         </CircleIconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align='end'
-        className='w-72 rounded-xl border border-subtle bg-surface-0 p-2 shadow-lg backdrop-blur-xl'
-      >
+      <DropdownMenuContent align='end' className='w-72'>
         <div className='px-2 pb-2 pt-1'>
           <p className='text-xs font-semibold text-primary-token'>Contacts</p>
           <p className='text-xs text-secondary-token'>{artistName}</p>
         </div>
-        <DropdownMenuSeparator className='bg-transparent border-t border-subtle' />
+        <DropdownMenuSeparator />
         <div className='max-h-80 overflow-auto'>
           {available.map(contact => {
             const primary = primaryChannel(contact);
             return (
               <div
                 key={contact.id}
-                className='group/contact flex items-center justify-between gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-surface-1'
+                className='group/contact flex items-center justify-between gap-2 rounded-lg px-2 py-2 transition-colors duration-150 ease-out hover:bg-surface-2'
               >
                 <button
                   type='button'

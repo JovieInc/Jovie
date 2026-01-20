@@ -1,7 +1,7 @@
 import { createLegalDocumentRoute } from '@/lib/legal/route-factory';
 
-// API routes should be dynamic
-export const dynamic = 'force-dynamic';
+// Static with hourly revalidation - legal content rarely changes
+export const revalidate = 3600;
 
 export const GET = createLegalDocumentRoute(
   'terms.md',

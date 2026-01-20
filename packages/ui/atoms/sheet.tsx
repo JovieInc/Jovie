@@ -52,11 +52,11 @@ const sheetVariants = cva(
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         ].join(' '),
         left: [
-          'inset-y-0 left-0 h-full w-3/4 border-r border-subtle sm:max-w-sm',
+          'inset-y-0 left-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-r border-subtle sm:max-w-sm',
           'data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
         ].join(' '),
         right: [
-          'inset-y-0 right-0 h-full w-3/4 border-l border-subtle sm:max-w-sm',
+          'inset-y-0 right-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-l border-subtle sm:max-w-sm',
           'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
         ].join(' '),
       },

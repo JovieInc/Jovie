@@ -10,6 +10,8 @@
 import type { AsyncDebouncerState } from '@tanstack/react-pacer';
 import { useAsyncDebouncer, useThrottler } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CACHE_PRESETS, createValidationCache } from './cache';
+import { isAbortError } from './errors';
 
 /**
  * Centralized timing constants for TanStack Pacer hooks.
@@ -31,14 +33,6 @@ export const PACER_TIMING = {
   /** Default timeout for validation requests */
   VALIDATION_TIMEOUT_MS: 5000,
 } as const;
-
-// Legacy exports for backwards compatibility
-export const DEFAULT_DEBOUNCE_MS = PACER_TIMING.DEBOUNCE_MS;
-export const DEFAULT_SEARCH_DEBOUNCE_MS = PACER_TIMING.SEARCH_DEBOUNCE_MS;
-export const DEFAULT_VALIDATION_DEBOUNCE_MS =
-  PACER_TIMING.VALIDATION_DEBOUNCE_MS;
-export const DEFAULT_SAVE_DEBOUNCE_MS = PACER_TIMING.SAVE_DEBOUNCE_MS;
-export const DEFAULT_THROTTLE_MS = PACER_TIMING.THROTTLE_MS;
 
 /**
  * Hook for debounced async API validation (e.g., handle availability checks).
@@ -97,7 +91,7 @@ export interface UseAsyncValidationReturn<TValue, TResult> {
 
 export function useAsyncValidation<TValue, TResult>({
   validatorFn,
-  wait = DEFAULT_VALIDATION_DEBOUNCE_MS,
+  wait = PACER_TIMING.VALIDATION_DEBOUNCE_MS,
   timeout = 5000,
   enabled = true,
   onSuccess,
@@ -109,7 +103,11 @@ export function useAsyncValidation<TValue, TResult>({
   const [result, setResult] = useState<TResult | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const cacheRef = useRef<Map<string, TResult>>(new Map());
+
+  // Use the shared cache utility with TTL and size limits
+  const cacheRef = useRef(
+    createValidationCache<string, TResult>(CACHE_PRESETS.validation)
+  );
 
   const asyncDebouncer = useAsyncDebouncer(
     async (value: TValue) => {
@@ -117,9 +115,9 @@ export function useAsyncValidation<TValue, TResult>({
 
       const cacheKey = JSON.stringify(value);
 
-      // Check cache first
-      if (cacheRef.current.has(cacheKey)) {
-        const cached = cacheRef.current.get(cacheKey)!;
+      // Check cache first (respects TTL)
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached !== undefined) {
         setResult(cached);
         setError(null);
         onSuccess?.(cached);
@@ -145,7 +143,7 @@ export function useAsyncValidation<TValue, TResult>({
           return undefined;
         }
 
-        // Cache the result
+        // Cache the result (with TTL)
         cacheRef.current.set(cacheKey, validationResult);
 
         setResult(validationResult);
@@ -156,7 +154,8 @@ export function useAsyncValidation<TValue, TResult>({
       } catch (err) {
         clearTimeout(timeoutId);
 
-        if (err instanceof Error && err.name === 'AbortError') {
+        // Use standardized error check
+        if (isAbortError(err)) {
           return undefined;
         }
 
@@ -266,7 +265,7 @@ export interface UseAsyncSearchReturn<TResult> {
 
 export function useAsyncSearch<TResult>({
   searchFn,
-  wait = DEFAULT_SEARCH_DEBOUNCE_MS,
+  wait = PACER_TIMING.SEARCH_DEBOUNCE_MS,
   minQueryLength = 2,
   onError,
 }: UseAsyncSearchOptions<TResult>): UseAsyncSearchReturn<TResult> {
@@ -307,7 +306,8 @@ export function useAsyncSearch<TResult>({
         setResults(searchResults);
         setSearchState(searchResults.length === 0 ? 'empty' : 'success');
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        // Use standardized error check
+        if (isAbortError(err)) {
           return;
         }
 
@@ -385,7 +385,8 @@ export function useAsyncSearch<TResult>({
         setResults(searchResults);
         setSearchState(searchResults.length === 0 ? 'empty' : 'success');
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        // Use standardized error check
+        if (isAbortError(err)) {
           return;
         }
 
@@ -483,7 +484,7 @@ export interface UseAutoSaveReturn<TData> {
 
 export function useAutoSave<TData>({
   saveFn,
-  wait = DEFAULT_SAVE_DEBOUNCE_MS,
+  wait = PACER_TIMING.SAVE_DEBOUNCE_MS,
   onSuccess,
   onError,
 }: UseAutoSaveOptions<TData>): UseAutoSaveReturn<TData> {
@@ -590,7 +591,7 @@ export function useThrottledEventHandler<
   T extends (...args: unknown[]) => void,
 >(handler: T, options: UseThrottledEventHandlerOptions = {}): T {
   const {
-    wait = DEFAULT_THROTTLE_MS,
+    wait = PACER_TIMING.THROTTLE_MS,
     leading = true,
     trailing = true,
   } = options;
@@ -634,7 +635,7 @@ export interface UseThrottledScrollReturn {
 export function useThrottledScroll(
   options: UseThrottledScrollOptions = {}
 ): UseThrottledScrollReturn {
-  const { wait = DEFAULT_THROTTLE_MS, threshold = 0 } = options;
+  const { wait = PACER_TIMING.THROTTLE_MS, threshold = 0 } = options;
 
   const [scrollY, setScrollY] = useState(() =>
     typeof window !== 'undefined' ? window.scrollY : 0
