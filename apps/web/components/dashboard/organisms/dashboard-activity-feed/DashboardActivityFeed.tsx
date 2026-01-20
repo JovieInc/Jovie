@@ -39,7 +39,7 @@ export function DashboardActivityFeed({
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-emerald-500'
-          />
+          />{' '}
           Live
         </span>
       </div>

@@ -43,7 +43,7 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
         }`}
         style={{ fontSynthesisWeight: 'none' }}
       >
-        Yearly $50
+        Yearly $50{' '}
         <span className='text-xs text-emerald-600 dark:text-emerald-400 font-medium'>
           Save $10
         </span>

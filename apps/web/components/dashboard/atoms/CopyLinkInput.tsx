@@ -10,7 +10,13 @@
  * - Visual feedback on copy (green highlight)
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +27,11 @@ export interface CopyLinkInputProps {
   size?: 'sm' | 'md';
   /** Additional CSS classes */
   className?: string;
+  /**
+   * Prevent click bubbling to parents (e.g. table row navigation).
+   * Defaults to false.
+   */
+  stopPropagation?: boolean;
   /** Callback when copy succeeds (does not need to write to clipboard) */
   onCopy?: () => void;
   /** Test ID for the component */
@@ -31,6 +42,7 @@ export function CopyLinkInput({
   url,
   size = 'md',
   className,
+  stopPropagation = false,
   onCopy,
   testId,
 }: CopyLinkInputProps) {
@@ -49,23 +61,36 @@ export function CopyLinkInput({
     };
   }, []);
 
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setIsCopied(true);
-      onCopy?.();
-
-      // Clear any existing timeout before setting a new one
-      if (copyResetTimeoutRef.current) {
-        clearTimeout(copyResetTimeoutRef.current);
+  const handleCopy = useCallback(
+    async (e?: MouseEvent<HTMLButtonElement>) => {
+      if (stopPropagation) {
+        e?.stopPropagation();
       }
-      copyResetTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-    }
-  }, [url, onCopy]);
 
-  const handleInputClick = () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        setIsCopied(true);
+        onCopy?.();
+
+        // Clear any existing timeout before setting a new one
+        if (copyResetTimeoutRef.current) {
+          clearTimeout(copyResetTimeoutRef.current);
+        }
+        copyResetTimeoutRef.current = setTimeout(
+          () => setIsCopied(false),
+          2000
+        );
+      } catch (error) {
+        console.error('Failed to copy to clipboard:', error);
+      }
+    },
+    [url, onCopy, stopPropagation]
+  );
+
+  const handleInputClick = (e: MouseEvent<HTMLInputElement>) => {
+    if (stopPropagation) {
+      e.stopPropagation();
+    }
     inputRef.current?.select();
   };
 
