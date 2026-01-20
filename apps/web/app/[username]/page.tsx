@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import { unstable_cache, unstable_noStore } from 'next/cache';
 import { notFound } from 'next/navigation';
 import Script from 'next/script';
@@ -423,7 +422,9 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 }
 
 // Generate metadata for the page with comprehensive SEO
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: Props): Promise<import('next').Metadata> {
   const { username } = await params;
   const { profile, genres, status } = await getProfileAndLinks(username);
 
