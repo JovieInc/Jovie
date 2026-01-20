@@ -26,7 +26,17 @@ interface OnboardingHandleStepProps {
   onSubmit: (e?: React.FormEvent) => void;
 }
 
-/** Error icon (X in circle) */
+/**
+ * Custom outlined error icon (X in circle) for onboarding flow.
+ *
+ * NOTE: Intentionally not using the shared ValidationStatusIcon from
+ * smart-handle-input or Lucide icons. The onboarding design requires:
+ * - Larger 20x20 icons with 2px stroke circles (vs 16x16 filled chips)
+ * - Outlined stroke style matching the premium onboarding aesthetic
+ * - Different visual weight than the dashboard's compact icons
+ *
+ * See Figma: Onboarding/Handle Step for the design spec.
+ */
 function ErrorIcon() {
   return (
     <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-5 w-5'>
@@ -49,7 +59,10 @@ function ErrorIcon() {
   );
 }
 
-/** Success icon (checkmark in circle) */
+/**
+ * Custom outlined success icon (checkmark in circle) for onboarding flow.
+ * See ErrorIcon comment for design rationale.
+ */
 function SuccessIcon() {
   return (
     <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-5 w-5'>
@@ -73,7 +86,11 @@ function SuccessIcon() {
   );
 }
 
-/** Determine which validation status icon to show */
+/**
+ * Onboarding-specific validation status icon.
+ * Uses custom outlined icons for visual consistency with onboarding design.
+ * See ErrorIcon comment for why this differs from the shared component.
+ */
 function ValidationStatusIcon({
   checking,
   hasError,

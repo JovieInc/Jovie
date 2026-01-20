@@ -50,7 +50,9 @@ function ErrorCard({ title }: { title: string }) {
             We couldn&apos;t fetch your analytics data right now
           </p>
         </div>
-        <p className='mt-4 text-xs text-tertiary-token'>Refresh to try again.</p>
+        <p className='mt-4 text-xs text-tertiary-token'>
+          Refresh to try again.
+        </p>
       </div>
     </DashboardCard>
   );
@@ -123,7 +125,7 @@ function AnalyticsCardsContent({
   refreshing: boolean;
 }) {
   return (
-    <div className={refreshing ? 'opacity-70 transition-opacity' : undefined}>
+    <div className={refreshing ? 'opacity-70 transition-opacity' : ''}>
       <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
         <AnalyticsCard
           title='Profile views'
@@ -210,7 +212,9 @@ export function DashboardAnalyticsCards({
 
     const step = (now: number) => {
       const progress = Math.min(1, (now - startTime) / COUNT_UP_DURATION_MS);
-      setDisplayProfileViews(calculateEasedValue(startValue, endValue, progress));
+      setDisplayProfileViews(
+        calculateEasedValue(startValue, endValue, progress)
+      );
       if (progress < 1) {
         raf = requestAnimationFrame(step);
       }
