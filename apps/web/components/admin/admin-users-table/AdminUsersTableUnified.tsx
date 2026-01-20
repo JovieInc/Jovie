@@ -25,6 +25,7 @@ import {
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminUsersTableProps } from './types';
 import { useAdminUsersTable } from './useAdminUsersTable';
@@ -400,7 +401,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
             getRowClassName={getRowClassName}
             getContextMenuItems={getContextMenuItems}
             enableVirtualization={true}
-            minWidth='960px'
+            minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
             className='text-[13px]'
           />
         )}

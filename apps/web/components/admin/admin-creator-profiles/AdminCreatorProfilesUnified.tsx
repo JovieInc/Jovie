@@ -37,7 +37,7 @@ import {
   useRowSelection,
 } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -697,7 +697,7 @@ export function AdminCreatorProfilesUnified({
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
-              minWidth='960px'
+              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[13px]'
             />
           )}
