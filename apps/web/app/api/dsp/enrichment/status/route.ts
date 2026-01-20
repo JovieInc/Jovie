@@ -133,22 +133,41 @@ export async function GET(request: Request) {
     }
 
     // Fetch the most recent discovery job for this profile
-    const [discoveryJob] = await db
-      .select({
-        id: ingestionJobs.id,
-        status: ingestionJobs.status,
-        createdAt: ingestionJobs.createdAt,
-        updatedAt: ingestionJobs.updatedAt,
-      })
-      .from(ingestionJobs)
-      .where(
-        and(
-          eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
-          sql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
+    let discoveryJob:
+      | {
+          id: string;
+          status: string;
+          createdAt: Date | null;
+          updatedAt: Date | null;
+        }
+      | undefined;
+
+    try {
+      const [job] = await db
+        .select({
+          id: ingestionJobs.id,
+          status: ingestionJobs.status,
+          createdAt: ingestionJobs.createdAt,
+          updatedAt: ingestionJobs.updatedAt,
+        })
+        .from(ingestionJobs)
+        .where(
+          and(
+            eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
+            sql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
+          )
         )
-      )
-      .orderBy(desc(ingestionJobs.createdAt))
-      .limit(1);
+        .orderBy(desc(ingestionJobs.createdAt))
+        .limit(1);
+
+      discoveryJob = job;
+    } catch (dbError) {
+      console.error(
+        '[DSP Enrichment Status - fetch discoveryJob] Failed to fetch discovery job',
+        { profileId, dbError }
+      );
+      throw dbError;
+    }
 
     const hasPendingDiscoveryJob =
       discoveryJob?.status === 'pending' ||
