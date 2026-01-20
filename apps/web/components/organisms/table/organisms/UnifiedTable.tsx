@@ -19,6 +19,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
 import {
@@ -78,7 +79,7 @@ export interface UnifiedTableProps<TData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 52
+   * @default 44
    */
   rowHeight?: number;
 
@@ -205,7 +206,7 @@ export function UnifiedTable<TData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 52,
+  rowHeight = 44,
   overscan = 5,
   renderRow,
   getRowId,
@@ -214,7 +215,7 @@ export function UnifiedTable<TData>({
   getContextMenuItems,
   getRowClassName,
   className,
-  minWidth = '960px',
+  minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   skeletonRows = 20,
   groupingConfig,
   enableKeyboardNavigation,

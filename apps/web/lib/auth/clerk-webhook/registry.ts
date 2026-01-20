@@ -11,6 +11,7 @@
  * - Unhandled event types return null (caller should acknowledge but skip)
  */
 
+import { logger } from '@/lib/utils/logger';
 import { userCreatedHandler } from './handlers/user-created-handler';
 import { userDeletedHandler } from './handlers/user-deleted-handler';
 import { userUpdatedHandler } from './handlers/user-updated-handler';
@@ -39,7 +40,7 @@ function buildRegistry(): HandlerRegistry {
   for (const handler of handlers) {
     for (const eventType of handler.eventTypes) {
       if (registry.has(eventType)) {
-        console.warn(
+        logger.warn(
           `[Clerk Webhook Registry] Event type "${eventType}" is registered by multiple handlers.`
         );
         continue;

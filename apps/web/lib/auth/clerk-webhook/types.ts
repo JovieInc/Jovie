@@ -36,7 +36,13 @@ export interface ClerkWebhookEvent {
 /**
  * Union type of all Clerk event types handled by our webhook system.
  */
-export type ClerkEventType = 'user.created' | 'user.updated' | 'user.deleted';
+export const CLERK_EVENT_TYPES = [
+  'user.created',
+  'user.updated',
+  'user.deleted',
+] as const;
+
+export type ClerkEventType = (typeof CLERK_EVENT_TYPES)[number];
 
 /**
  * Context passed to webhook handlers.
@@ -80,5 +86,5 @@ export interface ClerkWebhookHandler {
 export function isClerkEventType(
   eventType: string
 ): eventType is ClerkEventType {
-  return ['user.created', 'user.updated', 'user.deleted'].includes(eventType);
+  return (CLERK_EVENT_TYPES as readonly string[]).includes(eventType);
 }

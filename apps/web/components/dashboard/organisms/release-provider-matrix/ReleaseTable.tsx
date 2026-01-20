@@ -20,7 +20,10 @@ import {
   DateCell,
   UnifiedTable,
 } from '@/components/organisms/table';
-import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import {
+  RELEASE_TABLE_WIDTHS,
+  TABLE_ROW_HEIGHTS,
+} from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -253,9 +256,7 @@ export function ReleaseTable({
   };
 
   // Calculate dynamic min width based on column count
-  // Base: Release(220) + Released(70) + SmartLink(180) + Actions(60) = 530
-  // + Provider columns (100 each)
-  const minWidth = `${530 + primaryProviders.length * 100}px`;
+  const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + primaryProviders.length * RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
 
   return (
     <UnifiedTable
@@ -266,9 +267,6 @@ export function ReleaseTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={row => row.id}
-      getRowClassName={(_, index) =>
-        index !== releases.length - 1 ? 'border-b border-subtle' : ''
-      }
       enableVirtualization={false} // Low row count, no need for virtualization
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       minWidth={minWidth}

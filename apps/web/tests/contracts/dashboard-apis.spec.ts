@@ -435,6 +435,9 @@ describe('Dashboard API contracts', () => {
       mockSession();
       mockDb();
 
+      // Ensure doMock() applies to a fresh module import
+      vi.resetModules();
+
       vi.doMock('@clerk/nextjs/server', () => ({
         clerkClient: vi.fn().mockResolvedValue({
           users: {
