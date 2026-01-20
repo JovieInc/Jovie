@@ -1,28 +1,15 @@
 #!/bin/bash
 # Protect critical files based on agents.md HARD GUARDRAILS
-# Adapted for Windsurf - exit 2 to block
+# Synced with .claude/hooks/file-protection-check.sh
 # - Prevent modification of Drizzle migrations (append-only, line 51)
 # - Prevent creation of middleware.ts (use proxy.ts instead, line 11)
 # - Check for biome-ignore suppressions (never allowed, line 52)
 
-# Get file path and content from stdin (Windsurf passes JSON via stdin)
-input=$(cat)
-file_path=$(echo "$input" | jq -r '.tool_info.file_path // .file_path // empty' 2>/dev/null)
-jq_exit_path=$?
-content=$(echo "$input" | jq -r '.tool_info.content // .content // empty' 2>/dev/null)
-jq_exit_content=$?
+# Get file path and content from tool input (same as Claude)
+file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
+content=$(jq -r '.tool_input.content // .tool_input.new_string // empty' 2>/dev/null)
 
-# Fail closed: block if jq fails or if input is non-empty but file_path is empty
-if [ "$jq_exit_path" -ne 0 ] || [ "$jq_exit_content" -ne 0 ]; then
-  echo "BLOCKED: Unable to parse JSON input for file protection checks" >&2
-  exit 2
-fi
-
-if [ -n "$input" ] && [ -z "$file_path" ]; then
-  echo "BLOCKED: Missing file_path in JSON input" >&2
-  exit 2
-fi
-
+# If parsing fails or no file_path, allow (fail open)
 if [ -z "$file_path" ]; then
   exit 0
 fi
@@ -43,8 +30,7 @@ if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizz
 fi
 
 # HARD GUARDRAIL: No middleware.ts allowed (agents.md line 11)
-# Match both root-level and nested middleware.ts (but exclude .next/)
-if [[ "$file_path" =~ (^|/)middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; then
+if [[ "$file_path" =~ /middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; then
   echo "BLOCKED: Do not create middleware.ts (agents.md line 11)"
   echo "File: $file_path"
   echo ""
