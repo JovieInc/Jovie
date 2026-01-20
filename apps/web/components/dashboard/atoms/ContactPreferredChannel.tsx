@@ -26,7 +26,7 @@ export function ContactPreferredChannel({
             value='email'
             checked={(preferredChannel ?? 'email') === 'email'}
             onChange={() => onChannelChange('email')}
-          />
+          />{' '}
           Email
         </label>
         <label className='flex items-center gap-2 text-sm text-secondary-token'>
@@ -36,7 +36,7 @@ export function ContactPreferredChannel({
             value='phone'
             checked={preferredChannel === 'phone'}
             onChange={() => onChannelChange('phone')}
-          />
+          />{' '}
           Phone
         </label>
       </div>

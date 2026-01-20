@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -11,7 +11,7 @@ export interface RightDrawerProps
   children: React.ReactNode;
   className?: string;
   ariaLabel?: string;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLElement>) => void;
+  onKeyDown?: (event: KeyboardEvent) => void;
 }
 
 export function RightDrawer({
@@ -23,13 +23,34 @@ export function RightDrawer({
   onKeyDown,
   ...rest
 }: RightDrawerProps) {
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Handle keyboard events at the document level when drawer is open
+  useEffect(() => {
+    if (!isOpen || !onKeyDown) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle events when the drawer or its children have focus
+      if (
+        asideRef.current &&
+        (asideRef.current === document.activeElement ||
+          asideRef.current.contains(document.activeElement))
+      ) {
+        onKeyDown(event);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onKeyDown]);
+
   return (
     <aside
       {...rest}
+      ref={asideRef}
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}
-      onKeyDown={onKeyDown}
       className={cn(
         'shrink-0 h-full flex flex-col',
         'bg-surface-1 border-l border-subtle',

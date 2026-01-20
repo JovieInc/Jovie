@@ -20,7 +20,7 @@ export function generateImageHash(url: string, timestamp?: number): string {
   const input = url + (timestamp || Date.now().toString());
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
+    const char = input.codePointAt(i) ?? 0;
     hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }

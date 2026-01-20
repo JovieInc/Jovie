@@ -66,8 +66,8 @@ export default function Page() {
             href='https://docs.sentry.io/platforms/javascript/guides/nextjs/'
           >
             read our docs
-          </a>
-          .
+          </a>.
+
         </p>
 
         <button

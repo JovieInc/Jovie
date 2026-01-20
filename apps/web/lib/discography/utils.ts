@@ -52,7 +52,7 @@ export function buildSmartLinkUrl(
  */
 export function buildIsrcLookupPath(isrc: string): string {
   // Normalize ISRC: remove dashes and uppercase
-  const normalizedIsrc = isrc.replace(/-/g, '').toUpperCase();
+  const normalizedIsrc = isrc.replaceAll('-', '').toUpperCase();
   return `/r/isrc/${normalizedIsrc}`;
 }
 

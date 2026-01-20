@@ -39,7 +39,7 @@ export const stripe = new Proxy({} as Stripe, {
 });
 
 function escapeStripeSearchValue(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 }
 
 /**

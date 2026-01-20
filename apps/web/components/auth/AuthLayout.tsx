@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/components/auth/constants';
@@ -108,14 +108,6 @@ export function AuthLayout({
     };
   }, [logoSpinDelayMs]);
 
-  const logoStyle = useMemo(
-    () =>
-      shouldSpinLogo
-        ? { animation: 'logo-spin 1.2s ease-in-out 0s 1 forwards' }
-        : undefined,
-    [shouldSpinLogo]
-  );
-
   return (
     <div
       className={cn(
@@ -182,8 +174,7 @@ export function AuthLayout({
           tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
         >
           <span
-            className={shouldSpinLogo ? 'logo-spin-trigger' : undefined}
-            style={logoStyle}
+            className={shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'}
           >
             <BrandLogo size={48} tone='auto' priority />
           </span>
@@ -230,21 +221,6 @@ export function AuthLayout({
         </p>
       )}
 
-      {logoSpinDelayMs ? (
-        <style jsx>{`
-          @keyframes logo-spin {
-            from {
-              transform: rotate(0deg);
-            }
-            to {
-              transform: rotate(360deg);
-            }
-          }
-          .logo-spin-trigger {
-            display: inline-flex;
-          }
-        `}</style>
-      ) : null}
     </div>
   );
 }

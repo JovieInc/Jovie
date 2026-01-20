@@ -59,7 +59,7 @@ function validateEnvFormat(): void {
   }
 
   if (APPLE_MUSIC_PRIVATE_KEY) {
-    const normalizedKey = APPLE_MUSIC_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const normalizedKey = APPLE_MUSIC_PRIVATE_KEY.replaceAll('\\n', '\n');
     const hasPemHeader = normalizedKey.includes('-----BEGIN');
     const hasPemFooter = normalizedKey.includes('-----END');
 
@@ -125,7 +125,7 @@ async function generateToken(): Promise<string> {
   }
 
   // The private key may be stored with escaped newlines
-  const privateKeyPem = APPLE_MUSIC_PRIVATE_KEY.replace(/\\n/g, '\n');
+  const privateKeyPem = APPLE_MUSIC_PRIVATE_KEY.replaceAll('\\n', '\n');
 
   // Import the private key for ES256 signing
   const privateKey = await importPKCS8(privateKeyPem, 'ES256');
