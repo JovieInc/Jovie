@@ -1,17 +1,5 @@
 {
   "hooks": {
-    "pre_run_command": [
-      {
-        "command": "bash .windsurf/scripts/bash-safety-check.sh",
-        "show_output": true
-      }
-    ],
-    "pre_write_code": [
-      {
-        "command": "bash .windsurf/scripts/file-protection-check.sh",
-        "show_output": true
-      }
-    ],
     "post_write_code": [
       {
         "command": "bash .windsurf/scripts/format-on-edit.sh",
