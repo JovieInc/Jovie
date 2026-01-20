@@ -6,7 +6,7 @@ import html from 'remark-html';
 
 /**
  * Creates a legal document route handler that converts markdown to HTML
- * @param docFilename - The markdown filename in the docs/ directory (e.g., 'terms.md')
+ * @param docFilename - The markdown filename in content/legal/ (e.g., 'terms.md')
  * @param errorMessage - Custom error message if document fails to load
  * @returns Next.js route handler function
  */
@@ -16,7 +16,12 @@ export function createLegalDocumentRoute(
 ) {
   return async function GET() {
     try {
-      const filePath = path.join(process.cwd(), 'docs', docFilename);
+      const filePath = path.join(
+        process.cwd(),
+        'content',
+        'legal',
+        docFilename
+      );
       const fileContents = await readFile(filePath, 'utf8');
 
       const processedContent = await remark().use(html).process(fileContents);
