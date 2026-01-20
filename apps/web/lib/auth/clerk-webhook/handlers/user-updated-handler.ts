@@ -62,7 +62,7 @@ async function handleUserUpdated(
       const details = errors.map(e => `${e.step}=${e.error}`).join('; ');
       const message = `Partial Clerk sync failure for user.updated (userId=${user.id}, username=${user.username ?? 'null'}): ${details}`;
 
-      logger.error(message);
+      logger.warn(message);
 
       return {
         success: false,

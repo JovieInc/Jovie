@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { getClerkHandler } from '@/lib/auth/clerk-webhook/registry';
 import type { ClerkWebhookEvent } from '@/lib/auth/clerk-webhook/types';
-import { env } from '@/lib/env-server';
+import { env } from '@/lib/env';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
