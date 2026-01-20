@@ -5,6 +5,8 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
+import { PacerProvider } from '@/lib/pacer';
+import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
@@ -159,24 +161,37 @@ function ClientProvidersInnerBase({
     <React.StrictMode>
       <NuqsProvider>
         <QueryProvider>
-          <ThemeProvider
-            attribute='class'
-            defaultTheme={initialThemeMode}
-            enableSystem={true}
-            disableTransitionOnChange
-            storageKey='jovie-theme'
+          <PacerProvider
+            defaultOptions={{
+              debouncer: { wait: PACER_TIMING.DEBOUNCE_MS },
+              throttler: {
+                wait: PACER_TIMING.THROTTLE_MS,
+                leading: true,
+                trailing: true,
+              },
+            }}
           >
-            <ThemeKeyboardShortcut />
-            {enableStatsig ? (
-              <StatsigProviders userId={userId}>
-                <LazyProviders enableAnalytics={enableStatsig}>
+            <ThemeProvider
+              attribute='class'
+              defaultTheme={initialThemeMode}
+              enableSystem={true}
+              disableTransitionOnChange
+              storageKey='jovie-theme'
+            >
+              <ThemeKeyboardShortcut />
+              {enableStatsig ? (
+                <StatsigProviders userId={userId}>
+                  <LazyProviders enableAnalytics={enableStatsig}>
+                    {children}
+                  </LazyProviders>
+                </StatsigProviders>
+              ) : (
+                <LazyProviders enableAnalytics={false}>
                   {children}
                 </LazyProviders>
-              </StatsigProviders>
-            ) : (
-              <LazyProviders enableAnalytics={false}>{children}</LazyProviders>
-            )}
-          </ThemeProvider>
+              )}
+            </ThemeProvider>
+          </PacerProvider>
         </QueryProvider>
       </NuqsProvider>
     </React.StrictMode>
