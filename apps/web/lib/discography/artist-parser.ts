@@ -61,7 +61,7 @@ export interface SpotifyArtistInput {
  * Matches: "(X Remix)", "[X Remix]", "(Remixed by X)", "(X Mix)"
  */
 const REMIX_PATTERN =
-  /[\(\[]\s*(?:(?:remixed\s+by|remix\s+by)\s+)?([^)\]]+?)(?:\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))?\s*[\)\]]/gi;
+  /[\(\[]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[\)\]]/gi;
 
 /**
  * Pattern to match featured artists in track titles
@@ -174,7 +174,7 @@ export function extractRemixers(title: string): ParsedArtistCredit[] {
   REMIX_PATTERN.lastIndex = 0;
 
   while ((match = REMIX_PATTERN.exec(title)) !== null) {
-    const remixerPart = match[1];
+    const remixerPart = match[1] ?? match[2];
     if (!remixerPart) continue;
 
     // Check if this is just "Remix" without an artist
@@ -510,7 +510,7 @@ export function cleanTrackTitle(title: string): string {
       .replaceAll(/[\(\[]?\s*with\s+[^)\]]+[\)\]]?/gi, '')
       // Clean up whitespace and trailing punctuation
       .replaceAll(/\s+/g, ' ')
-      .replaceAll(/\s*[-–]\s*$/, '')
+      .replace(/\s*[-–]\s*$/, '')
       .trim()
   );
 }
