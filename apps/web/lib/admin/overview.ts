@@ -202,121 +202,131 @@ export async function getAdminUsageSeries(
   return points;
 }
 
+/** Default reliability summary when data is unavailable */
+function createDefaultReliabilitySummary(
+  latencyMs: number | null
+): AdminReliabilitySummary {
+  return {
+    errorRatePercent: 0,
+    p95LatencyMs: latencyMs,
+    incidents24h: 0,
+    lastIncidentAt: null,
+  };
+}
+
+/** Fetch total event count from stripe webhook events */
+async function fetchTotalEventCount(
+  dayAgo: Date
+): Promise<{ ok: true; count: number } | { ok: false }> {
+  try {
+    const rows = await db
+      .select({ count: drizzleSql<number>`count(*)` })
+      .from(stripeWebhookEvents)
+      .where(
+        drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`
+      );
+    return { ok: true, count: Number(rows[0]?.count ?? 0) };
+  } catch {
+    DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
+    console.warn(
+      'Stripe webhook events unavailable; skipping reliability summary.'
+    );
+    return { ok: false };
+  }
+}
+
+/** Fetch incident count and last incident timestamp */
+async function fetchIncidentData(
+  dayAgo: Date
+): Promise<
+  { ok: true; count: number; lastAt: Date | null } | { ok: false }
+> {
+  try {
+    const rows = await db
+      .select({
+        count: drizzleSql<number>`count(*)`,
+        lastAt: drizzleSql<Date | null>`max(${stripeWebhookEvents.createdAt})`,
+      })
+      .from(stripeWebhookEvents)
+      .where(
+        and(
+          drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`,
+          inArray(stripeWebhookEvents.type, [
+            'checkout.session.completed',
+            'customer.subscription.created',
+            'invoice.payment_failed',
+          ])
+        )
+      );
+
+    const row = rows[0];
+    const rawLastAt = row?.lastAt;
+    const lastAt =
+      rawLastAt instanceof Date
+        ? rawLastAt
+        : rawLastAt != null
+          ? new Date(String(rawLastAt))
+          : null;
+
+    return { ok: true, count: Number(row?.count ?? 0), lastAt };
+  } catch {
+    DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
+    console.warn(
+      'Stripe webhook incidents unavailable; skipping reliability summary.'
+    );
+    return { ok: false };
+  }
+}
+
+/** Get database health latency with fallback */
+async function getDbLatencyWithFallback(): Promise<number | null> {
+  try {
+    const dbHealth = await checkDbHealth();
+    return dbHealth.latency ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
-  const now = new Date();
-  const dayAgo = new Date(now.getTime() - MS_PER_DAY);
+  const dayAgo = new Date(Date.now() - MS_PER_DAY);
   const hasStripeEvents =
     !DISABLED_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
     (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
 
   if (!hasStripeEvents) {
-    const dbHealth = await checkDbHealth();
-    return {
-      errorRatePercent: 0,
-      p95LatencyMs: dbHealth.latency ?? null,
-      incidents24h: 0,
-      lastIncidentAt: null,
-    };
+    const latency = await getDbLatencyWithFallback();
+    return createDefaultReliabilitySummary(latency);
   }
 
   try {
-    const dbHealth = await checkDbHealth();
+    const latency = await getDbLatencyWithFallback();
 
-    let totalEvents = 0;
-    let incidentCount = 0;
-    let lastIncidentAt: Date | null = null;
-
-    try {
-      const rows = await db
-        .select({ count: drizzleSql<number>`count(*)` })
-        .from(stripeWebhookEvents)
-        .where(
-          drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`
-        );
-      totalEvents = Number(rows[0]?.count ?? 0);
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
-        'Stripe webhook events unavailable; skipping reliability summary.'
-      );
-
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
+    const totalResult = await fetchTotalEventCount(dayAgo);
+    if (!totalResult.ok) {
+      return createDefaultReliabilitySummary(latency);
     }
 
-    try {
-      const rows = await db
-        .select({
-          count: drizzleSql<number>`count(*)`,
-          lastAt: drizzleSql<Date | null>`max(${stripeWebhookEvents.createdAt})`,
-        })
-        .from(stripeWebhookEvents)
-        .where(
-          and(
-            drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`,
-            inArray(stripeWebhookEvents.type, [
-              'checkout.session.completed',
-              'customer.subscription.created',
-              'invoice.payment_failed',
-            ])
-          )
-        );
-
-      const row = rows[0];
-      incidentCount = Number(row?.count ?? 0);
-      const rawLastAt = row?.lastAt;
-      lastIncidentAt =
-        rawLastAt instanceof Date
-          ? rawLastAt
-          : rawLastAt != null
-            ? new Date(String(rawLastAt))
-            : null;
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
-        'Stripe webhook incidents unavailable; skipping reliability summary.'
-      );
-
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
+    const incidentResult = await fetchIncidentData(dayAgo);
+    if (!incidentResult.ok) {
+      return createDefaultReliabilitySummary(latency);
     }
 
     const errorRatePercent =
-      totalEvents > 0 ? (Number(incidentCount) / Number(totalEvents)) * 100 : 0;
+      totalResult.count > 0
+        ? (incidentResult.count / totalResult.count) * 100
+        : 0;
 
     return {
       errorRatePercent,
-      p95LatencyMs: dbHealth.latency ?? null,
-      incidents24h: Number(incidentCount),
-      lastIncidentAt,
+      p95LatencyMs: latency,
+      incidents24h: incidentResult.count,
+      lastIncidentAt: incidentResult.lastAt,
     };
   } catch (error) {
     console.error('Error loading admin reliability summary', error);
-
-    try {
-      const dbHealth = await checkDbHealth();
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    } catch {
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    }
+    const latency = await getDbLatencyWithFallback();
+    return createDefaultReliabilitySummary(latency);
   }
 }
 
@@ -501,84 +511,100 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
   }
 }
 
-export async function getAdminActivityFeed(
-  limit: number = 10
-): Promise<AdminActivityItem[]> {
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
+/** Fetch recent creator profile activity */
+async function fetchRecentCreatorActivity(
+  sevenDaysAgo: Date,
+  limit: number
+): Promise<CreatorActivityRow[]> {
+  const hasCreatorProfiles = await doesTableExist(TABLE_NAMES.creatorProfiles);
+  if (!hasCreatorProfiles) return [];
 
+  return db
+    .select({
+      id: creatorProfiles.id,
+      username: creatorProfiles.username,
+      createdAt: creatorProfiles.createdAt,
+    })
+    .from(creatorProfiles)
+    .where(
+      drizzleSql`${creatorProfiles.createdAt} >= ${sevenDaysAgo}::timestamp`
+    )
+    .orderBy(desc(creatorProfiles.createdAt))
+    .limit(limit);
+}
+
+/** Fetch recent Stripe webhook activity */
+async function fetchRecentStripeActivity(
+  sevenDaysAgo: Date,
+  limit: number
+): Promise<StripeActivityRow[]> {
   const hasStripeEvents =
     !DISABLED_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
     (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
-  const hasCreatorProfiles = await doesTableExist(TABLE_NAMES.creatorProfiles);
+
+  if (!hasStripeEvents) return [];
 
   try {
-    const creatorPromise: Promise<CreatorActivityRow[]> = hasCreatorProfiles
-      ? db
-          .select({
-            id: creatorProfiles.id,
-            username: creatorProfiles.username,
-            createdAt: creatorProfiles.createdAt,
-          })
-          .from(creatorProfiles)
-          .where(
-            drizzleSql`${creatorProfiles.createdAt} >= ${sevenDaysAgo}::timestamp`
-          )
-          .orderBy(desc(creatorProfiles.createdAt))
-          .limit(limit)
-      : Promise.resolve([] as CreatorActivityRow[]);
+    return await db
+      .select({
+        id: stripeWebhookEvents.id,
+        type: stripeWebhookEvents.type,
+        createdAt: stripeWebhookEvents.createdAt,
+      })
+      .from(stripeWebhookEvents)
+      .where(
+        drizzleSql`${stripeWebhookEvents.createdAt} >= ${sevenDaysAgo}::timestamp`
+      )
+      .orderBy(desc(stripeWebhookEvents.createdAt))
+      .limit(limit);
+  } catch (error) {
+    if (shouldDisableStripeEventsTable(error)) {
+      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
+    }
+    console.warn('Stripe webhook activity unavailable; skipping.');
+    return [];
+  }
+}
 
+/** Map creator row to activity item */
+function mapCreatorToActivity(row: CreatorActivityRow): AdminActivityItem {
+  return {
+    id: `creator-${row.id}`,
+    user: `@${row.username}`,
+    action: 'Creator profile created',
+    timestamp: formatTimestamp(row.createdAt ?? new Date()),
+    status: 'success',
+  };
+}
+
+/** Parse timestamp for sorting */
+function parseActivityTimestamp(timestamp: string): number {
+  return Date.parse(timestamp.replace(' UTC', '').replace(' ', 'T'));
+}
+
+/** Sort activity items by timestamp descending */
+function sortActivityByTimestamp(items: AdminActivityItem[]): void {
+  items.sort(
+    (a, b) => parseActivityTimestamp(b.timestamp) - parseActivityTimestamp(a.timestamp)
+  );
+}
+
+export async function getAdminActivityFeed(
+  limit: number = 10
+): Promise<AdminActivityItem[]> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * MS_PER_DAY);
+
+  try {
     const [recentCreators, recentStripeEvents] = await Promise.all([
-      creatorPromise,
-      (async () => {
-        if (!hasStripeEvents) return [] as StripeActivityRow[];
-        try {
-          return await db
-            .select({
-              id: stripeWebhookEvents.id,
-              type: stripeWebhookEvents.type,
-              createdAt: stripeWebhookEvents.createdAt,
-            })
-            .from(stripeWebhookEvents)
-            .where(
-              drizzleSql`${stripeWebhookEvents.createdAt} >= ${sevenDaysAgo}::timestamp`
-            )
-            .orderBy(desc(stripeWebhookEvents.createdAt))
-            .limit(limit);
-        } catch (error) {
-          if (shouldDisableStripeEventsTable(error)) {
-            DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-          }
-          DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-          console.warn('Stripe webhook activity unavailable; skipping.');
-          return [] as StripeActivityRow[];
-        }
-      })(),
+      fetchRecentCreatorActivity(sevenDaysAgo, limit),
+      fetchRecentStripeActivity(sevenDaysAgo, limit),
     ]);
 
-    const creatorItems: AdminActivityItem[] = recentCreators.map(row => ({
-      id: `creator-${row.id}`,
-      user: `@${row.username}`,
-      action: 'Creator profile created',
-      timestamp: formatTimestamp(row.createdAt ?? new Date()),
-      status: 'success',
-    }));
-
-    const stripeItems: AdminActivityItem[] = recentStripeEvents.map(event =>
-      mapStripeEventToActivity(event)
-    );
+    const creatorItems = recentCreators.map(mapCreatorToActivity);
+    const stripeItems = recentStripeEvents.map(mapStripeEventToActivity);
 
     const allItems = [...creatorItems, ...stripeItems];
-
-    allItems.sort((a, b) => {
-      const aTime = Date.parse(
-        a.timestamp.replace(' UTC', '').replace(' ', 'T')
-      );
-      const bTime = Date.parse(
-        b.timestamp.replace(' UTC', '').replace(' ', 'T')
-      );
-      return bTime - aTime;
-    });
+    sortActivityByTimestamp(allItems);
 
     return allItems.slice(0, limit);
   } catch (error) {
