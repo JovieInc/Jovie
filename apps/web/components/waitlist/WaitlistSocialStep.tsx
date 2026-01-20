@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { Input } from '@/components/atoms/Input';
+import { FieldError } from './FieldError';
 import {
-  type FormErrors,
   getSocialPlatformPrefix,
   SOCIAL_PLATFORM_OPTIONS,
   type SocialPlatform,
@@ -12,7 +12,7 @@ import {
 interface WaitlistSocialStepProps {
   socialPlatform: SocialPlatform;
   primarySocialUrl: string;
-  fieldErrors: FormErrors;
+  primarySocialUrlErrors: string[] | undefined;
   isSubmitting: boolean;
   isHydrating: boolean;
   onPlatformSelect: (platform: SocialPlatform) => void;
@@ -26,7 +26,7 @@ interface WaitlistSocialStepProps {
 export function WaitlistSocialStep({
   socialPlatform,
   primarySocialUrl,
-  fieldErrors,
+  primarySocialUrlErrors,
   isSubmitting,
   isHydrating,
   onPlatformSelect,
@@ -114,9 +114,9 @@ export function WaitlistSocialStep({
             onChange={e => onUrlChange(e.target.value)}
             maxLength={2048}
             required
-            aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
+            aria-invalid={Boolean(primarySocialUrlErrors)}
             aria-describedby={
-              fieldErrors.primarySocialUrl
+              primarySocialUrlErrors
                 ? 'waitlist-primary-social-url-error'
                 : undefined
             }
@@ -142,9 +142,9 @@ export function WaitlistSocialStep({
             maxLength={2048}
             required
             aria-label='Social profile username'
-            aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
+            aria-invalid={Boolean(primarySocialUrlErrors)}
             aria-describedby={
-              fieldErrors.primarySocialUrl
+              primarySocialUrlErrors
                 ? 'waitlist-primary-social-url-error'
                 : undefined
             }
@@ -156,15 +156,10 @@ export function WaitlistSocialStep({
         </div>
       )}
 
-      {fieldErrors.primarySocialUrl && (
-        <p
-          id='waitlist-primary-social-url-error'
-          role='alert'
-          className='text-sm text-red-400'
-        >
-          {fieldErrors.primarySocialUrl[0]}
-        </p>
-      )}
+      <FieldError
+        id='waitlist-primary-social-url-error'
+        errors={primarySocialUrlErrors}
+      />
     </>
   );
 }

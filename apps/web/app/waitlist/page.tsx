@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
 import {
   ALLOWED_PLANS,
@@ -70,6 +70,31 @@ export default function WaitlistPage() {
     if (!primaryGoal) return;
     setPrimaryGoalFocusIndex(selectedPrimaryGoalIndex);
   }, [primaryGoal, selectedPrimaryGoalIndex, step]);
+
+  const setPrimaryGoalButtonRef = useCallback(
+    (index: number, el: HTMLButtonElement | null) => {
+      primaryGoalButtonRefs.current[index] = el;
+    },
+    []
+  );
+
+  const setSocialPlatformButtonRef = useCallback(
+    (index: number, el: HTMLButtonElement | null) => {
+      socialPlatformButtonRefs.current[index] = el;
+    },
+    []
+  );
+
+  const setPrimarySocialUrlInputRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      primarySocialUrlInputRef.current = el;
+    },
+    []
+  );
+
+  const setSpotifyUrlInputRef = useCallback((el: HTMLInputElement | null) => {
+    spotifyUrlInputRef.current = el;
+  }, []);
 
   useEffect(() => {
     setIsHydrating(false);
@@ -455,14 +480,12 @@ export default function WaitlistPage() {
             <WaitlistPrimaryGoalStep
               primaryGoal={primaryGoal}
               primaryGoalFocusIndex={primaryGoalFocusIndex}
-              fieldErrors={fieldErrors}
+              primaryGoalErrors={fieldErrors.primaryGoal}
               isSubmitting={isSubmitting}
               isHydrating={isHydrating}
               onSelect={handlePrimaryGoalSelect}
               onKeyDown={handlePrimaryGoalKeyDown}
-              setButtonRef={(index, el) => {
-                primaryGoalButtonRefs.current[index] = el;
-              }}
+              setButtonRef={setPrimaryGoalButtonRef}
             />
           )}
 
@@ -470,19 +493,15 @@ export default function WaitlistPage() {
             <WaitlistSocialStep
               socialPlatform={socialPlatform}
               primarySocialUrl={primarySocialUrl}
-              fieldErrors={fieldErrors}
+              primarySocialUrlErrors={fieldErrors.primarySocialUrl}
               isSubmitting={isSubmitting}
               isHydrating={isHydrating}
               onPlatformSelect={handleSocialPlatformSelect}
               onPlatformKeyDown={handleSocialPlatformKeyDown}
               onUrlChange={setPrimarySocialUrl}
               onNext={handleNext}
-              setPlatformButtonRef={(index, el) => {
-                socialPlatformButtonRefs.current[index] = el;
-              }}
-              setUrlInputRef={el => {
-                primarySocialUrlInputRef.current = el;
-              }}
+              setPlatformButtonRef={setSocialPlatformButtonRef}
+              setUrlInputRef={setPrimarySocialUrlInputRef}
             />
           )}
 
@@ -490,14 +509,12 @@ export default function WaitlistPage() {
             <WaitlistAdditionalInfoStep
               spotifyUrl={spotifyUrl}
               heardAbout={heardAbout}
-              fieldErrors={fieldErrors}
+              spotifyUrlErrors={fieldErrors.spotifyUrl}
               isSubmitting={isSubmitting}
               isHydrating={isHydrating}
               onSpotifyUrlChange={setSpotifyUrl}
               onHeardAboutChange={setHeardAbout}
-              setSpotifyUrlInputRef={el => {
-                spotifyUrlInputRef.current = el;
-              }}
+              setSpotifyUrlInputRef={setSpotifyUrlInputRef}
             />
           )}
 

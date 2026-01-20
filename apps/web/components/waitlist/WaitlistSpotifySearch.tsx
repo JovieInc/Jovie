@@ -17,12 +17,12 @@ import {
 } from '@/lib/queries/useArtistSearchQuery';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
-import type { FormErrors } from './types';
+import { FieldError } from './FieldError';
 
 interface WaitlistSpotifySearchProps {
   spotifyUrl: string;
   onUrlChange: (url: string) => void;
-  fieldErrors: FormErrors;
+  spotifyUrlErrors: string[] | undefined;
   isSubmitting: boolean;
   isHydrating: boolean;
   setInputRef: (el: HTMLInputElement | null) => void;
@@ -40,7 +40,7 @@ function formatFollowers(count: number | undefined): string {
 export function WaitlistSpotifySearch({
   spotifyUrl,
   onUrlChange,
-  fieldErrors,
+  spotifyUrlErrors,
   isSubmitting,
   isHydrating,
   setInputRef,
@@ -234,11 +234,9 @@ export function WaitlistSpotifySearch({
               value={spotifyUrl}
               onChange={handleUrlInputChange}
               maxLength={2048}
-              aria-invalid={Boolean(fieldErrors.spotifyUrl)}
+              aria-invalid={Boolean(spotifyUrlErrors)}
               aria-describedby={
-                fieldErrors.spotifyUrl
-                  ? 'waitlist-spotify-url-error'
-                  : undefined
+                spotifyUrlErrors ? 'waitlist-spotify-url-error' : undefined
               }
               placeholder='open.spotify.com/artist/... (optional)'
               disabled={isSubmitting}
@@ -253,15 +251,7 @@ export function WaitlistSpotifySearch({
             </button>
           </>
         )}
-        {fieldErrors.spotifyUrl && (
-          <p
-            id='waitlist-spotify-url-error'
-            role='alert'
-            className='text-sm text-red-400'
-          >
-            {fieldErrors.spotifyUrl[0]}
-          </p>
-        )}
+        <FieldError id='waitlist-spotify-url-error' errors={spotifyUrlErrors} />
       </div>
     );
   }
@@ -477,15 +467,7 @@ export function WaitlistSpotifySearch({
         </div>
       )}
 
-      {fieldErrors.spotifyUrl && (
-        <p
-          id='waitlist-spotify-url-error'
-          role='alert'
-          className='text-sm text-red-400'
-        >
-          {fieldErrors.spotifyUrl[0]}
-        </p>
-      )}
+      <FieldError id='waitlist-spotify-url-error' errors={spotifyUrlErrors} />
     </div>
   );
 }

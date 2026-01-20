@@ -2,16 +2,13 @@
 
 import { Button } from '@jovie/ui';
 import { useEffect, useRef } from 'react';
-import {
-  type FormErrors,
-  PRIMARY_GOAL_OPTIONS,
-  type PrimaryGoal,
-} from './types';
+import { FieldError } from './FieldError';
+import { PRIMARY_GOAL_OPTIONS, type PrimaryGoal } from './types';
 
 interface WaitlistPrimaryGoalStepProps {
   primaryGoal: PrimaryGoal | null;
   primaryGoalFocusIndex: number;
-  fieldErrors: FormErrors;
+  primaryGoalErrors: string[] | undefined;
   isSubmitting: boolean;
   isHydrating: boolean;
   onSelect: (goal: PrimaryGoal) => void;
@@ -22,7 +19,7 @@ interface WaitlistPrimaryGoalStepProps {
 export function WaitlistPrimaryGoalStep({
   primaryGoal,
   primaryGoalFocusIndex,
-  fieldErrors,
+  primaryGoalErrors,
   isSubmitting,
   isHydrating,
   onSelect,
@@ -63,7 +60,7 @@ export function WaitlistPrimaryGoalStep({
         aria-label='Primary goal'
         tabIndex={0}
         aria-describedby={
-          fieldErrors.primaryGoal
+          primaryGoalErrors
             ? 'waitlist-primary-goal-hint waitlist-primary-goal-error'
             : 'waitlist-primary-goal-hint'
         }
@@ -95,15 +92,7 @@ export function WaitlistPrimaryGoalStep({
         })}
       </div>
 
-      {fieldErrors.primaryGoal && (
-        <p
-          id='waitlist-primary-goal-error'
-          role='alert'
-          className='text-sm text-red-400'
-        >
-          {fieldErrors.primaryGoal?.[0]}
-        </p>
-      )}
+      <FieldError id='waitlist-primary-goal-error' errors={primaryGoalErrors} />
     </>
   );
 }

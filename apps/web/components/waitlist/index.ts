@@ -1,4 +1,5 @@
 export * from './types';
+export { FieldError } from './FieldError';
 export { WaitlistAdditionalInfoStep } from './WaitlistAdditionalInfoStep';
 export { WaitlistPrimaryGoalStep } from './WaitlistPrimaryGoalStep';
 export { WaitlistSkeleton } from './WaitlistSkeleton';

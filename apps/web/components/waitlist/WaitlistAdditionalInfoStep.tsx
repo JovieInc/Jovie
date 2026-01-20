@@ -1,13 +1,12 @@
 'use client';
 
 import { Input } from '@/components/atoms/Input';
-import type { FormErrors } from './types';
 import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 
 interface WaitlistAdditionalInfoStepProps {
   spotifyUrl: string;
   heardAbout: string;
-  fieldErrors: FormErrors;
+  spotifyUrlErrors: string[] | undefined;
   isSubmitting: boolean;
   isHydrating: boolean;
   onSpotifyUrlChange: (value: string) => void;
@@ -18,7 +17,7 @@ interface WaitlistAdditionalInfoStepProps {
 export function WaitlistAdditionalInfoStep({
   spotifyUrl,
   heardAbout,
-  fieldErrors,
+  spotifyUrlErrors,
   isSubmitting,
   isHydrating,
   onSpotifyUrlChange,
@@ -30,7 +29,7 @@ export function WaitlistAdditionalInfoStep({
       <WaitlistSpotifySearch
         spotifyUrl={spotifyUrl}
         onUrlChange={onSpotifyUrlChange}
-        fieldErrors={fieldErrors}
+        spotifyUrlErrors={spotifyUrlErrors}
         isSubmitting={isSubmitting}
         isHydrating={isHydrating}
         setInputRef={setSpotifyUrlInputRef}
