@@ -301,7 +301,7 @@ export function WaitlistSpotifySearch({
           autoCapitalize='none'
           autoCorrect='off'
           autoComplete='off'
-          className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
+          className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
           role='combobox'
           aria-expanded={shouldShowDropdown}
           aria-controls='spotify-search-results'

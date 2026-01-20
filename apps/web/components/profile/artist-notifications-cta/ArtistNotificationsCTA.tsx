@@ -149,7 +149,7 @@ export function ArtistNotificationsCTA({
             ) : (
               <button
                 type='button'
-                className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus:outline-none'
+                className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
                 aria-label='Switch to email updates'
                 onClick={() => handleChannelChange('email')}
                 disabled={isSubmitting}
@@ -160,7 +160,7 @@ export function ArtistNotificationsCTA({
           ) : (
             <button
               type='button'
-              className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus:outline-none'
+              className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
               aria-label='Switch to text updates'
               onClick={() => handleChannelChange('sms')}
               disabled={isSubmitting}
@@ -179,7 +179,7 @@ export function ArtistNotificationsCTA({
               aria-describedby={disclaimerId}
               type={channel === 'sms' ? 'tel' : 'email'}
               inputMode={channel === 'sms' ? 'numeric' : 'email'}
-              className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus:outline-none focus:ring-0'
+              className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
               placeholder={
                 channel === 'sms' ? '(555) 123-4567' : 'your@email.com'
               }

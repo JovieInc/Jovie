@@ -60,7 +60,7 @@ export function OnboardingNameStep({
             aria-label='Your full name'
             maxLength={50}
             autoComplete='name'
-            className='w-full rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3 text-primary-token placeholder:text-tertiary-token focus:outline-none focus:ring-2 focus:ring-[#6c78e6]/40 focus:ring-offset-2 focus:ring-offset-[#f5f5f5] dark:focus:ring-offset-[#090909]'
+            className='w-full rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]'
           />
 
           <AuthButton

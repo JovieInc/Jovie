@@ -23,7 +23,7 @@ function getButtonStyles(
     // Transition effects
     'transition-all duration-200 ease-out',
     // Focus ring
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent',
     // Cursor
     isLoading ? 'cursor-wait' : 'cursor-pointer',
     // Verified state
