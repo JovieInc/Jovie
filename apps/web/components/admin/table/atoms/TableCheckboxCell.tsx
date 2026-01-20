@@ -108,12 +108,14 @@ export function TableCheckboxCell<TData = unknown>(
   // Header cell
   if (table && headerCheckboxState !== undefined && onToggleSelectAll) {
     // Convert boolean to 'checked'/'unchecked' format
-    const normalizedState =
-      typeof headerCheckboxState === 'boolean'
-        ? headerCheckboxState
-          ? 'checked'
-          : 'unchecked'
-        : headerCheckboxState;
+    const getNormalizedState = ():
+      | 'checked'
+      | 'unchecked'
+      | 'indeterminate' => {
+      if (typeof headerCheckboxState !== 'boolean') return headerCheckboxState;
+      return headerCheckboxState ? 'checked' : 'unchecked';
+    };
+    const normalizedState = getNormalizedState();
 
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox

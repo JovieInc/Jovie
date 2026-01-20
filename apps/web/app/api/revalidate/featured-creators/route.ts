@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { revalidateTag, updateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 

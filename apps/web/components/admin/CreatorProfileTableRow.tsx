@@ -22,15 +22,13 @@ import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
-const getRowClassName = (isChecked: boolean, isSelected: boolean) =>
-  cn(
-    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-    isChecked
-      ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
-      : isSelected
-        ? 'bg-base dark:bg-surface-2'
-        : 'hover:bg-base dark:hover:bg-surface-2'
-  );
+const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
+  const baseClasses =
+    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
+  if (isChecked) return cn(baseClasses, 'bg-[#ebebf6] dark:bg-[#1b1d38]');
+  if (isSelected) return cn(baseClasses, 'bg-base dark:bg-surface-2');
+  return cn(baseClasses, 'hover:bg-base dark:hover:bg-surface-2');
+};
 
 const renderContextMenuItem = ({
   onClick,

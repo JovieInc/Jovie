@@ -1,5 +1,5 @@
+import { randomUUID } from 'node:crypto';
 import { put as uploadBlob } from '@vercel/blob';
-import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
@@ -707,7 +707,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (existingCheck.existing && existingCheck.existing.isClaimed) {
+      if (existingCheck.existing?.isClaimed) {
         return NextResponse.json(
           {
             error: 'Profile already claimed',

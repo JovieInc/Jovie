@@ -36,13 +36,13 @@ function determineOverallPhase(
   }
 
   // Check if any provider is in an active phase
-  const activePhases: EnrichmentPhase[] = [
+  const activePhases = new Set<EnrichmentPhase>([
     'discovering',
     'matching',
     'enriching',
-  ];
+  ]);
   for (const status of providerStatuses) {
-    if (activePhases.includes(status.phase)) {
+    if (activePhases.has(status.phase)) {
       return status.phase;
     }
   }

@@ -54,12 +54,13 @@ export function BrandLogo({
     );
   }
 
-  const src =
-    tone === 'white'
-      ? '/brand/Jovie-Logo-Icon-White.svg'
-      : tone === 'black'
-        ? '/brand/Jovie-Logo-Icon-Black.svg'
-        : '/brand/Jovie-Logo-Icon.svg';
+  const TONE_SRC_MAP: Record<BrandLogoTone, string> = {
+    white: '/brand/Jovie-Logo-Icon-White.svg',
+    black: '/brand/Jovie-Logo-Icon-Black.svg',
+    color: '/brand/Jovie-Logo-Icon.svg',
+    auto: '/brand/Jovie-Logo-Icon.svg',
+  };
+  const src = TONE_SRC_MAP[tone];
 
   return (
     <Image

@@ -38,7 +38,10 @@ export function SortableHeaderButton({
         )}
         aria-hidden='true'
       >
-        {direction ? (direction === 'asc' ? '▴' : '▾') : '⇅'}
+        {(() => {
+          if (!direction) return '⇅';
+          return direction === 'asc' ? '▴' : '▾';
+        })()}
       </span>
     </button>
   );

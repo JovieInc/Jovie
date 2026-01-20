@@ -145,11 +145,12 @@ function KanbanColumn<TData>({
   enableVirtualization,
 }: KanbanColumnProps<TData>) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const itemGap = 12; // 0.75rem to match `space-y-3` / `pb-3`
 
   const rowVirtualizer = useVirtualizer({
     count: column.items.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => cardHeight,
+    estimateSize: () => cardHeight + itemGap,
     overscan: 3,
     enabled: enableVirtualization,
   });
@@ -201,74 +202,88 @@ function KanbanColumn<TData>({
         role='group'
         aria-label={`${column.title} column items`}
       >
-        {column.items.length === 0 ? (
-          <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
-            <div className='text-sm text-tertiary-token'>
-              {emptyState ?? 'No items'}
-            </div>
-          </div>
-        ) : enableVirtualization ? (
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map(virtualRow => {
-              const item = column.items[virtualRow.index];
-              return (
-                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-and-drop requires onDragStart
-                // biome-ignore lint/a11y/useSemanticElements: Virtualized list requires div for absolute positioning
-                <div
+        {(() => {
+          if (column.items.length === 0) {
+            return (
+              <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
+                <div className='text-sm text-tertiary-token'>
+                  {emptyState ?? 'No items'}
+                </div>
+              </div>
+            );
+          }
+
+          if (enableVirtualization) {
+            return (
+              <ul
+                className='m-0 list-none p-0'
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                  const item = column.items[virtualRow.index];
+                  if (!item) return null;
+
+                  const itemId = getItemId(item);
+
+                  return (
+                    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
+                    <li
+                      key={itemId}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      className={cn(
+                        'pb-3',
+                        onItemMove &&
+                          'cursor-move transition-opacity hover:opacity-80'
+                      )}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      draggable={Boolean(onItemMove)}
+                      onDragStart={e => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('itemId', itemId);
+                        e.dataTransfer.setData('columnId', column.id);
+                      }}
+                    >
+                      {renderCard(item, virtualRow.index)}
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          }
+
+          return (
+            <ul className='m-0 list-none space-y-3 p-0'>
+              {column.items.map((item, index) => (
+                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
+                <li
                   key={getItemId(item)}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  className='mb-3'
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
                   draggable={Boolean(onItemMove)}
                   onDragStart={e => {
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('itemId', getItemId(item));
                     e.dataTransfer.setData('columnId', column.id);
                   }}
-                  role='listitem'
+                  className={cn(
+                    onItemMove &&
+                      'cursor-move transition-opacity hover:opacity-80'
+                  )}
                 >
-                  {renderCard(item, virtualRow.index)}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          // biome-ignore lint/a11y/useSemanticElements: Consistent with virtualized list pattern
-          <div className='space-y-3' role='list'>
-            {column.items.map((item, index) => (
-              // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-and-drop requires onDragStart
-              // biome-ignore lint/a11y/useSemanticElements: Consistent with virtualized list pattern
-              <div
-                key={getItemId(item)}
-                draggable={Boolean(onItemMove)}
-                onDragStart={e => {
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('itemId', getItemId(item));
-                  e.dataTransfer.setData('columnId', column.id);
-                }}
-                className={cn(
-                  onItemMove &&
-                    'cursor-move transition-opacity hover:opacity-80'
-                )}
-                role='listitem'
-              >
-                {renderCard(item, index)}
-              </div>
-            ))}
-          </div>
-        )}
+                  {renderCard(item, index)}
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
       </div>
     </div>
   );

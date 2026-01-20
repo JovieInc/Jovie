@@ -97,16 +97,19 @@ export function KpiCards({
     stripeIsAvailable &&
     mercuryIsConfigured &&
     mercuryIsAvailable;
-  const runwayLabel = canCalculateRunway
-    ? runwayMonths == null
-      ? '∞ mo'
-      : `${runwayMonths.toFixed(1)} mo`
-    : '—';
-  const runwayMetadata = canCalculateRunway
-    ? runwayMonths == null
-      ? 'Profitable at the current run rate'
-      : 'Estimated months of runway'
-    : 'Requires Stripe and Mercury data';
+  const getRunwayLabel = (): string => {
+    if (!canCalculateRunway) return '—';
+    if (runwayMonths == null) return '∞ mo';
+    return `${runwayMonths.toFixed(1)} mo`;
+  };
+  const runwayLabel = getRunwayLabel();
+
+  const getRunwayMetadata = (): string => {
+    if (!canCalculateRunway) return 'Requires Stripe and Mercury data';
+    if (runwayMonths == null) return 'Profitable at the current run rate';
+    return 'Estimated months of runway';
+  };
+  const runwayMetadata = getRunwayMetadata();
 
   const waitlistLabel = waitlistCount.toLocaleString('en-US');
 

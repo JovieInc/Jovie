@@ -54,7 +54,7 @@ export function useContactHydration({
           .json()
           .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
 
-        if (!response.ok || !payload || !payload.success) {
+        if (!response.ok || !payload?.success) {
           setDraftContact(contactBase);
           return;
         }
@@ -76,7 +76,7 @@ export function useContactHydration({
   );
 
   const effectiveContact = useMemo(() => {
-    if (draftContact && draftContact.id === selectedId) return draftContact;
+    if (draftContact?.id === selectedId) return draftContact;
     return mapProfileToContact(selectedProfile);
   }, [draftContact, selectedId, selectedProfile]);
 

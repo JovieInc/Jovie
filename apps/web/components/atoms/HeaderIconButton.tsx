@@ -30,7 +30,12 @@ export const HeaderIconButton = React.forwardRef<
   },
   ref
 ) {
-  const sizeClassName = size === 'xs' ? 'p-1' : size === 'sm' ? 'p-1.5' : 'p-2';
+  const SIZE_CLASS_MAP: Record<HeaderIconButtonSize, string> = {
+    xs: 'p-1',
+    sm: 'p-1.5',
+    md: 'p-2',
+  };
+  const sizeClassName = SIZE_CLASS_MAP[size];
 
   return (
     <Button
