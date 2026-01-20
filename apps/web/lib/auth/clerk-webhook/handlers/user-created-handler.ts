@@ -84,7 +84,19 @@ async function handleUserCreated(
     });
 
     // Sync initial Jovie metadata to Clerk
-    await syncAllClerkMetadata(user.id);
+    const syncResult = await syncAllClerkMetadata(user.id);
+    if (!syncResult.success) {
+      logger.error(
+        `Failed to sync Clerk metadata for user ${user.id}:`,
+        syncResult.error
+      );
+
+      return {
+        success: false,
+        error: 'Failed to sync Clerk metadata',
+        message: syncResult.error ?? 'Unknown error',
+      };
+    }
 
     logger.info(`Post-signup processing completed for user ${user.id}`);
 
