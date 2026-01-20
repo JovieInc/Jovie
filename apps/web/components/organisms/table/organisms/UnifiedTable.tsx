@@ -78,7 +78,7 @@ export interface UnifiedTableProps<TData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 52
+   * @default 44
    */
   rowHeight?: number;
 
@@ -205,7 +205,7 @@ export function UnifiedTable<TData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 52,
+  rowHeight = 44,
   overscan = 5,
   renderRow,
   getRowId,
