@@ -16,16 +16,21 @@ export function SentryExamplePageClient() {
 
   useEffect(() => {
     async function checkConnectivity() {
-      const result = await Sentry.diagnoseSdkConnectivity();
-      setIsConnected(result !== 'sentry-unreachable');
+      try {
+        const result = await Sentry.diagnoseSdkConnectivity();
+        setIsConnected(result !== 'sentry-unreachable');
+      } catch (error) {
+        console.error('Failed to check Sentry connectivity:', error);
+        setIsConnected(false);
+      }
     }
     checkConnectivity();
   }, []);
 
   return (
     <div>
-      <main>
-        <div className='flex-spacer' />
+      <main className='flex min-h-screen flex-col items-center justify-center gap-4 p-4'>
+        <div className='flex-1' />
         <svg
           height='40'
           width='40'
@@ -38,14 +43,17 @@ export function SentryExamplePageClient() {
             fill='currentColor'
           />
         </svg>
-        <h1>sentry-example-page</h1>
+        <h1 className='rounded bg-[rgba(24,20,35,0.03)] px-1 text-[20px] leading-[1.2]'>
+          sentry-example-page
+        </h1>
 
-        <p className='description'>
+        <p className='m-0 max-w-[500px] text-center text-[20px] leading-[1.5] text-[#6e6c75] dark:text-[#a49fb5]'>
           Click the button below, and view the sample error on the Sentry{' '}
           <a
             target='_blank'
             rel='noreferrer'
             href='https://jovie.sentry.io/issues/?project=4510479236792320'
+            className='cursor-pointer underline text-[#6341f0] dark:text-[#b3a1ff]'
           >
             Issues Page
           </a>
@@ -54,6 +62,7 @@ export function SentryExamplePageClient() {
             target='_blank'
             rel='noreferrer'
             href='https://docs.sentry.io/platforms/javascript/guides/nextjs/'
+            className='cursor-pointer underline text-[#6341f0] dark:text-[#b3a1ff]'
           >
             read our docs
           </a>
@@ -80,151 +89,29 @@ export function SentryExamplePageClient() {
             );
           }}
           disabled={!isConnected}
+          className='mt-1 rounded-lg bg-[#553db8] p-0 text-white disabled:cursor-not-allowed disabled:opacity-60 [&>span]:inline-block [&>span]:rounded-[inherit] [&>span]:bg-[#7553ff] [&>span]:border [&>span]:border-[#553db8] [&>span]:px-4 [&>span]:py-3 [&>span]:text-[20px] [&>span]:font-bold [&>span]:leading-none [&>span]:translate-y-[-4px] [&>span]:transition-transform [&>span]:duration-150 hover:[&>span]:translate-y-[-8px] active:[&>span]:translate-y-0 disabled:[&>span]:translate-y-0 disabled:[&>span]:border-0'
         >
           <span>Throw Sample Error</span>
         </button>
 
         {hasSentError ? (
-          <p className='success'>Error sent to Sentry.</p>
+          <p className='m-0 rounded-lg border border-[#00bf4d] bg-[#00f261] px-4 py-3 text-[20px] leading-none text-[#181423]'>
+            Error sent to Sentry.
+          </p>
         ) : !isConnected ? (
-          <div className='connectivity-error'>
-            <p>
+          <div className='w-[500px] rounded-lg border border-[#a80033] bg-[#e50045] p-4 text-center text-white'>
+            <p className='m-0 text-[20px]'>
               It looks like network requests to Sentry are being blocked, which
               will prevent errors from being captured. Try disabling your
               ad-blocker to complete the test.
             </p>
           </div>
         ) : (
-          <div className='success_placeholder' />
+          <div className='h-[46px]' />
         )}
 
-        <div className='flex-spacer' />
+        <div className='flex-1' />
       </main>
-
-      <style>{`
-        main {
-          display: flex;
-          min-height: 100vh;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          gap: 16px;
-          padding: 16px;
-        }
-
-        h1 {
-          padding: 0px 4px;
-          border-radius: 4px;
-          background-color: rgba(24, 20, 35, 0.03);
-          font-size: 20px;
-          line-height: 1.2;
-        }
-
-        p {
-          margin: 0;
-          font-size: 20px;
-        }
-
-        a {
-          color: #6341f0;
-          text-decoration: underline;
-          cursor: pointer;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          a {
-            color: #b3a1ff;
-          }
-        }
-
-        button {
-          border-radius: 8px;
-          color: white;
-          cursor: pointer;
-          background-color: #553db8;
-          border: none;
-          padding: 0;
-          margin-top: 4px;
-        }
-
-        button > span {
-          display: inline-block;
-          padding: 12px 16px;
-          border-radius: inherit;
-          font-size: 20px;
-          font-weight: bold;
-          line-height: 1;
-          background-color: #7553ff;
-          border: 1px solid #553db8;
-          transform: translateY(-4px);
-        }
-
-        button:hover > span {
-          transform: translateY(-8px);
-        }
-
-        button:active > span {
-          transform: translateY(0);
-        }
-
-        button:disabled {
-          cursor: not-allowed;
-          opacity: 0.6;
-        }
-
-        button:disabled > span {
-          transform: translateY(0);
-          border: none;
-        }
-
-        .description {
-          text-align: center;
-          color: #6e6c75;
-          max-width: 500px;
-          line-height: 1.5;
-          font-size: 20px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          .description {
-            color: #a49fb5;
-          }
-        }
-
-        .flex-spacer {
-          flex: 1;
-        }
-
-        .success {
-          padding: 12px 16px;
-          border-radius: 8px;
-          font-size: 20px;
-          line-height: 1;
-          background-color: #00f261;
-          border: 1px solid #00bf4d;
-          color: #181423;
-        }
-
-        .success_placeholder {
-          height: 46px;
-        }
-
-        .connectivity-error {
-          padding: 12px 16px;
-          background-color: #e50045;
-          border-radius: 8px;
-          width: 500px;
-          color: #ffffff;
-          border: 1px solid #a80033;
-          text-align: center;
-          margin: 0;
-        }
-
-        .connectivity-error a {
-          color: #ffffff;
-          text-decoration: underline;
-        }
-      `}</style>
     </div>
   );
 }
