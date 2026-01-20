@@ -60,9 +60,8 @@ export default defineConfig({
       forks: {
         minForks: 1,
         maxForks: maxThreads,
-        // Work around memory growth across many test files by recycling workers.
-        // Tinypool expects bytes.
-        maxMemoryLimitBeforeRecycle: 1024 * 1024 * 1024,
+        // Force isolated workers to avoid memory growth across many test files.
+        isolate: true,
       },
     },
 
