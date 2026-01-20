@@ -268,6 +268,107 @@ export function splitByConjunction(artistString: string): string[] {
     .filter(Boolean);
 }
 
+/** Context for building artist credits during parsing */
+interface ArtistCreditContext {
+  artist: SpotifyArtistInput;
+  imageUrl: string | undefined;
+  isFirstArtist: boolean;
+  creditsCount: number;
+  currentPosition: number;
+}
+
+/**
+ * Handle "vs" pattern in artist name (e.g., "Artist A vs Artist B")
+ * Returns parsed credits and the number of credits added
+ */
+function handleVsPattern(
+  artistName: string,
+  ctx: ArtistCreditContext
+): { credits: ParsedArtistCredit[]; positionIncrement: number } {
+  const credits: ParsedArtistCredit[] = [];
+  const parts = artistName.split(VS_PATTERN);
+  let positionIncrement = 0;
+
+  for (let j = 0; j < parts.length; j++) {
+    const part = parts[j]?.trim();
+    if (!part) continue;
+
+    const isFirst = j === 0;
+    credits.push({
+      name: part,
+      role: isFirst ? 'main_artist' : 'vs',
+      joinPhrase: isFirst ? null : ' vs ',
+      position: ctx.currentPosition + positionIncrement,
+      isPrimary: isFirst && ctx.isFirstArtist,
+      spotifyId: isFirst ? ctx.artist.id : undefined,
+      imageUrl: isFirst ? ctx.imageUrl : undefined,
+    });
+    positionIncrement++;
+  }
+
+  return { credits, positionIncrement };
+}
+
+/**
+ * Handle "&" / "and" pattern in artist name (e.g., "Artist A & Artist B")
+ * Only splits if both parts are reasonably short (< 30 chars) to avoid
+ * splitting band names that legitimately include "&"
+ */
+function handleAndPattern(
+  artistName: string,
+  ctx: ArtistCreditContext
+): { credits: ParsedArtistCredit[]; positionIncrement: number } {
+  const parts = artistName.split(AND_PATTERN);
+  const shouldSplit = parts.length === 2 && parts.every(p => p && p.length < 30);
+
+  if (!shouldSplit) {
+    return {
+      credits: [createSingleArtistCredit(artistName, ctx)],
+      positionIncrement: 1,
+    };
+  }
+
+  const credits: ParsedArtistCredit[] = [];
+  let positionIncrement = 0;
+
+  for (let j = 0; j < parts.length; j++) {
+    const part = parts[j]?.trim();
+    if (!part) continue;
+
+    const isFirst = j === 0;
+    credits.push({
+      name: part,
+      role: 'main_artist',
+      joinPhrase: isFirst ? null : ' & ',
+      position: ctx.currentPosition + positionIncrement,
+      isPrimary: isFirst && ctx.isFirstArtist,
+      spotifyId: isFirst ? ctx.artist.id : undefined,
+      imageUrl: isFirst ? ctx.imageUrl : undefined,
+    });
+    positionIncrement++;
+  }
+
+  return { credits, positionIncrement };
+}
+
+/**
+ * Create a single artist credit (no splitting needed)
+ */
+function createSingleArtistCredit(
+  artistName: string,
+  ctx: ArtistCreditContext
+): ParsedArtistCredit {
+  return {
+    name: artistName,
+    role: 'main_artist',
+    joinPhrase: ctx.creditsCount === 0 ? null : ', ',
+    position: ctx.currentPosition,
+    isPrimary: ctx.isFirstArtist,
+    spotifyId: ctx.artist.id,
+    imageUrl: ctx.imageUrl,
+  };
+}
+
 /**
  * Parse main artists from Spotify artist array, handling "vs" and "&" in names
  *
@@ -285,75 +386,30 @@ export function parseMainArtists(
     const artist = spotifyArtists[i];
     if (!artist) continue;
 
+    const ctx: ArtistCreditContext = {
+      artist,
+      imageUrl: getBestImageUrl(artist.images),
+      isFirstArtist: i === 0,
+      creditsCount: credits.length,
+      currentPosition: position,
+    };
+
     const artistName = artist.name;
-    const imageUrl = getBestImageUrl(artist.images);
+    let result: { credits: ParsedArtistCredit[]; positionIncrement: number };
 
-    // Check for "vs" pattern in artist name
     if (VS_PATTERN.test(artistName)) {
-      const parts = artistName.split(VS_PATTERN);
-      for (let j = 0; j < parts.length; j++) {
-        const part = parts[j]?.trim();
-        if (!part) continue;
-
-        credits.push({
-          name: part,
-          role: j === 0 ? 'main_artist' : 'vs',
-          joinPhrase: j === 0 ? null : ' vs ',
-          position: position++,
-          isPrimary: j === 0 && i === 0,
-          // Only first artist gets the Spotify ID
-          spotifyId: j === 0 ? artist.id : undefined,
-          imageUrl: j === 0 ? imageUrl : undefined,
-        });
-      }
-    }
-    // Check for "&" / "and" pattern (but be careful - some artist names legitimately include these)
-    else if (AND_PATTERN.test(artistName)) {
-      // If this is the first artist in the list AND the name has conjunction,
-      // we might want to split. But be conservative - many bands have "&" in names
-      // Only split if it looks like "Name & Name" not "The Name & The Something Band"
-      const parts = artistName.split(AND_PATTERN);
-
-      // Only split if both parts are reasonably short (likely separate artists)
-      if (parts.length === 2 && parts.every(p => p && p.length < 30)) {
-        for (let j = 0; j < parts.length; j++) {
-          const part = parts[j]?.trim();
-          if (!part) continue;
-
-          credits.push({
-            name: part,
-            role: 'main_artist',
-            joinPhrase: j === 0 ? null : ' & ',
-            position: position++,
-            isPrimary: j === 0 && i === 0,
-            spotifyId: j === 0 ? artist.id : undefined,
-            imageUrl: j === 0 ? imageUrl : undefined,
-          });
-        }
-      } else {
-        // Keep as single artist
-        credits.push({
-          name: artistName,
-          role: 'main_artist',
-          joinPhrase: credits.length === 0 ? null : ', ',
-          position: position++,
-          isPrimary: i === 0,
-          spotifyId: artist.id,
-          imageUrl,
-        });
-      }
+      result = handleVsPattern(artistName, ctx);
+    } else if (AND_PATTERN.test(artistName)) {
+      result = handleAndPattern(artistName, ctx);
     } else {
-      // Single artist, no splitting needed
-      credits.push({
-        name: artistName,
-        role: 'main_artist',
-        joinPhrase: credits.length === 0 ? null : ', ',
-        position: position++,
-        isPrimary: i === 0,
-        spotifyId: artist.id,
-        imageUrl,
-      });
+      result = {
+        credits: [createSingleArtistCredit(artistName, ctx)],
+        positionIncrement: 1,
+      };
     }
+
+    credits.push(...result.credits);
+    position += result.positionIncrement;
   }
 
   return credits;
