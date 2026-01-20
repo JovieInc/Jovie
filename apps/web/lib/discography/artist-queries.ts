@@ -6,7 +6,7 @@
  * and collaboration queries.
  */
 
-import { and, count, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -563,28 +563,69 @@ export async function getFrequentCollaborators(
     .from(trackArtists)
     .where(eq(trackArtists.artistId, artistId));
 
-  if (artistTracks.length === 0) {
+  // Get all release IDs this artist appears on
+  const artistReleases = await db
+    .select({ releaseId: releaseArtists.releaseId })
+    .from(releaseArtists)
+    .where(eq(releaseArtists.artistId, artistId));
+
+  if (artistTracks.length === 0 && artistReleases.length === 0) {
     return [];
   }
 
   const trackIds = artistTracks.map(t => t.trackId);
+  const releaseIds = artistReleases.map(r => r.releaseId);
 
-  // Find other artists on these tracks
-  const collaborators = await db
-    .select({
-      artistId: trackArtists.artistId,
-      trackCount: count(trackArtists.trackId),
-    })
-    .from(trackArtists)
-    .where(
-      and(
-        inArray(trackArtists.trackId, trackIds),
-        sql`${trackArtists.artistId} != ${artistId}`
-      )
-    )
-    .groupBy(trackArtists.artistId)
-    .orderBy(desc(count(trackArtists.trackId)))
-    .limit(limit);
+  // Find other artists on these tracks (with track count)
+  const trackCollaborators =
+    trackIds.length > 0
+      ? await db
+          .select({
+            artistId: trackArtists.artistId,
+            trackCount: count(trackArtists.trackId),
+          })
+          .from(trackArtists)
+          .where(
+            and(
+              inArray(trackArtists.trackId, trackIds),
+              sql`${trackArtists.artistId} != ${artistId}`
+            )
+          )
+          .groupBy(trackArtists.artistId)
+      : [];
+
+  // Find other artists on these releases (with release count)
+  const releaseCollaborators =
+    releaseIds.length > 0
+      ? await db
+          .select({
+            artistId: releaseArtists.artistId,
+            releaseCount: count(releaseArtists.releaseId),
+          })
+          .from(releaseArtists)
+          .where(
+            and(
+              inArray(releaseArtists.releaseId, releaseIds),
+              sql`${releaseArtists.artistId} != ${artistId}`
+            )
+          )
+          .groupBy(releaseArtists.artistId)
+      : [];
+
+  // Merge track and release collaborator data
+  const releaseCountMap = new Map(
+    releaseCollaborators.map(c => [c.artistId, Number(c.releaseCount)])
+  );
+
+  // Sort by track count and limit
+  const collaborators = trackCollaborators
+    .map(c => ({
+      artistId: c.artistId,
+      trackCount: c.trackCount,
+      releaseCount: releaseCountMap.get(c.artistId) ?? 0,
+    }))
+    .sort((a, b) => Number(b.trackCount) - Number(a.trackCount))
+    .slice(0, limit);
 
   // Fetch artist details
   const collaboratorIds = collaborators.map(c => c.artistId);
@@ -607,7 +648,7 @@ export async function getFrequentCollaborators(
       return {
         artist,
         trackCount: Number(c.trackCount),
-        releaseCount: 0, // TODO: Calculate from release_artists if needed
+        releaseCount: c.releaseCount,
       };
     })
     .filter((c): c is CollaboratorInfo => c !== null);
