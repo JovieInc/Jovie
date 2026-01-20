@@ -32,8 +32,8 @@ describe('Avatar (legacy ArtistAvatar coverage)', () => {
       />
     );
 
-    const avatarContainer = screen.getByLabelText('Test Artist');
-    expect(avatarContainer).toBeInTheDocument();
+    const avatarImage = screen.getByAltText('Test Artist');
+    expect(avatarImage).toBeInTheDocument();
   });
 
   it('applies aria label and fallback initials when src is missing', () => {
@@ -46,8 +46,7 @@ describe('Avatar (legacy ArtistAvatar coverage)', () => {
       />
     );
 
-    const avatarContainer = screen.getByLabelText('Test Artist Avatar');
-    expect(avatarContainer).toBeInTheDocument();
+    expect(screen.getByText('Test Artist Avatar')).toBeInTheDocument();
     expect(screen.getByText('TA')).toBeInTheDocument();
   });
 });

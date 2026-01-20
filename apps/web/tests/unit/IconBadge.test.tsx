@@ -34,7 +34,7 @@ describe('IconBadge', () => {
     );
 
     const icon = screen.getByLabelText('Bolt icon');
-    expect(icon).toHaveAttribute('role', 'img');
+    expect(icon).not.toHaveAttribute('role');
     expect(icon).toHaveAttribute('aria-hidden', 'false');
   });
 });
