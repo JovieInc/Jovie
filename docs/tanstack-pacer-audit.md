@@ -347,12 +347,12 @@ if (PACER_DEBUG) {
 
 ## Migration Checklist
 
-- [ ] Consolidate `useDebouncedValue.ts` into `lib/pacer/hooks.ts`
-- [ ] Create shared cache utility with TTL/size limits
-- [ ] Implement `PacerProvider` in app root
-- [ ] Create `lib/pacer/errors.ts` for standardized error handling
-- [ ] Remove legacy constant exports after codebase migration
-- [ ] Add `{ passive: true }` to resize listener in FeaturedArtistsDriftRow
+- [x] Consolidate `useDebouncedValue.ts` into `lib/pacer/hooks.ts` ✅ **DONE**
+- [x] Create shared cache utility with TTL/size limits ✅ **DONE** (`lib/pacer/cache.ts`)
+- [x] Implement `PacerProvider` in app root ✅ **DONE** (added to `ClientProviders.tsx`)
+- [x] Create `lib/pacer/errors.ts` for standardized error handling ✅ **DONE**
+- [x] Remove legacy constant exports after codebase migration ✅ **DONE**
+- [x] Add `{ passive: true }` to resize listener in FeaturedArtistsDriftRow ✅ **DONE**
 - [ ] Consider rate limiting for `/api/handle/check` endpoint
 - [ ] Evaluate retry logic for auto-save operations
 
