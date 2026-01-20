@@ -13,8 +13,8 @@ const slugifyHeading = (value: string): string => {
   return safeValue
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-+)|(-+$)/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/(^-+)|(-+$)/g, '');
 };
 
 type HeadingNode = {
@@ -29,7 +29,7 @@ type HeadingNode = {
 };
 
 const applyMarkdownTemplate = (raw: string): string => {
-  return raw.replace(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
+  return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
 
 export async function getMarkdownDocument(

@@ -145,22 +145,21 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
 
     // Determine if profile is complete
     const hasCompleteProfile = Boolean(
-      profile &&
-        profile.onboardingCompletedAt &&
-        profile.username &&
-        profile.displayName &&
-        profile.isPublic !== false
+      profile?.onboardingCompletedAt &&
+        profile?.username &&
+        profile?.displayName &&
+        profile?.isPublic !== false
     );
 
     // Map userStatus lifecycle enum to Clerk's simpler status
-    const clerkStatus: 'active' | 'pending' | 'banned' =
-      dbUser.userStatus === 'banned'
-        ? 'banned'
-        : dbUser.userStatus === 'suspended'
-          ? 'banned'
-          : dbUser.userStatus === 'waitlist_pending'
-            ? 'pending'
-            : 'active';
+    let clerkStatus: 'active' | 'pending' | 'banned';
+    if (dbUser.userStatus === 'banned' || dbUser.userStatus === 'suspended') {
+      clerkStatus = 'banned';
+    } else if (dbUser.userStatus === 'waitlist_pending') {
+      clerkStatus = 'pending';
+    } else {
+      clerkStatus = 'active';
+    }
 
     const metadata: JovieClerkMetadata = {
       jovie_role: dbUser.isAdmin ? 'admin' : 'user',

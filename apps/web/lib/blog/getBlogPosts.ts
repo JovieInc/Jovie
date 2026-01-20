@@ -39,10 +39,10 @@ function createExcerpt(content: string): string {
     blocks.find(block => !block.startsWith('#')) ?? blocks[0] ?? '';
 
   return paragraph
-    .replace(/^#+\s*/g, '')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-    .replace(/[*_`>]/g, '')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/^#+\s*/g, '')
+    .replaceAll(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replaceAll(/[*_`>]/g, '')
+    .replaceAll(/\s+/g, ' ')
     .trim()
     .slice(0, 200);
 }

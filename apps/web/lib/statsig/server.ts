@@ -40,7 +40,7 @@ export async function checkStatsigGateForUser(
       .json()
       .catch(() => null)) as StatsigGateCheckResponse | null;
 
-    return Boolean(payload && payload.value === true);
+    return Boolean(payload?.value === true);
   } catch {
     return false;
   }

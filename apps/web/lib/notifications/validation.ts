@@ -4,7 +4,8 @@ const EMAIL_REGEX =
 const EMAIL_MAX_LENGTH = 254;
 const PHONE_MAX_LENGTH = 32;
 
-const CONTROL_OR_SPACE_REGEX = /[\s\u0000-\u001F\u007F]/g;
+/** Matches whitespace and C0/C1 control characters using Unicode property escapes */
+const CONTROL_OR_SPACE_REGEX = /[\s\p{Cc}]/gu;
 
 export function normalizeSubscriptionEmail(
   raw: string | null | undefined
@@ -26,7 +27,7 @@ export function normalizeSubscriptionPhone(
   if (!trimmed) return null;
   if (trimmed.length > PHONE_MAX_LENGTH) return null;
 
-  let normalized = trimmed.replace(/(?!^\+)[^\d]/g, '');
+  let normalized = trimmed.replaceAll(/(?!^\+)[^\d]/g, '');
 
   if (normalized.startsWith('00')) {
     normalized = `+${normalized.slice(2)}`;
@@ -36,7 +37,7 @@ export function normalizeSubscriptionPhone(
     normalized = `+${normalized}`;
   }
 
-  normalized = `+${normalized.slice(1).replace(/\D/g, '')}`;
+  normalized = `+${normalized.slice(1).replaceAll(/\D/g, '')}`;
 
   if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
     return null;

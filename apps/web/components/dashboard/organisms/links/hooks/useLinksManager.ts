@@ -172,7 +172,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       const sectionIndexes: number[] = [];
 
       next.forEach((link, index) => {
-        if (sectionOf(link as T) === targetSection) {
+        if (sectionOf(link) === targetSection) {
           sectionIndexes.push(index);
         }
       });
@@ -185,10 +185,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       const insertionIdx = sectionIndexes.find(index => {
         const existingLink = next[index];
         if (!existingLink) return false;
-        return (
-          popularityIndex((existingLink as DetectedLink).platform.id) >
-          targetPopularity
-        );
+        return popularityIndex(existingLink.platform.id) > targetPopularity;
       });
 
       const insertAt = insertionIdx ?? Math.max(...sectionIndexes) + 1;

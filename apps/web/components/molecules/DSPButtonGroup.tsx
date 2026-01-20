@@ -29,7 +29,7 @@ export function DSPButtonGroup({
   preferenceNoticeText = 'Your preference will be saved for next time',
   disabled = false,
 }: DSPButtonGroupProps) {
-  if (!dsps || !dsps.length) {
+  if (!dsps?.length) {
     return (
       <div className={`text-center py-8 ${className}`}>
         <p className='text-gray-500 text-sm'>

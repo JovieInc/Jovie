@@ -109,7 +109,12 @@ export function useAdminUsersTable({
     return sort.startsWith('-') ? sort.slice(1) : sort;
   };
   const sortColumn = getSortColumn();
-  const sortDirection = sort ? (sort.startsWith('-') ? 'desc' : 'asc') : null;
+
+  const getSortDirection = (): 'asc' | 'desc' | null => {
+    if (!sort) return null;
+    return sort.startsWith('-') ? 'desc' : 'asc';
+  };
+  const sortDirection = getSortDirection();
 
   return {
     router,

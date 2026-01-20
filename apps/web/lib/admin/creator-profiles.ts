@@ -77,7 +77,7 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   const limited = trimmed.slice(0, 100);
 
   // Allow basic handle-like characters and spaces; drop anything else
-  const sanitized = limited.replace(/[^a-zA-Z0-9_\-\s]/g, '');
+  const sanitized = limited.replaceAll(/[^a-zA-Z0-9_\-\s]/g, '');
 
   if (sanitized.length === 0) return undefined;
 
@@ -249,12 +249,14 @@ export async function getAdminCreatorProfiles(
 
       for (const row of confidenceRows) {
         const rawValue = row.averageConfidence;
-        const parsedValue =
-          typeof rawValue === 'number'
-            ? rawValue
-            : rawValue != null
-              ? Number(rawValue)
-              : Number.NaN;
+        let parsedValue: number;
+        if (typeof rawValue === 'number') {
+          parsedValue = rawValue;
+        } else if (rawValue != null) {
+          parsedValue = Number(rawValue);
+        } else {
+          parsedValue = Number.NaN;
+        }
 
         if (!Number.isNaN(parsedValue)) {
           const clamped = Math.min(1, Math.max(0, parsedValue));
