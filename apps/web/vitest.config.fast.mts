@@ -63,9 +63,21 @@ export default defineConfig({
     hookTimeout: 10000,
     teardownTimeout: 5000,
 
-    // Disable coverage for speed (enable separately if needed)
+    // Coverage disabled by default for speed (enable with --coverage flag)
     coverage: {
       enabled: false,
+      provider: 'v8',
+      reporter: ['text', 'json', 'lcov'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'node_modules/**',
+        'tests/**',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/coverage/**',
+        '.next/**',
+        'dist/**',
+      ],
     },
 
     // Enable isolation to prevent mock conflicts between tests
