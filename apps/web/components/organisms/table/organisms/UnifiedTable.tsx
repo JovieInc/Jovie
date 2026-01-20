@@ -19,6 +19,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
 import {
@@ -214,7 +215,7 @@ export function UnifiedTable<TData>({
   getContextMenuItems,
   getRowClassName,
   className,
-  minWidth = '960px',
+  minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   skeletonRows = 20,
   groupingConfig,
   enableKeyboardNavigation,
