@@ -85,6 +85,148 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   return escapeLikePattern(sanitized);
 }
 
+/**
+ * Get ORDER BY expressions based on sort parameter
+ */
+function getOrderByExpressions(sort: AdminCreatorProfilesSort) {
+  switch (sort) {
+    case 'created_asc':
+      return [creatorProfiles.createdAt];
+    case 'verified_desc':
+      return [desc(creatorProfiles.isVerified), desc(creatorProfiles.createdAt)];
+    case 'verified_asc':
+      return [creatorProfiles.isVerified, desc(creatorProfiles.createdAt)];
+    case 'claimed_desc':
+      return [desc(creatorProfiles.isClaimed), desc(creatorProfiles.createdAt)];
+    case 'claimed_asc':
+      return [creatorProfiles.isClaimed, desc(creatorProfiles.createdAt)];
+    case 'created_desc':
+    default:
+      return [desc(creatorProfiles.createdAt)];
+  }
+}
+
+/**
+ * Backfill claim tokens for unclaimed profiles that don't have one
+ */
+async function backfillClaimTokens(
+  pageRows: Array<{
+    id: string;
+    isClaimed: boolean | null;
+    claimToken: string | null;
+  }>
+): Promise<void> {
+  const needsToken = pageRows.filter(row => !row.isClaimed && !row.claimToken);
+
+  if (needsToken.length === 0) return;
+
+  const tokensById = new Map<string, { token: string; expiresAt: Date }>();
+
+  await Promise.all(
+    needsToken.map(async row => {
+      const token = randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
+      tokensById.set(row.id, { token, expiresAt });
+
+      await db
+        .update(creatorProfiles)
+        .set({
+          claimToken: token,
+          claimTokenExpiresAt: expiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, row.id));
+    })
+  );
+
+  // Update in-memory rows so callers immediately see the new tokens
+  for (const row of pageRows) {
+    const tokenData = tokensById.get(row.id);
+    if (tokenData) {
+      (row as { claimToken?: string | null }).claimToken = tokenData.token;
+      (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
+        tokenData.expiresAt;
+    }
+  }
+}
+
+/**
+ * Parse a raw confidence value to a clamped number
+ */
+function parseConfidenceValue(rawValue: unknown): number | null {
+  let parsedValue: number;
+
+  if (typeof rawValue === 'number') {
+    parsedValue = rawValue;
+  } else if (rawValue != null) {
+    parsedValue = Number(rawValue);
+  } else {
+    return null;
+  }
+
+  if (Number.isNaN(parsedValue)) return null;
+
+  return Math.min(1, Math.max(0, parsedValue));
+}
+
+/**
+ * Build a map of profile IDs to confidence scores
+ */
+function buildConfidenceMap(
+  rows: Array<{ creatorProfileId: string; averageConfidence: unknown }>
+): Map<string, number> {
+  const map = new Map<string, number>();
+
+  for (const row of rows) {
+    const value = parseConfidenceValue(row.averageConfidence);
+    if (value !== null) {
+      map.set(row.creatorProfileId, value);
+    }
+  }
+
+  return map;
+}
+
+/** Social link data structure */
+interface SocialLinkData {
+  id: string;
+  platform: string;
+  platformType: string;
+  url: string;
+  displayText: string | null;
+}
+
+/**
+ * Build a map of profile IDs to their social links
+ */
+function buildSocialLinksMap(
+  rows: Array<{
+    id: string;
+    creatorProfileId: string;
+    platform: string;
+    platformType: string;
+    url: string;
+    displayText: string | null;
+  }>
+): Map<string, SocialLinkData[]> {
+  const map = new Map<string, SocialLinkData[]>();
+
+  for (const link of rows) {
+    const existing = map.get(link.creatorProfileId) ?? [];
+    existing.push({
+      id: link.id,
+      platform: link.platform,
+      platformType: link.platformType,
+      url: link.url,
+      displayText: link.displayText,
+    });
+    map.set(link.creatorProfileId, existing);
+  }
+
+  return map;
+}
+
 export async function getAdminCreatorProfiles(
   params: AdminCreatorProfilesParams = {}
 ): Promise<AdminCreatorProfilesResult> {
@@ -101,32 +243,8 @@ export async function getAdminCreatorProfiles(
   const likePattern = sanitizedSearch ? `%${sanitizedSearch}%` : null;
 
   const sort: AdminCreatorProfilesSort = params.sort ?? 'created_desc';
+  const orderByExpressions = getOrderByExpressions(sort);
 
-  const orderByExpressions = (() => {
-    switch (sort) {
-      case 'created_asc':
-        return [creatorProfiles.createdAt];
-      case 'verified_desc':
-        return [
-          desc(creatorProfiles.isVerified),
-          desc(creatorProfiles.createdAt),
-        ];
-      case 'verified_asc':
-        return [creatorProfiles.isVerified, desc(creatorProfiles.createdAt)];
-      case 'claimed_desc':
-        return [
-          desc(creatorProfiles.isClaimed),
-          desc(creatorProfiles.createdAt),
-        ];
-      case 'claimed_asc':
-        return [creatorProfiles.isClaimed, desc(creatorProfiles.createdAt)];
-      case 'created_desc':
-      default:
-        return [desc(creatorProfiles.createdAt)];
-    }
-  })();
-
-  // Build where clause for reuse in both queries
   const whereClause: SQL | undefined = likePattern
     ? or(
         ilike(creatorProfiles.username, likePattern),
@@ -135,9 +253,7 @@ export async function getAdminCreatorProfiles(
     : undefined;
 
   try {
-    // Execute queries in parallel for better performance
     const [rows, [{ value: total }]] = await Promise.all([
-      // Paginated data query
       db
         .select({
           id: creatorProfiles.id,
@@ -161,70 +277,17 @@ export async function getAdminCreatorProfiles(
         .orderBy(...orderByExpressions)
         .limit(pageSize)
         .offset(offset),
-      // Total count query
-      db
-        .select({ value: count() })
-        .from(creatorProfiles)
-        .where(whereClause),
+      db.select({ value: count() }).from(creatorProfiles).where(whereClause),
     ]);
 
-    const pageRows = rows;
+    await backfillClaimTokens(rows);
 
-    // Legacy backfill: Ensure unclaimed profiles have a claim token.
-    // NOTE: New profiles should have tokens generated at creation time.
-    // This backfill is temporary for legacy rows without tokens.
-    const needsToken = pageRows.filter(
-      row => !row.isClaimed && !row.claimToken
-    );
-
-    if (needsToken.length > 0) {
-      const tokensById = new Map<string, { token: string; expiresAt: Date }>();
-
-      await Promise.all(
-        needsToken.map(async row => {
-          const token = randomUUID();
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
-          tokensById.set(row.id, { token, expiresAt });
-
-          await db
-            .update(creatorProfiles)
-            .set({
-              claimToken: token,
-              claimTokenExpiresAt: expiresAt,
-              updatedAt: new Date(),
-            })
-            .where(eq(creatorProfiles.id, row.id));
-        })
-      );
-
-      // Update in-memory rows so callers immediately see the new tokens.
-      for (const row of pageRows) {
-        const tokenData = tokensById.get(row.id);
-        if (tokenData) {
-          (row as { claimToken?: string | null }).claimToken = tokenData.token;
-          (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
-            tokenData.expiresAt;
-        }
-      }
-    }
-
-    const profileIds = pageRows.map(row => row.id);
-    const confidenceMap = new Map<string, number>();
-    const socialLinksMap = new Map<
-      string,
-      Array<{
-        id: string;
-        platform: string;
-        platformType: string;
-        url: string;
-        displayText: string | null;
-      }>
-    >();
+    const profileIds = rows.map(row => row.id);
+    let confidenceMap = new Map<string, number>();
+    let socialLinksMap = new Map<string, SocialLinkData[]>();
 
     if (profileIds.length > 0) {
       const [confidenceRows, socialLinksRows] = await Promise.all([
-        // Fetch confidence scores
         db
           .select({
             creatorProfileId: socialLinks.creatorProfileId,
@@ -233,7 +296,6 @@ export async function getAdminCreatorProfiles(
           .from(socialLinks)
           .where(inArray(socialLinks.creatorProfileId, profileIds))
           .groupBy(socialLinks.creatorProfileId),
-        // Fetch social links
         db
           .select({
             id: socialLinks.id,
@@ -247,39 +309,12 @@ export async function getAdminCreatorProfiles(
           .where(inArray(socialLinks.creatorProfileId, profileIds)),
       ]);
 
-      for (const row of confidenceRows) {
-        const rawValue = row.averageConfidence;
-        let parsedValue: number;
-        if (typeof rawValue === 'number') {
-          parsedValue = rawValue;
-        } else if (rawValue != null) {
-          parsedValue = Number(rawValue);
-        } else {
-          parsedValue = Number.NaN;
-        }
-
-        if (!Number.isNaN(parsedValue)) {
-          const clamped = Math.min(1, Math.max(0, parsedValue));
-          confidenceMap.set(row.creatorProfileId, clamped);
-        }
-      }
-
-      // Group social links by creator profile ID
-      for (const link of socialLinksRows) {
-        const existing = socialLinksMap.get(link.creatorProfileId) ?? [];
-        existing.push({
-          id: link.id,
-          platform: link.platform,
-          platformType: link.platformType,
-          url: link.url,
-          displayText: link.displayText,
-        });
-        socialLinksMap.set(link.creatorProfileId, existing);
-      }
+      confidenceMap = buildConfidenceMap(confidenceRows);
+      socialLinksMap = buildSocialLinksMap(socialLinksRows);
     }
 
     return {
-      profiles: pageRows.map(row => ({
+      profiles: rows.map(row => ({
         id: row.id,
         username: row.username,
         usernameNormalized: row.usernameNormalized,
