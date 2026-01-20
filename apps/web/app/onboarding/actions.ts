@@ -30,6 +30,114 @@ function getRequestBaseUrl(headersList: Headers): string {
   return publicEnv.NEXT_PUBLIC_APP_URL;
 }
 
+/** Result of fetching avatar from source URL */
+interface AvatarFetchResult {
+  ok: true;
+  buffer: ArrayBuffer;
+  contentType: string;
+}
+
+/** Errors that should not be retried */
+interface NonRetryableError {
+  ok: false;
+  shouldRetry: false;
+  error: Error;
+}
+
+/** Errors that can be retried */
+interface RetryableError {
+  ok: false;
+  shouldRetry: true;
+  error: Error;
+}
+
+type AvatarFetchError = NonRetryableError | RetryableError;
+
+/**
+ * Fetch avatar image from source URL
+ */
+async function fetchAvatarImage(
+  imageUrl: string
+): Promise<AvatarFetchResult | AvatarFetchError> {
+  const source = await fetch(imageUrl, {
+    signal: AbortSignal.timeout(10000),
+  });
+
+  if (!source.ok) {
+    return {
+      ok: false,
+      shouldRetry: true,
+      error: new Error(`Failed to fetch avatar: ${source.status}`),
+    };
+  }
+
+  const contentType =
+    source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? null;
+
+  if (!contentType?.startsWith('image/')) {
+    return {
+      ok: false,
+      shouldRetry: false,
+      error: new Error(`Invalid content type: ${contentType}`),
+    };
+  }
+
+  const buffer = await source.arrayBuffer();
+  return { ok: true, buffer, contentType };
+}
+
+/**
+ * Upload avatar buffer to API endpoint
+ */
+async function uploadAvatarToApi(params: {
+  buffer: ArrayBuffer;
+  contentType: string;
+  baseUrl: string;
+  cookieHeader: string | null;
+}): Promise<{ blobUrl: string; photoId: string } | RetryableError> {
+  const file = new File([params.buffer], 'oauth-avatar', {
+    type: params.contentType,
+  });
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: params.cookieHeader ? { cookie: params.cookieHeader } : undefined,
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!upload.ok) {
+    const errorBody = await upload.text().catch(() => 'Unknown error');
+    return {
+      ok: false,
+      shouldRetry: true,
+      error: new Error(`Upload failed: ${upload.status} - ${errorBody}`),
+    };
+  }
+
+  const data = (await upload.json()) as {
+    blobUrl?: string;
+    photoId?: string;
+    jobId?: string;
+  };
+
+  const blobUrl = data.blobUrl ?? null;
+  const photoId = data.photoId ?? data.jobId ?? null;
+
+  if (!blobUrl || !photoId) {
+    return {
+      ok: false,
+      shouldRetry: true,
+      error: new Error('Upload response missing required fields'),
+    };
+  }
+
+  return { blobUrl, photoId };
+}
+
 /**
  * Upload a remote avatar with retry mechanism.
  *
@@ -53,53 +161,32 @@ async function uploadRemoteAvatar(params: {
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Exponential backoff: 0ms, 1000ms, 2000ms
       if (attempt > 0) {
         const delay = Math.min(1000 * attempt, 5000);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      const source = await fetch(params.imageUrl, {
-        signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
-      });
+      const fetchResult = await fetchAvatarImage(params.imageUrl);
 
-      if (!source.ok) {
-        lastError = new Error(`Failed to fetch avatar: ${source.status}`);
+      if (!fetchResult.ok) {
+        lastError = fetchResult.error;
         console.warn(
-          `[AVATAR_UPLOAD] Fetch failed (attempt ${attempt + 1}/${maxRetries}):`,
+          `[AVATAR_UPLOAD] Fetch issue (attempt ${attempt + 1}/${maxRetries}):`,
           lastError.message
         );
+        if (!fetchResult.shouldRetry) break;
         continue;
       }
 
-      const contentType =
-        source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ??
-        null;
-      if (!contentType?.startsWith('image/')) {
-        lastError = new Error(`Invalid content type: ${contentType}`);
-        console.warn('[AVATAR_UPLOAD] Invalid content type:', contentType);
-        // Don't retry for invalid content type - it won't change
-        break;
-      }
-
-      const buffer = await source.arrayBuffer();
-      const file = new File([buffer], 'oauth-avatar', { type: contentType });
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
-        method: 'POST',
-        body: formData,
-        headers: params.cookieHeader
-          ? { cookie: params.cookieHeader }
-          : undefined,
-        signal: AbortSignal.timeout(30000), // 30s timeout for upload
+      const uploadResult = await uploadAvatarToApi({
+        buffer: fetchResult.buffer,
+        contentType: fetchResult.contentType,
+        baseUrl: params.baseUrl,
+        cookieHeader: params.cookieHeader,
       });
 
-      if (!upload.ok) {
-        const errorBody = await upload.text().catch(() => 'Unknown error');
-        lastError = new Error(`Upload failed: ${upload.status} - ${errorBody}`);
+      if (!('blobUrl' in uploadResult)) {
+        lastError = uploadResult.error;
         console.warn(
           `[AVATAR_UPLOAD] Upload failed (attempt ${attempt + 1}/${maxRetries}):`,
           lastError.message
@@ -107,26 +194,10 @@ async function uploadRemoteAvatar(params: {
         continue;
       }
 
-      const data = (await upload.json()) as {
-        blobUrl?: string;
-        photoId?: string;
-        jobId?: string;
-      };
-
-      const blobUrl = data.blobUrl ?? null;
-      const photoId = data.photoId ?? data.jobId ?? null;
-
-      if (!blobUrl || !photoId) {
-        lastError = new Error('Upload response missing required fields');
-        console.warn('[AVATAR_UPLOAD] Invalid response:', data);
-        continue;
-      }
-
-      // Success - always log for monitoring
       console.info(
         `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
       );
-      return { blobUrl, photoId, retriesUsed: attempt };
+      return { ...uploadResult, retriesUsed: attempt };
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
@@ -137,7 +208,6 @@ async function uploadRemoteAvatar(params: {
     }
   }
 
-  // All retries exhausted
   console.error(
     `[AVATAR_UPLOAD] Failed after ${maxRetries} attempts:`,
     lastError?.message
@@ -158,6 +228,237 @@ function profileIsPublishable(
   return hasHandle && hasName && isPublic && hasCompleted;
 }
 
+/** Validated onboarding input */
+interface ValidatedOnboardingInput {
+  userId: string;
+  trimmedDisplayName: string;
+  normalizedUsername: string;
+  userEmail: string | null;
+  oauthAvatarUrl: string | null;
+  cookieHeader: string | null;
+  baseUrl: string;
+}
+
+/**
+ * Validate authentication and all onboarding inputs
+ */
+async function validateOnboardingInput(params: {
+  username: string;
+  displayName?: string;
+  email?: string | null;
+}): Promise<ValidatedOnboardingInput> {
+  const { userId } = await auth();
+  if (!userId) {
+    throw onboardingErrorToError(
+      createOnboardingError(
+        OnboardingErrorCode.NOT_AUTHENTICATED,
+        'User not authenticated'
+      )
+    );
+  }
+
+  const validation = validateUsername(params.username);
+  if (!validation.isValid) {
+    throw onboardingErrorToError(
+      createOnboardingError(
+        OnboardingErrorCode.INVALID_USERNAME,
+        validation.error || 'Invalid username'
+      )
+    );
+  }
+
+  const trimmedDisplayName = params.displayName?.trim();
+  if (!trimmedDisplayName) {
+    throw onboardingErrorToError(
+      createOnboardingError(
+        OnboardingErrorCode.DISPLAY_NAME_REQUIRED,
+        'Display name is required'
+      )
+    );
+  }
+
+  if (trimmedDisplayName.length > 50) {
+    throw onboardingErrorToError(
+      createOnboardingError(
+        OnboardingErrorCode.DISPLAY_NAME_TOO_LONG,
+        'Display name must be 50 characters or less'
+      )
+    );
+  }
+
+  const headersList = await headers();
+  const clientIP = extractClientIP(headersList);
+  const cookieHeader = headersList.get('cookie');
+  const baseUrl = getRequestBaseUrl(headersList);
+
+  const clerkUser = await currentUser();
+  const clerkIdentity = resolveClerkIdentity(clerkUser);
+
+  await enforceOnboardingRateLimit({
+    userId,
+    ip: clientIP,
+    checkIP: true,
+  });
+
+  return {
+    userId,
+    trimmedDisplayName,
+    normalizedUsername: normalizeUsername(params.username),
+    userEmail: params.email ?? clerkIdentity.email ?? null,
+    oauthAvatarUrl: clerkIdentity.avatarUrl,
+    cookieHeader,
+    baseUrl,
+  };
+}
+
+/**
+ * Handle avatar upload after profile creation
+ */
+async function handleAvatarUploadAfterOnboarding(params: {
+  profileId: string;
+  oauthAvatarUrl: string;
+  baseUrl: string;
+  cookieHeader: string | null;
+}): Promise<void> {
+  try {
+    const uploaded = await uploadRemoteAvatar({
+      imageUrl: params.oauthAvatarUrl,
+      baseUrl: params.baseUrl,
+      cookieHeader: params.cookieHeader,
+      maxRetries: 3,
+    });
+
+    if (!uploaded) {
+      console.warn('[ONBOARDING] Avatar upload failed for profile:', params.profileId);
+      return;
+    }
+
+    await withDbSessionTx(async tx => {
+      const [profile] = await tx
+        .select({
+          avatarUrl: creatorProfiles.avatarUrl,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, params.profileId))
+        .limit(1);
+
+      await applyProfileEnrichment(tx, {
+        profileId: params.profileId,
+        avatarLockedByUser: profile?.avatarLockedByUser ?? null,
+        currentAvatarUrl: profile?.avatarUrl ?? null,
+        extractedAvatarUrl: uploaded.blobUrl,
+      });
+
+      await tx
+        .update(profilePhotos)
+        .set({
+          creatorProfileId: params.profileId,
+          sourcePlatform: 'clerk',
+          updatedAt: new Date(),
+        })
+        .where(eq(profilePhotos.id, uploaded.photoId));
+    });
+  } catch (avatarError) {
+    console.error(
+      '[ONBOARDING] Avatar upload exception for profile:',
+      params.profileId,
+      avatarError
+    );
+  }
+}
+
+/**
+ * Finalize onboarding completion (sync, cookie, revalidation)
+ */
+async function finalizeOnboardingCompletion(
+  userId: string,
+  completedUsername: string
+): Promise<void> {
+  await syncCanonicalUsernameFromApp(userId, completedUsername);
+
+  try {
+    await syncAllClerkMetadata(userId);
+  } catch (syncError) {
+    console.error('[ONBOARDING] Failed to sync Clerk metadata:', syncError);
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set('jovie_onboarding_complete', '1', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 120,
+    path: '/',
+  });
+
+  revalidatePath('/app', 'layout');
+}
+
+/**
+ * Log and capture onboarding error with full context
+ */
+function logAndCaptureOnboardingError(
+  error: unknown,
+  context: { username: string; displayName?: string; email?: string | null }
+): Error {
+  console.error('🔴 ONBOARDING ERROR:', error);
+  console.error(
+    '🔴 ERROR STACK:',
+    error instanceof Error ? error.stack : 'No stack available'
+  );
+
+  interface DatabaseErrorShape {
+    code?: string;
+    constraint?: string;
+    detail?: string;
+    hint?: string;
+    table?: string;
+    column?: string;
+    cause?: unknown;
+  }
+  const dbError = error as DatabaseErrorShape;
+  console.error('🔴 DATABASE ERROR DETAILS:', {
+    code: dbError?.code,
+    constraint: dbError?.constraint,
+    detail: dbError?.detail,
+    hint: dbError?.hint,
+    table: dbError?.table,
+    column: dbError?.column,
+    cause: dbError?.cause,
+  });
+
+  console.error('🔴 REQUEST CONTEXT:', {
+    ...context,
+    timestamp: new Date().toISOString(),
+    errorName: error instanceof Error ? error.name : 'Unknown',
+    errorMessage: error instanceof Error ? error.message : String(error),
+  });
+
+  Sentry.captureException(error, {
+    tags: {
+      context: 'onboarding_submission',
+      username: context.username ?? 'unknown',
+    },
+    extra: {
+      displayName: context.displayName,
+      email: context.email,
+      dbErrorCode: dbError?.code,
+      dbConstraint: dbError?.constraint,
+      dbDetail: dbError?.detail,
+    },
+  });
+
+  const resolvedError =
+    error instanceof Error && /^\[([A-Z_]+)\]/.test(error.message)
+      ? error
+      : onboardingErrorToError(mapDatabaseError(error));
+
+  console.error('🔴 RESOLVED ERROR TYPE:', resolvedError.message);
+
+  return resolvedError;
+}
+
 export async function completeOnboarding({
   username,
   displayName,
@@ -170,75 +471,12 @@ export async function completeOnboarding({
   redirectToDashboard?: boolean;
 }) {
   try {
-    // Step 1: Authentication check
-    const { userId } = await auth();
-    if (!userId) {
-      const error = createOnboardingError(
-        OnboardingErrorCode.NOT_AUTHENTICATED,
-        'User not authenticated'
-      );
-      throw onboardingErrorToError(error);
-    }
+    const input = await validateOnboardingInput({ username, displayName, email });
 
-    // Step 2: Input validation
-    const validation = validateUsername(username);
-    if (!validation.isValid) {
-      const error = createOnboardingError(
-        OnboardingErrorCode.INVALID_USERNAME,
-        validation.error || 'Invalid username'
-      );
-      throw onboardingErrorToError(error);
-    }
-
-    const trimmedDisplayName = displayName?.trim();
-
-    if (!trimmedDisplayName) {
-      throw onboardingErrorToError(
-        createOnboardingError(
-          OnboardingErrorCode.DISPLAY_NAME_REQUIRED,
-          'Display name is required'
-        )
-      );
-    }
-
-    if (trimmedDisplayName.length > 50) {
-      const error = createOnboardingError(
-        OnboardingErrorCode.DISPLAY_NAME_TOO_LONG,
-        'Display name must be 50 characters or less'
-      );
-      throw onboardingErrorToError(error);
-    }
-
-    // Step 3: Rate limiting check
-    const headersList = await headers();
-    const clientIP = extractClientIP(headersList);
-    const cookieHeader = headersList.get('cookie');
-    const baseUrl = getRequestBaseUrl(headersList);
-
-    const clerkUser = await currentUser();
-    const clerkIdentity = resolveClerkIdentity(clerkUser);
-    const oauthAvatarUrl = clerkIdentity.avatarUrl;
-
-    // IMPORTANT: Always check IP-based rate limiting, even for 'unknown' IPs
-    // The 'unknown' bucket acts as a shared rate limit to prevent abuse
-    // from users behind proxies or with missing/invalid headers
-    const shouldCheckIP = true;
-
-    await enforceOnboardingRateLimit({
-      userId,
-      ip: clientIP,
-      checkIP: shouldCheckIP,
-    });
-
-    // Step 4-6: Parallel operations for performance optimization
-    const normalizedUsername = normalizeUsername(username);
-
-    const userEmail = email ?? clerkIdentity.email ?? null;
+    // Use validated input values
+    const { normalizedUsername, trimmedDisplayName, userEmail } = input;
 
     // CRITICAL: Use SERIALIZABLE isolation level to prevent race conditions
-    // where two users could claim the same handle simultaneously.
-    // This ensures that concurrent transactions will see a consistent view
-    // of the data and will fail if there's a conflict.
     const completion = await withDbSessionTx(
       async (tx, clerkUserId: string) => {
         type CompletionResult = {
@@ -274,11 +512,12 @@ export async function completeOnboarding({
             .limit(1);
 
           if (conflict && (!profileId || conflict.id !== profileId)) {
-            const error = createOnboardingError(
-              OnboardingErrorCode.USERNAME_TAKEN,
-              'Handle already taken'
+            throw onboardingErrorToError(
+              createOnboardingError(
+                OnboardingErrorCode.USERNAME_TAKEN,
+                'Handle already taken'
+              )
             );
-            throw onboardingErrorToError(error);
           }
         };
 
@@ -288,7 +527,6 @@ export async function completeOnboarding({
           .where(eq(users.clerkId, clerkUserId))
           .limit(1);
 
-        // If the user record does not exist, the stored function will create both user + profile
         if (!existingUser) {
           await ensureEmailAvailable();
           await ensureHandleAvailable(null);
@@ -307,13 +545,7 @@ export async function completeOnboarding({
             ? String(result.rows[0].profile_id)
             : null;
 
-          const created: CompletionResult = {
-            username: normalizedUsername,
-            status: 'created',
-            profileId,
-          };
-
-          return created;
+          return { username: normalizedUsername, status: 'created', profileId } as CompletionResult;
         }
 
         const [existingProfile] = await tx
@@ -322,18 +554,12 @@ export async function completeOnboarding({
           .where(eq(creatorProfiles.userId, existingUser.id))
           .limit(1);
 
-        // If a profile already exists, ensure the handle is either the same or available
-        const handleChanged =
-          existingProfile?.usernameNormalized !== normalizedUsername;
-
+        const handleChanged = existingProfile?.usernameNormalized !== normalizedUsername;
         if (handleChanged) {
           await ensureHandleAvailable(existingProfile?.id);
         }
 
         const needsPublish = !profileIsPublishable(existingProfile);
-        // CRITICAL: Also update if isClaimed is not set - this is required by gate.ts
-        // which filters profiles by isClaimed=true. Without this, users with
-        // "publishable" profiles but isClaimed=false get stuck in an onboarding loop.
         const needsClaim = existingProfile && !existingProfile.isClaimed;
 
         if (existingProfile && (needsPublish || handleChanged || needsClaim)) {
@@ -346,8 +572,7 @@ export async function completeOnboarding({
               username: normalizedUsername,
               usernameNormalized: normalizedUsername,
               displayName: nextDisplayName,
-              onboardingCompletedAt:
-                existingProfile.onboardingCompletedAt ?? new Date(),
+              onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? new Date(),
               isPublic: true,
               isClaimed: true,
               claimedAt: existingProfile.claimedAt ?? new Date(),
@@ -356,23 +581,19 @@ export async function completeOnboarding({
             .where(eq(creatorProfiles.id, existingProfile.id))
             .returning();
 
-          const updatedResult: CompletionResult = {
+          return {
             username: updated?.usernameNormalized || normalizedUsername,
             status: 'updated',
             profileId: existingProfile.id,
-          };
-
-          return updatedResult;
+          } as CompletionResult;
         }
 
         if (existingProfile) {
-          const completed: CompletionResult = {
+          return {
             username: existingProfile.usernameNormalized,
             status: 'complete',
             profileId: existingProfile.id,
-          };
-
-          return completed;
+          } as CompletionResult;
         }
 
         // Fallback: user exists but no profile yet
@@ -393,100 +614,22 @@ export async function completeOnboarding({
           ? String(result.rows[0].profile_id)
           : null;
 
-        const created: CompletionResult = {
-          username: normalizedUsername,
-          status: 'created',
-          profileId,
-        };
-
-        return created;
+        return { username: normalizedUsername, status: 'created', profileId } as CompletionResult;
       },
       { isolationLevel: 'serializable' }
     );
 
-    // Step 7: Avatar upload (non-blocking, with retry and logging)
-    // Avatar upload failures are logged but don't block onboarding completion
-    const profileId = completion.profileId;
-
-    if (profileId && oauthAvatarUrl) {
-      try {
-        const uploaded = await uploadRemoteAvatar({
-          imageUrl: oauthAvatarUrl,
-          baseUrl,
-          cookieHeader,
-          maxRetries: 3,
-        });
-
-        if (uploaded) {
-          await withDbSessionTx(async tx => {
-            const [profile] = await tx
-              .select({
-                avatarUrl: creatorProfiles.avatarUrl,
-                avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-              })
-              .from(creatorProfiles)
-              .where(eq(creatorProfiles.id, profileId))
-              .limit(1);
-
-            await applyProfileEnrichment(tx, {
-              profileId,
-              avatarLockedByUser: profile?.avatarLockedByUser ?? null,
-              currentAvatarUrl: profile?.avatarUrl ?? null,
-              extractedAvatarUrl: uploaded.blobUrl,
-            });
-
-            await tx
-              .update(profilePhotos)
-              .set({
-                creatorProfileId: profileId,
-                sourcePlatform: 'clerk',
-                updatedAt: new Date(),
-              })
-              .where(eq(profilePhotos.id, uploaded.photoId));
-          });
-        } else {
-          console.warn(
-            '[ONBOARDING] Avatar upload failed for profile:',
-            profileId
-          );
-        }
-      } catch (avatarError) {
-        console.error(
-          '[ONBOARDING] Avatar upload exception for profile:',
-          profileId,
-          avatarError
-        );
-      }
+    // Avatar upload (non-blocking)
+    if (completion.profileId && input.oauthAvatarUrl) {
+      await handleAvatarUploadAfterOnboarding({
+        profileId: completion.profileId,
+        oauthAvatarUrl: input.oauthAvatarUrl,
+        baseUrl: input.baseUrl,
+        cookieHeader: input.cookieHeader,
+      });
     }
 
-    await syncCanonicalUsernameFromApp(userId, completion.username);
-
-    // Sync Jovie metadata to Clerk (profile completion, status, etc.)
-    // This is best-effort - don't block onboarding on sync failure
-    try {
-      await syncAllClerkMetadata(userId);
-    } catch (syncError) {
-      console.error('[ONBOARDING] Failed to sync Clerk metadata:', syncError);
-      // Continue with onboarding - metadata sync is not critical
-    }
-
-    // ENG-002: Set completion cookie to prevent redirect loop race condition
-    // The proxy checks this cookie and bypasses needsOnboarding check for 30s
-    // This handles the race between transaction commit and proxy's DB read
-    // IMPORTANT: Always set this cookie on success, even when redirectToDashboard=false,
-    // because the user will navigate to dashboard after seeing the completion step
-    const cookieStore = await cookies();
-    cookieStore.set('jovie_onboarding_complete', '1', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
-      path: '/',
-    });
-
-    // Invalidate dashboard data cache to prevent stale data causing redirect loops
-    // This ensures the app layout gets fresh data showing onboarding is complete
-    revalidatePath('/app', 'layout');
+    await finalizeOnboardingCompletion(input.userId, completion.username);
 
     if (redirectToDashboard) {
       redirect('/app/dashboard');
@@ -494,68 +637,6 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
-    // Enhanced logging with database-specific fields
-    console.error('🔴 ONBOARDING ERROR:', error);
-    console.error(
-      '🔴 ERROR STACK:',
-      error instanceof Error ? error.stack : 'No stack available'
-    );
-
-    // Log database-specific error details
-    // Define shape for PostgreSQL database errors
-    interface DatabaseErrorShape {
-      code?: string;
-      constraint?: string;
-      detail?: string;
-      hint?: string;
-      table?: string;
-      column?: string;
-      cause?: unknown;
-    }
-    const dbError = error as DatabaseErrorShape;
-    console.error('🔴 DATABASE ERROR DETAILS:', {
-      code: dbError?.code,
-      constraint: dbError?.constraint,
-      detail: dbError?.detail,
-      hint: dbError?.hint,
-      table: dbError?.table,
-      column: dbError?.column,
-      cause: dbError?.cause,
-    });
-
-    console.error('🔴 REQUEST CONTEXT:', {
-      username,
-      displayName,
-      email,
-      timestamp: new Date().toISOString(),
-      errorName: error instanceof Error ? error.name : 'Unknown',
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-
-    // Capture to Sentry with full context
-    Sentry.captureException(error, {
-      tags: {
-        context: 'onboarding_submission',
-        username: username ?? 'unknown',
-      },
-      extra: {
-        displayName,
-        email,
-        dbErrorCode: dbError?.code,
-        dbConstraint: dbError?.constraint,
-        dbDetail: dbError?.detail,
-      },
-    });
-
-    // Normalize unknown errors into onboarding-shaped errors for consistent handling
-    const resolvedError =
-      error instanceof Error && /^\[([A-Z_]+)\]/.test(error.message)
-        ? error
-        : onboardingErrorToError(mapDatabaseError(error));
-
-    // Log the resolved error type for monitoring
-    console.error('🔴 RESOLVED ERROR TYPE:', resolvedError.message);
-
-    throw resolvedError;
+    throw logAndCaptureOnboardingError(error, { username, displayName, email });
   }
 }

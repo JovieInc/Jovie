@@ -151,88 +151,79 @@ export async function GET() {
   );
 }
 
-export async function POST(request: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
+/**
+ * Validate auth and apply rate limiting
+ */
+async function validateAuthAndRateLimit(
+  request: Request
+): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse }> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
 
-    const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NODE_ENV === 'development';
+  if (!isDev) {
+    const clientIP = extractClientIPFromRequest({ headers: request.headers });
+    await enforceOnboardingRateLimit({
+      userId,
+      ip: clientIP,
+      checkIP: true,
+    });
+  }
 
-    // Abuse protection: apply the same lightweight in-memory limiter used for onboarding.
-    // Always check a shared bucket for missing/unknown IPs.
-    // Skip in development to avoid rate limit during testing
-    if (!isDev) {
-      const clientIP = extractClientIPFromRequest({ headers: request.headers });
-      await enforceOnboardingRateLimit({
-        userId,
-        ip: clientIP,
-        checkIP: true,
-      });
-    }
-    const databaseUrl = process.env.DATABASE_URL;
-    const hasDatabaseUrl = Boolean(databaseUrl);
+  return { ok: true, userId };
+}
 
-    if (!hasDatabaseUrl) {
-      return NextResponse.json(
-        {
-          success: false,
-          ...sanitizeErrorResponse(
-            'Waitlist is temporarily unavailable.',
-            'Set DATABASE_URL in .env.local and restart pnpm dev.',
-            { code: 'db_not_configured' }
-          ),
-        },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
-    }
+/**
+ * Check database connectivity and waitlist table existence
+ */
+async function checkDatabaseHealth(): Promise<NextResponse | null> {
+  const databaseUrl = process.env.DATABASE_URL;
+  const isDev = process.env.NODE_ENV === 'development';
 
-    const dbHost = (() => {
-      if (!isDev || !databaseUrl) return undefined;
-      try {
-        const parsed = new URL(databaseUrl);
-        return parsed.host;
-      } catch {
-        return undefined;
-      }
-    })();
+  if (!databaseUrl) {
+    return NextResponse.json(
+      {
+        success: false,
+        ...sanitizeErrorResponse(
+          'Waitlist is temporarily unavailable.',
+          'Set DATABASE_URL in .env.local and restart pnpm dev.',
+          { code: 'db_not_configured' }
+        ),
+      },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
 
-    let hasWaitlistTable = false;
+  const dbHost = (() => {
+    if (!isDev) return undefined;
     try {
-      const result = await db.execute(
-        drizzleSql<{ table_exists: boolean }>`
-          SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.tables
-            WHERE table_schema = 'public'
-              AND table_name = 'waitlist_entries'
-          ) AS table_exists
-        `
-      );
-
-      hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
-    } catch (error) {
-      logger.error('Waitlist API DB connectivity error', error);
-      const debugMsg =
-        error instanceof Error
-          ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
-          : `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`;
-      return NextResponse.json(
-        {
-          success: false,
-          ...sanitizeErrorResponse(
-            'Waitlist is temporarily unavailable.',
-            debugMsg,
-            { code: 'db_unreachable' }
-          ),
-        },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
+      return new URL(databaseUrl).host;
+    } catch {
+      return undefined;
     }
+  })();
+
+  try {
+    const result = await db.execute(
+      drizzleSql<{ table_exists: boolean }>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+            AND table_name = 'waitlist_entries'
+        ) AS table_exists
+      `
+    );
+
+    const hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
 
     if (!hasWaitlistTable) {
       return NextResponse.json(
@@ -248,209 +239,282 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await currentUser();
-    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
-    if (!emailRaw) {
-      return NextResponse.json(
+    return null;
+  } catch (error) {
+    logger.error('Waitlist API DB connectivity error', error);
+    const debugMsg =
+      error instanceof Error
+        ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
+        : `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`;
+    return NextResponse.json(
+      {
+        success: false,
+        ...sanitizeErrorResponse(
+          'Waitlist is temporarily unavailable.',
+          debugMsg,
+          { code: 'db_unreachable' }
+        ),
+      },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/** Parsed waitlist request data */
+interface WaitlistRequestData {
+  userId: string;
+  email: string;
+  emailRaw: string;
+  fullName: string;
+  primaryGoal: string | null;
+  primarySocialUrl: string;
+  platform: string | null;
+  normalizedUrl: string;
+  spotifyUrl: string | null;
+  spotifyUrlNormalized: string | null;
+  heardAbout: string | null;
+  selectedPlan: string | null;
+}
+
+/**
+ * Validate user and parse request body
+ */
+async function validateAndParseRequest(
+  request: Request
+): Promise<{ ok: true; data: WaitlistRequestData } | { ok: false; response: NextResponse }> {
+  const user = await currentUser();
+  const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+  if (!emailRaw) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { success: false, error: 'Email is required' },
         { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
 
-    const email = normalizeEmail(emailRaw);
-    const fullName = deriveFullName({
-      userFullName: user?.fullName,
-      userUsername: user?.username,
-      email,
-    });
+  const email = normalizeEmail(emailRaw);
+  const fullName = deriveFullName({
+    userFullName: user?.fullName,
+    userUsername: user?.username,
+    email,
+  });
 
-    const body = await request.json();
+  const body = await request.json();
+  const parseResult = waitlistRequestSchema.safeParse(body);
 
-    // Validate request body
-    const parseResult = waitlistRequestSchema.safeParse(body);
-    if (!parseResult.success) {
-      const errors = parseResult.error.flatten().fieldErrors;
-      return NextResponse.json(
+  if (!parseResult.success) {
+    const errors = parseResult.error.flatten().fieldErrors;
+    return {
+      ok: false,
+      response: NextResponse.json(
         { success: false, errors },
         { status: 400, headers: NO_STORE_HEADERS }
-      );
+      ),
+    };
+  }
+
+  const { primaryGoal, primarySocialUrl, spotifyUrl, heardAbout, selectedPlan } =
+    parseResult.data;
+  const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
+  const spotifyUrlNormalized = spotifyUrl ? normalizeSpotifyUrl(spotifyUrl) : null;
+
+  return {
+    ok: true,
+    data: {
+      userId: '', // Will be set by caller
+      email,
+      emailRaw,
+      fullName,
+      primaryGoal: primaryGoal ?? null,
+      primarySocialUrl,
+      platform,
+      normalizedUrl,
+      spotifyUrl: spotifyUrl ?? null,
+      spotifyUrlNormalized,
+      heardAbout: heardAbout?.trim() || null,
+      selectedPlan: selectedPlan ?? null,
+    },
+  };
+}
+
+/**
+ * Handle update for existing waitlist entry
+ */
+async function handleExistingEntry(
+  existing: { id: string; status: string },
+  data: WaitlistRequestData
+): Promise<NextResponse> {
+  await db.transaction(async tx => {
+    if (existing.status === 'new') {
+      await tx
+        .update(waitlistEntries)
+        .set({
+          fullName: data.fullName,
+          primaryGoal: data.primaryGoal,
+          primarySocialUrl: data.primarySocialUrl,
+          primarySocialPlatform: data.platform,
+          primarySocialUrlNormalized: data.normalizedUrl,
+          spotifyUrl: data.spotifyUrl,
+          spotifyUrlNormalized: data.spotifyUrlNormalized,
+          heardAbout: data.heardAbout,
+          selectedPlan: data.selectedPlan,
+          updatedAt: new Date(),
+        })
+        .where(eq(waitlistEntries.id, existing.id));
     }
 
-    const {
-      primaryGoal,
-      primarySocialUrl,
-      spotifyUrl,
-      heardAbout,
-      selectedPlan,
-    } = parseResult.data;
-    const sanitizedHeardAbout = heardAbout?.trim() || null;
+    await tx
+      .insert(users)
+      .values({
+        clerkId: data.userId,
+        email: data.emailRaw,
+        userStatus: 'waitlist_pending',
+      })
+      .onConflictDoUpdate({
+        target: users.clerkId,
+        set: {
+          userStatus: 'waitlist_pending',
+          updatedAt: new Date(),
+        },
+      });
+  });
 
-    // Detect platform and normalize primary social URL
-    const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
+  return NextResponse.json(
+    { success: true, status: existing.status },
+    { headers: NO_STORE_HEADERS }
+  );
+}
 
-    // Normalize Spotify URL if provided
-    const spotifyUrlNormalized = spotifyUrl
-      ? normalizeSpotifyUrl(spotifyUrl)
-      : null;
+/**
+ * Create new waitlist entry with profile
+ */
+async function createNewWaitlistEntry(data: WaitlistRequestData): Promise<void> {
+  await db.transaction(async tx => {
+    try {
+      const [entry] = await tx
+        .insert(waitlistEntries)
+        .values({
+          fullName: data.fullName,
+          email: data.email,
+          primaryGoal: data.primaryGoal,
+          primarySocialUrl: data.primarySocialUrl,
+          primarySocialPlatform: data.platform,
+          primarySocialUrlNormalized: data.normalizedUrl,
+          spotifyUrl: data.spotifyUrl,
+          spotifyUrlNormalized: data.spotifyUrlNormalized,
+          heardAbout: data.heardAbout,
+          selectedPlan: data.selectedPlan,
+          status: 'new' as const,
+        })
+        .returning({ id: waitlistEntries.id });
+
+      if (!entry) {
+        throw new Error('Failed to create waitlist entry');
+      }
+
+      const handleCandidate =
+        extractHandleFromUrl(data.normalizedUrl) ??
+        data.email.split('@')[0] ??
+        safeRandomHandle();
+
+      const baseHandle = validateUsername(handleCandidate).isValid
+        ? handleCandidate
+        : safeRandomHandle();
+
+      const usernameNormalized = await findAvailableHandle(tx, baseHandle);
+
+      const trimmedName = data.fullName.trim();
+      const displayName = trimmedName ? trimmedName.slice(0, 50) : 'Jovie creator';
+
+      await tx.insert(creatorProfiles).values({
+        creatorType: 'creator',
+        username: usernameNormalized,
+        usernameNormalized,
+        displayName,
+        isPublic: false,
+        isClaimed: false,
+        waitlistEntryId: entry.id,
+        settings: {},
+        theme: {},
+        ingestionStatus: 'idle',
+      });
+
+      await tx
+        .insert(users)
+        .values({
+          clerkId: data.userId,
+          email: data.emailRaw,
+          userStatus: 'waitlist_pending',
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: {
+            userStatus: 'waitlist_pending',
+            updatedAt: new Date(),
+          },
+        });
+    } catch (txError) {
+      logger.error('Waitlist API transaction error', txError);
+      throw txError;
+    }
+  });
+}
+
+/**
+ * Handle waitlist errors with appropriate responses
+ */
+function handleWaitlistError(error: unknown): NextResponse {
+  logger.error('Waitlist API error', error);
+
+  const isDev = process.env.NODE_ENV === 'development';
+  const errorMessage =
+    isDev && error instanceof Error
+      ? error.message
+      : 'Something went wrong. Please try again.';
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: errorMessage,
+      ...(isDev && error instanceof Error && { stack: error.stack, details: error }),
+    },
+    { status: 500, headers: NO_STORE_HEADERS }
+  );
+}
+
+export async function POST(request: Request) {
+  try {
+    const authResult = await validateAuthAndRateLimit(request);
+    if (!authResult.ok) return authResult.response;
+
+    const dbError = await checkDatabaseHealth();
+    if (dbError) return dbError;
+
+    const parseResult = await validateAndParseRequest(request);
+    if (!parseResult.ok) return parseResult.response;
+
+    const data = { ...parseResult.data, userId: authResult.userId };
 
     const [existing] = await db
       .select({ id: waitlistEntries.id, status: waitlistEntries.status })
       .from(waitlistEntries)
-      .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+      .where(drizzleSql`lower(${waitlistEntries.email}) = ${data.email}`)
       .limit(1);
 
     if (existing) {
-      // Avoid overwriting invited/claimed/rejected states.
-      // Wrap in transaction to ensure atomicity between waitlist and user updates
-      await db.transaction(async tx => {
-        if (existing.status === 'new') {
-          const updateValues = {
-            fullName,
-            primaryGoal: primaryGoal ?? null,
-            primarySocialUrl,
-            primarySocialPlatform: platform,
-            primarySocialUrlNormalized: normalizedUrl,
-            spotifyUrl: spotifyUrl ?? null,
-            spotifyUrlNormalized,
-            heardAbout: sanitizedHeardAbout,
-            selectedPlan: selectedPlan ?? null,
-            updatedAt: new Date(),
-          };
-
-          await tx
-            .update(waitlistEntries)
-            .set(updateValues)
-            .where(eq(waitlistEntries.id, existing.id));
-        }
-
-        // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
-        await tx
-          .insert(users)
-          .values({
-            clerkId: userId,
-            email: emailRaw,
-            userStatus: 'waitlist_pending',
-          })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: {
-              userStatus: 'waitlist_pending',
-              updatedAt: new Date(),
-            },
-          });
-      });
-
-      return NextResponse.json(
-        { success: true, status: existing.status },
-        { headers: NO_STORE_HEADERS }
-      );
+      return handleExistingEntry(existing, data);
     }
 
-    // Insert waitlist entry and update user in transaction for atomicity
-    const insertValues = {
-      fullName,
-      email,
-      primaryGoal: primaryGoal ?? null,
-      primarySocialUrl,
-      primarySocialPlatform: platform,
-      primarySocialUrlNormalized: normalizedUrl,
-      spotifyUrl: spotifyUrl ?? null,
-      spotifyUrlNormalized,
-      heardAbout: sanitizedHeardAbout,
-      selectedPlan: selectedPlan ?? null, // Quietly track pricing tier interest
-      status: 'new' as const,
-    };
-
-    await db.transaction(async tx => {
-      try {
-        // 1. Insert waitlist entry
-        const [entry] = await tx
-          .insert(waitlistEntries)
-          .values(insertValues)
-          .returning({ id: waitlistEntries.id });
-
-        if (!entry) {
-          throw new Error('Failed to create waitlist entry');
-        }
-
-        // 2. Auto-generate handle from social URL or email
-        const handleCandidate =
-          extractHandleFromUrl(normalizedUrl) ??
-          email.split('@')[0] ??
-          safeRandomHandle();
-
-        const baseHandle = validateUsername(handleCandidate).isValid
-          ? handleCandidate
-          : safeRandomHandle();
-
-        const usernameNormalized = await findAvailableHandle(tx, baseHandle);
-
-        // 3. Create unclaimed profile immediately (simplified signup flow)
-        // NOTE: Requires PR #1735 (waitlistEntryId column) to be merged first
-        const trimmedName = fullName.trim();
-        const displayName = trimmedName
-          ? trimmedName.slice(0, 50)
-          : 'Jovie creator';
-
-        await tx.insert(creatorProfiles).values({
-          creatorType: 'creator',
-          username: usernameNormalized,
-          usernameNormalized,
-          displayName,
-          isPublic: false, // Not public until approved
-          isClaimed: false, // Not claimed until approved
-          // userId omitted - defaults to NULL, will be linked on approval
-          waitlistEntryId: entry.id, // Link to waitlist entry (added in PR #1735)
-          settings: {},
-          theme: {},
-          ingestionStatus: 'idle',
-        });
-
-        // 4. Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
-        await tx
-          .insert(users)
-          .values({
-            clerkId: userId,
-            email: emailRaw,
-            userStatus: 'waitlist_pending',
-          })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: {
-              userStatus: 'waitlist_pending',
-              updatedAt: new Date(),
-            },
-          });
-      } catch (txError) {
-        logger.error('Waitlist API transaction error', txError);
-        throw txError;
-      }
-    });
+    await createNewWaitlistEntry(data);
 
     return NextResponse.json(
       { success: true, status: 'new' },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    logger.error('Waitlist API error', error);
-
-    // In development, return the actual error for debugging
-    const isDev = process.env.NODE_ENV === 'development';
-    const errorMessage =
-      isDev && error instanceof Error
-        ? error.message
-        : 'Something went wrong. Please try again.';
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: errorMessage,
-        ...(isDev &&
-          error instanceof Error && { stack: error.stack, details: error }),
-      },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+    return handleWaitlistError(error);
   }
 }
