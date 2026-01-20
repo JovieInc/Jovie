@@ -140,40 +140,6 @@ export function createValidationCache<K, V>(
 }
 
 /**
- * React hook for creating a validation cache that persists across renders.
- *
- * @example
- * ```tsx
- * function useHandleValidation() {
- *   const cache = useValidationCache<string, boolean>({ ttlMs: 60000 });
- *
- *   const validate = useCallback(async (handle: string) => {
- *     const cached = cache.get(handle);
- *     if (cached !== undefined) return cached;
- *
- *     const result = await checkHandle(handle);
- *     cache.set(handle, result);
- *     return result;
- *   }, [cache]);
- *
- *   return { validate };
- * }
- * ```
- */
-export function useValidationCache<K, V>(
-  options: CacheOptions = {}
-): ValidationCache<K, V> {
-  // Use a ref to persist the cache across renders
-  // This is intentionally not using useRef to avoid the import
-  // The cache is created once per component instance
-  const cacheInstance = createValidationCache<K, V>(options);
-
-  // In a real implementation, we'd use useRef here
-  // But since this file is pure utilities, consumers should wrap in useRef
-  return cacheInstance;
-}
-
-/**
  * Default cache options for common use cases
  */
 export const CACHE_PRESETS = {

@@ -52,7 +52,7 @@ export function isNetworkError(err: unknown): boolean {
     message.includes('network') ||
     message.includes('connection') ||
     message.includes('offline') ||
-    err.name === 'TypeError' // fetch throws TypeError for network issues
+    message.includes('failed to fetch') // fetch TypeError message
   );
 }
 
