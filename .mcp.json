@@ -10,6 +10,9 @@
     "puppeteer": {
       "command": "/opt/homebrew/bin/npx",
       "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    },
+    "linear": {
+      "url": "https://mcp.linear.app/sse"
     }
   }
 }
