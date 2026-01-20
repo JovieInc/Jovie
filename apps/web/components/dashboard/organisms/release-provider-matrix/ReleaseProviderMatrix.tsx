@@ -104,12 +104,28 @@ export function ReleaseProviderMatrix({
   const { setTableMeta } = useTableMeta();
 
   useEffect(() => {
+    // Toggle function: close if open, open first release if closed
+    const toggle = () => {
+      if (editingRelease) {
+        closeEditor();
+      } else if (rows.length > 0) {
+        openEditor(rows[0]);
+      }
+    };
+
     setTableMeta({
       rowCount: rows.length,
-      toggle: isSidebarOpen ? closeEditor : null,
+      toggle: rows.length > 0 ? toggle : null,
       rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
     });
-  }, [isSidebarOpen, rows.length, closeEditor, setTableMeta]);
+  }, [
+    editingRelease,
+    rows,
+    closeEditor,
+    openEditor,
+    isSidebarOpen,
+    setTableMeta,
+  ]);
 
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useHeaderActions();
