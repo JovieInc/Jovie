@@ -25,6 +25,7 @@ import {
   convertContextMenuItems,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
@@ -454,8 +455,7 @@ export function DashboardAudienceTableUnified({
                 }
                 getRowId={row => row.id}
                 enableVirtualization={true}
-                rowHeight={44}
-                minWidth='960px'
+                minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
                 className='text-[13px]'
                 getRowClassName={getRowClassName}
                 onRowClick={row => setSelectedMember(row)}
