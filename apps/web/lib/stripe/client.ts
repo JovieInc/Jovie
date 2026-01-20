@@ -9,27 +9,43 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 let stripeSingleton: Stripe | undefined;
+// Flag to prevent concurrent initialization (race condition fix)
+let stripeInitializing = false;
 
 function getStripe(): Stripe {
   if (stripeSingleton) return stripeSingleton;
 
-  const stripeSecretKey = env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    throw new Error('Missing STRIPE_SECRET_KEY');
+  // Prevent concurrent initialization - if another call is initializing, throw
+  // (the caller should retry, but in practice Stripe init is fast enough this rarely happens)
+  if (stripeInitializing) {
+    throw new Error('Stripe client initialization in progress, please retry');
   }
 
-  stripeSingleton = new Stripe(stripeSecretKey, {
-    appInfo: {
-      name: 'Jovie',
-      version: '1.0.0',
-      url: publicEnv.NEXT_PUBLIC_PROFILE_URL,
-    },
-    typescript: true,
-    timeout: 10000,
-    maxNetworkRetries: 3,
-  });
+  stripeInitializing = true;
+  try {
+    // Double-check after setting flag
+    if (stripeSingleton) return stripeSingleton;
 
-  return stripeSingleton;
+    const stripeSecretKey = env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      throw new Error('Missing STRIPE_SECRET_KEY');
+    }
+
+    stripeSingleton = new Stripe(stripeSecretKey, {
+      appInfo: {
+        name: 'Jovie',
+        version: '1.0.0',
+        url: publicEnv.NEXT_PUBLIC_PROFILE_URL,
+      },
+      typescript: true,
+      timeout: 10000,
+      maxNetworkRetries: 3,
+    });
+
+    return stripeSingleton;
+  } finally {
+    stripeInitializing = false;
+  }
 }
 
 export const stripe = new Proxy({} as Stripe, {

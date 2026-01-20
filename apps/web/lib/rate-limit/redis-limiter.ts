@@ -7,7 +7,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { Ratelimit } from '@upstash/ratelimit';
 
-import { redis } from '@/lib/redis';
+import { getRedis } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 
 /**
@@ -34,12 +34,13 @@ function toUpstashWindow(
 
 /**
  * Create a Redis-backed rate limiter
- * Returns null if Redis is not configured
+ * Returns null if Redis is not configured or unavailable
  */
 export function createRedisRateLimiter(
   config: RateLimitConfig
 ): Ratelimit | null {
-  if (!redis) {
+  const redisClient = getRedis();
+  if (!redisClient) {
     if (process.env.NODE_ENV === 'production') {
       Sentry.captureMessage(
         `Rate limiter "${config.name}" falling back to memory - Redis unavailable`,
@@ -50,7 +51,7 @@ export function createRedisRateLimiter(
   }
 
   return new Ratelimit({
-    redis,
+    redis: redisClient,
     limiter: Ratelimit.slidingWindow(
       config.limit,
       toUpstashWindow(config.window)
@@ -64,12 +65,12 @@ export function createRedisRateLimiter(
  * Check if Redis is available for rate limiting
  */
 export function isRedisAvailable(): boolean {
-  return redis !== null;
+  return getRedis() !== null;
 }
 
 /**
  * Get the Redis client (for advanced use cases)
  */
 export function getRedisClient() {
-  return redis;
+  return getRedis();
 }

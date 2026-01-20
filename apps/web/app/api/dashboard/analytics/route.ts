@@ -13,8 +13,35 @@ type CacheEntry = {
 };
 
 const TTL_MS = 5_000;
+const MAX_CACHE_ENTRIES = 1000;
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<unknown>>();
+
+/**
+ * Prune expired entries and enforce max cache size using LRU eviction.
+ * Called before adding new entries to prevent unbounded memory growth.
+ */
+function pruneCache(): void {
+  const now = Date.now();
+
+  // First pass: remove expired entries
+  for (const [key, entry] of cache) {
+    if (entry.expiresAt <= now) {
+      cache.delete(key);
+    }
+  }
+
+  // Second pass: if still over limit, remove oldest entries (LRU approximation)
+  if (cache.size > MAX_CACHE_ENTRIES) {
+    const entriesToRemove = cache.size - MAX_CACHE_ENTRIES;
+    const keys = cache.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const { value: key, done } = keys.next();
+      if (done) break;
+      cache.delete(key);
+    }
+  }
+}
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -91,6 +118,7 @@ export async function GET(request: Request) {
 
       try {
         const payload = await promise;
+        pruneCache();
         cache.set(key, { payload, expiresAt: Date.now() + TTL_MS });
         return NextResponse.json(payload, {
           status: 200,
