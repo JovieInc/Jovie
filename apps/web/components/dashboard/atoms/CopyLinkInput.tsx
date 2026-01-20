@@ -106,7 +106,7 @@ export function CopyLinkInput({
         className={cn(
           'w-full bg-surface-1 border border-subtle rounded-md pl-2 pr-8 py-1',
           'text-xs font-mono text-secondary-token truncate',
-          'cursor-text focus:outline-none focus:ring-1 focus:ring-ring',
+          'cursor-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
           'transition-colors',
           size === 'sm' && 'h-7',
           size === 'md' && 'h-8',

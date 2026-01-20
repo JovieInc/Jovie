@@ -59,7 +59,7 @@ export function AdminTableShell({
     >
       <div
         ref={tableContainerRef}
-        className='min-h-0 flex-1 overflow-auto flex flex-col rounded-xl focus:outline-none'
+        className='min-h-0 flex-1 overflow-auto flex flex-col rounded-xl focus-visible:outline-none'
         {...scrollContainerProps}
       >
         {toolbar ? (

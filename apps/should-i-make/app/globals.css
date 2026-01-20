@@ -62,7 +62,7 @@ body {
   background-color: var(--color-input-bg);
 }
 
-.input-field:focus {
+.input-field:focus-visible {
   border-color: var(--color-input-border-focus);
   outline: 2px solid transparent;
   outline-offset: 2px;

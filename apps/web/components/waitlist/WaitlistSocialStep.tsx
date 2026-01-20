@@ -148,7 +148,7 @@ export function WaitlistSocialStep({
                 ? 'waitlist-primary-social-url-error'
                 : undefined
             }
-            className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
+            className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
             placeholder='yourusername'
             disabled={isSubmitting}
             onKeyDown={handleKeyDown}

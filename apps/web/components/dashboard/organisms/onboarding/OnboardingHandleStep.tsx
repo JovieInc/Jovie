@@ -85,7 +85,7 @@ export function OnboardingHandleStep({
               autoCorrect='off'
               spellCheck={false}
               aria-invalid={handleValidation.error ? 'true' : undefined}
-              className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
+              className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
             />
             <div className='h-5 w-5 flex items-center justify-center'>
               {handleValidation.checking ? (
