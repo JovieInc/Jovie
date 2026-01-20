@@ -52,8 +52,13 @@ export default defineConfig({
         singleFork: false,
       },
     },
-    maxWorkers: process.env.CI ? 2 : undefined,
+    // CI stability: reduce memory pressure
+    maxWorkers: isCI ? 2 : undefined,
     minWorkers: 1,
+    fileParallelism: !isCI,
+    maxConcurrency: isCI ? 1 : undefined,
+
+    // Timeouts
     testTimeout: 10000,
     hookTimeout: 10000,
     teardownTimeout: 5000,
