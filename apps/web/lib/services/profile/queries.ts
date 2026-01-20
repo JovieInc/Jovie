@@ -62,6 +62,8 @@ export async function getProfileById(
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       profileViews: creatorProfiles.profileViews,
+      genres: creatorProfiles.genres,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
       createdAt: creatorProfiles.createdAt,
       updatedAt: creatorProfiles.updatedAt,
     })
@@ -103,6 +105,8 @@ export async function getProfileByUsername(
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       profileViews: creatorProfiles.profileViews,
+      genres: creatorProfiles.genres,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
       createdAt: creatorProfiles.createdAt,
       updatedAt: creatorProfiles.updatedAt,
     })
@@ -146,6 +150,8 @@ export async function getProfileWithUser(
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       profileViews: creatorProfiles.profileViews,
+      genres: creatorProfiles.genres,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
       createdAt: creatorProfiles.createdAt,
       updatedAt: creatorProfiles.updatedAt,
     })
@@ -370,6 +376,8 @@ async function fetchProfileFromDatabase(
         settings: creatorProfiles.settings,
         theme: creatorProfiles.theme,
         profileViews: creatorProfiles.profileViews,
+        genres: creatorProfiles.genres,
+        spotifyPopularity: creatorProfiles.spotifyPopularity,
         createdAt: creatorProfiles.createdAt,
         updatedAt: creatorProfiles.updatedAt,
       })
