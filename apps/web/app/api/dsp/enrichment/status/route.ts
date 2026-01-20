@@ -11,7 +11,7 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { and, eq, or } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db, ingestionJobs } from '@/lib/db';
@@ -132,22 +132,27 @@ export async function GET(request: Request) {
       );
     }
 
-    // Check for pending/processing discovery jobs
-    const pendingJobs = await db
-      .select({ id: ingestionJobs.id })
+    // Fetch the most recent discovery job for this profile
+    const [discoveryJob] = await db
+      .select({
+        id: ingestionJobs.id,
+        status: ingestionJobs.status,
+        createdAt: ingestionJobs.createdAt,
+        updatedAt: ingestionJobs.updatedAt,
+      })
       .from(ingestionJobs)
       .where(
         and(
           eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
-          or(
-            eq(ingestionJobs.status, 'pending'),
-            eq(ingestionJobs.status, 'processing')
-          )
+          sql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
         )
       )
+      .orderBy(desc(ingestionJobs.createdAt))
       .limit(1);
 
-    const hasPendingDiscoveryJob = pendingJobs.length > 0;
+    const hasPendingDiscoveryJob =
+      discoveryJob?.status === 'pending' ||
+      discoveryJob?.status === 'processing';
 
     // Fetch all matches for this profile
     const matches = await db
@@ -204,6 +209,30 @@ export async function GET(request: Request) {
       ? 25
       : calculateOverallProgress(providerStatuses);
 
+    // Calculate timestamps from job record
+    const discoveryStartedAt = discoveryJob?.createdAt?.toISOString() ?? null;
+    const discoveryCompletedAt =
+      discoveryJob?.status === 'succeeded'
+        ? (discoveryJob.updatedAt?.toISOString() ?? null)
+        : null;
+
+    // Enrichment timestamps are based on provider statuses
+    // Started when any provider has progress, completed when all are done
+    const hasEnrichmentStarted = providerStatuses.some(s => s.progress > 0);
+    const enrichmentStartedAt = hasEnrichmentStarted
+      ? (providerStatuses
+          .filter(s => s.lastUpdatedAt)
+          .sort((a, b) => a.lastUpdatedAt.localeCompare(b.lastUpdatedAt))[0]
+          ?.lastUpdatedAt ?? null)
+      : null;
+    const enrichmentCompletedAt =
+      overallPhase === 'complete'
+        ? (providerStatuses
+            .filter(s => s.lastUpdatedAt)
+            .sort((a, b) => b.lastUpdatedAt.localeCompare(a.lastUpdatedAt))[0]
+            ?.lastUpdatedAt ?? null)
+        : null;
+
     return NextResponse.json({
       success: true,
       status: {
@@ -211,10 +240,10 @@ export async function GET(request: Request) {
         overallPhase,
         overallProgress,
         providers: providerStatuses,
-        discoveryStartedAt: null, // TODO: Track from job
-        discoveryCompletedAt: null,
-        enrichmentStartedAt: null,
-        enrichmentCompletedAt: null,
+        discoveryStartedAt,
+        discoveryCompletedAt,
+        enrichmentStartedAt,
+        enrichmentCompletedAt,
       },
     });
   } catch (error) {
