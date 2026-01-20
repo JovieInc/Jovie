@@ -7,12 +7,12 @@ import { defineConfig } from 'vitest/config';
 // standard configuration while using the optimized defaults locally.
 dotenv.config({ path: '.env.test' });
 
-// Detect CI environment - reduce memory usage by using fewer threads
+// Detect CI environment - reduce memory usage by using fewer workers
 const isCI = process.env.CI === 'true';
 const maxThreadsFromEnv = process.env.VITEST_MAX_THREADS
   ? Number(process.env.VITEST_MAX_THREADS)
   : undefined;
-const defaultMaxThreads = isCI ? 2 : 2; // Default to 2 threads to reduce memory pressure
+const defaultMaxThreads = isCI ? 2 : 1; // Default to 1 worker locally for stability
 const maxThreads =
   maxThreadsFromEnv &&
   Number.isFinite(maxThreadsFromEnv) &&
@@ -57,17 +57,17 @@ export default defineConfig({
     // Use forks pool to prevent JS heap OOM in worker threads (mirrors CI stability)
     pool: 'forks',
     poolOptions: {
-      threads: {
-        // Optimize thread pool - reduce threads in CI to prevent memory exhaustion
-        minThreads: 1,
-        maxThreads,
-        useAtomics: true,
-      },
       forks: {
         minForks: 1,
         maxForks: maxThreads,
+        // Work around memory growth across many test files by recycling workers.
+        // Tinypool expects bytes.
+        maxMemoryLimitBeforeRecycle: 1024 * 1024 * 1024,
       },
     },
+
+    // Reduce in-worker concurrency to keep memory stable.
+    maxConcurrency: 1,
 
     // Aggressive timeouts to catch slow tests
     testTimeout: 5000, // 5s instead of 30s
