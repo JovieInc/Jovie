@@ -10,8 +10,10 @@
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import Script from 'next/script';
 import { cache } from 'react';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
+import { PROFILE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -29,6 +31,79 @@ import { trackServerEvent } from '@/lib/server-analytics';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
+
+/**
+ * Generate JSON-LD structured data for music content SEO.
+ * Implements schema.org MusicRecording/MusicAlbum schemas.
+ */
+function generateMusicStructuredData(
+  content: {
+    type: 'release' | 'track';
+    title: string;
+    artworkUrl: string | null;
+    releaseDate: Date | null;
+    providerLinks: Array<{ providerId: string; url: string }>;
+  },
+  creator: {
+    displayName: string | null;
+    username: string;
+    usernameNormalized: string;
+  }
+) {
+  const artistName = creator.displayName ?? creator.username;
+  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.title.toLowerCase().replace(/\s+/g, '-')}`;
+  const artistUrl = `${PROFILE_URL}/${creator.usernameNormalized}`;
+
+  // Build sameAs array from provider links
+  const sameAs = content.providerLinks.map(link => link.url);
+
+  const schemaType =
+    content.type === 'release' ? 'MusicAlbum' : 'MusicRecording';
+
+  const musicSchema = {
+    '@context': 'https://schema.org',
+    '@type': schemaType,
+    name: content.title,
+    url: contentUrl,
+    ...(content.artworkUrl && { image: content.artworkUrl }),
+    ...(content.releaseDate && {
+      datePublished: content.releaseDate.toISOString().split('T')[0],
+    }),
+    byArtist: {
+      '@type': 'MusicGroup',
+      name: artistName,
+      url: artistUrl,
+    },
+    ...(sameAs.length > 0 && { sameAs }),
+  };
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: PROFILE_URL,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: artistName,
+        item: artistUrl,
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: content.title,
+        item: contentUrl,
+      },
+    ],
+  };
+
+  return { musicSchema, breadcrumbSchema };
+}
 
 interface PageProps {
   params: Promise<{ username: string; slug: string }>;
@@ -291,21 +366,49 @@ export default async function ContentSmartLinkPage({
 
   const allProviders = [...providers, ...secondaryProviders];
 
+  // Generate structured data for SEO
+  const { musicSchema, breadcrumbSchema } = generateMusicStructuredData(
+    {
+      type: content.type,
+      title: content.title,
+      artworkUrl: content.artworkUrl,
+      releaseDate: content.releaseDate,
+      providerLinks: content.providerLinks,
+    },
+    creator
+  );
+
   // Use the same landing page component for both releases and tracks
   return (
-    <ReleaseLandingPage
-      release={{
-        title: content.title,
-        artworkUrl: content.artworkUrl,
-        releaseDate: content.releaseDate?.toISOString() ?? null,
-      }}
-      artist={{
-        name: creator.displayName ?? creator.username,
-        avatarUrl: creator.avatarUrl,
-      }}
-      providers={allProviders}
-      slug={`${creator.usernameNormalized}/${content.slug}`}
-    />
+    <>
+      {/* JSON-LD Structured Data for SEO */}
+      <Script
+        id='music-schema'
+        type='application/ld+json'
+        strategy='afterInteractive'
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(musicSchema) }}
+      />
+      <Script
+        id='breadcrumb-schema'
+        type='application/ld+json'
+        strategy='afterInteractive'
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+
+      <ReleaseLandingPage
+        release={{
+          title: content.title,
+          artworkUrl: content.artworkUrl,
+          releaseDate: content.releaseDate?.toISOString() ?? null,
+        }}
+        artist={{
+          name: creator.displayName ?? creator.username,
+          avatarUrl: creator.avatarUrl,
+        }}
+        providers={allProviders}
+        slug={`${creator.usernameNormalized}/${content.slug}`}
+      />
+    </>
   );
 }
 
@@ -330,35 +433,105 @@ export async function generateMetadata({
   }
 
   const artistName = creator.displayName ?? creator.username;
-  const title = `${content.title} by ${artistName}`;
-  const description = `Listen to "${content.title}" by ${artistName} on your favorite streaming platform.`;
+  const contentType = content.type === 'release' ? 'album' : 'song';
+  const canonicalUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.slug}`;
+
+  // Build SEO-optimized title
+  const title = `${content.title} by ${artistName} - Stream Now`;
+
+  // Build rich description with streaming context
+  const releaseYear = content.releaseDate
+    ? ` (${content.releaseDate.getFullYear()})`
+    : '';
+  const streamingPlatforms =
+    content.providerLinks.length > 0
+      ? content.providerLinks
+          .slice(0, 3)
+          .map(
+            l =>
+              PROVIDER_CONFIG[l.providerId as ProviderKey]?.label ||
+              l.providerId
+          )
+          .join(', ')
+      : 'Spotify, Apple Music';
+  const description = `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+
+  // Build dynamic keywords
+  const keywords = [
+    content.title,
+    artistName,
+    `${artistName} ${content.title}`,
+    `${content.title} lyrics`,
+    `${content.title} stream`,
+    `${artistName} music`,
+    `${artistName} ${contentType}`,
+    'stream music',
+    'music links',
+  ];
+
+  // Determine OG type based on content type
+  const ogType = content.type === 'release' ? 'music.album' : 'music.song';
 
   return {
     title,
     description,
+    keywords,
+    authors: [{ name: artistName }],
+    creator: artistName,
+    metadataBase: new URL(PROFILE_URL),
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     openGraph: {
-      title,
+      type: ogType,
+      title: `${content.title} by ${artistName}`,
       description,
+      url: canonicalUrl,
+      siteName: 'Jovie',
+      locale: 'en_US',
       images: content.artworkUrl
         ? [
             {
               url: content.artworkUrl,
               width: 640,
               height: 640,
-              alt: `${content.title} artwork`,
+              alt: `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`,
             },
           ]
         : undefined,
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: `${content.title} by ${artistName}`,
       description,
-      images: content.artworkUrl ? [content.artworkUrl] : undefined,
+      creator: '@jovieapp',
+      site: '@jovieapp',
+      images: content.artworkUrl
+        ? [
+            {
+              url: content.artworkUrl,
+              alt: `${content.title} artwork`,
+            },
+          ]
+        : undefined,
     },
-    robots: {
-      index: true,
-      follow: true,
+    other: {
+      'music:musician': artistName,
+      'music:release_type': content.type,
+      ...(content.releaseDate && {
+        'music:release_date': content.releaseDate.toISOString().split('T')[0],
+      }),
     },
   };
 }
