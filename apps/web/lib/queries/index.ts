@@ -56,6 +56,15 @@ export {
   fetchWithTimeout,
 } from './fetch';
 
+// Mutation utilities
+export {
+  createMutationCallbacks,
+  getErrorMessage,
+  handleMutationError,
+  handleMutationSuccess,
+  type MutationCallbackOptions,
+} from './mutation-utils';
+
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
 // Query key factories
@@ -125,3 +134,20 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+
+// Settings mutations
+export {
+  type SettingsUpdateInput,
+  useNotificationSettingsMutation,
+  useThemeMutation,
+  useUpdateSettingsMutation,
+} from './useSettingsMutation';
+
+// Social links mutations
+export {
+  type AcceptSuggestionInput,
+  type DismissSuggestionInput,
+  useAcceptSuggestionMutation,
+  useDismissSuggestionMutation,
+  useSuggestionMutations,
+} from './useSocialLinksMutation';

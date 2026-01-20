@@ -276,10 +276,53 @@ The `QueryErrorBoundary` component exists but isn't widely used. Wrap data-fetch
 
 ---
 
-## Next Steps
+## Completed Improvements (2026-01-20)
 
-1. Create tracking issue for this audit
-2. Implement mutation hooks for settings and links
-3. Add error toasts to silent failure components
-4. Update existing hooks to use cache presets
-5. Add QueryErrorBoundary to dashboard sections
+The following improvements have been implemented as part of this audit:
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `lib/queries/mutation-utils.ts` | Shared error handling utilities (`handleMutationError`, `handleMutationSuccess`, `getErrorMessage`) |
+| `lib/queries/useSettingsMutation.ts` | Settings mutation hooks (`useUpdateSettingsMutation`, `useThemeMutation`, `useNotificationSettingsMutation`) |
+| `lib/queries/useSocialLinksMutation.ts` | Social links mutation hooks (`useAcceptSuggestionMutation`, `useDismissSuggestionMutation`, `useSuggestionMutations`) |
+
+### Files Updated
+
+| File | Change |
+|------|--------|
+| `lib/queries/index.ts` | Export new mutation hooks and utilities |
+| `lib/queries/useBillingStatusQuery.ts` | Now uses `STANDARD_CACHE` preset instead of inline config |
+| `components/dashboard/organisms/SettingsAppearanceSection.tsx` | Now uses `useThemeMutation` hook with error toast |
+| `components/dashboard/organisms/SettingsNotificationsSection.tsx` | Now uses `useNotificationSettingsMutation` hook |
+| `components/dashboard/organisms/links/hooks/useSuggestionSync.ts` | Now uses mutation hooks instead of raw fetch |
+
+### Impact
+
+- **Error handling:** Settings components now show toast notifications on errors (previously silent)
+- **Consistency:** All updated components use the same mutation pattern with automatic cache invalidation
+- **Cache strategy:** `useBillingStatusQuery` now uses standardized cache preset
+- **Code reduction:** Removed ~80 lines of boilerplate fetch/error handling code
+
+### Updated Metrics
+
+| Metric | Before | After | Target |
+|--------|--------|-------|--------|
+| Files with raw fetch to `/api/*` | 43 | 40 | < 15 |
+| Mutation hooks | 5 | 8 | 12+ |
+| Hooks using cache presets | ~60% | ~70% | 100% |
+| Components with proper error handling | ~70% | ~80% | 100% |
+
+---
+
+## Remaining Next Steps
+
+1. ~~Implement mutation hooks for settings and links~~ ✅
+2. ~~Add error toasts to silent failure components~~ ✅
+3. ~~Update existing hooks to use cache presets~~ ✅ (partial)
+4. Refactor `useLinksPersistence.ts` to use mutation hooks for link saving
+5. Create mutation hook for `UpgradeButton.tsx` (Stripe checkout)
+6. Create mutation hook for `BillingPortalLink.tsx`
+7. Add QueryErrorBoundary to dashboard sections
+8. Continue migrating remaining raw fetch calls to mutation hooks

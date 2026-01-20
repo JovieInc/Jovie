@@ -2,14 +2,16 @@
  * useSuggestionSync Hook
  *
  * Custom hook for syncing link suggestions from the server.
- * Uses TanStack Query for polling, version tracking, and caching.
+ * Uses TanStack Query for polling, version tracking, caching, and mutations.
  */
 
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
-import { queryKeys, useSuggestionsQuery } from '@/lib/queries';
+import {
+  useAcceptSuggestionMutation,
+  useDismissSuggestionMutation,
+  useSuggestionsQuery,
+} from '@/lib/queries';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { LinkItem, SuggestedLink } from '../types';
 import {
@@ -92,8 +94,6 @@ export function useSuggestionSync({
   setLinks,
   setSuggestedLinks,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
-  const queryClient = useQueryClient();
-
   // Polling interval depends on whether we're in auto-refresh mode
   const refetchInterval = useMemo(
     () => (autoRefreshUntilMs ? 2000 : 4500),
@@ -106,6 +106,11 @@ export function useSuggestionSync({
     enabled: suggestionsEnabled && !!profileId,
     refetchInterval,
   });
+
+  // Use mutation hooks for accept/dismiss actions
+  // These handle toasts and cache invalidation automatically
+  const acceptMutation = useAcceptSuggestionMutation(profileId);
+  const dismissMutation = useDismissSuggestionMutation(profileId);
 
   // Process query data and update local state
   useEffect(() => {
@@ -138,7 +143,7 @@ export function useSuggestionSync({
     await refetch();
   }, [profileId, suggestionsEnabled, refetch]);
 
-  // Handle accepting a suggestion
+  // Handle accepting a suggestion using the mutation hook
   const handleAcceptSuggestion = useCallback(
     async (
       suggestion: DetectedLink & { suggestionId?: string }
@@ -148,60 +153,40 @@ export function useSuggestionSync({
         return null;
       }
 
-      try {
-        const suggestionId = suggestion.suggestionId;
-        if (!suggestionId) {
-          return null;
-        }
-
-        const response = await fetch('/api/dashboard/social-links', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId,
-            linkId: suggestionId,
-            action: 'accept',
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(errorData?.error || 'Failed to accept link');
-        }
-
-        const responseData = (await response.json()) as {
-          link?: ProfileSocialLink;
-        };
-
-        if (responseData.link) {
-          const [detected] = convertDbLinksToLinkItems([responseData.link]);
-          setSuggestedLinks(prev =>
-            prev.filter(s => s.suggestionId !== suggestionId)
-          );
-          if (detected) {
-            setLinks(prev => [...prev, detected]);
-          }
-          // Invalidate the suggestions query to ensure fresh data
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.suggestions.list(profileId),
-          });
-          toast.success('Link added to your list');
-          return detected ?? null;
-        }
-      } catch (error) {
-        console.error(error);
-        toast.error(
-          error instanceof Error ? error.message : 'Failed to accept link'
-        );
+      const suggestionId = suggestion.suggestionId;
+      if (!suggestionId) {
+        return null;
       }
-      return null;
+
+      return new Promise(resolve => {
+        acceptMutation.mutate(
+          { profileId, linkId: suggestionId },
+          {
+            onSuccess: data => {
+              if (data.link) {
+                const [detected] = convertDbLinksToLinkItems([data.link]);
+                setSuggestedLinks(prev =>
+                  prev.filter(s => s.suggestionId !== suggestionId)
+                );
+                if (detected) {
+                  setLinks(prev => [...prev, detected]);
+                }
+                resolve(detected ?? null);
+              } else {
+                resolve(null);
+              }
+            },
+            onError: () => {
+              resolve(null);
+            },
+          }
+        );
+      });
     },
-    [profileId, setLinks, setSuggestedLinks, queryClient]
+    [profileId, acceptMutation, setLinks, setSuggestedLinks]
   );
 
-  // Handle dismissing a suggestion
+  // Handle dismissing a suggestion using the mutation hook
   const handleDismissSuggestion = useCallback(
     async (
       suggestion: DetectedLink & { suggestionId?: string }
@@ -215,40 +200,24 @@ export function useSuggestionSync({
         return;
       }
 
-      try {
-        const response = await fetch('/api/dashboard/social-links', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId,
-            linkId: suggestion.suggestionId,
-            action: 'dismiss',
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(errorData?.error || 'Failed to dismiss link');
-        }
-
-        setSuggestedLinks(prev =>
-          prev.filter(s => s.suggestionId !== suggestion.suggestionId)
+      return new Promise(resolve => {
+        dismissMutation.mutate(
+          { profileId, linkId: suggestion.suggestionId! },
+          {
+            onSuccess: () => {
+              setSuggestedLinks(prev =>
+                prev.filter(s => s.suggestionId !== suggestion.suggestionId)
+              );
+              resolve();
+            },
+            onError: () => {
+              resolve();
+            },
+          }
         );
-        // Invalidate the suggestions query to ensure fresh data
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.suggestions.list(profileId),
-        });
-        toast.success('Suggestion dismissed');
-      } catch (error) {
-        console.error(error);
-        toast.error(
-          error instanceof Error ? error.message : 'Failed to dismiss link'
-        );
-      }
+      });
     },
-    [profileId, setSuggestedLinks, queryClient]
+    [profileId, dismissMutation, setSuggestedLinks]
   );
 
   return {
