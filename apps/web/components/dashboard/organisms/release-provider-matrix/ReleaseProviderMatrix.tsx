@@ -1,10 +1,16 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useState } from 'react';
+import { Copy } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
+import { useRowSelection } from '@/components/organisms/table';
+import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
@@ -38,6 +44,38 @@ export function ReleaseProviderMatrix({
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
+  // Row selection
+  const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const { selectedIds, clearSelection, setSelection } = useRowSelection(rowIds);
+
+  // Bulk actions
+  const bulkActions = useMemo(() => {
+    const selectedReleases = rows.filter(r => selectedIds.has(r.id));
+
+    return [
+      {
+        label: 'Copy Smart Links',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const links = selectedReleases
+            .map(r => `${window.location.origin}${r.smartLinkPath}`)
+            .join('\n');
+          navigator.clipboard.writeText(links);
+          clearSelection();
+        },
+      },
+      {
+        label: 'Copy Titles',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => {
+          const titles = selectedReleases.map(r => r.title).join('\n');
+          navigator.clipboard.writeText(titles);
+          clearSelection();
+        },
+      },
+    ];
+  }, [rows, selectedIds, clearSelection]);
+
   const handleArtistConnected = (
     newReleases: ReleaseViewModel[],
     newArtistName: string
@@ -62,61 +100,67 @@ export function ReleaseProviderMatrix({
 
   const isSidebarOpen = Boolean(editingRelease);
 
+  // Connect to tableMeta for drawer toggle button
+  const { setTableMeta } = useTableMeta();
+
+  // Use ref to avoid infinite loop - rows array reference changes each render
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+
+  useEffect(() => {
+    // Toggle function: close if open, open first release if closed
+    const toggle = () => {
+      if (editingRelease) {
+        closeEditor();
+      } else if (rowsRef.current.length > 0) {
+        openEditor(rowsRef.current[0]);
+      }
+    };
+
+    setTableMeta({
+      rowCount: rows.length,
+      toggle: rows.length > 0 ? toggle : null,
+      rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+  }, [
+    editingRelease,
+    rows.length,
+    closeEditor,
+    openEditor,
+    isSidebarOpen,
+    setTableMeta,
+  ]);
+
+  // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
+  const { setHeaderBadge, setHeaderActions } = useHeaderActions();
+
+  useEffect(() => {
+    // Spotify pill on left side of header
+    if (isConnected && artistName) {
+      setHeaderBadge(
+        <span className='inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954]'>
+          <SocialIcon platform='spotify' className='h-3 w-3' />
+          {artistName}
+        </span>
+      );
+    } else {
+      setHeaderBadge(null);
+    }
+
+    // Drawer toggle on right side
+    setHeaderActions(<DrawerToggleButton />);
+
+    return () => {
+      setHeaderBadge(null);
+      setHeaderActions(null);
+    };
+  }, [isConnected, artistName, setHeaderBadge, setHeaderActions]);
+
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
       {/* Main content area */}
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
-        <div className='shrink-0 border-b border-subtle'>
-          <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6'>
-            <div className='flex items-center gap-3'>
-              <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
-                Releases
-              </p>
-              {isConnected && artistName && (
-                <span className='inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954]'>
-                  <SocialIcon platform='spotify' className='h-3 w-3' />
-                  {artistName}
-                </span>
-              )}
-            </div>
-            <div className='flex items-center gap-3'>
-              {totalOverrides > 0 && (
-                <span className='inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'>
-                  <Icon
-                    name='PencilLine'
-                    className='h-3 w-3'
-                    aria-hidden='true'
-                  />
-                  {totalOverrides}{' '}
-                  {totalOverrides === 1 ? 'override' : 'overrides'}
-                </span>
-              )}
-              {isConnected && (
-                <button
-                  type='button'
-                  disabled={isSyncing}
-                  onClick={handleSync}
-                  data-testid='sync-spotify-button'
-                  className='inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-1.5 text-sm text-secondary-token transition-colors hover:bg-base hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
-                  aria-label='Sync releases from Spotify'
-                  aria-busy={isSyncing}
-                >
-                  <Icon
-                    name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                    className={cn(
-                      'h-4 w-4',
-                      isSyncing && 'animate-spin motion-reduce:animate-none'
-                    )}
-                    aria-hidden='true'
-                  />
-                  <span>{isSyncing ? 'Syncing...' : 'Sync from Spotify'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
         <div className='flex-1 min-h-0 flex flex-col bg-base'>
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
@@ -150,7 +194,6 @@ export function ReleaseProviderMatrix({
             {showReleasesTable && (
               <ReleaseTable
                 releases={rows}
-                primaryProviders={primaryProviders}
                 providerConfig={providerConfig}
                 artistName={artistName}
                 onCopy={handleCopy}
@@ -159,6 +202,10 @@ export function ReleaseProviderMatrix({
                 onSync={handleSync}
                 isAddingUrl={isSaving}
                 isSyncing={isSyncing}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelection}
+                bulkActions={bulkActions}
+                onClearSelection={clearSelection}
               />
             )}
 

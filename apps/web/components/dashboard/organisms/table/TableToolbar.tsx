@@ -1,5 +1,6 @@
 import { Checkbox } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { TableCountBadge } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 export interface TableToolbarProps {
@@ -69,9 +70,10 @@ export function TableToolbar({
         )}
 
         <div className='flex items-center gap-1.5'>
-          <span className='rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium tabular-nums'>
-            {hasSelection ? `${selectedCount} selected` : `${totalCount} total`}
-          </span>
+          <TableCountBadge
+            selectedCount={selectedCount}
+            totalCount={totalCount}
+          />
         </div>
       </div>
 

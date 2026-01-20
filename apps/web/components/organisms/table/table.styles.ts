@@ -5,8 +5,7 @@
 
 // Typography Scale - Visual Hierarchy
 export const typography = {
-  tableHeader:
-    'text-xs font-semibold uppercase tracking-wide text-tertiary-token line-clamp-1',
+  tableHeader: 'text-xs font-medium text-secondary-token line-clamp-1',
   cellPrimary: 'text-[13px] font-medium text-primary-token', // Main content
   cellSecondary: 'text-[13px] text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
@@ -19,7 +18,8 @@ export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
   rowHeight: '44px', // Fixed height for consistent alignment (compact standard)
-  cellPadding: 'px-4 py-3', // Consistent padding
+  cellPadding: 'px-4 py-3', // Consistent padding for cells
+  headerPadding: 'px-4 py-2', // Compact padding for headers
   checkboxSize: 'h-4 w-4', // 16px checkbox
 } as const;
 
@@ -29,6 +29,12 @@ export const selection = {
   checked: 'bg-surface-2/70 hover:bg-surface-2',
   selected: 'bg-primary/5 border-l-2 border-primary',
   hover: 'hover:bg-surface-2/50',
+} as const;
+
+// Icon Colors (use CSS variables where possible)
+export const iconColors = {
+  // Sort indicator - matches tertiary-token but slightly more visible
+  sortIndicator: 'text-tertiary-token',
 } as const;
 
 // Z-Index Layers
@@ -60,7 +66,7 @@ export const columnWidths = {
 // Layout Stability - Fixed Heights to Prevent Layout Shift
 export const layoutStability = {
   rowHeight: '44px',
-  headerHeight: '44px',
+  headerHeight: '36px', // Compact header with py-2 padding
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
@@ -128,5 +134,5 @@ export const presets = {
     'last:border-b-0'
   ),
   tableCell: cn(alignment.cellPadding, typography.cellPrimary),
-  tableHeader: cn(alignment.cellPadding, typography.tableHeader, 'text-left'),
+  tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),
 } as const;

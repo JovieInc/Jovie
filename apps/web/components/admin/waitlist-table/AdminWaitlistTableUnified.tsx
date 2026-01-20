@@ -8,12 +8,12 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
+  TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';

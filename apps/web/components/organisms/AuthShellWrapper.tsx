@@ -69,6 +69,9 @@ function AuthShellWrapperInner({ children }: { children: ReactNode }) {
       <PreviewToggleButton />
     ) : null);
 
+  // Header badge from context (shown after breadcrumb on left side)
+  const headerBadge = headerActionsContext?.headerBadge ?? null;
+
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
       <PreviewPanelProvider enabled={previewEnabled}>
@@ -76,6 +79,7 @@ function AuthShellWrapperInner({ children }: { children: ReactNode }) {
           section={config.section}
           navigation={config.navigation}
           breadcrumbs={config.breadcrumbs}
+          headerBadge={headerBadge}
           headerAction={headerAction}
           showMobileTabs={config.showMobileTabs}
           drawerContent={config.drawerContent}
