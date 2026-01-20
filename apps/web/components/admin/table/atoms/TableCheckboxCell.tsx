@@ -108,21 +108,24 @@ export function TableCheckboxCell<TData = unknown>(
   // Header cell
   if (table && headerCheckboxState !== undefined && onToggleSelectAll) {
     // Convert boolean to 'checked'/'unchecked' format
-    const getNormalizedState = (): 'checked' | 'unchecked' | 'indeterminate' => {
+    const getNormalizedState = ():
+      | 'checked'
+      | 'unchecked'
+      | 'indeterminate' => {
       if (typeof headerCheckboxState !== 'boolean') return headerCheckboxState;
       return headerCheckboxState ? 'checked' : 'unchecked';
     };
     const normalizedState = getNormalizedState();
 
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container
-      // biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only
+      // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
+        role='presentation'
       >
         <Checkbox
           aria-label='Select all rows'
@@ -138,14 +141,14 @@ export function TableCheckboxCell<TData = unknown>(
   // Row cell
   if (row && typeof isChecked === 'boolean' && onToggleSelect) {
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container
-      // biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only
+      // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
+        role='presentation'
       >
         <span
           className={cn(

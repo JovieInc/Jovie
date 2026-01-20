@@ -7,7 +7,7 @@
 
 import path from 'path';
 
-const CONTROL_CHARACTER_REGEX = /[\x00-\x1F\x80-\x9F]/g;
+const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u0080-\u009F]/g;
 
 /**
  * Validates that a file path is within an allowed base directory.

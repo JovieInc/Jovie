@@ -38,7 +38,11 @@ export function ProgressIndicator({
   return (
     <div
       className={`space-y-4 ${className}`}
+      role='progressbar'
       aria-label={`Progress: Step ${currentStep + 1} of ${totalSteps}`}
+      aria-valuenow={currentStep + 1}
+      aria-valuemin={1}
+      aria-valuemax={totalSteps}
     >
       {/* Progress bar */}
       <div className='space-y-2'>
@@ -71,18 +75,24 @@ export function ProgressIndicator({
             <div
               key={step.id}
               className={(() => {
-                const baseClasses = 'flex flex-col items-center space-y-1 transition-all duration-200 flex-1';
-                if (isCompleted) return `${baseClasses} text-green-600 dark:text-green-400`;
-                if (isCurrent) return `${baseClasses} text-blue-600 dark:text-blue-400`;
+                const baseClasses =
+                  'flex flex-col items-center space-y-1 transition-all duration-200 flex-1';
+                if (isCompleted)
+                  return `${baseClasses} text-green-600 dark:text-green-400`;
+                if (isCurrent)
+                  return `${baseClasses} text-blue-600 dark:text-blue-400`;
                 return `${baseClasses} text-gray-400 dark:text-gray-600`;
               })()}
             >
               {/* Step circle */}
               <div
                 className={(() => {
-                  const baseClasses = 'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-200';
-                  if (isCompleted) return `${baseClasses} bg-green-500 border-green-500 text-white`;
-                  if (isCurrent) return `${baseClasses} bg-blue-500 border-blue-500 text-white`;
+                  const baseClasses =
+                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-200';
+                  if (isCompleted)
+                    return `${baseClasses} bg-green-500 border-green-500 text-white`;
+                  if (isCurrent)
+                    return `${baseClasses} bg-blue-500 border-blue-500 text-white`;
                   return `${baseClasses} bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400`;
                 })()}
               >

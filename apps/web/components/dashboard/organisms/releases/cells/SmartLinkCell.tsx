@@ -35,8 +35,13 @@ export function SmartLinkCell({ release }: SmartLinkCellProps) {
   }, [release.title, smartLinkTestId]);
 
   return (
-    /* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noNoninteractiveElementInteractions lint/a11y/noStaticElementInteractions: stopPropagation prevents row click from firing */
-    <div className='contents' onClick={e => e.stopPropagation()}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for copy input
+    <div
+      className='contents'
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+      role='presentation'
+    >
       <CopyLinkInput
         url={smartLinkUrl}
         size='sm'

@@ -23,7 +23,8 @@ import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
-  const baseClasses = 'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
+  const baseClasses =
+    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
   if (isChecked) return cn(baseClasses, 'bg-[#ebebf6] dark:bg-[#1b1d38]');
   if (isSelected) return cn(baseClasses, 'bg-base dark:bg-surface-2');
   return cn(baseClasses, 'hover:bg-base dark:hover:bg-surface-2');
@@ -138,14 +139,14 @@ export function CreatorProfileTableRow({
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
             handleActivationKeyDown(event, e => e.stopPropagation())
           }
+          role='presentation'
         >
           <span
             className={cn(
