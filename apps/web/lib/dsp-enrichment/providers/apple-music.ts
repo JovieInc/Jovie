@@ -15,6 +15,12 @@
 
 import 'server-only';
 
+import {
+  getCachedArtistProfile,
+  getCachedIsrcTrack,
+  setCachedArtistProfile,
+  setCachedIsrcTrack,
+} from '../cache';
 import { appleMusicCircuitBreaker } from '../circuit-breakers';
 import type {
   AppleMusicAlbum,
@@ -253,10 +259,28 @@ export async function bulkLookupByIsrc(
     );
   }
 
+  const trackMap = new Map<string, AppleMusicTrack>();
+  const uncachedIsrcs: string[] = [];
+
+  // Check cache first for each ISRC
+  for (const isrc of isrcs) {
+    const cached = getCachedIsrcTrack<AppleMusicTrack>(isrc);
+    if (cached) {
+      trackMap.set(isrc.toUpperCase(), cached);
+    } else {
+      uncachedIsrcs.push(isrc);
+    }
+  }
+
+  // If all ISRCs were cached, return early
+  if (uncachedIsrcs.length === 0) {
+    return trackMap;
+  }
+
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
   // Apple Music accepts comma-separated ISRCs
-  const isrcParam = isrcs.map(i => encodeURIComponent(i)).join(',');
+  const isrcParam = uncachedIsrcs.map(i => encodeURIComponent(i)).join(',');
 
   const result = await executeWithCircuitBreaker(async () => {
     const response = await musicKitRequest<AppleMusicTrack>(
@@ -266,14 +290,14 @@ export async function bulkLookupByIsrc(
     return response;
   });
 
-  const trackMap = new Map<string, AppleMusicTrack>();
-
   if (result.data) {
     for (const track of result.data) {
       const trackIsrc = track.attributes?.isrc;
       if (trackIsrc) {
-        // Normalize ISRC to uppercase for consistent matching
-        trackMap.set(trackIsrc.toUpperCase(), track);
+        const normalizedIsrc = trackIsrc.toUpperCase();
+        trackMap.set(normalizedIsrc, track);
+        // Cache the result for future lookups
+        setCachedIsrcTrack(normalizedIsrc, track);
       }
     }
   }
@@ -320,6 +344,12 @@ export async function getArtist(
   artistId: string,
   options: AppleMusicProviderOptions = {}
 ): Promise<AppleMusicArtist | null> {
+  // Check cache first
+  const cached = getCachedArtistProfile<AppleMusicArtist>(artistId);
+  if (cached) {
+    return cached;
+  }
+
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
   const result = await executeWithCircuitBreaker(async () => {
@@ -331,7 +361,14 @@ export async function getArtist(
     return response;
   });
 
-  return result.data?.[0] ?? null;
+  const artist = result.data?.[0] ?? null;
+
+  // Cache the result for future lookups
+  if (artist) {
+    setCachedArtistProfile(artistId, artist);
+  }
+
+  return artist;
 }
 
 /**
