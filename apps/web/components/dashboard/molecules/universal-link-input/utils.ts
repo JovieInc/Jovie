@@ -5,6 +5,7 @@
  */
 
 import {
+  CATEGORY_LABELS,
   CATEGORY_ORDER,
   type PLATFORM_OPTIONS,
   type PlatformCategory,
@@ -142,15 +143,6 @@ export function fuzzyScore(queryRaw: string, targetRaw: string): number | null {
   return result?.score ?? null;
 }
 
-/**
- * Get the best match indices for highlighting a platform name.
- * Tries matching against both name and id, returns indices for the name.
- */
-export function getMatchIndices(query: string, name: string): number[] {
-  const result = fuzzyMatch(query, name);
-  return result?.matchIndices ?? [];
-}
-
 export type RankedPlatformOption = PlatformOption & {
   matchIndices: number[];
 };
@@ -189,16 +181,9 @@ export function groupByCategory(options: RankedPlatformOption[]): {
     groups.set(option.category, existing);
   }
 
-  const categoryLabels: Record<PlatformCategory, string> = {
-    music: 'Music',
-    social: 'Social',
-    video: 'Video',
-    other: 'Other',
-  };
-
   return CATEGORY_ORDER.filter(cat => groups.has(cat)).map(cat => ({
     category: cat,
-    label: categoryLabels[cat],
+    label: CATEGORY_LABELS[cat],
     options: groups.get(cat) ?? [],
   }));
 }
