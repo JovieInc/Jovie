@@ -25,6 +25,22 @@ interface PriceMapping {
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
     {
+      priceId: env.STRIPE_PRICE_INTRO_MONTHLY || '',
+      plan: 'standard',
+      amount: 500,
+      currency: 'usd',
+      interval: 'month',
+      description: 'Intro Monthly',
+    },
+    {
+      priceId: env.STRIPE_PRICE_INTRO_YEARLY || '',
+      plan: 'standard',
+      amount: 5000,
+      currency: 'usd',
+      interval: 'year',
+      description: 'Intro Yearly',
+    },
+    {
       priceId: env.STRIPE_PRICE_STANDARD_MONTHLY || '',
       plan: 'standard',
       amount: 500,

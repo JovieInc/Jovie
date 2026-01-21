@@ -16,15 +16,17 @@ import {
 
 describe('AvatarUploadable - Drag and Drop', () => {
   const { mockOnUpload } = createMockCallbacks();
+  let restoreUrlMocks: (() => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    setupUrlMocks();
+    restoreUrlMocks = setupUrlMocks();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreUrlMocks?.();
   });
 
   it('handles drag enter and shows drag overlay', async () => {
