@@ -20,7 +20,6 @@ import { toast } from 'sonner';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
@@ -33,6 +32,7 @@ import {
   convertContextMenuItems,
   DateCell,
   SocialLinksCell,
+  TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';

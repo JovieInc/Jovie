@@ -20,6 +20,9 @@ export interface AuthShellProps {
   section: 'admin' | 'dashboard' | 'settings';
   navigation: NavItem[];
   breadcrumbs: DashboardBreadcrumbItem[];
+  /** Badge/pill shown after breadcrumb (left side) */
+  headerBadge?: ReactNode;
+  /** Actions shown on right side of header */
   headerAction?: ReactNode;
   showMobileTabs?: boolean;
   drawerContent?: ReactNode;
@@ -35,6 +38,7 @@ function AuthShellInner({
   section,
   navigation,
   breadcrumbs,
+  headerBadge,
   headerAction,
   showMobileTabs = false,
   drawerContent,
@@ -74,6 +78,7 @@ function AuthShellInner({
                 breadcrumbs={breadcrumbs}
                 leading={MobileMenuButton}
                 sidebarTrigger={SidebarExpandButton}
+                breadcrumbSuffix={headerBadge}
                 action={headerAction}
                 showDivider={isTableRoute}
                 mobileTabs={

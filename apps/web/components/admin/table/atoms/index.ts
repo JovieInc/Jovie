@@ -3,20 +3,18 @@
  * Re-exports from organisms/table for backwards compatibility
  */
 
-// Re-export from unified organisms/table location
+// Re-export everything from unified organisms/table location
 export {
   TableBadge,
   TableCell,
   type TableCellProps,
+  TableCheckboxCell,
+  type TableCheckboxCellLegacyProps,
+  type TableCheckboxCellProps,
+  type TableCheckboxCellTanStackProps,
   TableEmptyState,
   type TableEmptyStateProps,
   TableHeaderCell,
   type TableHeaderCellProps,
   TableIconButton,
 } from '@/components/organisms/table';
-
-// Admin-specific component (kept for now)
-export {
-  TableCheckboxCell,
-  type TableCheckboxCellProps,
-} from './TableCheckboxCell';

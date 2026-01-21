@@ -7,6 +7,9 @@ export interface DashboardHeaderProps {
   breadcrumbs: DashboardBreadcrumbItem[];
   leading?: ReactNode;
   sidebarTrigger?: ReactNode;
+  /** Content shown after breadcrumb (left side) */
+  breadcrumbSuffix?: ReactNode;
+  /** Content shown on right side */
   action?: ReactNode;
   showDivider?: boolean;
   className?: string;
@@ -17,6 +20,7 @@ export function DashboardHeader({
   breadcrumbs,
   leading,
   sidebarTrigger,
+  breadcrumbSuffix,
   action,
   showDivider = false,
   className,
@@ -49,10 +53,11 @@ export function DashboardHeader({
           </span>
         </h1>
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='hidden flex-1 items-center gap-2 sm:flex'>
+        <div className='hidden flex-1 items-center gap-3 sm:flex'>
           <span className='text-[13px] font-medium text-primary-token'>
             {currentLabel}
           </span>
+          {breadcrumbSuffix}
         </div>
         {action ? (
           <div className='ml-auto flex items-center gap-2'>{action}</div>
