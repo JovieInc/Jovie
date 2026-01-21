@@ -8,14 +8,8 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
-  AudienceActionsCell,
-  AudienceDeviceCell,
   AudienceLastSeenCell,
-  AudienceLocationCell,
   AudienceRowSelectionCell,
-  AudienceTypeBadge,
-  AudienceUserCell,
-  AudienceVisitsCell,
 } from '@/components/dashboard/audience/table/atoms';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
@@ -29,6 +23,15 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
+import {
+  renderActionsCell,
+  renderDeviceCell,
+  renderEmailCell,
+  renderLocationCell,
+  renderTypeCell,
+  renderUserCell,
+  renderVisitsCell,
+} from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
@@ -177,14 +180,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('displayName', {
         id: 'user',
         header: 'User',
-        cell: ({ row }) => (
-          <AudienceUserCell
-            displayName={row.original.displayName}
-            type={row.original.type}
-            email={row.original.email}
-            phone={row.original.phone}
-          />
-        ),
+        cell: renderUserCell,
         size: 240,
       }),
 
@@ -192,7 +188,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('type', {
         id: 'type',
         header: 'Type',
-        cell: ({ getValue }) => <AudienceTypeBadge type={getValue()} />,
+        cell: renderTypeCell,
         size: 120,
       }),
 
@@ -200,9 +196,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('locationLabel', {
         id: 'location',
         header: 'Location',
-        cell: ({ getValue }) => (
-          <AudienceLocationCell locationLabel={getValue()} />
-        ),
+        cell: renderLocationCell,
         size: 160,
       }),
 
@@ -210,7 +204,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('deviceType', {
         id: 'device',
         header: 'Device',
-        cell: ({ getValue }) => <AudienceDeviceCell deviceType={getValue()} />,
+        cell: renderDeviceCell,
         size: 140,
       }),
 
@@ -218,12 +212,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('visits', {
         id: 'visits',
         header: 'Visits',
-        cell: ({ row }) => (
-          <AudienceVisitsCell
-            visits={row.original.visits}
-            intentLevel={row.original.intentLevel}
-          />
-        ),
+        cell: renderVisitsCell,
         size: 120,
       }),
 
@@ -231,12 +220,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('latestActions', {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <AudienceActionsCell
-            rowId={row.original.id}
-            actions={row.original.latestActions}
-          />
-        ),
+        cell: renderActionsCell,
         size: 180,
       }),
 
@@ -310,14 +294,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('displayName', {
         id: 'user',
         header: 'User',
-        cell: ({ row }) => (
-          <AudienceUserCell
-            displayName={row.original.displayName}
-            type={row.original.type}
-            email={row.original.email}
-            phone={row.original.phone}
-          />
-        ),
+        cell: renderUserCell,
         size: 300,
       }),
 
@@ -325,9 +302,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('email', {
         id: 'email',
         header: 'Email',
-        cell: ({ getValue }) => (
-          <span className='text-secondary-token'>{getValue() ?? '—'}</span>
-        ),
+        cell: renderEmailCell,
         size: 240,
       }),
 

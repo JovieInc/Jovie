@@ -28,17 +28,17 @@ export function TableHeaderCell({
     right: 'text-right',
   };
 
+  // Map sort direction without nested ternary
+  const sortButtonDirection =
+    sortDirection === 'asc' || sortDirection === 'desc'
+      ? sortDirection
+      : undefined;
+
   const content =
     sortable && onSort ? (
       <SortableHeaderButton
         label={typeof children === 'string' ? children : String(children)}
-        direction={
-          sortDirection === 'asc'
-            ? 'asc'
-            : sortDirection === 'desc'
-              ? 'desc'
-              : undefined
-        }
+        direction={sortButtonDirection}
         onClick={onSort}
       />
     ) : (

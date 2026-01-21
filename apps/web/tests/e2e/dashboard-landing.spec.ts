@@ -1,4 +1,5 @@
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 /**
  * Dashboard Landing Smoke Tests (ENG-002)
@@ -36,11 +37,16 @@ test.describe('Dashboard Landing @smoke', () => {
       }
     });
 
-    await page.goto('/app/dashboard', { timeout: 30000 });
-    await page.waitForLoadState('networkidle');
+    await page.goto('/app/dashboard', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForLoadState('load');
 
-    // Wait a bit to catch any delayed redirects
-    await page.waitForTimeout(2000);
+    // Wait for URL to stabilize (catch delayed redirects deterministically)
+    await expect(page).toHaveURL(/\/app\/dashboard/, {
+      timeout: SMOKE_TIMEOUTS.URL_STABLE,
+    });
 
     // Verify we're on the dashboard, NOT on onboarding
     const currentUrl = page.url();
@@ -66,9 +72,16 @@ test.describe('Dashboard Landing @smoke', () => {
       }
     });
 
-    await page.goto('/app/dashboard', { timeout: 30000 });
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await page.goto('/app/dashboard', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForLoadState('load');
+
+    // Wait for URL to stabilize
+    await expect(page).toHaveURL(/\/app\/dashboard/, {
+      timeout: SMOKE_TIMEOUTS.URL_STABLE,
+    });
 
     // Verify onboarding page was never loaded
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -82,15 +95,18 @@ test.describe('Dashboard Landing @smoke', () => {
   });
 
   test('dashboard content is visible after navigation', async ({ page }) => {
-    await page.goto('/app/dashboard', { timeout: 30000 });
-    await page.waitForLoadState('networkidle');
+    await page.goto('/app/dashboard', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForLoadState('load');
 
     // Verify dashboard content is visible (not blank/loading)
     // The Dashboard heading or welcome message should be visible
     const hasContent = await page
       .getByText(/Dashboard|Welcome/i)
       .first()
-      .isVisible({ timeout: 10000 })
+      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
       .catch(() => false);
 
     expect(hasContent, 'Dashboard should show content, not be blank').toBe(
@@ -122,9 +138,16 @@ test.describe('Dashboard Landing @smoke', () => {
       }
     });
 
-    await page.goto('/app/dashboard', { timeout: 30000 });
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/app/dashboard', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForLoadState('load');
+
+    // Wait for URL to stabilize
+    await expect(page).toHaveURL(/\/app\/dashboard/, {
+      timeout: SMOKE_TIMEOUTS.URL_STABLE,
+    });
 
     // With the cookie set, user should NOT be redirected to onboarding
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -144,8 +167,16 @@ test.describe('Dashboard Landing @smoke', () => {
   }) => {
     // Load dashboard multiple times to ensure no accumulating redirect issues
     for (let i = 0; i < 3; i++) {
-      await page.goto('/app/dashboard', { timeout: 30000 });
-      await page.waitForLoadState('networkidle');
+      await page.goto('/app/dashboard', {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        waitUntil: 'domcontentloaded',
+      });
+      await page.waitForLoadState('load');
+
+      // Wait for URL to stabilize
+      await expect(page).toHaveURL(/\/app\/dashboard/, {
+        timeout: SMOKE_TIMEOUTS.URL_STABLE,
+      });
 
       const currentUrl = page.url();
       expect(currentUrl, `Load ${i + 1}: Should stay on dashboard`).toContain(
