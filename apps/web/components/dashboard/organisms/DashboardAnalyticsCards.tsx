@@ -111,9 +111,7 @@ export function DashboardAnalyticsCards({
             Profile views
           </p>
         </div>
-        <p className='text-sm text-tertiary-token'>
-          Temporarily unavailable
-        </p>
+        <p className='text-sm text-tertiary-token'>Temporarily unavailable</p>
       </div>
 
       <div className='space-y-2 py-1'>
@@ -121,13 +119,9 @@ export function DashboardAnalyticsCards({
           <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
           </div>
-          <p className='text-xs font-medium text-secondary-token'>
-            Audience
-          </p>
+          <p className='text-xs font-medium text-secondary-token'>Audience</p>
         </div>
-        <p className='text-sm text-tertiary-token'>
-          Temporarily unavailable
-        </p>
+        <p className='text-sm text-tertiary-token'>Temporarily unavailable</p>
       </div>
     </div>
   );

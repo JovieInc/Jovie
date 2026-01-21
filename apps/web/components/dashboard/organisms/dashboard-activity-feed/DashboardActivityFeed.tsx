@@ -2,7 +2,6 @@
 
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Activity, DashboardActivityFeedProps } from './types';
@@ -72,9 +71,7 @@ export function DashboardActivityFeed({
           <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10 dark:bg-violet-500/15'>
             <Zap className='h-4 w-4 text-violet-600 dark:text-violet-400' />
           </div>
-          <h3 className='text-xs font-medium text-secondary-token'>
-            Activity
-          </h3>
+          <h3 className='text-xs font-medium text-secondary-token'>Activity</h3>
         </div>
         <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-tertiary-token'>
           <span
