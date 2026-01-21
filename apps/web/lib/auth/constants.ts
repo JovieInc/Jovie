@@ -14,12 +14,34 @@ export const AUTH_STORAGE_KEYS = {
 } as const;
 
 /**
+ * Shared form layout classes for auth, onboarding, and waitlist screens.
+ * These ensure consistent spacing and typography across all flows.
+ */
+export const FORM_LAYOUT = {
+  /** Title styling - consistent across all auth/onboarding/waitlist screens */
+  title: 'text-lg font-medium text-[#1f2023] dark:text-[#e3e4e6] text-center',
+  /** Hint/prompt text below titles */
+  hint: 'text-sm text-[#6b6f76] dark:text-[#969799] text-center',
+  /** Container for title + optional hint with consistent spacing */
+  headerSection: 'space-y-2',
+  /** Main form container with spacing between header and form elements */
+  formContainer: 'space-y-6',
+  /** Spacing within form (between input groups, buttons) */
+  formInner: 'space-y-4',
+  /** Footer hint text below the main CTA button - prevents layout shift */
+  footerHint:
+    'min-h-[40px] flex items-center justify-center text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center px-2',
+  /** Reserved space for error messages to prevent layout shift */
+  errorContainer: 'min-h-[24px] flex items-center justify-center',
+} as const;
+
+/**
  * Shared CSS classes for auth components
  */
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'mt-3 text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200',
+    'text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200',
   /** Step transition animation for multi-step forms */
   stepTransition:
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out',

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Input } from '@/components/atoms/Input';
+import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
   type FormErrors,
   getSocialPlatformPrefix,
@@ -60,10 +61,8 @@ export function WaitlistSocialStep({
 
   return (
     <>
-      <div className='space-y-1'>
-        <h1 className='text-lg font-medium text-primary-token text-center'>
-          Where do fans find you?
-        </h1>
+      <div className={FORM_LAYOUT.headerSection}>
+        <h1 className={FORM_LAYOUT.title}>Where do fans find you?</h1>
       </div>
 
       <div
@@ -98,73 +97,76 @@ export function WaitlistSocialStep({
         ))}
       </div>
 
-      {socialPlatform === 'other' ? (
-        <>
-          <label htmlFor='primarySocialUrl' className='sr-only'>
-            Social profile link
-          </label>
-          <Input
-            ref={el => {
-              urlInputRef.current = el;
-              setUrlInputRef(el);
-            }}
-            type='url'
-            id='primarySocialUrl'
-            value={primarySocialUrl}
-            onChange={e => onUrlChange(e.target.value)}
-            maxLength={2048}
-            required
-            aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
-            aria-describedby={
-              fieldErrors.primarySocialUrl
-                ? 'waitlist-primary-social-url-error'
-                : undefined
-            }
-            placeholder='Paste a link'
-            disabled={isSubmitting}
-            onKeyDown={handleKeyDown}
-          />
-        </>
-      ) : (
-        <div className='w-full flex items-center gap-2 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3 focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]'>
-          <span className='text-sm text-secondary-token whitespace-nowrap'>
-            {getSocialPlatformPrefix(socialPlatform).display}
-          </span>
-          <input
-            ref={el => {
-              urlInputRef.current = el;
-              setUrlInputRef(el);
-            }}
-            type='text'
-            id='primarySocialUrl'
-            value={primarySocialUrl}
-            onChange={e => onUrlChange(e.target.value)}
-            maxLength={2048}
-            required
-            aria-label='Social profile username'
-            aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
-            aria-describedby={
-              fieldErrors.primarySocialUrl
-                ? 'waitlist-primary-social-url-error'
-                : undefined
-            }
-            className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
-            placeholder='yourusername'
-            disabled={isSubmitting}
-            onKeyDown={handleKeyDown}
-          />
+      <div>
+        {socialPlatform === 'other' ? (
+          <>
+            <label htmlFor='primarySocialUrl' className='sr-only'>
+              Social profile link
+            </label>
+            <Input
+              ref={el => {
+                urlInputRef.current = el;
+                setUrlInputRef(el);
+              }}
+              type='url'
+              id='primarySocialUrl'
+              value={primarySocialUrl}
+              onChange={e => onUrlChange(e.target.value)}
+              maxLength={2048}
+              required
+              aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
+              aria-describedby={
+                fieldErrors.primarySocialUrl
+                  ? 'waitlist-primary-social-url-error'
+                  : undefined
+              }
+              placeholder='Paste a link'
+              disabled={isSubmitting}
+              onKeyDown={handleKeyDown}
+            />
+          </>
+        ) : (
+          <div className='w-full flex items-center gap-2 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3 focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]'>
+            <span className='text-sm text-secondary-token whitespace-nowrap'>
+              {getSocialPlatformPrefix(socialPlatform).display}
+            </span>
+            <input
+              ref={el => {
+                urlInputRef.current = el;
+                setUrlInputRef(el);
+              }}
+              type='text'
+              id='primarySocialUrl'
+              value={primarySocialUrl}
+              onChange={e => onUrlChange(e.target.value)}
+              maxLength={2048}
+              required
+              aria-label='Social profile username'
+              aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
+              aria-describedby={
+                fieldErrors.primarySocialUrl
+                  ? 'waitlist-primary-social-url-error'
+                  : undefined
+              }
+              className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
+              placeholder='yourusername'
+              disabled={isSubmitting}
+              onKeyDown={handleKeyDown}
+            />
+          </div>
+        )}
+        <div className={FORM_LAYOUT.errorContainer}>
+          {fieldErrors.primarySocialUrl && (
+            <p
+              id='waitlist-primary-social-url-error'
+              role='alert'
+              className='text-sm text-red-400'
+            >
+              {fieldErrors.primarySocialUrl[0]}
+            </p>
+          )}
         </div>
-      )}
-
-      {fieldErrors.primarySocialUrl && (
-        <p
-          id='waitlist-primary-social-url-error'
-          role='alert'
-          className='text-sm text-red-400'
-        >
-          {fieldErrors.primarySocialUrl[0]}
-        </p>
-      )}
+      </div>
     </>
   );
 }

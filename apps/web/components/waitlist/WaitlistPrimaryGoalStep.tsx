@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useEffect, useRef } from 'react';
+import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
   type FormErrors,
   PRIMARY_GOAL_OPTIONS,
@@ -45,14 +46,9 @@ export function WaitlistPrimaryGoalStep({
 
   return (
     <>
-      <div className='space-y-1'>
-        <h1 className='text-lg font-medium text-primary-token text-center'>
-          Primary goal
-        </h1>
-        <p
-          id='waitlist-primary-goal-hint'
-          className='text-sm text-secondary-token text-center'
-        >
+      <div className={FORM_LAYOUT.headerSection}>
+        <h1 className={FORM_LAYOUT.title}>Primary goal</h1>
+        <p id='waitlist-primary-goal-hint' className={FORM_LAYOUT.hint}>
           You can change this later.
         </p>
       </div>
@@ -95,15 +91,17 @@ export function WaitlistPrimaryGoalStep({
         })}
       </div>
 
-      {fieldErrors.primaryGoal && (
-        <p
-          id='waitlist-primary-goal-error'
-          role='alert'
-          className='text-sm text-red-400'
-        >
-          {fieldErrors.primaryGoal?.[0]}
-        </p>
-      )}
+      <div className={FORM_LAYOUT.errorContainer}>
+        {fieldErrors.primaryGoal && (
+          <p
+            id='waitlist-primary-goal-error'
+            role='alert'
+            className='text-sm text-red-400'
+          >
+            {fieldErrors.primaryGoal?.[0]}
+          </p>
+        )}
+      </div>
     </>
   );
 }

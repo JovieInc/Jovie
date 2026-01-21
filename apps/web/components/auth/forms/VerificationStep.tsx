@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCallback, useId, useState } from 'react';
-import { AUTH_CLASSES } from '@/lib/auth/constants';
+import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import { AuthBackButton, AuthButton, FormError, OtpInput } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
@@ -124,78 +124,78 @@ export function VerificationStep({
       <AuthBackButton onClick={onBack} ariaLabel='Use a different email' />
 
       <div className={AUTH_CLASSES.stepTransition}>
-        <h1 className='text-[18px] leading-[22px] font-medium text-[#1f2023] dark:text-[#e3e4e6] mb-0 text-center'>
-          Check your email
-        </h1>
-
-        <p
-          className='mt-6 mb-8 text-[13px] font-[450] leading-5 text-[#6b6f76] dark:text-[#969799] text-center px-2'
-          id='otp-description'
-        >
-          We&apos;ve sent you a 6-digit{' '}
-          {mode === 'signin' ? 'login' : 'verification'} code.{' '}
-          {email && (
-            <>
-              Please check your inbox at{' '}
-              <span className='text-[#1f2023] dark:text-[#e3e4e6] font-[450] break-all'>
-                {email}
-              </span>
-              {'.'}
-            </>
-          )}
-          {!email && <>Codes expire after 10 minutes.</>}
-        </p>
-
-        <form onSubmit={handleSubmit} className='space-y-6'>
-          <div>
-            <label className='sr-only' htmlFor='otp-input'>
-              Verification code
-            </label>
-            <OtpInput
-              value={code}
-              onChange={onCodeChange}
-              onComplete={handleComplete}
-              disabled={isLoading}
-              error={!!error}
-              errorId={error ? errorId : undefined}
-              aria-label='Enter 6-digit verification code'
-            />
-
-            <FormError message={error} id={errorId} />
-
-            {resendSuccess && !error && (
-              <p className='mt-3 text-sm text-green-600 dark:text-green-400 text-center animate-in fade-in-0 duration-200'>
-                New code sent! Check your email.
-              </p>
+        <div className={FORM_LAYOUT.headerSection}>
+          <h1 className={FORM_LAYOUT.title}>Check your email</h1>
+          <p className={FORM_LAYOUT.hint} id='otp-description'>
+            We&apos;ve sent you a 6-digit{' '}
+            {mode === 'signin' ? 'login' : 'verification'} code.{' '}
+            {email && (
+              <>
+                Please check your inbox at{' '}
+                <span className='text-[#1f2023] dark:text-[#e3e4e6] font-[450] break-all'>
+                  {email}
+                </span>
+                {'.'}
+              </>
             )}
+            {!email && <>Codes expire after 10 minutes.</>}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className={FORM_LAYOUT.formContainer}>
+          <div className={FORM_LAYOUT.formInner}>
+            <div>
+              <label className='sr-only' htmlFor='otp-input'>
+                Verification code
+              </label>
+              <OtpInput
+                value={code}
+                onChange={onCodeChange}
+                onComplete={handleComplete}
+                disabled={isLoading}
+                error={!!error}
+                errorId={error ? errorId : undefined}
+                aria-label='Enter 6-digit verification code'
+              />
+              <div className={FORM_LAYOUT.errorContainer}>
+                {error ? (
+                  <FormError message={error} id={errorId} />
+                ) : resendSuccess ? (
+                  <p className='text-sm text-green-600 dark:text-green-400 text-center animate-in fade-in-0 duration-200'>
+                    New code sent! Check your email.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <AuthButton
+              type='submit'
+              variant='primary'
+              disabled={isLoading || code.length !== 6}
+              aria-busy={isVerifying}
+              className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
+            >
+              {isCompleting ? (
+                <>
+                  <ButtonSpinner />
+                  <span>Completing signup...</span>
+                </>
+              ) : isVerifying ? (
+                <>
+                  <ButtonSpinner />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                'Verify code'
+              )}
+            </AuthButton>
           </div>
 
-          <AuthButton
-            type='submit'
-            variant='primary'
-            disabled={isLoading || code.length !== 6}
-            aria-busy={isVerifying}
-            className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
-          >
-            {isCompleting ? (
-              <>
-                <ButtonSpinner />
-                <span>Completing signup...</span>
-              </>
-            ) : isVerifying ? (
-              <>
-                <ButtonSpinner />
-                <span>Verifying...</span>
-              </>
-            ) : (
-              'Verify code'
-            )}
-          </AuthButton>
-
-          <div className='flex items-center justify-center gap-2 text-[13px] font-[450]'>
+          <div className={FORM_LAYOUT.footerHint}>
             <span className='text-[#6b6f76] dark:text-[#969799]'>
               Didn&apos;t receive it?
             </span>
+            &nbsp;
             <button
               type='button'
               onClick={handleResend}
