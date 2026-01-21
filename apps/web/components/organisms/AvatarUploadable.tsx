@@ -193,8 +193,8 @@ export const AvatarUploadable = React.memo(
         : computedProgress;
 
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: Div with conditional role='button', tabIndex, and keyboard support when interactive
       // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Role is dynamically 'button' or 'presentation'
-      // biome-ignore lint/a11y/noStaticElementInteractions: Role is dynamically 'button' when interactive
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label only present when role='button'
       <div
         ref={mergedRef}
