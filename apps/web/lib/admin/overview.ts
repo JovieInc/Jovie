@@ -238,9 +238,7 @@ async function fetchTotalEventCount(
 /** Fetch incident count and last incident timestamp */
 async function fetchIncidentData(
   dayAgo: Date
-): Promise<
-  { ok: true; count: number; lastAt: Date | null } | { ok: false }
-> {
+): Promise<{ ok: true; count: number; lastAt: Date | null } | { ok: false }> {
   try {
     const rows = await db
       .select({
@@ -585,7 +583,8 @@ function parseActivityTimestamp(timestamp: string): number {
 /** Sort activity items by timestamp descending */
 function sortActivityByTimestamp(items: AdminActivityItem[]): void {
   items.sort(
-    (a, b) => parseActivityTimestamp(b.timestamp) - parseActivityTimestamp(a.timestamp)
+    (a, b) =>
+      parseActivityTimestamp(b.timestamp) - parseActivityTimestamp(a.timestamp)
   );
 }
 
