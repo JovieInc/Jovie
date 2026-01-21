@@ -1,15 +1,53 @@
 'use client';
 
 import { Zap } from 'lucide-react';
+import Link from 'next/link';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-import type { DashboardActivityFeedProps } from './types';
+import type { Activity, DashboardActivityFeedProps } from './types';
 
 const DASHBOARD_ACTIVITY_LOADING_KEYS = Array.from(
   { length: 4 },
   (_, i) => `dashboard-activity-loading-${i + 1}`
 );
+
+function ActivityItem({ activity }: { activity: Activity }) {
+  const content = (
+    <>
+      <span
+        aria-hidden='true'
+        className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1 text-base'
+      >
+        {activity.icon}
+      </span>
+      <div className='min-w-0 flex-1'>
+        <p className='text-sm leading-5 text-primary-token'>
+          <span className='text-secondary-token tabular-nums'>
+            {formatTimeAgo(activity.timestamp)}
+          </span>
+          <span className='text-tertiary-token'> - </span>
+          <span className='text-primary-token'>{activity.description}</span>
+        </p>
+      </div>
+    </>
+  );
+
+  if (activity.href) {
+    return (
+      <li>
+        <Link
+          href={activity.href}
+          className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-1/50'
+        >
+          {content}
+        </Link>
+      </li>
+    );
+  }
+
+  return <li className='flex items-center gap-3 px-4 py-3'>{content}</li>;
+}
 
 export function DashboardActivityFeed({
   profileId,
@@ -104,28 +142,7 @@ export function DashboardActivityFeed({
           >
             <ul className='divide-y divide-white/5 overflow-hidden rounded-xl border border-subtle bg-surface-1/20'>
               {activities.map(activity => (
-                <li
-                  key={activity.id}
-                  className='flex items-center gap-3 px-4 py-3'
-                >
-                  <span
-                    aria-hidden='true'
-                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1 text-base'
-                  >
-                    {activity.icon}
-                  </span>
-                  <div className='min-w-0 flex-1'>
-                    <p className='text-sm leading-5 text-primary-token'>
-                      <span className='text-secondary-token tabular-nums'>
-                        {formatTimeAgo(activity.timestamp)}
-                      </span>
-                      <span className='text-tertiary-token'> - </span>
-                      <span className='text-primary-token'>
-                        {activity.description}
-                      </span>
-                    </p>
-                  </div>
-                </li>
+                <ActivityItem key={activity.id} activity={activity} />
               ))}
             </ul>
           </div>
