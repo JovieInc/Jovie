@@ -75,11 +75,8 @@ describe('QRCode', () => {
     fireEvent.error(img);
 
     // Should show error fallback
-    const errorElement = screen.getByRole('img', {
-      name: 'Test QR unavailable',
-    });
-    expect(errorElement).toBeInTheDocument();
-    expect(errorElement).toHaveTextContent('QR code unavailable');
+    expect(screen.getByText('Test QR unavailable')).toBeInTheDocument();
+    expect(screen.getByText('QR code unavailable')).toBeInTheDocument();
   });
 
   it('properly encodes special characters in data', () => {

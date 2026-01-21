@@ -6,7 +6,7 @@ describe('Logo', () => {
   it('renders the logo SVG', () => {
     render(<Logo />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     expect(logo).toBeInTheDocument();
     expect(logo.tagName.toLowerCase()).toBe('svg');
   });
@@ -14,7 +14,7 @@ describe('Logo', () => {
   it('has correct default attributes', () => {
     render(<Logo />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     expect(logo).toHaveAttribute('viewBox', '0 0 136 39');
     expect(logo).toHaveAttribute('fill', 'currentColor');
   });
@@ -22,7 +22,7 @@ describe('Logo', () => {
   it('applies default medium size class', () => {
     render(<Logo />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     expect(logo).toHaveClass('h-8', 'w-auto');
   });
 
@@ -38,7 +38,7 @@ describe('Logo', () => {
     Object.entries(sizes).forEach(([size, expectedClass]) => {
       const { unmount } = render(<Logo size={size as keyof typeof sizes} />);
 
-      const logo = screen.getByRole('img', { hidden: true });
+      const logo = screen.getByLabelText('Jovie logo');
       expect(logo).toHaveClass(expectedClass, 'w-auto');
 
       unmount();
@@ -49,7 +49,7 @@ describe('Logo', () => {
     const customClass = 'custom-logo-class';
     render(<Logo className={customClass} />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     expect(logo).toHaveClass(customClass);
     expect(logo).toHaveClass('h-8', 'w-auto'); // Should still have default size
     expect(logo).toHaveClass('text-black', 'dark:text-white'); // Should still have theme colors
@@ -58,7 +58,7 @@ describe('Logo', () => {
   it('includes color transition classes', () => {
     render(<Logo />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     expect(logo).toHaveClass(
       'text-black',
       'dark:text-white',
@@ -70,7 +70,7 @@ describe('Logo', () => {
   it('contains the Jovie logo path data', () => {
     render(<Logo />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     const path = logo.querySelector('path');
     expect(path).toBeInTheDocument();
     expect(path).toHaveAttribute('fill-rule', 'evenodd');
@@ -85,7 +85,7 @@ describe('Logo', () => {
   it('has proper xmlns attributes for SVG', () => {
     render(<Logo />);
 
-    const logo = screen.getByRole('img', { hidden: true });
+    const logo = screen.getByLabelText('Jovie logo');
     expect(logo).toHaveAttribute('xmlns', 'http://www.w3.org/2000/svg');
     expect(logo).toHaveAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
   });
