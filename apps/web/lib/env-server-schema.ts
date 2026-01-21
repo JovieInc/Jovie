@@ -47,6 +47,9 @@ export const ServerEnvSchema = z.object({
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
 
+  // Vercel Blob
+  BLOB_READ_WRITE_TOKEN: z.string().optional(),
+
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -106,6 +109,7 @@ export const ENV_KEYS = [
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
+  'BLOB_READ_WRITE_TOKEN',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_TIP_WEBHOOK_SECRET',
