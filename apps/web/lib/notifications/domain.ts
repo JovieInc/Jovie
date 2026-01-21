@@ -316,6 +316,64 @@ export const subscribeToNotificationsDomain = async (
   }
 };
 
+async function validateUnsubscribeIdentifiers(
+  email: string | undefined,
+  phone: string | undefined,
+  token: string | undefined,
+  artist_id: string,
+  method: string | undefined,
+  channel: NotificationChannel | undefined
+): Promise<
+  | {
+      normalizedEmail: string | null;
+      normalizedPhone: string | null;
+      targetChannel: NotificationChannel;
+    }
+  | NotificationDomainResponse<NotificationUnsubscribeResponse>
+> {
+  if (!email && !phone && !token) {
+    const targetChannel = channel || (phone ? 'sms' : 'email');
+    await trackUnsubscribeError({
+      artist_id,
+      error_type: 'missing_identifier',
+      method,
+      channel: targetChannel,
+    });
+    return buildMissingIdentifierResponse(
+      'Either email, phone, or token must be provided'
+    );
+  }
+
+  const normalizedEmail = normalizeSubscriptionEmail(email) ?? null;
+  const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
+
+  if (phone && !normalizedPhone) {
+    const targetChannel = channel || 'sms';
+    await trackUnsubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Invalid phone number'],
+      channel: targetChannel,
+    });
+    return buildValidationErrorResponse('Please provide a valid phone number');
+  }
+
+  const targetChannel: NotificationChannel =
+    channel || (normalizedPhone ? 'sms' : 'email');
+
+  if (!normalizedEmail && !normalizedPhone) {
+    await trackUnsubscribeError({
+      artist_id,
+      error_type: 'missing_identifier',
+      method,
+      channel: targetChannel,
+    });
+    return buildMissingIdentifierResponse('Contact required to unsubscribe');
+  }
+
+  return { normalizedEmail, normalizedPhone, targetChannel };
+}
+
 export const unsubscribeFromNotificationsDomain = async (
   payload: unknown
 ): Promise<NotificationDomainResponse<NotificationUnsubscribeResponse>> => {
@@ -339,47 +397,20 @@ export const unsubscribeFromNotificationsDomain = async (
 
     const { artist_id, email, phone, token, method, channel } = result.data;
 
-    if (!email && !phone && !token) {
-      const targetChannel = channel || (phone ? 'sms' : 'email');
-      await trackUnsubscribeError({
-        artist_id,
-        error_type: 'missing_identifier',
-        method,
-        channel: targetChannel,
-      });
-      return buildMissingIdentifierResponse(
-        'Either email, phone, or token must be provided'
-      );
+    const validation = await validateUnsubscribeIdentifiers(
+      email,
+      phone,
+      token,
+      artist_id,
+      method,
+      channel
+    );
+
+    if ('status' in validation) {
+      return validation;
     }
 
-    const normalizedEmail = normalizeSubscriptionEmail(email) ?? null;
-    const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
-
-    if (phone && !normalizedPhone) {
-      const targetChannel = channel || 'sms';
-      await trackUnsubscribeError({
-        artist_id,
-        error_type: 'validation_error',
-        validation_errors: ['Invalid phone number'],
-        channel: targetChannel,
-      });
-      return buildValidationErrorResponse(
-        'Please provide a valid phone number'
-      );
-    }
-
-    const targetChannel: NotificationChannel =
-      channel || (normalizedPhone ? 'sms' : 'email');
-
-    if (!normalizedEmail && !normalizedPhone) {
-      await trackUnsubscribeError({
-        artist_id,
-        error_type: 'missing_identifier',
-        method,
-        channel: targetChannel,
-      });
-      return buildMissingIdentifierResponse('Contact required to unsubscribe');
-    }
+    const { normalizedEmail, normalizedPhone, targetChannel } = validation;
 
     const whereClauses = [
       eq(notificationSubscriptions.creatorProfileId, artist_id),

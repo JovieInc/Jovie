@@ -256,25 +256,49 @@ async function discoverAppleMusicMatch(
   }
 
   // Convert to ISRC match results
-  const isrcMatches = convertAppleMusicToIsrcMatches(allTracks, selectedTracks);
+  const rawIsrcMatches = convertAppleMusicToIsrcMatches(
+    allTracks,
+    selectedTracks
+  );
+
+  // Filter out Various Artists and compilation matches to prevent false positives
+  const isrcMatches = rawIsrcMatches.filter(m => {
+    const name = m.matchedTrack.artistName.toLowerCase();
+    return (
+      !name.includes('various artists') &&
+      !name.includes('various artist') &&
+      !name.includes('compilation')
+    );
+  });
 
   if (isrcMatches.length === 0) {
-    return { match: null, status: null, error: 'No ISRC matches found' };
+    return {
+      match: null,
+      status: null,
+      error: 'No valid ISRC matches found (filtered compilations)',
+    };
   }
 
-  // Fetch artist profiles for enrichment
-  const artistIds = new Set(isrcMatches.map(m => m.matchedTrack.artistId));
+  // Fetch artist profiles for enrichment - parallelized to avoid N+1 queries
+  const artistIdList = Array.from(
+    new Set(isrcMatches.map(m => m.matchedTrack.artistId))
+  ).filter(id => id !== 'unknown');
+
   const artistProfiles = new Map<
     string,
     { url?: string; imageUrl?: string; name?: string }
   >();
 
-  for (const artistId of artistIds) {
-    if (artistId === 'unknown') continue;
-    try {
-      const artist = await getArtist(artistId);
-      if (artist) {
-        artistProfiles.set(artistId, {
+  // Fetch artist profiles in parallel with concurrency limit
+  const ARTIST_FETCH_CONCURRENCY = 5;
+  for (let i = 0; i < artistIdList.length; i += ARTIST_FETCH_CONCURRENCY) {
+    const batch = artistIdList.slice(i, i + ARTIST_FETCH_CONCURRENCY);
+    const results = await Promise.allSettled(batch.map(id => getArtist(id)));
+
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled' && result.value) {
+        const artist = result.value;
+        artistProfiles.set(batch[idx], {
           url: artist.attributes?.url,
           imageUrl: artist.attributes?.artwork?.url
             ?.replace('{w}', '300')
@@ -282,18 +306,17 @@ async function discoverAppleMusicMatch(
           name: artist.attributes?.name,
         });
       }
-    } catch {
-      // Continue without profile data
-    }
+      // Rejected promises are silently ignored (continue without profile data)
+    });
   }
 
-  // Orchestrate matching
+  // Orchestrate matching with minimum 3 ISRC matches for safer auto-confirmation
   const matchingResult = orchestrateMatching(
     'apple_music',
     isrcMatches,
     localArtist,
     {
-      minIsrcMatches: 1,
+      minIsrcMatches: 3,
       artistProfiles,
     }
   );
@@ -329,6 +352,14 @@ async function discoverAppleMusicMatch(
     matchingResult.bestMatch,
     status
   );
+
+  // If auto-confirmed, update the creator profile with Apple Music artist ID
+  if (status === 'auto_confirmed') {
+    await tx
+      .update(creatorProfiles)
+      .set({ appleMusicId: matchingResult.bestMatch.externalArtistId })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+  }
 
   return { match: matchingResult.bestMatch, status };
 }

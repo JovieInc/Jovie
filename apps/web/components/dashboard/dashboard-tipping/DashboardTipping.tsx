@@ -13,6 +13,12 @@ import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
 
+function getSaveButtonText(isSaving: boolean, hasVenmoHandle: boolean): string {
+  if (isSaving) return 'Saving...';
+  if (hasVenmoHandle) return 'Update';
+  return 'Connect';
+}
+
 export function DashboardTipping() {
   const dashboardData = useDashboardData();
   const {
@@ -150,11 +156,7 @@ export function DashboardTipping() {
                   variant='primary'
                   size='sm'
                 >
-                  {isSaving
-                    ? 'Saving...'
-                    : hasVenmoHandle
-                      ? 'Update'
-                      : 'Connect'}
+                  {getSaveButtonText(isSaving, hasVenmoHandle)}
                 </Button>
               </div>
               {saveSuccess && (

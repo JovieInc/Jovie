@@ -2,7 +2,7 @@
 
 import { Kbd } from '@jovie/ui';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import {
   SidebarMenuButton,
   SidebarMenuItem,
@@ -68,7 +68,12 @@ export function NavMenuItem({
   shortcut,
   actions,
 }: NavMenuItemProps) {
-  const tooltip = buildTooltip(item.name, shortcut);
+  // Memoize tooltip to prevent creating new objects on every render,
+  // which would cause unnecessary re-renders in SidebarMenuButton
+  const tooltip = useMemo(
+    () => buildTooltip(item.name, shortcut),
+    [item.name, shortcut]
+  );
 
   return (
     <SidebarMenuItem>

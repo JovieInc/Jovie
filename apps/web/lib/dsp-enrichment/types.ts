@@ -371,10 +371,17 @@ export interface ArtistMatchCandidate {
 }
 
 /**
+ * Confidence band categories for user-facing display
+ */
+export type ConfidenceBand = 'very_high' | 'high' | 'medium' | 'low';
+
+/**
  * Scored artist match candidate
  */
 export interface ScoredArtistMatch extends ArtistMatchCandidate {
   confidenceScore: number;
+  /** Confidence band for user-facing display */
+  confidenceBand: ConfidenceBand;
   confidenceBreakdown: {
     isrcMatchScore: number;
     upcMatchScore: number;

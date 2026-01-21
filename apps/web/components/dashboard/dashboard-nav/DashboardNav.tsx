@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
@@ -46,17 +47,28 @@ export function DashboardNav(_: DashboardNavProps) {
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
   const publicProfileHref = username ? `/${username}` : undefined;
 
-  const primaryItems = contactsGate.value
-    ? primaryNavigation
-    : primaryNavigation.filter(item => item.id !== 'contacts');
+  // Memoize filtered items to prevent creating new arrays on every render
+  const primaryItems = useMemo(
+    () =>
+      contactsGate.value
+        ? primaryNavigation
+        : primaryNavigation.filter(item => item.id !== 'contacts'),
+    [contactsGate.value]
+  );
 
   const isInSettings = pathname.startsWith('/app/settings');
-  const navSections = isInSettings
-    ? [{ key: 'settings', items: settingsNavigation }]
-    : [
-        { key: 'primary', items: primaryItems },
-        { key: 'secondary', items: secondaryNavigation },
-      ];
+
+  // Memoize nav sections to prevent creating new objects on every render
+  const navSections = useMemo(
+    () =>
+      isInSettings
+        ? [{ key: 'settings', items: settingsNavigation }]
+        : [
+            { key: 'primary', items: primaryItems },
+            { key: 'secondary', items: secondaryNavigation },
+          ],
+    [isInSettings, primaryItems]
+  );
 
   function renderNavItem(item: NavItem) {
     const isActive = isItemActive(pathname, item);

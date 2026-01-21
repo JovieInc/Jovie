@@ -33,6 +33,27 @@ const ARTIST_NAME_PREFIXES = ['the ', 'a ', 'an ', 'dj ', 'mc ', 'lil '];
 // Jaro Similarity
 // ============================================================================
 
+function countTranspositions(
+  s1: string,
+  s2: string,
+  s1Matches: boolean[],
+  s2Matches: boolean[]
+): number {
+  let transpositions = 0;
+  let k = 0;
+
+  for (let i = 0; i < s1.length; i++) {
+    if (!s1Matches[i]) continue;
+
+    while (!s2Matches[k]) k++;
+
+    if (s1[i] !== s2[k]) transpositions++;
+    k++;
+  }
+
+  return transpositions;
+}
+
 /**
  * Calculate the Jaro similarity between two strings.
  *
@@ -56,7 +77,6 @@ function jaroSimilarity(s1: string, s2: string): number {
   const s2Matches = new Array<boolean>(s2.length).fill(false);
 
   let matches = 0;
-  let transpositions = 0;
 
   // Find matching characters
   for (let i = 0; i < s1.length; i++) {
@@ -76,15 +96,7 @@ function jaroSimilarity(s1: string, s2: string): number {
   if (matches === 0) return 0;
 
   // Count transpositions
-  let k = 0;
-  for (let i = 0; i < s1.length; i++) {
-    if (!s1Matches[i]) continue;
-
-    while (!s2Matches[k]) k++;
-
-    if (s1[i] !== s2[k]) transpositions++;
-    k++;
-  }
+  const transpositions = countTranspositions(s1, s2, s1Matches, s2Matches);
 
   const jaro =
     (matches / s1.length +

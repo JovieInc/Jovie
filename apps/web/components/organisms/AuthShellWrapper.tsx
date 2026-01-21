@@ -2,7 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useTransition } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  useTransition,
+} from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
@@ -96,13 +102,18 @@ function AuthShellWrapperInner({
   // Header badge from context (shown after breadcrumb on left side)
   const headerBadge = headerActionsContext?.headerBadge ?? null;
 
-  const onSidebarOpenChange = persistSidebarCollapsed
-    ? (open: boolean) => {
-        startTransition(() => {
-          void persistSidebarCollapsed(!open);
-        });
-      }
-    : undefined;
+  // Memoize the sidebar open change handler to prevent context value changes
+  // that would cause infinite re-render loops in sidebar consumers.
+  // Only create a callback when persistSidebarCollapsed is defined, otherwise
+  // useSidebarCookieState needs undefined to manage internal state.
+  const handleSidebarOpenChange = useCallback(
+    (open: boolean) => {
+      startTransition(() => {
+        void persistSidebarCollapsed?.(!open);
+      });
+    },
+    [persistSidebarCollapsed, startTransition]
+  );
 
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
@@ -118,7 +129,9 @@ function AuthShellWrapperInner({
           drawerWidth={config.drawerWidth ?? undefined}
           isTableRoute={config.isTableRoute}
           previewPanel={previewEnabled ? <ProfileContactSidebar /> : undefined}
-          onSidebarOpenChange={onSidebarOpenChange}
+          onSidebarOpenChange={
+            persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+          }
         >
           {children}
         </AuthShell>

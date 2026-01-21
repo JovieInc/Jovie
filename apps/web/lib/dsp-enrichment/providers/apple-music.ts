@@ -15,6 +15,12 @@
 
 import 'server-only';
 
+import {
+  getCachedArtistProfile,
+  getCachedIsrcTrack,
+  setCachedArtistProfile,
+  setCachedIsrcTrack,
+} from '../cache';
 import { appleMusicCircuitBreaker } from '../circuit-breakers';
 import type {
   AppleMusicAlbum,
@@ -116,6 +122,59 @@ export class AppleMusicNotConfiguredError extends Error {
 }
 
 // ============================================================================
+// Retry Logic
+// ============================================================================
+
+/**
+ * Default retry configuration
+ */
+const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_BASE_DELAY_MS = 1000;
+
+/**
+ * Retry wrapper with exponential backoff for transient failures.
+ * Does not retry on auth errors (401) or not found (404).
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  baseDelayMs = DEFAULT_BASE_DELAY_MS
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on auth errors, not found, or configuration errors
+      if (error instanceof AppleMusicError) {
+        if (error.statusCode === 401 || error.statusCode === 404) {
+          throw error;
+        }
+      }
+      if (error instanceof AppleMusicNotConfiguredError) {
+        throw error;
+      }
+
+      // If this was the last attempt, throw
+      if (attempt >= maxRetries) {
+        throw lastError;
+      }
+
+      // Exponential backoff with jitter
+      const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15x
+      const delayMs = baseDelayMs * Math.pow(2, attempt) * jitter;
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  // This should never be reached, but TypeScript needs it
+  throw lastError ?? new Error('Unknown retry failure');
+}
+
+// ============================================================================
 // HTTP Client
 // ============================================================================
 
@@ -197,10 +256,11 @@ async function musicKitRequest<T>(
 }
 
 /**
- * Execute a MusicKit request with circuit breaker protection.
+ * Execute a MusicKit request with circuit breaker protection and retry logic.
+ * Retries transient failures with exponential backoff before opening circuit.
  */
 async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
-  return appleMusicCircuitBreaker.execute(fn);
+  return appleMusicCircuitBreaker.execute(() => withRetry(fn));
 }
 
 // ============================================================================
@@ -253,10 +313,28 @@ export async function bulkLookupByIsrc(
     );
   }
 
+  const trackMap = new Map<string, AppleMusicTrack>();
+  const uncachedIsrcs: string[] = [];
+
+  // Check cache first for each ISRC
+  for (const isrc of isrcs) {
+    const cached = getCachedIsrcTrack<AppleMusicTrack>(isrc);
+    if (cached) {
+      trackMap.set(isrc.toUpperCase(), cached);
+    } else {
+      uncachedIsrcs.push(isrc);
+    }
+  }
+
+  // If all ISRCs were cached, return early
+  if (uncachedIsrcs.length === 0) {
+    return trackMap;
+  }
+
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
   // Apple Music accepts comma-separated ISRCs
-  const isrcParam = isrcs.map(i => encodeURIComponent(i)).join(',');
+  const isrcParam = uncachedIsrcs.map(i => encodeURIComponent(i)).join(',');
 
   const result = await executeWithCircuitBreaker(async () => {
     const response = await musicKitRequest<AppleMusicTrack>(
@@ -266,14 +344,14 @@ export async function bulkLookupByIsrc(
     return response;
   });
 
-  const trackMap = new Map<string, AppleMusicTrack>();
-
   if (result.data) {
     for (const track of result.data) {
       const trackIsrc = track.attributes?.isrc;
       if (trackIsrc) {
-        // Normalize ISRC to uppercase for consistent matching
-        trackMap.set(trackIsrc.toUpperCase(), track);
+        const normalizedIsrc = trackIsrc.toUpperCase();
+        trackMap.set(normalizedIsrc, track);
+        // Cache the result for future lookups
+        setCachedIsrcTrack(normalizedIsrc, track);
       }
     }
   }
@@ -320,6 +398,12 @@ export async function getArtist(
   artistId: string,
   options: AppleMusicProviderOptions = {}
 ): Promise<AppleMusicArtist | null> {
+  // Check cache first
+  const cached = getCachedArtistProfile<AppleMusicArtist>(artistId);
+  if (cached) {
+    return cached;
+  }
+
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
   const result = await executeWithCircuitBreaker(async () => {
@@ -331,7 +415,14 @@ export async function getArtist(
     return response;
   });
 
-  return result.data?.[0] ?? null;
+  const artist = result.data?.[0] ?? null;
+
+  // Cache the result for future lookups
+  if (artist) {
+    setCachedArtistProfile(artistId, artist);
+  }
+
+  return artist;
 }
 
 /**
