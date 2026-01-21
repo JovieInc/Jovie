@@ -27,7 +27,8 @@ function logEnvironmentInfo() {
 }
 
 function logCriticalEnvironmentIssues(
-  result: ReturnType<typeof validateAndLogEnvironment>
+  result: ReturnType<typeof validateAndLogEnvironment>,
+  isProduction: boolean
 ) {
   if (result.critical.length === 0) {
     return false;
@@ -38,14 +39,14 @@ function logCriticalEnvironmentIssues(
   );
   console.error('[STARTUP] Critical issues:', result.critical);
 
-  if (process.env.NODE_ENV === 'production') {
+  if (isProduction) {
     console.error('[STARTUP] Exiting due to critical environment issues');
   }
 
   return true;
 }
 
-async function validateDatabaseConnection() {
+async function validateDatabaseConnection(isProduction: boolean) {
   console.log('[STARTUP] Testing database connection...');
   try {
     const dbConnection = await validateDbConnection();
@@ -61,7 +62,7 @@ async function validateDatabaseConnection() {
       '[STARTUP] ❌ Database connection failed:',
       dbConnection.error
     );
-    if (process.env.NODE_ENV === 'production') {
+    if (isProduction) {
       console.error(
         '[STARTUP] WARNING: Application starting without database connectivity'
       );
@@ -102,10 +103,14 @@ export async function runStartupEnvironmentValidation() {
     validationResult = validateAndLogEnvironment('runtime');
 
     const envInfo = logEnvironmentInfo();
-    const hasCriticalIssues = logCriticalEnvironmentIssues(validationResult);
+    const isProduction = envInfo.nodeEnv === 'production';
+    const hasCriticalIssues = logCriticalEnvironmentIssues(
+      validationResult,
+      isProduction
+    );
 
     if (!hasCriticalIssues && envInfo.hasDatabase) {
-      await validateDatabaseConnection();
+      await validateDatabaseConnection(isProduction);
     }
 
     logValidationSummary(validationResult);
