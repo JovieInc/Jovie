@@ -1,0 +1,81 @@
+# Codecov Configuration
+# Documentation: https://docs.codecov.com/docs/codecov-yaml
+
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+# Coverage status checks on PRs
+coverage:
+  precision: 2
+  round: down
+  range: "60...90"
+  status:
+    # Project coverage: overall codebase coverage
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        # Don't fail CI, just report
+        informational: true
+        # Only measure files changed in the PR
+        only_pulls: true
+    # Patch coverage: coverage of new/modified lines
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        # Don't fail CI initially, just report
+        informational: true
+
+# PR comment configuration
+comment:
+  layout: "header, diff, flags, components, footer"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
+
+# Flag management for different test types
+flags:
+  unittests:
+    paths:
+      - apps/web/
+    carryforward: true
+
+# Ignore patterns - files not considered for coverage
+ignore:
+  - "**/*.d.ts"
+  - "**/*.config.*"
+  - "**/*.test.*"
+  - "**/*.spec.*"
+  - "**/tests/**"
+  - "**/coverage/**"
+  - "**/node_modules/**"
+  - "**/.next/**"
+  - "**/dist/**"
+  - "**/__mocks__/**"
+  - "**/storybook-static/**"
+  - "packages/ui/**"  # UI package has its own coverage if needed
+
+# Component management for better PR insights
+component_management:
+  individual_components:
+    - component_id: app
+      name: App Core
+      paths:
+        - apps/web/app/**
+    - component_id: components
+      name: Components
+      paths:
+        - apps/web/components/**
+    - component_id: lib
+      name: Libraries
+      paths:
+        - apps/web/lib/**
+    - component_id: hooks
+      name: Hooks
+      paths:
+        - apps/web/hooks/**
