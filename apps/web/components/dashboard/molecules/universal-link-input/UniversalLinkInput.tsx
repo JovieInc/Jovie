@@ -7,15 +7,18 @@
  * and supports artist search mode for Spotify.
  */
 
-import { forwardRef, useImperativeHandle, useMemo } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { isBrandDark } from '@/lib/utils/color';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 import { UniversalLinkInputArtistSearchMode } from '../artist-search-mode';
 import { UniversalLinkInputUrlMode } from '../UniversalLinkInputUrlMode';
+import { MultiLinkPasteDialog } from './MultiLinkPasteDialog';
 import type { UniversalLinkInputProps } from './types';
+import { useMultiLinkPaste } from './useMultiLinkPaste';
 import { useUniversalLinkInput } from './useUniversalLinkInput';
 import {
   groupByCategory,
@@ -166,6 +169,29 @@ export const UniversalLinkInput = forwardRef<
       clearSignal,
     });
 
+    // Batch add handler for multi-link paste
+    const handleBatchAdd = useCallback(
+      (links: DetectedLink[]) => {
+        for (const link of links) {
+          onAdd(link);
+        }
+      },
+      [onAdd]
+    );
+
+    const {
+      multiLinkState,
+      handlePaste,
+      handleDialogClose,
+      handleConfirmAdd,
+      toggleLinkSelection,
+      selectableCount,
+    } = useMultiLinkPaste({
+      existingPlatforms,
+      creatorName,
+      onBatchAdd: handleBatchAdd,
+    });
+
     useImperativeHandle(forwardedRef, () => ({
       getInputElement: () => urlInputRef.current,
     }));
@@ -203,6 +229,7 @@ export const UniversalLinkInput = forwardRef<
           inputRef={urlInputRef}
           onUrlChange={handleUrlChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onClear={handleClear}
           onPlatformSelect={handlePlatformSelect}
           onArtistSearchSelect={handleArtistSearchSelect}
@@ -292,6 +319,16 @@ export const UniversalLinkInput = forwardRef<
                 })}
           </div>
         ) : null}
+
+        {/* Multi-link paste dialog */}
+        <MultiLinkPasteDialog
+          open={multiLinkState.isOpen}
+          onClose={handleDialogClose}
+          onConfirm={handleConfirmAdd}
+          extractedLinks={multiLinkState.extractedLinks}
+          onToggleSelection={toggleLinkSelection}
+          selectableCount={selectableCount}
+        />
       </div>
     );
   }

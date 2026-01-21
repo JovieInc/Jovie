@@ -35,6 +35,7 @@ interface UniversalLinkInputUrlModeProps {
   inputRef: React.RefObject<HTMLInputElement | null>;
   onUrlChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLInputElement>) => void;
   onClear: () => void;
   onPlatformSelect: (platform: (typeof PLATFORM_OPTIONS)[number]) => void;
   onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
@@ -60,6 +61,7 @@ export function UniversalLinkInputUrlMode({
   inputRef,
   onUrlChange,
   onKeyDown,
+  onPaste,
   onClear,
   onPlatformSelect,
   onArtistSearchSelect,
@@ -108,6 +110,7 @@ export function UniversalLinkInputUrlMode({
           value={url}
           onChange={event => onUrlChange(event.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           onFocus={onFocus}
           onBlur={onBlur}
           disabled={disabled}

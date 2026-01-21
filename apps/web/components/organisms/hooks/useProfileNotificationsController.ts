@@ -149,6 +149,11 @@ export function useProfileNotificationsController({
 
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasMenuOpenRef = useRef(false);
+  const inputFocusFnRef = useRef<(() => void) | null>(null);
+
+  const registerInputFocus = useCallback((focusFn: (() => void) | null) => {
+    inputFocusFnRef.current = focusFn;
+  }, []);
 
   const hasActiveSubscriptions = useMemo(
     () => Boolean(subscribedChannels.email || subscribedChannels.sms),
@@ -276,8 +281,20 @@ export function useProfileNotificationsController({
       return;
     }
 
+    // If already in editing state, just focus the input
+    if (state === 'editing') {
+      inputFocusFnRef.current?.();
+      return;
+    }
+
     openSubscription(channel);
-  }, [channel, hasActiveSubscriptions, notificationsEnabled, openSubscription]);
+  }, [
+    channel,
+    hasActiveSubscriptions,
+    notificationsEnabled,
+    openSubscription,
+    state,
+  ]);
 
   const handleMenuOpenChange = useCallback(
     (open: boolean) => {
@@ -413,6 +430,7 @@ export function useProfileNotificationsController({
     menuTriggerRef,
     notificationsEnabled,
     openSubscription,
+    registerInputFocus,
     setChannel,
     setState,
     setSubscribedChannels,

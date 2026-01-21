@@ -35,12 +35,23 @@ export function ArtistNotificationsCTA({
     channel,
     subscribedChannels,
     openSubscription,
+    registerInputFocus,
   } = useSubscriptionForm({ artist });
 
   const inputId = useId();
   const disclaimerId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // Register the input focus function so bell icon click can focus the input
+  useEffect(() => {
+    registerInputFocus(() => {
+      inputRef.current?.focus();
+    });
+    return () => {
+      registerInputFocus(null);
+    };
+  }, [registerInputFocus]);
 
   useEffect(() => {
     const maxNationalDigits = getMaxNationalDigits(country.dialCode);
