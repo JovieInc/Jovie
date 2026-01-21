@@ -275,7 +275,7 @@ const clerkAppearance = {
 
     // OTP input
     otpCodeFieldInput:
-      'bg-surface-0 border border-subtle text-primary-token focus:border-default focus:ring-2 focus:ring-[rgb(var(--focus-ring))]/30',
+      'bg-surface-0 border border-subtle text-primary-token focus-visible:border-default focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]/30',
 
     // Modal overlays
     modalBackdrop: 'bg-black/50 dark:bg-black/70 backdrop-blur-sm',

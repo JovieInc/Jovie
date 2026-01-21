@@ -70,7 +70,7 @@ export const WithForm: Story = {
                 id='email'
                 type='email'
                 placeholder='Enter your email'
-                className='w-full px-3 py-2 text-sm border border-subtle rounded-md bg-surface-0 focus:ring-2 focus:ring-accent focus:border-transparent'
+                className='w-full px-3 py-2 text-sm border border-subtle rounded-md bg-surface-0 focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent'
               />
             </div>
             <div className='space-y-1'>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -8,9 +9,8 @@ import {
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
-import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import {
-  ProviderCell,
+  AvailabilityCell,
   ReleaseCell,
   SmartLinkCell,
 } from '@/components/dashboard/organisms/releases/cells';
@@ -18,30 +18,17 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
+  type HeaderBulkAction,
+  HeaderBulkActions,
+  TableCheckboxCell,
   UnifiedTable,
+  useRowSelection,
 } from '@/components/organisms/table';
 import {
   RELEASE_TABLE_WIDTHS,
   TABLE_ROW_HEIGHTS,
 } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import type { DspProviderId } from '@/lib/dsp-enrichment/types';
-
-/**
- * Maps ProviderKey (discography) to DspProviderId (for icons).
- * Returns null for providers without DSP icons (bandcamp, beatport).
- */
-const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
-  spotify: 'spotify',
-  apple_music: 'apple_music',
-  youtube: 'youtube_music',
-  soundcloud: 'soundcloud',
-  deezer: 'deezer',
-  tidal: 'tidal',
-  amazon_music: 'amazon_music',
-  bandcamp: null,
-  beatport: null,
-};
 
 interface ProviderConfig {
   label: string;
@@ -50,7 +37,6 @@ interface ProviderConfig {
 
 interface ReleaseTableProps {
   releases: ReleaseViewModel[];
-  primaryProviders: ProviderKey[];
   providerConfig: Record<ProviderKey, ProviderConfig>;
   artistName?: string | null;
   onCopy: (path: string, label: string, testId: string) => Promise<string>;
@@ -63,23 +49,30 @@ interface ReleaseTableProps {
   onSync: () => void;
   isAddingUrl?: boolean;
   isSyncing?: boolean;
+  /** Selected release IDs (controlled from parent) */
+  selectedIds?: Set<string>;
+  /** Callback when selection changes */
+  onSelectionChange?: (selectedIds: Set<string>) => void;
+  /** Bulk actions shown in header when items selected */
+  bulkActions?: HeaderBulkAction[];
+  /** Callback to clear selection */
+  onClearSelection?: () => void;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
 
 /**
- * ReleaseTable - Releases table using UnifiedTable with dynamic columns
+ * ReleaseTable - Releases table using UnifiedTable
  *
  * Features:
- * - Dynamic provider columns based on primaryProviders prop
+ * - Consolidated availability column showing all providers in a popover
  * - Sortable title and release date columns
  * - Context menu for edit, copy, sync, delete actions
  * - Actions column with ellipsis menu
- * - Uses extracted cell components (ReleaseCell, SmartLinkCell, ProviderCell)
+ * - Uses extracted cell components (ReleaseCell, SmartLinkCell, AvailabilityCell)
  */
 export function ReleaseTable({
   releases,
-  primaryProviders,
   providerConfig,
   artistName,
   onCopy,
@@ -88,23 +81,163 @@ export function ReleaseTable({
   onSync,
   isAddingUrl,
   isSyncing,
+  selectedIds: externalSelectedIds,
+  onSelectionChange,
+  bulkActions = [],
+  onClearSelection,
 }: ReleaseTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'releaseDate', desc: true },
   ]);
 
+  // Row selection - use external selection if provided, otherwise use internal
+  const rowIds = useMemo(() => releases.map(r => r.id), [releases]);
+  const rowIdSet = useMemo(() => new Set(rowIds), [rowIds]);
+  const internalSelection = useRowSelection(rowIds);
+
+  const selectedIds = externalSelectedIds ?? internalSelection.selectedIds;
+
+  // Compute visible selected (intersection of selectedIds and current rowIds)
+  const visibleSelectedCount = useMemo(() => {
+    let count = 0;
+    for (const id of selectedIds) {
+      if (rowIdSet.has(id)) count++;
+    }
+    return count;
+  }, [selectedIds, rowIdSet]);
+
+  // Compute header checkbox state based on visible selection
+  const headerCheckboxState = useMemo(() => {
+    // Use internal state if no external selection provided
+    if (externalSelectedIds === undefined) {
+      return internalSelection.headerCheckboxState;
+    }
+    // Compute from visible selection
+    if (visibleSelectedCount === 0) return false;
+    if (visibleSelectedCount === rowIds.length) return true;
+    return 'indeterminate';
+  }, [
+    externalSelectedIds,
+    internalSelection.headerCheckboxState,
+    visibleSelectedCount,
+    rowIds.length,
+  ]);
+
+  const toggleSelect = (id: string) => {
+    if (onSelectionChange) {
+      const newSet = new Set(selectedIds);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      onSelectionChange(newSet);
+    } else {
+      internalSelection.toggleSelect(id);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (onSelectionChange) {
+      // Check if all visible rows are selected
+      if (visibleSelectedCount === rowIds.length) {
+        // Deselect all visible rows (preserve non-visible selections)
+        const newSet = new Set(selectedIds);
+        for (const id of rowIds) {
+          newSet.delete(id);
+        }
+        onSelectionChange(newSet);
+      } else {
+        // Select all visible rows (preserve existing selections)
+        const newSet = new Set(selectedIds);
+        for (const id of rowIds) {
+          newSet.add(id);
+        }
+        onSelectionChange(newSet);
+      }
+    } else {
+      internalSelection.toggleSelectAll();
+    }
+  };
+
   // Build dynamic column definitions
   const columns = useMemo(() => {
-    const baseColumns = [
-      // Release column (artwork + title + artist)
+    const checkboxColumn = columnHelper.display({
+      id: 'select',
+      header: ({ table }) => (
+        <TableCheckboxCell
+          table={table}
+          headerCheckboxState={headerCheckboxState}
+          onToggleSelectAll={toggleSelectAll}
+        />
+      ),
+      cell: ({ row }) => {
+        const release = row.original;
+        const isChecked = selectedIds.has(release.id);
+        const rowNumber = row.index + 1;
+
+        return (
+          <TableCheckboxCell
+            row={row}
+            rowNumber={rowNumber}
+            isChecked={isChecked}
+            onToggleSelect={() => toggleSelect(release.id)}
+          />
+        );
+      },
+      size: 56,
+    });
+
+    // All provider keys for the availability cell
+    const allProviders = Object.keys(providerConfig) as ProviderKey[];
+
+    // Column definitions in logical order
+    const columns = [
+      // Release column (artwork + title + artist) with inline bulk actions
       columnHelper.accessor('title', {
         id: 'release',
-        header: 'Release',
+        header: () => (
+          <div className='flex items-center gap-2'>
+            {selectedIds.size === 0 && <span>Release</span>}
+            <HeaderBulkActions
+              selectedCount={selectedIds.size}
+              bulkActions={bulkActions}
+              onClearSelection={onClearSelection}
+            />
+          </div>
+        ),
         cell: ({ row }) => (
           <ReleaseCell release={row.original} artistName={artistName} />
         ),
-        size: 220,
+        size: 280,
         enableSorting: true,
+      }),
+
+      // Availability column showing all providers
+      columnHelper.display({
+        id: 'availability',
+        header: 'Availability',
+        cell: ({ row }) => (
+          <AvailabilityCell
+            release={row.original}
+            allProviders={allProviders}
+            providerConfig={providerConfig}
+            onCopy={onCopy}
+            onAddUrl={onAddUrl}
+            isAddingUrl={isAddingUrl}
+          />
+        ),
+        size: 120,
+      }),
+
+      // Smart link column
+      columnHelper.display({
+        id: 'smartLink',
+        header: 'Smart link',
+        cell: ({ row }) => (
+          <SmartLinkCell release={row.original} onCopy={onCopy} />
+        ),
+        size: 180,
       }),
 
       // Release date column (sortable)
@@ -131,78 +264,73 @@ export function ReleaseTable({
         enableSorting: true,
       }),
 
-      // Smart link column
+      // Actions column - header shows toolbar buttons, cells show row menu
       columnHelper.display({
-        id: 'smartLink',
-        header: 'Smart link',
-        cell: ({ row }) => (
-          <SmartLinkCell release={row.original} onCopy={onCopy} />
+        id: 'actions',
+        header: () => (
+          <div className='flex items-center justify-end gap-1'>
+            {selectedIds.size > 0 ? (
+              // Clear button when items selected
+              onClearSelection && (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={onClearSelection}
+                  className='h-7 gap-1 text-xs'
+                >
+                  <Icon name='X' className='h-3.5 w-3.5' />
+                  Clear
+                </Button>
+              )
+            ) : (
+              // Sync button when nothing selected
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={onSync}
+                disabled={isSyncing}
+                className='h-7 gap-1 text-xs'
+              >
+                <Icon
+                  name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                  className={
+                    isSyncing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'
+                  }
+                />
+                Sync
+              </Button>
+            )}
+          </div>
         ),
-        size: 180,
+        cell: ({ row }) => {
+          const contextMenuItems = getContextMenuItems(row.original);
+          const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+          return (
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={actionMenuItems} align='end' />
+            </div>
+          );
+        },
+        size: 80,
       }),
     ];
 
-    // Dynamically add provider columns
-    const providerColumns = primaryProviders.map(provider => {
-      const dspId = PROVIDER_TO_DSP[provider];
-
-      return columnHelper.display({
-        id: provider,
-        header: () => (
-          <div className='flex items-center gap-2'>
-            {dspId ? (
-              <DspProviderIcon provider={dspId} size='sm' />
-            ) : (
-              <span
-                className='h-4 w-4 shrink-0 rounded-full'
-                style={{ backgroundColor: providerConfig[provider].accent }}
-                aria-hidden='true'
-              />
-            )}
-            <span className='line-clamp-1'>
-              {providerConfig[provider].label}
-            </span>
-          </div>
-        ),
-        cell: ({ row }) => (
-          <ProviderCell
-            release={row.original}
-            provider={provider}
-            config={providerConfig[provider]}
-            onCopy={onCopy}
-            onAddUrl={onAddUrl}
-            isAddingUrl={isAddingUrl}
-          />
-        ),
-        size: 100,
-      });
-    });
-
-    // Actions column with ellipsis menu
-    const actionsColumn = columnHelper.display({
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => {
-        const contextMenuItems = getContextMenuItems(row.original);
-        const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-        return (
-          <div className='flex items-center justify-end'>
-            <TableActionMenu items={actionMenuItems} align='end' />
-          </div>
-        );
-      },
-      size: 60,
-    });
-
-    return [...baseColumns, ...providerColumns, actionsColumn];
+    return [checkboxColumn, ...columns];
   }, [
-    primaryProviders,
     providerConfig,
     artistName,
     onCopy,
     onAddUrl,
     isAddingUrl,
+    headerCheckboxState,
+    selectedIds,
+    rowIds,
+    bulkActions,
+    onClearSelection,
+    releases.length,
+    isSyncing,
+    onSync,
   ]);
 
   // Context menu items for right-click
@@ -228,35 +356,19 @@ export function ReleaseTable({
           );
         },
       },
-      { type: 'separator' as const },
       {
-        id: 'sync-release',
-        label: 'Sync from Spotify',
-        icon: (
-          <Icon
-            name={isSyncing ? 'Loader2' : 'RefreshCw'}
-            className='h-3.5 w-3.5'
-          />
-        ),
-        onClick: () => onSync(),
-        disabled: isSyncing,
-      },
-      { type: 'separator' as const },
-      {
-        id: 'delete',
-        label: 'Delete release',
-        icon: <Icon name='Trash2' className='h-3.5 w-3.5' />,
-        destructive: true,
+        id: 'copy-release-id',
+        label: 'Copy release ID',
+        icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
         onClick: () => {
-          // TODO: Implement delete functionality
+          navigator.clipboard.writeText(release.id);
         },
-        disabled: true, // Placeholder for future deletion feature
       },
     ];
   };
 
-  // Calculate dynamic min width based on column count
-  const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + primaryProviders.length * RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
+  // Fixed min width - availability column consolidates all providers
+  const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
 
   return (
     <UnifiedTable
@@ -267,6 +379,11 @@ export function ReleaseTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={row => row.id}
+      getRowClassName={row =>
+        selectedIds.has(row.id)
+          ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
+          : 'group hover:bg-surface-2/50'
+      }
       enableVirtualization={false} // Low row count, no need for virtualization
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       minWidth={minWidth}

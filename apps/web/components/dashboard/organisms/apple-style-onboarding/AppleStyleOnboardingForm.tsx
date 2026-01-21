@@ -23,7 +23,7 @@ export function AppleStyleOnboardingForm({
   userEmail = null,
   userId,
   skipNameStep = false,
-}: AppleStyleOnboardingFormProps) {
+}: Readonly<AppleStyleOnboardingFormProps>) {
   const PRODUCTION_PROFILE_DOMAIN = PROFILE_HOSTNAME;
   const PRODUCTION_PROFILE_BASE_URL = PROFILE_URL;
 

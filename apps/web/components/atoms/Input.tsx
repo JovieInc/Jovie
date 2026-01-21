@@ -5,7 +5,7 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 export function InputGroup({
   children,
-}: React.ComponentPropsWithoutRef<'span'>) {
+}: Readonly<React.ComponentPropsWithoutRef<'span'>>) {
   return (
     <span
       data-slot='control'
@@ -189,7 +189,7 @@ export const Input = forwardRef(function Input(
     'aria-describedby': ariaDescribedBy,
     'aria-invalid': ariaInvalid,
     ...props
-  }: InputProps & Partial<LegacyInputProps>,
+  }: Readonly<InputProps & Partial<LegacyInputProps>>,
   ref: React.ForwardedRef<HTMLInputElement>
 ) {
   const { id, errorId, helpTextId } = useInputIds(props.id);
@@ -240,7 +240,7 @@ export const Input = forwardRef(function Input(
         aria-invalid={isInvalid ? 'true' : undefined}
         aria-busy={isPending ? 'true' : undefined}
         aria-describedby={describedBy}
-        {...props}
+        {...(props as unknown as Headless.InputProps)}
         className={clsx([
           // Date classes
           isDateType(props.type) && dateInputClasses,

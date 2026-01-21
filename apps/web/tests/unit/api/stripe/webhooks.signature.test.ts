@@ -1,9 +1,9 @@
 /**
  * Stripe Webhooks Tests - Signature Verification
  */
+import './webhooks.test-utils';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
   mockConstructEvent,
   mockGetHandler,
@@ -11,7 +11,7 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
+const { POST } = await import('@/app/api/stripe/webhooks/route');
 
 describe('/api/stripe/webhooks - Signature Verification', () => {
   beforeEach(() => {
@@ -22,8 +22,6 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
   });
 
   it('returns 400 when signature header is missing', async () => {
-    vi.mocked(headers).mockResolvedValue(new Map() as any);
-
     const request = new NextRequest(
       'http://localhost:3000/api/stripe/webhooks',
       {
@@ -39,10 +37,6 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
   });
 
   it('returns 400 when signature is invalid', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_invalid']]) as any
-    );
-
     mockConstructEvent.mockImplementation(() => {
       throw new Error('Invalid signature');
     });
@@ -52,6 +46,9 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_invalid',
+        },
       }
     );
 

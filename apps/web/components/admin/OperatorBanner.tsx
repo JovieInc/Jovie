@@ -27,7 +27,7 @@ interface EnvHealthResponse {
  * - Dismissible (state persists in session storage)
  * - Styled consistently with the app's design system
  */
-export function OperatorBanner({ isAdmin }: { isAdmin: boolean }) {
+export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const [envIssues, setEnvIssues] = useState<string[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);

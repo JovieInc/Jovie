@@ -76,10 +76,10 @@ export function useReleaseProviderMatrix({
     setDrafts(nextDrafts);
   };
 
-  const closeEditor = () => {
+  const closeEditor = useCallback(() => {
     setEditingRelease(null);
     setDrafts({});
-  };
+  }, []);
 
   const updateRow = (updated: ReleaseViewModel) => {
     setRawRows(prev =>

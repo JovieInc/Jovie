@@ -17,7 +17,9 @@ export function ContactGlyph() {
   );
 }
 
-export function ChannelIcon({ type }: { type: PublicContactChannel['type'] }) {
+export function ChannelIcon({
+  type,
+}: Readonly<{ type: PublicContactChannel['type'] }>) {
   if (type === 'phone') {
     return (
       <svg

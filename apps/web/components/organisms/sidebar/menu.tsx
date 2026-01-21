@@ -100,14 +100,16 @@ export const SidebarMenuButton = React.forwardRef<
       return button;
     }
 
-    const tooltipLabel =
-      typeof tooltip === 'string' ? tooltip : tooltip.children;
+    // Handle both string tooltips and custom tooltip content with children
+    // Don't wrap custom children in <span> to preserve flex layout for Kbd components
+    const tooltipContent =
+      typeof tooltip === 'string' ? <span>{tooltip}</span> : tooltip.children;
 
     return (
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent side='right' align='center' hidden={isMobile}>
-          <span>{tooltipLabel}</span>
+          {tooltipContent}
         </TooltipContent>
       </Tooltip>
     );

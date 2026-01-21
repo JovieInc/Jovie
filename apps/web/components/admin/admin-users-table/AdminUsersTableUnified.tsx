@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
@@ -17,6 +16,7 @@ import {
   DateCell,
   ExportCSVButton,
   TableBulkActionsToolbar,
+  TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';

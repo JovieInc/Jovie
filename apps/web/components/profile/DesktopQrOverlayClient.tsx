@@ -7,6 +7,8 @@ const DesktopQrOverlay = dynamic(() => import('./DesktopQrOverlay'), {
   loading: () => null,
 });
 
-export function DesktopQrOverlayClient({ handle }: { handle: string }) {
+export function DesktopQrOverlayClient({
+  handle,
+}: Readonly<{ handle: string }>) {
   return <DesktopQrOverlay handle={handle} />;
 }

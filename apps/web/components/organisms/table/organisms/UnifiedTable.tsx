@@ -503,7 +503,7 @@ export function UnifiedTable<TData>({
                         presets.tableRow,
                         onRowClick && 'cursor-pointer',
                         shouldEnableKeyboardNav &&
-                          'focus:outline-none focus:bg-surface-2',
+                          'focus-visible:outline-none focus-visible:bg-surface-2',
                         focusedIndex === index && 'bg-surface-2',
                         getRowClassName?.(rowData, index)
                       )}
@@ -512,7 +512,12 @@ export function UnifiedTable<TData>({
                         setFocusedIndex(index);
                       }}
                       onKeyDown={e => handleKeyDown(e, index, rowData)}
-                      onFocus={() => setFocusedIndex(index)}
+                      onFocus={() =>
+                        shouldEnableKeyboardNav && setFocusedIndex(index)
+                      }
+                      onMouseEnter={() =>
+                        shouldEnableKeyboardNav && setFocusedIndex(index)
+                      }
                       onContextMenu={e => onRowContextMenu?.(rowData, e)}
                     >
                       {row.getVisibleCells().map(cell => (
@@ -646,7 +651,7 @@ export function UnifiedTable<TData>({
                   presets.tableRow,
                   onRowClick && 'cursor-pointer',
                   shouldEnableKeyboardNav &&
-                    'focus:outline-none focus:bg-surface-2',
+                    'focus-visible:outline-none focus-visible:bg-surface-2',
                   focusedIndex === rowIndex && 'bg-surface-2',
                   getRowClassName?.(rowData, rowIndex)
                 )}
@@ -655,7 +660,12 @@ export function UnifiedTable<TData>({
                   setFocusedIndex(rowIndex);
                 }}
                 onKeyDown={e => handleKeyDown(e, rowIndex, rowData)}
-                onFocus={() => setFocusedIndex(rowIndex)}
+                onFocus={() =>
+                  shouldEnableKeyboardNav && setFocusedIndex(rowIndex)
+                }
+                onMouseEnter={() =>
+                  shouldEnableKeyboardNav && setFocusedIndex(rowIndex)
+                }
                 onContextMenu={e => onRowContextMenu?.(rowData, e)}
                 style={
                   shouldVirtualize && virtualItem

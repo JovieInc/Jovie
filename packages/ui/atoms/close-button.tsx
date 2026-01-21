@@ -12,7 +12,7 @@ export const closeButtonStyles = {
   base: 'absolute right-4 top-4 rounded-sm opacity-70 transition-opacity',
   hover: 'hover:opacity-100',
   focus:
-    'focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
   disabled: 'disabled:pointer-events-none',
   offset: 'ring-offset-surface-1',
 } as const;

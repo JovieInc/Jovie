@@ -87,7 +87,7 @@ export function SocialIcon({
   size,
   'aria-hidden': ariaHidden = true,
   'aria-label': ariaLabel,
-}: SocialIconProps) {
+}: Readonly<SocialIconProps>) {
   const icon = platformMap[platform.toLowerCase()];
   const iconClass = className || 'h-4 w-4';
   const sizeStyle = size ? { width: size, height: size } : undefined;

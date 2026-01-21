@@ -162,9 +162,9 @@ export function FeaturedCreatorsExample() {
 // Example 4: Integration with feature flags
 export function ConditionalAvatarExample({
   userOwnsProfile,
-}: {
+}: Readonly<{
   userOwnsProfile: boolean;
-}) {
+}>) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Determine if upload should be enabled

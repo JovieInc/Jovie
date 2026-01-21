@@ -1,9 +1,9 @@
 /**
  * Stripe Webhooks Tests - Idempotency Handling
  */
+import './webhooks.test-utils';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
   mockConstructEvent,
   mockGetHandler,
@@ -13,7 +13,7 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
+const { POST } = await import('@/app/api/stripe/webhooks/route');
 
 describe('/api/stripe/webhooks - Idempotency Handling', () => {
   beforeEach(() => {
@@ -24,10 +24,6 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
   });
 
   it('skips processing for duplicate events', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_duplicate',
       type: 'checkout.session.completed',
@@ -45,6 +41,9 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
