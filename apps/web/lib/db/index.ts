@@ -195,6 +195,85 @@ let _pool: Pool | undefined;
 // Flag to prevent concurrent pool initialization (race condition fix)
 let _poolInitializing = false;
 
+function initializePoolIfNeeded(
+  databaseUrl: string,
+  isProduction: boolean
+): void {
+  if (_pool || _poolInitializing) return;
+
+  // Set flag immediately to prevent concurrent initialization attempts
+  _poolInitializing = true;
+
+  try {
+    // Double-check after setting flag (another thread may have just finished)
+    if (!_pool) {
+      _pool = new Pool({
+        connectionString: databaseUrl,
+        // Neon serverless connections can be terminated unexpectedly;
+        // keep pool small and allow quick reconnection
+        max: isProduction ? 10 : 3,
+        idleTimeoutMillis: 30000, // 30s idle timeout
+        connectionTimeoutMillis: 15000, // 15s connection timeout (allows Neon wake-up)
+      });
+
+      // Handle pool errors to prevent unhandled rejections
+      // and allow the pool to recover from transient failures
+      _pool.on('error', (err: Error) => {
+        logDbError('pool_error', err, {
+          message: 'Pool encountered an error, will attempt to recover',
+        });
+        // Don't throw - let the pool attempt to recover
+      });
+
+      // In development, register pool cleanup so hot reloads and Ctrl+C don't leak pools.
+      registerDevCleanup('db_pool', async () => {
+        const poolToClose =
+          _pool ?? (typeof global !== 'undefined' ? global.pool : undefined);
+        if (poolToClose) {
+          try {
+            await poolToClose.end();
+          } catch (error) {
+            logDbError('pool_cleanup_failed', error, {
+              reason: 'dev_cleanup',
+            });
+          }
+        }
+
+        _pool = undefined;
+        _db = undefined;
+        _poolInitializing = false;
+        if (typeof global !== 'undefined') {
+          global.pool = undefined;
+          global.db = undefined;
+        }
+      });
+
+      // Optional dev-only memory monitor (opt-in via env)
+      startDevMemoryMonitor();
+    }
+  } finally {
+    _poolInitializing = false;
+  }
+}
+
+function createDbInstance(pool: Pool, isProduction: boolean): DbType {
+  if (isProduction) {
+    return drizzle(pool, { schema, logger: false });
+  }
+
+  return drizzle(pool, {
+    schema,
+    logger: {
+      logQuery: (query: string, params: unknown[]): void => {
+        logDbInfo('query', 'Database query executed', {
+          query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
+          paramsLength: params.length,
+        });
+      },
+    },
+  });
+}
+
 function initializeDb(): DbType {
   // Validate the database URL at runtime
   const databaseUrl = env.DATABASE_URL;
@@ -229,61 +308,7 @@ function initializeDb(): DbType {
 
   // Create the database connection pool with flag guard to prevent race conditions
   // Note: Pool works in both Edge and Node, but WebSocket (for transactions) is Node-only
-  if (!_pool && !_poolInitializing) {
-    // Set flag immediately to prevent concurrent initialization attempts
-    _poolInitializing = true;
-
-    try {
-      // Double-check after setting flag (another thread may have just finished)
-      if (!_pool) {
-        _pool = new Pool({
-          connectionString: databaseUrl,
-          // Neon serverless connections can be terminated unexpectedly;
-          // keep pool small and allow quick reconnection
-          max: isProduction ? 10 : 3,
-          idleTimeoutMillis: 30000, // 30s idle timeout
-          connectionTimeoutMillis: 15000, // 15s connection timeout (allows Neon wake-up)
-        });
-
-        // Handle pool errors to prevent unhandled rejections
-        // and allow the pool to recover from transient failures
-        _pool.on('error', (err: Error) => {
-          logDbError('pool_error', err, {
-            message: 'Pool encountered an error, will attempt to recover',
-          });
-          // Don't throw - let the pool attempt to recover
-        });
-
-        // In development, register pool cleanup so hot reloads and Ctrl+C don't leak pools.
-        registerDevCleanup('db_pool', async () => {
-          const poolToClose =
-            _pool ?? (typeof global !== 'undefined' ? global.pool : undefined);
-          if (poolToClose) {
-            try {
-              await poolToClose.end();
-            } catch (error) {
-              logDbError('pool_cleanup_failed', error, {
-                reason: 'dev_cleanup',
-              });
-            }
-          }
-
-          _pool = undefined;
-          _db = undefined;
-          _poolInitializing = false;
-          if (typeof global !== 'undefined') {
-            global.pool = undefined;
-            global.db = undefined;
-          }
-        });
-
-        // Optional dev-only memory monitor (opt-in via env)
-        startDevMemoryMonitor();
-      }
-    } finally {
-      _poolInitializing = false;
-    }
-  }
+  initializePoolIfNeeded(databaseUrl, isProduction);
 
   // Ensure pool was initialized (should always be true at this point)
   if (!_pool) {
@@ -293,21 +318,11 @@ function initializeDb(): DbType {
   // Use a single connection in development to avoid connection pool exhaustion
   // In Edge runtime (where global is undefined), always create fresh instance
   if (isProduction || !hasGlobal) {
-    return drizzle(_pool, { schema, logger: false });
+    return createDbInstance(_pool, isProduction);
   } else {
     if (!global.db) {
       global.pool = _pool;
-      global.db = drizzle(_pool, {
-        schema,
-        logger: {
-          logQuery: (query: string, params: unknown[]): void => {
-            logDbInfo('query', 'Database query executed', {
-              query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
-              paramsLength: params.length,
-            });
-          },
-        },
-      });
+      global.db = createDbInstance(_pool, isProduction);
     }
     return global.db;
   }
