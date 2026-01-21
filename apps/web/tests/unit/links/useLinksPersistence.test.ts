@@ -56,6 +56,8 @@ import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links
 import { useLinksPersistence } from '@/components/dashboard/organisms/links/hooks/useLinksPersistence';
 import type { LinkItem } from '@/components/dashboard/organisms/links/types';
 
+const EMPTY_INITIAL_LINKS: ProfileSocialLink[] = [];
+
 const mockFetch = vi.fn();
 
 function createMockProfileLink(
@@ -164,7 +166,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -178,7 +180,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -239,7 +241,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -265,7 +267,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -294,11 +296,12 @@ describe('useLinksPersistence', () => {
       });
 
       const onSyncSuggestions = vi.fn().mockResolvedValue(undefined);
+      const initialLinks = [createMockProfileLink({ version: 3 })];
 
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [createMockProfileLink({ version: 3 })],
+          initialLinks,
           suggestionsEnabled: false,
           onSyncSuggestions,
         })
@@ -331,7 +334,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -351,7 +354,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -371,7 +374,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: undefined,
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -395,7 +398,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -410,7 +413,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -451,7 +454,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
