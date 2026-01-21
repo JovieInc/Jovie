@@ -47,11 +47,13 @@ export function useAvatarUpload({
   const [uploadStatus, setUploadStatus] = useState<AvatarUploadStatus>('idle');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const statusResetTimeoutRef = useRef<number | null>(null);
+  const statusResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const clearStatusReset = useCallback(() => {
     if (statusResetTimeoutRef.current) {
-      window.clearTimeout(statusResetTimeoutRef.current);
+      clearTimeout(statusResetTimeoutRef.current);
       statusResetTimeoutRef.current = null;
     }
   }, []);
@@ -59,7 +61,7 @@ export function useAvatarUpload({
   const resetStatus = useCallback(
     (delay: number) => {
       clearStatusReset();
-      statusResetTimeoutRef.current = window.setTimeout(() => {
+      statusResetTimeoutRef.current = setTimeout(() => {
         setUploadStatus('idle');
         statusResetTimeoutRef.current = null;
       }, delay);

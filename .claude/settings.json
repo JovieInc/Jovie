@@ -212,7 +212,8 @@
         "touch *",
         "cp *",
         "mv *",
-        "rm .windsurf/todos/*"
+        "rm .windsurf/todos/*",
+        "xargs *"
       ],
       "prompt": [
         "gh pr create *",

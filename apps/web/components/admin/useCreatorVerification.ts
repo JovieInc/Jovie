@@ -32,7 +32,9 @@ export function useCreatorVerification(
   const [statuses, setStatuses] = useState<
     Record<string, CreatorVerificationStatus>
   >({});
-  const statusTimeoutsRef = useRef<Record<string, number>>({});
+  const statusTimeoutsRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
 
   useEffect(() => {
     setProfiles(initialProfiles);
@@ -41,17 +43,17 @@ export function useCreatorVerification(
   useEffect(() => {
     const timeouts = statusTimeoutsRef.current;
     return () => {
-      Object.values(timeouts).forEach(timeout => window.clearTimeout(timeout));
+      Object.values(timeouts).forEach(timeout => clearTimeout(timeout));
     };
   }, []);
 
   const resetStatus = useCallback((profileId: string, delay = 2200) => {
     const previousTimeout = statusTimeoutsRef.current[profileId];
     if (previousTimeout) {
-      window.clearTimeout(previousTimeout);
+      clearTimeout(previousTimeout);
     }
 
-    statusTimeoutsRef.current[profileId] = window.setTimeout(() => {
+    statusTimeoutsRef.current[profileId] = setTimeout(() => {
       setStatuses(prev => ({
         ...prev,
         [profileId]: 'idle',
