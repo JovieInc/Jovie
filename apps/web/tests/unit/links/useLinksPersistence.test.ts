@@ -293,11 +293,14 @@ describe('useLinksPersistence', () => {
       });
 
       const onSyncSuggestions = vi.fn().mockResolvedValue(undefined);
+      const initialLinks = [
+        createMockProfileLink({ id: 'link-409', version: 3 }),
+      ];
 
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [createMockProfileLink({ version: 3 })],
+          initialLinks,
           suggestionsEnabled: false,
           onSyncSuggestions,
         })
