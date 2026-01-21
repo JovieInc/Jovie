@@ -3,7 +3,6 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
   mockConstructEvent,
   mockGetHandler,
@@ -12,12 +11,15 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
+let POST: typeof import('@/app/api/stripe/webhooks/route').POST;
+
 describe('/api/stripe/webhooks - Handler Delegation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     setSkipProcessing(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
+    ({ POST } = await import('@/app/api/stripe/webhooks/route'));
   });
 
   it('delegates to the correct handler for supported event types', async () => {
