@@ -3,8 +3,6 @@
  */
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import after mocks are set up
-import { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockGetUserIdFromStripeCustomer,
@@ -15,12 +13,15 @@ import {
 } from './subscription-handler.test-utils';
 
 describe('@critical SubscriptionHandler - Updated', () => {
-  let handler: SubscriptionHandler;
+  let handler: import('@/lib/stripe/webhooks/handlers/subscription-handler').SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
     setupDefaultMocks();
+    const { SubscriptionHandler } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandler();
   });
 
   it('processes subscription updated with active status', async () => {

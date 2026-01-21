@@ -3,11 +3,6 @@
  */
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import after mocks are set up
-import {
-  SubscriptionHandler,
-  subscriptionHandler,
-} from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockInvalidateBillingCache,
@@ -16,12 +11,15 @@ import {
 } from './subscription-handler.test-utils';
 
 describe('@critical SubscriptionHandler - Misc', () => {
-  let handler: SubscriptionHandler;
+  let handler: import('@/lib/stripe/webhooks/handlers/subscription-handler').SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
     setupDefaultMocks();
+    const { SubscriptionHandler } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandler();
   });
 
   describe('eventTypes', () => {
@@ -144,7 +142,10 @@ describe('@critical SubscriptionHandler - Misc', () => {
   });
 
   describe('singleton instance', () => {
-    it('exports a singleton handler instance', () => {
+    it('exports a singleton handler instance', async () => {
+      const { subscriptionHandler, SubscriptionHandler } = await import(
+        '@/lib/stripe/webhooks/handlers/subscription-handler'
+      );
       expect(subscriptionHandler).toBeInstanceOf(SubscriptionHandler);
       expect(subscriptionHandler.eventTypes).toContain(
         'customer.subscription.created'
