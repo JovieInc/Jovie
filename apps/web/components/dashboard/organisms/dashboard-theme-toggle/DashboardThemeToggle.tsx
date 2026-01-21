@@ -3,7 +3,11 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { MoonIcon, SunIcon } from './ThemeIcons';
-import { type DashboardThemeToggleProps, THEME_OPTIONS } from './types';
+import {
+  type DashboardThemeToggleProps,
+  THEME_OPTIONS,
+  type ThemeValue,
+} from './types';
 import { useDashboardTheme } from './useDashboardTheme';
 
 function SystemIcon({ className }: Readonly<{ className: string }>) {
@@ -56,6 +60,135 @@ function getThemeIcon(value: string) {
   return <SystemIcon className='h-5 w-5 text-secondary-token' />;
 }
 
+interface ThemeOptionGridProps {
+  theme: string | undefined;
+  resolvedTheme: string | undefined;
+  isUpdating: boolean;
+  onThemeChange: (value: ThemeValue) => void;
+}
+
+function ThemeOptionGrid({
+  theme,
+  resolvedTheme,
+  isUpdating,
+  onThemeChange,
+}: ThemeOptionGridProps) {
+  const showResolvedTheme = (optionValue: string) =>
+    theme === optionValue && optionValue === 'system';
+
+  return (
+    <div className='space-y-3'>
+      <span className='text-sm font-medium text-primary-token'>
+        Theme Preference
+      </span>
+      <div className='grid grid-cols-3 gap-2'>
+        {THEME_OPTIONS.map(option => (
+          <button
+            type='button'
+            key={option.value}
+            onClick={() => onThemeChange(option.value)}
+            disabled={isUpdating}
+            className={cn(
+              'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200',
+              theme === option.value
+                ? 'border-accent bg-accent/10 text-primary-token'
+                : 'border-border hover:bg-surface-hover-token text-secondary-token',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            <span className='mb-1 flex items-center justify-center'>
+              {getThemeIcon(option.value)}
+            </span>
+            <span className='text-xs font-medium'>{option.label}</span>
+            {showResolvedTheme(option.value) && (
+              <span className='text-xs text-secondary-token mt-1'>
+                ({resolvedTheme})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      <p className='text-xs text-secondary-token'>
+        Choose how the interface appears. System follows your device settings.
+      </p>
+    </div>
+  );
+}
+
+interface ThemeToggleButtonProps {
+  isDark: boolean;
+  isUpdating: boolean;
+  onToggle: () => void;
+  variant: 'compact' | 'default';
+}
+
+function ThemeToggleButton({
+  isDark,
+  isUpdating,
+  onToggle,
+  variant,
+}: ThemeToggleButtonProps) {
+  const ThemeIcon = isDark ? MoonIcon : SunIcon;
+  const tooltipText = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+
+  if (variant === 'compact') {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type='button'
+            disabled={isUpdating}
+            onClick={onToggle}
+            className={cn(
+              'flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors duration-150',
+              isUpdating && 'opacity-70'
+            )}
+          >
+            <ThemeIcon className='h-4 w-4 text-secondary-token' />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side='right'>{tooltipText}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  const srText = isUpdating
+    ? 'Updating theme...'
+    : `Switch to ${isDark ? 'light' : 'dark'} mode`;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type='button'
+          disabled={isUpdating}
+          onClick={onToggle}
+          className={cn(
+            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed',
+            isDark ? 'bg-accent' : 'bg-surface-hover-token',
+            'p-0.5'
+          )}
+          role='switch'
+          aria-checked={isDark}
+        >
+          <span className='sr-only'>{srText}</span>
+          <span
+            aria-hidden='true'
+            className={cn(
+              'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out items-center justify-center',
+              isDark ? 'translate-x-5' : 'translate-x-0',
+              isUpdating && 'animate-pulse motion-reduce:animate-none'
+            )}
+          >
+            <ThemeIcon className='h-3 w-3 text-accent-token' />
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side='right'>{tooltipText}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function DashboardThemeToggle({
   onThemeChange,
   onThemeSave,
@@ -81,110 +214,21 @@ export function DashboardThemeToggle({
 
   if (showSystemOption) {
     return (
-      <div className='space-y-3'>
-        <span className='text-sm font-medium text-primary-token'>
-          Theme Preference
-        </span>
-        <div className='grid grid-cols-3 gap-2'>
-          {THEME_OPTIONS.map(option => (
-            <button
-              type='button'
-              key={option.value}
-              onClick={() => handleThemeChange(option.value)}
-              disabled={isUpdating}
-              className={cn(
-                'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200',
-                theme === option.value
-                  ? 'border-accent bg-accent/10 text-primary-token'
-                  : 'border-border hover:bg-surface-hover-token text-secondary-token',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-            >
-              <span className='mb-1 flex items-center justify-center'>
-                {getThemeIcon(option.value)}
-              </span>
-              <span className='text-xs font-medium'>{option.label}</span>
-              {theme === option.value && option.value === 'system' && (
-                <span className='text-xs text-secondary-token mt-1'>
-                  ({resolvedTheme})
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        <p className='text-xs text-secondary-token'>
-          Choose how the interface appears. System follows your device settings.
-        </p>
-      </div>
-    );
-  }
-
-  if (variant === 'compact') {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type='button'
-            disabled={isUpdating}
-            onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors duration-150',
-              isUpdating && 'opacity-70'
-            )}
-          >
-            {isDark ? (
-              <MoonIcon className='h-4 w-4 text-secondary-token' />
-            ) : (
-              <SunIcon className='h-4 w-4 text-secondary-token' />
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side='right'>
-          {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        </TooltipContent>
-      </Tooltip>
+      <ThemeOptionGrid
+        theme={theme}
+        resolvedTheme={resolvedTheme}
+        isUpdating={isUpdating}
+        onThemeChange={handleThemeChange}
+      />
     );
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type='button'
-          disabled={isUpdating}
-          onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-          className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed',
-            isDark ? 'bg-accent' : 'bg-surface-hover-token',
-            'p-0.5'
-          )}
-          role='switch'
-          aria-checked={isDark}
-        >
-          <span className='sr-only'>
-            {isUpdating
-              ? 'Updating theme...'
-              : `Switch to ${isDark ? 'light' : 'dark'} mode`}
-          </span>
-          <span
-            aria-hidden='true'
-            className={cn(
-              'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out items-center justify-center',
-              isDark ? 'translate-x-5' : 'translate-x-0',
-              isUpdating && 'animate-pulse motion-reduce:animate-none'
-            )}
-          >
-            {isDark ? (
-              <MoonIcon className='h-3 w-3 text-accent-token' />
-            ) : (
-              <SunIcon className='h-3 w-3 text-accent-token' />
-            )}
-          </span>
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side='right'>
-        {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      </TooltipContent>
-    </Tooltip>
+    <ThemeToggleButton
+      isDark={isDark}
+      isUpdating={isUpdating}
+      onToggle={() => handleThemeChange(isDark ? 'light' : 'dark')}
+      variant={variant}
+    />
   );
 }
