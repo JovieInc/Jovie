@@ -7,28 +7,33 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 ## Repository Overview
 
 - **Stack**: Next.js 15 (App Router), TypeScript, Tailwind CSS v4
-- **Auth**: Clerk (migrated from Supabase Auth)  
+- **Auth**: Clerk (migrated from Supabase Auth)
 - **Database**: Neon PostgreSQL with Drizzle ORM (migrated from Supabase)
-- **Package Manager**: pnpm 8.15.9 (exact version required)
-- **Node.js**: 20.17+ required
+- **Package Manager**: pnpm 9.15.4 (exact version required - NOT npm or yarn)
+- **Node.js**: 24.0.0 required (see `.nvmrc`)
 - **Env validation**: `lib/env.ts` (Zod-based validation)
 - **Branches**: `develop` (work) → `preview` (staging) → `production`
 - **CI gates**: `lint`, `typecheck`, `test`, `build`, and e2e
 
+> **IMPORTANT FOR AI AGENTS**: Verify `node --version` shows v24.x and `pnpm --version` shows 9.15.4 BEFORE running any commands. Using older Node versions will cause failures.
+
 ## Critical Setup Requirements
 
 ### Prerequisites
-- **Node.js 20.17+**: Required version for Next.js 15 compatibility
-- **pnpm 8.15.9**: Exact version required (not npm or yarn)
+- **Node.js 24.0.0**: Required version (check `.nvmrc`). Use `nvm use 24` or `nvm install 24`
+- **pnpm 9.15.4**: Exact version required (not npm or yarn)
 - **Environment Variables**: Copy `.env.example` to `.env.local` and configure
 
 ### Initial Setup Commands
 Run these commands in order for a fresh repository clone:
 
 ```bash
-# 1. Ensure exact pnpm version via Corepack (Node 20+)
+# 0. VERIFY NODE VERSION FIRST (must be v24.x)
+node --version  # Expected: v24.0.0
+
+# 1. Ensure exact pnpm version via Corepack
 corepack enable pnpm
-corepack prepare pnpm@8.15.9 --activate
+corepack prepare pnpm@9.15.4 --activate
 
 # 2. Install dependencies (TIMING: ~60-90 seconds)
 # NOTE: Use --no-frozen-lockfile due to lockfile sync issues
@@ -327,8 +332,8 @@ After making changes, **ALWAYS test these user scenarios manually**:
 ## Troubleshooting Guide
 
 ### Development Server Won't Start
-1. **Check Node version**: Must be 20.17+
-2. **Check pnpm version**: Must be exactly 8.15.9  
+1. **Check Node version**: Must be 24.0.0+ (`node --version`)
+2. **Check pnpm version**: Must be exactly 9.15.4 (`pnpm --version`)
 3. **Reinstall dependencies**: `rm -rf node_modules pnpm-lock.yaml && pnpm install --no-frozen-lockfile`
 4. **Check environment**: Verify `.env.local` has required variables
 

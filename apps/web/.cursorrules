@@ -1,5 +1,24 @@
 # Cursor Rules for Jovie Project
 
+## STOP: Verify Tooling First
+
+```bash
+node --version   # MUST be v24.x (not 18, 20, or 22)
+pnpm --version   # MUST be 9.15.4 (not npm or yarn)
+```
+
+**If wrong:** `nvm use 24` and `corepack prepare pnpm@9.15.4 --activate`
+
+| Do | Don't |
+|----|-------|
+| `pnpm install` | `npm install` / `yarn` |
+| `pnpm --filter web dev` | `cd apps/web && pnpm dev` |
+| Run from repo root | Run from subdirectories |
+
+See `agents.md` at repo root for full AI agent guidelines.
+
+---
+
 ## ⚠️ CRITICAL: BRANCH PROTECTION RULES
 
 ### **NEVER PUSH TO PREVIEW OR MAIN**
@@ -17,16 +36,20 @@
 
 ## Project Overview
 
-Jovie is a Next.js 14 application with Clerk authentication and Supabase database integration. The project uses the latest native Clerk-Supabase integration method and Statsig for feature flags.
+Jovie is a Next.js 15 application with Clerk authentication and Neon PostgreSQL database (migrated from Supabase). The project uses Drizzle ORM and Statsig for feature flags.
 
 ## Technology Stack
 
-- **Frontend**: Next.js 14 (App Router)
-- **Database**: Supabase (PostgreSQL with RLS)
-- **Authentication**: Clerk with native Supabase integration
+- **Runtime**: Node.js 24.0.0 (required)
+- **Package Manager**: pnpm 9.15.4 (required)
+- **Frontend**: Next.js 15 (App Router)
+- **Database**: Neon PostgreSQL with Drizzle ORM
+- **Authentication**: Clerk
 - **Feature Flags**: Statsig for experimentation and feature management
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS v4
+- **Linting**: Biome
 - **Testing**: Vitest + Playwright
+- **Monorepo**: Turborepo
 - **Deployment**: Vercel
 
 ## Critical Guidelines
