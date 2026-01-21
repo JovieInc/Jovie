@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
+import { captureError } from '@/lib/error-tracking';
 import {
   extractErrorCode,
   getErrorMessage,
@@ -11,11 +12,7 @@ import {
   mapErrorToUserMessage,
 } from './errors';
 import type { HandleValidationState, OnboardingState } from './types';
-import {
-  canSubmitOnboarding,
-  getResolvedHandle,
-  validateDisplayName,
-} from './validation';
+import { getResolvedHandle, validateDisplayName } from './validation';
 
 interface UseOnboardingSubmitOptions {
   userId: string;
@@ -32,6 +29,7 @@ interface UseOnboardingSubmitReturn {
   state: OnboardingState;
   setState: React.Dispatch<React.SetStateAction<OnboardingState>>;
   handleSubmit: (e?: React.FormEvent) => Promise<void>;
+  isPendingSubmit: boolean;
 }
 
 /**
@@ -55,6 +53,7 @@ export function useOnboardingSubmit({
     retryCount: 0,
     isSubmitting: false,
   });
+  const [isPendingSubmit, setIsPendingSubmit] = useState(false);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -63,18 +62,26 @@ export function useOnboardingSubmit({
       const resolvedHandle = getResolvedHandle(handle, handleInput);
       const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
 
-      // Early return if form cannot be submitted
-      if (
-        !canSubmitOnboarding({
-          handle,
-          handleInput,
-          handleValidation,
-          isSubmitting: state.isSubmitting,
-          hasError: Boolean(state.error),
-        })
-      ) {
+      // If already submitting, don't allow another submission
+      if (state.isSubmitting) {
         return;
       }
+
+      // If validation is currently checking, set pending flag and return
+      // The useEffect below will auto-submit when validation completes
+      if (handleValidation.checking) {
+        setIsPendingSubmit(true);
+        return;
+      }
+
+      // Clear pending flag since we're proceeding with submission
+      setIsPendingSubmit(false);
+
+      // Check remaining validation requirements (excluding checking state)
+      if (!resolvedHandle) return;
+      if (state.error) return;
+      if (!handleValidation.clientValid) return;
+      if (!handleValidation.available) return;
 
       // Track submission start
       track('onboarding_submission_started', {
@@ -128,6 +135,15 @@ export function useOnboardingSubmit({
         }
 
         const errorCode = extractErrorCode(error);
+
+        // Capture error to Sentry for monitoring
+        void captureError('Onboarding submission failed', error, {
+          userId,
+          handle: resolvedHandle,
+          errorCode,
+          step: 'submission',
+          route: '/onboarding',
+        });
 
         // Handle database errors with retry suggestion
         if (isDatabaseError(error)) {
@@ -201,9 +217,31 @@ export function useOnboardingSubmit({
     ]
   );
 
+  // Auto-submit when validation completes if user had pending submit intent
+  useEffect(() => {
+    if (
+      isPendingSubmit &&
+      !handleValidation.checking &&
+      handleValidation.available &&
+      handleValidation.clientValid &&
+      !state.isSubmitting
+    ) {
+      setIsPendingSubmit(false);
+      void handleSubmit();
+    }
+  }, [
+    isPendingSubmit,
+    handleValidation.checking,
+    handleValidation.available,
+    handleValidation.clientValid,
+    state.isSubmitting,
+    handleSubmit,
+  ]);
+
   return {
     state,
     setState,
     handleSubmit,
+    isPendingSubmit,
   };
 }

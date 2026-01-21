@@ -24,6 +24,7 @@ interface OnboardingHandleStepProps {
   inputRef: React.RefObject<HTMLInputElement>;
   onHandleChange: (value: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
+  isPendingSubmit?: boolean;
 }
 
 export function OnboardingHandleStep({
@@ -38,6 +39,7 @@ export function OnboardingHandleStep({
   inputRef,
   onHandleChange,
   onSubmit,
+  isPendingSubmit = false,
 }: OnboardingHandleStepProps) {
   return (
     <div className='flex flex-col items-center justify-center h-full space-y-5'>
@@ -172,6 +174,11 @@ export function OnboardingHandleStep({
               <div className='flex items-center justify-center space-x-2'>
                 <LoadingSpinner size='sm' className='text-current' />
                 <span>Saving…</span>
+              </div>
+            ) : isPendingSubmit && handleValidation.checking ? (
+              <div className='flex items-center justify-center space-x-2'>
+                <LoadingSpinner size='sm' className='text-current' />
+                <span>Checking…</span>
               </div>
             ) : (
               'Continue'
