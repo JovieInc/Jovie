@@ -24,6 +24,7 @@ export interface UseAvatarUploadReturn {
   isDragOver: boolean;
   isUploading: boolean;
   uploadStatus: AvatarUploadStatus;
+  uploadProgress: number;
   previewUrl: string | null;
   handleFileUpload: (file: File) => Promise<void>;
   handleDragEnter: (e: React.DragEvent) => void;
@@ -45,9 +46,13 @@ export function useAvatarUpload({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<AvatarUploadStatus>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const statusResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
 
@@ -55,6 +60,13 @@ export function useAvatarUpload({
     if (statusResetTimeoutRef.current) {
       clearTimeout(statusResetTimeoutRef.current);
       statusResetTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearProgressInterval = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
     }
   }, []);
 
@@ -106,6 +118,9 @@ export function useAvatarUpload({
   // Cleanup timeout on unmount
   useEffect(() => clearStatusReset, [clearStatusReset]);
 
+  // Cleanup progress interval on unmount
+  useEffect(() => clearProgressInterval, [clearProgressInterval]);
+
   const handleFileUpload = useCallback(
     async (file: File) => {
       if (!onUpload) return;
@@ -129,15 +144,27 @@ export function useAvatarUpload({
 
       setIsUploading(true);
       setUploadStatus('uploading');
+      setUploadProgress(5);
       setPreviewFromFile(file);
       track('avatar_upload_start', {
         file_size: file.size,
         file_type: file.type,
       });
 
+      clearProgressInterval();
+      progressIntervalRef.current = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) return prev;
+          // Ease out as we approach 90 to avoid jumping to 100 too early
+          const increment = Math.max(1, Math.floor((90 - prev) * 0.1));
+          return Math.min(90, prev + increment);
+        });
+      }, 300);
+
       try {
         const imageUrl = await onUpload(file);
         setUploadStatus('success');
+        setUploadProgress(100);
         setPreviewUrl(imageUrl);
         onSuccess?.(imageUrl);
         track('avatar_upload_success', { file_size: file.size });
@@ -169,11 +196,17 @@ export function useAvatarUpload({
         setPreviewUrl(null);
         resetStatus(3000);
       } finally {
+        clearProgressInterval();
         setIsUploading(false);
+        // If we errored, keep progress at 100 for the ring state; otherwise reset when status reset runs
+        if (uploadStatus !== 'error') {
+          setUploadProgress(0);
+        }
       }
     },
     [
       acceptedTypes,
+      clearProgressInterval,
       clearStatusReset,
       maxFileSize,
       onError,
@@ -231,6 +264,7 @@ export function useAvatarUpload({
       isUploading,
       uploadStatus,
       previewUrl,
+      uploadProgress,
       handleFileUpload,
       handleDragEnter,
       handleDragLeave,

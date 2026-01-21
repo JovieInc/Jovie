@@ -24,6 +24,7 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
+import { downloadVCard } from './utils';
 import {
   renderActionsCell,
   renderDeviceCell,
@@ -126,28 +127,7 @@ export function DashboardAudienceTableUnified({
           label: 'Export as vCard',
           icon: <Download className='h-3.5 w-3.5' />,
           onClick: () => {
-            // Generate vCard format
-            const vcard = [
-              'BEGIN:VCARD',
-              'VERSION:3.0',
-              `FN:${member.displayName}`,
-              member.email ? `EMAIL:${member.email}` : '',
-              member.phone ? `TEL:${member.phone}` : '',
-              'END:VCARD',
-            ]
-              .filter(Boolean)
-              .join('\n');
-
-            // Create blob and download
-            const blob = new Blob([vcard], { type: 'text/vcard' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${(member.displayName || 'contact').replaceAll(/[^a-z0-9]/gi, '_')}.vcf`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
+            downloadVCard(member);
             toast.success('Contact exported as vCard');
           },
         },
@@ -440,8 +420,8 @@ export function DashboardAudienceTableUnified({
             )}
           </div>
 
-          {/* Footer - direct flex child anchored to bottom */}
-          <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
+          {/* Footer - shrink-0 ensures it stays anchored to bottom when drawer opens */}
+          <div className='shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
             <span className='tracking-wide'>{paginationLabel()}</span>
             <div className='flex items-center gap-3'>
               <AdminPageSizeSelect

@@ -1476,54 +1476,67 @@ jobs:
           retention-days: 3
 
   # Homepage smoke test runs BEFORE production deploy
-  # This prevents broken homepages from reaching production
-  # TODO: Remove continue-on-error once Vercel preview auth bypass is fixed
+  # Uses curl-based check for reliability (Playwright had issues with Vercel bypass)
   ci-homepage-smoke:
     name: Homepage Smoke (Pre-Deploy)
     needs: [ci-fast, ci-build]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true # Temporarily non-blocking due to Vercel preview auth issues
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 1
-
-      - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
-        with:
-          path: ~/.cache/ms-playwright
-          # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
-
-      - name: Run Homepage Smoke Test against production
-        run: |
-          # Run homepage and critical pages tests only
-          # Skip: Public Profile tests (require seeded data), Error Handling tests (test 404 behavior, not homepage)
-          pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line --grep-invert="Public Profile|Error Handling"
+      - name: Verify homepage renders correctly
         env:
-          CI: 'true'
-          SMOKE_ONLY: '1'
-          BASE_URL: https://jov.ie
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          echo "Running homepage smoke test against production..."
 
-      - name: Upload Playwright Artifacts on Failure
-        if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: homepage-smoke-report-${{ github.run_id }}
-          path: |
-            apps/web/playwright-report/
-            apps/web/test-results/
-          retention-days: 3
+          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
+          COOKIE_JAR="$(mktemp)"
+
+          # Vercel Deployment Protection bypass for automation
+          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
+          BYPASS_ARGS=()
+          if [ -n "$BYPASS_SECRET" ]; then
+            BYPASS_ARGS+=(
+              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
+              -H "x-vercel-set-bypass-cookie: true"
+              -c "$COOKIE_JAR"
+              -b "$COOKIE_JAR"
+            )
+          fi
+
+          # Check homepage
+          response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "https://jov.ie" || echo "\n000")
+          status="${response##*$'\n'}"
+          body="${response%$'\n'*}"
+
+          if [ "$status" != "200" ]; then
+            echo "❌ Homepage returned HTTP $status"
+            exit 1
+          fi
+
+          if [ ${#body} -lt 1000 ]; then
+            echo "❌ Homepage body too short (${#body} chars) - likely broken"
+            exit 1
+          fi
+
+          if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
+            echo "❌ Homepage contains error message"
+            exit 1
+          fi
+
+          # Check critical pages (/sign-up, /pricing)
+          for route in "/sign-up" "/pricing"; do
+            route_response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "https://jov.ie${route}" || echo "\n000")
+            route_status="${route_response##*$'\n'}"
+
+            if [ "$route_status" -ge 500 ]; then
+              echo "❌ Route ${route} returned HTTP $route_status (server error)"
+              exit 1
+            fi
+          done
+
+          echo "✅ Homepage smoke passed"
 
   deploy:
     needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required, ci-homepage-smoke] # Required smoke + homepage smoke must pass before deploy
