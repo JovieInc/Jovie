@@ -99,9 +99,11 @@ export function DashboardNav(_: DashboardNavProps) {
     [pathname, profileActions]
   );
 
-  function renderSection(items: NavItem[]) {
-    return <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>;
-  }
+  // Memoize renderSection to prevent creating new functions on every render
+  const renderSection = useCallback(
+    (items: NavItem[]) => <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>,
+    [renderNavItem]
+  );
 
   return (
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
