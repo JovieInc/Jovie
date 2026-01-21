@@ -195,6 +195,77 @@ export async function lookupAppleMusicByIsrc(
   }
 }
 
+function processManualOverrides(
+  overrides: ResolveProviderLinksOptions['overrides'],
+  links: ProviderLink[],
+  seenProviders: Set<ProviderKey>
+): void {
+  if (!overrides) return;
+
+  for (const [provider, override] of Object.entries(overrides)) {
+    if (!override) continue;
+    const key = provider as ProviderKey;
+    seenProviders.add(key);
+    links.push({
+      provider: key,
+      url: override.url,
+      quality: 'manual_override',
+      discovered_from: override.discovered_from ?? 'manual_override',
+    });
+  }
+}
+
+async function runIsrcLookups(
+  track: TrackDescriptor,
+  providers: ProviderKey[],
+  seenProviders: Set<ProviderKey>,
+  links: ProviderLink[],
+  options: { storefront: string; fetcher: typeof fetch }
+): Promise<void> {
+  if (!track.isrc) return;
+
+  const lookupPromises: Promise<void>[] = [];
+
+  // Apple Music ISRC lookup
+  if (providers.includes('apple_music') && !seenProviders.has('apple_music')) {
+    lookupPromises.push(
+      lookupAppleMusicByIsrc(track.isrc, options).then(result => {
+        if (result) {
+          links.push({
+            provider: 'apple_music',
+            url: result.url,
+            quality: 'canonical',
+            discovered_from: 'apple_music_isrc',
+            provider_id: result.trackId ?? undefined,
+          });
+          seenProviders.add('apple_music');
+        }
+      })
+    );
+  }
+
+  // Deezer ISRC lookup
+  if (providers.includes('deezer') && !seenProviders.has('deezer')) {
+    lookupPromises.push(
+      lookupDeezerByIsrc(track.isrc, options).then(result => {
+        if (result) {
+          // Prefer album URL over track URL for releases
+          links.push({
+            provider: 'deezer',
+            url: result.albumUrl ?? result.url,
+            quality: 'canonical',
+            discovered_from: 'deezer_isrc',
+            provider_id: result.albumId ?? result.trackId,
+          });
+          seenProviders.add('deezer');
+        }
+      })
+    );
+  }
+
+  await Promise.all(lookupPromises);
+}
+
 export async function resolveProviderLinks(
   track: TrackDescriptor,
   options: ResolveProviderLinksOptions = {}
@@ -207,68 +278,13 @@ export async function resolveProviderLinks(
   const seenProviders = new Set<ProviderKey>();
 
   // Manual overrides take precedence
-  if (options.overrides) {
-    for (const [provider, override] of Object.entries(options.overrides)) {
-      if (!override) continue;
-      const key = provider as ProviderKey;
-      seenProviders.add(key);
-      links.push({
-        provider: key,
-        url: override.url,
-        quality: 'manual_override',
-        discovered_from: override.discovered_from ?? 'manual_override',
-      });
-    }
-  }
+  processManualOverrides(options.overrides, links, seenProviders);
 
   // Run ISRC lookups in parallel for speed
-  if (track.isrc) {
-    const lookupPromises: Promise<void>[] = [];
-
-    // Apple Music ISRC lookup
-    if (
-      providers.includes('apple_music') &&
-      !seenProviders.has('apple_music')
-    ) {
-      lookupPromises.push(
-        lookupAppleMusicByIsrc(track.isrc, { storefront, fetcher }).then(
-          result => {
-            if (result) {
-              links.push({
-                provider: 'apple_music',
-                url: result.url,
-                quality: 'canonical',
-                discovered_from: 'apple_music_isrc',
-                provider_id: result.trackId ?? undefined,
-              });
-              seenProviders.add('apple_music');
-            }
-          }
-        )
-      );
-    }
-
-    // Deezer ISRC lookup
-    if (providers.includes('deezer') && !seenProviders.has('deezer')) {
-      lookupPromises.push(
-        lookupDeezerByIsrc(track.isrc, { fetcher }).then(result => {
-          if (result) {
-            // Prefer album URL over track URL for releases
-            links.push({
-              provider: 'deezer',
-              url: result.albumUrl ?? result.url,
-              quality: 'canonical',
-              discovered_from: 'deezer_isrc',
-              provider_id: result.albumId ?? result.trackId,
-            });
-            seenProviders.add('deezer');
-          }
-        })
-      );
-    }
-
-    await Promise.all(lookupPromises);
-  }
+  await runIsrcLookups(track, providers, seenProviders, links, {
+    storefront,
+    fetcher,
+  });
 
   for (const provider of providers) {
     if (seenProviders.has(provider)) continue;
