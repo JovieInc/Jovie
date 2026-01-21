@@ -7,7 +7,7 @@ import { Footer } from '@/components/site/Footer';
 const MINIMAL_FOOTER_PATHS = ['/', '/investors'];
 
 // Pages that hide the theme toggle (dark mode only)
-const DARK_MODE_ONLY_PATHS = ['/'];
+const DARK_MODE_ONLY_PATHS: string[] = [];
 
 export function MarketingFooter() {
   const pathname = usePathname();

@@ -1,22 +1,10 @@
 'use client';
 
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type RowSelectionState,
-} from '@tanstack/react-table';
-import {
-  CheckCircle,
-  Copy,
-  Star,
-  Trash2,
-  UserCircle2,
-  XCircle,
-} from 'lucide-react';
+import type { RowSelectionState } from '@tanstack/react-table';
+import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -24,34 +12,31 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
-import {
-  type ContextMenuItemType,
-  convertContextMenuItems,
-  TableCheckboxCell,
-  UnifiedTable,
-  useRowSelection,
-} from '@/components/organisms/table';
+import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
+import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
-import {
-  renderAvatarCell,
-  renderCreatedDateCell,
-  renderMusicLinksCell,
-  renderSocialLinksCell,
-} from './utils/column-renderers';
+import { createCreatorProfileColumns } from './utils/column-definitions';
 
 const DeleteCreatorDialog = dynamic(
   () =>
     import('@/components/admin/DeleteCreatorDialog').then(mod => ({
       default: mod.DeleteCreatorDialog,
+    })),
+  { ssr: false }
+);
+
+const BulkDeleteCreatorDialog = dynamic(
+  () =>
+    import('@/components/admin/BulkDeleteCreatorDialog').then(mod => ({
+      default: mod.BulkDeleteCreatorDialog,
     })),
   { ssr: false }
 );
@@ -74,8 +59,6 @@ const ContactSidebar = dynamic(
     ssr: false,
   }
 );
-
-const columnHelper = createColumnHelper<AdminCreatorProfileRow>();
 
 export function AdminCreatorProfilesUnified({
   profiles: initialProfiles,
@@ -100,15 +83,24 @@ export function AdminCreatorProfilesUnified({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteCount, setBulkDeleteCount] = useState(0);
+  const bulkDeleteResolverRef = React.useRef<
+    ((confirmed: boolean) => void) | null
+  >(null);
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [profileToDelete, setProfileToDelete] = useState<
-    (typeof profilesWithActions)[number] | null
-  >(null);
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [profileToInvite, setProfileToInvite] = useState<
-    (typeof profilesWithActions)[number] | null
-  >(null);
+  const {
+    deleteDialogOpen,
+    profileToDelete,
+    inviteDialogOpen,
+    profileToInvite,
+    openDeleteDialog,
+    closeDeleteDialog,
+    openInviteDialog,
+    closeInviteDialog,
+    clearDeleteProfile,
+    clearInviteProfile,
+  } = useDialogState();
 
   const {
     totalPages,
@@ -135,8 +127,26 @@ export function AdminCreatorProfilesUnified({
     [filteredProfiles]
   );
 
-  const { selectedIds, headerCheckboxState, toggleSelect, toggleSelectAll } =
-    useRowSelection(rowIds);
+  const {
+    selectedIds,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+  } = useRowSelection(rowIds);
+
+  const selectedIdsKey = useMemo(
+    () => Array.from(selectedIds).sort().join(','),
+    [selectedIds]
+  );
+
+  const confirmBulkDelete = useCallback((count: number) => {
+    setBulkDeleteCount(count);
+    setBulkDeleteDialogOpen(true);
+    return new Promise<boolean>(resolve => {
+      bulkDeleteResolverRef.current = resolve;
+    });
+  }, []);
 
   const {
     setDraftContact,
@@ -159,6 +169,32 @@ export function AdminCreatorProfilesUnified({
     onSaveSuccess: updatedContact => {
       setDraftContact(updatedContact);
     },
+  });
+
+  const { getContextMenuItems } = useContextMenuItems({
+    ingestRefreshStatuses,
+    refreshIngest,
+    toggleVerification,
+    toggleFeatured,
+    toggleMarketing,
+    openDeleteDialog,
+    openInviteDialog,
+  });
+
+  const {
+    handleBulkVerify,
+    handleBulkUnverify,
+    handleBulkFeature,
+    handleBulkDelete,
+    handleClearSelection,
+  } = useBulkActions({
+    profiles: profilesWithActions,
+    selectedIds,
+    confirmBulkDelete,
+    toggleVerification,
+    toggleFeatured,
+    deleteCreatorOrUser,
+    clearSelection,
   });
 
   const handleRowClick = useCallback(
@@ -230,356 +266,28 @@ export function AdminCreatorProfilesUnified({
     [rowSelection, filteredProfiles.length, selectedIds.size, toggleSelectAll]
   );
 
-  // Context menu items for right-click AND actions button
-  const getContextMenuItems = useCallback(
-    (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
-      const items: ContextMenuItemType[] = [];
-
-      // Refresh ingest (if available)
-      const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
-      if (refreshIngestStatus !== undefined) {
-        items.push({
-          id: 'refresh-ingest',
-          label: 'Refresh ingest',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => void refreshIngest(profile.id),
-          disabled: refreshIngestStatus === 'loading',
-        });
-        items.push({ type: 'separator' as const });
-      }
-
-      // Verify/Unverify
-      items.push(
-        profile.isVerified
-          ? {
-              id: 'unverify',
-              label: 'Unverify creator',
-              icon: <XCircle className='h-3.5 w-3.5' />,
-              onClick: () => {
-                void (async () => {
-                  const result = await toggleVerification(profile.id, false);
-                  if (!result.success) {
-                    toast.error('Failed to unverify creator');
-                  } else {
-                    toast.success('Creator unverified');
-                  }
-                })();
-              },
-            }
-          : {
-              id: 'verify',
-              label: 'Verify creator',
-              icon: <CheckCircle className='h-3.5 w-3.5' />,
-              onClick: () => {
-                void (async () => {
-                  const result = await toggleVerification(profile.id, true);
-                  if (!result.success) {
-                    toast.error('Failed to verify creator');
-                  } else {
-                    toast.success('Creator verified');
-                  }
-                })();
-              },
-            }
-      );
-
-      // Feature/Unfeature
-      items.push({
-        id: 'feature',
-        label: profile.isFeatured ? 'Unfeature' : 'Feature',
-        icon: <Star className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void (async () => {
-            const result = await toggleFeatured(
-              profile.id,
-              !profile.isFeatured
-            );
-            if (!result.success) {
-              toast.error(
-                `Failed to ${profile.isFeatured ? 'unfeature' : 'feature'} creator`
-              );
-            } else {
-              toast.success(
-                `Creator ${profile.isFeatured ? 'unfeatured' : 'featured'}`
-              );
-            }
-          })();
-        },
-      });
-
-      items.push({ type: 'separator' as const });
-
-      // Marketing emails toggle
-      items.push({
-        id: 'marketing',
-        label: profile.marketingOptOut
-          ? 'Enable marketing emails'
-          : 'Disable marketing emails',
-        icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void (async () => {
-            const result = await toggleMarketing(
-              profile.id,
-              !profile.marketingOptOut
-            );
-            if (!result.success) {
-              toast.error('Failed to toggle marketing');
-            }
-          })();
-        },
-      });
-
-      // View profile
-      items.push({
-        id: 'view-profile',
-        label: 'View profile',
-        icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          window.open(`/${profile.username}`, '_blank');
-        },
-      });
-
-      // Copy claim link & Send invite (if unclaimed and has claim token)
-      if (!profile.isClaimed && profile.claimToken) {
-        items.push({ type: 'separator' as const });
-        items.push({
-          id: 'copy-claim-link',
-          label: 'Copy claim link',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            const baseUrl =
-              typeof window !== 'undefined'
-                ? window.location.origin
-                : 'https://jovie.app';
-            const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
-            navigator.clipboard.writeText(claimUrl);
-            toast.success('Claim link copied to clipboard');
-          },
-        });
-
-        items.push({
-          id: 'send-invite',
-          label: 'Send invite',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            setProfileToInvite(profile);
-            setInviteDialogOpen(true);
-          },
-        });
-      }
-
-      items.push({ type: 'separator' as const });
-
-      // Delete
-      items.push({
-        id: 'delete',
-        label: profile.isClaimed ? 'Delete user' : 'Delete creator',
-        icon: <Trash2 className='h-3.5 w-3.5' />,
-        destructive: true,
-        onClick: () => {
-          setProfileToDelete(profile);
-          setDeleteDialogOpen(true);
-        },
-      });
-
-      return items;
-    },
+  // Define columns using factory function
+  const columns = useMemo(
+    () =>
+      createCreatorProfileColumns({
+        page,
+        pageSize,
+        selectedIds,
+        headerCheckboxState,
+        toggleSelectAll,
+        toggleSelect,
+        getContextMenuItems,
+      }),
     [
-      ingestRefreshStatuses,
-      refreshIngest,
-      toggleVerification,
-      toggleFeatured,
-      toggleMarketing,
-    ]
-  );
-
-  // Define columns using TanStack Table
-  const columns = useMemo<ColumnDef<AdminCreatorProfileRow, any>[]>(
-    () => [
-      // Checkbox column
-      columnHelper.display({
-        id: 'select',
-        header: ({ table }) => (
-          <TableCheckboxCell
-            table={table}
-            headerCheckboxState={headerCheckboxState}
-            onToggleSelectAll={toggleSelectAll}
-          />
-        ),
-        cell: ({ row }) => {
-          const profile = row.original;
-          const isChecked = selectedIds.has(profile.id);
-          const rowNumber = (page - 1) * pageSize + row.index + 1;
-
-          return (
-            <TableCheckboxCell
-              row={row}
-              rowNumber={rowNumber}
-              isChecked={isChecked}
-              onToggleSelect={() => toggleSelect(profile.id)}
-            />
-          );
-        },
-        size: 56, // 14 * 4 = 56px (w-14)
-      }),
-
-      // Avatar + Name column
-      columnHelper.accessor('username', {
-        id: 'avatar',
-        header: 'Creator',
-        cell: renderAvatarCell,
-        size: 280,
-      }),
-
-      // Social Media Links column
-      columnHelper.accessor('socialLinks', {
-        id: 'social',
-        header: 'Social',
-        cell: renderSocialLinksCell,
-        size: 220,
-      }),
-
-      // Music Streaming Links column
-      columnHelper.accessor('socialLinks', {
-        id: 'music',
-        header: 'Music',
-        cell: renderMusicLinksCell,
-        size: 220,
-      }),
-
-      // Created Date column
-      columnHelper.accessor('createdAt', {
-        id: 'created',
-        header: 'Created',
-        cell: renderCreatedDateCell,
-        size: 180,
-      }),
-
-      // Actions column - shows ellipsis menu with SAME items as right-click context menu
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          const profile = row.original;
-          const contextMenuItems = getContextMenuItems(profile);
-          const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
-        },
-        size: 48,
-      }),
-    ],
-    [
-      headerCheckboxState,
-      toggleSelectAll,
-      selectedIds,
       page,
       pageSize,
+      selectedIdsKey,
+      headerCheckboxState,
+      toggleSelectAll,
       toggleSelect,
       getContextMenuItems,
     ]
   );
-
-  // Bulk action handlers
-  const handleBulkVerify = useCallback(async () => {
-    const selectedProfiles = profilesWithActions.filter(p =>
-      selectedIds.has(p.id)
-    );
-    const results = await Promise.all(
-      selectedProfiles.map(p => toggleVerification(p.id, true))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-    }
-  }, [profilesWithActions, selectedIds, toggleVerification]);
-
-  const handleBulkUnverify = useCallback(async () => {
-    const selectedProfiles = profilesWithActions.filter(p =>
-      selectedIds.has(p.id)
-    );
-    const results = await Promise.all(
-      selectedProfiles.map(p => toggleVerification(p.id, false))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-    }
-  }, [profilesWithActions, selectedIds, toggleVerification]);
-
-  const handleBulkFeature = useCallback(async () => {
-    const selectedProfiles = profilesWithActions.filter(p =>
-      selectedIds.has(p.id)
-    );
-    const results = await Promise.all(
-      selectedProfiles.map(p => toggleFeatured(p.id, true))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-    }
-  }, [profilesWithActions, selectedIds, toggleFeatured]);
-
-  const handleBulkDelete = useCallback(async () => {
-    const selectedProfiles = profilesWithActions.filter(p =>
-      selectedIds.has(p.id)
-    );
-    if (selectedProfiles.length === 0) return;
-
-    const confirmed = confirm(
-      `Are you sure you want to delete ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}? This action cannot be undone.`
-    );
-    if (!confirmed) return;
-
-    const results = await Promise.all(
-      selectedProfiles.map(p => deleteCreatorOrUser(p.id))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to delete ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-      // Clear selection after successful deletion
-      toggleSelectAll();
-      router.refresh();
-    }
-  }, [
-    profilesWithActions,
-    selectedIds,
-    deleteCreatorOrUser,
-    toggleSelectAll,
-    router,
-  ]);
-
-  const handleClearSelection = useCallback(() => {
-    toggleSelectAll();
-  }, [toggleSelectAll]);
 
   // Get row className based on selection state - uses unified tokens
   const getRowClassName = useCallback(
@@ -698,22 +406,38 @@ export function AdminCreatorProfilesUnified({
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
+        onOpenChange={closeDeleteDialog}
         onConfirm={async () => {
           if (!profileToDelete) return { success: false };
           const result = await deleteCreatorOrUser(profileToDelete.id);
           if (result.success) {
-            setProfileToDelete(null);
+            clearDeleteProfile();
           }
           return result;
+        }}
+      />
+      <BulkDeleteCreatorDialog
+        open={bulkDeleteDialogOpen}
+        count={bulkDeleteCount}
+        onOpenChange={open => {
+          setBulkDeleteDialogOpen(open);
+          if (!open) {
+            bulkDeleteResolverRef.current?.(false);
+            bulkDeleteResolverRef.current = null;
+          }
+        }}
+        onConfirm={() => {
+          bulkDeleteResolverRef.current?.(true);
+          bulkDeleteResolverRef.current = null;
+          setBulkDeleteDialogOpen(false);
         }}
       />
       <SendInviteDialog
         profile={profileToInvite}
         open={inviteDialogOpen}
-        onOpenChange={setInviteDialogOpen}
+        onOpenChange={closeInviteDialog}
         onSuccess={() => {
-          setProfileToInvite(null);
+          clearInviteProfile();
         }}
       />
     </div>

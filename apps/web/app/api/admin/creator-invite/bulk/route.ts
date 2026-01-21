@@ -1,92 +1,24 @@
-import { and, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-
-import { db } from '@/lib/db';
-import {
-  creatorClaimInvites,
-  creatorContacts,
-  creatorProfiles,
-} from '@/lib/db/schema';
+import { creatorClaimInvites } from '@/lib/db/schema';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
+import {
+  bulkInviteSchema,
+  calculateEffectiveLimit,
+  calculateEstimatedTiming,
+  fetchEligibleProfilesForPreview,
+  fetchProfilesByFitScore,
+  fetchProfilesById,
+  getEligibleProfileCount,
+  maskEmail,
+  NO_STORE_HEADERS,
+  parsePreviewParams,
+} from './lib';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-/**
- * Mask an email address for preview display.
- * Preserves domain, masks local part with varying amounts based on length.
- */
-function maskEmail(email: string | null | undefined): string | undefined {
-  if (!email) return undefined;
-
-  // Validate email contains exactly one '@'
-  const atCount = (email.match(/@/g) || []).length;
-  if (atCount !== 1) return undefined;
-
-  const [localPart, domain] = email.split('@');
-  if (!localPart || !domain) return undefined;
-
-  // For very short local parts (1-2 chars), show first char + ***
-  if (localPart.length <= 2) {
-    return `${localPart[0]}***@${domain}`;
-  }
-
-  // For longer local parts, show first 2 chars + ***
-  return `${localPart.slice(0, 2)}***@${domain}`;
-}
-
-const bulkInviteSchema = z
-  .object({
-    /**
-     * Array of profile IDs to send invites to.
-     * If not provided, will auto-select based on fitScoreThreshold.
-     */
-    creatorProfileIds: z.array(z.string().uuid()).optional(),
-
-    /**
-     * Minimum fit score for auto-selection (0-100).
-     * Only used when creatorProfileIds is not provided.
-     */
-    fitScoreThreshold: z.number().min(0).max(100).optional().default(50),
-
-    /**
-     * Maximum number of invites to send in this batch.
-     */
-    limit: z.number().min(1).max(500).optional().default(50),
-
-    /**
-     * Minimum delay between emails in milliseconds.
-     * Actual delay will be randomized between minDelayMs and maxDelayMs.
-     */
-    minDelayMs: z.number().min(1000).max(300000).optional().default(30000), // 30 sec min
-
-    /**
-     * Maximum delay between emails in milliseconds.
-     * Actual delay will be randomized between minDelayMs and maxDelayMs.
-     */
-    maxDelayMs: z.number().min(1000).max(600000).optional().default(120000), // 2 min max
-
-    /**
-     * Maximum emails per hour (rate limiting).
-     * Default is 30/hour to stay well under spam thresholds.
-     */
-    maxPerHour: z.number().min(1).max(100).optional().default(30),
-
-    /**
-     * If true, only return what would be sent without actually sending.
-     */
-    dryRun: z.boolean().optional().default(false),
-  })
-  .refine(data => data.minDelayMs <= data.maxDelayMs, {
-    message: 'minDelayMs must be <= maxDelayMs',
-    path: ['minDelayMs'],
-  });
 
 /**
  * Admin endpoint to send bulk claim invites.
@@ -143,11 +75,7 @@ export async function POST(request: Request) {
       dryRun,
     } = parsed.data;
 
-    // Cap batch size to 2 hours worth of emails to prevent excessively large batches
-    // that could overload the queue or exceed daily sending limits.
-    // For example: if maxPerHour=30, we cap at 60 emails per batch.
-    // This prevents a misconfigured batch from queuing hundreds of emails at once.
-    const effectiveLimit = Math.min(limit, maxPerHour * 2);
+    const effectiveLimit = calculateEffectiveLimit(limit, maxPerHour);
 
     if (effectiveLimit < limit) {
       logger.warn('Batch size capped by maxPerHour constraint', {
@@ -158,82 +86,21 @@ export async function POST(request: Request) {
     }
 
     // Get eligible profiles
-    let eligibleProfiles: {
-      id: string;
-      username: string;
-      displayName: string | null;
-      fitScore: number | null;
-      contactEmail: string | null;
-    }[];
-
-    if (creatorProfileIds && creatorProfileIds.length > 0) {
-      // Specific profiles requested
-      eligibleProfiles = await db
-        .select({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          displayName: creatorProfiles.displayName,
-          fitScore: creatorProfiles.fitScore,
-          contactEmail: creatorContacts.email,
-        })
-        .from(creatorProfiles)
-        .leftJoin(
-          creatorContacts,
-          and(
-            eq(creatorContacts.creatorProfileId, creatorProfiles.id),
-            eq(creatorContacts.isActive, true)
-          )
-        )
-        .where(
-          and(
-            inArray(creatorProfiles.id, creatorProfileIds),
-            eq(creatorProfiles.isClaimed, false),
-            isNotNull(creatorProfiles.claimToken)
-          )
-        )
-        .limit(effectiveLimit);
-    } else {
-      // Auto-select based on fit score
-      eligibleProfiles = await db
-        .select({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          displayName: creatorProfiles.displayName,
-          fitScore: creatorProfiles.fitScore,
-          contactEmail: creatorContacts.email,
-        })
-        .from(creatorProfiles)
-        .leftJoin(
-          creatorContacts,
-          and(
-            eq(creatorContacts.creatorProfileId, creatorProfiles.id),
-            eq(creatorContacts.isActive, true)
-          )
-        )
-        .leftJoin(
-          creatorClaimInvites,
-          eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
-        )
-        .where(
-          and(
-            eq(creatorProfiles.isClaimed, false),
-            isNotNull(creatorProfiles.claimToken),
-            gte(creatorProfiles.fitScore, fitScoreThreshold),
-            isNull(creatorClaimInvites.id) // No existing invites
-          )
-        )
-        .orderBy(sql`${creatorProfiles.fitScore} DESC`)
-        .limit(effectiveLimit);
-    }
+    const eligibleProfiles =
+      creatorProfileIds && creatorProfileIds.length > 0
+        ? await fetchProfilesById(creatorProfileIds, effectiveLimit)
+        : await fetchProfilesByFitScore(fitScoreThreshold, effectiveLimit);
 
     // Filter to profiles with valid emails
     const profilesWithEmails = eligibleProfiles.filter(p => p.contactEmail);
     const profilesWithoutEmails = eligibleProfiles.filter(p => !p.contactEmail);
 
-    // Calculate estimated timing with randomized delays
-    const avgDelayMs = (minDelayMs + maxDelayMs) / 2;
-    const estimatedTotalMs = profilesWithEmails.length * avgDelayMs;
-    const estimatedMinutes = Math.ceil(estimatedTotalMs / 60000);
+    // Calculate estimated timing
+    const { avgDelayMs, estimatedMinutes } = calculateEstimatedTiming(
+      profilesWithEmails.length,
+      minDelayMs,
+      maxDelayMs
+    );
 
     if (dryRun) {
       return NextResponse.json(
@@ -248,7 +115,7 @@ export async function POST(request: Request) {
             maxDelayMs,
             avgDelayMs: Math.round(avgDelayMs),
             maxPerHour,
-            effectiveRate: Math.round(3600000 / avgDelayMs), // emails per hour
+            effectiveRate: Math.round(3600000 / avgDelayMs),
           },
           profiles: profilesWithEmails.map(p => ({
             id: p.id,
@@ -286,7 +153,6 @@ export async function POST(request: Request) {
       let skippedDuplicates = 0;
 
       for (const profile of profilesWithEmails) {
-        // Create invite record
         const [invite] = await tx
           .insert(creatorClaimInvites)
           .values({
@@ -310,7 +176,6 @@ export async function POST(request: Request) {
         }
       }
 
-      // Enqueue all jobs with randomized staggering
       const { enqueued, skipped } = await enqueueBulkClaimInviteJobs(
         tx,
         invitePayloads,
@@ -396,84 +261,23 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    // Strict number parsing to prevent NaN and Infinity injection
-    const rawThreshold = searchParams.get('threshold');
-    const rawLimit = searchParams.get('limit');
+    const { fitScoreThreshold, limit } = parsePreviewParams(searchParams);
 
-    const parsedThreshold = rawThreshold
-      ? Number.parseInt(rawThreshold, 10)
-      : 50;
-    const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
-
-    // Validate parsed values are finite numbers within expected range
-    const fitScoreThreshold =
-      Number.isFinite(parsedThreshold) &&
-      parsedThreshold >= 0 &&
-      parsedThreshold <= 100
-        ? parsedThreshold
-        : 50;
-    const limit =
-      Number.isFinite(parsedLimit) && parsedLimit >= 1
-        ? Math.min(parsedLimit, 100)
-        : 50;
-
-    // Get eligible profiles count and sample
-    const eligibleProfiles = await db
-      .select({
-        id: creatorProfiles.id,
-        username: creatorProfiles.username,
-        displayName: creatorProfiles.displayName,
-        fitScore: creatorProfiles.fitScore,
-        contactEmail: creatorContacts.email,
-      })
-      .from(creatorProfiles)
-      .leftJoin(
-        creatorContacts,
-        and(
-          eq(creatorContacts.creatorProfileId, creatorProfiles.id),
-          eq(creatorContacts.isActive, true)
-        )
-      )
-      .leftJoin(
-        creatorClaimInvites,
-        eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(
-          eq(creatorProfiles.isClaimed, false),
-          isNotNull(creatorProfiles.claimToken),
-          gte(creatorProfiles.fitScore, fitScoreThreshold),
-          isNull(creatorClaimInvites.id)
-        )
-      )
-      .orderBy(sql`${creatorProfiles.fitScore} DESC`)
-      .limit(limit);
+    const eligibleProfiles = await fetchEligibleProfilesForPreview(
+      fitScoreThreshold,
+      limit
+    );
 
     const withEmails = eligibleProfiles.filter(p => p.contactEmail);
     const withoutEmails = eligibleProfiles.filter(p => !p.contactEmail);
 
-    // Get total count for this threshold
-    const [countResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(creatorProfiles)
-      .leftJoin(
-        creatorClaimInvites,
-        eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(
-          eq(creatorProfiles.isClaimed, false),
-          isNotNull(creatorProfiles.claimToken),
-          gte(creatorProfiles.fitScore, fitScoreThreshold),
-          isNull(creatorClaimInvites.id)
-        )
-      );
+    const totalEligible = await getEligibleProfileCount(fitScoreThreshold);
 
     return NextResponse.json(
       {
         ok: true,
         threshold: fitScoreThreshold,
-        totalEligible: Number(countResult?.count ?? 0),
+        totalEligible,
         sample: {
           withEmails: withEmails.length,
           withoutEmails: withoutEmails.length,

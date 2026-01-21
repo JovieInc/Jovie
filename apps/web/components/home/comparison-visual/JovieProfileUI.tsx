@@ -35,6 +35,12 @@ const dspLinks = [
   { id: 'youtube', label: 'YouTube Music', color: 'bg-[#FF0000]' },
 ];
 
+const CTA_BUTTON_LABELS: Record<string, string> = {
+  listen: 'Listen Now',
+  shop: 'Shop Merch',
+  tickets: 'Get Tickets',
+};
+
 export function JovieProfileUI() {
   const reducedMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('typing');
@@ -120,7 +126,7 @@ export function JovieProfileUI() {
                   {/* Subscribe button */}
                   <button
                     type='button'
-                    className='w-full h-11 px-5 rounded-lg bg-white text-gray-900 border border-subtle text-sm font-semibold hover:bg-surface-1 transition-colors'
+                    className='w-full h-11 px-5 rounded-lg bg-btn-primary text-btn-primary-foreground border border-subtle text-sm font-semibold hover:opacity-90 transition-colors'
                   >
                     Subscribe
                   </button>
@@ -155,11 +161,9 @@ export function JovieProfileUI() {
                 >
                   <button
                     type='button'
-                    className='w-full h-11 px-5 rounded-lg flex items-center justify-center text-sm font-semibold shadow-sm transition-colors bg-white text-gray-900 border border-subtle hover:bg-surface-1'
+                    className='w-full h-11 px-5 rounded-lg flex items-center justify-center text-sm font-semibold shadow-sm transition-colors bg-btn-primary text-btn-primary-foreground border border-subtle hover:opacity-90'
                   >
-                    {phase === 'listen' && 'Listen Now'}
-                    {phase === 'shop' && 'Shop Merch'}
-                    {phase === 'tickets' && 'Get Tickets'}
+                    {CTA_BUTTON_LABELS[phase]}
                   </button>
                 </motion.div>
               )}
