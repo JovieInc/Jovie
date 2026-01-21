@@ -46,7 +46,11 @@ You are tasked with creating a complete commit-to-PR workflow. Follow these step
    - Target branch: `main`
    - Auto-assign to the current user if possible
 
-7. **Summary**
+7. **Enable Auto-Merge**
+   - Enable auto-merge with squash: `gh pr merge {pr-number} --auto --squash`
+   - This ensures the PR merges automatically once all checks pass
+
+8. **Summary**
    - Output the PR URL
    - Provide a summary of what was committed and why
 
@@ -66,6 +70,7 @@ You are tasked with creating a complete commit-to-PR workflow. Follow these step
 💾 Committed changes: "feat: enhance dashboard analytics display"
 🚀 Pushed to origin
 🔗 Created PR: https://github.com/user/repo/pull/123
+🔄 Auto-merge enabled (squash)
 
 Summary: Added real-time analytics updates to dashboard with improved data visualization.
 ```
