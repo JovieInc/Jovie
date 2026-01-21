@@ -3,6 +3,7 @@
 import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { AuthButton } from '@/components/auth';
+import { ValidationStatusIcon } from '@/components/organisms/smart-handle-input/ValidationStatusIcon';
 
 interface HandleValidationState {
   available: boolean;
@@ -24,92 +25,6 @@ interface OnboardingHandleStepProps {
   inputRef: React.RefObject<HTMLInputElement>;
   onHandleChange: (value: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
-}
-
-/**
- * Custom outlined error icon (X in circle) for onboarding flow.
- *
- * NOTE: Intentionally not using the shared ValidationStatusIcon from
- * smart-handle-input or Lucide icons. The onboarding design requires:
- * - Larger 20x20 icons with 2px stroke circles (vs 16x16 filled chips)
- * - Outlined stroke style matching the premium onboarding aesthetic
- * - Different visual weight than the dashboard's compact icons
- *
- * See Figma: Onboarding/Handle Step for the design spec.
- */
-function ErrorIcon() {
-  return (
-    <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-5 w-5'>
-      <circle
-        cx='10'
-        cy='10'
-        r='9'
-        stroke='currentColor'
-        className='text-error'
-        strokeWidth='2'
-      />
-      <path
-        d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
-        stroke='currentColor'
-        className='text-error'
-        strokeWidth='2'
-        strokeLinecap='round'
-      />
-    </svg>
-  );
-}
-
-/**
- * Custom outlined success icon (checkmark in circle) for onboarding flow.
- * See ErrorIcon comment for design rationale.
- */
-function SuccessIcon() {
-  return (
-    <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-5 w-5'>
-      <circle
-        cx='10'
-        cy='10'
-        r='9'
-        stroke='currentColor'
-        className='text-success'
-        strokeWidth='2'
-      />
-      <path
-        d='M6 10.2l2.6 2.6L14 7.4'
-        stroke='currentColor'
-        className='text-success'
-        strokeWidth='2'
-        strokeLinecap='round'
-        strokeLinejoin='round'
-      />
-    </svg>
-  );
-}
-
-/**
- * Onboarding-specific validation status icon.
- * Uses custom outlined icons for visual consistency with onboarding design.
- * See ErrorIcon comment for why this differs from the shared component.
- */
-function ValidationStatusIcon({
-  checking,
-  hasError,
-  isValid,
-}: {
-  checking: boolean;
-  hasError: boolean;
-  isValid: boolean;
-}) {
-  if (checking) {
-    return <LoadingSpinner size='sm' className='text-secondary-token' />;
-  }
-  if (hasError) {
-    return <ErrorIcon />;
-  }
-  if (isValid) {
-    return <SuccessIcon />;
-  }
-  return null;
 }
 
 /** Determine validation status message to display */
@@ -223,9 +138,13 @@ export function OnboardingHandleStep({
             />
             <div className='h-5 w-5 flex items-center justify-center'>
               <ValidationStatusIcon
+                showAvailability={
+                  Boolean(handleInput) || hasError || handleValidation.checking
+                }
                 checking={handleValidation.checking}
+                available={isValid}
+                clientValid={true}
                 hasError={hasError}
-                isValid={isValid}
               />
             </div>
           </div>
