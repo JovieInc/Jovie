@@ -4,7 +4,18 @@
  * Provides context menu items for creator profile rows.
  */
 
-import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  Mail,
+  MailX,
+  RefreshCw,
+  Send,
+  Star,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { ContextMenuItemType } from '@/components/organisms/table';
@@ -43,12 +54,16 @@ export function useContextMenuItems({
       const items: ContextMenuItemType[] = [];
 
       // Refresh ingest (if available)
-      const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
-      if (refreshIngestStatus !== undefined) {
+      const hasIngestStatus = Object.prototype.hasOwnProperty.call(
+        ingestRefreshStatuses,
+        profile.id
+      );
+      if (hasIngestStatus) {
+        const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
         items.push({
           id: 'refresh-ingest',
           label: 'Refresh ingest',
-          icon: <Copy className='h-3.5 w-3.5' />,
+          icon: <RefreshCw className='h-3.5 w-3.5' />,
           onClick: () => void refreshIngest(profile.id),
           disabled: refreshIngestStatus === 'loading',
         });
@@ -123,7 +138,11 @@ export function useContextMenuItems({
         label: marketingOptOut
           ? 'Enable marketing emails'
           : 'Disable marketing emails',
-        icon: <Copy className='h-3.5 w-3.5' />,
+        icon: marketingOptOut ? (
+          <Mail className='h-3.5 w-3.5' />
+        ) : (
+          <MailX className='h-3.5 w-3.5' />
+        ),
         onClick: () => {
           void (async () => {
             const result = await toggleMarketing(profile.id, !marketingOptOut);
@@ -138,7 +157,7 @@ export function useContextMenuItems({
       items.push({
         id: 'view-profile',
         label: 'View profile',
-        icon: <Copy className='h-3.5 w-3.5' />,
+        icon: <ExternalLink className='h-3.5 w-3.5' />,
         onClick: () => {
           window.open(`/${profile.username}`, '_blank');
         },
@@ -154,20 +173,27 @@ export function useContextMenuItems({
           label: 'Copy claim link',
           icon: <Copy className='h-3.5 w-3.5' />,
           onClick: () => {
-            const baseUrl =
-              typeof window !== 'undefined'
-                ? window.location.origin
-                : 'https://jovie.app';
-            const claimUrl = `${baseUrl}/claim/${claimToken}`;
-            navigator.clipboard.writeText(claimUrl);
-            toast.success('Claim link copied to clipboard');
+            void (async () => {
+              const baseUrl =
+                typeof window !== 'undefined'
+                  ? window.location.origin
+                  : 'https://jovie.app';
+              const claimUrl = `${baseUrl}/claim/${claimToken}`;
+              try {
+                await navigator.clipboard.writeText(claimUrl);
+                toast.success('Claim link copied to clipboard');
+              } catch {
+                toast.error('Failed to copy claim link');
+                window.prompt('Copy claim link:', claimUrl);
+              }
+            })();
           },
         });
 
         items.push({
           id: 'send-invite',
           label: 'Send invite',
-          icon: <Copy className='h-3.5 w-3.5' />,
+          icon: <Send className='h-3.5 w-3.5' />,
           onClick: () => {
             openInviteDialog(profile);
           },

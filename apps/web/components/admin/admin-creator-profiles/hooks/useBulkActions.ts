@@ -12,6 +12,7 @@ import type { AdminCreatorProfileRow } from '../types';
 export interface BulkActionsParams {
   profiles: AdminCreatorProfileRow[];
   selectedIds: Set<string>;
+  confirmBulkDelete: (count: number) => Promise<boolean>;
   toggleVerification: (
     id: string,
     verified: boolean
@@ -21,7 +22,7 @@ export interface BulkActionsParams {
     featured: boolean
   ) => Promise<{ success: boolean }>;
   deleteCreatorOrUser: (id: string) => Promise<{ success: boolean }>;
-  toggleSelectAll: () => void;
+  clearSelection: () => void;
 }
 
 export interface BulkActions {
@@ -35,10 +36,11 @@ export interface BulkActions {
 export function useBulkActions({
   profiles,
   selectedIds,
+  confirmBulkDelete,
   toggleVerification,
   toggleFeatured,
   deleteCreatorOrUser,
-  toggleSelectAll,
+  clearSelection,
 }: BulkActionsParams): BulkActions {
   const router = useRouter();
 
@@ -97,9 +99,7 @@ export function useBulkActions({
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
     if (selectedProfiles.length === 0) return;
 
-    const confirmed = confirm(
-      `Are you sure you want to delete ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}? This action cannot be undone.`
-    );
+    const confirmed = await confirmBulkDelete(selectedProfiles.length);
     if (!confirmed) return;
 
     const results = await Promise.all(
@@ -115,14 +115,21 @@ export function useBulkActions({
         `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
       );
       // Clear selection after successful deletion
-      toggleSelectAll();
+      clearSelection();
       router.refresh();
     }
-  }, [profiles, selectedIds, deleteCreatorOrUser, toggleSelectAll, router]);
+  }, [
+    profiles,
+    selectedIds,
+    confirmBulkDelete,
+    deleteCreatorOrUser,
+    clearSelection,
+    router,
+  ]);
 
   const handleClearSelection = useCallback(() => {
-    toggleSelectAll();
-  }, [toggleSelectAll]);
+    clearSelection();
+  }, [clearSelection]);
 
   return {
     handleBulkVerify,

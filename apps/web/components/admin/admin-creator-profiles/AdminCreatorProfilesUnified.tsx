@@ -33,6 +33,14 @@ const DeleteCreatorDialog = dynamic(
   { ssr: false }
 );
 
+const BulkDeleteCreatorDialog = dynamic(
+  () =>
+    import('@/components/admin/BulkDeleteCreatorDialog').then(mod => ({
+      default: mod.BulkDeleteCreatorDialog,
+    })),
+  { ssr: false }
+);
+
 const SendInviteDialog = dynamic(
   () =>
     import('@/components/admin/SendInviteDialog').then(mod => ({
@@ -75,6 +83,11 @@ export function AdminCreatorProfilesUnified({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteCount, setBulkDeleteCount] = useState(0);
+  const bulkDeleteResolverRef = React.useRef<
+    ((confirmed: boolean) => void) | null
+  >(null);
 
   const {
     deleteDialogOpen,
@@ -114,8 +127,26 @@ export function AdminCreatorProfilesUnified({
     [filteredProfiles]
   );
 
-  const { selectedIds, headerCheckboxState, toggleSelect, toggleSelectAll } =
-    useRowSelection(rowIds);
+  const {
+    selectedIds,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+  } = useRowSelection(rowIds);
+
+  const selectedIdsKey = useMemo(
+    () => Array.from(selectedIds).sort().join(','),
+    [selectedIds]
+  );
+
+  const confirmBulkDelete = useCallback((count: number) => {
+    setBulkDeleteCount(count);
+    setBulkDeleteDialogOpen(true);
+    return new Promise<boolean>(resolve => {
+      bulkDeleteResolverRef.current = resolve;
+    });
+  }, []);
 
   const {
     setDraftContact,
@@ -159,10 +190,11 @@ export function AdminCreatorProfilesUnified({
   } = useBulkActions({
     profiles: profilesWithActions,
     selectedIds,
+    confirmBulkDelete,
     toggleVerification,
     toggleFeatured,
     deleteCreatorOrUser,
-    toggleSelectAll,
+    clearSelection,
   });
 
   const handleRowClick = useCallback(
@@ -249,7 +281,7 @@ export function AdminCreatorProfilesUnified({
     [
       page,
       pageSize,
-      selectedIds,
+      selectedIdsKey,
       headerCheckboxState,
       toggleSelectAll,
       toggleSelect,
@@ -382,6 +414,22 @@ export function AdminCreatorProfilesUnified({
             clearDeleteProfile();
           }
           return result;
+        }}
+      />
+      <BulkDeleteCreatorDialog
+        open={bulkDeleteDialogOpen}
+        count={bulkDeleteCount}
+        onOpenChange={open => {
+          setBulkDeleteDialogOpen(open);
+          if (!open) {
+            bulkDeleteResolverRef.current?.(false);
+            bulkDeleteResolverRef.current = null;
+          }
+        }}
+        onConfirm={() => {
+          bulkDeleteResolverRef.current?.(true);
+          bulkDeleteResolverRef.current = null;
+          setBulkDeleteDialogOpen(false);
         }}
       />
       <SendInviteDialog
