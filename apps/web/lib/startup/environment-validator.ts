@@ -58,10 +58,7 @@ async function validateDatabaseConnection(isProduction: boolean) {
       return;
     }
 
-    console.error(
-      '[STARTUP] ❌ Database connection failed:',
-      dbConnection.error
-    );
+    console.error('[STARTUP] ❌ Database connection failed');
     if (isProduction) {
       console.error(
         '[STARTUP] WARNING: Application starting without database connectivity'
