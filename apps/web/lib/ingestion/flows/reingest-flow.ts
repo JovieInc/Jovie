@@ -19,19 +19,6 @@ import { generateClaimToken } from './social-platform-flow';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
- * Existing profile data for reingest handling
- */
-export interface ExistingProfileForReingest {
-  id: string;
-  usernameNormalized: string;
-  avatarUrl: string | null;
-  displayName: string | null;
-  claimToken: string | null;
-  avatarLockedByUser: boolean | null;
-  displayNameLocked: boolean | null;
-}
-
-/**
  * Handle re-ingesting an existing unclaimed profile.
  *
  * Updates the profile with fresh extraction data without creating a new profile.

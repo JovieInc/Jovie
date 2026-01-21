@@ -39,7 +39,9 @@ export function isSafeExternalHttpsUrl(input: string): boolean {
     // Note: this is ad-hoc; consider a dedicated SSRF filter library for comprehensive protection.
     if (hostname.includes('%')) return false; // Reject IPv6 zone identifiers (e.g. fe80::1%en0)
     if (/^\s*169\.254\.\d{1,3}\.\d{1,3}\s*$/.test(hostname)) return false;
-    if (/^fe80:/i.test(hostname)) return false;
+    // Block full IPv6 link-local range fe80::/10 (fe80–febf), but only for IPv6 literals.
+    if (hostname.includes(':') && /^fe(?:8|9|a|b)/i.test(hostname))
+      return false;
 
     // Block raw IP addresses (IPv4/IPv6) to reduce SSRF risk.
     // We intentionally do not DNS-resolve here.
