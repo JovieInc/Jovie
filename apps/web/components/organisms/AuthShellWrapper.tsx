@@ -5,8 +5,8 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useTransition } from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { PreviewPanel } from '@/components/dashboard/layout/PreviewPanel';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
+import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -91,7 +91,7 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
-      <PreviewPanelProvider enabled={previewEnabled}>
+      <PreviewPanelProvider enabled={previewEnabled} defaultOpen>
         <AuthShell
           section={config.section}
           navigation={config.navigation}
@@ -102,7 +102,7 @@ function AuthShellWrapperInner({
           drawerContent={config.drawerContent}
           drawerWidth={config.drawerWidth ?? undefined}
           isTableRoute={config.isTableRoute}
-          previewPanel={previewEnabled ? <PreviewPanel /> : undefined}
+          previewPanel={previewEnabled ? <ProfileContactSidebar /> : undefined}
           onSidebarOpenChange={onSidebarOpenChange}
         >
           {children}
