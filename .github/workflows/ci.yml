@@ -670,11 +670,8 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          # Enable coverage on main branch
-          COVERAGE_FLAG=""
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            COVERAGE_FLAG="--coverage"
-          fi
+          # Enable coverage on main branch and PRs for Codecov integration
+          COVERAGE_FLAG="--coverage"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running critical tests with coverage"
@@ -682,15 +679,15 @@ jobs:
             # Full test suite runs in nightly CI, not on every main push
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running critical tests + tests changed since ${{ github.base_ref }}"
-            # First run critical tests (~8s) - vitest matches "critical" substring in file paths
-            cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} "critical"
-            # Then run tests for changed files
+            echo "🔍 PR: Running critical tests with coverage + tests changed since ${{ github.base_ref }}"
+            # First run critical tests (~8s) with coverage - vitest matches "critical" substring in file paths
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
+            # Then run tests for changed files (coverage already generated above)
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
             pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
-            echo "📦 Full suite"
-            pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "📦 Full suite with coverage"
+            pnpm --filter=@jovie/web run test -- $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -705,7 +702,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload coverage to Codecov
-        if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
