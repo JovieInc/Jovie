@@ -48,6 +48,13 @@ export function useUserButton({
   const { data, isLoading, error } = useBillingStatusQuery();
   const billingErrorNotifiedRef = useRef(false);
 
+  // Normalize error to string without nested ternary
+  const errorMessage = (() => {
+    if (error instanceof Error) return error.message;
+    if (error) return String(error);
+    return null;
+  })();
+
   // Normalize TanStack Query result to legacy shape for consumers
   const billingStatus: BillingStatus = useMemo(
     () => ({
@@ -55,10 +62,9 @@ export function useUserButton({
       plan: data?.plan ?? null,
       hasStripeCustomer: data?.hasStripeCustomer ?? false,
       loading: isLoading,
-      error:
-        error instanceof Error ? error.message : error ? String(error) : null,
+      error: errorMessage,
     }),
-    [data, isLoading, error]
+    [data, isLoading, errorMessage]
   );
 
   const redirectToUrl = (url: string) => {
@@ -117,13 +123,17 @@ export function useUserButton({
         .slice(0, 2)
     : 'A';
 
-  const profileUrl =
-    profileHref ??
-    (user?.username
-      ? `/${user.username}`
-      : artist?.handle
-        ? `/${artist.handle}`
-        : '/app/settings');
+  // Determine profile URL without nested ternary
+  let profileUrl: string;
+  if (profileHref) {
+    profileUrl = profileHref;
+  } else if (user?.username) {
+    profileUrl = `/${user.username}`;
+  } else if (artist?.handle) {
+    profileUrl = `/${artist.handle}`;
+  } else {
+    profileUrl = '/app/settings';
+  }
   const settingsUrl = settingsHref ?? '/app/settings';
 
   const jovieUsername =

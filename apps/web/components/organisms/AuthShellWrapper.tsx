@@ -68,13 +68,14 @@ function AuthShellWrapperInner({
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
+  let defaultHeaderAction: ReactNode = null;
+  if (config.isTableRoute) {
+    defaultHeaderAction = <DrawerToggleButton />;
+  } else if (isProfileRoute) {
+    defaultHeaderAction = <PreviewToggleButton />;
+  }
   const headerAction =
-    headerActionsContext?.headerActions ??
-    (config.isTableRoute ? (
-      <DrawerToggleButton />
-    ) : isProfileRoute ? (
-      <PreviewToggleButton />
-    ) : null);
+    headerActionsContext?.headerActions ?? defaultHeaderAction;
 
   // Header badge from context (shown after breadcrumb on left side)
   const headerBadge = headerActionsContext?.headerBadge ?? null;
