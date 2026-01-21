@@ -44,14 +44,16 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use forks for better memory isolation
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        isolate: true,
-        singleFork: false,
-      },
-    },
+    // Prefer threads in CI to reduce memory overhead in constrained runners.
+    pool: isCI ? 'threads' : 'forks',
+    poolOptions: isCI
+      ? undefined
+      : {
+          forks: {
+            isolate: true,
+            singleFork: false,
+          },
+        },
     // CI stability: reduce memory pressure
     maxWorkers: isCI ? 2 : undefined,
     minWorkers: 1,
