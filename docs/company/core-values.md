@@ -45,7 +45,7 @@
 ### 8. Bias for Measurable Outcomes
 
 - **Why**: Gut is good, but metrics drive growth.
-- **AI Interpretation**: Attach KPIs and PostHog events to features by default.
+- **AI Interpretation**: Attach KPIs and analytics events to features by default.
 - **Result**: Every release becomes a data point, not a guess.
 
 ### 9. Progressive Security

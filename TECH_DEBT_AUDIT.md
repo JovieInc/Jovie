@@ -18,7 +18,6 @@ This audit identifies technical debt across the Jovie codebase. The findings are
 | `@ts-ignore`/`@ts-nocheck` | 50+ | High |
 | eslint-disable comments | 40+ | Medium |
 | Empty catch blocks | 1 | High |
-| PostHog remnants | 20+ | Medium |
 
 ---
 
@@ -204,24 +203,7 @@ Most are due to:
 
 ---
 
-## 8. PostHog References (Per agents.md - Statsig Only)
-
-**Severity: Medium** | **Count: 20+**
-
-The agents.md specifies "Statsig-only" for analytics, but PostHog references remain:
-
-### Files with PostHog mentions
-- `lib/error-tracking.ts` - Used as "secondary sink" for errors
-- `app/api/wrap-link/route.ts` - Comments reference PostHog
-- `app/api/dashboard/profile/route.ts` - Runtime comment mentions PostHog
-- `tests/e2e/tipping.spec.ts` - Test mocking PostHog
-- `lib/server-analytics.ts` - Comment about PostHog delegation
-
-**Note:** Some PostHog usage appears intentional for error tracking backup. Verify with team whether this should be migrated to Statsig.
-
----
-
-## 9. Large Files Needing Refactoring
+## 8. Large Files Needing Refactoring
 
 **Severity: Low** | Files over 700 lines
 
@@ -272,7 +254,6 @@ Multiple planning/tracking markdown files in root that may be stale:
 1. Add proper Clerk window types to avoid `as any` in E2E tests
 2. Complete TODO items or convert to GitHub Issues
 3. Clean up deprecated rate-limit files
-4. Review PostHog vs Statsig policy
 
 ### P3 - Low (Nice to Have)
 1. Split large test files

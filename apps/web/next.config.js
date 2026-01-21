@@ -273,14 +273,6 @@ const nextConfig = {
       };
     }
 
-    // Exclude PostHog Node.js from Edge Runtime bundles
-    if (!isServer) {
-      config.externals = config.externals || [];
-      config.externals.push({
-        'posthog-node': 'commonjs posthog-node',
-      });
-    }
-
     // Exclude Storybook files from production builds
     if (!dev) {
       config.module.rules.push({

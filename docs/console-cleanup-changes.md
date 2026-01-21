@@ -21,13 +21,13 @@ This document summarizes all the changes made to eliminate console warnings and 
 - The Next.js codemod automatically fixed the ESLint configuration
 - Verified that `next`, `next/core-web-vitals`, and `next/typescript` are properly extended
 
-### 3. PostHog Edge Runtime Compatibility
-**Warning**: Module not found: Can't resolve 'crypto' in PostHog Node.js package when using Edge Runtime.
+### 3. Analytics Edge Runtime Compatibility
+**Warning**: Module not found: Can't resolve 'crypto' in analytics package when using Edge Runtime.
 
 **Solution**:
 - Created `lib/analytics/runtime-aware.ts` with runtime detection
-- Automatically uses PostHog Node.js SDK for Node.js runtime
-- Falls back to fetch API for Edge Runtime compatibility
+- Automatically detects Node.js vs Edge runtime
+- Uses appropriate analytics approach for each runtime
 - Updated imports in:
   - `app/api/dashboard/profile/route.ts`
   - `app/api/notifications/unsubscribe/route.ts`

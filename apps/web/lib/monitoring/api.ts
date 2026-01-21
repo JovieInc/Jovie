@@ -59,7 +59,6 @@ function sendApiMetric(data: Record<string, unknown>) {
   }
 
   // In production, you might use:
-  // - Server-side PostHog
   // - Datadog
   // - New Relic
   // - Custom logging to database

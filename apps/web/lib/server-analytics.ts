@@ -1,6 +1,6 @@
 /**
  * Server-side analytics implementation
- * Delegates to the runtime-aware analytics helpers without PostHog.
+ * Delegates to the runtime-aware analytics helpers.
  */
 
 import { identifyUser, trackEvent } from '@/lib/analytics/runtime-aware';

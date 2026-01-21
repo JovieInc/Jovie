@@ -94,7 +94,6 @@ export const EXPECTED_ERROR_PATTERNS = [
   // Analytics (not critical for smoke)
   'analytics',
   'tracking',
-  'posthog',
   'mixpanel',
   'segment',
   // Vercel-specific

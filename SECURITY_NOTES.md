@@ -20,7 +20,7 @@ _Last reviewed: 2025-11-29_
   - **Planned fix:** split into `lib/env-server.ts` (server-only, with Stripe/DB/etc.) and `lib/env-public.ts` (only `NEXT_PUBLIC_*` vars) and update imports so no client component ever touches the server env module.
 
 - **Historical env backups**
-  - `env-backup/.env.*` and the committed `.env.local` contain real-looking Supabase, Stripe, Clerk, Statsig/PostHog, and DB credentials.
+  - `env-backup/.env.*` and the committed `.env.local` contain real-looking Supabase, Stripe, Clerk, and DB credentials.
   - These files are in git history; all values in them should be treated as **compromised** and rotated (most already are).
   - **Rule going forward:**
     - Do **not** add new real secrets under `env-backup/`.

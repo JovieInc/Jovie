@@ -51,4 +51,4 @@ Scope: #378 (bundle/code splitting) across app/pages/components
 
 ## Notes
 
-- Comply with guardrails: use Next primitives, Tailwind, Server Components by default, no 'any', PostHog wrapper only.
+- Comply with guardrails: use Next primitives, Tailwind, Server Components by default, no 'any', runtime-aware analytics only.

@@ -406,7 +406,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 
 ### Complex Business Logic
 - **Onboarding flow changes**: User signup, profile creation, handle claiming
-- **Analytics and tracking**: PostHog integration, event tracking, user behavior analysis  
+- **Analytics and tracking**: Event tracking, user behavior analysis
 - **Third-party integrations**: Spotify API, Cloudinary, external service connections
 - **Security implementations**: Rate limiting, input validation, data sanitization
 

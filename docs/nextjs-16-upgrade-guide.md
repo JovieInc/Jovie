@@ -21,12 +21,12 @@ This document outlines the steps taken to prepare the Jovie application for Next
   - Helps detect unexpected side effects
 
 ### 3. Runtime Compatibility ✅
-- **Issue**: PostHog Node.js SDK incompatible with Edge Runtime
+- **Issue**: Analytics SDK incompatible with Edge Runtime
 - **Solution**: Created runtime-aware analytics wrapper
 - **Implementation**:
   - New `lib/analytics/runtime-aware.ts` module
   - Automatically detects Node.js vs Edge runtime
-  - Uses PostHog Node.js SDK for Node.js runtime
+  - Uses appropriate analytics approach for each runtime
   - Uses fetch API for Edge runtime compatibility
   - Updated all API routes to use the new wrapper
 
@@ -104,7 +104,7 @@ When Next.js 16 is released, follow these steps:
 
 ### Application-Specific Considerations
 1. **Clerk Integration**: Ensure latest Clerk SDK compatibility
-2. **PostHog Analytics**: Verify both runtime approaches still work
+2. **Analytics**: Verify runtime-aware analytics still works
 3. **Tailwind CSS**: Check for any CSS-in-JS compatibility issues
 4. **Drizzle ORM**: Validate database connection in Edge Runtime
 

@@ -26,7 +26,6 @@ We use:
 
 - **Clerk**: User authentication and management
 - **Neon**: Database services
-- **PostHog**: Analytics and tracking
 - **Spotify**: Music data and artist information
 - **Stripe**: Payment processing for subscriptions
 
@@ -44,7 +43,7 @@ We use your information to:
 
 We do not sell your personal data. We may share data with:
 
-- Third-party service providers (Clerk, Neon, PostHog, Stripe)
+- Third-party service providers (Clerk, Neon, Stripe)
 - Legal authorities when required by law
 - Business partners for service functionality
 

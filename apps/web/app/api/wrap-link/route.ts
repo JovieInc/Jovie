@@ -8,7 +8,7 @@
  *
  * Rate limiting will be enabled when:
  * - Wrapped link creation exceeds ~10k/day
- * - Abuse/spam patterns detected in PostHog
+ * - Abuse/spam patterns detected in analytics
  * - Link shortening abuse becomes measurable
  *
  * Current Protection:
@@ -20,7 +20,7 @@
  * - Enable rate limiting (50/hour per IP is already configured)
  * - Add CAPTCHA for anonymous users after N links
  * - Implement link expiration cleanup job
- * - Track abuse patterns in PostHog
+ * - Track abuse patterns in analytics
  */
 
 export const runtime = 'nodejs';
