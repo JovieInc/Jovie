@@ -371,7 +371,16 @@ export function ProviderCell({
   const isManual = provider?.source === 'manual';
   const testId = `provider-copy-${release.id}-${providerKey}`;
   const isCopied = copiedTestId === testId;
-  const status = isManual ? 'manual' : available ? 'available' : 'missing';
+
+  // Determine provider status for visual indicator
+  let status: 'available' | 'manual' | 'missing';
+  if (isManual) {
+    status = 'manual';
+  } else if (available) {
+    status = 'available';
+  } else {
+    status = 'missing';
+  }
 
   const renderProviderContent = () => {
     if (available && provider?.url) {
