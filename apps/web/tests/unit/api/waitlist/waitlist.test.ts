@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Note: For tests using vi.hoisted(), we inline the mock creation.
+// For tests that don't need hoisting, use the shared utilities:
+// import { createDrizzleMocksHoisted, createTransactionMock } from '../../../test-utils';
+
+// Create hoisted mocks
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockCurrentUser = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
@@ -63,41 +68,52 @@ vi.mock('@/lib/validation/username', () => ({
   validateUsername: vi.fn(() => ({ isValid: true })),
 }));
 
+// Helper to create a standard transaction mock
+// This pattern is also available in test-utils/db/drizzle-query-mock.ts
+function createTransactionMock(
+  options: { selectResult?: unknown[]; insertReturn?: unknown[] } = {}
+) {
+  const { selectResult = [], insertReturn = [{ id: 'mock-id' }] } = options;
+
+  return async <T>(callback: (tx: any) => Promise<T>): Promise<T> => {
+    const mockReturning = vi.fn().mockResolvedValue(insertReturn);
+    const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+    const mockValues = vi.fn().mockReturnValue({
+      returning: mockReturning,
+      onConflictDoUpdate: mockOnConflict,
+    });
+    const mockWhere = vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue(selectResult),
+    });
+    const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
+    const mockSet = vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const tx = {
+      select: vi.fn().mockReturnValue({ from: mockFrom }),
+      insert: vi.fn().mockReturnValue({ values: mockValues }),
+      update: vi.fn().mockReturnValue({ set: mockSet }),
+      execute: vi.fn().mockResolvedValue({ rows: [] }),
+    };
+
+    return await callback(tx);
+  };
+}
+
 describe('Waitlist API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
     process.env.DATABASE_URL = 'postgres://test@localhost/test';
 
-    // Mock transaction to execute callback with tx object that has same methods as db
-    // Now supports .returning() for profile auto-creation flow
-    mockDbTransaction.mockImplementation(async callback => {
-      const mockReturning = vi.fn().mockResolvedValue([
-        { id: 'entry_123' }, // Return value for waitlist entry insert
-      ]);
-      const mockValues = vi.fn().mockReturnValue({
-        returning: mockReturning,
-        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-      });
-      const mockWhere = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]), // No existing profiles
-      });
-      const mockFrom = vi.fn().mockReturnValue({
-        where: mockWhere,
-      });
-
-      const tx = {
-        select: vi.fn().mockReturnValue({
-          from: mockFrom,
-        }),
-        insert: vi.fn().mockReturnValue({
-          values: mockValues,
-        }),
-        update: mockDbUpdate,
-        execute: mockDbExecute,
-      };
-      return await callback(tx);
-    });
+    // Set up default transaction mock
+    mockDbTransaction.mockImplementation(
+      createTransactionMock({
+        selectResult: [],
+        insertReturn: [{ id: 'entry_123' }],
+      })
+    );
   });
 
   describe('GET /api/waitlist', () => {
@@ -323,7 +339,6 @@ describe('Waitlist API', () => {
       expect(mockDbTransaction).toHaveBeenCalled();
 
       // Verify users table was upserted with userStatus='waitlist_pending'
-      // Should be the third insert call (after waitlist entry and profile)
       const userInsertCall = mockValuesCalls.find(
         (call: unknown) =>
           typeof call === 'object' &&
