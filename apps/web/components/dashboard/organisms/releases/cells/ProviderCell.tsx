@@ -234,6 +234,75 @@ function AddProviderUrlPopover({
   );
 }
 
+interface ProviderActionButtonsProps {
+  provider: { url: string; path?: string };
+  releaseTitle: string;
+  providerLabel: string;
+  testId: string;
+  isCopied: boolean;
+  onCopyClick: () => void;
+}
+
+function ProviderActionButtons({
+  provider,
+  releaseTitle,
+  providerLabel,
+  testId,
+  isCopied,
+  onCopyClick,
+}: ProviderActionButtonsProps) {
+  return (
+    <div className='inline-flex items-center overflow-hidden rounded-md border border-subtle'>
+      {/* Open button (left) */}
+      <button
+        type='button'
+        title='Open'
+        onClick={() => {
+          window.open(provider.url, '_blank', 'noopener,noreferrer');
+        }}
+        className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+      >
+        <Icon name='ExternalLink' className='h-3.5 w-3.5' aria-hidden='true' />
+        <span className='sr-only'>Open</span>
+      </button>
+
+      {/* Divider */}
+      <div className='h-4 w-px bg-subtle' />
+
+      {/* Copy button (right) */}
+      <button
+        type='button'
+        title={isCopied ? 'Copied' : 'Copy'}
+        data-testid={testId}
+        data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
+        onClick={onCopyClick}
+        className={cn(
+          'inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
+          isCopied && 'text-green-600 hover:text-green-600 dark:text-green-400'
+        )}
+      >
+        <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+          <Icon
+            name='Copy'
+            className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+              isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+            }`}
+            aria-hidden='true'
+          />
+          <Icon
+            name='Check'
+            className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+              isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+            }`}
+            aria-hidden='true'
+          />
+        </span>
+        <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
+      </button>
+    </div>
+  );
+}
+
 interface ProviderCellProps {
   release: ReleaseViewModel;
   provider: ProviderKey;
@@ -304,76 +373,29 @@ export function ProviderCell({
   const isCopied = copiedTestId === testId;
   const status = isManual ? 'manual' : available ? 'available' : 'missing';
 
-  return (
-    <div className='flex items-center gap-3'>
-      <ProviderStatusDot status={status} accent={config.accent} />
+  const renderProviderContent = () => {
+    if (available && provider?.url) {
+      return (
+        <ProviderActionButtons
+          provider={{ url: provider.url, path: provider.path }}
+          releaseTitle={release.title}
+          providerLabel={config.label}
+          testId={testId}
+          isCopied={isCopied}
+          onCopyClick={() => {
+            if (!provider.path) return;
+            handleCopyWithFeedback(
+              provider.path,
+              `${release.title} – ${config.label}`,
+              testId
+            ).catch(() => {});
+          }}
+        />
+      );
+    }
 
-      {available ? (
-        <div className='inline-flex items-center overflow-hidden rounded-md border border-subtle'>
-          {/* Open button (left) */}
-          <button
-            type='button'
-            title='Open'
-            onClick={() => {
-              if (provider?.url) {
-                window.open(provider.url, '_blank', 'noopener,noreferrer');
-              }
-            }}
-            className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-          >
-            <Icon
-              name='ExternalLink'
-              className='h-3.5 w-3.5'
-              aria-hidden='true'
-            />
-            <span className='sr-only'>Open</span>
-          </button>
-
-          {/* Divider */}
-          <div className='h-4 w-px bg-subtle' />
-
-          {/* Copy button (right) */}
-          <button
-            type='button'
-            title={isCopied ? 'Copied' : 'Copy'}
-            data-testid={testId}
-            data-url={
-              provider?.path ? `${getBaseUrl()}${provider.path}` : undefined
-            }
-            onClick={() => {
-              if (!provider?.path) return;
-              handleCopyWithFeedback(
-                provider.path,
-                `${release.title} – ${config.label}`,
-                testId
-              ).catch(() => {});
-            }}
-            className={cn(
-              'inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
-              isCopied &&
-                'text-green-600 hover:text-green-600 dark:text-green-400'
-            )}
-          >
-            <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
-              <Icon
-                name='Copy'
-                className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
-                  isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
-                }`}
-                aria-hidden='true'
-              />
-              <Icon
-                name='Check'
-                className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
-                  isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
-                }`}
-                aria-hidden='true'
-              />
-            </span>
-            <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-          </button>
-        </div>
-      ) : onAddUrl ? (
+    if (onAddUrl) {
+      return (
         <AddProviderUrlPopover
           providerLabel={config.label}
           providerKey={providerKey}
@@ -381,11 +403,20 @@ export function ProviderCell({
           onSave={handleAddUrl}
           isSaving={isAddingUrl}
         />
-      ) : (
-        <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token/50'>
-          —
-        </span>
-      )}
+      );
+    }
+
+    return (
+      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token/50'>
+        —
+      </span>
+    );
+  };
+
+  return (
+    <div className='flex items-center gap-3'>
+      <ProviderStatusDot status={status} accent={config.accent} />
+      {renderProviderContent()}
     </div>
   );
 }
