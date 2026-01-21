@@ -459,14 +459,40 @@ export async function completeOnboarding({
       }
     }
 
-    await syncCanonicalUsernameFromApp(userId, completion.username);
+    // Sync username to Clerk (best-effort - don't block onboarding on sync failure)
+    // This updates the Clerk user's username to match the Jovie handle
+    try {
+      await syncCanonicalUsernameFromApp(userId, completion.username);
+    } catch (usernameSyncError) {
+      console.error(
+        '[ONBOARDING] Failed to sync username to Clerk:',
+        usernameSyncError
+      );
+      Sentry.captureException(usernameSyncError, {
+        tags: {
+          context: 'onboarding_username_sync',
+          username: completion.username,
+        },
+      });
+      // Continue with onboarding - username sync is not critical
+      // The user can still use Jovie with their handle; Clerk username may differ
+    }
 
     // Sync Jovie metadata to Clerk (profile completion, status, etc.)
     // This is best-effort - don't block onboarding on sync failure
     try {
       await syncAllClerkMetadata(userId);
-    } catch (syncError) {
-      console.error('[ONBOARDING] Failed to sync Clerk metadata:', syncError);
+    } catch (metadataSyncError) {
+      console.error(
+        '[ONBOARDING] Failed to sync Clerk metadata:',
+        metadataSyncError
+      );
+      Sentry.captureException(metadataSyncError, {
+        tags: {
+          context: 'onboarding_metadata_sync',
+          username: completion.username,
+        },
+      });
       // Continue with onboarding - metadata sync is not critical
     }
 
