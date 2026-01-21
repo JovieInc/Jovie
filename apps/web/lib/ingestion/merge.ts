@@ -20,6 +20,89 @@ type SocialLinkRow = typeof socialLinks.$inferSelect;
 // Re-export for backward compatibility
 export { mergeEvidence } from './services/evidence-merger';
 
+// Process an existing link update
+async function processExistingLink(
+  tx: DbType,
+  existing: SocialLinkRow,
+  link: {
+    url: string;
+    title?: string | null;
+    evidence?: { sources?: string[]; signals?: string[] };
+    sourcePlatform?: string;
+  },
+  detected: { normalizedUrl: string },
+  usernameNormalized: string | null
+): Promise<void> {
+  const existingState =
+    (existing.state as 'active' | 'suggested' | 'rejected' | null) ||
+    (existing.isActive ? 'active' : 'suggested');
+
+  const mergedEvidence = mergeEvidence(
+    (existing.evidence as Record<string, unknown>) ?? null,
+    link.evidence
+  );
+
+  const merged = computeLinkConfidence({
+    sourceType: existing.sourceType ?? 'ingested',
+    signals: mergedEvidence.signals as string[] | undefined,
+    sources: mergedEvidence.sources as string[] | undefined,
+    usernameNormalized,
+    url: detected.normalizedUrl,
+    existingConfidence:
+      typeof existing.confidence === 'number' ? existing.confidence : null,
+  });
+
+  const newState =
+    existing.sourceType === 'ingested' ? merged.state : existingState;
+
+  await tx
+    .update(socialLinks)
+    .set({
+      url: detected.normalizedUrl,
+      displayText: link.title ?? existing.displayText,
+      sourcePlatform: existing.sourcePlatform ?? link.sourcePlatform,
+      sourceType: existing.sourceType ?? 'manual',
+      evidence: mergedEvidence,
+      confidence: merged.confidence.toFixed(2),
+      state: newState,
+      isActive: newState === 'active',
+      updatedAt: new Date(),
+    })
+    .where(eq(socialLinks.id, existing.id));
+}
+
+// Insert a new link
+async function insertNewLink(
+  tx: DbType,
+  profileId: string,
+  link: { url: string; title?: string | null; sourcePlatform?: string },
+  detected: {
+    normalizedUrl: string;
+    platform: { id: string; category: string };
+  },
+  sortOrder: number,
+  evidence: SocialLinkRow['evidence'],
+  confidence: number,
+  state: 'active' | 'suggested' | 'rejected'
+): Promise<void> {
+  const insertPayload: typeof socialLinks.$inferInsert = {
+    creatorProfileId: profileId,
+    platform: detected.platform.id,
+    platformType: detected.platform.category,
+    url: detected.normalizedUrl,
+    displayText: link.title,
+    sortOrder,
+    isActive: state === 'active',
+    state,
+    confidence: confidence.toFixed(2),
+    sourcePlatform: link.sourcePlatform ?? 'ingestion',
+    sourceType: 'ingested',
+    evidence,
+  };
+
+  await tx.insert(socialLinks).values(insertPayload);
+}
+
 /**
  * Create an in-memory social link row for tracking during merge.
  */
@@ -108,10 +191,7 @@ export async function normalizeAndMergeExtraction(
       // Prepare evidence with defaults
       const evidence = ensureEvidenceDefaults(
         mergeEvidence(null, link.evidence),
-        {
-          sources: ['ingestion'],
-          signals: ['ingestion_profile_link'],
-        }
+        { sources: ['ingestion'], signals: ['ingestion_profile_link'] }
       );
 
       const { confidence, state } = computeLinkConfidence({
@@ -125,63 +205,27 @@ export async function normalizeAndMergeExtraction(
       // Check if link already exists
       const existing = existingByCanonical.get(canonical);
       if (existing) {
-        const existingState =
-          (existing.state as 'active' | 'suggested' | 'rejected' | null) ||
-          (existing.isActive ? 'active' : 'suggested');
-        const mergedEvidence = mergeEvidence(
-          (existing.evidence as Record<string, unknown>) ?? null,
-          link.evidence
+        await processExistingLink(
+          tx,
+          existing,
+          link,
+          detected,
+          profile.usernameNormalized
         );
-        const merged = computeLinkConfidence({
-          sourceType: existing.sourceType ?? 'ingested',
-          signals: mergedEvidence.signals as string[] | undefined,
-          sources: mergedEvidence.sources as string[] | undefined,
-          usernameNormalized: profile.usernameNormalized,
-          url: detected.normalizedUrl,
-          existingConfidence:
-            typeof existing.confidence === 'number'
-              ? existing.confidence
-              : null,
-        });
-
-        await tx
-          .update(socialLinks)
-          .set({
-            url: detected.normalizedUrl,
-            displayText: link.title ?? existing.displayText,
-            sourcePlatform: existing.sourcePlatform ?? link.sourcePlatform,
-            sourceType: existing.sourceType ?? 'manual',
-            evidence: mergedEvidence,
-            confidence: merged.confidence.toFixed(2),
-            state:
-              existing.sourceType === 'ingested' ? merged.state : existingState,
-            isActive:
-              (existing.sourceType === 'ingested'
-                ? merged.state
-                : existingState) === 'active',
-            updatedAt: new Date(),
-          })
-          .where(eq(socialLinks.id, existing.id));
         updated += 1;
         continue;
       }
 
-      const insertPayload: typeof socialLinks.$inferInsert = {
-        creatorProfileId: profile.id,
-        platform: detected.platform.id,
-        platformType: detected.platform.category,
-        url: detected.normalizedUrl,
-        displayText: link.title,
-        sortOrder: sortStart + inserted,
-        isActive: state === 'active',
-        state,
-        confidence: confidence.toFixed(2),
-        sourcePlatform: link.sourcePlatform ?? 'ingestion',
-        sourceType: 'ingested',
+      await insertNewLink(
+        tx,
+        profile.id,
+        link,
+        detected,
+        sortStart + inserted,
         evidence,
-      };
-
-      await tx.insert(socialLinks).values(insertPayload);
+        confidence,
+        state
+      );
       existingByCanonical.set(
         canonical,
         createInMemorySocialLinkRow({
