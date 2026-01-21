@@ -143,8 +143,8 @@ export default function GlobalError({
               }
 
               .logo svg {
-                width: 3.5rem;
-                height: 3.5rem;
+                width: 2.5rem;
+                height: 2.5rem;
               }
 
               .logo-icon {
