@@ -6,7 +6,7 @@ import { MoonIcon, SunIcon } from './ThemeIcons';
 import { type DashboardThemeToggleProps, THEME_OPTIONS } from './types';
 import { useDashboardTheme } from './useDashboardTheme';
 
-function SystemIcon({ className }: { className: string }) {
+function SystemIcon({ className }: Readonly<{ className: string }>) {
   return (
     <svg
       aria-hidden='true'
@@ -61,7 +61,7 @@ export function DashboardThemeToggle({
   onThemeSave,
   showSystemOption = false,
   variant = 'default',
-}: DashboardThemeToggleProps) {
+}: Readonly<DashboardThemeToggleProps>) {
   const {
     mounted,
     isUpdating,

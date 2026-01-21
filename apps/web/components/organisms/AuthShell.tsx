@@ -28,6 +28,7 @@ export interface AuthShellProps {
   drawerContent?: ReactNode;
   drawerWidth?: number;
   isTableRoute?: boolean;
+  onSidebarOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }
 
@@ -45,7 +46,7 @@ function AuthShellInner({
   drawerWidth,
   isTableRoute = false,
   children,
-}: Omit<AuthShellProps, 'children'> & { children: ReactNode }) {
+}: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
 
   // Mobile menu button (only on mobile)
@@ -118,11 +119,13 @@ function AuthShellInner({
  *
  * Replaces: DashboardLayoutClient, AdminShell
  */
-export function AuthShell(props: AuthShellProps) {
+export function AuthShell(props: Readonly<AuthShellProps>) {
+  const { onSidebarOpenChange, ...rest } = props;
+
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
-      <SidebarProvider>
-        <AuthShellInner {...props} />
+      <SidebarProvider onOpenChange={onSidebarOpenChange}>
+        <AuthShellInner {...rest} />
       </SidebarProvider>
     </div>
   );

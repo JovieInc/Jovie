@@ -109,7 +109,7 @@ export function CreatorProfileTableRow({
   onToggleMarketing,
   onSendInvite,
   onDelete,
-}: CreatorProfileTableRowProps) {
+}: Readonly<CreatorProfileTableRowProps>) {
   const displayName =
     'displayName' in profile ? (profile.displayName ?? null) : null;
 

@@ -207,7 +207,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   artistName,
   imageType,
   enableVersioning = true,
-}: OptimizedImageProps) {
+}: Readonly<OptimizedImageProps>) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 

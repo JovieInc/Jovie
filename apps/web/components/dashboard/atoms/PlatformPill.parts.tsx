@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 /**
  * Shimmer overlay effect for newly added pills
  */
-export function PillShimmer({ show }: { show: boolean }) {
+export function PillShimmer({ show }: Readonly<{ show: boolean }>) {
   if (!show) return null;
 
   return (
@@ -38,7 +38,7 @@ export interface PillIconProps {
 /**
  * Platform icon chip
  */
-export function PillIcon({ platformIcon, style }: PillIconProps) {
+export function PillIcon({ platformIcon, style }: Readonly<PillIconProps>) {
   return (
     <span
       className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
@@ -64,7 +64,7 @@ export interface CollapsedContentProps {
 export function CollapsedContent({
   defaultExpanded,
   primaryText,
-}: CollapsedContentProps) {
+}: Readonly<CollapsedContentProps>) {
   return (
     <span
       className={cn(
@@ -97,7 +97,7 @@ export function ExpandedContent({
   secondaryText,
   badgeText,
   suffix,
-}: ExpandedContentProps) {
+}: Readonly<ExpandedContentProps>) {
   const hasSecondary = Boolean(
     secondaryText && secondaryText.trim().length > 0
   );
@@ -146,7 +146,10 @@ export interface TrailingContentProps {
 /**
  * Trailing content (action buttons, etc.)
  */
-export function TrailingContent({ children, collapsed }: TrailingContentProps) {
+export function TrailingContent({
+  children,
+  collapsed,
+}: Readonly<TrailingContentProps>) {
   if (collapsed) return null;
   return <div className='relative ml-1 shrink-0'>{children}</div>;
 }

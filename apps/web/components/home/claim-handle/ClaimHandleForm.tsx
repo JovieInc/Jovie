@@ -126,7 +126,9 @@ const getButtonContent = ({
   return 'Request Early Access';
 };
 
-export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
+export function ClaimHandleForm({
+  onHandleChange,
+}: Readonly<ClaimHandleFormProps>) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);

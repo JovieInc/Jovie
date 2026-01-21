@@ -18,9 +18,9 @@ const YOUTUBE_CONFIG: StrategyConfig = {
 } as const;
 
 const CHANNEL_PATTERNS = [
-  /^https:\/\/(www\.)?youtube\.com\/channel\/[^/?#]+/i,
-  /^https:\/\/(www\.)?youtube\.com\/c\/[^/?#]+/i,
-  /^https:\/\/(www\.)?youtube\.com\/@[^/?#]+/i,
+  /^https?:\/\/(www\.)?youtube\.com\/channel\/[^/?#]+/i,
+  /^https?:\/\/(www\.)?youtube\.com\/c\/[^/?#]+/i,
+  /^https?:\/\/(www\.)?youtube\.com\/@[^/?#]+/i,
 ];
 const MAX_URL_LENGTH = 2048;
 

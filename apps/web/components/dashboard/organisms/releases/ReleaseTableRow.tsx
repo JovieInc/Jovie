@@ -25,10 +25,10 @@ interface ProviderConfig {
 function ProviderStatusDot({
   status,
   accent,
-}: {
+}: Readonly<{
   status: 'available' | 'manual' | 'missing';
   accent: string;
-}) {
+}>) {
   if (status === 'missing') {
     return (
       <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
@@ -64,7 +64,7 @@ function AddProviderUrlPopover({
   accent,
   onSave,
   isSaving,
-}: AddProviderUrlPopoverProps) {
+}: Readonly<AddProviderUrlPopoverProps>) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -189,7 +189,7 @@ export function ReleaseTableRow({
   onAddUrl,
   isAddingUrl,
   artistName,
-}: ReleaseTableRowProps) {
+}: Readonly<ReleaseTableRowProps>) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopyWithFeedback = useCallback(

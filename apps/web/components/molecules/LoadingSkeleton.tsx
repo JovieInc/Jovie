@@ -101,7 +101,7 @@ export function LoadingSkeleton({
   height = 'h-4',
   width = 'w-full',
   rounded = 'sm',
-}: LoadingSkeletonProps) {
+}: Readonly<LoadingSkeletonProps>) {
   // Validate height and width classes
   const validatedHeight = validateSizeClass(height, 'height');
   const validatedWidth = validateSizeClass(width, 'width');
@@ -254,7 +254,7 @@ export function CardSkeleton() {
   );
 }
 
-export function ListSkeleton({ items = 3 }: { items?: number }) {
+export function ListSkeleton({ items = 3 }: Readonly<{ items?: number }>) {
   const itemKeys = useMemo(
     () => generateSkeletonKeys('list-item', items),
     [items]
@@ -283,10 +283,10 @@ export function ListSkeleton({ items = 3 }: { items?: number }) {
 export function TableSkeleton({
   rows = 5,
   columns = 3,
-}: {
+}: Readonly<{
   rows?: number;
   columns?: number;
-}) {
+}>) {
   const headerKeys = useMemo(
     () => generateSkeletonKeys('table-header', columns),
     [columns]

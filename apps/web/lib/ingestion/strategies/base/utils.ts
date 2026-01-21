@@ -61,5 +61,5 @@ export function isValidHandle(handle: string): boolean {
  * Normalizes a handle for storage.
  */
 export function normalizeHandle(handle: string): string {
-  return normalizeString(handle).replaceAll(/^@/, '');
+  return normalizeString(handle).replace(/^@+/, '');
 }

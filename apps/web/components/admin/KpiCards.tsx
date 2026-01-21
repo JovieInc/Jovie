@@ -28,7 +28,7 @@ interface KpiCardsProps {
   mercuryAvailability?: DataAvailability;
 }
 
-function UnavailableBadge({ message }: { message?: string }) {
+function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
       className='inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 line-clamp-1'
@@ -41,7 +41,7 @@ function UnavailableBadge({ message }: { message?: string }) {
   );
 }
 
-function NotConfiguredBadge({ message }: { message?: string }) {
+function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
       className='inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-1'
@@ -62,7 +62,7 @@ export function KpiCards({
   activeSubscribers,
   stripeAvailability,
   mercuryAvailability,
-}: KpiCardsProps) {
+}: Readonly<KpiCardsProps>) {
   const formatUsd = (value: number) =>
     value.toLocaleString('en-US', {
       style: 'currency',
