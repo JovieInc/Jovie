@@ -30,7 +30,6 @@ const DOT_FIX_PATTERNS: Array<[RegExp, string]> = [
   [/\b(threads)net\b/i, '$1.net'],
   [/\b(twitch)tv\b/i, '$1.tv'],
   [/\b(rumble)com\b/i, '$1.com'],
-  [/\b(linkedin)com\b/i, '$1.com'],
   [/\b(telegram)me\b/i, '$1.me'],
   [/\b(telegram)com\b/i, '$1.com'],
   [/\b(line)me\b/i, '$1.me'],
@@ -84,25 +83,6 @@ const DANGEROUS_SCHEMES = [
  * Pattern to detect encoded control characters
  */
 const ENCODED_CONTROL_PATTERN = /%(0a|0d|09|00)/i;
-
-/**
- * Reserved YouTube paths that shouldn't be treated as usernames
- */
-const YOUTUBE_RESERVED_PATHS = [
-  'watch',
-  'results',
-  'shorts',
-  'live',
-  'playlist',
-  'feed',
-  'gaming',
-  'music',
-  'premium',
-  'c',
-  'channel',
-  'user',
-  'embed',
-];
 
 /**
  * Reserved TikTok paths that shouldn't be prefixed with @
@@ -239,20 +219,6 @@ export function normalizeUrl(url: string): string {
 
     // Canonicalize Twitter domain to x.com
     canonicalizeTwitterDomain(parsedUrl);
-
-    // Normalize YouTube legacy custom channel URLs
-    if (/(?:www\.)?youtube\.com/i.test(parsedUrl.hostname)) {
-      const path = parsedUrl.pathname;
-      const parts = path.split('/').filter(Boolean);
-
-      // If a single-segment legacy custom URL and not reserved, keep as-is
-      if (
-        parts.length === 1 &&
-        !YOUTUBE_RESERVED_PATHS.includes(parts[0].toLowerCase())
-      ) {
-        // no-op; just ensuring we don't reject/transform it unnecessarily
-      }
-    }
 
     // Normalize TikTok paths
     normalizeTikTokPath(parsedUrl);
