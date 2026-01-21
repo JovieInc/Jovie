@@ -13,7 +13,7 @@ import {
 describe('@critical SubscriptionHandler - Misc', () => {
   let handler: import('@/lib/stripe/webhooks/handlers/subscription-handler').SubscriptionHandler;
   let SubscriptionHandlerCtor: typeof import('@/lib/stripe/webhooks/handlers/subscription-handler').SubscriptionHandler;
-  let subscriptionHandlerInstance: import('@/lib/stripe/webhooks/handlers/subscription-handler').subscriptionHandler;
+  let subscriptionHandlerInstance: typeof import('@/lib/stripe/webhooks/handlers/subscription-handler').subscriptionHandler;
 
   beforeEach(async () => {
     vi.clearAllMocks();
