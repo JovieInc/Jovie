@@ -386,12 +386,14 @@ export default async function ContentSmartLinkPage({
         id='music-schema'
         type='application/ld+json'
         strategy='afterInteractive'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{ __html: JSON.stringify(musicSchema) }}
       />
       <Script
         id='breadcrumb-schema'
         type='application/ld+json'
         strategy='afterInteractive'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
 

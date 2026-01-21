@@ -156,7 +156,9 @@ export async function GET() {
  */
 async function validateAuthAndRateLimit(
   request: Request
-): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse }> {
+): Promise<
+  { ok: true; userId: string } | { ok: false; response: NextResponse }
+> {
   const { userId } = await auth();
   if (!userId) {
     return {
@@ -281,7 +283,10 @@ interface WaitlistRequestData {
  */
 async function validateAndParseRequest(
   request: Request
-): Promise<{ ok: true; data: WaitlistRequestData } | { ok: false; response: NextResponse }> {
+): Promise<
+  | { ok: true; data: WaitlistRequestData }
+  | { ok: false; response: NextResponse }
+> {
   const user = await currentUser();
   const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
@@ -316,10 +321,17 @@ async function validateAndParseRequest(
     };
   }
 
-  const { primaryGoal, primarySocialUrl, spotifyUrl, heardAbout, selectedPlan } =
-    parseResult.data;
+  const {
+    primaryGoal,
+    primarySocialUrl,
+    spotifyUrl,
+    heardAbout,
+    selectedPlan,
+  } = parseResult.data;
   const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
-  const spotifyUrlNormalized = spotifyUrl ? normalizeSpotifyUrl(spotifyUrl) : null;
+  const spotifyUrlNormalized = spotifyUrl
+    ? normalizeSpotifyUrl(spotifyUrl)
+    : null;
 
   return {
     ok: true,
@@ -391,7 +403,9 @@ async function handleExistingEntry(
 /**
  * Create new waitlist entry with profile
  */
-async function createNewWaitlistEntry(data: WaitlistRequestData): Promise<void> {
+async function createNewWaitlistEntry(
+  data: WaitlistRequestData
+): Promise<void> {
   await db.transaction(async tx => {
     try {
       const [entry] = await tx
@@ -427,7 +441,9 @@ async function createNewWaitlistEntry(data: WaitlistRequestData): Promise<void> 
       const usernameNormalized = await findAvailableHandle(tx, baseHandle);
 
       const trimmedName = data.fullName.trim();
-      const displayName = trimmedName ? trimmedName.slice(0, 50) : 'Jovie creator';
+      const displayName = trimmedName
+        ? trimmedName.slice(0, 50)
+        : 'Jovie creator';
 
       await tx.insert(creatorProfiles).values({
         creatorType: 'creator',
@@ -479,7 +495,8 @@ function handleWaitlistError(error: unknown): NextResponse {
     {
       success: false,
       error: errorMessage,
-      ...(isDev && error instanceof Error && { stack: error.stack, details: error }),
+      ...(isDev &&
+        error instanceof Error && { stack: error.stack, details: error }),
     },
     { status: 500, headers: NO_STORE_HEADERS }
   );

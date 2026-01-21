@@ -319,7 +319,8 @@ function handleAndPattern(
   ctx: ArtistCreditContext
 ): { credits: ParsedArtistCredit[]; positionIncrement: number } {
   const parts = artistName.split(AND_PATTERN);
-  const shouldSplit = parts.length === 2 && parts.every(p => p && p.length < 30);
+  const shouldSplit =
+    parts.length === 2 && parts.every(p => p && p.length < 30);
 
   if (!shouldSplit) {
     return {

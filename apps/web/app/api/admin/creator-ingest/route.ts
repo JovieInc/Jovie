@@ -747,7 +747,11 @@ async function handleFullExtractionIngestion(
 
   let extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
   try {
-    extraction = await fetchFullExtractionProfile(isLaylo, validatedUrl, handle);
+    extraction = await fetchFullExtractionProfile(
+      isLaylo,
+      validatedUrl,
+      handle
+    );
   } catch (fetchError) {
     const errorMessage =
       fetchError instanceof Error

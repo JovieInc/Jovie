@@ -93,7 +93,10 @@ function getOrderByExpressions(sort: AdminCreatorProfilesSort) {
     case 'created_asc':
       return [creatorProfiles.createdAt];
     case 'verified_desc':
-      return [desc(creatorProfiles.isVerified), desc(creatorProfiles.createdAt)];
+      return [
+        desc(creatorProfiles.isVerified),
+        desc(creatorProfiles.createdAt),
+      ];
     case 'verified_asc':
       return [creatorProfiles.isVerified, desc(creatorProfiles.createdAt)];
     case 'claimed_desc':

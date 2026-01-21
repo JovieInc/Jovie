@@ -151,7 +151,11 @@ function processSubscription(
   thirtyDaysAgoSeconds: number
 ): void {
   if (!isActiveSubscription(subscription.status)) return;
-  if (!Array.isArray(subscription.items.data) || subscription.items.data.length === 0) return;
+  if (
+    !Array.isArray(subscription.items.data) ||
+    subscription.items.data.length === 0
+  )
+    return;
 
   metrics.activeSubscribers += 1;
 

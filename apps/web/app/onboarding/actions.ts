@@ -329,7 +329,10 @@ async function handleAvatarUploadAfterOnboarding(params: {
     });
 
     if (!uploaded) {
-      console.warn('[ONBOARDING] Avatar upload failed for profile:', params.profileId);
+      console.warn(
+        '[ONBOARDING] Avatar upload failed for profile:',
+        params.profileId
+      );
       return;
     }
 
@@ -471,7 +474,11 @@ export async function completeOnboarding({
   redirectToDashboard?: boolean;
 }) {
   try {
-    const input = await validateOnboardingInput({ username, displayName, email });
+    const input = await validateOnboardingInput({
+      username,
+      displayName,
+      email,
+    });
 
     // Use validated input values
     const { normalizedUsername, trimmedDisplayName, userEmail } = input;
@@ -545,7 +552,11 @@ export async function completeOnboarding({
             ? String(result.rows[0].profile_id)
             : null;
 
-          return { username: normalizedUsername, status: 'created', profileId } as CompletionResult;
+          return {
+            username: normalizedUsername,
+            status: 'created',
+            profileId,
+          } as CompletionResult;
         }
 
         const [existingProfile] = await tx
@@ -554,7 +565,8 @@ export async function completeOnboarding({
           .where(eq(creatorProfiles.userId, existingUser.id))
           .limit(1);
 
-        const handleChanged = existingProfile?.usernameNormalized !== normalizedUsername;
+        const handleChanged =
+          existingProfile?.usernameNormalized !== normalizedUsername;
         if (handleChanged) {
           await ensureHandleAvailable(existingProfile?.id);
         }
@@ -572,7 +584,8 @@ export async function completeOnboarding({
               username: normalizedUsername,
               usernameNormalized: normalizedUsername,
               displayName: nextDisplayName,
-              onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? new Date(),
+              onboardingCompletedAt:
+                existingProfile.onboardingCompletedAt ?? new Date(),
               isPublic: true,
               isClaimed: true,
               claimedAt: existingProfile.claimedAt ?? new Date(),
@@ -614,7 +627,11 @@ export async function completeOnboarding({
           ? String(result.rows[0].profile_id)
           : null;
 
-        return { username: normalizedUsername, status: 'created', profileId } as CompletionResult;
+        return {
+          username: normalizedUsername,
+          status: 'created',
+          profileId,
+        } as CompletionResult;
       },
       { isolationLevel: 'serializable' }
     );

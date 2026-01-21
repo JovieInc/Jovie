@@ -296,7 +296,10 @@ async function fetchExistingTracksBySpotifyId(
  */
 function sanitizeIsrc(isrc: string | undefined): string | null {
   if (!isrc) return null;
-  return isrc.replaceAll(/[^a-zA-Z0-9]/g, '').slice(0, 12).toUpperCase();
+  return isrc
+    .replaceAll(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 12)
+    .toUpperCase();
 }
 
 /**
@@ -450,7 +453,10 @@ async function importSingleRelease(
       existingRelease?.id
     ));
 
-  const releaseType = determineReleaseType(album.album_type, album.total_tracks);
+  const releaseType = determineReleaseType(
+    album.album_type,
+    album.total_tracks
+  );
   const releaseDate = parseSpotifyReleaseDate(
     album.release_date,
     album.release_date_precision
