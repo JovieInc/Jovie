@@ -80,24 +80,85 @@ function isSubscriptionActiveAt(
   return true;
 }
 
+// Result type for accumulating subscription metrics
+interface SubscriptionMetricsAccumulator {
+  mrrCents: number;
+  activeSubscribers: number;
+  pastMrrCents: number;
+}
+
+// Process a single subscription and accumulate metrics
+function processSubscription(
+  sub: Stripe.Subscription,
+  thirtyDaysAgoSeconds: number,
+  accumulator: SubscriptionMetricsAccumulator
+): void {
+  if (!isActiveSubscription(sub.status)) return;
+  if (!Array.isArray(sub.items.data) || sub.items.data.length === 0) return;
+
+  accumulator.activeSubscribers += 1;
+
+  for (const item of sub.items.data) {
+    const itemMrrCents = computeMonthlyCentsFromPriceItem(item);
+    accumulator.mrrCents += itemMrrCents;
+    if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
+      accumulator.pastMrrCents += itemMrrCents;
+    }
+  }
+}
+
+// Build the success response from accumulated metrics
+function buildSuccessResponse(
+  accumulator: SubscriptionMetricsAccumulator
+): AdminStripeOverviewMetrics {
+  return {
+    mrrUsd: accumulator.mrrCents / 100,
+    activeSubscribers: accumulator.activeSubscribers,
+    mrrUsd30dAgo: accumulator.pastMrrCents / 100,
+    mrrGrowth30dUsd: (accumulator.mrrCents - accumulator.pastMrrCents) / 100,
+    isConfigured: true,
+    isAvailable: true,
+  };
+}
+
+// Build error response for unconfigured state
+function buildUnconfiguredResponse(): AdminStripeOverviewMetrics {
+  return {
+    mrrUsd: 0,
+    activeSubscribers: 0,
+    mrrUsd30dAgo: 0,
+    mrrGrowth30dUsd: 0,
+    isConfigured: false,
+    isAvailable: false,
+    errorMessage:
+      'Stripe credentials not configured (STRIPE_SECRET_KEY required)',
+  };
+}
+
+// Build error response for API failure
+function buildErrorResponse(message: string): AdminStripeOverviewMetrics {
+  return {
+    mrrUsd: 0,
+    activeSubscribers: 0,
+    mrrUsd30dAgo: 0,
+    mrrGrowth30dUsd: 0,
+    isConfigured: true,
+    isAvailable: false,
+    errorMessage: `Stripe API error: ${message}`,
+  };
+}
+
 export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOverviewMetrics> {
   if (!isStripeConfigured()) {
-    return {
-      mrrUsd: 0,
-      activeSubscribers: 0,
-      mrrUsd30dAgo: 0,
-      mrrGrowth30dUsd: 0,
-      isConfigured: false,
-      isAvailable: false,
-      errorMessage:
-        'Stripe credentials not configured (STRIPE_SECRET_KEY required)',
-    };
+    return buildUnconfiguredResponse();
   }
 
   try {
-    let mrrCents = 0;
-    let activeSubscribers = 0;
-    let pastMrrCents = 0;
+    const accumulator: SubscriptionMetricsAccumulator = {
+      mrrCents: 0,
+      activeSubscribers: 0,
+      pastMrrCents: 0,
+    };
     let startingAfter: string | undefined;
     const thirtyDaysAgoSeconds = Math.floor(
       (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
@@ -112,49 +173,19 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
       });
 
       for (const sub of page.data) {
-        if (!isActiveSubscription(sub.status)) continue;
-        if (!Array.isArray(sub.items.data) || sub.items.data.length === 0)
-          continue;
-
-        activeSubscribers += 1;
-
-        for (const item of sub.items.data) {
-          const itemMrrCents = computeMonthlyCentsFromPriceItem(item);
-          // Subscription is active (verified by isActiveSubscription check above)
-          mrrCents += itemMrrCents;
-          if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
-            pastMrrCents += itemMrrCents;
-          }
-        }
+        processSubscription(sub, thirtyDaysAgoSeconds, accumulator);
       }
 
-      if (!page.has_more || page.data.length === 0) {
-        break;
-      }
+      if (!page.has_more || page.data.length === 0) break;
 
       startingAfter = page.data[page.data.length - 1]?.id;
       if (!startingAfter) break;
     }
 
-    return {
-      mrrUsd: mrrCents / 100,
-      activeSubscribers,
-      mrrUsd30dAgo: pastMrrCents / 100,
-      mrrGrowth30dUsd: (mrrCents - pastMrrCents) / 100,
-      isConfigured: true,
-      isAvailable: true,
-    };
+    return buildSuccessResponse(accumulator);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error loading Stripe metrics:', error);
-    return {
-      mrrUsd: 0,
-      activeSubscribers: 0,
-      mrrUsd30dAgo: 0,
-      mrrGrowth30dUsd: 0,
-      isConfigured: true,
-      isAvailable: false,
-      errorMessage: `Stripe API error: ${message}`,
-    };
+    return buildErrorResponse(message);
   }
 }
