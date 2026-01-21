@@ -78,7 +78,7 @@ export function DashboardActivityFeed({
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
           />
-          Live
+          <span>Live</span>
         </span>
       </div>
 

@@ -73,7 +73,7 @@ export function ContactSidebar({
         id: 'copy-url',
         label: 'Copy profile URL',
         icon: <Copy className='h-4 w-4' />,
-        onClick: handleCopyProfileUrl,
+        onClick: () => void handleCopyProfileUrl(),
         className: CONTEXT_MENU_ITEM_CLASS,
       });
 
