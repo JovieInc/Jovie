@@ -1,8 +1,9 @@
-permissions:
-  contents: read
 name: Production Synthetic Monitoring
 
-"on":
+permissions:
+  contents: read
+
+on:
   schedule:
     # Run every 15 minutes during business hours (8 AM - 8 PM PST = 16:00-04:00 UTC)
     - cron: '*/15 16-23 * * *'

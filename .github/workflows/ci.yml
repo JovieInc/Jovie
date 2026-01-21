@@ -713,6 +713,7 @@ jobs:
 
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
+    environment: Preview – jovie
     # Gated: only runs with 'testing' label to save CI time on most PRs
     # Full E2E runs on merge to main anyway
     needs: [ci-fast]
@@ -810,6 +811,7 @@ jobs:
 
   ci-e2e-migrate:
     name: E2E DB Migrate
+    environment: Preview – jovie
     needs: [ci-fast, ci-build, neon-db]
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -900,6 +902,7 @@ jobs:
 
   ci-e2e-tests:
     name: E2E Tests
+    environment: Preview – jovie
     # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
     needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
     # E2E runs on push to main or PRs with testing label

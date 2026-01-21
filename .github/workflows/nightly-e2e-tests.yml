@@ -21,6 +21,7 @@ concurrency:
 jobs:
   nightly-e2e:
     name: Nightly E2E Suite
+    environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
