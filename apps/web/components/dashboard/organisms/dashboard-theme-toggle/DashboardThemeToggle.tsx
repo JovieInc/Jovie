@@ -3,7 +3,11 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { MoonIcon, SunIcon } from './ThemeIcons';
-import { type DashboardThemeToggleProps, THEME_OPTIONS } from './types';
+import type {
+  DashboardThemeToggleProps,
+  UseDashboardThemeReturn,
+} from './types';
+import { THEME_OPTIONS } from './types';
 import { useDashboardTheme } from './useDashboardTheme';
 
 function SystemIcon({ className }: Readonly<{ className: string }>) {
@@ -56,37 +60,24 @@ function getThemeIcon(value: string) {
   return <SystemIcon className='h-5 w-5 text-secondary-token' />;
 }
 
-export function DashboardThemeToggle({
-  onThemeChange,
-  onThemeSave,
-  showSystemOption = false,
-  variant = 'default',
-}: Readonly<DashboardThemeToggleProps>) {
-  const {
-    mounted,
-    isUpdating,
-    theme,
-    resolvedTheme,
-    isDark,
-    handleThemeChange,
-  } = useDashboardTheme({ onThemeChange, onThemeSave });
+type ThemeState = UseDashboardThemeReturn;
 
-  if (!mounted) {
-    return showSystemOption ? (
-      <LoadingStateWithSystem />
-    ) : (
-      <LoadingStateToggle />
-    );
-  }
-
-  if (showSystemOption) {
-    return (
-      <div className='space-y-3'>
-        <span className='text-sm font-medium text-primary-token'>
-          Theme Preference
-        </span>
-        <div className='grid grid-cols-3 gap-2'>
-          {THEME_OPTIONS.map(option => (
+function SystemOptionVariant({
+  theme,
+  resolvedTheme,
+  isUpdating,
+  handleThemeChange,
+}: ThemeState) {
+  return (
+    <div className='space-y-3'>
+      <span className='text-sm font-medium text-primary-token'>
+        Theme Preference
+      </span>
+      <div className='grid grid-cols-3 gap-2'>
+        {THEME_OPTIONS.map(option => {
+          const isSelected = theme === option.value;
+          const showResolved = isSelected && option.value === 'system';
+          return (
             <button
               type='button'
               key={option.value}
@@ -94,7 +85,7 @@ export function DashboardThemeToggle({
               disabled={isUpdating}
               className={cn(
                 'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200',
-                theme === option.value
+                isSelected
                   ? 'border-accent bg-accent/10 text-primary-token'
                   : 'border-border hover:bg-surface-hover-token text-secondary-token',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -104,47 +95,50 @@ export function DashboardThemeToggle({
                 {getThemeIcon(option.value)}
               </span>
               <span className='text-xs font-medium'>{option.label}</span>
-              {theme === option.value && option.value === 'system' && (
+              {showResolved && (
                 <span className='text-xs text-secondary-token mt-1'>
                   ({resolvedTheme})
                 </span>
               )}
             </button>
-          ))}
-        </div>
-        <p className='text-xs text-secondary-token'>
-          Choose how the interface appears. System follows your device settings.
-        </p>
+          );
+        })}
       </div>
-    );
-  }
+      <p className='text-xs text-secondary-token'>
+        Choose how the interface appears. System follows your device settings.
+      </p>
+    </div>
+  );
+}
 
-  if (variant === 'compact') {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type='button'
-            disabled={isUpdating}
-            onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors duration-150',
-              isUpdating && 'opacity-70'
-            )}
-          >
-            {isDark ? (
-              <MoonIcon className='h-4 w-4 text-secondary-token' />
-            ) : (
-              <SunIcon className='h-4 w-4 text-secondary-token' />
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side='right'>
-          {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
+function CompactVariant({ isDark, isUpdating, handleThemeChange }: ThemeState) {
+  const Icon = isDark ? MoonIcon : SunIcon;
+  const tooltip = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type='button'
+          disabled={isUpdating}
+          onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
+          className={cn(
+            'flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors duration-150',
+            isUpdating && 'opacity-70'
+          )}
+        >
+          <Icon className='h-4 w-4 text-secondary-token' />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side='right'>{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SwitchVariant({ isDark, isUpdating, handleThemeChange }: ThemeState) {
+  const Icon = isDark ? MoonIcon : SunIcon;
+  const tooltip = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+  const srText = isUpdating ? 'Updating theme...' : tooltip;
 
   return (
     <Tooltip>
@@ -161,11 +155,7 @@ export function DashboardThemeToggle({
           role='switch'
           aria-checked={isDark}
         >
-          <span className='sr-only'>
-            {isUpdating
-              ? 'Updating theme...'
-              : `Switch to ${isDark ? 'light' : 'dark'} mode`}
-          </span>
+          <span className='sr-only'>{srText}</span>
           <span
             aria-hidden='true'
             className={cn(
@@ -174,17 +164,38 @@ export function DashboardThemeToggle({
               isUpdating && 'animate-pulse motion-reduce:animate-none'
             )}
           >
-            {isDark ? (
-              <MoonIcon className='h-3 w-3 text-accent-token' />
-            ) : (
-              <SunIcon className='h-3 w-3 text-accent-token' />
-            )}
+            <Icon className='h-3 w-3 text-accent-token' />
           </span>
         </button>
       </TooltipTrigger>
-      <TooltipContent side='right'>
-        {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      </TooltipContent>
+      <TooltipContent side='right'>{tooltip}</TooltipContent>
     </Tooltip>
   );
+}
+
+export function DashboardThemeToggle({
+  onThemeChange,
+  onThemeSave,
+  showSystemOption = false,
+  variant = 'default',
+}: Readonly<DashboardThemeToggleProps>) {
+  const themeState = useDashboardTheme({ onThemeChange, onThemeSave });
+
+  if (!themeState.mounted) {
+    return showSystemOption ? (
+      <LoadingStateWithSystem />
+    ) : (
+      <LoadingStateToggle />
+    );
+  }
+
+  if (showSystemOption) {
+    return <SystemOptionVariant {...themeState} />;
+  }
+
+  if (variant === 'compact') {
+    return <CompactVariant {...themeState} />;
+  }
+
+  return <SwitchVariant {...themeState} />;
 }

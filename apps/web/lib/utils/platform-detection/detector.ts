@@ -126,6 +126,88 @@ export function detectPlatform(
 }
 
 /**
+ * Get identity for social platforms (Instagram, Twitter, TikTok)
+ */
+function getSocialIdentity(platformId: string, parts: string[]): string | null {
+  if (parts[0]) {
+    return `${platformId}:${parts[0].replace(/^@/, '').toLowerCase()}`;
+  }
+  return null;
+}
+
+/**
+ * Get identity for YouTube URLs
+ */
+function getYouTubeIdentity(parts: string[]): string | null {
+  if (parts[0]?.startsWith('@')) {
+    return `youtube:${parts[0].slice(1).toLowerCase()}`;
+  }
+  if (parts[0] === 'channel' && parts[1]) {
+    return `youtube:channel:${parts[1].toLowerCase()}`;
+  }
+  if (parts[0] === 'user' && parts[1]) {
+    return `youtube:user:${parts[1].toLowerCase()}`;
+  }
+  if (parts.length === 1) {
+    return `youtube:legacy:${parts[0].toLowerCase()}`;
+  }
+  return null;
+}
+
+/**
+ * Get identity for simple username platforms
+ */
+function getSimpleIdentity(platformId: string, parts: string[]): string | null {
+  if (parts[0]) {
+    return `${platformId}:${parts[0].toLowerCase()}`;
+  }
+  return null;
+}
+
+/**
+ * Get identity for Thematic URLs
+ */
+function getThematicIdentity(parts: string[]): string | null {
+  const isValidPath =
+    parts.length >= 3 &&
+    (parts[0] === 'artist' || parts[0] === 'creator') &&
+    parts[1] === 'profile';
+
+  if (isValidPath) {
+    return `thematic:${parts[0]}:${parts[2].toLowerCase()}`;
+  }
+  return null;
+}
+
+/**
+ * Get platform-specific identity from URL parts
+ */
+function getPlatformIdentity(
+  platformId: string,
+  parts: string[]
+): string | null {
+  switch (platformId) {
+    case 'instagram':
+    case 'twitter':
+    case 'tiktok':
+      return getSocialIdentity(platformId, parts);
+    case 'youtube':
+      return getYouTubeIdentity(parts);
+    case 'facebook':
+    case 'twitch':
+    case 'linkedin':
+    case 'soundcloud':
+    case 'bandcamp':
+    case 'linktree':
+      return getSimpleIdentity(platformId, parts);
+    case 'thematic':
+      return getThematicIdentity(parts);
+    default:
+      return null;
+  }
+}
+
+/**
  * Compute a canonical identity string used to detect duplicates across
  * small URL variations (missing dots, protocol, www, with/without @, etc.).
  * The identity is stable per platform + primary handle/ID where possible.
@@ -138,47 +220,9 @@ export function canonicalIdentity(
     const host = u.hostname.replace(/^www\./, '').toLowerCase();
     const parts = u.pathname.split('/').filter(Boolean);
 
-    switch (link.platform.id) {
-      case 'instagram':
-      case 'twitter':
-      case 'tiktok':
-        // x.com/twitter.com and tiktok.com; username is first segment
-        if (parts[0])
-          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
-        break;
-      case 'youtube':
-        // Prefer @handle, else channel/ID, else legacy single segment
-        if (parts[0]?.startsWith('@'))
-          return `youtube:${parts[0].slice(1).toLowerCase()}`;
-        if (parts[0] === 'channel' && parts[1])
-          return `youtube:channel:${parts[1].toLowerCase()}`;
-        if (parts[0] === 'user' && parts[1])
-          return `youtube:user:${parts[1].toLowerCase()}`;
-        if (parts.length === 1)
-          return `youtube:legacy:${parts[0].toLowerCase()}`;
-        break;
-      case 'facebook':
-      case 'twitch':
-      case 'linkedin':
-      case 'soundcloud':
-      case 'bandcamp':
-        if (parts[0]) return `${link.platform.id}:${parts[0].toLowerCase()}`;
-        break;
-      case 'linktree':
-        if (parts[0]) return `linktree:${parts[0].toLowerCase()}`;
-        break;
-      case 'thematic':
-        // Path format: /artist/profile/{id} or /creator/profile/{id}
-        if (
-          parts.length >= 3 &&
-          (parts[0] === 'artist' || parts[0] === 'creator') &&
-          parts[1] === 'profile'
-        ) {
-          return `thematic:${parts[0]}:${parts[2].toLowerCase()}`;
-        }
-        break;
-      default:
-        break;
+    const identity = getPlatformIdentity(link.platform.id, parts);
+    if (identity) {
+      return identity;
     }
 
     // Fallback to host+path signature
