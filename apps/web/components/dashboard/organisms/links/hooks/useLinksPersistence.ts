@@ -135,13 +135,29 @@ export function useLinksPersistence({
   );
 
   // Sync links when server props change
+  const lastSyncedActiveLinksRef = useRef<LinkItem[] | null>(null);
   useEffect(() => {
     const next = convertDbLinksToLinkItems(activeInitialLinks || []);
+    if (
+      lastSyncedActiveLinksRef.current &&
+      areLinkItemsEqual(lastSyncedActiveLinksRef.current, next)
+    ) {
+      return;
+    }
+    lastSyncedActiveLinksRef.current = next;
     setLinks(prev => (areLinkItemsEqual(prev, next) ? prev : next));
   }, [activeInitialLinks]);
 
+  const lastSyncedSuggestedLinksRef = useRef<SuggestedLink[] | null>(null);
   useEffect(() => {
     const next = convertDbLinksToSuggestions(suggestionInitialLinks || []);
+    if (
+      lastSyncedSuggestedLinksRef.current &&
+      areSuggestionListsEqual(lastSyncedSuggestedLinksRef.current, next)
+    ) {
+      return;
+    }
+    lastSyncedSuggestedLinksRef.current = next;
     setSuggestedLinks(prev =>
       areSuggestionListsEqual(prev, next) ? prev : next
     );
