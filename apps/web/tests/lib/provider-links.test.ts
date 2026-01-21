@@ -90,7 +90,7 @@ describe('provider link discovery', () => {
         provider: 'apple_music',
         url: 'https://music.apple.com/us/album/anti-hero/123456789?i=123456789',
         quality: 'canonical',
-        discovered_from: 'apple_music_lookup',
+        discovered_from: 'apple_music_isrc',
         provider_id: '123456789',
       });
 
