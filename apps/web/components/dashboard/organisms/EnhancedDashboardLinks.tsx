@@ -149,8 +149,8 @@ export function EnhancedDashboardLinks({
     [links]
   );
 
-  // Sync preview data
-  const { setPreviewData } = usePreviewPanel();
+  // Sync preview data and get sidebar state
+  const { setPreviewData, isOpen: sidebarOpen } = usePreviewPanel();
 
   useEffect(() => {
     setPreviewData({
@@ -175,7 +175,8 @@ export function EnhancedDashboardLinks({
       data-testid='enhanced-dashboard-links'
     >
       <div className='w-full min-w-0 space-y-4'>
-        {profileId && artist && (
+        {/* Profile editor section - hidden when sidebar is open */}
+        {!sidebarOpen && profileId && artist && (
           <ProfileEditorSection
             artist={artist}
             avatarUrl={avatarUrl}
@@ -211,6 +212,7 @@ export function EnhancedDashboardLinks({
           }
           suggestionsEnabled={suggestionsEnabled}
           profileId={profileId}
+          sidebarOpen={sidebarOpen}
         />
       </div>
     </div>

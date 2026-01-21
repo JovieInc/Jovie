@@ -39,6 +39,7 @@ export interface SpotifyAlbum {
   release_date: string;
   release_date_precision: 'year' | 'month' | 'day';
   total_tracks: number;
+  popularity?: number;
   images: SpotifyImage[];
   external_urls: {
     spotify: string;
@@ -79,6 +80,7 @@ export interface SpotifyAlbumFull extends SpotifyAlbum {
     next: string | null;
   };
   label: string;
+  popularity: number;
   copyrights: Array<{ text: string; type: string }>;
   external_ids?: {
     upc?: string;

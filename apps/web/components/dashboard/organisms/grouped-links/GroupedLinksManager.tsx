@@ -35,6 +35,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   onDismissSuggestion,
   suggestionsEnabled = false,
   profileId,
+  sidebarOpen = false,
 }: GroupedLinksManagerProps<T>) {
   // Link state management
   const {
@@ -155,6 +156,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             />
           )}
 
+          {/* Prompt text when sidebar is open */}
+          {sidebarOpen && (
+            <p className='text-sm text-secondary-token'>
+              What other profiles do you have?
+            </p>
+          )}
+
           {/* Combined search + add input */}
           <UniversalLinkInput
             ref={linkInputRef}
@@ -181,47 +189,52 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             />
           )}
 
-          {/* Quick-add platform suggestion pills */}
-          <QuickAddSuggestions
-            existingPlatforms={existingPlatforms}
-            isMusicProfile={isMusicProfile}
-            onPlatformSelect={setPrefillUrl}
-          />
+          {/* Quick-add platform suggestion pills - hidden when sidebar open */}
+          {!sidebarOpen && (
+            <QuickAddSuggestions
+              existingPlatforms={existingPlatforms}
+              isMusicProfile={isMusicProfile}
+              onPlatformSelect={setPrefillUrl}
+            />
+          )}
         </div>
       </div>
 
-      <div className='mx-auto w-full max-w-3xl'>
-        {!hasAnyLinks && (
-          <EmptyState
-            heading='Add your first link'
-            description='Start with your most important link — music, socials, or a landing page.'
-            size='sm'
-            className='mt-3 w-full'
-          />
-        )}
+      {/* Link categories - hidden when sidebar open */}
+      {!sidebarOpen && (
+        <div className='mx-auto w-full max-w-3xl'>
+          {!hasAnyLinks && (
+            <EmptyState
+              heading='Add your first link'
+              description='Start with your most important link — music, socials, or a landing page.'
+              size='sm'
+              className='mt-3 w-full'
+            />
+          )}
 
-        {hasAnyLinks && (
-          <LinkCategoryGrid
-            links={links}
-            onLinksChange={next => {
-              setLinks(next as T[]);
-              onLinksChange?.(next as T[]);
-            }}
-            onToggle={handleToggle}
-            onRemove={handleRemove}
-            onEdit={handleEdit}
-            openMenuId={openMenuId}
-            onAnyMenuOpen={handleAnyMenuOpen}
-            lastAddedId={lastAddedId}
-            buildPillLabel={buildPillLabel}
-            addingLink={addingLink}
-            pendingPreview={pendingPreview}
-            onAddPendingPreview={handleAddPendingPreview}
-            onCancelPendingPreview={handleCancelPendingPreview}
-            onHint={setHint}
-          />
-        )}
-      </div>
+          {hasAnyLinks && (
+            <LinkCategoryGrid
+              links={links}
+              onLinksChange={next => {
+                setLinks(next as T[]);
+                onLinksChange?.(next as T[]);
+              }}
+              onToggle={handleToggle}
+              onRemove={handleRemove}
+              onEdit={handleEdit}
+              openMenuId={openMenuId}
+              onAnyMenuOpen={handleAnyMenuOpen}
+              lastAddedId={lastAddedId}
+              buildPillLabel={buildPillLabel}
+              addingLink={addingLink}
+              pendingPreview={pendingPreview}
+              onAddPendingPreview={handleAddPendingPreview}
+              onCancelPendingPreview={handleCancelPendingPreview}
+              onHint={setHint}
+            />
+          )}
+        </div>
+      )}
     </section>
   );
 }
