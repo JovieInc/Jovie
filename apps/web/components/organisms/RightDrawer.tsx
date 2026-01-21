@@ -77,16 +77,38 @@ export function RightDrawer({
     </aside>
   );
 
-  // Wrap with context menu if items are provided
+  // Context menu wrapper - renders inside the drawer content, not around the aside
+  // This preserves the drawer's layout while still enabling right-click menu
   if (contextMenuItems && contextMenuItems.length > 0) {
     return (
-      <CommonDropdown
-        variant='context'
-        items={contextMenuItems}
-        contentClassName={CONTEXT_MENU_CONTENT_CLASS}
+      <aside
+        {...rest}
+        ref={asideRef}
+        aria-hidden={!isOpen}
+        aria-label={ariaLabel}
+        tabIndex={isOpen ? -1 : undefined}
+        className={cn(
+          'shrink-0 h-full flex flex-col',
+          'bg-surface-1 border-l border-subtle',
+          'transition-[width,opacity] duration-300 ease-out',
+          'overflow-hidden',
+          isOpen
+            ? 'opacity-100 visible'
+            : 'opacity-0 pointer-events-none invisible w-0 border-l-0',
+          className
+        )}
+        style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
       >
-        {drawerContent}
-      </CommonDropdown>
+        <CommonDropdown
+          variant='context'
+          items={contextMenuItems}
+          contentClassName={CONTEXT_MENU_CONTENT_CLASS}
+        >
+          <div className='h-full overflow-y-auto overflow-x-hidden'>
+            {children}
+          </div>
+        </CommonDropdown>
+      </aside>
     );
   }
 
