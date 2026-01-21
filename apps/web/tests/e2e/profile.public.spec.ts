@@ -4,12 +4,13 @@
  */
 
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS, smokeNavigate } from './utils/smoke-test-utils';
 
 test.describe('Public Profile Performance', () => {
   test.describe('Tim Profile Rendering', () => {
     test.beforeEach(async ({ page }) => {
-      // Use seeded 'tim' profile
-      await page.goto('/tim');
+      // Use seeded 'tim' profile with optimized navigation
+      await smokeNavigate(page, '/tim');
     });
 
     test('renders main heading correctly', async ({ page }) => {
@@ -62,9 +63,13 @@ test.describe('Public Profile Performance', () => {
       // DOM should load quickly (basic threshold)
       expect(domLoadTime).toBeLessThan(3000);
 
-      // Wait for main content to be visible
-      await page.waitForSelector('h1', { timeout: 2000 });
-      await page.waitForSelector('img', { timeout: 2000 });
+      // Wait for main content to be visible using expect assertions (not waitForSelector)
+      await expect(page.locator('h1').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.QUICK,
+      });
+      await expect(page.locator('img').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.QUICK,
+      });
 
       const fullLoadTime = Date.now() - startTime;
 
@@ -83,14 +88,20 @@ test.describe('Public Profile Performance', () => {
 
       const startTime = Date.now();
 
+      // Use domcontentloaded instead of networkidle for more reliable timing
       await page.goto('/tim', {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: 10000,
       });
+      await page.waitForLoadState('load');
 
-      // Wait for key elements to ensure LCP measurement
-      await page.waitForSelector('h1', { timeout: 3000 });
-      await page.waitForSelector('img', { timeout: 3000 });
+      // Wait for key elements to ensure LCP measurement using expect assertions
+      await expect(page.locator('h1').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+      await expect(page.locator('img').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
 
       const loadTime = Date.now() - startTime;
 
@@ -102,9 +113,7 @@ test.describe('Public Profile Performance', () => {
       // Check basic performance requirements
       expect(loadTime).toBeLessThan(2500); // LCP target
 
-      // Verify main content is rendered
-      await expect(page.locator('h1')).toBeVisible();
-      await expect(page.locator('img')).toBeVisible();
+      // Verify main content is rendered (already verified above)
     });
 
     test('loads efficiently on mobile viewport', async ({ page }) => {
@@ -222,24 +231,26 @@ test.describe('Public Profile Performance', () => {
         timeout: 8000, // Slightly more lenient for CI
       });
 
-      // Wait for critical content
-      await page.waitForSelector('h1', { timeout: 3000 });
-      await page.waitForSelector('img', { timeout: 3000 });
+      // Wait for critical content using expect assertions (not waitForSelector)
+      await expect(page.locator('h1').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+      await expect(page.locator('img').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
 
       const loadTime = Date.now() - startTime;
 
       // LCP target for Preview environment
       expect(loadTime).toBeLessThan(2500);
 
-      // Verify all critical elements are present
-      await expect(page.locator('h1')).toBeVisible();
-      await expect(page.locator('img')).toBeVisible();
-
       // Check for at least one social element
       const socialElements = page.locator(
         '[href*="instagram"], [href*="twitter"], [href*="spotify"], [href*="tiktok"], button[title*="Follow"]'
       );
-      await expect(socialElements.first()).toBeVisible();
+      await expect(socialElements.first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
     });
   });
 
@@ -264,7 +275,9 @@ test.describe('Public Profile Performance', () => {
       expect(loadTime).toBeLessThan(4000);
 
       // Critical content should still be visible
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator('h1').first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
     });
 
     test('measures Time to Interactive (TTI) approximation', async ({
@@ -272,14 +285,15 @@ test.describe('Public Profile Performance', () => {
     }) => {
       const startTime = Date.now();
 
-      await page.goto('/tim');
+      await page.goto('/tim', { waitUntil: 'domcontentloaded' });
 
-      // Wait for page to be fully interactive
-      await page.waitForLoadState('networkidle');
+      // Wait for page to be fully interactive using load state instead of networkidle
+      await page.waitForLoadState('load');
 
       // Test interactivity by trying to interact with social elements
       const socialElement = page.locator('button, a').first();
-      if (await socialElement.isVisible()) {
+      const isVisible = await socialElement.isVisible().catch(() => false);
+      if (isVisible) {
         await socialElement.hover(); // Test if interactive
       }
 

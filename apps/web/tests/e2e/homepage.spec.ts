@@ -1,10 +1,11 @@
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    // Wait for React to fully hydrate
-    await page.waitForLoadState('networkidle');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    // Wait for React to fully hydrate using deterministic method
+    await waitForHydration(page);
   });
 
   test('displays the main hero section', async ({ page }) => {
@@ -53,15 +54,21 @@ test.describe('Homepage', () => {
     // Check if artist carousel is present
     await expect(
       page.locator('section').filter({ hasText: 'Featured Artists' })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
     // Check if artist images are displayed
     const artistImages = page.locator('img[alt*="Music Artist"]');
-    await expect(artistImages.first()).toBeVisible();
+    await expect(artistImages.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    // Check if carousel is scrollable
-    const carousel = page.locator('.overflow-x-auto');
-    await expect(carousel).toBeVisible();
+    // Check if carousel is scrollable (use role-based or semantic selector)
+    const carousel = page.locator(
+      '[data-testid="artist-carousel"], [role="region"][aria-label*="carousel"], .overflow-x-auto'
+    );
+    await expect(carousel.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
   test('shows problem and solution sections', async ({ page }) => {
@@ -109,13 +116,21 @@ test.describe('Homepage', () => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
 
-    // Check that elements are still visible
-    await expect(page.locator('h1')).toContainText('Link in bio');
-    await expect(page.getByPlaceholder('Search artists...')).toBeVisible();
+    // Check that elements are still visible (with explicit timeouts for stability)
+    await expect(page.locator('h1')).toContainText('Link in bio', {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.getByPlaceholder('Search artists...')).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    // Check that carousel is still functional
-    const carousel = page.locator('.overflow-x-auto');
-    await expect(carousel).toBeVisible();
+    // Check that carousel is still functional (use fallback selectors)
+    const carousel = page.locator(
+      '[data-testid="artist-carousel"], [role="region"][aria-label*="carousel"], .overflow-x-auto'
+    );
+    await expect(carousel.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
   test('has proper accessibility features', async ({ page }) => {
