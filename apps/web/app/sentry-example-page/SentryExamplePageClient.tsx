@@ -57,7 +57,7 @@ export function SentryExamplePageClient() {
           >
             Issues Page
           </a>
-          . For more details about setting up Sentry,{' '}
+          {'. '}For more details about setting up Sentry,{' '}
           <a
             target='_blank'
             rel='noreferrer'
@@ -66,7 +66,7 @@ export function SentryExamplePageClient() {
           >
             read our docs
           </a>
-          .
+          {'.'}
         </p>
 
         <button
