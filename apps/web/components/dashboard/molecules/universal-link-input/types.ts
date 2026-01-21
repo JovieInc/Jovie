@@ -42,7 +42,6 @@ export interface UseUniversalLinkInputReturn {
   handleAdd: () => void;
   handleClear: () => void;
   handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  handlePlatformSelect: (platform: PlatformOption) => void;
   handleArtistSearchSelect: (provider: ArtistSearchProvider) => void;
   handleExitSearchMode: (nextUrl?: string) => void;
   handleArtistLinkSelect: (link: DetectedLink) => void;

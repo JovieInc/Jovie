@@ -87,22 +87,22 @@ function PlatformSuggestionItem({
       aria-selected={active}
       type='button'
       className={cn(
-        'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-primary-token transition',
+        'flex w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
         active ? 'bg-surface-2' : 'hover:bg-surface-2'
       )}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
     >
-      <span className='flex items-center gap-2'>
+      <span className='flex items-center gap-2.5'>
         {/* Platform icon */}
         <span
-          className='flex h-5 w-5 shrink-0 items-center justify-center rounded'
+          className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md'
           style={{
             backgroundColor: iconHex,
             color: isDark ? '#ffffff' : '#0f172a',
           }}
         >
-          <SocialIcon platform={option.icon} className='h-3 w-3' />
+          <SocialIcon platform={option.icon} className='h-3.5 w-3.5' />
         </span>
         {/* Platform name with match highlighting */}
         <HighlightedName
@@ -151,7 +151,6 @@ export const UniversalLinkInput = forwardRef<
       handleUrlChange,
       handleKeyDown,
       handleClear,
-      handlePlatformSelect,
       handleArtistSearchSelect,
       handleExitSearchMode,
       handleArtistLinkSelect,
@@ -231,7 +230,7 @@ export const UniversalLinkInput = forwardRef<
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onClear={handleClear}
-          onPlatformSelect={handlePlatformSelect}
+          onPlatformSelect={commitPlatformSelection}
           onArtistSearchSelect={handleArtistSearchSelect}
           onRestoreFocus={focusInput}
           isDropdownOpen={shouldShowAutosuggest}
@@ -268,20 +267,24 @@ export const UniversalLinkInput = forwardRef<
             role='listbox'
             aria-label='Platform suggestions'
             tabIndex={-1}
-            className='absolute left-0 right-0 top-full z-50 overflow-hidden rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-lg'
+            className='absolute left-0 right-0 top-full z-50 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
             onMouseDown={event => {
               event.preventDefault();
             }}
           >
             {groupedSuggestions
               ? // Grouped view for short queries (popular platforms by category)
-                groupedSuggestions.map(group => {
+                groupedSuggestions.map((group, groupIndex) => {
                   const groupStartIndex = flatSuggestions.findIndex(
                     opt => opt.id === group.options[0]?.id
                   );
                   return (
                     <div key={group.category}>
-                      <div className='px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                      {/* Divider between categories (not before first) */}
+                      {groupIndex > 0 && (
+                        <div className='mx-3 my-1 border-t border-default' />
+                      )}
+                      <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
                         {group.label}
                       </div>
                       {group.options.map((option, indexInGroup) => {
