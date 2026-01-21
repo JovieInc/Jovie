@@ -17,25 +17,21 @@ export default defineConfig({
       'node_modules/**',
       '.next/**',
     ],
-    // Use forks pool to prevent JS heap OOM in worker threads
+    // Use forks pool to prevent JS heap OOM in worker threads (Vitest 4 style)
     // CI runners have 7GB RAM - safe to use more workers for parallelization
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        minForks: 1,
-        // Use available CPUs in CI (up to 8 for faster execution), single fork locally for stability
-        maxForks: process.env.CI
-          ? Math.max(
-              2,
-              Math.floor(
-                process.env.VITEST_MAX_FORKS
-                  ? parseInt(process.env.VITEST_MAX_FORKS)
-                  : 8
-              )
-            )
-          : 1,
-      },
-    },
+    minWorkers: 1,
+    // Use available CPUs in CI (up to 8 for faster execution), single fork locally for stability
+    maxWorkers: process.env.CI
+      ? Math.max(
+          2,
+          Math.floor(
+            process.env.VITEST_MAX_FORKS
+              ? parseInt(process.env.VITEST_MAX_FORKS)
+              : 8
+          )
+        )
+      : 1,
     // Isolate tests to prevent cross-contamination but allow within-file parallelism
     isolate: true,
     // Coverage optimization
