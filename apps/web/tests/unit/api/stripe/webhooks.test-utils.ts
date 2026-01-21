@@ -11,6 +11,11 @@ export function setSkipProcessing(value: boolean) {
   skipProcessing = value;
 }
 
+export async function getWebhookPostHandler() {
+  const { POST } = await import('@/app/api/stripe/webhooks/route');
+  return POST;
+}
+
 export const {
   mockConstructEvent,
   mockRetrieve,

@@ -3,8 +3,8 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
+  getWebhookPostHandler,
   mockConstructEvent,
   mockGetHandler,
   mockGetPlanFromPriceId,
@@ -15,8 +15,6 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
-
 describe('/api/stripe/webhooks - Event Recording', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,10 +24,6 @@ describe('/api/stripe/webhooks - Event Recording', () => {
   });
 
   it('records webhook event with extracted object ID', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_record_test',
       type: 'checkout.session.completed',
@@ -55,9 +49,13 @@ describe('/api/stripe/webhooks - Event Recording', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
+    const POST = await getWebhookPostHandler();
     await POST(request);
 
     // Verify getStripeObjectId was called to extract the object ID
@@ -76,10 +74,6 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
   });
 
   it('processes a new checkout.session.completed event and records webhook', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_1',
       type: 'checkout.session.completed',
@@ -109,9 +103,13 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -122,10 +120,6 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
   });
 
   it('returns 500 when handler indicates processing failed (legacy behavior)', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_unknown',
       type: 'checkout.session.completed',
@@ -159,9 +153,13 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(500);
     const data = await response.json();

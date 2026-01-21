@@ -3,8 +3,8 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
+  getWebhookPostHandler,
   mockConstructEvent,
   mockGetHandler,
   mockGetPlanFromPriceId,
@@ -45,6 +45,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(200);
     const data = await response.json();

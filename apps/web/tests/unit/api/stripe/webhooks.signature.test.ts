@@ -3,8 +3,8 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
+  getWebhookPostHandler,
   mockConstructEvent,
   mockGetHandler,
   mockGetPlanFromPriceId,
@@ -28,6 +28,7 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(400);
     const data = await response.json();
@@ -50,6 +51,7 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(400);
     const data = await response.json();

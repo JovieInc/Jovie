@@ -3,8 +3,8 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
+  getWebhookPostHandler,
   mockCaptureCriticalError,
   mockConstructEvent,
   mockGetHandler,
@@ -12,8 +12,6 @@ import {
   mockHandlerHandle,
   setSkipProcessing,
 } from './webhooks.test-utils';
-
-const { headers } = await import('next/headers');
 
 describe('/api/stripe/webhooks - Error Propagation', () => {
   beforeEach(() => {
@@ -24,10 +22,6 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
   });
 
   it('returns 500 when handler throws an error', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_error',
       type: 'checkout.session.completed',
@@ -56,9 +50,13 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(500);
     const data = await response.json();
@@ -66,10 +64,6 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
   });
 
   it('returns 500 when handler returns an error result', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_error_result',
       type: 'checkout.session.completed',
@@ -102,9 +96,13 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(500);
     const data = await response.json();
@@ -121,10 +119,6 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
   });
 
   it('does not treat skipped results as errors', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_skipped',
       type: 'checkout.session.completed',
@@ -157,9 +151,13 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       {
         method: 'POST',
         body: 'test-body',
+        headers: {
+          'stripe-signature': 'sig_test',
+        },
       }
     );
 
+    const POST = await getWebhookPostHandler();
     const response = await POST(request);
     expect(response.status).toBe(200);
     const data = await response.json();
