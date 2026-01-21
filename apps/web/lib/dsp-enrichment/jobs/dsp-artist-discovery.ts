@@ -279,19 +279,26 @@ async function discoverAppleMusicMatch(
     };
   }
 
-  // Fetch artist profiles for enrichment
-  const artistIds = new Set(isrcMatches.map(m => m.matchedTrack.artistId));
+  // Fetch artist profiles for enrichment - parallelized to avoid N+1 queries
+  const artistIdList = Array.from(
+    new Set(isrcMatches.map(m => m.matchedTrack.artistId))
+  ).filter(id => id !== 'unknown');
+
   const artistProfiles = new Map<
     string,
     { url?: string; imageUrl?: string; name?: string }
   >();
 
-  for (const artistId of artistIds) {
-    if (artistId === 'unknown') continue;
-    try {
-      const artist = await getArtist(artistId);
-      if (artist) {
-        artistProfiles.set(artistId, {
+  // Fetch artist profiles in parallel with concurrency limit
+  const ARTIST_FETCH_CONCURRENCY = 5;
+  for (let i = 0; i < artistIdList.length; i += ARTIST_FETCH_CONCURRENCY) {
+    const batch = artistIdList.slice(i, i + ARTIST_FETCH_CONCURRENCY);
+    const results = await Promise.allSettled(batch.map(id => getArtist(id)));
+
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled' && result.value) {
+        const artist = result.value;
+        artistProfiles.set(batch[idx], {
           url: artist.attributes?.url,
           imageUrl: artist.attributes?.artwork?.url
             ?.replace('{w}', '300')
@@ -299,9 +306,8 @@ async function discoverAppleMusicMatch(
           name: artist.attributes?.name,
         });
       }
-    } catch {
-      // Continue without profile data
-    }
+      // Rejected promises are silently ignored (continue without profile data)
+    });
   }
 
   // Orchestrate matching with minimum 3 ISRC matches for safer auto-confirmation
