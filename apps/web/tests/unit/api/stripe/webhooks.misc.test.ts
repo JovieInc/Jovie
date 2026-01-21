@@ -3,22 +3,123 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
-import {
+
+const {
   mockConstructEvent,
-  mockGetHandler,
+  mockRetrieve,
+  mockUpdateBilling,
   mockGetPlanFromPriceId,
-  mockGetStripeObjectId,
-  mockHandlerHandle,
-  mockStripeTimestampToDate,
   mockWithTransaction,
-  setSkipProcessing,
-} from './webhooks.test-utils';
+  mockGetHandler,
+  mockGetStripeObjectId,
+  mockStripeTimestampToDate,
+  mockHandlerHandle,
+  mockCaptureCriticalError,
+} = vi.hoisted(() => {
+  const mockTx = vi.fn(async (callback: any) => {
+    const txContext = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve([])),
+          })),
+        })),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([{ id: 'webhook-1' }])),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn(() => ({
+          where: vi.fn(() => Promise.resolve()),
+        })),
+      })),
+    };
+    try {
+      const result = await callback(txContext);
+      return { data: result, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  });
+
+  return {
+    mockConstructEvent: vi.fn(),
+    mockRetrieve: vi.fn(),
+    mockUpdateBilling: vi.fn(),
+    mockGetPlanFromPriceId: vi.fn(() => 'standard'),
+    mockWithTransaction: mockTx,
+    mockGetHandler: vi.fn(),
+    mockGetStripeObjectId: vi.fn(() => 'obj_123'),
+    mockStripeTimestampToDate: vi.fn(
+      (timestamp: number) => new Date(timestamp * 1000)
+    ),
+    mockHandlerHandle: vi.fn(),
+    mockCaptureCriticalError: vi.fn(),
+  };
+});
+
+vi.mock('@/lib/stripe/client', () => ({
+  stripe: {
+    webhooks: { constructEvent: mockConstructEvent },
+    subscriptions: { retrieve: mockRetrieve },
+  },
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {},
+  users: {
+    clerkId: 'clerk_id_column',
+    stripeCustomerId: 'stripe_customer_id_column',
+  },
+  stripeWebhookEvents: {
+    id: 'id',
+    stripeEventId: 'stripe_event_id',
+    processedAt: 'processed_at',
+  },
+  withTransaction: mockWithTransaction,
+}));
+
+vi.mock('@/lib/db/schema', () => ({
+  users: {
+    clerkId: 'clerk_id_column',
+    stripeCustomerId: 'stripe_customer_id_column',
+  },
+  stripeWebhookEvents: {
+    id: 'id',
+    stripeEventId: 'stripe_event_id',
+    processedAt: 'processed_at',
+  },
+}));
+
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  updateUserBillingStatus: mockUpdateBilling,
+}));
+vi.mock('@/lib/stripe/config', () => ({
+  getPlanFromPriceId: mockGetPlanFromPriceId,
+}));
+vi.mock('@/lib/env-server', () => ({
+  env: { STRIPE_WEBHOOK_SECRET: 'whsec_test' },
+}));
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
+  captureWarning: vi.fn(),
+  logFallback: vi.fn(),
+}));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('next/headers', () => ({ headers: vi.fn() }));
+vi.mock('@/lib/stripe/webhooks', () => ({
+  getHandler: mockGetHandler,
+  getStripeObjectId: mockGetStripeObjectId,
+  stripeTimestampToDate: mockStripeTimestampToDate,
+}));
+
+import { POST } from '@/app/api/stripe/webhooks/route';
 
 describe('/api/stripe/webhooks - Event Recording', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setSkipProcessing(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
   });
@@ -65,7 +166,6 @@ describe('/api/stripe/webhooks - Event Recording', () => {
 describe('/api/stripe/webhooks - Backwards Compatibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setSkipProcessing(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
   });

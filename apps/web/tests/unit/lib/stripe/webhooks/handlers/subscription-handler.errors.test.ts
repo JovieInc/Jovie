@@ -3,15 +3,58 @@
  */
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Hoisted mocks - must be defined before vi.mock calls
+const {
+  mockGetUserIdFromStripeCustomer,
+  mockInvalidateBillingCache,
+  mockUpdateUserBillingStatus,
+  mockGetPlanFromPriceId,
+  mockCaptureCriticalError,
+  mockLogFallback,
+} = vi.hoisted(() => ({
+  mockGetUserIdFromStripeCustomer: vi.fn(),
+  mockInvalidateBillingCache: vi.fn(),
+  mockUpdateUserBillingStatus: vi.fn(),
+  mockGetPlanFromPriceId: vi.fn(),
+  mockCaptureCriticalError: vi.fn(),
+  mockLogFallback: vi.fn(),
+}));
+
+// Setup mocks
+vi.mock('@/lib/stripe/webhooks/utils', () => ({
+  getUserIdFromStripeCustomer: mockGetUserIdFromStripeCustomer,
+  invalidateBillingCache: mockInvalidateBillingCache,
+  isActiveSubscription: (status: Stripe.Subscription.Status) =>
+    status === 'active' || status === 'trialing',
+  getCustomerId: (customer: string | { id: string } | null) => {
+    if (!customer) return null;
+    if (typeof customer === 'string') return customer;
+    return customer.id;
+  },
+}));
+
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  updateUserBillingStatus: mockUpdateUserBillingStatus,
+}));
+
+vi.mock('@/lib/stripe/config', () => ({
+  getPlanFromPriceId: mockGetPlanFromPriceId,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
+  logFallback: mockLogFallback,
+}));
+
 import { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
-import {
-  mockCaptureCriticalError,
-  mockGetPlanFromPriceId,
-  mockGetUserIdFromStripeCustomer,
-  mockUpdateUserBillingStatus,
-  setupDefaultMocks,
-} from './subscription-handler.test-utils';
+
+function setupDefaultMocks() {
+  mockGetPlanFromPriceId.mockReturnValue('standard');
+  mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+  mockInvalidateBillingCache.mockResolvedValue(undefined);
+}
 
 describe('@critical SubscriptionHandler - Errors', () => {
   let handler: SubscriptionHandler;

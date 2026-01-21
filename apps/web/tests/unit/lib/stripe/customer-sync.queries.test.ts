@@ -2,6 +2,51 @@
  * Customer Sync Tests - Successful Queries & Selective Field Retrieval
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Hoisted mocks - must be defined before vi.mock calls
+const { mockDbSelect, mockCaptureCriticalError } = vi.hoisted(() => ({
+  mockDbSelect: vi.fn(),
+  mockCaptureCriticalError: vi.fn(),
+}));
+
+// Mock database
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: mockDbSelect,
+  },
+}));
+
+// Mock database schema - provide the users table columns
+vi.mock('@/lib/db/schema', () => ({
+  users: {
+    id: Symbol('users.id'),
+    clerkId: Symbol('users.clerkId'),
+    email: Symbol('users.email'),
+    isAdmin: Symbol('users.isAdmin'),
+    isPro: Symbol('users.isPro'),
+    stripeCustomerId: Symbol('users.stripeCustomerId'),
+    stripeSubscriptionId: Symbol('users.stripeSubscriptionId'),
+    billingVersion: Symbol('users.billingVersion'),
+    lastBillingEventAt: Symbol('users.lastBillingEventAt'),
+  },
+  billingAuditLog: {
+    id: Symbol('billingAuditLog.id'),
+  },
+}));
+
+// Mock error tracking
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
+  captureWarning: vi.fn(),
+}));
+
+// Mock drizzle-orm
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((a, b) => ({ type: 'eq', left: a, right: b })),
+  and: vi.fn((...args) => ({ type: 'and', conditions: args })),
+  sql: vi.fn((strings, ...values) => ({ type: 'sql', strings, values })),
+}));
+
 // Import module once after mocks are set up
 import {
   BILLING_FIELDS_CUSTOMER,
@@ -9,7 +54,6 @@ import {
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,
 } from '@/lib/stripe/customer-sync';
-import { mockDbSelect } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Queries', () => {
   beforeEach(() => {
