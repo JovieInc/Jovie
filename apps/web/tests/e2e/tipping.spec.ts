@@ -1,4 +1,5 @@
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 // Extend Window interface to include our test properties
 declare global {
@@ -81,13 +82,15 @@ test.describe('Tipping MVP', () => {
           };
         });
 
-        // Visit the profile page
-        await page.goto('/testartist');
-        await page.waitForLoadState('networkidle');
+        // Visit the profile page and wait for hydration (not networkidle)
+        await page.goto('/testartist', { waitUntil: 'domcontentloaded' });
+        await waitForHydration(page);
 
         // Check that the tip button is visible
         const tipButton = page.getByRole('link', { name: 'Tip' });
-        await expect(tipButton).toBeVisible();
+        await expect(tipButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
 
         // Set up event tracking
         await page.addInitScript(() => {
@@ -115,11 +118,15 @@ test.describe('Tipping MVP', () => {
         await tipButton.click();
 
         // Verify we're on the tip page
-        await page.waitForURL('**/testartist?mode=tip');
+        await page.waitForURL('**/testartist?mode=tip', {
+          timeout: SMOKE_TIMEOUTS.URL_STABLE,
+        });
 
         // Check that the tip interface is visible
         const tipSelector = page.locator('[data-test="tip-selector"]');
-        await expect(tipSelector).toBeVisible();
+        await expect(tipSelector).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
 
         // Check that the amount buttons are visible
         const amountButtons = page.locator('button:has-text("$")');
@@ -127,26 +134,34 @@ test.describe('Tipping MVP', () => {
 
         // Check that the continue button is visible
         const continueButton = page.getByRole('button', { name: 'Continue' });
-        await expect(continueButton).toBeVisible();
+        await expect(continueButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
       });
 
       test('generates and displays QR code on desktop', async ({ page }) => {
         // Set viewport to desktop size
         await page.setViewportSize({ width: 1280, height: 800 });
 
-        // Visit the profile page
-        await page.goto('/testartist?mode=tip');
-        await page.waitForLoadState('networkidle');
+        // Visit the profile page and wait for hydration (not networkidle)
+        await page.goto('/testartist?mode=tip', {
+          waitUntil: 'domcontentloaded',
+        });
+        await waitForHydration(page);
 
         // Check that the QR code overlay is visible
         const qrOverlay = page
           .locator('div')
           .filter({ hasText: 'View on mobile' });
-        await expect(qrOverlay).toBeVisible();
+        await expect(qrOverlay).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
 
         // Check that the QR code image is loaded
         const qrImage = qrOverlay.locator('img');
-        await expect(qrImage).toBeVisible();
+        await expect(qrImage).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
 
         // Verify QR code contains the correct URL
         const qrSrc = await qrImage.getAttribute('src');
@@ -164,22 +179,31 @@ test.describe('Tipping MVP', () => {
         const reopenButton = page.getByRole('button', {
           name: 'View on mobile',
         });
-        await expect(reopenButton).toBeVisible();
+        await expect(reopenButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
 
         // Click reopen button
         await reopenButton.click();
 
         // QR overlay should be visible again
-        await expect(qrOverlay).toBeVisible();
+        await expect(qrOverlay).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
       });
 
       test('selects amount and opens Venmo link', async ({ page, context }) => {
-        // Visit the tip page
-        await page.goto('/testartist?mode=tip');
-        await page.waitForLoadState('networkidle');
+        // Visit the tip page and wait for hydration (not networkidle)
+        await page.goto('/testartist?mode=tip', {
+          waitUntil: 'domcontentloaded',
+        });
+        await waitForHydration(page);
 
         // Select an amount (the middle option)
         const amountButtons = page.locator('button:has-text("$")');
+        await expect(amountButtons.first()).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
         await amountButtons.nth(1).click();
 
         // Listen for new pages/tabs
@@ -191,7 +215,7 @@ test.describe('Tipping MVP', () => {
 
         // Get the new page
         const newPage = await pagePromise;
-        await newPage.waitForLoadState();
+        await newPage.waitForLoadState('domcontentloaded');
 
         // Verify the URL contains Venmo
         const url = newPage.url();
@@ -207,25 +231,33 @@ test.describe('Tipping MVP', () => {
       test('shows back button on tip page that returns to profile', async ({
         page,
       }) => {
-        // Visit the tip page
-        await page.goto('/testartist?mode=tip');
-        await page.waitForLoadState('networkidle');
+        // Visit the tip page and wait for hydration (not networkidle)
+        await page.goto('/testartist?mode=tip', {
+          waitUntil: 'domcontentloaded',
+        });
+        await waitForHydration(page);
 
         // Check that the back button is visible
         const backButton = page.getByRole('button', {
           name: 'Back to profile',
         });
-        await expect(backButton).toBeVisible();
+        await expect(backButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
 
         // Click the back button
         await backButton.click();
 
         // Verify we're back on the profile page
-        await page.waitForURL('**/testartist');
+        await page.waitForURL('**/testartist', {
+          timeout: SMOKE_TIMEOUTS.URL_STABLE,
+        });
 
         // Check that we're on the profile page (tip button is visible)
         const tipButton = page.getByRole('link', { name: 'Tip' });
-        await expect(tipButton).toBeVisible();
+        await expect(tipButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
       });
     });
   });

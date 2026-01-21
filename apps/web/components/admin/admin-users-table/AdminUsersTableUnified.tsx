@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -13,7 +13,6 @@ import {
   AdminPageSizeSelect,
   type ContextMenuItemType,
   convertContextMenuItems,
-  DateCell,
   ExportCSVButton,
   TableBulkActionsToolbar,
   TableCheckboxCell,
@@ -29,6 +28,12 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminUsersTableProps } from './types';
 import { useAdminUsersTable } from './useAdminUsersTable';
+import {
+  renderCreatedDateCell,
+  renderNameCell,
+  renderPlanCell,
+  renderStatusCell,
+} from './utils/column-renderers';
 
 const columnHelper = createColumnHelper<AdminUserRow>();
 
@@ -190,19 +195,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       columnHelper.accessor('name', {
         id: 'name',
         header: 'Name',
-        cell: ({ getValue, row }) => {
-          const user = row.original;
-          return (
-            <div>
-              <div className='font-semibold text-primary-token'>
-                {getValue() ?? 'User'}
-              </div>
-              <div className='text-xs text-secondary-token'>
-                {user.email ?? '—'}
-              </div>
-            </div>
-          );
-        },
+        cell: renderNameCell,
         size: 320,
       }),
 
@@ -210,7 +203,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       columnHelper.accessor('createdAt', {
         id: 'created',
         header: 'Sign up',
-        cell: ({ getValue }) => <DateCell date={getValue()} />,
+        cell: renderCreatedDateCell,
         size: 160,
       }),
 
@@ -218,14 +211,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       columnHelper.accessor('plan', {
         id: 'plan',
         header: 'Plan',
-        cell: ({ getValue }) => {
-          const plan = getValue();
-          return (
-            <Badge size='sm' variant={plan === 'pro' ? 'primary' : 'secondary'}>
-              {plan}
-            </Badge>
-          );
-        },
+        cell: renderPlanCell,
         size: 140,
       }),
 
@@ -233,21 +219,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       columnHelper.display({
         id: 'status',
         header: 'Status',
-        cell: ({ row }) => {
-          const user = row.original;
-          return user.deletedAt ? (
-            <Badge size='sm' variant='warning'>
-              Deleted
-            </Badge>
-          ) : (
-            <Badge size='sm' variant='success'>
-              <span className='flex items-center gap-1.5'>
-                <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />{' '}
-                Active
-              </span>
-            </Badge>
-          );
-        },
+        cell: renderStatusCell,
         size: 120,
       }),
 

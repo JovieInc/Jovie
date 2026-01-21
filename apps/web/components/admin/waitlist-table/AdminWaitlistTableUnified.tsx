@@ -1,6 +1,5 @@
 'use client';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -12,7 +11,6 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
-  DateCell,
   TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
@@ -22,6 +20,10 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import {
+  renderDateCellWrapper,
+  renderEmailCell,
+  renderHeardAboutCell,
+  renderNameCell,
   renderPrimaryGoalCell,
   renderPrimarySocialCell,
   renderSpotifyCell,
@@ -151,9 +153,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('fullName', {
         id: 'name',
         header: 'Name',
-        cell: ({ getValue }) => (
-          <span className='font-medium text-primary-token'>{getValue()}</span>
-        ),
+        cell: ({ getValue }) => renderNameCell(getValue()),
         size: 180,
       }),
 
@@ -161,14 +161,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('email', {
         id: 'email',
         header: 'Email',
-        cell: ({ getValue }) => (
-          <a
-            href={`mailto:${getValue()}`}
-            className='text-secondary-token hover:underline'
-          >
-            {getValue()}
-          </a>
-        ),
+        cell: ({ getValue }) => renderEmailCell(getValue()),
         size: 220,
       }),
 
@@ -200,29 +193,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('heardAbout', {
         id: 'heardAbout',
         header: 'Heard About',
-        cell: ({ getValue }) => {
-          const value = getValue();
-          const heardAboutTruncated =
-            value && value.length > 30 ? value.slice(0, 30) + '…' : value;
-          return value ? (
-            value.length > 30 ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className='cursor-help text-secondary-token'>
-                    {heardAboutTruncated}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side='top' className='max-w-xs'>
-                  {value}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <span className='text-secondary-token'>{value}</span>
-            )
-          ) : (
-            <span className='text-tertiary-token'>—</span>
-          );
-        },
+        cell: ({ getValue }) => renderHeardAboutCell(getValue()),
         size: 160,
       }),
 
@@ -238,9 +209,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('createdAt', {
         id: 'created',
         header: 'Created',
-        cell: ({ getValue }) => {
-          return <DateCell date={getValue()} />;
-        },
+        cell: ({ getValue }) => renderDateCellWrapper(getValue()),
         size: 160,
       }),
 

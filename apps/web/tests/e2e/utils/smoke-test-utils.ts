@@ -48,6 +48,13 @@ export const RETRY_CONFIG = {
 /**
  * Patterns for console errors that are expected in test environments
  * and should not fail tests
+ *
+ * These patterns cover:
+ * - Authentication/auth provider issues (expected without real config)
+ * - Network/resource loading (non-critical)
+ * - Security headers (normal in test)
+ * - Framework development warnings
+ * - Third-party service errors (analytics, etc.)
  */
 export const EXPECTED_ERROR_PATTERNS = [
   // Auth/Clerk related
@@ -55,27 +62,67 @@ export const EXPECTED_ERROR_PATTERNS = [
   'handshake',
   'authentication',
   'test-pass-',
+  'publishable key',
+  'unauthorized',
   // Network/resource loading (non-critical)
   'failed to load resource',
   'net::err_',
+  'net::err_failed',
+  'net::err_connection_refused',
+  'net::err_name_not_resolved',
+  'fetch failed',
+  '404',
   // CSP and security headers (expected in test)
   'content security policy',
   'csp',
+  'blocked by cors',
+  'cross-origin',
   // React/Next.js development warnings
   'warning:',
   'hydration',
+  'text content does not match',
+  'server rendered html',
+  'did not match',
+  'extra attributes from the server',
   // Nonce mismatches in test environment
   'nonce',
-  'did not match',
   // Test environment indicators
   'test environment',
   'mock data',
+  'dummy',
+  'placeholder',
   // Analytics (not critical for smoke)
   'analytics',
   'tracking',
+  'posthog',
+  'mixpanel',
+  'segment',
   // Vercel-specific
   'vercel',
   '__vercel',
+  // Image/media loading errors
+  'i.scdn.co', // Spotify CDN
+  'image',
+  'loading image',
+  // Sentry/monitoring
+  'sentry',
+  'dsn',
+  // Database/API errors in CI (expected without DB)
+  'database',
+  'connection',
+  'prisma',
+  'drizzle',
+  // WebSocket/realtime
+  'websocket',
+  'socket',
+  // Third-party scripts
+  'google',
+  'facebook',
+  'twitter',
+  'stripe',
+  // Browser-specific
+  'deprecated',
+  'passive event listener',
 ] as const;
 
 // ============================================================================

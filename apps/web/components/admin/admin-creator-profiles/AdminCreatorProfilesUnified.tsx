@@ -27,11 +27,8 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import {
-  AvatarCell,
   type ContextMenuItemType,
   convertContextMenuItems,
-  DateCell,
-  SocialLinksCell,
   TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
@@ -44,6 +41,12 @@ import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
+import {
+  renderAvatarCell,
+  renderCreatedDateCell,
+  renderMusicLinksCell,
+  renderSocialLinksCell,
+} from './utils/column-renderers';
 
 const DeleteCreatorDialog = dynamic(
   () =>
@@ -424,22 +427,7 @@ export function AdminCreatorProfilesUnified({
       columnHelper.accessor('username', {
         id: 'avatar',
         header: 'Creator',
-        cell: ({ row }) => {
-          const profile = row.original;
-          const displayName =
-            'displayName' in profile ? (profile.displayName ?? null) : null;
-
-          return (
-            <AvatarCell
-              profileId={profile.id}
-              username={profile.username}
-              avatarUrl={profile.avatarUrl}
-              displayName={displayName}
-              verified={profile.isVerified}
-              isFeatured={profile.isFeatured}
-            />
-          );
-        },
+        cell: renderAvatarCell,
         size: 280,
       }),
 
@@ -447,16 +435,7 @@ export function AdminCreatorProfilesUnified({
       columnHelper.accessor('socialLinks', {
         id: 'social',
         header: 'Social',
-        cell: ({ row }) => {
-          const profile = row.original;
-          return (
-            <SocialLinksCell
-              links={profile.socialLinks ?? null}
-              filterPlatformType='social_media'
-              maxLinks={3}
-            />
-          );
-        },
+        cell: renderSocialLinksCell,
         size: 220,
       }),
 
@@ -464,16 +443,7 @@ export function AdminCreatorProfilesUnified({
       columnHelper.accessor('socialLinks', {
         id: 'music',
         header: 'Music',
-        cell: ({ row }) => {
-          const profile = row.original;
-          return (
-            <SocialLinksCell
-              links={profile.socialLinks ?? null}
-              filterPlatformType='music_streaming'
-              maxLinks={3}
-            />
-          );
-        },
+        cell: renderMusicLinksCell,
         size: 220,
       }),
 
@@ -481,10 +451,7 @@ export function AdminCreatorProfilesUnified({
       columnHelper.accessor('createdAt', {
         id: 'created',
         header: 'Created',
-        cell: ({ row }) => {
-          const profile = row.original;
-          return <DateCell date={profile.createdAt} />;
-        },
+        cell: renderCreatedDateCell,
         size: 180,
       }),
 

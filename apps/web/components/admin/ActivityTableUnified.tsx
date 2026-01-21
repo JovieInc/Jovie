@@ -1,7 +1,8 @@
 'use client';
 
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import type { CellContext, ColumnDef } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
 import { UnifiedTable } from '@/components/organisms/table';
@@ -26,6 +27,46 @@ const statusLabel: Record<AdminActivityStatus, string> = {
   error: 'Error',
 };
 
+// Cell renderer functions extracted to module level to avoid nested component definitions (S6478)
+function renderUserCell({ getValue }: CellContext<AdminActivityItem, string>) {
+  return (
+    <span className='font-medium text-primary-token whitespace-nowrap'>
+      {getValue()}
+    </span>
+  );
+}
+
+function renderActionCell({
+  getValue,
+  row,
+}: CellContext<AdminActivityItem, string>) {
+  const item = row.original;
+  return (
+    <div>
+      <span className='block truncate text-secondary-token'>{getValue()}</span>
+      <span className='mt-0.5 block text-xs text-tertiary-token md:hidden'>
+        {item.timestamp}
+      </span>
+    </div>
+  );
+}
+
+function renderTimestampCell({
+  getValue,
+}: CellContext<AdminActivityItem, string>) {
+  return (
+    <span className='whitespace-nowrap text-secondary-token'>{getValue()}</span>
+  );
+}
+
+function renderStatusCell(status: AdminActivityStatus) {
+  return (
+    <Badge variant={statusVariant[status]} size='sm'>
+      {statusLabel[status]}
+    </Badge>
+  );
+}
+
 interface ActivityTableUnifiedProps {
   items: AdminActivityItem[];
 }
@@ -40,11 +81,7 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
       columnHelper.accessor('user', {
         id: 'user',
         header: 'User',
-        cell: ({ getValue }) => (
-          <span className='font-medium text-primary-token whitespace-nowrap'>
-            {getValue()}
-          </span>
-        ),
+        cell: renderUserCell,
         size: 200,
       }),
 
@@ -52,30 +89,14 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
       columnHelper.accessor('action', {
         id: 'action',
         header: 'Action',
-        cell: ({ getValue, row }) => {
-          const item = row.original;
-          return (
-            <div>
-              <span className='block truncate text-secondary-token'>
-                {getValue()}
-              </span>
-              <span className='mt-0.5 block text-xs text-tertiary-token md:hidden'>
-                {item.timestamp}
-              </span>
-            </div>
-          );
-        },
+        cell: renderActionCell,
       }),
 
       // Timestamp column
       columnHelper.accessor('timestamp', {
         id: 'timestamp',
         header: 'Timestamp',
-        cell: ({ getValue }) => (
-          <span className='whitespace-nowrap text-secondary-token'>
-            {getValue()}
-          </span>
-        ),
+        cell: renderTimestampCell,
         size: 180,
       }),
 
@@ -83,14 +104,8 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
       columnHelper.accessor('status', {
         id: 'status',
         header: 'Status',
-        cell: ({ getValue }) => {
-          const status = getValue() as AdminActivityStatus;
-          return (
-            <Badge variant={statusVariant[status]} size='sm'>
-              {statusLabel[status]}
-            </Badge>
-          );
-        },
+        cell: ({ getValue }) =>
+          renderStatusCell(getValue() as AdminActivityStatus),
         size: 140,
       }),
     ],
