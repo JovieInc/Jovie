@@ -201,7 +201,6 @@ export const AvatarUploadable = React.memo(
         tabIndex={isInteractive ? 0 : undefined}
         role={isInteractive ? 'button' : 'presentation'}
         aria-label={isInteractive ? 'Upload profile photo' : undefined}
-        aria-disabled={isInteractive ? !isInteractive : undefined}
         aria-busy={isUploading || undefined}
       >
         <Avatar
