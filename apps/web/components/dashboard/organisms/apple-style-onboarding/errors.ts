@@ -60,6 +60,7 @@ export function mapErrorToUserMessage(
 ): ErrorMappingResult {
   const errorMessage = getErrorMessage(error);
   const message = errorMessage.toUpperCase();
+  const errorCode = extractErrorCode(error);
 
   // Invalid session - needs refresh
   if (message.includes('INVALID_SESSION')) {
@@ -92,6 +93,17 @@ export function mapErrorToUserMessage(
   ) {
     return {
       userMessage: 'Too many attempts. Please try again in a few moments.',
+    };
+  }
+
+  if (
+    errorCode === 'DATABASE_ERROR' ||
+    errorCode === 'TRANSACTION_FAILED' ||
+    errorCode === 'CONSTRAINT_VIOLATION'
+  ) {
+    return {
+      userMessage:
+        "We couldn't finish setting up your account. Please try again in a moment.",
     };
   }
 
@@ -141,7 +153,7 @@ export function extractErrorCode(error: unknown): string | undefined {
   if (message === 'Unknown error' || message === 'An error occurred') {
     return undefined;
   }
-  const match = message.match(/^\[([A-Z_]+)\]/);
+  const match = message.match(/\[([A-Z_]+)\]/);
   return match?.[1];
 }
 
@@ -152,8 +164,17 @@ export function extractErrorCode(error: unknown): string | undefined {
  * @returns True if database error
  */
 export function isDatabaseError(error: unknown): boolean {
-  const errorMessage = getErrorMessage(error);
-  const message = errorMessage.toUpperCase();
+  const errorCode = extractErrorCode(error);
+  if (errorCode) {
+    return (
+      errorCode === 'DATABASE_ERROR' ||
+      errorCode === 'TRANSACTION_FAILED' ||
+      errorCode === 'CONSTRAINT_VIOLATION' ||
+      errorCode === 'NETWORK_ERROR'
+    );
+  }
+
+  const message = getErrorMessage(error).toUpperCase();
   return (
     message.includes('DATABASE_ERROR') ||
     message.includes('TRANSACTION_FAILED') ||
