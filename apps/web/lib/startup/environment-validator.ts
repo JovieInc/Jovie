@@ -10,6 +10,82 @@ let validationCompleted = false;
 let validationResult: ReturnType<typeof validateAndLogEnvironment> | null =
   null;
 
+function logEnvironmentInfo() {
+  const envInfo = getEnvironmentInfo();
+  console.log('[STARTUP] Environment Info:', {
+    environment: envInfo.nodeEnv,
+    platform: envInfo.platform,
+    nodeVersion: envInfo.nodeVersion,
+    integrations: {
+      database: envInfo.hasDatabase,
+      auth: envInfo.hasClerk,
+      payments: envInfo.hasStripe,
+      images: envInfo.hasCloudinary,
+    },
+  });
+  return envInfo;
+}
+
+function logCriticalEnvironmentIssues(
+  result: ReturnType<typeof validateAndLogEnvironment>
+) {
+  if (result.critical.length === 0) {
+    return false;
+  }
+
+  console.error(
+    '[STARTUP] CRITICAL: Application cannot start due to missing required environment variables'
+  );
+  console.error('[STARTUP] Critical issues:', result.critical);
+
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[STARTUP] Exiting due to critical environment issues');
+  }
+
+  return true;
+}
+
+async function validateDatabaseConnection() {
+  console.log('[STARTUP] Testing database connection...');
+  try {
+    const dbConnection = await validateDbConnection();
+
+    if (dbConnection.connected) {
+      console.log(
+        `[STARTUP] ✅ Database connection validated (${dbConnection.latency}ms)`
+      );
+      return;
+    }
+
+    console.error(
+      '[STARTUP] ❌ Database connection failed:',
+      dbConnection.error
+    );
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        '[STARTUP] WARNING: Application starting without database connectivity'
+      );
+    }
+  } catch (dbError) {
+    console.error('[STARTUP] Database connection validation crashed:', dbError);
+  }
+}
+
+function logValidationSummary(
+  result: ReturnType<typeof validateAndLogEnvironment>
+) {
+  if (result.valid) {
+    console.log('[STARTUP] ✅ Environment validation completed successfully');
+    return;
+  }
+
+  const totalIssues =
+    result.errors.length + result.warnings.length + result.critical.length;
+  console.warn(
+    `[STARTUP] ⚠️  Environment validation completed with ${totalIssues} issue(s)`
+  );
+}
+
 /**
  * Run environment validation at application startup
  * This should be called early in the application lifecycle
@@ -23,79 +99,16 @@ export async function runStartupEnvironmentValidation() {
   try {
     console.log('[STARTUP] Running environment validation...');
 
-    // Run the validation
     validationResult = validateAndLogEnvironment('runtime');
 
-    // Log additional startup information
-    const envInfo = getEnvironmentInfo();
-    console.log('[STARTUP] Environment Info:', {
-      environment: envInfo.nodeEnv,
-      platform: envInfo.platform,
-      nodeVersion: envInfo.nodeVersion,
-      integrations: {
-        database: envInfo.hasDatabase,
-        auth: envInfo.hasClerk,
-        payments: envInfo.hasStripe,
-        images: envInfo.hasCloudinary,
-      },
-    });
+    const envInfo = logEnvironmentInfo();
+    const hasCriticalIssues = logCriticalEnvironmentIssues(validationResult);
 
-    // Handle critical failures
-    if (validationResult.critical.length > 0) {
-      console.error(
-        '[STARTUP] CRITICAL: Application cannot start due to missing required environment variables'
-      );
-      console.error('[STARTUP] Critical issues:', validationResult.critical);
-
-      // In production, we might want to exit or throw an error
-      // In development, we'll continue with warnings
-      if (process.env.NODE_ENV === 'production') {
-        console.error('[STARTUP] Exiting due to critical environment issues');
-        // Note: In Next.js, we can't actually exit the process, but we can log the error
-        // The application will continue but may not function correctly
-      }
-    } else if (envInfo.hasDatabase) {
-      // If we have a database configured and no critical env issues, test the connection
-      console.log('[STARTUP] Testing database connection...');
-      try {
-        const dbConnection = await validateDbConnection();
-
-        if (dbConnection.connected) {
-          console.log(
-            `[STARTUP] ✅ Database connection validated (${dbConnection.latency}ms)`
-          );
-        } else {
-          console.error(
-            '[STARTUP] ❌ Database connection failed:',
-            dbConnection.error
-          );
-          // Don't fail startup for database issues, but log them prominently
-          if (process.env.NODE_ENV === 'production') {
-            console.error(
-              '[STARTUP] WARNING: Application starting without database connectivity'
-            );
-          }
-        }
-      } catch (dbError) {
-        console.error(
-          '[STARTUP] Database connection validation crashed:',
-          dbError
-        );
-      }
+    if (!hasCriticalIssues && envInfo.hasDatabase) {
+      await validateDatabaseConnection();
     }
 
-    // Log summary
-    if (validationResult.valid) {
-      console.log('[STARTUP] ✅ Environment validation completed successfully');
-    } else {
-      const totalIssues =
-        validationResult.errors.length +
-        validationResult.warnings.length +
-        validationResult.critical.length;
-      console.warn(
-        `[STARTUP] ⚠️  Environment validation completed with ${totalIssues} issue(s)`
-      );
-    }
+    logValidationSummary(validationResult);
 
     validationCompleted = true;
     return validationResult;
