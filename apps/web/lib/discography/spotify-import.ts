@@ -316,6 +316,9 @@ async function importSingleRelease(
     ? fullAlbum.external_ids.upc.replaceAll(/[^a-zA-Z0-9]/g, '').slice(0, 20)
     : null;
 
+  // Get popularity from full album (more reliable) or basic album
+  const popularity = fullAlbum?.popularity ?? album.popularity ?? null;
+
   // Upsert the release with sanitized data
   const release = await upsertRelease({
     creatorProfileId,
@@ -328,6 +331,7 @@ async function importSingleRelease(
     totalTracks: Math.min(album.total_tracks, MAX_TRACKS_PER_RELEASE),
     isExplicit: false, // Will be updated from tracks if available
     artworkUrl,
+    spotifyPopularity: popularity,
     sourceType: 'ingested',
     metadata: {
       spotifyId: album.id,

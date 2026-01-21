@@ -43,6 +43,13 @@
       "when": 1768854229748,
       "tag": "0005_silky_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769040000000,
+      "tag": "0006_add_spotify_popularity",
+      "breakpoints": true
     }
   ]
 }
