@@ -133,16 +133,6 @@ export function fuzzyMatch(
   };
 }
 
-/**
- * Calculate a fuzzy match score between a query and target string.
- * Returns null if no match, otherwise a score (higher is better).
- * @deprecated Use fuzzyMatch instead to get match indices for highlighting
- */
-export function fuzzyScore(queryRaw: string, targetRaw: string): number | null {
-  const result = fuzzyMatch(queryRaw, targetRaw);
-  return result?.score ?? null;
-}
-
 export type RankedPlatformOption = PlatformOption & {
   matchIndices: number[];
 };

@@ -148,7 +148,6 @@ export const UniversalLinkInput = forwardRef<
       handleUrlChange,
       handleKeyDown,
       handleClear,
-      handlePlatformSelect,
       handleArtistSearchSelect,
       handleExitSearchMode,
       handleArtistLinkSelect,
@@ -204,7 +203,7 @@ export const UniversalLinkInput = forwardRef<
           onUrlChange={handleUrlChange}
           onKeyDown={handleKeyDown}
           onClear={handleClear}
-          onPlatformSelect={handlePlatformSelect}
+          onPlatformSelect={commitPlatformSelection}
           onArtistSearchSelect={handleArtistSearchSelect}
           onRestoreFocus={focusInput}
           isDropdownOpen={shouldShowAutosuggest}

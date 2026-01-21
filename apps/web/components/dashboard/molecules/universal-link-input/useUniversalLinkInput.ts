@@ -251,13 +251,6 @@ export function useUniversalLinkInput({
     ]
   );
 
-  const handlePlatformSelect = useCallback(
-    (platform: PlatformOption) => {
-      commitPlatformSelection(platform);
-    },
-    [commitPlatformSelection]
-  );
-
   const handleArtistSearchSelect = useCallback(
     (provider: ArtistSearchProvider) => {
       track('spotify_artist_search_start', { provider });
@@ -326,7 +319,6 @@ export function useUniversalLinkInput({
     handleAdd,
     handleClear,
     handleKeyDown,
-    handlePlatformSelect,
     handleArtistSearchSelect,
     handleExitSearchMode,
     handleArtistLinkSelect,

@@ -8,7 +8,6 @@ export type { UniversalLinkInputRef } from './UniversalLinkInput';
 export { UniversalLinkInput } from './UniversalLinkInput';
 
 export {
-  fuzzyScore,
   isUnsafeUrl,
   looksLikeUrlOrDomain,
   normalizeQuery,
