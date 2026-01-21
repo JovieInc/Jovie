@@ -670,11 +670,17 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
+          # Enable coverage on main branch
+          COVERAGE_FLAG=""
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running critical tests only (9 files, ~2s)"
+            COVERAGE_FLAG="--coverage"
+          fi
+
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "🚀 Main branch: Running critical tests with coverage"
             # Run only *.critical.test.ts files - vitest matches "critical" substring in file paths
             # Full test suite runs in nightly CI, not on every main push
-            cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} "critical"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           elif [ -n "${{ github.base_ref }}" ]; then
             echo "🔍 PR: Running critical tests + tests changed since ${{ github.base_ref }}"
             # First run critical tests (~8s) - vitest matches "critical" substring in file paths
@@ -697,6 +703,16 @@ jobs:
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Upload coverage to Codecov
+        if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: apps/web/coverage
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
 
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
