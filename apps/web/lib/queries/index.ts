@@ -80,6 +80,13 @@ export {
   useArtistSearchQuery,
 } from './useArtistSearchQuery';
 export {
+  type CheckoutInput,
+  type CheckoutResponse,
+  type PortalResponse,
+  useCheckoutMutation,
+  usePortalMutation,
+} from './useBillingMutations';
+export {
   type BillingStatusData,
   useBillingStatusQuery,
 } from './useBillingStatusQuery';
@@ -127,6 +134,11 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+export {
+  type PricingOption,
+  type PricingOptionsResponse,
+  usePricingOptionsQuery,
+} from './usePricingOptionsQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,

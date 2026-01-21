@@ -1,58 +1,50 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
-import { useDedupedFetchAll } from '@/lib/fetch';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-
-interface BillingInfo {
-  isPro: boolean;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-}
-
-interface PricingOptions {
-  pricingOptions?: Array<{ priceId: string }>;
-  options?: Array<{ priceId: string }>;
-}
-
-// Cache billing data for 30 seconds to reduce API calls
-const BILLING_CACHE_TTL_MS = 30_000;
+import {
+  queryKeys,
+  useBillingStatusQuery,
+  usePricingOptionsQuery,
+} from '@/lib/queries';
 
 export function BillingDashboard() {
   const { error: notifyError } = useNotifications();
+  const queryClient = useQueryClient();
 
-  // Fetch billing status and pricing options with deduplication
-  // Multiple components/renders will share the same request
-  const { data, loading, errors, refresh } = useDedupedFetchAll<
-    [BillingInfo, PricingOptions]
-  >(['/api/billing/status', '/api/stripe/pricing-options'], {
-    ttlMs: BILLING_CACHE_TTL_MS,
-    onError: useCallback(() => {
+  const billingQuery = useBillingStatusQuery();
+  const pricingQuery = usePricingOptionsQuery();
+
+  const isLoading = billingQuery.isLoading || pricingQuery.isLoading;
+  const hasError = Boolean(billingQuery.error || pricingQuery.error);
+
+  // Show error notification when queries fail
+  useEffect(() => {
+    if (hasError && !isLoading) {
       notifyError('Billing is temporarily unavailable.');
-    }, [notifyError]),
-  });
+    }
+  }, [hasError, isLoading, notifyError]);
 
-  const [billingInfo, pricingData] = data;
-  const [billingError] = errors;
-
-  // Extract default price ID from pricing options
   const defaultPriceId = useMemo(() => {
+    const pricingData = pricingQuery.data;
     if (!pricingData) return undefined;
     return (
       pricingData.pricingOptions?.[0]?.priceId ||
       pricingData.options?.[0]?.priceId
     );
-  }, [pricingData]);
+  }, [pricingQuery.data]);
 
-  const errorMessage = billingError
-    ? 'We could not load your billing details. Please retry or visit the portal once the connection is restored.'
-    : null;
+  // Refresh handler for error state
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.billing.all });
+  };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className='animate-pulse motion-reduce:animate-none'>
         <div className='mb-4 h-8 rounded bg-muted'></div>
@@ -62,19 +54,21 @@ export function BillingDashboard() {
     );
   }
 
-  if (errorMessage) {
+  if (hasError) {
     return (
       <ErrorBanner
         title='Billing is temporarily unavailable'
-        description={errorMessage}
+        description='We could not load your billing details. Please retry or visit the portal once the connection is restored.'
         actions={[
-          { label: 'Retry', onClick: () => void refresh() },
+          { label: 'Retry', onClick: handleRefresh },
           { label: 'Contact support', href: '/support' },
         ]}
         testId='billing-error-state'
       />
     );
   }
+
+  const billingInfo = billingQuery.data;
 
   return (
     <div className='space-y-6'>
