@@ -1,5 +1,6 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
@@ -114,21 +115,10 @@ export function convertContextMenuItems(
     }
 
     if (isSubmenu(item)) {
-      // TODO: Implement nested submenu support in TableActionMenuItem
-      // Context: Currently TableActionMenuItem only supports flat menu structures.
-      // We need to extend TableActionMenuItem type to support nested submenus.
-      // This would require:
-      // 1. Add submenu support to TableActionMenu component
-      // 2. Update TableActionMenuItem type to include optional submenu array
-      // 3. Update menu rendering logic to handle nested menus
-      // For now, flatten submenu items into regular actions with prefixed labels
-      console.warn(
-        `Submenu "${item.label}" is not yet supported - flattening to regular items`
-      );
-      // Return a separator with the submenu label as a placeholder
+      // Submenus not yet fully supported - return as disabled placeholder
       return {
         id: item.id,
-        label: `${item.label} (submenu not supported)`,
+        label: `${item.label} (submenu)`,
         onClick: () => {},
         disabled: true,
       };
@@ -170,4 +160,53 @@ export function TableContextMenu({
       {children}
     </TableActionMenu>
   );
+}
+
+/**
+ * Convert ContextMenuItemType[] to CommonDropdownItem[]
+ * Used to share the same menu items between table rows and RightDrawer sidebars
+ */
+export function convertToCommonDropdownItems(
+  items: ContextMenuItemType[]
+): CommonDropdownItem[] {
+  return items.map((item, index) => {
+    if (isSeparator(item)) {
+      return {
+        type: 'separator' as const,
+        id: `sep-${index}`,
+      };
+    }
+
+    if (isSubmenu(item)) {
+      // Submenus not yet fully supported - flatten to disabled item
+      return {
+        type: 'action' as const,
+        id: item.id,
+        label: `${item.label} (submenu)`,
+        icon: item.icon,
+        onClick: () => {},
+        disabled: true,
+      };
+    }
+
+    if (isAction(item)) {
+      return {
+        type: 'action' as const,
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        onClick: item.onClick,
+        disabled: item.disabled,
+        variant: item.destructive ? ('destructive' as const) : undefined,
+      };
+    }
+
+    // Fallback
+    return {
+      type: 'action' as const,
+      id: `unknown-${index}`,
+      label: 'Unknown',
+      onClick: () => {},
+    };
+  });
 }
