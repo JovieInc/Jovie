@@ -25,6 +25,109 @@ logger.info('Waitlist Route Module loaded', {
   timestamp: new Date().toISOString(),
 });
 
+// Response builders for common responses
+function unauthorizedResponse() {
+  return NextResponse.json(
+    { success: false, error: 'Unauthorized' },
+    { status: 401, headers: NO_STORE_HEADERS }
+  );
+}
+
+function serviceUnavailableResponse(
+  userMessage: string,
+  debugMessage: string,
+  code: string
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      ...sanitizeErrorResponse(userMessage, debugMessage, { code }),
+    },
+    { status: 503, headers: NO_STORE_HEADERS }
+  );
+}
+
+function badRequestResponse(errorOrErrors: string | Record<string, unknown>) {
+  const body =
+    typeof errorOrErrors === 'string'
+      ? { success: false, error: errorOrErrors }
+      : { success: false, errors: errorOrErrors };
+  return NextResponse.json(body, { status: 400, headers: NO_STORE_HEADERS });
+}
+
+function successResponse(data: Record<string, unknown>) {
+  return NextResponse.json(
+    { success: true, ...data },
+    { headers: NO_STORE_HEADERS }
+  );
+}
+
+// Database configuration check result
+interface DbCheckResult {
+  isConfigured: boolean;
+  hasTable: boolean;
+  errorResponse?: NextResponse;
+  dbHost?: string;
+}
+
+async function checkDatabaseConfiguration(
+  isDev: boolean
+): Promise<DbCheckResult> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return {
+      isConfigured: false,
+      hasTable: false,
+      errorResponse: serviceUnavailableResponse(
+        'Waitlist is temporarily unavailable.',
+        'Set DATABASE_URL in .env.local and restart pnpm dev.',
+        'db_not_configured'
+      ),
+    };
+  }
+
+  const dbHost = isDev ? extractDbHost(databaseUrl) : undefined;
+
+  try {
+    const result = await db.execute(
+      drizzleSql<{ table_exists: boolean }>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+            AND table_name = 'waitlist_entries'
+        ) AS table_exists
+      `
+    );
+    const hasTable = Boolean(result.rows?.[0]?.table_exists ?? false);
+    return { isConfigured: true, hasTable, dbHost };
+  } catch (error) {
+    logger.error('Waitlist API DB connectivity error', error);
+    const debugMsg =
+      error instanceof Error
+        ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
+        : `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`;
+    return {
+      isConfigured: true,
+      hasTable: false,
+      errorResponse: serviceUnavailableResponse(
+        'Waitlist is temporarily unavailable.',
+        debugMsg,
+        'db_unreachable'
+      ),
+    };
+  }
+}
+
+function extractDbHost(databaseUrl: string): string | undefined {
+  try {
+    const parsed = new URL(databaseUrl);
+    return parsed.host;
+  } catch {
+    return undefined;
+  }
+}
+
 function deriveFullName(params: {
   userFullName: string | null | undefined;
   userUsername: string | null | undefined;
@@ -155,106 +258,34 @@ export async function POST(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
+      return unauthorizedResponse();
     }
 
     const isDev = process.env.NODE_ENV === 'development';
 
     // Abuse protection: apply the same lightweight in-memory limiter used for onboarding.
-    // Always check a shared bucket for missing/unknown IPs.
-    // Skip in development to avoid rate limit during testing
     if (!isDev) {
       const clientIP = extractClientIPFromRequest({ headers: request.headers });
-      await enforceOnboardingRateLimit({
-        userId,
-        ip: clientIP,
-        checkIP: true,
-      });
-    }
-    const databaseUrl = process.env.DATABASE_URL;
-    const hasDatabaseUrl = Boolean(databaseUrl);
-
-    if (!hasDatabaseUrl) {
-      return NextResponse.json(
-        {
-          success: false,
-          ...sanitizeErrorResponse(
-            'Waitlist is temporarily unavailable.',
-            'Set DATABASE_URL in .env.local and restart pnpm dev.',
-            { code: 'db_not_configured' }
-          ),
-        },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
+      await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: true });
     }
 
-    const dbHost = (() => {
-      if (!isDev || !databaseUrl) return undefined;
-      try {
-        const parsed = new URL(databaseUrl);
-        return parsed.host;
-      } catch {
-        return undefined;
-      }
-    })();
-
-    let hasWaitlistTable = false;
-    try {
-      const result = await db.execute(
-        drizzleSql<{ table_exists: boolean }>`
-          SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.tables
-            WHERE table_schema = 'public'
-              AND table_name = 'waitlist_entries'
-          ) AS table_exists
-        `
-      );
-
-      hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
-    } catch (error) {
-      logger.error('Waitlist API DB connectivity error', error);
-      const debugMsg =
-        error instanceof Error
-          ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
-          : `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`;
-      return NextResponse.json(
-        {
-          success: false,
-          ...sanitizeErrorResponse(
-            'Waitlist is temporarily unavailable.',
-            debugMsg,
-            { code: 'db_unreachable' }
-          ),
-        },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
+    // Check database configuration and connectivity
+    const dbCheck = await checkDatabaseConfiguration(isDev);
+    if (dbCheck.errorResponse) {
+      return dbCheck.errorResponse;
     }
-
-    if (!hasWaitlistTable) {
-      return NextResponse.json(
-        {
-          success: false,
-          ...sanitizeErrorResponse(
-            'Waitlist is temporarily unavailable.',
-            `Run pnpm drizzle:migrate to create/update waitlist tables.${dbHost ? ` (host: ${dbHost})` : ''}`,
-            { code: 'waitlist_table_missing' }
-          ),
-        },
-        { status: 503, headers: NO_STORE_HEADERS }
+    if (!dbCheck.hasTable) {
+      return serviceUnavailableResponse(
+        'Waitlist is temporarily unavailable.',
+        `Run pnpm drizzle:migrate to create/update waitlist tables.${dbCheck.dbHost ? ` (host: ${dbCheck.dbHost})` : ''}`,
+        'waitlist_table_missing'
       );
     }
 
     const user = await currentUser();
     const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
     if (!emailRaw) {
-      return NextResponse.json(
-        { success: false, error: 'Email is required' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return badRequestResponse('Email is required');
     }
 
     const email = normalizeEmail(emailRaw);
@@ -269,11 +300,7 @@ export async function POST(request: Request) {
     // Validate request body
     const parseResult = waitlistRequestSchema.safeParse(body);
     if (!parseResult.success) {
-      const errors = parseResult.error.flatten().fieldErrors;
-      return NextResponse.json(
-        { success: false, errors },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return badRequestResponse(parseResult.error.flatten().fieldErrors);
     }
 
     const {
@@ -341,10 +368,7 @@ export async function POST(request: Request) {
           });
       });
 
-      return NextResponse.json(
-        { success: true, status: existing.status },
-        { headers: NO_STORE_HEADERS }
-      );
+      return successResponse({ status: existing.status });
     }
 
     // Insert waitlist entry and update user in transaction for atomicity
@@ -429,10 +453,7 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json(
-      { success: true, status: 'new' },
-      { headers: NO_STORE_HEADERS }
-    );
+    return successResponse({ status: 'new' });
   } catch (error) {
     logger.error('Waitlist API error', error);
 
