@@ -122,6 +122,59 @@ export class AppleMusicNotConfiguredError extends Error {
 }
 
 // ============================================================================
+// Retry Logic
+// ============================================================================
+
+/**
+ * Default retry configuration
+ */
+const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_BASE_DELAY_MS = 1000;
+
+/**
+ * Retry wrapper with exponential backoff for transient failures.
+ * Does not retry on auth errors (401) or not found (404).
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  baseDelayMs = DEFAULT_BASE_DELAY_MS
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on auth errors, not found, or configuration errors
+      if (error instanceof AppleMusicError) {
+        if (error.statusCode === 401 || error.statusCode === 404) {
+          throw error;
+        }
+      }
+      if (error instanceof AppleMusicNotConfiguredError) {
+        throw error;
+      }
+
+      // If this was the last attempt, throw
+      if (attempt >= maxRetries) {
+        throw lastError;
+      }
+
+      // Exponential backoff with jitter
+      const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15x
+      const delayMs = baseDelayMs * Math.pow(2, attempt) * jitter;
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  // This should never be reached, but TypeScript needs it
+  throw lastError ?? new Error('Unknown retry failure');
+}
+
+// ============================================================================
 // HTTP Client
 // ============================================================================
 
@@ -203,10 +256,11 @@ async function musicKitRequest<T>(
 }
 
 /**
- * Execute a MusicKit request with circuit breaker protection.
+ * Execute a MusicKit request with circuit breaker protection and retry logic.
+ * Retries transient failures with exponential backoff before opening circuit.
  */
 async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
-  return appleMusicCircuitBreaker.execute(fn);
+  return appleMusicCircuitBreaker.execute(() => withRetry(fn));
 }
 
 // ============================================================================

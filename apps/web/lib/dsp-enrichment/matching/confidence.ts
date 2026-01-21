@@ -19,6 +19,38 @@ import {
 import { artistNameSimilarity } from './name-similarity';
 
 // ============================================================================
+// Confidence Bands
+// ============================================================================
+
+/**
+ * Confidence band categories for user-facing display.
+ * Helps users understand match quality at a glance.
+ */
+export type ConfidenceBand = 'very_high' | 'high' | 'medium' | 'low';
+
+/**
+ * Thresholds for confidence bands.
+ */
+const CONFIDENCE_BAND_THRESHOLDS = {
+  veryHigh: 0.85,
+  high: 0.75,
+  medium: 0.5,
+} as const;
+
+/**
+ * Get the confidence band for a given score.
+ *
+ * @param score - Confidence score between 0 and 1
+ * @returns The confidence band category
+ */
+export function getConfidenceBand(score: number): ConfidenceBand {
+  if (score >= CONFIDENCE_BAND_THRESHOLDS.veryHigh) return 'very_high';
+  if (score >= CONFIDENCE_BAND_THRESHOLDS.high) return 'high';
+  if (score >= CONFIDENCE_BAND_THRESHOLDS.medium) return 'medium';
+  return 'low';
+}
+
+// ============================================================================
 // Constants
 // ============================================================================
 
@@ -243,6 +275,7 @@ export function calculateConfidenceScore(
   return {
     ...candidate,
     confidenceScore,
+    confidenceBand: getConfidenceBand(confidenceScore),
     confidenceBreakdown: {
       isrcMatchScore,
       upcMatchScore,
@@ -308,6 +341,7 @@ export function refineConfidenceScore(
   return {
     ...scoredMatch,
     confidenceScore,
+    confidenceBand: getConfidenceBand(confidenceScore),
     confidenceBreakdown: {
       ...scoredMatch.confidenceBreakdown,
       followerRatioScore,
