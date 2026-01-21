@@ -10,6 +10,7 @@ import {
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { getUserState } from '@/lib/auth/proxy-state';
 import {
   buildContentSecurityPolicy,
@@ -319,19 +320,18 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     if (userId && isAuthPath && !isAuthCallbackPath && !isRSCPrefetch) {
       // Check complete user state to determine where authenticated user should go
       const userState = await getUserState(userId);
-      const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
+      // Sanitize redirect_url to strip hash fragments and validate path
+      const redirectUrl = sanitizeRedirectUrl(
+        req.nextUrl.searchParams.get('redirect_url')
+      );
 
       // If user needs waitlist/onboarding, send them there (ignore redirect_url)
       if (userState.needsWaitlist) {
         res = NextResponse.redirect(new URL('/waitlist', req.url));
       } else if (userState.needsOnboarding) {
         res = NextResponse.redirect(new URL('/onboarding', req.url));
-      } else if (
-        redirectUrl &&
-        redirectUrl.startsWith('/') &&
-        !redirectUrl.startsWith('//')
-      ) {
-        // User is fully active - honor redirect_url for things like /claim/token
+      } else if (redirectUrl) {
+        // User is fully active - honor sanitized redirect_url for things like /claim/token
         res = NextResponse.redirect(new URL(redirectUrl, req.url));
       } else {
         // Fully active user, no redirect_url - go to dashboard

@@ -43,6 +43,29 @@ export function SignInForm() {
   const hasHandledEmailParam = useRef(false);
   const isClerkStalled = useLoadingStall(isLoaded);
 
+  // Handle password-related hash fragments that Clerk may add
+  // Since Jovie is passwordless, we strip these invalid hashes
+  useEffect(() => {
+    const hash = window.location.hash;
+    const passwordHashFragments = [
+      '#reset-password',
+      '#/reset-password',
+      '#forgot-password',
+      '#/forgot-password',
+      '#set-password',
+      '#/set-password',
+    ];
+
+    if (passwordHashFragments.some(fragment => hash.startsWith(fragment))) {
+      // Clear the hash from the URL without triggering a reload
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search
+      );
+    }
+  }, []);
+
   // Store redirect URL from query params on mount
   useEffect(() => {
     try {
