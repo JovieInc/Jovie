@@ -1,6 +1,5 @@
 export {
   adminNavigation,
-  navShortcuts,
   primaryNavigation,
   secondaryNavigation,
   settingsNavigation,

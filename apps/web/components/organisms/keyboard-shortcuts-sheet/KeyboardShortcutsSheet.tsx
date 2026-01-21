@@ -36,11 +36,15 @@ function ShortcutKeys({ keys }: { keys: string }) {
   }
 
   // Handle space-separated keys (like "⌘ K" or "⌥ ⇧ Q")
-  const keyParts = keys.split(' ').filter(Boolean);
+  // Create array of {key, id} to avoid using array index in React key
+  const keyParts = keys
+    .split(' ')
+    .filter(Boolean)
+    .map((keyPart, i) => ({ keyPart, id: `${keys}-${i}` }));
   return (
     <div className='flex items-center gap-1'>
-      {keyParts.map((keyPart, index) => (
-        <Kbd key={`${keyPart}-${index}`} variant='default'>
+      {keyParts.map(({ keyPart, id }) => (
+        <Kbd key={id} variant='default'>
           {keyPart}
         </Kbd>
       ))}
