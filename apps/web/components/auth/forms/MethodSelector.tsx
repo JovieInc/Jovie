@@ -18,6 +18,12 @@ import { ButtonSpinner } from '../ButtonSpinner';
 const FOOTER_LINK_CLASSES =
   'text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md touch-manipulation';
 
+const METHOD_DISPLAY_NAMES: Record<AuthMethod, string> = {
+  google: 'Google',
+  spotify: 'Spotify',
+  email: 'email',
+};
+
 interface MethodSelectorProps {
   /**
    * Called when email option is selected
@@ -186,13 +192,7 @@ export function MethodSelector({
         <div className='min-h-[20px] flex items-center justify-center'>
           {lastMethod && orderedMethods.includes(lastMethod) && (
             <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
-              You used{' '}
-              {lastMethod === 'google'
-                ? 'Google'
-                : lastMethod === 'spotify'
-                  ? 'Spotify'
-                  : 'email'}{' '}
-              last time
+              You used {METHOD_DISPLAY_NAMES[lastMethod]} last time
             </p>
           )}
         </div>

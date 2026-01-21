@@ -42,6 +42,26 @@ export function OnboardingHandleStep({
   onSubmit,
   isPendingSubmit = false,
 }: OnboardingHandleStepProps) {
+  function renderValidationStatus(): React.ReactNode {
+    if (!handleInput || stateError) return null;
+    if (handleValidation.checking) {
+      return (
+        <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
+          Checking…
+        </div>
+      );
+    }
+    if (handleValidation.clientValid && handleValidation.available) return null;
+    if (handleValidation.error) {
+      return (
+        <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+          Not available
+        </div>
+      );
+    }
+    return null;
+  }
+
   return (
     <div className='flex flex-col items-center justify-center h-full'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
@@ -149,18 +169,7 @@ export function OnboardingHandleStep({
               role='status'
               aria-live='polite'
             >
-              {handleInput && !stateError ? (
-                handleValidation.checking ? (
-                  <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                    Checking…
-                  </div>
-                ) : handleValidation.clientValid &&
-                  handleValidation.available ? null : handleValidation.error ? (
-                  <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
-                    Not available
-                  </div>
-                ) : null
-              ) : null}
+              {renderValidationStatus()}
             </div>
           </div>
 
