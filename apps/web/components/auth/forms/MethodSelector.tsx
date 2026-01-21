@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import * as React from 'react';
 import { useMemo } from 'react';
-import { AUTH_CLASSES } from '@/lib/auth/constants';
+import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AuthMethod, LoadingState } from '@/lib/auth/types';
 import { useFeatureGate } from '@/lib/flags/client';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
@@ -158,65 +158,73 @@ export function MethodSelector({
   };
 
   return (
-    <div className={`space-y-4 ${AUTH_CLASSES.stepTransition}`}>
-      <h1 className='text-[18px] leading-[22px] font-medium text-[#1f2023] dark:text-[#e3e4e6] mb-0 text-center'>
-        {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
-      </h1>
+    <div
+      className={`${FORM_LAYOUT.formContainer} ${AUTH_CLASSES.stepTransition}`}
+    >
+      <div className={FORM_LAYOUT.headerSection}>
+        <h1 className={FORM_LAYOUT.title}>
+          {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
+        </h1>
+      </div>
 
-      {error && (
-        <p
-          className='text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 duration-200'
-          role='alert'
-        >
-          {error}
-        </p>
-      )}
+      <div className={FORM_LAYOUT.errorContainer}>
+        {error && (
+          <p
+            className='text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 duration-200'
+            role='alert'
+          >
+            {error}
+          </p>
+        )}
+      </div>
 
-      <div className='mt-2 space-y-4'>
+      <div className={FORM_LAYOUT.formInner}>
         {/* Primary method */}
         <div>{renderMethodButton(orderedMethods[0], true)}</div>
 
-        {/* Last used indicator */}
-        {lastMethod && orderedMethods.includes(lastMethod) && (
-          <p className='-mt-1 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
-            You used{' '}
-            {lastMethod === 'google'
-              ? 'Google'
-              : lastMethod === 'spotify'
-                ? 'Spotify'
-                : 'email'}{' '}
-            last time
-          </p>
-        )}
+        {/* Last used indicator - fixed height to prevent layout shift */}
+        <div className='min-h-[20px] flex items-center justify-center'>
+          {lastMethod && orderedMethods.includes(lastMethod) && (
+            <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
+              You used{' '}
+              {lastMethod === 'google'
+                ? 'Google'
+                : lastMethod === 'spotify'
+                  ? 'Spotify'
+                  : 'email'}{' '}
+              last time
+            </p>
+          )}
+        </div>
 
         {/* Secondary methods */}
         {orderedMethods.length > 1 && (
-          <div className='space-y-4'>
+          <div className={FORM_LAYOUT.formInner}>
             {orderedMethods.slice(1).map(method => (
               <div key={method}>{renderMethodButton(method, false)}</div>
             ))}
           </div>
         )}
-
-        {/* Footer link */}
-        <p className='mt-8 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center'>
-          {mode === 'signin' ? (
-            <>
-              Don&apos;t have access?{' '}
-              <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
-                Join the waitlist
-              </Link>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <Link href='/signin' className={FOOTER_LINK_CLASSES}>
-                Sign in
-              </Link>
-            </>
-          )}
-        </p>
       </div>
+
+      {/* Footer link */}
+      <p className={FORM_LAYOUT.footerHint}>
+        {mode === 'signin' ? (
+          <>
+            Don&apos;t have access?{' '}
+            <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
+              Join the waitlist
+            </Link>
+          </>
+        ) : (
+          <>
+            Already have an account?{' '}
+            <Link href='/signin' className={FOOTER_LINK_CLASSES}>
+              Sign in
+            </Link>
+          </>
+        )}
+      </p>
     </div>
   );
 }
