@@ -78,8 +78,8 @@ export default defineConfig({
     // Component tests need isolation for proper mock scoping
     isolate: true,
 
-    // Reduce reporter overhead
-    reporters: isCI ? ['basic'] : ['default'],
+    // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false
+    reporters: isCI ? [['default', { summary: false }]] : ['default'],
 
     // Optimize file watching
     watch: false,
