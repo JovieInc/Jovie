@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
@@ -55,6 +55,19 @@ export function useOnboardingSubmit({
   });
   const [isPendingSubmit, setIsPendingSubmit] = useState(false);
 
+  // Refs to track current state values without causing callback recreation
+  const isSubmittingRef = useRef(state.isSubmitting);
+  const errorRef = useRef(state.error);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isSubmittingRef.current = state.isSubmitting;
+  }, [state.isSubmitting]);
+
+  useEffect(() => {
+    errorRef.current = state.error;
+  }, [state.error]);
+
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
@@ -63,7 +76,7 @@ export function useOnboardingSubmit({
       const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
 
       // If already submitting, don't allow another submission
-      if (state.isSubmitting) {
+      if (isSubmittingRef.current) {
         return;
       }
 
@@ -79,7 +92,7 @@ export function useOnboardingSubmit({
 
       // Check remaining validation requirements (excluding checking state)
       if (!resolvedHandle) return;
-      if (state.error) return;
+      if (errorRef.current) return;
       if (!handleValidation.clientValid) return;
       if (!handleValidation.available) return;
 
@@ -210,8 +223,6 @@ export function useOnboardingSubmit({
       handleValidation,
       router,
       setProfileReadyHandle,
-      state.error,
-      state.isSubmitting,
       userEmail,
       userId,
     ]
