@@ -28,7 +28,7 @@ export interface PillClassNameParams {
 const BASE_CLASSES = [
   'group/pill relative inline-flex items-center rounded-full border text-xs font-medium',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
-  'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
+  'bg-surface-1 hover:bg-(--pill-bg-hover) dark:bg-surface-1/60 dark:hover:bg-(--pill-bg-hover) dark:backdrop-blur-sm',
   'text-secondary-token hover:text-primary-token',
   'transition-all duration-200',
 ] as const;
@@ -37,7 +37,7 @@ const BASE_CLASSES = [
  * Classes for interactive pills
  */
 const INTERACTIVE_CLASSES =
-  'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-(--pill-bg-hover) hover:bg-(--pill-bg-hover) dark:hover:bg-(--pill-bg-hover)';
+  'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:bg-(--pill-bg-hover)';
 
 /**
  * Classes for non-interactive pills
@@ -88,7 +88,7 @@ function getStateClasses(state: PlatformPillState): string {
  */
 function getToneClasses(tone: PlatformPillTone): string {
   if (tone === 'faded') {
-    return 'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token';
+    return 'bg-surface-1/60 text-secondary-token/85 hover:text-primary-token';
   }
   return '';
 }
