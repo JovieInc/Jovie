@@ -47,7 +47,7 @@ vi.mock('@/lib/error-tracking', () => ({
   logFallback: mockLogFallback,
 }));
 
-import { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
+import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
 function setupDefaultMocks() {
@@ -59,9 +59,12 @@ function setupDefaultMocks() {
 describe('@critical SubscriptionHandler - Errors', () => {
   let handler: SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
+    const { SubscriptionHandler: SubscriptionHandlerClass } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandlerClass();
     setupDefaultMocks();
   });
 
@@ -259,9 +262,12 @@ describe('@critical SubscriptionHandler - Errors', () => {
 describe('@critical SubscriptionHandler - Status Handling', () => {
   let handler: SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
+    const { SubscriptionHandler: SubscriptionHandlerClass } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandlerClass();
     setupDefaultMocks();
   });
 

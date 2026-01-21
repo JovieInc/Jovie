@@ -47,10 +47,7 @@ vi.mock('@/lib/error-tracking', () => ({
   logFallback: mockLogFallback,
 }));
 
-import {
-  SubscriptionHandler,
-  subscriptionHandler,
-} from '@/lib/stripe/webhooks/handlers/subscription-handler';
+import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
 function setupDefaultMocks() {
@@ -62,9 +59,12 @@ function setupDefaultMocks() {
 describe('@critical SubscriptionHandler - Misc', () => {
   let handler: SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
+    const { SubscriptionHandler: SubscriptionHandlerClass } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandlerClass();
     setupDefaultMocks();
   });
 
@@ -188,8 +188,12 @@ describe('@critical SubscriptionHandler - Misc', () => {
   });
 
   describe('singleton instance', () => {
-    it('exports a singleton handler instance', () => {
-      expect(subscriptionHandler).toBeInstanceOf(SubscriptionHandler);
+    it('exports a singleton handler instance', async () => {
+      const {
+        subscriptionHandler,
+        SubscriptionHandler: SubscriptionHandlerClass,
+      } = await import('@/lib/stripe/webhooks/handlers/subscription-handler');
+      expect(subscriptionHandler).toBeInstanceOf(SubscriptionHandlerClass);
       expect(subscriptionHandler.eventTypes).toContain(
         'customer.subscription.created'
       );

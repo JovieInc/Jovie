@@ -59,9 +59,12 @@ function setupDefaultMocks() {
 describe('@critical SubscriptionHandler - Deleted', () => {
   let handler: SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
+    const { SubscriptionHandler: SubscriptionHandlerClass } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandlerClass();
     setupDefaultMocks();
   });
 
