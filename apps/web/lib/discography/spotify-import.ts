@@ -315,12 +315,7 @@ async function importSingleTrack(
 
   const trackSlug =
     existingTrack?.slug ??
-    (await generateUniqueSlug(
-      creatorProfileId,
-      sanitizedTrackTitle,
-      'track',
-      existingTrack?.id
-    ));
+    (await generateUniqueSlug(creatorProfileId, sanitizedTrackTitle, 'track'));
 
   const sanitizedIsrc = sanitizeIsrc(track.external_ids?.isrc);
   const sanitizedPreviewUrl = track.preview_url

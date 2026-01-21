@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
@@ -41,6 +43,10 @@ vi.mock('@jovie/ui', () => ({
 global.fetch = mockFetch as unknown as typeof fetch;
 
 import { ClaimHandleForm } from '@/components/home/ClaimHandleForm';
+
+function readGlobalsCss(): string {
+  return readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8');
+}
 
 describe('ClaimHandleForm', () => {
   test('prevents layout jumps with consistent spacing', () => {
@@ -135,13 +141,8 @@ describe('ClaimHandleForm', () => {
 
   describe('reduced motion support', () => {
     test('styled-jsx includes prefers-reduced-motion media query', () => {
-      render(<ClaimHandleForm />);
-
-      // Get all style tags in the document
-      const styleTags = document.querySelectorAll('style');
-      const styleContents = Array.from(styleTags)
-        .map(tag => tag.textContent || '')
-        .join('');
+      // Note: these styles live in `app/globals.css` (not styled-jsx).
+      const styleContents = readGlobalsCss();
 
       // Verify the reduced motion media query exists
       expect(styleContents).toContain('prefers-reduced-motion');
@@ -151,13 +152,7 @@ describe('ClaimHandleForm', () => {
     });
 
     test('shake animation is disabled for reduced motion users via CSS', () => {
-      render(<ClaimHandleForm />);
-
-      // Get all style tags in the document
-      const styleTags = document.querySelectorAll('style');
-      const styleContents = Array.from(styleTags)
-        .map(tag => tag.textContent || '')
-        .join('');
+      const styleContents = readGlobalsCss();
 
       // Within the prefers-reduced-motion media query, the jv-shake should have animation: none
       // This verifies the CSS rule exists: .jv-shake { animation: none }
@@ -172,13 +167,7 @@ describe('ClaimHandleForm', () => {
     });
 
     test('available pulse animation uses opacity fade for reduced motion users', () => {
-      render(<ClaimHandleForm />);
-
-      // Get all style tags in the document
-      const styleTags = document.querySelectorAll('style');
-      const styleContents = Array.from(styleTags)
-        .map(tag => tag.textContent || '')
-        .join('');
+      const styleContents = readGlobalsCss();
 
       // Verify the jv-available-fade keyframe exists for reduced motion
       expect(styleContents).toContain('jv-available-fade');
@@ -190,12 +179,7 @@ describe('ClaimHandleForm', () => {
     });
 
     test('jv-available class exists and has pulse animation for normal motion', () => {
-      render(<ClaimHandleForm />);
-
-      const styleTags = document.querySelectorAll('style');
-      const styleContents = Array.from(styleTags)
-        .map(tag => tag.textContent || '')
-        .join('');
+      const styleContents = readGlobalsCss();
 
       // Verify the normal jv-available-pulse keyframes exist
       expect(styleContents).toContain('jv-available-pulse');
@@ -205,12 +189,7 @@ describe('ClaimHandleForm', () => {
     });
 
     test('reduced motion users get box-shadow: none for available state', () => {
-      render(<ClaimHandleForm />);
-
-      const styleTags = document.querySelectorAll('style');
-      const styleContents = Array.from(styleTags)
-        .map(tag => tag.textContent || '')
-        .join('');
+      const styleContents = readGlobalsCss();
 
       // The reduced motion block should contain .jv-available with box-shadow: none
       // Since CSS is minified/structured, we check for the presence of both:

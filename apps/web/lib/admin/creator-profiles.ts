@@ -5,7 +5,6 @@ import {
   count,
   desc,
   sql as drizzleSql,
-  eq,
   ilike,
   inArray,
   or,
@@ -125,23 +124,32 @@ async function backfillClaimTokens(
 
   const tokensById = new Map<string, { token: string; expiresAt: Date }>();
 
-  await Promise.all(
-    needsToken.map(async row => {
-      const token = randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
-      tokensById.set(row.id, { token, expiresAt });
+  const now = new Date();
+  const updates = needsToken.map(row => {
+    const token = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
+    tokensById.set(row.id, { token, expiresAt });
+    return { id: row.id, token, expiresAt };
+  });
 
-      await db
-        .update(creatorProfiles)
-        .set({
-          claimToken: token,
-          claimTokenExpiresAt: expiresAt,
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, row.id));
-    })
+  const valuesList = drizzleSql.join(
+    updates.map(
+      row =>
+        drizzleSql`(${row.id}::uuid, ${row.token}, ${row.expiresAt}::timestamptz)`
+    ),
+    drizzleSql`, `
   );
+
+  await db.execute(drizzleSql`
+    UPDATE ${creatorProfiles}
+    SET
+      ${creatorProfiles.claimToken} = v.token,
+      ${creatorProfiles.claimTokenExpiresAt} = v.expires_at,
+      ${creatorProfiles.updatedAt} = ${now}
+    FROM (VALUES ${valuesList}) AS v(id, token, expires_at)
+    WHERE ${creatorProfiles.id} = v.id
+  `);
 
   // Update in-memory rows so callers immediately see the new tokens
   for (const row of pageRows) {

@@ -18,6 +18,29 @@ import {
 } from '../utils/link-transformers';
 import { isIngestableUrl } from '../utils/platform-category';
 
+function buildInitialLinksSignature(links: ProfileSocialLink[]): string {
+  // Only include fields that meaningfully impact derived LinkItem content.
+  // This prevents unnecessary sync effects when `initialLinks` is passed as a new array each render.
+  return (links || [])
+    .map(l =>
+      [
+        l.id,
+        l.platform,
+        l.platformType,
+        l.url,
+        l.sortOrder,
+        l.isActive,
+        l.displayText ?? '',
+        l.state,
+        l.confidence ?? '',
+        l.sourceType ?? '',
+        l.sourcePlatform ?? '',
+        l.version ?? '',
+      ].join(':')
+    )
+    .join('|');
+}
+
 /**
  * Options for the useLinksPersistence hook
  */
@@ -105,8 +128,17 @@ export function useLinksPersistence({
     [initialLinks]
   );
 
+  const activeInitialLinksSignature = useMemo(
+    () => buildInitialLinksSignature(activeInitialLinks),
+    [activeInitialLinks]
+  );
+  const suggestionInitialLinksSignature = useMemo(
+    () => buildInitialLinksSignature(suggestionInitialLinks),
+    [suggestionInitialLinks]
+  );
+
   // Initialize links state
-  const [links, setLinks] = useState<LinkItem[]>(() =>
+  const [links, setLinksState] = useState<LinkItem[]>(() =>
     convertDbLinksToLinkItems(activeInitialLinks || [])
   );
 
@@ -120,9 +152,17 @@ export function useLinksPersistence({
 
   // Ref for async access to links
   const linksRef = useRef<LinkItem[]>(links);
-  useEffect(() => {
-    linksRef.current = links;
-  }, [links]);
+  const setLinks: React.Dispatch<React.SetStateAction<LinkItem[]>> =
+    useCallback(next => {
+      setLinksState(prev => {
+        const resolved =
+          typeof next === 'function'
+            ? (next as (value: LinkItem[]) => LinkItem[])(prev)
+            : next;
+        linksRef.current = resolved;
+        return resolved;
+      });
+    }, []);
 
   // Suggested links state
   const [suggestedLinks, setSuggestedLinks] = useState<SuggestedLink[]>(() =>
@@ -138,7 +178,7 @@ export function useLinksPersistence({
   useEffect(() => {
     const nextLinks = convertDbLinksToLinkItems(activeInitialLinks || []);
     setLinks(prev => (areLinkItemsEqual(prev, nextLinks) ? prev : nextLinks));
-  }, [activeInitialLinks]);
+  }, [activeInitialLinksSignature, setLinks]);
 
   useEffect(() => {
     const nextSuggested = convertDbLinksToSuggestions(
@@ -147,7 +187,7 @@ export function useLinksPersistence({
     setSuggestedLinks(prev =>
       areSuggestionListsEqual(prev, nextSuggested) ? prev : nextSuggested
     );
-  }, [suggestionInitialLinks]);
+  }, [suggestionInitialLinksSignature]);
 
   // Save queue to ensure we never write older state after newer state
   const saveLoopRunningRef = useRef(false);

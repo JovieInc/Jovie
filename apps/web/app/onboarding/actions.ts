@@ -1,5 +1,6 @@
 'use server';
 
+import { createHash } from 'node:crypto';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -10,6 +11,7 @@ import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
+import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import {
   createOnboardingError,
@@ -28,6 +30,10 @@ function getRequestBaseUrl(headersList: Headers): string {
   const proto = headersList.get('x-forwarded-proto') ?? 'https';
   if (host) return `${proto}://${host}`;
   return publicEnv.NEXT_PUBLIC_APP_URL;
+}
+
+function hashIdentifier(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 12);
 }
 
 /** Result of fetching avatar from source URL */
@@ -389,7 +395,7 @@ async function finalizeOnboardingCompletion(
   const cookieStore = await cookies();
   cookieStore.set('jovie_onboarding_complete', '1', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 120,
     path: '/',
@@ -438,14 +444,24 @@ function logAndCaptureOnboardingError(
     errorMessage: error instanceof Error ? error.message : String(error),
   });
 
+  // Avoid sending raw PII (username/email) to Sentry.
+  const usernameHash = context.username
+    ? hashIdentifier(context.username)
+    : 'unknown';
+  const hasEmail = Boolean(context.email);
+  const emailHash = context.email
+    ? hashIdentifier(context.email.toLowerCase())
+    : null;
+
   Sentry.captureException(error, {
     tags: {
       context: 'onboarding_submission',
-      username: context.username ?? 'unknown',
+      usernameHash,
+      hasEmail: hasEmail ? 'true' : 'false',
     },
     extra: {
-      displayName: context.displayName,
-      email: context.email,
+      emailHash,
+      displayNamePresent: Boolean(context.displayName),
       dbErrorCode: dbError?.code,
       dbConstraint: dbError?.constraint,
       dbDetail: dbError?.detail,

@@ -151,8 +151,15 @@ export function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
     if (left.normalizedUrl !== right.normalizedUrl) return false;
     if (left.originalUrl !== right.originalUrl) return false;
     if (left.isVisible !== right.isVisible) return false;
+    if (left.order !== right.order) return false;
+    if (left.title !== right.title) return false;
+    if ((left.state ?? null) !== (right.state ?? null)) return false;
+    if ((left.confidence ?? null) !== (right.confidence ?? null)) return false;
     if (left.category !== right.category) return false;
     if (left.platform.id !== right.platform.id) return false;
+    if ((left.sourceType ?? null) !== (right.sourceType ?? null)) return false;
+    if ((left.sourcePlatform ?? null) !== (right.sourcePlatform ?? null))
+      return false;
   }
   return true;
 }
@@ -175,7 +182,7 @@ export function areSuggestionListsEqual(
     list
       .map(
         item =>
-          `${item.suggestionId ?? item.normalizedUrl}:${item.platform.id}:${item.normalizedUrl}`
+          `${item.suggestionId ?? item.normalizedUrl}:${item.platform.id}:${item.normalizedUrl}:${item.suggestedTitle ?? ''}:${item.state ?? ''}:${item.confidence ?? ''}`
       )
       .sort((a, b) => a.localeCompare(b));
 

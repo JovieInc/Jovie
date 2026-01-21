@@ -4,6 +4,7 @@ import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, type TransactionType, waitlistEntries } from '@/lib/db';
 import { creatorProfiles, users, waitlistInvites } from '@/lib/db/schema';
+import { env } from '@/lib/env';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -24,6 +25,8 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 logger.info('Waitlist Route Module loaded', {
   timestamp: new Date().toISOString(),
 });
+
+let cachedHasWaitlistTable: boolean | null = null;
 
 function deriveFullName(params: {
   userFullName: string | null | undefined;
@@ -170,7 +173,7 @@ async function validateAuthAndRateLimit(
     };
   }
 
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = env.NODE_ENV === 'development';
   if (!isDev) {
     const clientIP = extractClientIPFromRequest({ headers: request.headers });
     await enforceOnboardingRateLimit({
@@ -187,8 +190,8 @@ async function validateAuthAndRateLimit(
  * Check database connectivity and waitlist table existence
  */
 async function checkDatabaseHealth(): Promise<NextResponse | null> {
-  const databaseUrl = process.env.DATABASE_URL;
-  const isDev = process.env.NODE_ENV === 'development';
+  const databaseUrl = env.DATABASE_URL;
+  const isDev = env.NODE_ENV === 'development';
 
   if (!databaseUrl) {
     return NextResponse.json(
@@ -213,6 +216,23 @@ async function checkDatabaseHealth(): Promise<NextResponse | null> {
     }
   })();
 
+  if (cachedHasWaitlistTable !== null) {
+    if (!cachedHasWaitlistTable) {
+      return NextResponse.json(
+        {
+          success: false,
+          ...sanitizeErrorResponse(
+            'Waitlist is temporarily unavailable.',
+            `Run pnpm drizzle:migrate to create/update waitlist tables.${dbHost ? ` (host: ${dbHost})` : ''}`,
+            { code: 'waitlist_table_missing' }
+          ),
+        },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+    return null;
+  }
+
   try {
     const result = await db.execute(
       drizzleSql<{ table_exists: boolean }>`
@@ -226,6 +246,7 @@ async function checkDatabaseHealth(): Promise<NextResponse | null> {
     );
 
     const hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
+    cachedHasWaitlistTable = hasWaitlistTable;
 
     if (!hasWaitlistTable) {
       return NextResponse.json(
@@ -314,7 +335,26 @@ async function validateAndParseRequest(
     email,
   });
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch (error) {
+    const isSyntaxError =
+      error instanceof SyntaxError ||
+      (error instanceof Error && /json/i.test(error.message));
+
+    if (isSyntaxError) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { success: false, errors: { body: ['invalid JSON'] } },
+          { status: 400, headers: NO_STORE_HEADERS }
+        ),
+      };
+    }
+
+    throw error;
+  }
   const parseResult = waitlistRequestSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -492,7 +532,7 @@ async function createNewWaitlistEntry(
 function handleWaitlistError(error: unknown): NextResponse {
   logger.error('Waitlist API error', error);
 
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = env.NODE_ENV === 'development';
   const errorMessage =
     isDev && error instanceof Error
       ? error.message

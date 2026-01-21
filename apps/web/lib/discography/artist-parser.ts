@@ -297,7 +297,7 @@ function handleVsPattern(
     credits.push({
       name: part,
       role: isFirst ? 'main_artist' : 'vs',
-      joinPhrase: isFirst ? null : ' vs ',
+      joinPhrase: isFirst ? (ctx.isFirstArtist ? null : ', ') : ' vs ',
       position: ctx.currentPosition + positionIncrement,
       isPrimary: isFirst && ctx.isFirstArtist,
       spotifyId: isFirst ? ctx.artist.id : undefined,
@@ -340,7 +340,7 @@ function handleAndPattern(
     credits.push({
       name: part,
       role: 'main_artist',
-      joinPhrase: isFirst ? null : ' & ',
+      joinPhrase: isFirst ? (ctx.currentPosition > 0 ? ', ' : null) : ' & ',
       position: ctx.currentPosition + positionIncrement,
       isPrimary: isFirst && ctx.isFirstArtist,
       spotifyId: isFirst ? ctx.artist.id : undefined,

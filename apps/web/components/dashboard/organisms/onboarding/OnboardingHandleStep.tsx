@@ -143,7 +143,7 @@ export function OnboardingHandleStep({
                 }
                 checking={handleValidation.checking}
                 available={isValid}
-                clientValid={true}
+                clientValid={handleValidation.clientValid}
                 hasError={hasError}
               />
             </div>
