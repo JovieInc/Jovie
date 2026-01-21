@@ -28,17 +28,18 @@ export function TableHeaderCell({
     right: 'text-right',
   };
 
+  let direction: 'asc' | 'desc' | undefined;
+  if (sortDirection === 'asc') {
+    direction = 'asc';
+  } else if (sortDirection === 'desc') {
+    direction = 'desc';
+  }
+
   const content =
     sortable && onSort ? (
       <SortableHeaderButton
         label={typeof children === 'string' ? children : String(children)}
-        direction={
-          sortDirection === 'asc'
-            ? 'asc'
-            : sortDirection === 'desc'
-              ? 'desc'
-              : undefined
-        }
+        direction={direction}
         onClick={onSort}
       />
     ) : (

@@ -49,17 +49,22 @@ export function useUserButton({
   const billingErrorNotifiedRef = useRef(false);
 
   // Normalize TanStack Query result to legacy shape for consumers
-  const billingStatus: BillingStatus = useMemo(
-    () => ({
+  const billingStatus: BillingStatus = useMemo(() => {
+    let billingError: string | null = null;
+    if (error instanceof Error) {
+      billingError = error.message;
+    } else if (error) {
+      billingError = String(error);
+    }
+
+    return {
       isPro: data?.isPro ?? false,
       plan: data?.plan ?? null,
       hasStripeCustomer: data?.hasStripeCustomer ?? false,
       loading: isLoading,
-      error:
-        error instanceof Error ? error.message : error ? String(error) : null,
-    }),
-    [data, isLoading, error]
-  );
+      error: billingError,
+    };
+  }, [data, isLoading, error]);
 
   const redirectToUrl = (url: string) => {
     if (typeof window === 'undefined') return;
@@ -117,13 +122,14 @@ export function useUserButton({
         .slice(0, 2)
     : 'A';
 
-  const profileUrl =
-    profileHref ??
-    (user?.username
-      ? `/${user.username}`
-      : artist?.handle
-        ? `/${artist.handle}`
-        : '/app/settings');
+  let profileUrl = profileHref ?? '/app/settings';
+  if (!profileHref) {
+    if (user?.username) {
+      profileUrl = `/${user.username}`;
+    } else if (artist?.handle) {
+      profileUrl = `/${artist.handle}`;
+    }
+  }
   const settingsUrl = settingsHref ?? '/app/settings';
 
   const jovieUsername =

@@ -30,14 +30,16 @@ export function TableHeaderCell<TData>({
   tableHeaderClass,
   onToggleSort,
 }: TableHeaderCellProps<TData>) {
-  const ariaSort =
-    canSort && !header.isPlaceholder
-      ? sortDirection === 'asc'
-        ? 'ascending'
-        : sortDirection === 'desc'
-          ? 'descending'
-          : 'none'
-      : undefined;
+  let ariaSort: 'ascending' | 'descending' | 'none' | undefined;
+  if (canSort && !header.isPlaceholder) {
+    if (sortDirection === 'asc') {
+      ariaSort = 'ascending';
+    } else if (sortDirection === 'desc') {
+      ariaSort = 'descending';
+    } else {
+      ariaSort = 'none';
+    }
+  }
 
   return (
     <th

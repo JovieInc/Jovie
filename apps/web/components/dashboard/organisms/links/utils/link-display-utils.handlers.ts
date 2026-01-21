@@ -74,11 +74,12 @@ export function formatAsHandle(value: string): string {
  */
 export function stripUrlScheme(url: string): string {
   const lower = url.toLowerCase();
-  const withoutScheme = lower.startsWith('https://')
-    ? url.slice(8)
-    : lower.startsWith('http://')
-      ? url.slice(7)
-      : url;
+  let withoutScheme = url;
+  if (lower.startsWith('https://')) {
+    withoutScheme = url.slice(8);
+  } else if (lower.startsWith('http://')) {
+    withoutScheme = url.slice(7);
+  }
   const beforePath = withoutScheme.split('/')[0];
   return beforePath || url;
 }
