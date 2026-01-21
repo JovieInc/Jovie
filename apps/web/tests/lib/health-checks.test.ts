@@ -24,9 +24,9 @@ declare global {
 vi.mock('@neondatabase/serverless', () => {
   return {
     neonConfig: { webSocketConstructor: undefined },
-    Pool: vi.fn().mockImplementation(() => ({
-      end: vi.fn().mockReturnValue(Promise.resolve()),
-    })),
+    Pool: vi.fn().mockImplementation(function (this: any) {
+      this.end = vi.fn().mockResolvedValue(undefined);
+    }),
   };
 });
 
