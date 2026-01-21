@@ -42,7 +42,7 @@ export function UserActionsMenu({
     const success = await copyTextToClipboard(user.clerkId);
     if (success) {
       setCopySuccess(true);
-      window.setTimeout(() => setCopySuccess(false), 1500);
+      setTimeout(() => setCopySuccess(false), 1500);
     }
   }, [user.clerkId]);
 
@@ -51,7 +51,7 @@ export function UserActionsMenu({
     const success = await copyTextToClipboard(user.email);
     if (success) {
       setCopySuccess(true);
-      window.setTimeout(() => setCopySuccess(false), 1500);
+      setTimeout(() => setCopySuccess(false), 1500);
     }
   }, [user.email]);
 

@@ -13,12 +13,12 @@ export function HudAutoRefreshClient({
   const router = useRouter();
 
   useEffect(() => {
-    const id = window.setInterval(() => {
+    const id = setInterval(() => {
       router.refresh();
     }, intervalMs);
 
     return () => {
-      window.clearInterval(id);
+      clearInterval(id);
     };
   }, [intervalMs, router]);
 

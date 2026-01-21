@@ -66,7 +66,7 @@ export function useIngestRefresh({
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
         notifications.handleError(error);
       } finally {
-        window.setTimeout(() => {
+        setTimeout(() => {
           setIngestRefreshStatuses(prev => ({
             ...prev,
             [profileId]: 'idle',

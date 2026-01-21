@@ -298,11 +298,11 @@ export function useSettingsProfile({
   // Clear success status after delay
   useEffect(() => {
     if (!profileSaveStatus.success) return;
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setProfileSaveStatus(prev => ({ ...prev, success: null }));
     }, 1500);
     return () => {
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [profileSaveStatus.success]);
 

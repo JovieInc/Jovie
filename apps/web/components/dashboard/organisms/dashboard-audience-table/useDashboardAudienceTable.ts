@@ -55,7 +55,9 @@ export function useDashboardAudienceTable({
   const [selectedMember, setSelectedMember] =
     React.useState<AudienceRow | null>(null);
   const [copiedProfileLink, setCopiedProfileLink] = React.useState(false);
-  const copyTimeoutRef = React.useRef<number | null>(null);
+  const copyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const rowIds = React.useMemo(() => rows.map(row => row.id), [rows]);
   const {
@@ -209,9 +211,9 @@ export function useDashboardAudienceTable({
       notifications.success('Profile link copied');
       setCopiedProfileLink(true);
       if (copyTimeoutRef.current) {
-        window.clearTimeout(copyTimeoutRef.current);
+        clearTimeout(copyTimeoutRef.current);
       }
-      copyTimeoutRef.current = window.setTimeout(() => {
+      copyTimeoutRef.current = setTimeout(() => {
         setCopiedProfileLink(false);
         copyTimeoutRef.current = null;
       }, 2000);
@@ -224,7 +226,7 @@ export function useDashboardAudienceTable({
   React.useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) {
-        window.clearTimeout(copyTimeoutRef.current);
+        clearTimeout(copyTimeoutRef.current);
       }
     };
   }, []);

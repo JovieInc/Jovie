@@ -27,7 +27,7 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
 
     window.print();
 
-    window.setTimeout(() => {
+    setTimeout(() => {
       restoreTitle();
     }, 2000);
   };

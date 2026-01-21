@@ -150,8 +150,8 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
   // Clear lastAddedId after highlight duration
   useEffect(() => {
     if (!lastAddedId) return;
-    const timer = window.setTimeout(() => setLastAddedId(null), 1400);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(() => setLastAddedId(null), 1400);
+    return () => clearTimeout(timer);
   }, [lastAddedId]);
 
   // Notify parent of link changes

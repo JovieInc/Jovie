@@ -110,7 +110,7 @@ export const UniversalLinkInput = forwardRef<
             setAutosuggestOpen(nextOpen);
           }}
           onBlur={() => {
-            window.setTimeout(() => {
+            setTimeout(() => {
               setAutosuggestOpen(false);
               setActiveSuggestionIndex(0);
             }, 0);
