@@ -456,6 +456,11 @@ export async function completeOnboarding({
           profileId,
           avatarError
         );
+        // Capture to Sentry for monitoring (non-blocking, warning level)
+        Sentry.captureException(avatarError, {
+          tags: { context: 'onboarding_avatar_upload', profileId },
+          level: 'warning',
+        });
       }
     }
 

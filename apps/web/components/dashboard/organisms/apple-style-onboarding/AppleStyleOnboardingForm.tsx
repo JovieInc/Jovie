@@ -49,7 +49,7 @@ export function AppleStyleOnboardingForm({
       fullName,
     });
 
-  const { state, handleSubmit } = useOnboardingSubmit({
+  const { state, handleSubmit, isPendingSubmit } = useOnboardingSubmit({
     userId,
     userEmail,
     fullName,
@@ -179,6 +179,7 @@ export function AppleStyleOnboardingForm({
             inputRef={handleInputRef}
             onHandleChange={setHandleInput}
             onSubmit={handleSubmit}
+            isPendingSubmit={isPendingSubmit}
           />
         );
 
