@@ -2,10 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
-import {
-  KEYBOARD_SHORTCUTS,
-  type KeyboardShortcut,
-} from '@/lib/keyboard-shortcuts';
+import { KEYBOARD_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 
 /**
  * Configuration for sequential shortcuts hook
@@ -136,24 +133,4 @@ export function useSequentialShortcuts({
   return {
     clearSequence,
   };
-}
-
-/**
- * Get the shortcut for a specific nav item ID
- */
-export function getNavShortcut(navId: string): KeyboardShortcut | undefined {
-  const navIdToShortcutId: Record<string, string> = {
-    overview: 'nav-dashboard',
-    links: 'nav-profile',
-    contacts: 'nav-contacts',
-    releases: 'nav-releases',
-    audience: 'nav-audience',
-    earnings: 'nav-earnings',
-    account: 'nav-settings',
-  };
-
-  const shortcutId = navIdToShortcutId[navId];
-  if (!shortcutId) return undefined;
-
-  return KEYBOARD_SHORTCUTS.find(s => s.id === shortcutId);
 }

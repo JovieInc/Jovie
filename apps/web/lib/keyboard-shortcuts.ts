@@ -193,26 +193,3 @@ export const SHORTCUT_CATEGORY_LABELS: Record<ShortcutCategory, string> = {
   navigation: 'Navigation',
   actions: 'Actions',
 };
-
-/**
- * Get shortcuts by category
- */
-export function getShortcutsByCategory(
-  category: ShortcutCategory
-): KeyboardShortcut[] {
-  return KEYBOARD_SHORTCUTS.filter(s => s.category === category);
-}
-
-/**
- * Get all sequential navigation shortcuts
- */
-export function getNavigationShortcuts(): KeyboardShortcut[] {
-  return KEYBOARD_SHORTCUTS.filter(s => s.isSequential && s.href);
-}
-
-/**
- * Format shortcut keys for display in tooltip
- */
-export function formatShortcutForTooltip(shortcut: KeyboardShortcut): string {
-  return shortcut.keys;
-}
