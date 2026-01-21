@@ -56,8 +56,8 @@ export function ProfileLinkCategorySelector({
             aria-pressed={isActive}
             className={
               isActive
-                ? 'flex-1 h-7 rounded-full bg-surface-1 px-2.5 text-xs font-semibold text-primary-token shadow-sm shadow-black/10 dark:shadow-black/40 transition-all'
-                : 'flex-1 h-7 rounded-full px-2.5 text-xs font-medium text-secondary-token transition-all hover:bg-surface-2/40 hover:text-primary-token'
+                ? 'flex-1 h-7 rounded-full bg-surface-1 px-2.5 text-xs font-semibold text-primary-token shadow-sm shadow-black/10 dark:shadow-black/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
+                : 'flex-1 h-7 rounded-full px-2.5 text-xs font-medium text-secondary-token transition-all hover:bg-surface-2/40 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
             }
           >
             {category.label}

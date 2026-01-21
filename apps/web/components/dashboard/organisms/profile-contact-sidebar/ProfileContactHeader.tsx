@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/atoms/Avatar/Avatar';
 
@@ -20,6 +20,16 @@ export function ProfileContactHeader({
   profilePath,
 }: ProfileContactHeaderProps) {
   const [isCopied, setIsCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCopyUrl = useCallback(async () => {
     try {
@@ -27,7 +37,13 @@ export function ProfileContactHeader({
       await navigator.clipboard.writeText(url);
       setIsCopied(true);
       toast.success('Profile URL copied');
-      setTimeout(() => setIsCopied(false), 2000);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setIsCopied(false);
+        timeoutRef.current = null;
+      }, 2000);
     } catch {
       toast.error('Failed to copy');
     }

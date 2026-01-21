@@ -35,6 +35,11 @@ function compactUrlDisplay(platform: string, url: string): string {
   }
 }
 
+function getLinkSection(platform: string): LinkSection {
+  const category = getPlatformCategory(platform);
+  return category === 'websites' ? 'custom' : (category as LinkSection);
+}
+
 interface LinkItemProps {
   link: PreviewPanelLink;
 }
@@ -64,11 +69,11 @@ function LinkItem({ link }: LinkItemProps) {
           tone={link.isVisible ? 'default' : 'faded'}
         />
       </div>
-      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity'>
+      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'>
         <button
           type='button'
           onClick={handleCopy}
-          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors'
+          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
           aria-label='Copy link'
         >
           <Copy className='h-3.5 w-3.5' />
@@ -76,7 +81,7 @@ function LinkItem({ link }: LinkItemProps) {
         <button
           type='button'
           onClick={handleOpen}
-          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors'
+          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
           aria-label='Open in new tab'
         >
           <ExternalLink className='h-3.5 w-3.5' />
@@ -100,9 +105,7 @@ export function ProfileLinkList({
     };
 
     for (const link of links) {
-      const category = getPlatformCategory(link.platform);
-      const section: LinkSection =
-        category === 'websites' ? 'custom' : (category as LinkSection);
+      const section = getLinkSection(link.platform);
       groups[section].push(link);
     }
 
@@ -149,9 +152,7 @@ export function getCategoryCounts(
   };
 
   for (const link of links) {
-    const category = getPlatformCategory(link.platform);
-    const section: LinkSection =
-      category === 'websites' ? 'custom' : (category as LinkSection);
+    const section = getLinkSection(link.platform);
     counts[section]++;
   }
 

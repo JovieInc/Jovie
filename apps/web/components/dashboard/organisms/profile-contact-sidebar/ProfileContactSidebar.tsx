@@ -28,8 +28,10 @@ export function ProfileContactSidebar() {
   useEffect(() => {
     if (!categoryCounts) return;
 
-    const currentCount = categoryCounts[selectedCategory] ?? 0;
-    if (currentCount === 0) {
+    setSelectedCategory(prevSelectedCategory => {
+      const currentCount = categoryCounts[prevSelectedCategory] ?? 0;
+      if (currentCount > 0) return prevSelectedCategory;
+
       // Find first category with links
       const categories: CategoryOption[] = [
         'social',
@@ -39,12 +41,13 @@ export function ProfileContactSidebar() {
       ];
       for (const cat of categories) {
         if ((categoryCounts[cat] ?? 0) > 0) {
-          setSelectedCategory(cat);
-          break;
+          return cat;
         }
       }
-    }
-  }, [categoryCounts, selectedCategory]);
+
+      return prevSelectedCategory;
+    });
+  }, [categoryCounts]);
 
   // Don't render until we have preview data
   if (!previewData) {
