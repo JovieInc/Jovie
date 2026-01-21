@@ -55,4 +55,9 @@ export * from './TableErrorFallback';
 export * from './Textarea';
 export * from './Tooltip';
 export * from './VerifiedBadge';
-export * from './WrappedSocialLink';
+// WrappedSocialLink re-exported from molecules (has business logic - useState, useEffect, API calls)
+export {
+  WrappedSocialLink,
+  WrappedDSPButton,
+  LegacySocialLink,
+} from '@/components/molecules/WrappedSocialLink';
