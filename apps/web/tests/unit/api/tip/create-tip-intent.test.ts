@@ -5,12 +5,12 @@ const mockStripePaymentIntentsCreate = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => vi.fn());
 
 vi.mock('stripe', () => {
-  const Stripe = vi.fn().mockImplementation(() => ({
-    paymentIntents: {
+  const Stripe = vi.fn().mockImplementation(function (this: any) {
+    this.paymentIntents = {
       create: mockStripePaymentIntentsCreate,
-    },
-  }));
-  return { default: Stripe };
+    };
+  });
+  return { __esModule: true, default: Stripe };
 });
 
 vi.mock('@clerk/nextjs/server', () => ({

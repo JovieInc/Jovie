@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/clerk/webhook/route';
 
 // Mock dependencies
 const mockUpdateUser = vi.fn();
@@ -18,6 +17,11 @@ const clerkSyncMocks = vi.hoisted(() => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
   syncEmailFromClerkByClerkId: vi.fn().mockResolvedValue({ success: true }),
 }));
+
+async function getPost() {
+  const mod = await import('@/app/api/clerk/webhook/route');
+  return mod.POST;
+}
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: vi.fn(() => Promise.resolve(mockClerkClient)),
@@ -59,7 +63,7 @@ describe('/api/clerk/webhook', () => {
 
     // Mock headers
     const { headers } = await import('next/headers');
-    vi.mocked(headers).mockResolvedValue(
+    vi.mocked(headers).mockReturnValue(
       new Map([
         ['svix-id', 'svix_123'],
         ['svix-timestamp', '1234567890'],
@@ -69,7 +73,9 @@ describe('/api/clerk/webhook', () => {
 
     // Mock webhook verification
     const { Webhook } = await import('svix');
-    vi.mocked(Webhook).mockImplementation(() => mockWebhook as any);
+    vi.mocked(Webhook).mockImplementation(function () {
+      return mockWebhook as any;
+    });
   });
 
   describe('user.created event', () => {
@@ -106,7 +112,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -154,7 +160,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -195,7 +201,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -236,7 +242,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -250,7 +256,7 @@ describe('/api/clerk/webhook', () => {
   describe('webhook security', () => {
     it('should reject requests with missing headers', async () => {
       const { headers } = await import('next/headers');
-      vi.mocked(headers).mockResolvedValue(new Map() as any);
+      vi.mocked(headers).mockReturnValue(new Map() as any);
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -260,7 +266,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(400);
@@ -281,7 +287,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(400);
@@ -300,7 +306,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(500);
@@ -327,7 +333,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -363,7 +369,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -402,7 +408,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -450,7 +456,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await POST(request);
+      const response = await (await getPost())(request);
       const result = await response.json();
 
       // Should return 200 to prevent retries

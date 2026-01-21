@@ -154,3 +154,19 @@ export function FormSettingsLoading({
     </SettingsLoadingSkeleton>
   );
 }
+
+/** Branding settings loading skeleton (used by branding and remove-branding pages) */
+export function BrandingSettingsLoading() {
+  return (
+    <SettingsLoadingSkeleton titleWidth='w-56' descriptionWidth='w-96'>
+      <div className='flex items-center justify-between gap-4'>
+        <div className='space-y-2'>
+          <div className='h-4 w-56 rounded skeleton' />
+          <div className='h-4 w-80 rounded skeleton' />
+        </div>
+        <div className='h-6 w-10 rounded skeleton' />
+      </div>
+      <ButtonSkeleton width='w-44' />
+    </SettingsLoadingSkeleton>
+  );
+}

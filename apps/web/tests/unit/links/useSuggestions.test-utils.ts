@@ -1,14 +1,7 @@
 /**
  * Shared test utilities for useSuggestions tests
  */
-import { vi } from 'vitest';
-
 import type { SuggestedLink } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
-
-// Mock the analytics module
-vi.mock('@/lib/analytics', () => ({
-  track: vi.fn(),
-}));
 
 /**
  * Helper to create a mock SuggestedLink

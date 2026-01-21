@@ -2,11 +2,13 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/capture-tip/route';
 
-const { mockHeaders, mockInsert, mockSelect } = vi.hoisted(() => ({
-  mockHeaders: vi.fn(),
-  mockInsert: vi.fn(),
-  mockSelect: vi.fn(),
-}));
+const { mockHeaders, mockInsert, mockSelect, mockStripeConstructEvent } =
+  vi.hoisted(() => ({
+    mockHeaders: vi.fn(),
+    mockInsert: vi.fn(),
+    mockSelect: vi.fn(),
+    mockStripeConstructEvent: vi.fn(),
+  }));
 
 vi.mock('next/headers', () => ({
   headers: () => mockHeaders(),
@@ -25,12 +27,12 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('stripe', () => {
-  class StripeMock {
-    webhooks = {
-      constructEvent: vi.fn(),
+  const StripeMock = vi.fn().mockImplementation(function (this: any) {
+    this.webhooks = {
+      constructEvent: mockStripeConstructEvent,
     };
-  }
-  return { default: StripeMock };
+  });
+  return { __esModule: true, default: StripeMock };
 });
 
 describe('/api/capture-tip', () => {
@@ -59,8 +61,6 @@ describe('/api/capture-tip', () => {
       new Map([['stripe-signature', 'sig_test']]) as any
     );
 
-    const stripeModule = await import('stripe');
-    const stripeInstance: any = new (stripeModule as any).default('sk_test');
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -83,9 +83,7 @@ describe('/api/capture-tip', () => {
       },
     } as any;
 
-    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
-
-    (stripeModule as any).default = vi.fn(() => stripeInstance);
+    mockStripeConstructEvent.mockReturnValue(event);
 
     mockSelect.mockReturnValue({
       from: () => ({
@@ -122,8 +120,6 @@ describe('/api/capture-tip', () => {
       new Map([['stripe-signature', 'sig_test']]) as any
     );
 
-    const stripeModule = await import('stripe');
-    const stripeInstance: any = new (stripeModule as any).default('sk_test');
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -136,8 +132,7 @@ describe('/api/capture-tip', () => {
       },
     } as any;
 
-    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
-    (stripeModule as any).default = vi.fn(() => stripeInstance);
+    mockStripeConstructEvent.mockReturnValue(event);
 
     // Simulate creator profile not found
     mockSelect.mockReturnValue({
@@ -170,8 +165,6 @@ describe('/api/capture-tip', () => {
       new Map([['stripe-signature', 'sig_test']]) as any
     );
 
-    const stripeModule = await import('stripe');
-    const stripeInstance: any = new (stripeModule as any).default('sk_test');
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -184,8 +177,7 @@ describe('/api/capture-tip', () => {
       },
     } as any;
 
-    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
-    (stripeModule as any).default = vi.fn(() => stripeInstance);
+    mockStripeConstructEvent.mockReturnValue(event);
 
     mockSelect.mockReturnValue({
       from: () => ({
@@ -220,8 +212,6 @@ describe('/api/capture-tip', () => {
       new Map([['stripe-signature', 'sig_test']]) as any
     );
 
-    const stripeModule = await import('stripe');
-    const stripeInstance: any = new (stripeModule as any).default('sk_test');
     const event = {
       type: 'payment_intent.created', // Different event type
       data: {
@@ -231,8 +221,7 @@ describe('/api/capture-tip', () => {
       },
     } as any;
 
-    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
-    (stripeModule as any).default = vi.fn(() => stripeInstance);
+    mockStripeConstructEvent.mockReturnValue(event);
 
     const request = new NextRequest('http://localhost:3000/api/capture-tip', {
       method: 'POST',
