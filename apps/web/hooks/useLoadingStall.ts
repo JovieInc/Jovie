@@ -37,12 +37,12 @@ export function useLoadingStall(
       return undefined;
     }
 
-    const timeout = window.setTimeout(() => {
+    const timeout = setTimeout(() => {
       setIsStalled(true);
     }, stallTimeoutMs);
 
     return () => {
-      window.clearTimeout(timeout);
+      clearTimeout(timeout);
     };
   }, [isLoaded, stallTimeoutMs]);
 

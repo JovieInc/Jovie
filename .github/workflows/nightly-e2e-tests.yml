@@ -1,0 +1,145 @@
+name: Nightly E2E Tests
+
+on:
+  schedule:
+    # Run daily at 3:00 AM UTC (after nightly-unit-tests at 2:00 AM)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: 'Test file pattern (leave empty for nightly suite)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-e2e-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly-e2e:
+    name: Nightly E2E Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: nightly-e2e-${{ github.run_id }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run database migrations
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: nightly
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run nightly E2E tests
+        run: |
+          cd apps/web
+          if [ -n "${{ github.event.inputs.test_filter }}" ]; then
+            pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium --reporter=line
+          else
+            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line
+          fi
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: nightly-e2e-report-${{ github.run_id }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Upload Test Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: nightly-e2e-results-${{ github.run_id }}
+          path: apps/web/test-results/
+          retention-days: 7
+
+  notify:
+    name: Notify Results
+    needs: [nightly-e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack notification on failure
+        if: ${{ needs.nightly-e2e.result == 'failure' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Nightly E2E Tests'
+          custom_payload: |
+            {
+              "text": ":warning: Nightly E2E tests failed",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Workflow", "value": "Nightly E2E Tests", "short": true },
+                    { "title": "Status", "value": "Failed", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notification on success
+        if: ${{ needs.nightly-e2e.result == 'success' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#monitoring'
+          author_name: 'Nightly E2E Tests'
+          custom_payload: |
+            {
+              "text": ":white_check_mark: Nightly E2E tests passed",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Workflow", "value": "Nightly E2E Tests", "short": true },
+                    { "title": "Status", "value": "Success", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -4,6 +4,7 @@ import type {
   PLATFORM_OPTIONS,
 } from '../universalLinkInput.constants';
 import type { CursorPosition } from '../useInputFocusController';
+import type { RankedPlatformOption } from './utils';
 
 export type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
 
@@ -33,14 +34,14 @@ export interface UseUniversalLinkInputReturn {
   urlInputRef: React.RefObject<HTMLInputElement | null>;
   detectedLink: DetectedLink | null;
   isPlatformDuplicate: boolean;
-  platformSuggestions: PlatformOption[];
+  platformSuggestions: RankedPlatformOption[];
   shouldShowAutosuggest: boolean;
+  isShortQuery: boolean;
   focusInput: (cursor?: CursorPosition) => void;
   handleUrlChange: (value: string) => void;
   handleAdd: () => void;
   handleClear: () => void;
   handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  handlePlatformSelect: (platform: PlatformOption) => void;
   handleArtistSearchSelect: (provider: ArtistSearchProvider) => void;
   handleExitSearchMode: (nextUrl?: string) => void;
   handleArtistLinkSelect: (link: DetectedLink) => void;

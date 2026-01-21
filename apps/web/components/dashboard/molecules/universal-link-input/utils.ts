@@ -4,9 +4,17 @@
  * Shared utility functions for link input components.
  */
 
-import type { PLATFORM_OPTIONS } from '../universalLinkInput.constants';
+import {
+  CATEGORY_LABELS,
+  CATEGORY_ORDER,
+  type PLATFORM_OPTIONS,
+  type PlatformCategory,
+} from '../universalLinkInput.constants';
 
 type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
+
+/** Minimum query length required for fuzzy search */
+const MIN_FUZZY_QUERY_LENGTH = 2;
 
 /**
  * Normalize a query string for comparison.
@@ -32,6 +40,7 @@ interface FuzzyMatchState {
   score: number;
   lastMatchIdx: number;
   targetIdx: number;
+  matchIndices: number[];
 }
 
 /**
@@ -54,6 +63,7 @@ function findNextMatch(
         score: state.score + pointsAdded,
         lastMatchIdx: targetIdx,
         targetIdx: targetIdx + 1,
+        matchIndices: [...state.matchIndices, targetIdx],
       };
     }
     targetIdx += 1;
@@ -83,11 +93,19 @@ function applyBonusScoring(
   return score;
 }
 
+export interface FuzzyMatchResult {
+  score: number;
+  matchIndices: number[];
+}
+
 /**
  * Calculate a fuzzy match score between a query and target string.
- * Returns null if no match, otherwise a score (higher is better).
+ * Returns null if no match, otherwise a score and match indices.
  */
-export function fuzzyScore(queryRaw: string, targetRaw: string): number | null {
+export function fuzzyMatch(
+  queryRaw: string,
+  targetRaw: string
+): FuzzyMatchResult | null {
   const query = normalizeQuery(queryRaw);
   const target = normalizeQuery(targetRaw);
   if (!query) return null;
@@ -96,6 +114,7 @@ export function fuzzyScore(queryRaw: string, targetRaw: string): number | null {
     score: 0,
     lastMatchIdx: -1,
     targetIdx: 0,
+    matchIndices: [],
   };
 
   for (let qIdx = 0; qIdx < query.length; qIdx += 1) {
@@ -108,19 +127,75 @@ export function fuzzyScore(queryRaw: string, targetRaw: string): number | null {
     state = nextState;
   }
 
-  return applyBonusScoring(state.score, query, target);
+  return {
+    score: applyBonusScoring(state.score, query, target),
+    matchIndices: state.matchIndices,
+  };
+}
+
+export type RankedPlatformOption = PlatformOption & {
+  matchIndices: number[];
+};
+
+/**
+ * Get popular platforms filtered by existing platforms, grouped by category.
+ * Used when query is too short for meaningful fuzzy search.
+ */
+export function getPopularPlatforms(
+  options: readonly PlatformOption[],
+  existingPlatforms: readonly string[]
+): RankedPlatformOption[] {
+  const existing = new Set(existingPlatforms);
+
+  return options
+    .filter(option => {
+      if (option.id === 'youtube') return true;
+      return !existing.has(option.id) && option.popular;
+    })
+    .map(option => ({ ...option, matchIndices: [] }));
+}
+
+/**
+ * Group platforms by category in a specified order.
+ */
+export function groupByCategory(options: RankedPlatformOption[]): {
+  category: PlatformCategory;
+  label: string;
+  options: RankedPlatformOption[];
+}[] {
+  const groups = new Map<PlatformCategory, RankedPlatformOption[]>();
+
+  for (const option of options) {
+    const existing = groups.get(option.category) ?? [];
+    existing.push(option);
+    groups.set(option.category, existing);
+  }
+
+  return CATEGORY_ORDER.filter(cat => groups.has(cat)).map(cat => ({
+    category: cat,
+    label: CATEGORY_LABELS[cat],
+    options: groups.get(cat) ?? [],
+  }));
 }
 
 /**
  * Rank platform options by fuzzy match score against a query.
  * Filters out platforms that already exist (except YouTube which can appear multiple times).
+ * For short queries (< 2 chars), returns popular platforms instead.
  */
 export function rankPlatformOptions(
   query: string,
   options: readonly PlatformOption[],
   existingPlatforms: readonly string[]
-): PlatformOption[] {
+): RankedPlatformOption[] {
+  const trimmed = normalizeQuery(query);
   const existing = new Set(existingPlatforms);
+
+  // For very short queries, return popular platforms (no fuzzy matching)
+  if (trimmed.length < MIN_FUZZY_QUERY_LENGTH) {
+    return getPopularPlatforms(options, existingPlatforms);
+  }
+
   const scored = options
     .filter(option => {
       // Allow YouTube selection even if present (it can live in multiple sections).
@@ -128,18 +203,35 @@ export function rankPlatformOptions(
       return !existing.has(option.id);
     })
     .map(option => {
-      const byName = fuzzyScore(query, option.name);
-      const byId = fuzzyScore(query, option.id.replaceAll('-', ' '));
-      const best = Math.max(byName ?? -Infinity, byId ?? -Infinity);
-      return { option, score: Number.isFinite(best) ? best : null };
+      const byName = fuzzyMatch(query, option.name);
+      const byId = fuzzyMatch(query, option.id.replaceAll('-', ' '));
+
+      // Pick the best score, but always use name's match indices for highlighting
+      const nameScore = byName?.score ?? -Infinity;
+      const idScore = byId?.score ?? -Infinity;
+      const bestScore = Math.max(nameScore, idScore);
+
+      // Use name match indices if available, otherwise derive from id match
+      const matchIndices = byName?.matchIndices ?? [];
+
+      return {
+        option,
+        score: Number.isFinite(bestScore) ? bestScore : null,
+        matchIndices,
+      };
     })
     .filter(
-      (entry): entry is { option: PlatformOption; score: number } =>
-        typeof entry.score === 'number'
+      (
+        entry
+      ): entry is {
+        option: PlatformOption;
+        score: number;
+        matchIndices: number[];
+      } => typeof entry.score === 'number'
     )
     .sort((a, b) => b.score - a.score)
     .slice(0, 8)
-    .map(entry => entry.option);
+    .map(entry => ({ ...entry.option, matchIndices: entry.matchIndices }));
 
   return scored;
 }

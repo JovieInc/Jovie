@@ -31,6 +31,8 @@ export interface GroupedLinksManagerProps<
   ) => Promise<void> | void;
   suggestionsEnabled?: boolean;
   profileId?: string;
+  /** When true, hides categories and shows simplified prompt above input */
+  sidebarOpen?: boolean;
 }
 
 export interface PendingPreview {

@@ -48,6 +48,15 @@ interface ToastProviderProps {
  * toast.success('Copied!', { duration: 2000 });
  * ```
  */
+// Map resolved theme to Toaster theme
+function getToasterTheme(
+  resolvedTheme: string | undefined
+): 'dark' | 'light' | 'system' {
+  if (resolvedTheme === 'dark') return 'dark';
+  if (resolvedTheme === 'light') return 'light';
+  return 'system';
+}
+
 export function ToastProvider({ children }: ToastProviderProps) {
   const { resolvedTheme } = useTheme();
 
@@ -55,13 +64,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <>
       {children}
       <Toaster
-        theme={
-          resolvedTheme === 'dark'
-            ? 'dark'
-            : resolvedTheme === 'light'
-              ? 'light'
-              : 'system'
-        }
+        theme={getToasterTheme(resolvedTheme)}
         position='bottom-right'
         // Expand stacked notifications on hover
         expand

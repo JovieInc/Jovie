@@ -393,7 +393,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
           item.className
         )}
       >
-        {renderIcon(IconComponent, 'h-3.5 w-3.5')}
+        {renderIcon(IconComponent, 'h-4 w-4')}
         <span className='flex-1'>{item.label}</span>
         {item.badge && (
           <span
@@ -414,7 +414,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         {item.shortcut && (
           <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
         )}
-        {renderIcon(IconAfterComponent, 'ml-auto h-3.5 w-3.5')}
+        {renderIcon(IconAfterComponent, 'ml-auto h-4 w-4')}
       </MenuItem>
     );
   }
@@ -442,12 +442,12 @@ export function CommonDropdown(props: CommonDropdownProps) {
         disabled={item.disabled}
         className={cn(CHECKBOX_RADIO_ITEM_BASE, item.className)}
       >
-        <span className='absolute left-2 flex h-3.5 w-3.5 items-center justify-center'>
+        <span className='absolute left-2 flex h-4 w-4 items-center justify-center'>
           <ItemIndicator>
             <Check className='h-4 w-4' />
           </ItemIndicator>
         </span>
-        {IconComponent && <IconComponent className='h-3.5 w-3.5' />}
+        {IconComponent && <IconComponent className='h-4 w-4' />}
         {item.label}
       </CheckboxItem>
     );
@@ -486,12 +486,12 @@ export function CommonDropdown(props: CommonDropdownProps) {
               disabled={radioItem.disabled}
               className={cn(CHECKBOX_RADIO_ITEM_BASE, radioItem.className)}
             >
-              <span className='absolute left-2 flex h-3.5 w-3.5 items-center justify-center'>
+              <span className='absolute left-2 flex h-4 w-4 items-center justify-center'>
                 <ItemIndicator>
                   <Circle className='h-2 w-2 fill-current' />
                 </ItemIndicator>
               </span>
-              {renderIcon(IconComponent, 'h-3.5 w-3.5')}
+              {renderIcon(IconComponent, 'h-4 w-4')}
               {radioItem.label}
             </RadioItem>
           );
@@ -527,7 +527,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
           disabled={item.disabled}
           className={cn(MENU_ITEM_BASE, item.className)}
         >
-          {renderIcon(item.icon, 'h-3.5 w-3.5')}
+          {renderIcon(item.icon, 'h-4 w-4')}
           {item.label}
           <ChevronRight className='ml-auto' />
         </SubTrigger>

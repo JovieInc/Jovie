@@ -35,6 +35,7 @@ interface UniversalLinkInputUrlModeProps {
   inputRef: React.RefObject<HTMLInputElement | null>;
   onUrlChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLInputElement>) => void;
   onClear: () => void;
   onPlatformSelect: (platform: (typeof PLATFORM_OPTIONS)[number]) => void;
   onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
@@ -60,6 +61,7 @@ export function UniversalLinkInputUrlMode({
   inputRef,
   onUrlChange,
   onKeyDown,
+  onPaste,
   onClear,
   onPlatformSelect,
   onArtistSearchSelect,
@@ -82,9 +84,10 @@ export function UniversalLinkInputUrlMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
-          'focus-within:ring-2 focus-within:ring-accent',
-          isDropdownOpen ? 'rounded-t-3xl border-b-0' : 'rounded-full',
+          'relative flex w-full items-center gap-2 overflow-hidden bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          isDropdownOpen
+            ? 'rounded-t-3xl border-2 border-b-0 border-accent'
+            : 'rounded-full border border-default focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
           disabled && 'opacity-50'
         )}
       >
@@ -108,6 +111,7 @@ export function UniversalLinkInputUrlMode({
           value={url}
           onChange={event => onUrlChange(event.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           onFocus={onFocus}
           onBlur={onBlur}
           disabled={disabled}

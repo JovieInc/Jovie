@@ -16,7 +16,7 @@ export function useSocialsForm({
   const [error, setError] = useState<string | undefined>();
   const [success, setSuccess] = useState(false);
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
-  const timers = useRef<Record<string, number>>({});
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     const fetchSocialLinks = async () => {
@@ -101,9 +101,9 @@ export function useSocialsForm({
   const scheduleNormalize = useCallback((index: number, raw: string) => {
     const key = `${index}-url`;
     if (timers.current[key]) {
-      window.clearTimeout(timers.current[key]);
+      clearTimeout(timers.current[key]);
     }
-    timers.current[key] = window.setTimeout(() => {
+    timers.current[key] = setTimeout(() => {
       try {
         const norm = normalizeUrl(raw.trim());
         setSocialLinks(prev => {

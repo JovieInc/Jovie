@@ -1,0 +1,41 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+
+export interface DrawerPropertyRowProps {
+  label: string;
+  value: ReactNode;
+  labelWidth?: number;
+  interactive?: boolean;
+  onClick?: () => void;
+  className?: string;
+}
+
+export function DrawerPropertyRow({
+  label,
+  value,
+  labelWidth = 96,
+  interactive = false,
+  onClick,
+  className,
+}: DrawerPropertyRowProps) {
+  const Wrapper = interactive ? 'button' : 'div';
+
+  return (
+    <Wrapper
+      type={interactive ? 'button' : undefined}
+      onClick={interactive ? onClick : undefined}
+      className={cn(
+        'grid items-start gap-2 w-full text-left',
+        interactive &&
+          'rounded-md -mx-2 px-2 py-1.5 hover:bg-surface-2 transition-colors cursor-pointer',
+        className
+      )}
+      style={{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }}
+    >
+      <div className='pt-0.5 text-xs text-secondary-token'>{label}</div>
+      <div className='min-w-0 text-sm text-primary-token'>{value}</div>
+    </Wrapper>
+  );
+}

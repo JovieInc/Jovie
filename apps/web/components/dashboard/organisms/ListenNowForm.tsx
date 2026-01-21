@@ -26,14 +26,14 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     youtube_url: artist.youtube_url || '',
   });
   // Debounce timers per field
-  const timers = useRef<Record<string, number>>({});
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const scheduleNormalize = (key: keyof typeof formData, value: string) => {
     // clear previous timer
     if (timers.current[key]) {
-      window.clearTimeout(timers.current[key]);
+      clearTimeout(timers.current[key]);
     }
-    timers.current[key] = window.setTimeout(() => {
+    timers.current[key] = setTimeout(() => {
       try {
         const norm = normalizeUrl(value.trim());
         setFormData(prev =>

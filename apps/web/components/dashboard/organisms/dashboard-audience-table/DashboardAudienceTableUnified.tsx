@@ -8,14 +8,8 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
-  AudienceActionsCell,
-  AudienceDeviceCell,
   AudienceLastSeenCell,
-  AudienceLocationCell,
   AudienceRowSelectionCell,
-  AudienceTypeBadge,
-  AudienceUserCell,
-  AudienceVisitsCell,
 } from '@/components/dashboard/audience/table/atoms';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
@@ -23,12 +17,23 @@ import {
   AdminPageSizeSelect,
   type ContextMenuItemType,
   convertContextMenuItems,
+  convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
+import { downloadVCard } from './utils';
+import {
+  renderActionsCell,
+  renderDeviceCell,
+  renderEmailCell,
+  renderLocationCell,
+  renderTypeCell,
+  renderUserCell,
+  renderVisitsCell,
+} from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
@@ -122,28 +127,7 @@ export function DashboardAudienceTableUnified({
           label: 'Export as vCard',
           icon: <Download className='h-3.5 w-3.5' />,
           onClick: () => {
-            // Generate vCard format
-            const vcard = [
-              'BEGIN:VCARD',
-              'VERSION:3.0',
-              `FN:${member.displayName}`,
-              member.email ? `EMAIL:${member.email}` : '',
-              member.phone ? `TEL:${member.phone}` : '',
-              'END:VCARD',
-            ]
-              .filter(Boolean)
-              .join('\n');
-
-            // Create blob and download
-            const blob = new Blob([vcard], { type: 'text/vcard' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${(member.displayName || 'contact').replaceAll(/[^a-z0-9]/gi, '_')}.vcf`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
+            downloadVCard(member);
             toast.success('Contact exported as vCard');
           },
         },
@@ -177,14 +161,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('displayName', {
         id: 'user',
         header: 'User',
-        cell: ({ row }) => (
-          <AudienceUserCell
-            displayName={row.original.displayName}
-            type={row.original.type}
-            email={row.original.email}
-            phone={row.original.phone}
-          />
-        ),
+        cell: renderUserCell,
         size: 240,
       }),
 
@@ -192,7 +169,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('type', {
         id: 'type',
         header: 'Type',
-        cell: ({ getValue }) => <AudienceTypeBadge type={getValue()} />,
+        cell: renderTypeCell,
         size: 120,
       }),
 
@@ -200,9 +177,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('locationLabel', {
         id: 'location',
         header: 'Location',
-        cell: ({ getValue }) => (
-          <AudienceLocationCell locationLabel={getValue()} />
-        ),
+        cell: renderLocationCell,
         size: 160,
       }),
 
@@ -210,7 +185,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('deviceType', {
         id: 'device',
         header: 'Device',
-        cell: ({ getValue }) => <AudienceDeviceCell deviceType={getValue()} />,
+        cell: renderDeviceCell,
         size: 140,
       }),
 
@@ -218,12 +193,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('visits', {
         id: 'visits',
         header: 'Visits',
-        cell: ({ row }) => (
-          <AudienceVisitsCell
-            visits={row.original.visits}
-            intentLevel={row.original.intentLevel}
-          />
-        ),
+        cell: renderVisitsCell,
         size: 120,
       }),
 
@@ -231,12 +201,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('latestActions', {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <AudienceActionsCell
-            rowId={row.original.id}
-            actions={row.original.latestActions}
-          />
-        ),
+        cell: renderActionsCell,
         size: 180,
       }),
 
@@ -310,14 +275,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('displayName', {
         id: 'user',
         header: 'User',
-        cell: ({ row }) => (
-          <AudienceUserCell
-            displayName={row.original.displayName}
-            type={row.original.type}
-            email={row.original.email}
-            phone={row.original.phone}
-          />
-        ),
+        cell: renderUserCell,
         size: 300,
       }),
 
@@ -325,9 +283,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('email', {
         id: 'email',
         header: 'Email',
-        cell: ({ getValue }) => (
-          <span className='text-secondary-token'>{getValue() ?? '—'}</span>
-        ),
+        cell: renderEmailCell,
         size: 240,
       }),
 
@@ -464,8 +420,8 @@ export function DashboardAudienceTableUnified({
             )}
           </div>
 
-          {/* Footer - direct flex child anchored to bottom */}
-          <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
+          {/* Footer - shrink-0 ensures it stays anchored to bottom when drawer opens */}
+          <div className='shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
             <span className='tracking-wide'>{paginationLabel()}</span>
             <div className='flex items-center gap-3'>
               <AdminPageSizeSelect
@@ -508,6 +464,11 @@ export function DashboardAudienceTableUnified({
         member={selectedMember}
         isOpen={Boolean(selectedMember)}
         onClose={() => setSelectedMember(null)}
+        contextMenuItems={
+          selectedMember
+            ? convertToCommonDropdownItems(getContextMenuItems(selectedMember))
+            : undefined
+        }
       />
     </div>
   );

@@ -12,15 +12,15 @@ vi.mock('@/lib/notifications/preferences', () => ({
 }));
 
 vi.mock('@/lib/notifications/providers/resend', () => ({
-  ResendEmailProvider: vi.fn().mockImplementation(() => ({
-    provider: 'resend',
-    sendEmail: vi.fn().mockResolvedValue({
+  ResendEmailProvider: vi.fn().mockImplementation(function (this: any) {
+    this.provider = 'resend';
+    this.sendEmail = vi.fn().mockResolvedValue({
       channel: 'email',
       status: 'sent',
       provider: 'resend',
       detail: 'msg-123',
-    }),
-  })),
+    });
+  }),
 }));
 
 vi.mock('@/lib/notifications/config', () => ({

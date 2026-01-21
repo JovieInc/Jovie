@@ -61,21 +61,21 @@ export interface SpotifyArtistInput {
  * Matches: "(X Remix)", "[X Remix]", "(Remixed by X)", "(X Mix)"
  */
 const REMIX_PATTERN =
-  /[\(\[]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[\)\]]/gi;
+  /[([]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[)\]]/gi;
 
 /**
  * Pattern to match featured artists in track titles
  * Matches: "(feat. X)", "(ft. X)", "(featuring X)", "feat. X", "ft. X"
  */
 const FEATURED_PATTERN =
-  /(?:[\(\[]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[\)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+))/gi;
+  /(?:[([]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+))/gi;
 
 /**
  * Pattern to match "with" credits
  * Matches: "(with X)", "with X"
  */
 const WITH_PATTERN =
-  /(?:[\(\[]\s*\bwith\b\s+([^)\]]+?)\s*[\)\]])|(?:\bwith\s+([^\(\)\[\]]+))/gi;
+  /(?:[([]\s*\bwith\b\s+([^)\]]+?)\s*[)\]])|(?:\bwith\s+([^()[\]]+))/gi;
 
 /**
  * Pattern to match "vs" credits in artist names
@@ -475,12 +475,12 @@ export function isRemix(title: string): boolean {
   const lowerTitle = title.toLowerCase();
 
   const bracketPatterns = [
-    /[\(\[].*remix.*[\)\]]/i,
-    /[\(\[].*rmx.*[\)\]]/i,
-    /[\(\[].*rework.*[\)\]]/i,
-    /[\(\[].*bootleg.*[\)\]]/i,
-    /[\(\[].*edit.*[\)\]]/i,
-    /[\(\[].*flip.*[\)\]]/i,
+    /[([].*remix.*[)\]]/i,
+    /[([].*rmx.*[)\]]/i,
+    /[([].*rework.*[)\]]/i,
+    /[([].*bootleg.*[)\]]/i,
+    /[([].*edit.*[)\]]/i,
+    /[([].*flip.*[)\]]/i,
   ];
 
   return (
@@ -502,13 +502,13 @@ export function cleanTrackTitle(title: string): string {
     title
       // Remove featured credits
       .replaceAll(
-        /[\(\[]?\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+[^)\]]+[\)\]]?/gi,
+        /[([]?\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+[^)\]]+[)\]]?/gi,
         ''
       )
       // Remove remix credits
       .replaceAll(REMIX_PATTERN, '')
       // Remove "with" credits
-      .replaceAll(/[\(\[]?\s*with\s+[^)\]]+[\)\]]?/gi, '')
+      .replaceAll(/[([]?\s*with\s+[^)\]]+[)\]]?/gi, '')
       // Clean up whitespace and trailing punctuation
       .replaceAll(/\s+/g, ' ')
       .replace(/\s*[-–]\s*$/, '')

@@ -42,11 +42,15 @@ export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
   const allSelected = rowIds.length > 0 && selectedCount === rowIds.length;
   const someSelected = selectedCount > 0 && selectedCount < rowIds.length;
 
-  const headerCheckboxState: HeaderCheckboxState = allSelected
-    ? true
-    : someSelected
-      ? 'indeterminate'
-      : false;
+  // Determine header checkbox state without nested ternary
+  let headerCheckboxState: HeaderCheckboxState;
+  if (allSelected) {
+    headerCheckboxState = true;
+  } else if (someSelected) {
+    headerCheckboxState = 'indeterminate';
+  } else {
+    headerCheckboxState = false;
+  }
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {

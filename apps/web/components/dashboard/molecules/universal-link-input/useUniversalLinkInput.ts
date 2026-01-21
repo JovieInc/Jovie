@@ -17,6 +17,8 @@ import type { PlatformOption, UseUniversalLinkInputReturn } from './types';
 import {
   isUnsafeUrl,
   looksLikeUrlOrDomain,
+  normalizeQuery,
+  type RankedPlatformOption,
   rankPlatformOptions,
 } from './utils';
 
@@ -75,13 +77,18 @@ export function useUniversalLinkInput({
     ? existingPlatforms.includes(detectedLink.platform.id)
     : false;
 
-  const platformSuggestions = useMemo(() => {
+  const platformSuggestions = useMemo((): RankedPlatformOption[] => {
     const trimmed = url.trim();
-    if (!trimmed) return [] as PlatformOption[];
-    if (looksLikeUrlOrDomain(trimmed)) return [] as PlatformOption[];
-    if (detectedLink?.isValid) return [] as PlatformOption[];
+    if (!trimmed) return [];
+    if (looksLikeUrlOrDomain(trimmed)) return [];
+    if (detectedLink?.isValid) return [];
     return rankPlatformOptions(trimmed, PLATFORM_OPTIONS, existingPlatforms);
   }, [detectedLink?.isValid, existingPlatforms, url]);
+
+  const isShortQuery = useMemo(() => {
+    const trimmed = normalizeQuery(url);
+    return trimmed.length > 0 && trimmed.length < 2;
+  }, [url]);
 
   const shouldShowAutosuggest =
     autosuggestOpen && platformSuggestions.length > 0;
@@ -244,13 +251,6 @@ export function useUniversalLinkInput({
     ]
   );
 
-  const handlePlatformSelect = useCallback(
-    (platform: PlatformOption) => {
-      commitPlatformSelection(platform);
-    },
-    [commitPlatformSelection]
-  );
-
   const handleArtistSearchSelect = useCallback(
     (provider: ArtistSearchProvider) => {
       track('spotify_artist_search_start', { provider });
@@ -313,12 +313,12 @@ export function useUniversalLinkInput({
     isPlatformDuplicate,
     platformSuggestions,
     shouldShowAutosuggest,
+    isShortQuery,
     focusInput,
     handleUrlChange,
     handleAdd,
     handleClear,
     handleKeyDown,
-    handlePlatformSelect,
     handleArtistSearchSelect,
     handleExitSearchMode,
     handleArtistLinkSelect,

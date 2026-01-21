@@ -4,7 +4,7 @@ interface ButtonSpinnerProps {
   className?: string;
 }
 
-export function ButtonSpinner({ className }: ButtonSpinnerProps) {
+export function ButtonSpinner({ className }: Readonly<ButtonSpinnerProps>) {
   return (
     <svg
       className={cn(

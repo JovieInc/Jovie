@@ -19,6 +19,7 @@ import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
+import { captureError } from '@/lib/error-tracking';
 
 // ============================================================================
 // Route Handler
@@ -111,7 +112,9 @@ export async function GET(request: Request) {
       matches: transformedMatches,
     });
   } catch (error) {
-    console.error('[DSP Matches] Error:', error);
+    await captureError('DSP Matches list failed', error, {
+      route: '/api/dsp/matches',
+    });
 
     return NextResponse.json(
       {

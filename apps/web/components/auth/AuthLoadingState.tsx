@@ -26,7 +26,10 @@ const modeLabels: Record<AuthMode, { loading: string; stall: string }> = {
  * Displays a skeleton UI while Clerk initializes, with a stall message
  * if loading takes longer than expected.
  */
-export function AuthLoadingState({ mode, isStalled }: AuthLoadingStateProps) {
+export function AuthLoadingState({
+  mode,
+  isStalled,
+}: Readonly<AuthLoadingStateProps>) {
   const labels = modeLabels[mode];
 
   return (

@@ -24,7 +24,7 @@ export function AuthBackButton({
   className,
   ariaLabel = 'Go back',
   inline = false,
-}: AuthBackButtonProps) {
+}: Readonly<AuthBackButtonProps>) {
   const haptic = useHapticFeedback();
 
   // Position classes - fixed by default, relative when inline

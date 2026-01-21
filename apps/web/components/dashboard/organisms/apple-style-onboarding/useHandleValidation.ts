@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   generateUsernameSuggestions,
   validateUsernameFormat,
@@ -135,6 +136,13 @@ export function useHandleValidation({
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
+
+        // Capture warning to Sentry for monitoring API failures
+        void captureWarning('Handle validation API failed', error, {
+          handle: normalizedInput,
+          route: '/onboarding',
+          component: 'useHandleValidation',
+        });
 
         setHandleValidation({
           available: false,

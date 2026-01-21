@@ -19,7 +19,7 @@ export function AuthPageSkeleton({
   footerPrompt,
   footerLinkText,
   footerLinkHref,
-}: AuthPageSkeletonProps) {
+}: Readonly<AuthPageSkeletonProps>) {
   return (
     <AuthLayout
       formTitle={formTitle}

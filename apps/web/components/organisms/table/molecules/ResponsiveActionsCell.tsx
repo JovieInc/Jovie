@@ -11,6 +11,19 @@ import { MoreVertical } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
+/** Breakpoint thresholds for responsive behavior */
+const BREAKPOINTS = {
+  MOBILE: 768,
+  TABLET: 1024,
+} as const;
+
+/** Max inline actions per breakpoint */
+const MAX_INLINE_ACTIONS = {
+  mobile: 0,
+  tablet: 1,
+  desktop: 2,
+} as const;
+
 export interface Action {
   id: string;
   label: string;
@@ -75,9 +88,9 @@ export function ResponsiveActionsCell({
   useEffect(() => {
     const updateBreakpoint = () => {
       const width = window.innerWidth;
-      if (width < 768) {
+      if (width < BREAKPOINTS.MOBILE) {
         setBreakpoint('mobile');
-      } else if (width < 1024) {
+      } else if (width < BREAKPOINTS.TABLET) {
         setBreakpoint('tablet');
       } else {
         setBreakpoint('desktop');
@@ -89,36 +102,16 @@ export function ResponsiveActionsCell({
     return () => window.removeEventListener('resize', updateBreakpoint);
   }, []);
 
-  // Determine which actions to show inline
-  const getPrimaryActions = (): Action[] => {
-    if (breakpoint === 'mobile') {
-      return []; // No inline actions on mobile
-    }
+  // Determine which actions to show inline vs overflow
+  const maxInline = MAX_INLINE_ACTIONS[breakpoint];
 
-    if (primaryActionIds) {
-      return actions.filter(a => primaryActionIds.includes(a.id));
-    }
+  const primaryActions = primaryActionIds
+    ? actions.filter(a => primaryActionIds.includes(a.id))
+    : actions.slice(0, maxInline);
 
-    // Default: show first 2 on desktop, first 1 on tablet
-    const maxInline = breakpoint === 'desktop' ? 2 : 1;
-    return actions.slice(0, maxInline);
-  };
-
-  const getOverflowActions = (): Action[] => {
-    if (breakpoint === 'mobile') {
-      return actions; // All actions in overflow on mobile
-    }
-
-    if (primaryActionIds) {
-      return actions.filter(a => !primaryActionIds.includes(a.id));
-    }
-
-    const maxInline = breakpoint === 'desktop' ? 2 : 1;
-    return actions.slice(maxInline);
-  };
-
-  const primaryActions = getPrimaryActions();
-  const overflowActions = getOverflowActions();
+  const overflowActions = primaryActionIds
+    ? actions.filter(a => !primaryActionIds.includes(a.id))
+    : actions.slice(maxInline);
 
   return (
     <div className={cn('flex items-center justify-end gap-2', className)}>
@@ -130,15 +123,15 @@ export function ResponsiveActionsCell({
           onClick={action.onClick}
           disabled={action.disabled}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out',
             action.destructive
-              ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+              ? 'text-destructive hover:text-destructive hover:bg-destructive/10 [&_svg]:text-destructive'
               : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token',
             action.disabled && 'opacity-50 cursor-not-allowed'
           )}
         >
           {action.icon && (
-            <span className='h-4 w-4 flex items-center justify-center'>
+            <span className='h-4 w-4 flex items-center justify-center [&>svg]:h-4 [&>svg]:w-4'>
               {action.icon}
             </span>
           )}
@@ -152,13 +145,13 @@ export function ResponsiveActionsCell({
           <DropdownMenuTrigger asChild>
             <button
               type='button'
-              className='inline-flex items-center justify-center rounded-md p-2 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+              className='inline-flex items-center justify-center rounded-full h-8 w-8 border border-subtle bg-transparent text-tertiary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
               aria-label='More actions'
             >
               <MoreVertical className='h-4 w-4' />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' className='w-48'>
+          <DropdownMenuContent align='end'>
             {overflowActions.map((action, index) => (
               <div key={action.id}>
                 {index > 0 &&
@@ -167,13 +160,10 @@ export function ResponsiveActionsCell({
                 <DropdownMenuItem
                   onClick={action.onClick}
                   disabled={action.disabled}
-                  className={cn(
-                    action.destructive &&
-                      'text-red-600 focus-visible:text-red-600 dark:text-red-400 dark:focus-visible:text-red-400'
-                  )}
+                  variant={action.destructive ? 'destructive' : 'default'}
                 >
                   {action.icon && (
-                    <span className='mr-2 h-4 w-4 flex items-center justify-center'>
+                    <span className='h-4 w-4 flex items-center justify-center [&>svg]:h-4 [&>svg]:w-4'>
                       {action.icon}
                     </span>
                   )}

@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
+import { captureError } from '@/lib/error-tracking';
 import {
   extractErrorCode,
   getErrorMessage,
@@ -11,11 +12,7 @@ import {
   mapErrorToUserMessage,
 } from './errors';
 import type { HandleValidationState, OnboardingState } from './types';
-import {
-  canSubmitOnboarding,
-  getResolvedHandle,
-  validateDisplayName,
-} from './validation';
+import { getResolvedHandle, validateDisplayName } from './validation';
 
 interface UseOnboardingSubmitOptions {
   userId: string;
@@ -32,6 +29,7 @@ interface UseOnboardingSubmitReturn {
   state: OnboardingState;
   setState: React.Dispatch<React.SetStateAction<OnboardingState>>;
   handleSubmit: (e?: React.FormEvent) => Promise<void>;
+  isPendingSubmit: boolean;
 }
 
 /**
@@ -55,6 +53,20 @@ export function useOnboardingSubmit({
     retryCount: 0,
     isSubmitting: false,
   });
+  const [isPendingSubmit, setIsPendingSubmit] = useState(false);
+
+  // Refs to track current state values without causing callback recreation
+  const isSubmittingRef = useRef(state.isSubmitting);
+  const errorRef = useRef(state.error);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isSubmittingRef.current = state.isSubmitting;
+  }, [state.isSubmitting]);
+
+  useEffect(() => {
+    errorRef.current = state.error;
+  }, [state.error]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -63,18 +75,26 @@ export function useOnboardingSubmit({
       const resolvedHandle = getResolvedHandle(handle, handleInput);
       const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
 
-      // Early return if form cannot be submitted
-      if (
-        !canSubmitOnboarding({
-          handle,
-          handleInput,
-          handleValidation,
-          isSubmitting: state.isSubmitting,
-          hasError: Boolean(state.error),
-        })
-      ) {
+      // If already submitting, don't allow another submission
+      if (isSubmittingRef.current) {
         return;
       }
+
+      // If validation is currently checking, set pending flag and return
+      // The useEffect below will auto-submit when validation completes
+      if (handleValidation.checking) {
+        setIsPendingSubmit(true);
+        return;
+      }
+
+      // Clear pending flag since we're proceeding with submission
+      setIsPendingSubmit(false);
+
+      // Check remaining validation requirements (excluding checking state)
+      if (!resolvedHandle) return;
+      if (errorRef.current) return;
+      if (!handleValidation.clientValid) return;
+      if (!handleValidation.available) return;
 
       // Track submission start
       track('onboarding_submission_started', {
@@ -129,6 +149,15 @@ export function useOnboardingSubmit({
 
         const errorCode = extractErrorCode(error);
 
+        // Capture error to Sentry for monitoring
+        void captureError('Onboarding submission failed', error, {
+          userId,
+          handle: resolvedHandle,
+          errorCode,
+          step: 'submission',
+          route: '/onboarding',
+        });
+
         // Handle database errors with retry suggestion
         if (isDatabaseError(error)) {
           console.error(
@@ -137,7 +166,7 @@ export function useOnboardingSubmit({
           setState(prev => ({
             ...prev,
             error:
-              'We had trouble setting up your account. Please try again in a moment.',
+              "We couldn't finish setting up your account. Please try again in a moment.",
             step: 'validating',
             progress: 0,
             isSubmitting: false,
@@ -194,16 +223,36 @@ export function useOnboardingSubmit({
       handleValidation,
       router,
       setProfileReadyHandle,
-      state.error,
-      state.isSubmitting,
       userEmail,
       userId,
     ]
   );
 
+  // Auto-submit when validation completes if user had pending submit intent
+  useEffect(() => {
+    if (
+      isPendingSubmit &&
+      !handleValidation.checking &&
+      handleValidation.available &&
+      handleValidation.clientValid &&
+      !state.isSubmitting
+    ) {
+      setIsPendingSubmit(false);
+      void handleSubmit();
+    }
+  }, [
+    isPendingSubmit,
+    handleValidation.checking,
+    handleValidation.available,
+    handleValidation.clientValid,
+    state.isSubmitting,
+    handleSubmit,
+  ]);
+
   return {
     state,
     setState,
     handleSubmit,
+    isPendingSubmit,
   };
 }

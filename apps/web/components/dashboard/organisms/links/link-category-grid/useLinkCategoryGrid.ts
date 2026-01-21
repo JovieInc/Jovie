@@ -113,7 +113,7 @@ export function useLinkCategoryGrid<T extends DetectedLink>({
         onHint(
           `${platformName} can't be moved to ${targetLabel}. Only certain platforms (e.g., YouTube) can live in multiple sections.`
         );
-        window.setTimeout(() => onHint(null), 2400);
+        setTimeout(() => onHint(null), 2400);
         return;
       }
 

@@ -6,7 +6,7 @@ interface AuthLinkProps {
   children: ReactNode;
 }
 
-export function AuthLink({ href, children }: AuthLinkProps) {
+export function AuthLink({ href, children }: Readonly<AuthLinkProps>) {
   return (
     <Link
       href={href}

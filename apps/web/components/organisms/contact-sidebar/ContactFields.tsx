@@ -9,6 +9,8 @@
 import { Input, Label } from '@jovie/ui';
 import React from 'react';
 
+import { DrawerPropertyRow } from '@/components/molecules/drawer';
+
 import { formatUsername } from './utils';
 
 interface ContactFieldsProps {
@@ -31,9 +33,9 @@ export function ContactFields({
   return (
     <div className='space-y-3'>
       {/* Name field */}
-      <div className='grid grid-cols-[96px,minmax(0,1fr)] items-start gap-2'>
-        <Label className='text-xs text-sidebar-muted pt-2'>Name</Label>
-        {isEditable ? (
+      {isEditable ? (
+        <div className='grid grid-cols-[96px,minmax(0,1fr)] items-start gap-2'>
+          <Label className='text-xs text-secondary-token pt-2'>Name</Label>
           <div className='grid grid-cols-2 gap-2 min-w-0'>
             <div className='min-w-0'>
               <Label className='sr-only'>First name</Label>
@@ -56,21 +58,24 @@ export function ContactFields({
               />
             </div>
           </div>
-        ) : (
-          <div className='min-h-9 flex items-center text-sm'>
-            {firstName || lastName ? (
-              <span>{[firstName, lastName].filter(Boolean).join(' ')}</span>
+        </div>
+      ) : (
+        <DrawerPropertyRow
+          label='Name'
+          value={
+            firstName || lastName ? (
+              [firstName, lastName].filter(Boolean).join(' ')
             ) : (
-              <span className='text-sidebar-muted italic'>Not provided</span>
-            )}
-          </div>
-        )}
-      </div>
+              <span className='text-secondary-token italic'>Not provided</span>
+            )
+          }
+        />
+      )}
 
       {/* Username field */}
-      <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-        <Label className='text-xs text-sidebar-muted'>Username</Label>
-        {isEditable ? (
+      {isEditable ? (
+        <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
+          <Label className='text-xs text-secondary-token'>Username</Label>
           <Input
             value={formatUsername(username)}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -78,16 +83,19 @@ export function ContactFields({
             }
             placeholder='@username'
           />
-        ) : (
-          <div className='min-h-9 flex items-center text-sm'>
-            {username ? (
-              <span>{formatUsername(username)}</span>
+        </div>
+      ) : (
+        <DrawerPropertyRow
+          label='Username'
+          value={
+            username ? (
+              formatUsername(username)
             ) : (
-              <span className='text-sidebar-muted italic'>Not provided</span>
-            )}
-          </div>
-        )}
-      </div>
+              <span className='text-secondary-token italic'>Not provided</span>
+            )
+          }
+        />
+      )}
     </div>
   );
 }

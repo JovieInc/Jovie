@@ -88,6 +88,7 @@ export { TableBulkActionsToolbar } from './molecules/TableBulkActionsToolbar';
 export type { ContextMenuItemType } from './molecules/TableContextMenu';
 export {
   convertContextMenuItems,
+  convertToCommonDropdownItems,
   TableContextMenu,
 } from './molecules/TableContextMenu';
 export type { TableHeaderRowProps } from './molecules/TableHeaderRow';

@@ -12,8 +12,6 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
-
 describe('/api/stripe/webhooks - Handler Delegation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -23,10 +21,6 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
   });
 
   it('delegates to the correct handler for supported event types', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_1',
       type: 'checkout.session.completed',
@@ -55,6 +49,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -76,10 +71,6 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
   });
 
   it('returns success for unhandled event types without processing', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_unhandled',
       type: 'customer.created', // An unhandled event type
@@ -95,6 +86,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -111,10 +103,6 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
   });
 
   it('handles subscription.updated events via handler delegation', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_sub_updated',
       type: 'customer.subscription.updated',
@@ -144,6 +132,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -158,10 +147,6 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
   });
 
   it('handles invoice.payment_failed events via handler delegation', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_payment_failed',
       type: 'invoice.payment_failed',
@@ -189,6 +174,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );

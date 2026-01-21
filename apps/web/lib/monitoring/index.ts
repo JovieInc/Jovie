@@ -11,4 +11,9 @@ export {
   trackDatabaseQuery as trackDatabasePerformanceQuery,
   withDatabaseMonitoring,
 } from './database-performance';
-export { withPerformanceMonitoring as withMiddlewarePerformanceMonitoring } from './middleware';
+export {
+  generateRequestId,
+  getOrCreateRequestId,
+  REQUEST_ID_HEADER,
+  withPerformanceMonitoring as withMiddlewarePerformanceMonitoring,
+} from './middleware';

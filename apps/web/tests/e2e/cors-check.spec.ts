@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 test('No CORS errors on homepage', async ({ page }) => {
   const corsErrors: string[] = [];
@@ -9,10 +10,20 @@ test('No CORS errors on homepage', async ({ page }) => {
     }
   });
 
-  await page.goto('/', { waitUntil: 'networkidle', timeout: 15000 });
+  // Use domcontentloaded + hydration instead of networkidle
+  await page.goto('/', {
+    waitUntil: 'domcontentloaded',
+    timeout: SMOKE_TIMEOUTS.NAVIGATION,
+  });
 
-  // Wait a bit for any async requests
-  await page.waitForTimeout(3000);
+  // Wait for hydration and async requests to complete deterministically
+  await waitForHydration(page);
+  await page.waitForLoadState('load');
+
+  // Verify the page has loaded content before checking CORS errors
+  await expect(page.locator('body')).toBeVisible({
+    timeout: SMOKE_TIMEOUTS.QUICK,
+  });
 
   console.log('CORS errors found:', corsErrors.length);
   if (corsErrors.length > 0) {

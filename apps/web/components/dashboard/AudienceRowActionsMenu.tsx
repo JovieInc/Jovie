@@ -47,7 +47,7 @@ export function AudienceRowActionsMenu({
     if (success) {
       setCopySuccess(true);
       notifications.success('Copied email');
-      window.setTimeout(() => setCopySuccess(false), 1500);
+      setTimeout(() => setCopySuccess(false), 1500);
       return;
     }
     notifications.error('Failed to copy email');
@@ -59,7 +59,7 @@ export function AudienceRowActionsMenu({
     if (success) {
       setCopySuccess(true);
       notifications.success('Copied phone number');
-      window.setTimeout(() => setCopySuccess(false), 1500);
+      setTimeout(() => setCopySuccess(false), 1500);
       return;
     }
     notifications.error('Failed to copy phone number');

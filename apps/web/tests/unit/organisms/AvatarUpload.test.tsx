@@ -1,5 +1,13 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from 'vitest';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 import { fastRender } from '@/tests/utils/fast-render';
 
@@ -30,6 +38,9 @@ vi.mock('@/lib/analytics', () => ({
 global.fetch = vi.fn() as any;
 
 describe('AvatarUpload - Error Handling', () => {
+  let originalCreateObjectURL: typeof URL.createObjectURL | undefined;
+  let originalRevokeObjectURL: typeof URL.revokeObjectURL | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
     const fetchMock = global.fetch as unknown as Mock;
@@ -38,12 +49,39 @@ describe('AvatarUpload - Error Handling', () => {
       ok: false,
       json: () => Promise.resolve({ error: 'Upload failed' }),
     });
-    // jsdom does not implement these by default; mock for preview logic
-    // @ts-expect-error partial URL mock for tests
-    global.URL = {
-      createObjectURL: vi.fn(() => 'blob:preview'),
-      revokeObjectURL: vi.fn(),
-    };
+
+    // jsdom does not implement these by default; mock for preview logic.
+    // Don't replace `global.URL` (Next.js uses it as a constructor).
+    originalCreateObjectURL = global.URL?.createObjectURL;
+    originalRevokeObjectURL = global.URL?.revokeObjectURL;
+
+    Object.defineProperty(global.URL, 'createObjectURL', {
+      value: vi.fn(() => 'blob:preview'),
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(global.URL, 'revokeObjectURL', {
+      value: vi.fn(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    if (originalCreateObjectURL) {
+      Object.defineProperty(global.URL, 'createObjectURL', {
+        value: originalCreateObjectURL,
+        configurable: true,
+        writable: true,
+      });
+    }
+    if (originalRevokeObjectURL) {
+      Object.defineProperty(global.URL, 'revokeObjectURL', {
+        value: originalRevokeObjectURL,
+        configurable: true,
+        writable: true,
+      });
+    }
   });
 
   it('should show error toast for invalid file type', async () => {

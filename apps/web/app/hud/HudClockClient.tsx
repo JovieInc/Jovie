@@ -22,12 +22,12 @@ export function HudClockClient({ locale }: HudClockClientProps) {
   const [now, setNow] = useState<Date>(() => new Date());
 
   useEffect(() => {
-    const id = window.setInterval(() => {
+    const id = setInterval(() => {
       setNow(new Date());
     }, 1000);
 
     return () => {
-      window.clearInterval(id);
+      clearInterval(id);
     };
   }, []);
 

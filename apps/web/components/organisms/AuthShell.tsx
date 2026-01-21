@@ -28,6 +28,8 @@ export interface AuthShellProps {
   drawerContent?: ReactNode;
   drawerWidth?: number;
   isTableRoute?: boolean;
+  /** Preview panel slot (rendered alongside main content) */
+  previewPanel?: ReactNode;
   onSidebarOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }
@@ -45,6 +47,7 @@ function AuthShellInner({
   drawerContent,
   drawerWidth,
   isTableRoute = false,
+  previewPanel,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
@@ -93,8 +96,11 @@ function AuthShellInner({
                   {children}
                 </div>
               ) : (
-                <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
-                  {children}
+                <div className='flex-1 min-h-0 overflow-hidden flex'>
+                  <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
+                    {children}
+                  </div>
+                  {previewPanel}
                 </div>
               )}
             </div>

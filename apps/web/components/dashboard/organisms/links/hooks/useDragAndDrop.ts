@@ -101,12 +101,12 @@ export function useDragAndDrop<T extends DetectedLink = DetectedLink>({
 }: UseDragAndDropOptions<T>): UseDragAndDropReturn<T> {
   // Hint state for showing error messages on invalid drag operations
   const [hint, setHint] = useState<string | null>(null);
-  const hintTimerRef = useRef<number | null>(null);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (hintTimerRef.current != null) {
-        window.clearTimeout(hintTimerRef.current);
+        clearTimeout(hintTimerRef.current);
         hintTimerRef.current = null;
       }
     };
@@ -152,10 +152,10 @@ export function useDragAndDrop<T extends DetectedLink = DetectedLink>({
       setHint(message);
 
       if (hintTimerRef.current != null) {
-        window.clearTimeout(hintTimerRef.current);
+        clearTimeout(hintTimerRef.current);
       }
 
-      hintTimerRef.current = window.setTimeout(() => {
+      hintTimerRef.current = setTimeout(() => {
         setHint(null);
         hintTimerRef.current = null;
       }, hintDuration);

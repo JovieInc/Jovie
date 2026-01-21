@@ -6,6 +6,7 @@ import { createContext, useContext, useState, useTransition } from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
+import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -68,13 +69,14 @@ function AuthShellWrapperInner({
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
+  let defaultHeaderAction: ReactNode = null;
+  if (config.isTableRoute) {
+    defaultHeaderAction = <DrawerToggleButton />;
+  } else if (isProfileRoute) {
+    defaultHeaderAction = <PreviewToggleButton />;
+  }
   const headerAction =
-    headerActionsContext?.headerActions ??
-    (config.isTableRoute ? (
-      <DrawerToggleButton />
-    ) : isProfileRoute ? (
-      <PreviewToggleButton />
-    ) : null);
+    headerActionsContext?.headerActions ?? defaultHeaderAction;
 
   // Header badge from context (shown after breadcrumb on left side)
   const headerBadge = headerActionsContext?.headerBadge ?? null;
@@ -89,7 +91,7 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
-      <PreviewPanelProvider enabled={previewEnabled}>
+      <PreviewPanelProvider enabled={previewEnabled} defaultOpen>
         <AuthShell
           section={config.section}
           navigation={config.navigation}
@@ -100,6 +102,7 @@ function AuthShellWrapperInner({
           drawerContent={config.drawerContent}
           drawerWidth={config.drawerWidth ?? undefined}
           isTableRoute={config.isTableRoute}
+          previewPanel={previewEnabled ? <ProfileContactSidebar /> : undefined}
           onSidebarOpenChange={onSidebarOpenChange}
         >
           {children}

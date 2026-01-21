@@ -20,8 +20,8 @@
     "check": "pnpm run validate && pnpm run build && pnpm run test",
     "check:ci": "pnpm run validate && pnpm run test:ci",
     "validate": "pnpm run next:proxy-guard && pnpm run biome:check && pnpm run typecheck",
-    "test": "vitest",
-    "test:ci": "vitest run --pool=forks --maxWorkers=2",
+    "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest",
+    "test:ci": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
@@ -224,6 +224,6 @@
     "tsx": "^4.20.5",
     "typescript": "^5",
     "uuid": "^13.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.16"
   }
 }

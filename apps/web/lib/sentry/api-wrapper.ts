@@ -19,6 +19,8 @@
 import * as Sentry from '@sentry/nextjs';
 import type { NextRequest } from 'next/server';
 
+import { REQUEST_ID_HEADER } from '@/lib/monitoring/middleware';
+
 type RouteHandler = (
   request: NextRequest,
   context?: { params?: Record<string, string> }
@@ -29,6 +31,13 @@ interface WrapperOptions {
   routeName: string;
   /** Additional tags to attach to the Sentry span */
   tags?: Record<string, string>;
+}
+
+/**
+ * Extracts request ID from request headers for distributed tracing.
+ */
+function getRequestId(request: NextRequest): string | null {
+  return request.headers.get(REQUEST_ID_HEADER);
 }
 
 /**
@@ -46,6 +55,7 @@ export function withSentryApiRoute(
   return async (request, context) => {
     const method = request.method;
     const spanName = `${method} ${options.routeName}`;
+    const requestId = getRequestId(request);
 
     return Sentry.startSpan(
       {
@@ -54,6 +64,7 @@ export function withSentryApiRoute(
         attributes: {
           'http.method': method,
           'http.route': options.routeName,
+          ...(requestId ? { 'request.id': requestId } : {}),
           ...options.tags,
         },
       },
@@ -71,16 +82,18 @@ export function withSentryApiRoute(
 
           return response;
         } catch (error) {
-          // Capture the exception in Sentry
+          // Capture the exception in Sentry with request ID context
           Sentry.captureException(error, {
             extra: {
               route: options.routeName,
               method,
               url: request.url,
+              requestId,
             },
             tags: {
               route: options.routeName,
               method,
+              ...(requestId ? { requestId } : {}),
               ...options.tags,
             },
           });
@@ -102,13 +115,15 @@ export function withSentryApiRoute(
  *
  * @param error - The error to capture
  * @param routeName - The API route name
- * @param context - Additional context to attach
+ * @param context - Additional context to attach (including optional requestId)
  */
 export function captureApiError(
   error: unknown,
   routeName: string,
   context?: Record<string, unknown>
 ): void {
+  const requestId = context?.requestId as string | undefined;
+
   Sentry.captureException(error, {
     extra: {
       route: routeName,
@@ -117,6 +132,7 @@ export function captureApiError(
     tags: {
       route: routeName,
       errorType: 'api_error',
+      ...(requestId ? { requestId } : {}),
     },
   });
 }
