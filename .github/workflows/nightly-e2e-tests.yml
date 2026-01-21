@@ -1,28 +1,28 @@
-name: E2E Full Browser Matrix
+name: Nightly E2E Tests
 
 on:
   schedule:
-    # Run every Monday at 6:00 AM UTC
-    - cron: '0 6 * * 1'
+    # Run daily at 3:00 AM UTC (after nightly-unit-tests at 2:00 AM)
+    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       test_filter:
-        description: 'Test file pattern (leave empty for all tests)'
+        description: 'Test file pattern (leave empty for nightly suite)'
         required: false
         default: ''
 
 permissions:
   contents: read
 
+concurrency:
+  group: nightly-e2e-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  e2e-full-matrix:
-    name: E2E (Chrome + Firefox)
+  nightly-e2e:
+    name: Nightly E2E Suite
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox]
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -32,10 +32,10 @@ jobs:
 
       - name: Create ephemeral Neon database branch
         id: neon-branch
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
+          branch_name: nightly-e2e-${{ github.run_id }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
 
@@ -44,38 +44,41 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
-          GIT_BRANCH: e2e-weekly
+          GIT_BRANCH: nightly
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
         uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-${{ matrix.browser }}-
+            ${{ runner.os }}-playwright-chromium-
 
-      - name: Install Playwright (${{ matrix.browser }})
-        run: pnpm --filter=@jovie/web exec playwright install ${{ matrix.browser }} --with-deps
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Run E2E tests (${{ matrix.browser }})
+      - name: Run nightly E2E tests
         run: |
           cd apps/web
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
+            pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium --reporter=line
           else
-            # Exclude nightly tests (they run daily in nightly-e2e-tests.yml)
-            pnpm playwright test --ignore-snapshots --ignore='tests/e2e/nightly/**' --project=${{ matrix.browser }} --reporter=line
+            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Upload Playwright Report on Failure
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: e2e-full-${{ matrix.browser }}-report-${{ github.run_id }}
+          name: nightly-e2e-report-${{ github.run_id }}
           path: apps/web/playwright-report/
           retention-days: 7
 
@@ -83,31 +86,31 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
+          name: nightly-e2e-results-${{ github.run_id }}
           path: apps/web/test-results/
           retention-days: 7
 
   notify:
     name: Notify Results
-    needs: [e2e-full-matrix]
-    if: ${{ always() && github.event_name == 'schedule' }}
+    needs: [nightly-e2e]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Slack notification on failure
-        if: ${{ needs.e2e-full-matrix.result == 'failure' }}
+        if: ${{ needs.nightly-e2e.result == 'failure' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#alerts-critical'
-          author_name: 'E2E Full Matrix'
+          author_name: 'Nightly E2E Tests'
           custom_payload: |
             {
-              "text": "⚠️ Weekly E2E full browser matrix failed",
+              "text": ":warning: Nightly E2E tests failed",
               "attachments": [
                 {
                   "color": "danger",
                   "fields": [
-                    { "title": "Workflow", "value": "E2E Full Browser Matrix (Chrome + Firefox)", "short": true },
+                    { "title": "Workflow", "value": "Nightly E2E Tests", "short": true },
                     { "title": "Status", "value": "Failed", "short": true },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
                   ]
@@ -118,20 +121,20 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notification on success
-        if: ${{ needs.e2e-full-matrix.result == 'success' }}
+        if: ${{ needs.nightly-e2e.result == 'success' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#monitoring'
-          author_name: 'E2E Full Matrix'
+          author_name: 'Nightly E2E Tests'
           custom_payload: |
             {
-              "text": "✅ Weekly E2E full browser matrix passed",
+              "text": ":white_check_mark: Nightly E2E tests passed",
               "attachments": [
                 {
                   "color": "good",
                   "fields": [
-                    { "title": "Workflow", "value": "E2E Full Browser Matrix (Chrome + Firefox)", "short": true },
+                    { "title": "Workflow", "value": "Nightly E2E Tests", "short": true },
                     { "title": "Status", "value": "Success", "short": true },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
                   ]
