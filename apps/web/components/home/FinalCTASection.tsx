@@ -16,7 +16,7 @@ export function FinalCTASection() {
             <LinearButton
               variant='primary'
               href='/waitlist'
-              className='h-10 rounded-[10px] px-4 text-[15px] leading-[40px] font-[510] tracking-[0px]! bg-[#e6e6e6] text-[#08090a] border border-[#e6e6e6] shadow-[0_8px_2px_0_rgba(0,0,0,0),0_5px_2px_0_rgba(0,0,0,0.01),0_3px_2px_0_rgba(0,0,0,0.04),0_1px_1px_0_rgba(0,0,0,0.07),0_0_1px_0_rgba(0,0,0,0.08)] hover:opacity-90'
+              className='btn-linear-primary'
             >
               Request early access
             </LinearButton>
