@@ -15,6 +15,7 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import {
   adminImpersonateLimiter,
   createRateLimitHeaders,
+  getClientIP,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
@@ -116,11 +117,9 @@ export async function POST(request: Request) {
 
   // Apply rate limiting (5 attempts per hour per admin)
   const { userId: adminClerkId } = await auth();
-  if (!adminClerkId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
+  const clientIp = getClientIP(request);
+  const rateLimitKey = adminClerkId ?? `ip:${clientIp}`;
+  const rateLimitResult = await adminImpersonateLimiter.limit(rateLimitKey);
   if (!rateLimitResult.success) {
     return NextResponse.json(
       {
@@ -134,6 +133,10 @@ export async function POST(request: Request) {
         headers: createRateLimitHeaders(rateLimitResult),
       }
     );
+  }
+
+  if (!adminClerkId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   try {
