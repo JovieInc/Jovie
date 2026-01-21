@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
@@ -47,6 +47,15 @@ export function DashboardNav(_: DashboardNavProps) {
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
   const publicProfileHref = username ? `/${username}` : undefined;
 
+  // Memoize profile actions to prevent creating new JSX on every render
+  const profileActions = useMemo(
+    () =>
+      publicProfileHref ? (
+        <ProfileMenuActions publicProfileHref={publicProfileHref} />
+      ) : null,
+    [publicProfileHref]
+  );
+
   // Memoize filtered items to prevent creating new arrays on every render
   const primaryItems = useMemo(
     () =>
@@ -70,29 +79,31 @@ export function DashboardNav(_: DashboardNavProps) {
     [isInSettings, primaryItems]
   );
 
-  function renderNavItem(item: NavItem) {
-    const isActive = isItemActive(pathname, item);
-    const shortcut = NAV_SHORTCUTS[item.id];
-    const isProfileItem = item.href === PROFILE_HREF;
+  // Memoize renderNavItem to prevent creating new functions on every render
+  const renderNavItem = useCallback(
+    (item: NavItem) => {
+      const isActive = isItemActive(pathname, item);
+      const shortcut = NAV_SHORTCUTS[item.id];
+      const isProfileItem = item.href === PROFILE_HREF;
 
-    return (
-      <NavMenuItem
-        key={item.id}
-        item={item}
-        isActive={isActive}
-        shortcut={shortcut}
-        actions={
-          isProfileItem && publicProfileHref ? (
-            <ProfileMenuActions publicProfileHref={publicProfileHref} />
-          ) : null
-        }
-      />
-    );
-  }
+      return (
+        <NavMenuItem
+          key={item.id}
+          item={item}
+          isActive={isActive}
+          shortcut={shortcut}
+          actions={isProfileItem ? profileActions : null}
+        />
+      );
+    },
+    [pathname, profileActions]
+  );
 
-  function renderSection(items: NavItem[]) {
-    return <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>;
-  }
+  // Memoize renderSection to prevent creating new functions on every render
+  const renderSection = useCallback(
+    (items: NavItem[]) => <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>,
+    [renderNavItem]
+  );
 
   return (
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
