@@ -285,11 +285,10 @@ export async function fetchDocument(
       );
 }
 
-async function readResponseTextWithLimit(
-  response: Response,
+function validateContentLength(
+  contentLengthHeader: string | null,
   maxBytes: number
-): Promise<string> {
-  const contentLengthHeader = response.headers.get('content-length');
+): void {
   const contentLength = contentLengthHeader
     ? Number(contentLengthHeader)
     : null;
@@ -299,16 +298,12 @@ async function readResponseTextWithLimit(
       throw new ExtractionError('Response too large', 'FETCH_FAILED');
     }
   }
+}
 
-  if (!response.body) {
-    const text = await response.text();
-    if (text.length > maxBytes) {
-      throw new ExtractionError('Response too large', 'FETCH_FAILED');
-    }
-    return text;
-  }
-
-  const reader = response.body.getReader();
+async function streamResponseBody(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number
+): Promise<string> {
   const decoder = new TextDecoder();
   let received = 0;
   let out = '';
@@ -327,4 +322,23 @@ async function readResponseTextWithLimit(
 
   out += decoder.decode();
   return out;
+}
+
+async function readResponseTextWithLimit(
+  response: Response,
+  maxBytes: number
+): Promise<string> {
+  const contentLengthHeader = response.headers.get('content-length');
+  validateContentLength(contentLengthHeader, maxBytes);
+
+  if (!response.body) {
+    const text = await response.text();
+    if (text.length > maxBytes) {
+      throw new ExtractionError('Response too large', 'FETCH_FAILED');
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  return streamResponseBody(reader, maxBytes);
 }
