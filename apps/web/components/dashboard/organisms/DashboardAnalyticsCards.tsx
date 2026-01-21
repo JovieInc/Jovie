@@ -3,8 +3,6 @@
 import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -103,46 +101,28 @@ export function DashboardAnalyticsCards({
     (data?.unique_users ?? 0) === 0;
 
   const errorCards = (
-    <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
-      <DashboardCard variant='analytics'>
-        <div className='flex h-full min-h-[164px] flex-col justify-between'>
-          <div className='space-y-2'>
-            <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-              Profile views
-            </p>
-            <p className='text-sm font-medium text-primary-token'>
-              Analytics temporarily unavailable
-            </p>
-            <p className='text-xs text-secondary-token'>
-              We couldn&apos;t fetch your analytics data right now
-            </p>
+    <div className='grid grid-cols-2 gap-8'>
+      <div className='space-y-2 py-1'>
+        <div className='flex items-center gap-2'>
+          <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 dark:bg-sky-500/15'>
+            <BarChart3 className='h-4 w-4 text-sky-600 dark:text-sky-400' />
           </div>
-
-          <p className='mt-4 text-xs text-tertiary-token'>
-            Refresh to try again.
+          <p className='text-xs font-medium text-secondary-token'>
+            Profile views
           </p>
         </div>
-      </DashboardCard>
+        <p className='text-sm text-tertiary-token'>Temporarily unavailable</p>
+      </div>
 
-      <DashboardCard variant='analytics'>
-        <div className='flex h-full min-h-[164px] flex-col justify-between'>
-          <div className='space-y-2'>
-            <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-              Audience
-            </p>
-            <p className='text-sm font-medium text-primary-token'>
-              Analytics temporarily unavailable
-            </p>
-            <p className='text-xs text-secondary-token'>
-              We couldn&apos;t fetch your analytics data right now
-            </p>
+      <div className='space-y-2 py-1'>
+        <div className='flex items-center gap-2'>
+          <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15'>
+            <Users className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
           </div>
-
-          <p className='mt-4 text-xs text-tertiary-token'>
-            Refresh to try again.
-          </p>
+          <p className='text-xs font-medium text-secondary-token'>Audience</p>
         </div>
-      </DashboardCard>
+        <p className='text-sm text-tertiary-token'>Temporarily unavailable</p>
+      </div>
     </div>
   );
 
@@ -159,75 +139,82 @@ export function DashboardAnalyticsCards({
     }
   };
 
-  return (
-    <div className='space-y-3' data-testid='dashboard-analytics-cards'>
-      <div className='min-h-[196px]'>
-        {showInitialSkeleton ? (
-          <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        ) : error ? (
-          errorCards
-        ) : showEmpty ? (
-          <div className='min-h-[196px]'>
-            <EmptyState
-              icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
-              heading='No profile views yet'
-              description='Share your profile link to start tracking clicks and engagement from your fans.'
-              action={
-                profileUrl
-                  ? {
-                      label: copied ? 'Copied!' : 'Copy profile link',
-                      onClick: () => void handleCopy(),
-                    }
-                  : {
-                      label: 'Open profile settings',
-                      href: '/app/dashboard/profile',
-                    }
-              }
-              secondaryAction={{
-                label: 'See sharing tips',
-                href: '/support',
-              }}
-            />
-          </div>
-        ) : (
-          <div
-            className={refreshing ? 'opacity-70 transition-opacity' : undefined}
-          >
-            <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
-              <AnalyticsCard
-                title='Profile views'
-                value={profileViewsLabel}
-                metadata={rangeLabel}
-                icon={BarChart3}
-                iconClassName='text-sky-600 dark:text-sky-400'
-                iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
-              />
-
-              <AnalyticsCard
-                title='Audience'
-                value={uniqueUsersLabel}
-                metadata={rangeLabel}
-                icon={Users}
-                iconClassName='text-emerald-600 dark:text-emerald-400'
-                iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
-              >
-                <div className='flex items-center justify-between'>
-                  <p className='text-xs text-tertiary-token'>Unique users</p>
-                  <Link
-                    href='/app/dashboard/audience'
-                    className='text-xs font-semibold text-primary-token underline-offset-2 hover:underline'
-                  >
-                    View audience
-                  </Link>
-                </div>
-              </AnalyticsCard>
-            </div>
-          </div>
-        )}
+  const skeletonMetric = (
+    <div className='space-y-2 py-1 animate-pulse'>
+      <div className='flex items-center gap-2'>
+        <div className='h-7 w-7 rounded-lg bg-surface-2' />
+        <div className='h-3 w-20 rounded bg-surface-2' />
       </div>
+      <div className='h-8 w-16 rounded bg-surface-2' />
+      <div className='h-3 w-24 rounded bg-surface-2' />
+    </div>
+  );
+
+  return (
+    <div data-testid='dashboard-analytics-cards'>
+      {showInitialSkeleton ? (
+        <div className='grid grid-cols-2 gap-8'>
+          {skeletonMetric}
+          {skeletonMetric}
+        </div>
+      ) : error ? (
+        errorCards
+      ) : showEmpty ? (
+        <EmptyState
+          icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
+          heading='No profile views yet'
+          description='Share your profile link to start tracking clicks and engagement from your fans.'
+          action={
+            profileUrl
+              ? {
+                  label: copied ? 'Copied!' : 'Copy profile link',
+                  onClick: () => void handleCopy(),
+                }
+              : {
+                  label: 'Open profile settings',
+                  href: '/app/dashboard/profile',
+                }
+          }
+          secondaryAction={{
+            label: 'See sharing tips',
+            href: '/support',
+          }}
+        />
+      ) : (
+        <div
+          className={refreshing ? 'opacity-70 transition-opacity' : undefined}
+        >
+          <div className='grid grid-cols-2 gap-8'>
+            <AnalyticsCard
+              title='Profile views'
+              value={profileViewsLabel}
+              metadata={rangeLabel}
+              icon={BarChart3}
+              iconClassName='text-sky-600 dark:text-sky-400'
+              iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
+            />
+
+            <AnalyticsCard
+              title='Audience'
+              value={uniqueUsersLabel}
+              metadata={rangeLabel}
+              icon={Users}
+              iconClassName='text-emerald-600 dark:text-emerald-400'
+              iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
+            >
+              <div className='flex items-center justify-between'>
+                <p className='text-xs text-tertiary-token'>Unique users</p>
+                <Link
+                  href='/app/dashboard/audience'
+                  className='text-xs font-medium text-accent-token hover:underline underline-offset-2'
+                >
+                  View audience
+                </Link>
+              </div>
+            </AnalyticsCard>
+          </div>
+        </div>
+      )}
       <div className='sr-only' aria-live='polite' aria-atomic='true'>
         {displayProfileViews > 0 &&
           `Profile views: ${profileViewsLabel}, Unique users: ${uniqueUsersLabel}`}
