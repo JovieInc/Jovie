@@ -5,7 +5,7 @@
  * version tracking, cache behavior, and error handling.
  */
 
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('sonner', () => ({
@@ -57,7 +57,6 @@ import { useLinksPersistence } from '@/components/dashboard/organisms/links/hook
 import type { LinkItem } from '@/components/dashboard/organisms/links/types';
 
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 function createMockProfileLink(
   overrides: Partial<ProfileSocialLink> = {}
@@ -109,6 +108,7 @@ describe('useLinksPersistence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -117,7 +117,7 @@ describe('useLinksPersistence', () => {
   });
 
   afterEach(() => {
-    cleanup();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
