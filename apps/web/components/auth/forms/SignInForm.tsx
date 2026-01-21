@@ -105,10 +105,6 @@ export function SignInForm() {
     setStep('email');
   };
 
-  const handleBack = () => {
-    goBack();
-  };
-
   return (
     <Card className='shadow-none border-0 bg-transparent p-0'>
       <CardContent className='space-y-3 p-0'>
@@ -138,7 +134,7 @@ export function SignInForm() {
               onSubmit={startEmailFlow}
               isLoading={loadingState.type === 'submitting'}
               error={error}
-              onBack={handleBack}
+              onBack={goBack}
               mode='signin'
             />
           </AccessibleStepWrapper>
@@ -160,7 +156,7 @@ export function SignInForm() {
               isVerifying={loadingState.type === 'verifying'}
               isResending={loadingState.type === 'resending'}
               error={error}
-              onBack={handleBack}
+              onBack={goBack}
               mode='signin'
             />
           </AccessibleStepWrapper>
