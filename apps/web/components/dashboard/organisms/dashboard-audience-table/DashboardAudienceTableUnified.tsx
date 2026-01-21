@@ -420,8 +420,8 @@ export function DashboardAudienceTableUnified({
             )}
           </div>
 
-          {/* Footer - direct flex child anchored to bottom */}
-          <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
+          {/* Footer - shrink-0 ensures it stays anchored to bottom when drawer opens */}
+          <div className='shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token sm:px-6'>
             <span className='tracking-wide'>{paginationLabel()}</span>
             <div className='flex items-center gap-3'>
               <AdminPageSizeSelect
