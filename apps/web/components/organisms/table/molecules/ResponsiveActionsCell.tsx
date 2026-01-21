@@ -11,6 +11,19 @@ import { MoreVertical } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
+/** Breakpoint thresholds for responsive behavior */
+const BREAKPOINTS = {
+  MOBILE: 768,
+  TABLET: 1024,
+} as const;
+
+/** Max inline actions per breakpoint */
+const MAX_INLINE_ACTIONS = {
+  mobile: 0,
+  tablet: 1,
+  desktop: 2,
+} as const;
+
 export interface Action {
   id: string;
   label: string;
@@ -75,9 +88,9 @@ export function ResponsiveActionsCell({
   useEffect(() => {
     const updateBreakpoint = () => {
       const width = window.innerWidth;
-      if (width < 768) {
+      if (width < BREAKPOINTS.MOBILE) {
         setBreakpoint('mobile');
-      } else if (width < 1024) {
+      } else if (width < BREAKPOINTS.TABLET) {
         setBreakpoint('tablet');
       } else {
         setBreakpoint('desktop');
@@ -89,36 +102,16 @@ export function ResponsiveActionsCell({
     return () => window.removeEventListener('resize', updateBreakpoint);
   }, []);
 
-  // Determine which actions to show inline
-  const getPrimaryActions = (): Action[] => {
-    if (breakpoint === 'mobile') {
-      return []; // No inline actions on mobile
-    }
+  // Determine which actions to show inline vs overflow
+  const maxInline = MAX_INLINE_ACTIONS[breakpoint];
 
-    if (primaryActionIds) {
-      return actions.filter(a => primaryActionIds.includes(a.id));
-    }
+  const primaryActions = primaryActionIds
+    ? actions.filter(a => primaryActionIds.includes(a.id))
+    : actions.slice(0, maxInline);
 
-    // Default: show first 2 on desktop, first 1 on tablet
-    const maxInline = breakpoint === 'desktop' ? 2 : 1;
-    return actions.slice(0, maxInline);
-  };
-
-  const getOverflowActions = (): Action[] => {
-    if (breakpoint === 'mobile') {
-      return actions; // All actions in overflow on mobile
-    }
-
-    if (primaryActionIds) {
-      return actions.filter(a => !primaryActionIds.includes(a.id));
-    }
-
-    const maxInline = breakpoint === 'desktop' ? 2 : 1;
-    return actions.slice(maxInline);
-  };
-
-  const primaryActions = getPrimaryActions();
-  const overflowActions = getOverflowActions();
+  const overflowActions = primaryActionIds
+    ? actions.filter(a => !primaryActionIds.includes(a.id))
+    : actions.slice(maxInline);
 
   return (
     <div className={cn('flex items-center justify-end gap-2', className)}>
