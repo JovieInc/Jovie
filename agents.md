@@ -10,7 +10,7 @@
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **24.0.0** (exact) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **24.x** (24.0.0+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
 | **Turbo** | 2.7.4+ | Root devDependencies |
 
