@@ -136,7 +136,10 @@ export function AdminCreatorProfilesUnified({
   } = useRowSelection(rowIds);
 
   const selectedIdsKey = useMemo(
-    () => Array.from(selectedIds).sort().join(','),
+    () =>
+      Array.from(selectedIds)
+        .sort((a, b) => a.localeCompare(b))
+        .join(','),
     [selectedIds]
   );
 
