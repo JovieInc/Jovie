@@ -21,7 +21,6 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
@@ -48,8 +47,7 @@ const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
-    const headersList = await headers();
-    const signature = headersList.get('stripe-signature');
+    const signature = request.headers.get('stripe-signature');
 
     if (!signature) {
       await captureCriticalError(
