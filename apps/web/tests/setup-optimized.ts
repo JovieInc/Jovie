@@ -15,7 +15,7 @@ expect.extend(matchers);
 
 // Baseline env vars for fast/unit tests (see `tests/setup.ts` for details).
 process.env.VITEST ??= 'true';
-process.env.NODE_ENV = 'test';
+(process.env as Record<string, string | undefined>).NODE_ENV = 'test';
 process.env.URL_ENCRYPTION_KEY ??= 'test-encryption-key-32-chars!!';
 process.env.STRIPE_PRICE_STANDARD_MONTHLY ??= 'price_pro_monthly';
 process.env.STRIPE_PRICE_STANDARD_YEARLY ??= 'price_pro_yearly';
