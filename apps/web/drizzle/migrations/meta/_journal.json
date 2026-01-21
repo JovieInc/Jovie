@@ -50,6 +50,13 @@
       "when": 1769040000000,
       "tag": "0006_add_spotify_popularity",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1769050000000,
+      "tag": "0007_add_spotify_popularity_range_check",
+      "breakpoints": true
     }
   ]
 }

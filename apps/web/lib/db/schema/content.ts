@@ -74,6 +74,10 @@ export const discogReleases = pgTable(
     releaseDateIndex: index('discog_releases_release_date_idx').on(
       table.releaseDate
     ),
+    spotifyPopularityRange: check(
+      'discog_releases_spotify_popularity_range',
+      drizzleSql`spotify_popularity >= 0 AND spotify_popularity <= 100`
+    ),
   })
 );
 

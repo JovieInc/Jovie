@@ -19,22 +19,31 @@ export function PopularityCell({ popularity }: PopularityCellProps) {
     return <span className='text-xs text-tertiary-token'>-</span>;
   }
 
-  const percentage = Math.min(100, Math.max(0, popularity));
+  if (!Number.isFinite(popularity)) {
+    return <span className='text-xs text-tertiary-token'>-</span>;
+  }
+
+  const clampedPopularity = Math.min(100, Math.max(0, popularity));
+  const displayPopularity = Math.round(clampedPopularity);
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className='flex items-center gap-1.5'>
+        <button
+          type='button'
+          className='inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-spotify/50'
+          aria-label={`Spotify popularity ${displayPopularity} out of 100`}
+        >
           <div className='h-2 w-12 overflow-hidden rounded-full bg-surface-3'>
             <div
-              className='h-full rounded-full bg-[#1DB954] transition-all'
-              style={{ width: `${percentage}%` }}
+              className='h-full rounded-full bg-brand-spotify transition-all'
+              style={{ width: `${clampedPopularity}%` }}
             />
           </div>
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent side='top' className='text-xs'>
-        <span className='font-medium'>{popularity}</span>
+        <span className='font-medium'>{displayPopularity}</span>
         <span className='text-secondary-token'>/100 popularity</span>
       </TooltipContent>
     </Tooltip>
