@@ -146,8 +146,6 @@ export default function DashboardLayoutClient({
     pathname?.startsWith('/app/dashboard/audience');
   const isProfileRoute =
     pathname?.startsWith('/app/dashboard/profile') ?? false;
-  const isAudienceRoute =
-    pathname?.startsWith('/app/dashboard/audience') ?? false;
   const useFullWidth = fullWidth || isFullWidthRoute;
   const resolvedPreviewEnabled =
     previewEnabled && isAppDashboardRoute && isProfileRoute;
@@ -237,7 +235,6 @@ export default function DashboardLayoutClient({
             useFullWidth={useFullWidth}
             isContactTableRoute={isContactTableRoute}
             isProfileRoute={isProfileRoute}
-            isAudienceRoute={isAudienceRoute}
             previewEnabled={resolvedPreviewEnabled}
             showMobileTabs={showMobileTabs}
           >
@@ -377,7 +374,6 @@ function DashboardLayoutInner({
   useFullWidth: boolean;
   isContactTableRoute: boolean;
   isProfileRoute: boolean;
-  isAudienceRoute: boolean;
   previewEnabled: boolean;
   showMobileTabs: boolean;
   children: React.ReactNode;

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useTransition } from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { PreviewPanel } from '@/components/dashboard/layout/PreviewPanel';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import {
   HeaderActionsProvider,
@@ -101,6 +102,7 @@ function AuthShellWrapperInner({
           drawerContent={config.drawerContent}
           drawerWidth={config.drawerWidth ?? undefined}
           isTableRoute={config.isTableRoute}
+          previewPanel={previewEnabled ? <PreviewPanel /> : undefined}
           onSidebarOpenChange={onSidebarOpenChange}
         >
           {children}

@@ -27,13 +27,15 @@ async function storeAndReturnError(
   response: { error: string },
   headers: HeadersInit
 ): Promise<NextResponse> {
-  await storeIdempotencyKey(
-    idempotencyKey ?? '',
-    clerkUserId,
-    IDEMPOTENCY_ROUTE,
-    status,
-    response
-  );
+  if (idempotencyKey) {
+    await storeIdempotencyKey(
+      idempotencyKey,
+      clerkUserId,
+      IDEMPOTENCY_ROUTE,
+      status,
+      response
+    );
+  }
   return NextResponse.json(response, { status, headers });
 }
 
@@ -180,13 +182,15 @@ export async function PUT(req: Request) {
       );
 
       const successResponse = { ok: true, version: versioning.nextVersion };
-      await storeIdempotencyKey(
-        idempotencyKey ?? '',
-        clerkUserId,
-        IDEMPOTENCY_ROUTE,
-        200,
-        successResponse
-      );
+      if (idempotencyKey) {
+        await storeIdempotencyKey(
+          idempotencyKey,
+          clerkUserId,
+          IDEMPOTENCY_ROUTE,
+          200,
+          successResponse
+        );
+      }
 
       await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
 

@@ -9,6 +9,7 @@ import {
   CONTEXT_TRANSFORM_ORIGIN,
   contextMenuContentClasses,
   MENU_ITEM_BASE,
+  MENU_ITEM_DESTRUCTIVE,
   MENU_LABEL_BASE,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
@@ -107,11 +108,17 @@ const ContextMenuItem = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
     inset?: boolean;
+    variant?: 'default' | 'destructive';
   }
->(({ className, inset, ...props }, ref) => (
+>(({ className, inset, variant, ...props }, ref) => (
   <ContextMenuPrimitive.Item
     ref={ref}
-    className={cn(MENU_ITEM_BASE, inset && 'pl-10', className)}
+    className={cn(
+      MENU_ITEM_BASE,
+      inset && 'pl-10',
+      variant === 'destructive' && MENU_ITEM_DESTRUCTIVE,
+      className
+    )}
     {...props}
   />
 ));

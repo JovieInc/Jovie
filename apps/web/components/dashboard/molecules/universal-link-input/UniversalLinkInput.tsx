@@ -7,18 +7,115 @@
  * and supports artist search mode for Spotify.
  */
 
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 
+import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
+import { isBrandDark } from '@/lib/utils/color';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 import { UniversalLinkInputArtistSearchMode } from '../artist-search-mode';
 import { UniversalLinkInputUrlMode } from '../UniversalLinkInputUrlMode';
+import { MultiLinkPasteDialog } from './MultiLinkPasteDialog';
 import type { UniversalLinkInputProps } from './types';
+import { useMultiLinkPaste } from './useMultiLinkPaste';
 import { useUniversalLinkInput } from './useUniversalLinkInput';
-import { looksLikeUrlOrDomain } from './utils';
+import {
+  groupByCategory,
+  looksLikeUrlOrDomain,
+  type RankedPlatformOption,
+} from './utils';
 
 export interface UniversalLinkInputRef {
   getInputElement: () => HTMLInputElement | null;
+}
+
+/**
+ * Renders a platform name with matched characters highlighted.
+ */
+function HighlightedName({
+  name,
+  matchIndices,
+}: {
+  name: string;
+  matchIndices: number[];
+}) {
+  if (matchIndices.length === 0) {
+    return <span className='font-medium'>{name}</span>;
+  }
+
+  const matchSet = new Set(matchIndices);
+
+  // For character-by-character rendering, using index as key is acceptable
+  // since the string content is static and reordering never occurs
+  return (
+    <span className='font-medium'>
+      {name.split('').map((char, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: Static string, no reordering
+        <span key={i} className={matchSet.has(i) ? 'text-accent' : undefined}>
+          {char}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * A single platform suggestion item with icon, highlighted name, and hint.
+ */
+function PlatformSuggestionItem({
+  option,
+  active,
+  optionId,
+  onMouseEnter,
+  onClick,
+}: {
+  option: RankedPlatformOption;
+  active: boolean;
+  optionId: string;
+  onMouseEnter: () => void;
+  onClick: () => void;
+}) {
+  const iconMeta = getPlatformIcon(option.icon);
+  const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const isDark = isBrandDark(iconHex);
+
+  return (
+    <button
+      id={optionId}
+      role='option'
+      aria-selected={active}
+      type='button'
+      className={cn(
+        'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-primary-token transition',
+        active ? 'bg-surface-2' : 'hover:bg-surface-2'
+      )}
+      onMouseEnter={onMouseEnter}
+      onClick={onClick}
+    >
+      <span className='flex items-center gap-2'>
+        {/* Platform icon */}
+        <span
+          className='flex h-5 w-5 shrink-0 items-center justify-center rounded'
+          style={{
+            backgroundColor: iconHex,
+            color: isDark ? '#ffffff' : '#0f172a',
+          }}
+        >
+          <SocialIcon platform={option.icon} className='h-3 w-3' />
+        </span>
+        {/* Platform name with match highlighting */}
+        <HighlightedName
+          name={option.name}
+          matchIndices={option.matchIndices}
+        />
+        {/* Simplified hint */}
+        <span className='text-xs text-tertiary-token'>{option.hint}</span>
+      </span>
+      {/* Only show Enter hint on active item */}
+      {active && <span className='text-xs text-tertiary-token'>Enter</span>}
+    </button>
+  );
 }
 
 export const UniversalLinkInput = forwardRef<
@@ -49,6 +146,7 @@ export const UniversalLinkInput = forwardRef<
       detectedLink,
       platformSuggestions,
       shouldShowAutosuggest,
+      isShortQuery,
       focusInput,
       handleUrlChange,
       handleKeyDown,
@@ -71,9 +169,44 @@ export const UniversalLinkInput = forwardRef<
       clearSignal,
     });
 
+    // Batch add handler for multi-link paste
+    const handleBatchAdd = useCallback(
+      (links: DetectedLink[]) => {
+        for (const link of links) {
+          onAdd(link);
+        }
+      },
+      [onAdd]
+    );
+
+    const {
+      multiLinkState,
+      handlePaste,
+      handleDialogClose,
+      handleConfirmAdd,
+      toggleLinkSelection,
+      selectableCount,
+    } = useMultiLinkPaste({
+      existingPlatforms,
+      creatorName,
+      onBatchAdd: handleBatchAdd,
+    });
+
     useImperativeHandle(forwardedRef, () => ({
       getInputElement: () => urlInputRef.current,
     }));
+
+    // Group platforms by category when showing popular platforms (short query)
+    const groupedSuggestions = useMemo(() => {
+      if (!isShortQuery) return null;
+      return groupByCategory(platformSuggestions);
+    }, [isShortQuery, platformSuggestions]);
+
+    // Calculate global index for keyboard navigation across groups
+    const flatSuggestions = useMemo(() => {
+      if (!groupedSuggestions) return platformSuggestions;
+      return groupedSuggestions.flatMap(group => group.options);
+    }, [groupedSuggestions, platformSuggestions]);
 
     return searchMode ? (
       <UniversalLinkInputArtistSearchMode
@@ -96,6 +229,7 @@ export const UniversalLinkInput = forwardRef<
           inputRef={urlInputRef}
           onUrlChange={handleUrlChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onClear={handleClear}
           onPlatformSelect={handlePlatformSelect}
           onArtistSearchSelect={handleArtistSearchSelect}
@@ -139,34 +273,62 @@ export const UniversalLinkInput = forwardRef<
               event.preventDefault();
             }}
           >
-            {platformSuggestions.map((option, index) => {
-              const active = index === activeSuggestionIndex;
-              return (
-                <button
-                  key={option.id}
-                  id={`${autosuggestListId}-option-${index}`}
-                  role='option'
-                  aria-selected={active}
-                  type='button'
-                  className={cn(
-                    'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-primary-token transition',
-                    active ? 'bg-surface-2' : 'hover:bg-surface-2'
-                  )}
-                  onMouseEnter={() => setActiveSuggestionIndex(index)}
-                  onClick={() => commitPlatformSelection(option)}
-                >
-                  <span className='flex items-center gap-2'>
-                    <span className='font-medium'>{option.name}</span>
-                    <span className='text-xs text-tertiary-token'>
-                      {option.prefill}
-                    </span>
-                  </span>
-                  <span className='text-xs text-tertiary-token'>Enter</span>
-                </button>
-              );
-            })}
+            {groupedSuggestions
+              ? // Grouped view for short queries (popular platforms by category)
+                groupedSuggestions.map(group => {
+                  const groupStartIndex = flatSuggestions.findIndex(
+                    opt => opt.id === group.options[0]?.id
+                  );
+                  return (
+                    <div key={group.category}>
+                      <div className='px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                        {group.label}
+                      </div>
+                      {group.options.map((option, indexInGroup) => {
+                        const globalIndex = groupStartIndex + indexInGroup;
+                        const active = globalIndex === activeSuggestionIndex;
+                        return (
+                          <PlatformSuggestionItem
+                            key={option.id}
+                            option={option}
+                            active={active}
+                            optionId={`${autosuggestListId}-option-${globalIndex}`}
+                            onMouseEnter={() =>
+                              setActiveSuggestionIndex(globalIndex)
+                            }
+                            onClick={() => commitPlatformSelection(option)}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })
+              : // Flat view for longer queries (fuzzy matched results)
+                platformSuggestions.map((option, index) => {
+                  const active = index === activeSuggestionIndex;
+                  return (
+                    <PlatformSuggestionItem
+                      key={option.id}
+                      option={option}
+                      active={active}
+                      optionId={`${autosuggestListId}-option-${index}`}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      onClick={() => commitPlatformSelection(option)}
+                    />
+                  );
+                })}
           </div>
         ) : null}
+
+        {/* Multi-link paste dialog */}
+        <MultiLinkPasteDialog
+          open={multiLinkState.isOpen}
+          onClose={handleDialogClose}
+          onConfirm={handleConfirmAdd}
+          extractedLinks={multiLinkState.extractedLinks}
+          onToggleSelection={toggleLinkSelection}
+          selectableCount={selectableCount}
+        />
       </div>
     );
   }

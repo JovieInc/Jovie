@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache } from '@/lib/cache';
 import { creatorProfiles, eq, profilePhotos } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
+import { env } from '@/lib/env';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -251,7 +252,7 @@ async function checkRateLimit(
   userIdFromSession: string
 ): Promise<NextResponse | null> {
   if (!avatarUploadRateLimit) {
-    if (process.env.NODE_ENV === 'production') {
+    if (env.NODE_ENV === 'production') {
       logger.warn(
         '[upload] Rate limiting disabled - Redis not configured. User:',
         userIdFromSession.slice(0, 10) + '...'
@@ -339,6 +340,19 @@ async function validateFileUpload(request: NextRequest): Promise<
     };
   }
 
+  // Check file size before buffering to avoid memory waste on oversized uploads
+  if (file.size > AVATAR_MAX_FILE_SIZE_BYTES) {
+    const maxMB = Math.round(AVATAR_MAX_FILE_SIZE_BYTES / (1024 * 1024));
+    return {
+      ok: false,
+      response: errorResponse(
+        `File too large. Maximum ${maxMB}MB allowed.`,
+        UPLOAD_ERROR_CODES.FILE_TOO_LARGE,
+        400
+      ),
+    };
+  }
+
   const fileBuffer = await fileToBuffer(file);
   if (
     !validateMagicBytes(fileBuffer, normalizedType as SupportedImageMimeType)
@@ -351,18 +365,6 @@ async function validateFileUpload(request: NextRequest): Promise<
       response: errorResponse(
         'File content does not match declared type. Please upload a valid image.',
         UPLOAD_ERROR_CODES.INVALID_FILE,
-        400
-      ),
-    };
-  }
-
-  if (file.size > AVATAR_MAX_FILE_SIZE_BYTES) {
-    const maxMB = Math.round(AVATAR_MAX_FILE_SIZE_BYTES / (1024 * 1024));
-    return {
-      ok: false,
-      response: errorResponse(
-        `File too large. Maximum ${maxMB}MB allowed.`,
-        UPLOAD_ERROR_CODES.FILE_TOO_LARGE,
         400
       ),
     };
@@ -386,10 +388,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (
-    process.env.NODE_ENV === 'production' &&
-    !process.env.BLOB_READ_WRITE_TOKEN
-  ) {
+  if (env.NODE_ENV === 'production' && !process.env.BLOB_READ_WRITE_TOKEN) {
     logger.error('BLOB_READ_WRITE_TOKEN is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',

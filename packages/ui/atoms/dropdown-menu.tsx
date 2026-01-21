@@ -9,6 +9,7 @@ import {
   DROPDOWN_TRANSFORM_ORIGIN,
   dropdownMenuContentClasses,
   MENU_ITEM_BASE,
+  MENU_ITEM_DESTRUCTIVE,
   MENU_LABEL_BASE,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
@@ -119,11 +120,17 @@ const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
     inset?: boolean;
+    variant?: 'default' | 'destructive';
   }
->(({ className, inset, ...props }, ref) => (
+>(({ className, inset, variant, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
-    className={cn(MENU_ITEM_BASE, inset && 'pl-10', className)}
+    className={cn(
+      MENU_ITEM_BASE,
+      inset && 'pl-10',
+      variant === 'destructive' && MENU_ITEM_DESTRUCTIVE,
+      className
+    )}
     {...props}
   />
 ));

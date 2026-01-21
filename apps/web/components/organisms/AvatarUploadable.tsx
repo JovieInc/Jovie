@@ -108,6 +108,7 @@ export const AvatarUploadable = React.memo(
       isDragOver,
       isUploading,
       uploadStatus,
+      uploadProgress,
       previewUrl,
       handleFileUpload,
       handleDragEnter,
@@ -168,18 +169,28 @@ export const AvatarUploadable = React.memo(
       [uploadable, onUpload, isUploading]
     );
 
-    useEffect(() => {
-      if (isUploading && progress > 0) {
-        track('avatar_upload_progress', { progress });
+    const computedProgress = useMemo(() => {
+      // Prefer internal upload progress when we manage the upload lifecycle
+      if (isUploading || uploadStatus !== 'idle') {
+        return uploadProgress;
       }
-    }, [isUploading, progress]);
+      return progress;
+    }, [isUploading, progress, uploadProgress, uploadStatus]);
+
+    useEffect(() => {
+      if (isUploading && computedProgress > 0) {
+        track('avatar_upload_progress', { progress: computedProgress });
+      }
+    }, [computedProgress, isUploading]);
 
     const canUpload = uploadable && Boolean(onUpload);
     const isInteractive = canUpload && !isUploading;
     const showProgress =
       isUploading || uploadStatus === 'success' || uploadStatus === 'error';
     const currentProgress =
-      uploadStatus === 'success' || uploadStatus === 'error' ? 100 : progress;
+      uploadStatus === 'success' || uploadStatus === 'error'
+        ? 100
+        : computedProgress;
 
     return (
       // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Role is dynamically 'button' or 'presentation'
@@ -242,7 +253,10 @@ export const AvatarUploadable = React.memo(
           />
         )}
 
-        <AvatarUploadAnnouncer progress={progress} status={uploadStatus} />
+        <AvatarUploadAnnouncer
+          progress={computedProgress}
+          status={uploadStatus}
+        />
       </div>
     );
   })

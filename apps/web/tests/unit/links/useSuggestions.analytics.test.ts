@@ -7,6 +7,10 @@ import { useSuggestions } from '@/components/dashboard/organisms/links/hooks/use
 import { track } from '@/lib/analytics';
 import { createMockSuggestion } from './useSuggestions.test-utils';
 
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
 describe('useSuggestions - Analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();

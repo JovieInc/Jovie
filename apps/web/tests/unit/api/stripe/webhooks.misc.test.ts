@@ -15,8 +15,6 @@ import {
   setSkipProcessing,
 } from './webhooks.test-utils';
 
-const { headers } = await import('next/headers');
-
 describe('/api/stripe/webhooks - Event Recording', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,10 +24,6 @@ describe('/api/stripe/webhooks - Event Recording', () => {
   });
 
   it('records webhook event with extracted object ID', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_record_test',
       type: 'checkout.session.completed',
@@ -54,6 +48,7 @@ describe('/api/stripe/webhooks - Event Recording', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -76,10 +71,6 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
   });
 
   it('processes a new checkout.session.completed event and records webhook', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_1',
       type: 'checkout.session.completed',
@@ -108,6 +99,7 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );
@@ -122,10 +114,6 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
   });
 
   it('returns 500 when handler indicates processing failed (legacy behavior)', async () => {
-    vi.mocked(headers).mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       id: 'evt_unknown',
       type: 'checkout.session.completed',
@@ -158,6 +146,7 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
       'http://localhost:3000/api/stripe/webhooks',
       {
         method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
         body: 'test-body',
       }
     );

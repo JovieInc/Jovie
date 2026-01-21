@@ -56,13 +56,13 @@ export function TableBulkActionsToolbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start'>
             {actions.map(action => (
-              <DropdownMenuItem
-                key={action.label}
-                onClick={action.onClick}
-                className='flex items-center gap-2'
-              >
-                {action.icon && <span className='h-4 w-4'>{action.icon}</span>}
-                <span>{action.label}</span>
+              <DropdownMenuItem key={action.label} onClick={action.onClick}>
+                {action.icon && (
+                  <span className='h-4 w-4 flex items-center justify-center [&>svg]:h-4 [&>svg]:w-4'>
+                    {action.icon}
+                  </span>
+                )}
+                {action.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

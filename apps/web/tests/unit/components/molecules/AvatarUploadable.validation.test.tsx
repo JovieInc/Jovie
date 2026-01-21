@@ -16,15 +16,17 @@ import {
 
 describe('AvatarUploadable - File Validation', () => {
   const { mockOnUpload, mockOnSuccess, mockOnError } = createMockCallbacks();
+  let restoreUrlMocks: (() => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    setupUrlMocks();
+    restoreUrlMocks = setupUrlMocks();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreUrlMocks?.();
   });
 
   it('calls onUpload when file is selected', async () => {

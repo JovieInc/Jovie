@@ -25,7 +25,7 @@ function isFormElement(target: EventTarget | null): boolean {
 }
 
 function handleArrowNavigation(
-  key: string,
+  key: 'ArrowDown' | 'ArrowUp',
   selectedIndex: number,
   itemIds: string[],
   onSelect: (id: string | null) => void
@@ -38,7 +38,7 @@ function handleArrowNavigation(
         ? 0
         : Math.min(selectedIndex + 1, itemIds.length - 1);
     onSelect(itemIds[nextIndex] ?? null);
-  } else {
+  } else if (key === 'ArrowUp') {
     const prevIndex =
       selectedIndex === -1
         ? itemIds.length - 1
@@ -75,7 +75,12 @@ export function useAdminTableKeyboardNavigation<ItemType>(
 
       if (key === 'ArrowDown' || key === 'ArrowUp') {
         event.preventDefault();
-        handleArrowNavigation(key, selectedIndex, itemIds, onSelect);
+        handleArrowNavigation(
+          key as 'ArrowDown' | 'ArrowUp',
+          selectedIndex,
+          itemIds,
+          onSelect
+        );
         return;
       }
 

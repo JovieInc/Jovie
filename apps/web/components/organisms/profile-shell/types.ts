@@ -27,6 +27,8 @@ export interface ProfileNotificationsContextValue {
     React.SetStateAction<NotificationContactValues>
   >;
   openSubscription: (channel?: NotificationChannel) => void;
+  /** Register a callback to focus the subscription input */
+  registerInputFocus: (focusFn: (() => void) | null) => void;
 }
 
 export interface ProfileShellProps {
