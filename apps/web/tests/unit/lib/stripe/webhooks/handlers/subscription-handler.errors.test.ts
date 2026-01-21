@@ -3,7 +3,7 @@
  */
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
+import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockCaptureCriticalError,
@@ -16,9 +16,12 @@ import {
 describe('@critical SubscriptionHandler - Errors', () => {
   let handler: SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
+    const { SubscriptionHandler: SubscriptionHandlerClass } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandlerClass();
     setupDefaultMocks();
   });
 
@@ -216,9 +219,12 @@ describe('@critical SubscriptionHandler - Errors', () => {
 describe('@critical SubscriptionHandler - Status Handling', () => {
   let handler: SubscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
+    const { SubscriptionHandler: SubscriptionHandlerClass } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    handler = new SubscriptionHandlerClass();
     setupDefaultMocks();
   });
 

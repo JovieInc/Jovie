@@ -1,0 +1,230 @@
+/**
+ * Context Menu Items Hook
+ *
+ * Provides context menu items for creator profile rows.
+ */
+
+import {
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  Mail,
+  MailX,
+  RefreshCw,
+  Send,
+  Star,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
+import { useCallback } from 'react';
+import { toast } from 'sonner';
+import type { ContextMenuItemType } from '@/components/organisms/table';
+import type { AdminCreatorProfileRow, IngestRefreshStatus } from '../types';
+
+export interface ContextMenuDependencies {
+  ingestRefreshStatuses: Record<string, IngestRefreshStatus>;
+  refreshIngest: (profileId: string) => Promise<void>;
+  toggleVerification: (
+    id: string,
+    verified: boolean
+  ) => Promise<{ success: boolean }>;
+  toggleFeatured: (
+    id: string,
+    featured: boolean
+  ) => Promise<{ success: boolean }>;
+  toggleMarketing: (
+    id: string,
+    optOut: boolean
+  ) => Promise<{ success: boolean }>;
+  openDeleteDialog: (profile: AdminCreatorProfileRow) => void;
+  openInviteDialog: (profile: AdminCreatorProfileRow) => void;
+}
+
+export function useContextMenuItems({
+  ingestRefreshStatuses,
+  refreshIngest,
+  toggleVerification,
+  toggleFeatured,
+  toggleMarketing,
+  openDeleteDialog,
+  openInviteDialog,
+}: ContextMenuDependencies) {
+  const getContextMenuItems = useCallback(
+    (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
+      const items: ContextMenuItemType[] = [];
+
+      // Refresh ingest (if available)
+      const hasIngestStatus = Object.prototype.hasOwnProperty.call(
+        ingestRefreshStatuses,
+        profile.id
+      );
+      if (hasIngestStatus) {
+        const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
+        items.push({
+          id: 'refresh-ingest',
+          label: 'Refresh ingest',
+          icon: <RefreshCw className='h-3.5 w-3.5' />,
+          onClick: () => void refreshIngest(profile.id),
+          disabled: refreshIngestStatus === 'loading',
+        });
+        items.push({ type: 'separator' as const });
+      }
+
+      // Verify/Unverify
+      items.push(
+        profile.isVerified
+          ? {
+              id: 'unverify',
+              label: 'Unverify creator',
+              icon: <XCircle className='h-3.5 w-3.5' />,
+              onClick: () => {
+                void (async () => {
+                  const result = await toggleVerification(profile.id, false);
+                  if (!result.success) {
+                    toast.error('Failed to unverify creator');
+                  } else {
+                    toast.success('Creator unverified');
+                  }
+                })();
+              },
+            }
+          : {
+              id: 'verify',
+              label: 'Verify creator',
+              icon: <CheckCircle className='h-3.5 w-3.5' />,
+              onClick: () => {
+                void (async () => {
+                  const result = await toggleVerification(profile.id, true);
+                  if (!result.success) {
+                    toast.error('Failed to verify creator');
+                  } else {
+                    toast.success('Creator verified');
+                  }
+                })();
+              },
+            }
+      );
+
+      // Feature/Unfeature
+      const isFeatured =
+        'isFeatured' in profile ? Boolean(profile.isFeatured) : false;
+      items.push({
+        id: 'feature',
+        label: isFeatured ? 'Unfeature' : 'Feature',
+        icon: <Star className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void (async () => {
+            const result = await toggleFeatured(profile.id, !isFeatured);
+            if (!result.success) {
+              toast.error(
+                `Failed to ${isFeatured ? 'unfeature' : 'feature'} creator`
+              );
+            } else {
+              toast.success(
+                `Creator ${isFeatured ? 'unfeatured' : 'featured'}`
+              );
+            }
+          })();
+        },
+      });
+
+      items.push({ type: 'separator' as const });
+
+      // Marketing emails toggle
+      const marketingOptOut =
+        'marketingOptOut' in profile ? Boolean(profile.marketingOptOut) : false;
+      items.push({
+        id: 'marketing',
+        label: marketingOptOut
+          ? 'Enable marketing emails'
+          : 'Disable marketing emails',
+        icon: marketingOptOut ? (
+          <Mail className='h-3.5 w-3.5' />
+        ) : (
+          <MailX className='h-3.5 w-3.5' />
+        ),
+        onClick: () => {
+          void (async () => {
+            const result = await toggleMarketing(profile.id, !marketingOptOut);
+            if (!result.success) {
+              toast.error('Failed to toggle marketing');
+            }
+          })();
+        },
+      });
+
+      // View profile
+      items.push({
+        id: 'view-profile',
+        label: 'View profile',
+        icon: <ExternalLink className='h-3.5 w-3.5' />,
+        onClick: () => {
+          window.open(`/${profile.username}`, '_blank');
+        },
+      });
+
+      // Copy claim link & Send invite (if unclaimed and has claim token)
+      const claimToken =
+        'claimToken' in profile ? (profile.claimToken as string | null) : null;
+      if (!profile.isClaimed && claimToken) {
+        items.push({ type: 'separator' as const });
+        items.push({
+          id: 'copy-claim-link',
+          label: 'Copy claim link',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void (async () => {
+              const baseUrl =
+                typeof window !== 'undefined'
+                  ? window.location.origin
+                  : 'https://jovie.app';
+              const claimUrl = `${baseUrl}/claim/${claimToken}`;
+              try {
+                await navigator.clipboard.writeText(claimUrl);
+                toast.success('Claim link copied to clipboard');
+              } catch {
+                toast.error('Failed to copy claim link');
+                window.prompt('Copy claim link:', claimUrl);
+              }
+            })();
+          },
+        });
+
+        items.push({
+          id: 'send-invite',
+          label: 'Send invite',
+          icon: <Send className='h-3.5 w-3.5' />,
+          onClick: () => {
+            openInviteDialog(profile);
+          },
+        });
+      }
+
+      items.push({ type: 'separator' as const });
+
+      // Delete
+      items.push({
+        id: 'delete',
+        label: profile.isClaimed ? 'Delete user' : 'Delete creator',
+        icon: <Trash2 className='h-3.5 w-3.5' />,
+        destructive: true,
+        onClick: () => {
+          openDeleteDialog(profile);
+        },
+      });
+
+      return items;
+    },
+    [
+      ingestRefreshStatuses,
+      refreshIngest,
+      toggleVerification,
+      toggleFeatured,
+      toggleMarketing,
+      openDeleteDialog,
+      openInviteDialog,
+    ]
+  );
+
+  return { getContextMenuItems };
+}
