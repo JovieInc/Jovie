@@ -33,6 +33,61 @@ const SOURCE_BONUS = 0.15;
 const ACTIVE_THRESHOLD = 0.7;
 const SUGGESTED_THRESHOLD = 0.3;
 
+function extractHandleFromUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const [first] = parsed.pathname.split('/').filter(Boolean);
+    if (!first) return null;
+    return first.replace(/^@/, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function computeBaseSignals(
+  signals: Set<ConfidenceSignal>,
+  sourceType: ConfidenceInput['sourceType']
+): void {
+  if (sourceType === 'manual') {
+    signals.add('manual_user');
+  } else if (sourceType === 'admin') {
+    signals.add('manual_admin');
+  }
+}
+
+function computeHandleSimilaritySignal(
+  signals: Set<ConfidenceSignal>,
+  usernameNormalized: string | null | undefined,
+  url: string | undefined
+): void {
+  if (!usernameNormalized) return;
+
+  const handle = extractHandleFromUrl(url);
+  if (handle && handle === usernameNormalized.toLowerCase()) {
+    signals.add('handle_similarity');
+  }
+}
+
+function computeScore(signals: Set<ConfidenceSignal>, sourcesSize: number): number {
+  let score = 0;
+  signals.forEach(signal => {
+    score += SIGNAL_WEIGHTS[signal] ?? 0;
+  });
+
+  if (signals.has('manual_user')) {
+    score = Math.max(score, 0.75);
+  }
+  if (signals.has('manual_admin')) {
+    score = Math.max(score, 0.7);
+  }
+  if (sourcesSize > 1) {
+    score += SOURCE_BONUS * (sourcesSize - 1);
+  }
+
+  return score;
+}
+
 export interface ConfidenceInput {
   sourceType: IngestionSourceType;
   signals?: Array<ConfidenceSignal | string>;
@@ -53,55 +108,10 @@ export function computeLinkConfidence(input: ConfidenceInput): {
   );
   const sources = new Set<string>(input.sources ?? []);
 
-  // Base weight by source type
-  if (input.sourceType === 'manual') {
-    signals.add('manual_user');
-  } else if (input.sourceType === 'admin') {
-    signals.add('manual_admin');
-  } else {
-    // ingested base: small starting value via linktree or similar signals
-    // (handled below through explicit signals)
-  }
+  computeBaseSignals(signals, input.sourceType);
+  computeHandleSimilaritySignal(signals, input.usernameNormalized, input.url);
 
-  // Handle similarity bonus
-  if (input.usernameNormalized) {
-    const handle = (() => {
-      if (!input.url) return null;
-      try {
-        const parsed = new URL(input.url);
-        const [first] = parsed.pathname.split('/').filter(Boolean);
-        if (!first) return null;
-        return first.replace(/^@/, '').toLowerCase();
-      } catch {
-        return null;
-      }
-    })();
-
-    if (handle) {
-      const normalizedUsername = input.usernameNormalized.toLowerCase();
-      if (handle === normalizedUsername) {
-        signals.add('handle_similarity');
-      }
-    }
-  }
-
-  let score = 0;
-  signals.forEach(signal => {
-    score += SIGNAL_WEIGHTS[signal] ?? 0;
-  });
-
-  if (signals.has('manual_user')) {
-    score = Math.max(score, 0.75);
-  }
-
-  if (signals.has('manual_admin')) {
-    score = Math.max(score, 0.7);
-  }
-
-  // Multi-source bonus (beyond first source)
-  if (sources.size > 1) {
-    score += SOURCE_BONUS * (sources.size - 1);
-  }
+  let score = computeScore(signals, sources.size);
 
   if (typeof input.existingConfidence === 'number') {
     score = Math.max(score, input.existingConfidence);

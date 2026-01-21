@@ -20,6 +20,93 @@ const DELAY_SPRING_Y = 0.05;
 const DELAY_OPACITY_Y = 0.1;
 const DELAY_HEIGHT_COLLAPSED = 0.05;
 
+// Easing curves
+const EASE_HEIGHT = [0.32, 0.72, 0.32, 0.98] as const;
+const EASE_OPACITY = [0.32, 0, 0.67, 1] as const;
+
+function buildContainerVariants(
+  duration: number,
+  delay: number,
+  reduceMotion: boolean
+): Variants {
+  const d = reduceMotion ? 0 : duration;
+  const dl = reduceMotion ? 0 : delay;
+
+  return {
+    open: {
+      opacity: 1,
+      height: 'auto',
+      transition: {
+        height: { duration: d, ease: EASE_HEIGHT, delay: dl },
+        opacity: {
+          duration: d * OPACITY_DURATION_MULTIPLIER_OPEN,
+          ease: EASE_OPACITY,
+          delay: dl * DELAY_MULTIPLIER_OPACITY,
+        },
+      },
+    },
+    collapsed: {
+      opacity: 0,
+      height: 0,
+      transition: {
+        height: {
+          duration: d * HEIGHT_DURATION_MULTIPLIER_COLLAPSED,
+          ease: EASE_HEIGHT,
+          delay: reduceMotion ? 0 : DELAY_HEIGHT_COLLAPSED,
+        },
+        opacity: {
+          duration: d * OPACITY_DURATION_MULTIPLIER_COLLAPSED,
+          ease: EASE_OPACITY,
+        },
+      },
+    },
+  };
+}
+
+function buildContentVariants(
+  duration: number,
+  delay: number,
+  reduceMotion: boolean
+): Variants {
+  const d = reduceMotion ? 0 : duration;
+  const dl = reduceMotion ? 0 : delay;
+
+  return {
+    open: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        y: {
+          type: 'spring',
+          stiffness: SPRING_STIFFNESS,
+          damping: SPRING_DAMPING,
+          delay: dl + (reduceMotion ? 0 : DELAY_SPRING_Y),
+        },
+        opacity: {
+          duration: d * HEIGHT_DURATION_MULTIPLIER_COLLAPSED,
+          ease: EASE_OPACITY,
+          delay: dl + (reduceMotion ? 0 : DELAY_OPACITY_Y),
+        },
+      },
+    },
+    collapsed: {
+      y: VERTICAL_OFFSET,
+      opacity: 0,
+      transition: {
+        y: {
+          type: 'spring',
+          stiffness: SPRING_STIFFNESS,
+          damping: SPRING_DAMPING,
+        },
+        opacity: {
+          duration: d * OPACITY_DURATION_MULTIPLIER_COLLAPSED,
+          ease: EASE_OPACITY,
+        },
+      },
+    },
+  };
+}
+
 interface AnimatedAccordionProps {
   isOpen: boolean;
   children: React.ReactNode;
@@ -44,87 +131,10 @@ export function AnimatedAccordion({
   duration = 0.3,
 }: AnimatedAccordionProps) {
   const shouldReduceMotion = useReducedMotion();
+  const reduceMotion = Boolean(shouldReduceMotion);
 
-  // Motion variants for the container
-  const containerVariants: Variants = {
-    open: {
-      opacity: 1,
-      height: 'auto',
-      transition: {
-        height: {
-          duration: shouldReduceMotion ? 0 : duration,
-          ease: [0.32, 0.72, 0.32, 0.98],
-          delay: shouldReduceMotion ? 0 : delay,
-        },
-        opacity: {
-          duration: shouldReduceMotion
-            ? 0
-            : duration * OPACITY_DURATION_MULTIPLIER_OPEN,
-          ease: [0.32, 0, 0.67, 1],
-          delay: shouldReduceMotion ? 0 : delay * DELAY_MULTIPLIER_OPACITY,
-        },
-      },
-    },
-    collapsed: {
-      opacity: 0,
-      height: 0,
-      transition: {
-        height: {
-          duration: shouldReduceMotion
-            ? 0
-            : duration * HEIGHT_DURATION_MULTIPLIER_COLLAPSED,
-          ease: [0.32, 0.72, 0.32, 0.98],
-          delay: shouldReduceMotion ? 0 : DELAY_HEIGHT_COLLAPSED,
-        },
-        opacity: {
-          duration: shouldReduceMotion
-            ? 0
-            : duration * OPACITY_DURATION_MULTIPLIER_COLLAPSED,
-          ease: [0.32, 0, 0.67, 1],
-        },
-      },
-    },
-  };
-
-  // Motion variants for the content
-  const contentVariants: Variants = {
-    open: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        y: {
-          type: 'spring',
-          stiffness: SPRING_STIFFNESS,
-          damping: SPRING_DAMPING,
-          delay: shouldReduceMotion ? 0 : delay + DELAY_SPRING_Y,
-        },
-        opacity: {
-          duration: shouldReduceMotion
-            ? 0
-            : duration * HEIGHT_DURATION_MULTIPLIER_COLLAPSED,
-          ease: [0.32, 0, 0.67, 1],
-          delay: shouldReduceMotion ? 0 : delay + DELAY_OPACITY_Y,
-        },
-      },
-    },
-    collapsed: {
-      y: VERTICAL_OFFSET,
-      opacity: 0,
-      transition: {
-        y: {
-          type: 'spring',
-          stiffness: SPRING_STIFFNESS,
-          damping: SPRING_DAMPING,
-        },
-        opacity: {
-          duration: shouldReduceMotion
-            ? 0
-            : duration * OPACITY_DURATION_MULTIPLIER_COLLAPSED,
-          ease: [0.32, 0, 0.67, 1],
-        },
-      },
-    },
-  };
+  const containerVariants = buildContainerVariants(duration, delay, reduceMotion);
+  const contentVariants = buildContentVariants(duration, delay, reduceMotion);
 
   return (
     <AnimatePresence initial={false}>
@@ -133,16 +143,12 @@ export function AnimatedAccordion({
           initial='collapsed'
           animate='open'
           exit='collapsed'
-          variants={shouldReduceMotion ? undefined : containerVariants}
+          variants={reduceMotion ? undefined : containerVariants}
           className={cn('overflow-hidden', className)}
-          style={
-            shouldReduceMotion
-              ? { display: isOpen ? 'block' : 'none' }
-              : undefined
-          }
+          style={reduceMotion ? { display: isOpen ? 'block' : 'none' } : undefined}
         >
           <motion.div
-            variants={shouldReduceMotion ? undefined : contentVariants}
+            variants={reduceMotion ? undefined : contentVariants}
             className='origin-top'
           >
             {children}

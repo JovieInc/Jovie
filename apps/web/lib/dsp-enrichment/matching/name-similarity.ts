@@ -30,6 +30,69 @@ const DEFAULT_SIMILARITY_THRESHOLD = 0.85;
 const ARTIST_NAME_PREFIXES = ['the ', 'a ', 'an ', 'dj ', 'mc ', 'lil '];
 
 // ============================================================================
+// Jaro Similarity - Helper Functions
+// ============================================================================
+
+interface MatchResult {
+  s1Matches: boolean[];
+  s2Matches: boolean[];
+  matchCount: number;
+}
+
+/**
+ * Find matching characters between two strings within the match window.
+ */
+function findMatchingCharacters(
+  s1: string,
+  s2: string,
+  matchWindow: number
+): MatchResult {
+  const s1Matches = new Array<boolean>(s1.length).fill(false);
+  const s2Matches = new Array<boolean>(s2.length).fill(false);
+  let matchCount = 0;
+
+  for (let i = 0; i < s1.length; i++) {
+    const start = Math.max(0, i - matchWindow);
+    const end = Math.min(i + matchWindow + 1, s2.length);
+
+    for (let j = start; j < end; j++) {
+      if (!s2Matches[j] && s1[i] === s2[j]) {
+        s1Matches[i] = true;
+        s2Matches[j] = true;
+        matchCount++;
+        break;
+      }
+    }
+  }
+
+  return { s1Matches, s2Matches, matchCount };
+}
+
+/**
+ * Count transpositions between matched characters.
+ */
+function countTranspositions(
+  s1: string,
+  s2: string,
+  s1Matches: boolean[],
+  s2Matches: boolean[]
+): number {
+  let transpositions = 0;
+  let k = 0;
+
+  for (let i = 0; i < s1.length; i++) {
+    if (!s1Matches[i]) continue;
+
+    while (!s2Matches[k]) k++;
+
+    if (s1[i] !== s2[k]) transpositions++;
+    k++;
+  }
+
+  return transpositions;
+}
+
+// ============================================================================
 // Jaro Similarity
 // ============================================================================
 
@@ -49,50 +112,23 @@ function jaroSimilarity(s1: string, s2: string): number {
   if (s1 === s2) return 1;
   if (s1.length === 0 || s2.length === 0) return 0;
 
-  // Calculate the match window
   const matchWindow = Math.floor(Math.max(s1.length, s2.length) / 2) - 1;
+  const { s1Matches, s2Matches, matchCount } = findMatchingCharacters(
+    s1,
+    s2,
+    matchWindow
+  );
 
-  const s1Matches = new Array<boolean>(s1.length).fill(false);
-  const s2Matches = new Array<boolean>(s2.length).fill(false);
+  if (matchCount === 0) return 0;
 
-  let matches = 0;
-  let transpositions = 0;
+  const transpositions = countTranspositions(s1, s2, s1Matches, s2Matches);
 
-  // Find matching characters
-  for (let i = 0; i < s1.length; i++) {
-    const start = Math.max(0, i - matchWindow);
-    const end = Math.min(i + matchWindow + 1, s2.length);
-
-    for (let j = start; j < end; j++) {
-      if (s2Matches[j] || s1[i] !== s2[j]) continue;
-
-      s1Matches[i] = true;
-      s2Matches[j] = true;
-      matches++;
-      break;
-    }
-  }
-
-  if (matches === 0) return 0;
-
-  // Count transpositions
-  let k = 0;
-  for (let i = 0; i < s1.length; i++) {
-    if (!s1Matches[i]) continue;
-
-    while (!s2Matches[k]) k++;
-
-    if (s1[i] !== s2[k]) transpositions++;
-    k++;
-  }
-
-  const jaro =
-    (matches / s1.length +
-      matches / s2.length +
-      (matches - transpositions / 2) / matches) /
-    3;
-
-  return jaro;
+  return (
+    (matchCount / s1.length +
+      matchCount / s2.length +
+      (matchCount - transpositions / 2) / matchCount) /
+    3
+  );
 }
 
 // ============================================================================

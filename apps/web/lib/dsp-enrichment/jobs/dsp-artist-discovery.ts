@@ -200,6 +200,72 @@ async function storeMatch(
 }
 
 // ============================================================================
+// Provider-Specific Discovery - Helpers
+// ============================================================================
+
+type AppleMusicTrackMap = Map<
+  string,
+  Awaited<ReturnType<typeof bulkLookupByIsrc>> extends Map<string, infer T>
+    ? T
+    : never
+>;
+
+type DiscoveryResult = {
+  match: ScoredArtistMatch | null;
+  status: DspMatchStatus | null;
+  error?: string;
+};
+
+const noMatch = (error: string): DiscoveryResult => ({
+  match: null,
+  status: null,
+  error,
+});
+
+/**
+ * Batch lookup ISRCs on Apple Music.
+ */
+async function batchLookupIsrcs(isrcs: string[]): Promise<AppleMusicTrackMap> {
+  const allTracks: AppleMusicTrackMap = new Map();
+
+  for (let i = 0; i < isrcs.length; i += MAX_ISRC_BATCH_SIZE) {
+    const batch = isrcs.slice(i, i + MAX_ISRC_BATCH_SIZE);
+    const batchResults = await bulkLookupByIsrc(batch);
+    for (const [isrc, track] of batchResults) {
+      allTracks.set(isrc, track);
+    }
+  }
+
+  return allTracks;
+}
+
+type ArtistProfile = { url?: string; imageUrl?: string; name?: string };
+
+/**
+ * Fetch artist profile data for enrichment.
+ */
+async function fetchArtistProfile(
+  artistId: string
+): Promise<ArtistProfile | null> {
+  if (artistId === 'unknown') return null;
+
+  try {
+    const artist = await getArtist(artistId);
+    if (!artist) return null;
+
+    return {
+      url: artist.attributes?.url,
+      imageUrl: artist.attributes?.artwork?.url
+        ?.replace('{w}', '300')
+        .replace('{h}', '300'),
+      name: artist.attributes?.name,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
 // Provider-Specific Discovery
 // ============================================================================
 
@@ -211,117 +277,64 @@ async function discoverAppleMusicMatch(
   localTracks: LocalTrackData[],
   localArtist: LocalArtistData,
   creatorProfileId: string
-): Promise<{
-  match: ScoredArtistMatch | null;
-  status: DspMatchStatus | null;
-  error?: string;
-}> {
+): Promise<DiscoveryResult> {
   if (!isAppleMusicAvailable()) {
-    return { match: null, status: null, error: 'Apple Music not available' };
+    return noMatch('Apple Music not available');
   }
 
-  // Select tracks for matching
   const selectedTracks = selectTracksForMatching(
     localTracks,
     MAX_TRACKS_FOR_MATCHING
   );
 
   if (selectedTracks.length < MIN_TRACKS_FOR_DISCOVERY) {
-    return {
-      match: null,
-      status: null,
-      error: `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${selectedTracks.length})`,
-    };
+    return noMatch(
+      `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${selectedTracks.length})`
+    );
   }
 
-  // Batch lookup ISRCs
   const isrcs = selectedTracks
     .map(t => t.isrc)
     .filter((isrc): isrc is string => isrc !== null);
 
-  // Process in batches of 25 (Apple Music limit)
-  const allTracks = new Map<
-    string,
-    Awaited<ReturnType<typeof bulkLookupByIsrc>> extends Map<string, infer T>
-      ? T
-      : never
-  >();
-
-  for (let i = 0; i < isrcs.length; i += MAX_ISRC_BATCH_SIZE) {
-    const batch = isrcs.slice(i, i + MAX_ISRC_BATCH_SIZE);
-    const batchResults = await bulkLookupByIsrc(batch);
-    for (const [isrc, track] of batchResults) {
-      allTracks.set(isrc, track);
-    }
-  }
-
-  // Convert to ISRC match results
+  const allTracks = await batchLookupIsrcs(isrcs);
   const isrcMatches = convertAppleMusicToIsrcMatches(allTracks, selectedTracks);
 
   if (isrcMatches.length === 0) {
-    return { match: null, status: null, error: 'No ISRC matches found' };
+    return noMatch('No ISRC matches found');
   }
 
   // Fetch artist profiles for enrichment
   const artistIds = new Set(isrcMatches.map(m => m.matchedTrack.artistId));
-  const artistProfiles = new Map<
-    string,
-    { url?: string; imageUrl?: string; name?: string }
-  >();
+  const artistProfiles = new Map<string, ArtistProfile>();
 
   for (const artistId of artistIds) {
-    if (artistId === 'unknown') continue;
-    try {
-      const artist = await getArtist(artistId);
-      if (artist) {
-        artistProfiles.set(artistId, {
-          url: artist.attributes?.url,
-          imageUrl: artist.attributes?.artwork?.url
-            ?.replace('{w}', '300')
-            .replace('{h}', '300'),
-          name: artist.attributes?.name,
-        });
-      }
-    } catch {
-      // Continue without profile data
+    const profile = await fetchArtistProfile(artistId);
+    if (profile) {
+      artistProfiles.set(artistId, profile);
     }
   }
 
-  // Orchestrate matching
   const matchingResult = orchestrateMatching(
     'apple_music',
     isrcMatches,
     localArtist,
-    {
-      minIsrcMatches: 1,
-      artistProfiles,
-    }
+    { minIsrcMatches: 1, artistProfiles }
   );
 
   if (!matchingResult.bestMatch) {
-    return {
-      match: null,
-      status: null,
-      error: matchingResult.errors.join('; ') || 'No match found',
-    };
+    return noMatch(matchingResult.errors.join('; ') || 'No match found');
   }
 
-  // Validate the match
   const validation = validateMatch(matchingResult.bestMatch, localArtist);
   if (!validation.valid) {
-    return {
-      match: null,
-      status: null,
-      error: validation.reason ?? 'Match validation failed',
-    };
+    return noMatch(validation.reason ?? 'Match validation failed');
   }
 
-  // Determine status (auto-confirm if threshold met)
   const status: DspMatchStatus = matchingResult.bestMatch.shouldAutoConfirm
     ? 'auto_confirmed'
     : 'suggested';
 
-  // Store the match
   await storeMatch(
     tx,
     creatorProfileId,
