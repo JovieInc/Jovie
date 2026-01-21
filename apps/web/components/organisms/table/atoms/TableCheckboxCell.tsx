@@ -41,6 +41,147 @@ function isLegacyProps<TData = unknown>(
   return 'checked' in props && 'onChange' in props;
 }
 
+// Normalize header checkbox state to string format
+function normalizeHeaderState(
+  headerCheckboxState: 'checked' | 'unchecked' | 'indeterminate' | boolean
+): 'checked' | 'unchecked' | 'indeterminate' {
+  if (typeof headerCheckboxState === 'boolean') {
+    return headerCheckboxState ? 'checked' : 'unchecked';
+  }
+  return headerCheckboxState;
+}
+
+// Header checkbox component for TanStack mode
+function TanStackHeaderCheckbox({
+  headerCheckboxState,
+  onToggleSelectAll,
+}: {
+  headerCheckboxState: 'checked' | 'unchecked' | 'indeterminate' | boolean;
+  onToggleSelectAll: () => void;
+}) {
+  const normalizedState = normalizeHeaderState(headerCheckboxState);
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
+    <div
+      className='relative flex h-5 w-5 items-center justify-center'
+      onClick={event => event.stopPropagation()}
+      onKeyDown={event =>
+        handleActivationKeyDown(event, e => e.stopPropagation())
+      }
+      role='presentation'
+    >
+      <Checkbox
+        aria-label='Select all rows'
+        checked={normalizedState === 'checked'}
+        indeterminate={normalizedState === 'indeterminate'}
+        onCheckedChange={onToggleSelectAll}
+        className={CHECKBOX_STYLES}
+      />
+    </div>
+  );
+}
+
+// Row checkbox component for TanStack mode
+function TanStackRowCheckbox({
+  rowNumber,
+  isChecked,
+  onToggleSelect,
+}: {
+  rowNumber?: number;
+  isChecked: boolean;
+  onToggleSelect: () => void;
+}) {
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
+    <div
+      className='relative flex h-5 w-5 items-center justify-center'
+      onClick={event => event.stopPropagation()}
+      onKeyDown={event =>
+        handleActivationKeyDown(event, e => e.stopPropagation())
+      }
+      role='presentation'
+    >
+      <span
+        className={cn(
+          'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
+          isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
+        )}
+        aria-hidden='true'
+      >
+        {rowNumber}
+      </span>
+      <div
+        className={cn(
+          'absolute inset-0 transition-opacity',
+          isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        )}
+      >
+        <Checkbox
+          aria-label={
+            rowNumber !== undefined ? `Select row ${rowNumber}` : 'Select row'
+          }
+          checked={isChecked}
+          onCheckedChange={onToggleSelect}
+          className={CHECKBOX_STYLES}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Legacy checkbox component
+function LegacyCheckboxCell({
+  checked,
+  onChange,
+  rowNumber,
+  ariaLabel,
+  isHeader = false,
+  indeterminate = false,
+  className,
+}: TableCheckboxCellLegacyProps) {
+  const Component = isHeader ? 'th' : 'td';
+
+  return (
+    <Component
+      className={cn(
+        'px-4 py-3 border-b border-subtle w-14 text-center',
+        isHeader && 'sticky z-20 bg-surface-1/80 backdrop-blur',
+        !isHeader && 'group-hover:bg-transparent',
+        className
+      )}
+    >
+      <div className='relative flex items-center justify-center'>
+        {!isHeader && rowNumber !== undefined && (
+          <span
+            className={cn(
+              'absolute inset-0 flex items-center justify-center text-[11px] tabular-nums text-tertiary-token transition-opacity',
+              checked ? 'opacity-0' : 'group-hover:opacity-0'
+            )}
+          >
+            {rowNumber}
+          </span>
+        )}
+        <div
+          className={cn(
+            'transition-opacity',
+            !isHeader && !checked && 'opacity-0 group-hover:opacity-100'
+          )}
+        >
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(value: boolean | 'indeterminate') =>
+              onChange(value === true)
+            }
+            aria-label={ariaLabel}
+            indeterminate={indeterminate}
+          />
+        </div>
+      </div>
+    </Component>
+  );
+}
+
 /**
  * Unified table checkbox cell with row number toggle on hover.
  *
@@ -74,56 +215,7 @@ export function TableCheckboxCell<TData = unknown>(
 ) {
   // Legacy mode
   if (isLegacyProps(props)) {
-    const {
-      checked,
-      onChange,
-      rowNumber,
-      ariaLabel,
-      isHeader = false,
-      indeterminate = false,
-      className,
-    } = props;
-
-    const Component = isHeader ? 'th' : 'td';
-
-    return (
-      <Component
-        className={cn(
-          'px-4 py-3 border-b border-subtle w-14 text-center',
-          isHeader && 'sticky z-20 bg-surface-1/80 backdrop-blur',
-          !isHeader && 'group-hover:bg-transparent',
-          className
-        )}
-      >
-        <div className='relative flex items-center justify-center'>
-          {!isHeader && rowNumber !== undefined && (
-            <span
-              className={cn(
-                'absolute inset-0 flex items-center justify-center text-[11px] tabular-nums text-tertiary-token transition-opacity',
-                checked ? 'opacity-0' : 'group-hover:opacity-0'
-              )}
-            >
-              {rowNumber}
-            </span>
-          )}
-          <div
-            className={cn(
-              'transition-opacity',
-              !isHeader && !checked && 'opacity-0 group-hover:opacity-100'
-            )}
-          >
-            <Checkbox
-              checked={checked}
-              onCheckedChange={(value: boolean | 'indeterminate') =>
-                onChange(value === true)
-              }
-              aria-label={ariaLabel}
-              indeterminate={indeterminate}
-            />
-          </div>
-        </div>
-      </Component>
-    );
+    return <LegacyCheckboxCell {...props} />;
   }
 
   // TanStack Table mode
@@ -139,72 +231,22 @@ export function TableCheckboxCell<TData = unknown>(
 
   // Header cell
   if (table && headerCheckboxState !== undefined && onToggleSelectAll) {
-    // Normalize boolean to 'checked'/'unchecked' format
-    const normalizedState =
-      typeof headerCheckboxState === 'boolean'
-        ? headerCheckboxState
-          ? 'checked'
-          : 'unchecked'
-        : headerCheckboxState;
-
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
-      <div
-        className='relative flex h-5 w-5 items-center justify-center'
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event =>
-          handleActivationKeyDown(event, e => e.stopPropagation())
-        }
-        role='presentation'
-      >
-        <Checkbox
-          aria-label='Select all rows'
-          checked={normalizedState === 'checked'}
-          indeterminate={normalizedState === 'indeterminate'}
-          onCheckedChange={onToggleSelectAll}
-          className={CHECKBOX_STYLES}
-        />
-      </div>
+      <TanStackHeaderCheckbox
+        headerCheckboxState={headerCheckboxState}
+        onToggleSelectAll={onToggleSelectAll}
+      />
     );
   }
 
   // Row cell
   if (row && typeof isChecked === 'boolean' && onToggleSelect) {
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
-      <div
-        className='relative flex h-5 w-5 items-center justify-center'
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event =>
-          handleActivationKeyDown(event, e => e.stopPropagation())
-        }
-        role='presentation'
-      >
-        <span
-          className={cn(
-            'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
-            isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
-          )}
-          aria-hidden='true'
-        >
-          {rowNumber}
-        </span>
-        <div
-          className={cn(
-            'absolute inset-0 transition-opacity',
-            isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          )}
-        >
-          <Checkbox
-            aria-label={
-              rowNumber !== undefined ? `Select row ${rowNumber}` : 'Select row'
-            }
-            checked={isChecked}
-            onCheckedChange={onToggleSelect}
-            className={CHECKBOX_STYLES}
-          />
-        </div>
-      </div>
+      <TanStackRowCheckbox
+        rowNumber={rowNumber}
+        isChecked={isChecked}
+        onToggleSelect={onToggleSelect}
+      />
     );
   }
 

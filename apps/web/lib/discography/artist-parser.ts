@@ -291,6 +291,85 @@ export function splitByConjunction(artistString: string): string[] {
     .filter(Boolean);
 }
 
+// Helper to split "vs" pattern in artist name
+function splitVsName(name: string): string[] | null {
+  if (!VS_PATTERN.test(name)) return null;
+  return name
+    .split(VS_PATTERN)
+    .map(p => p.trim())
+    .filter(Boolean);
+}
+
+// Helper to split conjunction pattern in artist name
+function splitMainConjunctionName(name: string): string[] | null {
+  if (!AND_PATTERN.test(name)) return null;
+
+  const parts = name
+    .split(AND_PATTERN)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  // Only split if both parts are reasonably short (likely separate artists)
+  if (parts.length === 2 && parts.every(p => p.length < 30)) {
+    return parts;
+  }
+  return null;
+}
+
+// Process "vs" split artists into credits
+function processVsParts(
+  vsParts: string[],
+  artistIndex: number,
+  artist: SpotifyArtistInput,
+  imageUrl: string | undefined,
+  credits: ParsedArtistCredit[],
+  startPosition: number
+): number {
+  let position = startPosition;
+  for (let j = 0; j < vsParts.length; j++) {
+    const part = vsParts[j];
+    if (!part) continue;
+
+    credits.push({
+      name: part,
+      role: j === 0 ? 'main_artist' : 'vs',
+      joinPhrase: j === 0 ? null : ' vs ',
+      position: position++,
+      isPrimary: j === 0 && artistIndex === 0,
+      spotifyId: j === 0 ? artist.id : undefined,
+      imageUrl: j === 0 ? imageUrl : undefined,
+    });
+  }
+  return position;
+}
+
+// Process conjunction split artists into credits
+function processConjunctionParts(
+  conjunctionParts: string[],
+  artistIndex: number,
+  artist: SpotifyArtistInput,
+  imageUrl: string | undefined,
+  credits: ParsedArtistCredit[],
+  startPosition: number
+): number {
+  let position = startPosition;
+  for (let j = 0; j < conjunctionParts.length; j++) {
+    const part = conjunctionParts[j];
+    if (!part) continue;
+
+    credits.push({
+      name: part,
+      role: 'main_artist',
+      joinPhrase: j === 0 ? null : ' & ',
+      position: position++,
+      isPrimary: j === 0 && artistIndex === 0,
+      spotifyId: j === 0 ? artist.id : undefined,
+      imageUrl: j === 0 ? imageUrl : undefined,
+    });
+  }
+  return position;
+}
+
 /**
  * Parse main artists from Spotify artist array, handling "vs" and "&" in names
  *
@@ -301,60 +380,6 @@ export function splitByConjunction(artistString: string): string[] {
 export function parseMainArtists(
   spotifyArtists: SpotifyArtistInput[]
 ): ParsedArtistCredit[] {
-  function createCredit({
-    name,
-    role,
-    joinPhrase,
-    position,
-    isPrimary,
-    spotifyId,
-    imageUrl,
-  }: {
-    name: string;
-    role: ArtistRole;
-    joinPhrase: string | null;
-    position: number;
-    isPrimary: boolean;
-    spotifyId?: string;
-    imageUrl?: string;
-  }): ParsedArtistCredit {
-    return {
-      name,
-      role,
-      joinPhrase,
-      position,
-      isPrimary,
-      spotifyId,
-      imageUrl,
-    };
-  }
-
-  function splitVsName(name: string): string[] | null {
-    if (!VS_PATTERN.test(name)) return null;
-    return name
-      .split(VS_PATTERN)
-      .map(p => p.trim())
-      .filter(Boolean);
-  }
-
-  function splitMainConjunctionName(name: string): string[] | null {
-    if (!AND_PATTERN.test(name)) return null;
-
-    // If this is the first artist in the list AND the name has conjunction,
-    // we might want to split. But be conservative - many bands have "&" in names
-    // Only split if it looks like "Name & Name" not "The Name & The Something Band"
-    const parts = name
-      .split(AND_PATTERN)
-      .map(p => p.trim())
-      .filter(Boolean);
-
-    // Only split if both parts are reasonably short (likely separate artists)
-    if (parts.length === 2 && parts.every(p => p.length < 30)) {
-      return parts;
-    }
-    return null;
-  }
-
   const credits: ParsedArtistCredit[] = [];
   let position = 0;
 
@@ -367,59 +392,40 @@ export function parseMainArtists(
 
     const vsParts = splitVsName(artistName);
     if (vsParts) {
-      for (let j = 0; j < vsParts.length; j++) {
-        const part = vsParts[j];
-        if (!part) continue;
-
-        credits.push(
-          createCredit({
-            name: part,
-            role: j === 0 ? 'main_artist' : 'vs',
-            joinPhrase: j === 0 ? null : ' vs ',
-            position: position++,
-            isPrimary: j === 0 && i === 0,
-            // Only first artist gets the Spotify ID
-            spotifyId: j === 0 ? artist.id : undefined,
-            imageUrl: j === 0 ? imageUrl : undefined,
-          })
-        );
-      }
+      position = processVsParts(
+        vsParts,
+        i,
+        artist,
+        imageUrl,
+        credits,
+        position
+      );
       continue;
     }
 
     const conjunctionParts = splitMainConjunctionName(artistName);
     if (conjunctionParts) {
-      for (let j = 0; j < conjunctionParts.length; j++) {
-        const part = conjunctionParts[j];
-        if (!part) continue;
-
-        credits.push(
-          createCredit({
-            name: part,
-            role: 'main_artist',
-            joinPhrase: j === 0 ? null : ' & ',
-            position: position++,
-            isPrimary: j === 0 && i === 0,
-            spotifyId: j === 0 ? artist.id : undefined,
-            imageUrl: j === 0 ? imageUrl : undefined,
-          })
-        );
-      }
+      position = processConjunctionParts(
+        conjunctionParts,
+        i,
+        artist,
+        imageUrl,
+        credits,
+        position
+      );
       continue;
     }
 
     // Keep as single artist
-    credits.push(
-      createCredit({
-        name: artistName,
-        role: 'main_artist',
-        joinPhrase: credits.length === 0 ? null : ', ',
-        position: position++,
-        isPrimary: i === 0,
-        spotifyId: artist.id,
-        imageUrl,
-      })
-    );
+    credits.push({
+      name: artistName,
+      role: 'main_artist',
+      joinPhrase: credits.length === 0 ? null : ', ',
+      position: position++,
+      isPrimary: i === 0,
+      spotifyId: artist.id,
+      imageUrl,
+    });
   }
 
   return credits;
