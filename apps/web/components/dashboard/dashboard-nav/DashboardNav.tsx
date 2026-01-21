@@ -1,25 +1,15 @@
 'use client';
 
-import { Kbd } from '@jovie/ui';
-import { Copy, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuActions,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { track } from '@/lib/analytics';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
-import { useNotifications } from '@/lib/hooks/useNotifications';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import {
   adminNavigation,
   navShortcuts,
@@ -27,17 +17,35 @@ import {
   secondaryNavigation,
   settingsNavigation,
 } from './config';
+import { NavMenuItem } from './NavMenuItem';
+import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
-import { copyToClipboard } from './utils';
 
-export function DashboardNav(_props: DashboardNavProps) {
+const PROFILE_HREF = '/app/dashboard/profile';
+const ADMIN_BASE_HREF = '/app/admin';
+
+function isItemActive(pathname: string, item: NavItem): boolean {
+  if (pathname === item.href) {
+    return true;
+  }
+
+  // Admin routes need exact match to avoid false positives
+  if (item.href === ADMIN_BASE_HREF) {
+    return false;
+  }
+
+  return pathname.startsWith(`${item.href}/`);
+}
+
+export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
-  const notifications = useNotifications();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
   const publicProfileHref = username ? `/${username}` : undefined;
+
   const primaryItems = contactsGate.value
     ? primaryNavigation
     : primaryNavigation.filter(item => item.id !== 'contacts');
@@ -50,81 +58,29 @@ export function DashboardNav(_props: DashboardNavProps) {
         { key: 'secondary', items: secondaryNavigation },
       ];
 
-  const renderSection = (items: NavItem[]) => (
-    <SidebarMenu>
-      {items.map(item => {
-        const isActive =
-          pathname === item.href ||
-          (pathname.startsWith(`${item.href}/`) && item.href !== '/app/admin');
-        const shortcut = navShortcuts[item.id];
-        const tooltip = shortcut
-          ? {
-              children: (
-                <>
-                  <span>{item.name}</span>
-                  <Kbd variant='tooltip'>{shortcut}</Kbd>
-                </>
-              ),
-            }
-          : item.name;
+  function renderNavItem(item: NavItem) {
+    const isActive = isItemActive(pathname, item);
+    const shortcut = navShortcuts[item.id];
+    const isProfileItem = item.href === PROFILE_HREF;
 
-        return (
-          <SidebarMenuItem key={item.id}>
-            <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-              <Link
-                href={item.href}
-                aria-current={isActive ? 'page' : undefined}
-                className='flex w-full min-w-0 items-center gap-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
-              >
-                <item.icon className='size-4' aria-hidden='true' />
-                <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  {item.name}
-                </span>
-              </Link>
-            </SidebarMenuButton>
-            {item.href === '/app/dashboard/profile' && publicProfileHref ? (
-              <SidebarMenuActions showOnHover>
-                <SidebarMenuAction
-                  type='button'
-                  aria-label='Copy public profile link'
-                  onClick={async () => {
-                    const url = `${getBaseUrl()}${publicProfileHref}`;
-                    const success = await copyToClipboard(url);
+    return (
+      <NavMenuItem
+        key={item.id}
+        item={item}
+        isActive={isActive}
+        shortcut={shortcut}
+        actions={
+          isProfileItem && publicProfileHref ? (
+            <ProfileMenuActions publicProfileHref={publicProfileHref} />
+          ) : null
+        }
+      />
+    );
+  }
 
-                    if (success) {
-                      notifications.success('Copied to clipboard');
-                      track('profile_copy_url_click', {
-                        status: 'success',
-                        source: 'dashboard_nav',
-                      });
-                    } else {
-                      notifications.error('Failed to copy');
-                      track('profile_copy_url_click', {
-                        status: 'error',
-                        source: 'dashboard_nav',
-                      });
-                    }
-                  }}
-                >
-                  <Copy aria-hidden='true' className='size-4' />
-                </SidebarMenuAction>
-                <SidebarMenuAction asChild>
-                  <Link
-                    href={publicProfileHref}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='Open public profile in a new tab'
-                  >
-                    <ExternalLink aria-hidden='true' className='size-4' />
-                  </Link>
-                </SidebarMenuAction>
-              </SidebarMenuActions>
-            ) : null}
-          </SidebarMenuItem>
-        );
-      })}
-    </SidebarMenu>
-  );
+  function renderSection(items: NavItem[]) {
+    return <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>;
+  }
 
   return (
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
