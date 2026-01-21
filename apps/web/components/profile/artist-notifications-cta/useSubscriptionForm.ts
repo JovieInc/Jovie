@@ -50,6 +50,7 @@ interface UseSubscriptionFormReturn {
   channel: NotificationChannel;
   subscribedChannels: Partial<Record<NotificationChannel, boolean>>;
   openSubscription: () => void;
+  registerInputFocus: (focusFn: (() => void) | null) => void;
 }
 
 export function useSubscriptionForm({
@@ -65,6 +66,7 @@ export function useSubscriptionForm({
     setSubscribedChannels,
     setSubscriptionDetails,
     openSubscription,
+    registerInputFocus,
   } = useProfileNotifications();
 
   const [country, setCountry] = useState<CountryOption>(COUNTRY_OPTIONS[0]);
@@ -314,5 +316,6 @@ export function useSubscriptionForm({
     channel,
     subscribedChannels,
     openSubscription,
+    registerInputFocus,
   };
 }

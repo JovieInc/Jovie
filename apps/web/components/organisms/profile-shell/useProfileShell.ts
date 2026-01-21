@@ -79,6 +79,7 @@ export function useProfileShell({
     hasStoredContacts,
     hydrationStatus,
     openSubscription,
+    registerInputFocus,
     setChannel,
     setState: setNotificationsState,
     setSubscribedChannels,
@@ -102,6 +103,7 @@ export function useProfileShell({
       subscriptionDetails,
       setSubscriptionDetails,
       openSubscription,
+      registerInputFocus,
     }),
     [
       channel,
@@ -109,6 +111,7 @@ export function useProfileShell({
       hydrationStatus,
       notificationsState,
       openSubscription,
+      registerInputFocus,
       setChannel,
       setNotificationsState,
       setSubscribedChannels,

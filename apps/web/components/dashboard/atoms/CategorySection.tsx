@@ -45,8 +45,8 @@ export function CategorySection({
         <div
           className={cn(
             variant === 'flat'
-              ? 'mt-2 flex items-start gap-1.5 overflow-x-auto scrollbar-none py-1'
-              : 'mt-2 flex items-start gap-2 overflow-x-auto scrollbar-none py-1',
+              ? 'mt-2 flex items-start gap-1.5 overflow-x-auto scrollbar-hide'
+              : 'mt-2 flex items-start gap-2 overflow-x-auto scrollbar-hide',
             gridClassName
           )}
         >

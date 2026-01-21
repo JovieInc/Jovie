@@ -114,7 +114,7 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
       <div className='pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-linear-to-r from-(--color-bg-surface-0) to-transparent' />
 
       {/* Scrollable container */}
-      <div className='flex items-center gap-2 overflow-x-auto scrollbar-none px-1'>
+      <div className='flex items-center gap-2 overflow-x-auto scrollbar-hide px-1'>
         {suggestionPills.map(pill => (
           <PlatformPill
             key={pill.id}
