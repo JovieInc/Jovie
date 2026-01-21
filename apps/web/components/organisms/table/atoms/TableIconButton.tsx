@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@jovie/ui';
+import { Button, SimpleTooltip } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface TableIconButtonProps {
@@ -39,16 +33,7 @@ export function TableIconButton({
   );
 
   if (tooltip) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent>
-            <p>{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
+    return <SimpleTooltip content={tooltip}>{button}</SimpleTooltip>;
   }
 
   return button;

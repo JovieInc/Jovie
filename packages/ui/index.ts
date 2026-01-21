@@ -175,6 +175,9 @@ export {
   SheetTitle,
   SheetTrigger,
 } from './atoms/sheet';
+// Simple Tooltip (convenience wrapper for common use cases)
+export type { SimpleTooltipProps } from './atoms/simple-tooltip';
+export { SimpleTooltip } from './atoms/simple-tooltip';
 // Switch
 export { Switch } from './atoms/switch';
 // Tooltip
