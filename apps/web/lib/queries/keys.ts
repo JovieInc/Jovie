@@ -23,6 +23,8 @@ export const queryKeys = {
     status: () => [...queryKeys.billing.all, 'status'] as const,
     subscription: () => [...queryKeys.billing.all, 'subscription'] as const,
     invoices: () => [...queryKeys.billing.all, 'invoices'] as const,
+    pricingOptions: () =>
+      [...queryKeys.billing.all, 'pricing-options'] as const,
   },
 
   // User/profile queries

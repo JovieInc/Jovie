@@ -2,8 +2,8 @@
 
 import { Button, type ButtonProps } from '@jovie/ui';
 import { CreditCard } from 'lucide-react';
-import { useState } from 'react';
 import { track } from '@/lib/analytics';
+import { usePortalMutation } from '@/lib/queries';
 
 interface BillingPortalLinkProps {
   className?: string;
@@ -18,78 +18,57 @@ export function BillingPortalLink({
   variant = 'outline',
   size = 'md',
 }: BillingPortalLinkProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const portalMutation = usePortalMutation();
 
-  const handleClick = async () => {
-    setLoading(true);
-    setError(null);
+  const handleClick = () => {
+    // Track billing portal access attempt
+    track('billing_portal_clicked', {
+      source: 'billing_dashboard',
+    });
 
-    try {
-      // Track billing portal access attempt
-      track('billing_portal_clicked', {
-        source: 'billing_dashboard',
-      });
-
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
+    portalMutation.mutate(undefined, {
+      onSuccess: data => {
+        track('billing_portal_redirect', {
+          source: 'billing_dashboard',
+        });
+        // Redirect to Stripe billing portal
+        window.location.href = data.url;
+      },
+      onError: error => {
         const errorMessage =
-          errorData.error || 'Failed to create billing portal session';
-
-        track('billing_portal_failed', {
+          error instanceof Error
+            ? error.message
+            : 'Failed to access billing portal';
+        track('billing_portal_error', {
           error: errorMessage,
           source: 'billing_dashboard',
         });
-
-        throw new Error(errorMessage);
-      }
-
-      const { url } = await response.json();
-
-      track('billing_portal_redirect', {
-        source: 'billing_dashboard',
-      });
-
-      // Redirect to Stripe billing portal
-      window.location.href = url;
-    } catch (err) {
-      console.error('Error accessing billing portal:', err);
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to access billing portal';
-      setError(errorMessage);
-
-      track('billing_portal_error', {
-        error: errorMessage,
-        source: 'billing_dashboard',
-      });
-    } finally {
-      setLoading(false);
-    }
+      },
+    });
   };
 
   const mappedSize: ButtonProps['size'] = size === 'md' ? 'default' : size;
+  const isLoading = portalMutation.isPending;
+  const error = portalMutation.error;
 
   return (
     <div className={className}>
       <Button
         onClick={handleClick}
-        disabled={loading}
+        disabled={isLoading}
         variant={variant}
         size={mappedSize}
         className='inline-flex items-center gap-2'
       >
         <CreditCard className='h-4 w-4' />
-        {loading ? 'Loading...' : children}
+        {isLoading ? 'Loading...' : children}
       </Button>
       {error && (
-        <p className='mt-2 text-sm text-red-600 dark:text-red-400'>{error}</p>
+        <p className='mt-2 text-sm text-red-600 dark:text-red-400'>
+          {error instanceof Error
+            ? error.message
+            : 'Failed to access billing portal'}
+        </p>
       )}
     </div>
   );

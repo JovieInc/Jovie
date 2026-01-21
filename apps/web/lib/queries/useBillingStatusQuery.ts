@@ -6,6 +6,7 @@ export interface BillingStatusData {
   isPro: boolean;
   plan: string | null;
   hasStripeCustomer: boolean;
+  stripeSubscriptionId: string | null;
 }
 
 interface BillingStatusResponse {
@@ -32,6 +33,7 @@ async function fetchBillingStatus({
     isPro: Boolean(payload?.isPro),
     plan: payload?.plan ?? null,
     hasStripeCustomer: Boolean(payload?.stripeCustomerId),
+    stripeSubscriptionId: payload?.stripeSubscriptionId ?? null,
   };
 }
 
@@ -39,7 +41,7 @@ async function fetchBillingStatus({
  * Query hook for fetching user billing status.
  *
  * Replaces the manual useBillingStatus hook with TanStack Query benefits:
- * - Automatic caching (5 min stale time)
+ * - Automatic caching (1 min stale time via FREQUENT_CACHE)
  * - Background refetching
  * - Deduplication of concurrent requests
  * - Optimistic UI support via queryClient
@@ -55,13 +57,13 @@ async function fetchBillingStatus({
  * }
  */
 export function useBillingStatusQuery() {
-  return useQuery<BillingStatusData>({
+  return useQuery({
     queryKey: queryKeys.billing.status(),
     queryFn: fetchBillingStatus,
-    // STANDARD_CACHE values inlined for type compatibility
-    staleTime: 5 * 60 * 1000, // 5 min
-    gcTime: 30 * 60 * 1000, // 30 min
+    // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
+    staleTime: 1 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnMount: true,
-    refetchOnWindowFocus: process.env.NODE_ENV === 'production',
+    refetchOnWindowFocus: true,
   });
 }
