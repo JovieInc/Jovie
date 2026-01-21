@@ -97,8 +97,15 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   );
 
   // Dynamically import session replay plugin only on client and for dashboard
+  // Note: Session replay requires 'unsafe-eval' which is only allowed in development
+  // due to CSP restrictions. In production, eval-based replay would violate CSP.
   React.useEffect(() => {
-    if (!pathname.startsWith('/app/dashboard')) {
+    // Only load session replay in development (when unsafe-eval is allowed in CSP)
+    // and on dashboard routes
+    if (
+      process.env.NODE_ENV !== 'development' ||
+      !pathname.startsWith('/app/dashboard')
+    ) {
       setPlugins([]);
       return;
     }
