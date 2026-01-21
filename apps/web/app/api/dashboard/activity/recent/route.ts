@@ -20,11 +20,15 @@ const ACTION_ICONS: Record<string, string> = {
   other: '🔗',
 };
 
+type ActivityType = 'click' | 'visit' | 'subscribe' | 'unknown';
+
 type ActivityRow = {
   id: string;
+  type: ActivityType;
   description: string;
   icon: string;
   timestamp: string;
+  href?: string;
 };
 
 type ActorKind = 'subscriber' | 'spotify_fan' | 'customer' | 'someone';
@@ -212,9 +216,11 @@ export async function GET(request: NextRequest) {
         const icon = ACTION_ICONS[row.linkType] ?? '✨';
         return {
           id: row.id,
+          type: 'click' as const,
           description: `${actorLabel}${locationLabel} ${phrase}.`,
           icon,
           timestamp: row.createdAt.toISOString(),
+          href: '/app/dashboard/audience',
         };
       });
 
@@ -227,9 +233,11 @@ export async function GET(request: NextRequest) {
           const timestamp = (row.lastSeenAt as Date).toISOString();
           return {
             id: `visit:${row.id}:${timestamp}`,
+            type: 'visit' as const,
             description: `${actorLabel}${locationLabel} visited your Jovie profile.`,
             icon: '👀',
             timestamp,
+            href: '/app/dashboard/audience',
           };
         });
 
@@ -242,9 +250,11 @@ export async function GET(request: NextRequest) {
         const locationLabel = resolveLocationLabel();
         return {
           id: `subscribe:${row.id}`,
+          type: 'subscribe' as const,
           description: `Someone${locationLabel} just subscribed.`,
           icon: row.channel === 'sms' ? '📱' : '📩',
           timestamp: row.createdAt.toISOString(),
+          href: '/app/dashboard/contacts',
         };
       });
 
