@@ -44,14 +44,8 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use forks for better memory isolation
+    // Use forks for better memory isolation (Vitest 4 style)
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        isolate: true,
-        singleFork: false,
-      },
-    },
     // CI stability: reduce memory pressure
     maxWorkers: isCI ? 2 : undefined,
     minWorkers: 1,

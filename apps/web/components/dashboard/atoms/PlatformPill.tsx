@@ -9,11 +9,7 @@ import {
   PillShimmer,
   TrailingContent,
 } from './PlatformPill.parts';
-import {
-  getPillA11yProps,
-  getPillClassNames,
-  getPillTitle,
-} from './PlatformPill.utils';
+import { getPillClassNames, getPillTitle } from './PlatformPill.utils';
 import {
   getBorderColors,
   getIconChipStyle,
@@ -152,16 +148,16 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       className,
     });
 
-    const a11yProps = getPillA11yProps(
-      isInteractive,
-      collapsed,
-      platformName,
-      primaryText
-    );
+    const ariaLabel = isInteractive
+      ? collapsed
+        ? `${platformName}: ${primaryText}`
+        : `Select ${platformName}`
+      : undefined;
 
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: a11yProps dynamically adds role when interactive
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: a11yProps dynamically adds role when interactive
+      // biome-ignore lint/a11y/noStaticElementInteractions: role is dynamically 'button' when interactive
+      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: role is dynamically 'button' when interactive
+      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label only present when role='button'
       <div
         ref={ref}
         onClick={isInteractive ? onClick : undefined}
@@ -170,7 +166,9 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         className={pillClassName}
         style={wrapperStyle}
         data-testid={testId}
-        {...a11yProps}
+        role={isInteractive ? 'button' : undefined}
+        tabIndex={isInteractive ? 0 : undefined}
+        aria-label={ariaLabel}
       >
         <PillShimmer show={showShimmer} />
         <PillIcon platformIcon={platformIcon} style={iconChipStyle} />
