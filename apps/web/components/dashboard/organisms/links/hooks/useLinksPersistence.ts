@@ -12,6 +12,7 @@ import { debounce } from '@/lib/utils';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
   areLinkItemsEqual,
+  areSuggestionListsEqual,
   convertDbLinksToLinkItems,
   convertDbLinksToSuggestions,
 } from '../utils/link-transformers';
@@ -135,12 +136,14 @@ export function useLinksPersistence({
 
   // Sync links when server props change
   useEffect(() => {
-    setLinks(convertDbLinksToLinkItems(activeInitialLinks || []));
+    const next = convertDbLinksToLinkItems(activeInitialLinks || []);
+    setLinks(prev => (areLinkItemsEqual(prev, next) ? prev : next));
   }, [activeInitialLinks]);
 
   useEffect(() => {
-    setSuggestedLinks(
-      convertDbLinksToSuggestions(suggestionInitialLinks || [])
+    const next = convertDbLinksToSuggestions(suggestionInitialLinks || []);
+    setSuggestedLinks(prev =>
+      areSuggestionListsEqual(prev, next) ? prev : next
     );
   }, [suggestionInitialLinks]);
 
