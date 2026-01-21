@@ -9,8 +9,8 @@
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { AudienceDetailRow } from '@/components/dashboard/atoms/AudienceDetailRow';
 import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
+import { DrawerPropertyRow } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import { formatLongDate } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
@@ -63,7 +63,7 @@ interface AudienceMemberDetailsProps {
 export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
   return (
     <div className='space-y-3'>
-      <AudienceDetailRow
+      <DrawerPropertyRow
         label='Location'
         value={
           member.locationLabel ? (
@@ -73,7 +73,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
           )
         }
       />
-      <AudienceDetailRow
+      <DrawerPropertyRow
         label='Device'
         value={
           member.deviceType ? (
@@ -83,16 +83,16 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
           )
         }
       />
-      <AudienceDetailRow label='Visits' value={String(member.visits)} />
-      <AudienceDetailRow
+      <DrawerPropertyRow label='Visits' value={String(member.visits)} />
+      <DrawerPropertyRow
         label='Last seen'
         value={formatLongDate(member.lastSeenAt)}
       />
-      <AudienceDetailRow
+      <DrawerPropertyRow
         label='Intent'
         value={<AudienceIntentBadge intentLevel={member.intentLevel} />}
       />
-      <AudienceDetailRow
+      <DrawerPropertyRow
         label='Email'
         value={
           member.email ? (
@@ -102,7 +102,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
           )
         }
       />
-      <AudienceDetailRow
+      <DrawerPropertyRow
         label='Phone'
         value={
           member.phone ? (
