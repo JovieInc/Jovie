@@ -84,7 +84,7 @@ export async function handleReingestProfile({
       },
       {
         status: mergeError ? 207 : 200,
-        headers: { 'Cache-Control': 'no-store' },
+        headers: NO_STORE_HEADERS,
       }
     );
   });
@@ -192,7 +192,7 @@ export async function handleNewProfileIngest({
           ? `Profile created but link extraction had issues: ${mergeError}`
           : undefined,
       },
-      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      { status: 200, headers: NO_STORE_HEADERS }
     );
   });
 }

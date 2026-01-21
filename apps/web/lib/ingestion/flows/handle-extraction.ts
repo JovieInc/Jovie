@@ -117,20 +117,29 @@ export function extractHandleFromSocialUrl(url: string): string | null {
       return null;
     }
 
+    // Spotify artist IDs are case-sensitive base62 strings; preserve case for `artist-*`.
+    const isSpotifyArtist = handle.startsWith('artist-');
+
     // Clean up the handle
     handle = handle
       .replace(/^@/, '') // Remove @ prefix
-      .replace(/[?#].*/, '') // Remove query strings/fragments (safe: greedy match, no backtracking)
-      .toLowerCase();
+      .replace(/[?#].*/, ''); // Remove query strings/fragments (safe: greedy match, no backtracking)
+
+    if (!isSpotifyArtist) {
+      handle = handle.toLowerCase();
+    }
 
     // Validate handle format (30 char limit to match downstream validation)
     if (handle.length > 30) {
       return null;
     }
 
-    // Only allow alphanumeric, underscores, hyphens, and periods
-    if (!/^[a-z0-9._-]+$/.test(handle)) {
-      return null;
+    if (isSpotifyArtist) {
+      // Allow base62 artist IDs with the `artist-` prefix.
+      if (!/^artist-[A-Za-z0-9]+$/.test(handle)) return null;
+    } else {
+      // Only allow alphanumeric, underscores, hyphens, and periods
+      if (!/^[a-z0-9._-]+$/.test(handle)) return null;
     }
 
     return handle;

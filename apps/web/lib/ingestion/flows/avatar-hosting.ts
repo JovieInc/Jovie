@@ -9,6 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { put as uploadBlob } from '@vercel/blob';
+import { env } from '@/lib/env';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
@@ -33,6 +34,12 @@ export function isSafeExternalHttpsUrl(input: string): boolean {
     if (hostname === 'localhost') return false;
     if (hostname.endsWith('.local')) return false;
     if (hostname.endsWith('.internal')) return false;
+
+    // Block link-local / metadata ranges explicitly (defense-in-depth).
+    // Note: this is ad-hoc; consider a dedicated SSRF filter library for comprehensive protection.
+    if (hostname.includes('%')) return false; // Reject IPv6 zone identifiers (e.g. fe80::1%en0)
+    if (/^\s*169\.254\.\d{1,3}\.\d{1,3}\s*$/.test(hostname)) return false;
+    if (/^fe80:/i.test(hostname)) return false;
 
     // Block raw IP addresses (IPv4/IPv6) to reduce SSRF risk.
     // We intentionally do not DNS-resolve here.
@@ -59,7 +66,7 @@ export async function copyAvatarToBlob(
   sourceUrl: string,
   handle: string
 ): Promise<string | null> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
     logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
     return null;
