@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
   type SpotifyArtistResult,
   useArtistSearchQuery,
@@ -253,15 +254,17 @@ export function WaitlistSpotifySearch({
             </button>
           </>
         )}
-        {fieldErrors.spotifyUrl && (
-          <p
-            id='waitlist-spotify-url-error'
-            role='alert'
-            className='text-sm text-red-400'
-          >
-            {fieldErrors.spotifyUrl[0]}
-          </p>
-        )}
+        <div className={FORM_LAYOUT.errorContainer}>
+          {fieldErrors.spotifyUrl && (
+            <p
+              id='waitlist-spotify-url-error'
+              role='alert'
+              className='text-sm text-red-400'
+            >
+              {fieldErrors.spotifyUrl[0]}
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -477,15 +480,17 @@ export function WaitlistSpotifySearch({
         </div>
       )}
 
-      {fieldErrors.spotifyUrl && (
-        <p
-          id='waitlist-spotify-url-error'
-          role='alert'
-          className='text-sm text-red-400'
-        >
-          {fieldErrors.spotifyUrl[0]}
-        </p>
-      )}
+      <div className={FORM_LAYOUT.errorContainer}>
+        {fieldErrors.spotifyUrl && (
+          <p
+            id='waitlist-spotify-url-error'
+            role='alert'
+            className='text-sm text-red-400'
+          >
+            {fieldErrors.spotifyUrl[0]}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

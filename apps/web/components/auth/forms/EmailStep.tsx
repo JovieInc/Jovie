@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useCallback, useRef, useState } from 'react';
+import { FORM_LAYOUT } from '@/lib/auth/constants';
 import { AuthBackButton, AuthButton, AuthInput, FormError } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
@@ -116,53 +117,56 @@ export function EmailStep({
   const displayError = error || localError;
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-6'>
-      <h1 className='text-[18px] leading-[22px] font-medium text-[#1f2023] dark:text-[#e3e4e6] mb-0 text-center'>
-        What&apos;s your email address?
-      </h1>
-
-      <div>
-        <label className='sr-only' htmlFor='email-input'>
-          Email Address
-        </label>
-        <AuthInput
-          ref={inputRef}
-          id='email-input'
-          type='email'
-          value={email}
-          onChange={handleChange}
-          placeholder='Enter your email address'
-          autoComplete='email'
-          enterKeyHint='send'
-          error={!!displayError}
-          disabled={isLoading}
-        />
-
-        <FormError message={displayError} />
+    <form onSubmit={handleSubmit} className={FORM_LAYOUT.formContainer}>
+      <div className={FORM_LAYOUT.headerSection}>
+        <h1 className={FORM_LAYOUT.title}>What&apos;s your email address?</h1>
       </div>
 
-      <p className='text-[13px] font-[450] leading-5 text-[#6b6f76] dark:text-[#969799] text-center px-2'>
+      <div className={FORM_LAYOUT.formInner}>
+        <div>
+          <label className='sr-only' htmlFor='email-input'>
+            Email Address
+          </label>
+          <AuthInput
+            ref={inputRef}
+            id='email-input'
+            type='email'
+            value={email}
+            onChange={handleChange}
+            placeholder='Enter your email address'
+            autoComplete='email'
+            enterKeyHint='send'
+            error={!!displayError}
+            disabled={isLoading}
+          />
+          <div className={FORM_LAYOUT.errorContainer}>
+            <FormError message={displayError} />
+          </div>
+        </div>
+
+        <AuthButton
+          type='submit'
+          variant='secondary'
+          disabled={isLoading}
+          aria-busy={isLoading}
+          className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
+        >
+          {isLoading ? (
+            <>
+              <ButtonSpinner />
+              <span>Sending code...</span>
+            </>
+          ) : (
+            'Continue with email'
+          )}
+        </AuthButton>
+      </div>
+
+      <p className={FORM_LAYOUT.footerHint}>
         {mode === 'signin'
           ? "We'll email a 6-digit code to keep your account secure."
           : "We'll send a 6-digit code to verify your email."}
       </p>
-
-      <AuthButton
-        type='submit'
-        variant='secondary'
-        disabled={isLoading}
-        aria-busy={isLoading}
-        className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
-      >
-        {isLoading ? (
-          <>
-            <ButtonSpinner />
-            <span>Sending code...</span>
-          </>
-        ) : (
-          'Continue with email'
-        )}
-      </AuthButton>
 
       {onBack && <AuthBackButton onClick={onBack} ariaLabel='Back' />}
     </form>
