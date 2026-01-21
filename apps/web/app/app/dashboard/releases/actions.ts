@@ -80,6 +80,7 @@ function mapReleaseToViewModel(
     artworkUrl: release.artworkUrl ?? undefined,
     slug,
     smartLinkPath: buildSmartLinkPath(profileHandle, slug),
+    spotifyPopularity: release.spotifyPopularity,
     providers: Object.entries(providerLabels).map(([key, label]) => {
       const providerKey = key as ProviderKey;
       const match = release.providerLinks.find(

@@ -11,6 +11,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AvailabilityCell,
+  PopularityCell,
   ReleaseCell,
   SmartLinkCell,
 } from '@/components/dashboard/organisms/releases/cells';
@@ -261,6 +262,15 @@ export function ReleaseTable({
           );
         },
         size: 70,
+        enableSorting: true,
+      }),
+
+      // Spotify popularity column
+      columnHelper.accessor('spotifyPopularity', {
+        id: 'popularity',
+        header: 'Popularity',
+        cell: ({ getValue }) => <PopularityCell popularity={getValue()} />,
+        size: 80,
         enableSorting: true,
       }),
 

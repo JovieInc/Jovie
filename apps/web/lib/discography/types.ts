@@ -43,6 +43,7 @@ export interface ReleaseViewModel {
   artworkUrl?: string;
   slug: string;
   smartLinkPath: string;
+  spotifyPopularity?: number | null;
   providers: Array<
     ProviderLink & {
       label: string;
