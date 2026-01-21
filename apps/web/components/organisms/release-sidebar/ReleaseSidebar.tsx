@@ -7,15 +7,23 @@
  * including artwork, title, release date, and DSP links.
  */
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
+import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
+
+const CONTEXT_MENU_ITEM_CLASS =
+  'rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] [&_svg]:text-tertiary-token hover:[&_svg]:text-secondary-token data-[highlighted]:[&_svg]:text-secondary-token focus-visible:[&_svg]:text-secondary-token';
 
 export function ReleaseSidebar({
   release,
@@ -61,12 +69,68 @@ export function ReleaseSidebar({
     onRemoveDspLink,
   });
 
+  const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
+    if (!release) return [];
+
+    const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+    const items: CommonDropdownItem[] = [];
+
+    items.push({
+      type: 'action',
+      id: 'copy-url',
+      label: 'Copy smart link',
+      icon: <Copy className='h-4 w-4' />,
+      onClick: handleCopySmartLink,
+      className: CONTEXT_MENU_ITEM_CLASS,
+    });
+
+    items.push({
+      type: 'action',
+      id: 'open-release',
+      label: 'Open release',
+      icon: <ExternalLink className='h-4 w-4' />,
+      onClick: () => window.open(smartLinkUrl, '_blank'),
+      className: CONTEXT_MENU_ITEM_CLASS,
+    });
+
+    items.push({
+      type: 'action',
+      id: 'refresh',
+      label: 'Refresh',
+      icon: <RefreshCw className='h-4 w-4' />,
+      onClick: () => {
+        if (onRefresh) {
+          onRefresh();
+        } else {
+          window.location.reload();
+        }
+      },
+      className: CONTEXT_MENU_ITEM_CLASS,
+    });
+
+    items.push({ type: 'separator', id: 'sep-1', className: '-mx-0.5 my-1' });
+
+    items.push({
+      type: 'action',
+      id: 'delete',
+      label: 'Delete release',
+      icon: <Trash2 className='h-4 w-4' />,
+      onClick: () => toast.info('Delete not implemented'),
+      variant: 'destructive',
+      className: CONTEXT_MENU_ITEM_CLASS,
+    });
+
+    return items;
+  }, [release, handleCopySmartLink, onRefresh]);
+
   return (
     <RightDrawer
       isOpen={isOpen}
       width={SIDEBAR_WIDTH}
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
+      contextMenuItems={contextMenuItems}
+      className='bg-surface-1'
     >
       <div data-testid='release-sidebar' className='flex h-full flex-col'>
         <ReleaseSidebarHeader

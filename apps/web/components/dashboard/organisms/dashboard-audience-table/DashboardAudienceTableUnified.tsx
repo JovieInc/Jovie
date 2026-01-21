@@ -17,6 +17,7 @@ import {
   AdminPageSizeSelect,
   type ContextMenuItemType,
   convertContextMenuItems,
+  convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
@@ -483,6 +484,11 @@ export function DashboardAudienceTableUnified({
         member={selectedMember}
         isOpen={Boolean(selectedMember)}
         onClose={() => setSelectedMember(null)}
+        contextMenuItems={
+          selectedMember
+            ? convertToCommonDropdownItems(getContextMenuItems(selectedMember))
+            : undefined
+        }
       />
     </div>
   );

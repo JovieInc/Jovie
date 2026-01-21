@@ -3,12 +3,13 @@
 /**
  * AudienceMemberSidebar Component
  *
- * Displays detailed information about an audience member in a right-side drawer
+ * Displays detailed information about an audience member in a right-side drawer.
+ * Context menu items are passed from the parent table to ensure they are identical
+ * to the table row context menu.
  */
 
-import { X } from 'lucide-react';
 import { AudienceMemberHeader } from '@/components/dashboard/atoms/AudienceMemberHeader';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DrawerHeader, DrawerSection } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { AudienceMemberActions } from './AudienceMemberActions';
@@ -26,6 +27,7 @@ export function AudienceMemberSidebar({
   member,
   isOpen,
   onClose,
+  contextMenuItems,
 }: AudienceMemberSidebarProps) {
   const title = computeMemberTitle(member);
   const subtitle = computeMemberSubtitle(member);
@@ -37,18 +39,10 @@ export function AudienceMemberSidebar({
       isOpen={isOpen}
       width={SIDEBAR_WIDTH}
       ariaLabel='Audience member details'
+      contextMenuItems={contextMenuItems}
+      data-testid='audience-member-sidebar'
     >
-      <div
-        className='flex h-12 items-center justify-between px-4 shrink-0'
-        data-testid='audience-member-sidebar'
-      >
-        <h2 className='text-[13px] font-medium text-primary-token'>Contact</h2>
-        <DashboardHeaderActionButton
-          ariaLabel='Close contact sidebar'
-          onClick={onClose}
-          icon={<X aria-hidden='true' />}
-        />
-      </div>
+      <DrawerHeader title='Contact' onClose={onClose} />
 
       <div className='flex-1 min-h-0 overflow-auto p-4 space-y-6'>
         <AudienceMemberHeader
@@ -62,19 +56,13 @@ export function AudienceMemberSidebar({
           <div className='space-y-6'>
             <AudienceMemberDetails member={member} />
 
-            <div className='pt-2 space-y-2'>
-              <div className='text-xs font-semibold uppercase tracking-wide text-secondary-token'>
-                Recent actions
-              </div>
+            <DrawerSection title='Recent actions'>
               <AudienceMemberActions member={member} />
-            </div>
+            </DrawerSection>
 
-            <div className='pt-2 space-y-2'>
-              <div className='text-xs font-semibold uppercase tracking-wide text-secondary-token'>
-                Referrers
-              </div>
+            <DrawerSection title='Referrers'>
               <AudienceMemberReferrers member={member} />
-            </div>
+            </DrawerSection>
           </div>
         ) : (
           <div className='text-sm text-secondary-token'>
