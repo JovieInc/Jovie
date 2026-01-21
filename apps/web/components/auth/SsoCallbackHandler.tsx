@@ -25,7 +25,7 @@ interface SsoCallbackHandlerProps {
 export function SsoCallbackHandler({
   signInFallbackRedirectUrl,
   signUpFallbackRedirectUrl,
-}: SsoCallbackHandlerProps) {
+}: Readonly<SsoCallbackHandlerProps>) {
   const router = useRouter();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
 

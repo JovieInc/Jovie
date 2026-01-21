@@ -49,7 +49,7 @@ export function AuthLayout({
   showLogo = true,
   showLogoutButton = false,
   logoutRedirectUrl = '/signin',
-}: AuthLayoutProps) {
+}: Readonly<AuthLayoutProps>) {
   const [shouldSpinLogo, setShouldSpinLogo] = useState(false);
   const { isKeyboardVisible } = useMobileKeyboard();
   const formRef = useRef<HTMLDivElement>(null);

@@ -2,7 +2,7 @@ export interface AuthGoogleIconProps {
   className?: string;
 }
 
-export function AuthGoogleIcon({ className }: AuthGoogleIconProps) {
+export function AuthGoogleIcon({ className }: Readonly<AuthGoogleIconProps>) {
   return (
     <svg
       viewBox='0 0 24 24'

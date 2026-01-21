@@ -20,7 +20,11 @@ interface FormErrorProps {
  * Standardized error message component for auth forms.
  * Includes proper ARIA attributes and consistent styling.
  */
-export function FormError({ message, className, id }: FormErrorProps) {
+export function FormError({
+  message,
+  className,
+  id,
+}: Readonly<FormErrorProps>) {
   if (!message) return null;
 
   return (

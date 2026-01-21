@@ -34,7 +34,7 @@ export function AuthBranding({
   gradientVariant = 'blue-purple-cyan',
   textColorClass = 'text-blue-100 dark:text-blue-200',
   showText = true,
-}: AuthBrandingProps) {
+}: Readonly<AuthBrandingProps>) {
   const gradientClass = gradientVariants[gradientVariant];
 
   return (

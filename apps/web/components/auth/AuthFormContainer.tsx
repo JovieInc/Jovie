@@ -8,7 +8,10 @@ interface AuthFormContainerProps {
   title: string;
 }
 
-export function AuthFormContainer({ children, title }: AuthFormContainerProps) {
+export function AuthFormContainer({
+  children,
+  title,
+}: Readonly<AuthFormContainerProps>) {
   return (
     <div className='flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 xl:px-12'>
       <Container className={`w-full ${AUTH_FORM_MAX_WIDTH_CLASS} mx-auto`}>
