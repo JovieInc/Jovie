@@ -1,11 +1,11 @@
 'use server';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -374,7 +374,7 @@ export async function completeOnboarding({
   redirectToDashboard?: boolean;
 }) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       throw onboardingErrorToError(
         createOnboardingError(
@@ -394,7 +394,7 @@ export async function completeOnboarding({
     const cookieHeader = headersList.get('cookie');
     const baseUrl = getRequestBaseUrl(headersList);
 
-    const clerkUser = await currentUser();
+    const clerkUser = await getCachedCurrentUser();
     const clerkIdentity = resolveClerkIdentity(clerkUser);
     const oauthAvatarUrl = clerkIdentity.avatarUrl;
 

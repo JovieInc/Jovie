@@ -1,8 +1,9 @@
 'use client';
 
 import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Props for SsoCallbackHandler component.
@@ -27,7 +28,27 @@ export function SsoCallbackHandler({
   signUpFallbackRedirectUrl,
 }: Readonly<SsoCallbackHandlerProps>) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
+
+  // Track OAuth errors from URL params (Clerk passes errors via query params)
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+
+    if (error) {
+      void captureError(
+        'SSO callback error',
+        new Error(errorDescription || error),
+        {
+          route: window.location.pathname,
+          error,
+          errorDescription,
+          component: 'SsoCallbackHandler',
+        }
+      );
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add

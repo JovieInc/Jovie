@@ -1,9 +1,9 @@
-import { currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
+import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState } from '@/lib/auth/gate';
 
@@ -39,7 +39,7 @@ export default async function OnboardingPage({
     redirect('/signin?redirect_url=/onboarding');
   }
 
-  const user = await currentUser();
+  const user = await getCachedCurrentUser();
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
