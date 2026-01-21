@@ -85,16 +85,18 @@ export function ReleaseSidebarHeader({
       icon: ExternalLink,
       href: release!.smartLinkPath,
     });
+  }
 
-    // Copy release ID - overflow action
+  // Copy release ID - available for all releases with an ID
+  if (hasRelease && release?.id) {
     overflowActions.push({
       id: 'copy-id',
       label: 'Copy release ID',
       icon: Hash,
       onClick: () => {
-        if (release?.id) {
-          navigator.clipboard.writeText(release.id);
-        }
+        navigator.clipboard.writeText(release.id).catch(() => {
+          // Silently fail - clipboard may not be available
+        });
       },
     });
   }

@@ -129,38 +129,39 @@ export function ReleaseDspLinks({
                   )}
                 </div>
 
-                {/* Right: Actions (visible on hover) */}
-                <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0'>
+                {/* Right: Actions (visible on hover/focus) */}
+                <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0'>
                   <button
                     type='button'
                     onClick={() =>
                       window.open(provider.url, '_blank', 'noopener,noreferrer')
                     }
-                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors'
-                    title='Open'
+                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
                     aria-label={`Open ${config?.label || provider.key}`}
                   >
-                    <ExternalLink className='h-3.5 w-3.5' />
+                    <ExternalLink className='h-4 w-4' aria-hidden='true' />
                   </button>
                   <button
                     type='button'
-                    onClick={() => navigator.clipboard.writeText(provider.url)}
-                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors'
-                    title='Copy link'
+                    onClick={() => {
+                      navigator.clipboard.writeText(provider.url).catch(() => {
+                        // Silently fail - clipboard may not be available
+                      });
+                    }}
+                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
                     aria-label={`Copy ${config?.label || provider.key} link`}
                   >
-                    <Copy className='h-3.5 w-3.5' />
+                    <Copy className='h-4 w-4' aria-hidden='true' />
                   </button>
                   {isEditable && (
                     <button
                       type='button'
                       onClick={() => void onRemoveLink(provider.key)}
                       disabled={isRemovingDspLink === provider.key}
-                      className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors disabled:opacity-50'
-                      title='Remove'
+                      className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
                       aria-label={`Remove ${config?.label || provider.key}`}
                     >
-                      <X className='h-3.5 w-3.5' />
+                      <X className='h-4 w-4' aria-hidden='true' />
                     </button>
                   )}
                 </div>
