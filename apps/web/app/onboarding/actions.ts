@@ -10,6 +10,7 @@ import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
+import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import {
   createOnboardingError,
@@ -335,7 +336,7 @@ function logAndCaptureError(
   console.error('🔴 REQUEST CONTEXT:', {
     username,
     displayName,
-    email,
+    hasEmail: !!email,
     timestamp: new Date().toISOString(),
     errorName: error instanceof Error ? error.name : 'Unknown',
     errorMessage: error instanceof Error ? error.message : String(error),
@@ -345,7 +346,7 @@ function logAndCaptureError(
     tags: { context: 'onboarding_submission', username: username ?? 'unknown' },
     extra: {
       displayName,
-      email,
+      hasEmail: !!email,
       dbErrorCode: dbError?.code,
       dbConstraint: dbError?.constraint,
       dbDetail: dbError?.detail,
@@ -383,7 +384,10 @@ export async function completeOnboarding({
       );
     }
 
-    const { trimmedDisplayName } = validateOnboardingInput(username, displayName);
+    const { trimmedDisplayName } = validateOnboardingInput(
+      username,
+      displayName
+    );
 
     const headersList = await headers();
     const clientIP = extractClientIP(headersList);
@@ -417,7 +421,10 @@ export async function completeOnboarding({
 
           if (emailOwner && emailOwner.clerkId !== clerkUserId) {
             throw onboardingErrorToError(
-              createOnboardingError(OnboardingErrorCode.EMAIL_IN_USE, 'Email is already in use')
+              createOnboardingError(
+                OnboardingErrorCode.EMAIL_IN_USE,
+                'Email is already in use'
+              )
             );
           }
         };
@@ -431,7 +438,10 @@ export async function completeOnboarding({
 
           if (conflict && (!profileId || conflict.id !== profileId)) {
             throw onboardingErrorToError(
-              createOnboardingError(OnboardingErrorCode.USERNAME_TAKEN, 'Handle already taken')
+              createOnboardingError(
+                OnboardingErrorCode.USERNAME_TAKEN,
+                'Handle already taken'
+              )
             );
           }
         };
@@ -449,7 +459,9 @@ export async function completeOnboarding({
           return {
             username: normalizedUsername,
             status: 'created',
-            profileId: result.rows?.[0]?.profile_id ? String(result.rows[0].profile_id) : null,
+            profileId: result.rows?.[0]?.profile_id
+              ? String(result.rows[0].profile_id)
+              : null,
           };
         };
 
@@ -469,7 +481,8 @@ export async function completeOnboarding({
 
         if (!existingProfile) return createNewProfile();
 
-        const handleChanged = existingProfile.usernameNormalized !== normalizedUsername;
+        const handleChanged =
+          existingProfile.usernameNormalized !== normalizedUsername;
         if (handleChanged) await ensureHandleAvailable(existingProfile.id);
 
         const needsPublish = !profileIsPublishable(existingProfile);
@@ -481,8 +494,10 @@ export async function completeOnboarding({
             .set({
               username: normalizedUsername,
               usernameNormalized: normalizedUsername,
-              displayName: trimmedDisplayName || existingProfile.displayName || username,
-              onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? new Date(),
+              displayName:
+                trimmedDisplayName || existingProfile.displayName || username,
+              onboardingCompletedAt:
+                existingProfile.onboardingCompletedAt ?? new Date(),
               isPublic: true,
               isClaimed: true,
               claimedAt: existingProfile.claimedAt ?? new Date(),
@@ -510,7 +525,12 @@ export async function completeOnboarding({
     // Step 7: Avatar upload (non-blocking, with retry and logging)
     // Avatar upload failures are logged but don't block onboarding completion
     if (completion.profileId && oauthAvatarUrl) {
-      await processAvatarUpload(completion.profileId, oauthAvatarUrl, baseUrl, cookieHeader);
+      await processAvatarUpload(
+        completion.profileId,
+        oauthAvatarUrl,
+        baseUrl,
+        cookieHeader
+      );
     }
 
     // Sync username to Clerk (best-effort - don't block onboarding on sync failure)
@@ -551,7 +571,7 @@ export async function completeOnboarding({
     const cookieStore = await cookies();
     cookieStore.set('jovie_onboarding_complete', '1', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 120,
       path: '/',

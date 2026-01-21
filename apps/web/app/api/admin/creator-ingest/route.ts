@@ -725,7 +725,11 @@ async function handleFullExtractionIngest(
 
   let extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
   try {
-    extraction = await fetchFullExtractionProfile(isLaylo, validatedUrl, handle);
+    extraction = await fetchFullExtractionProfile(
+      isLaylo,
+      validatedUrl,
+      handle
+    );
   } catch (fetchError) {
     const errorMessage =
       fetchError instanceof Error
@@ -833,8 +837,7 @@ async function handleSocialPlatformIngest(
  * Handle ingestion errors and return appropriate response.
  */
 function handleIngestionError(error: unknown): NextResponse {
-  const errorMessage =
-    error instanceof Error ? error.message : 'Unknown error';
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
   logger.error('Admin ingestion failed', {
     error: errorMessage,
@@ -892,7 +895,11 @@ export async function POST(request: Request) {
       detectFullExtractionPlatform(inputUrl);
 
     if (isLinktree || isLaylo) {
-      return handleFullExtractionIngest(inputUrl, isLaylo, linktreeValidatedUrl);
+      return handleFullExtractionIngest(
+        inputUrl,
+        isLaylo,
+        linktreeValidatedUrl
+      );
     }
 
     return handleSocialPlatformIngest(inputUrl, detected);

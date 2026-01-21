@@ -87,7 +87,10 @@ function FeaturedItem({
   return (
     <DropdownMenuItem onClick={onClick}>
       <Star
-        className={cn('h-4 w-4', isFeatured && 'fill-yellow-400 text-yellow-400')}
+        className={cn(
+          'h-4 w-4',
+          isFeatured && 'fill-yellow-400 text-yellow-400'
+        )}
       />
       {isFeatured ? 'Unfeature' : 'Feature'}
     </DropdownMenuItem>
@@ -103,7 +106,11 @@ function MarketingItem({
 }) {
   return (
     <DropdownMenuItem onClick={onClick}>
-      {marketingOptOut ? <Mail className='h-4 w-4' /> : <MailX className='h-4 w-4' />}
+      {marketingOptOut ? (
+        <Mail className='h-4 w-4' />
+      ) : (
+        <MailX className='h-4 w-4' />
+      )}
       {marketingOptOut ? 'Enable marketing emails' : 'Disable marketing emails'}
     </DropdownMenuItem>
   );
@@ -189,11 +196,23 @@ function MenuItems({
 }: MenuItemsProps) {
   return (
     <>
-      <RefreshIngestItem onRefreshIngest={onRefreshIngest} isLoading={isLoading} />
-      <VerificationItem isVerified={profile.isVerified} onClick={onToggleVerification} />
-      <FeaturedItem isFeatured={profile.isFeatured} onClick={onToggleFeatured} />
+      <RefreshIngestItem
+        onRefreshIngest={onRefreshIngest}
+        isLoading={isLoading}
+      />
+      <VerificationItem
+        isVerified={profile.isVerified}
+        onClick={onToggleVerification}
+      />
+      <FeaturedItem
+        isFeatured={profile.isFeatured}
+        onClick={onToggleFeatured}
+      />
       {!includeSeparatorBeforeClaim && <DropdownMenuSeparator />}
-      <MarketingItem marketingOptOut={profile.marketingOptOut} onClick={onToggleMarketing} />
+      <MarketingItem
+        marketingOptOut={profile.marketingOptOut}
+        onClick={onToggleMarketing}
+      />
       {includeSeparatorBeforeClaim && <DropdownMenuSeparator />}
       <ViewProfileItem username={profile.username} />
       <ClaimItems
@@ -228,7 +247,9 @@ export function CreatorActionsMenu({
 
   const handleCopyClaimLink = useCallback(async () => {
     if (!profile.claimToken) return;
-    const success = await copyTextToClipboard(`${getBaseUrl()}/claim/${profile.claimToken}`);
+    const success = await copyTextToClipboard(
+      `${getBaseUrl()}/claim/${profile.claimToken}`
+    );
     if (success) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
@@ -264,7 +285,10 @@ export function CreatorActionsMenu({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' sideOffset={8}>
-            <MenuItems {...menuItemsProps} includeSeparatorBeforeClaim={false} />
+            <MenuItems
+              {...menuItemsProps}
+              includeSeparatorBeforeClaim={false}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -282,7 +306,13 @@ export function CreatorActionsMenu({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button type='button' size='sm' variant='ghost' className={stateClass} disabled={isLoading}>
+        <Button
+          type='button'
+          size='sm'
+          variant='ghost'
+          className={stateClass}
+          disabled={isLoading}
+        >
           Actions
           <MoreVertical className='h-4 w-4 ml-1' />
         </Button>

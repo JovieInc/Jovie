@@ -271,7 +271,9 @@ function getMobileTabsPadding(showMobileTabs: boolean): string | undefined {
 function getContainerClass(useFullWidth: boolean): string {
   return cn(
     'p-1',
-    useFullWidth ? 'w-full h-full min-h-0' : 'container mx-auto max-w-7xl h-full'
+    useFullWidth
+      ? 'w-full h-full min-h-0'
+      : 'container mx-auto max-w-7xl h-full'
   );
 }
 
@@ -387,7 +389,10 @@ function DashboardLayoutInner({
   const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
 
   const showPreview =
-    previewEnabled && !!previewContext && isProfileRoute && !isContactTableRoute;
+    previewEnabled &&
+    !!previewContext &&
+    isProfileRoute &&
+    !isContactTableRoute;
 
   useEffect(() => {
     if (isContactTableRoute && previewOpen) {
@@ -421,14 +426,18 @@ function DashboardLayoutInner({
     </Button>
   ) : null;
 
-  const sidebarExpandButton = !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+  const sidebarExpandButton =
+    !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <SkipToContent />
       <DashboardSidebar />
       <SidebarInset className='flex flex-1 flex-col overflow-hidden bg-base'>
-        <main id='main-content' className='flex-1 min-h-0 overflow-hidden bg-base'>
+        <main
+          id='main-content'
+          className='flex-1 min-h-0 overflow-hidden bg-base'
+        >
           {isContactTableRoute ? (
             <ContactTableLayout
               crumbs={crumbs}

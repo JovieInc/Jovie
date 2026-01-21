@@ -4,6 +4,7 @@ import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, type TransactionType, waitlistEntries } from '@/lib/db';
 import { creatorProfiles, users, waitlistInvites } from '@/lib/db/schema';
+import { env } from '@/lib/env';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -19,11 +20,6 @@ import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-// Module-level log to verify this file is loaded
-logger.info('Waitlist Route Module loaded', {
-  timestamp: new Date().toISOString(),
-});
 
 function deriveFullName(params: {
   userFullName: string | null | undefined;
@@ -152,17 +148,17 @@ export async function GET() {
 }
 
 function getDbHost(): string | undefined {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (process.env.NODE_ENV !== 'development' || !databaseUrl) return undefined;
+  const nodeEnv = env.NODE_ENV ?? 'development';
+  if (nodeEnv !== 'development' || !env.DATABASE_URL) return undefined;
   try {
-    return new URL(databaseUrl).host;
+    return new URL(env.DATABASE_URL).host;
   } catch {
     return undefined;
   }
 }
 
 async function checkDatabaseAvailability(): Promise<NextResponse | null> {
-  if (!process.env.DATABASE_URL) {
+  if (!env.DATABASE_URL) {
     return NextResponse.json(
       {
         success: false,
@@ -235,7 +231,7 @@ async function handleExistingEntry(
     fullName: string;
     primaryGoal: string | null;
     primarySocialUrl: string;
-    platform: string | null;
+    platform: string;
     normalizedUrl: string;
     spotifyUrl: string | null;
     spotifyUrlNormalized: string | null;
@@ -264,7 +260,11 @@ async function handleExistingEntry(
 
     await tx
       .insert(users)
-      .values({ clerkId: userId, email: emailRaw, userStatus: 'waitlist_pending' })
+      .values({
+        clerkId: userId,
+        email: emailRaw,
+        userStatus: 'waitlist_pending',
+      })
       .onConflictDoUpdate({
         target: users.clerkId,
         set: { userStatus: 'waitlist_pending', updatedAt: new Date() },
@@ -285,7 +285,7 @@ async function createNewEntry(
     fullName: string;
     primaryGoal: string | null;
     primarySocialUrl: string;
-    platform: string | null;
+    platform: string;
     normalizedUrl: string;
     spotifyUrl: string | null;
     spotifyUrlNormalized: string | null;
@@ -324,7 +324,9 @@ async function createNewEntry(
 
     const usernameNormalized = await findAvailableHandle(tx, baseHandle);
     const trimmedName = entryData.fullName.trim();
-    const displayName = trimmedName ? trimmedName.slice(0, 50) : 'Jovie creator';
+    const displayName = trimmedName
+      ? trimmedName.slice(0, 50)
+      : 'Jovie creator';
 
     await tx.insert(creatorProfiles).values({
       creatorType: 'creator',
@@ -341,7 +343,11 @@ async function createNewEntry(
 
     await tx
       .insert(users)
-      .values({ clerkId: userId, email: emailRaw, userStatus: 'waitlist_pending' })
+      .values({
+        clerkId: userId,
+        email: emailRaw,
+        userStatus: 'waitlist_pending',
+      })
       .onConflictDoUpdate({
         target: users.clerkId,
         set: { userStatus: 'waitlist_pending', updatedAt: new Date() },
@@ -359,7 +365,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = env.NODE_ENV === 'development';
 
     if (!isDev) {
       const clientIP = extractClientIPFromRequest({ headers: request.headers });
@@ -394,8 +400,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { primaryGoal, primarySocialUrl, spotifyUrl, heardAbout, selectedPlan } =
-      parseResult.data;
+    const {
+      primaryGoal,
+      primarySocialUrl,
+      spotifyUrl,
+      heardAbout,
+      selectedPlan,
+    } = parseResult.data;
     const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
 
     const entryData = {
@@ -428,7 +439,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     logger.error('Waitlist API error', error);
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = env.NODE_ENV === 'development';
     const errorMessage =
       isDev && error instanceof Error
         ? error.message
@@ -438,7 +449,8 @@ export async function POST(request: Request) {
       {
         success: false,
         error: errorMessage,
-        ...(isDev && error instanceof Error && { stack: error.stack, details: error }),
+        ...(isDev &&
+          error instanceof Error && { stack: error.stack, details: error }),
       },
       { status: 500, headers: NO_STORE_HEADERS }
     );

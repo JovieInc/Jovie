@@ -185,15 +185,18 @@ async function uploadBufferToBlob(
   throw lastError ?? new Error('Blob upload failed after retries');
 }
 
-async function optimizeImageToAvif(file: File): Promise<{
+async function optimizeImageToAvif(
+  file: File,
+  inputBuffer?: Buffer
+): Promise<{
   avatar: { data: Buffer; info: OutputInfo };
   width: number | null;
   height: number | null;
 }> {
   const sharp = await getSharp();
-  const inputBuffer = await fileToBuffer(file);
+  const buffer = inputBuffer ?? (await fileToBuffer(file));
 
-  const baseImage = sharp(inputBuffer, {
+  const baseImage = sharp(buffer, {
     failOnError: false,
   })
     .rotate()
@@ -278,10 +281,13 @@ async function checkRateLimit(
   );
 }
 
-async function validateFileUpload(
-  request: NextRequest
-): Promise<
-  | { ok: true; file: File; normalizedType: SupportedImageMimeType }
+async function validateFileUpload(request: NextRequest): Promise<
+  | {
+      ok: true;
+      file: File;
+      normalizedType: SupportedImageMimeType;
+      buffer: Buffer;
+    }
   | { ok: false; response: NextResponse }
 > {
   const contentType = request.headers.get('content-type');
@@ -334,7 +340,9 @@ async function validateFileUpload(
   }
 
   const fileBuffer = await fileToBuffer(file);
-  if (!validateMagicBytes(fileBuffer, normalizedType as SupportedImageMimeType)) {
+  if (
+    !validateMagicBytes(fileBuffer, normalizedType as SupportedImageMimeType)
+  ) {
     logger.warn(
       `[upload] Magic bytes mismatch for claimed type ${normalizedType}`
     );
@@ -360,7 +368,12 @@ async function validateFileUpload(
     };
   }
 
-  return { ok: true, file, normalizedType: normalizedType as SupportedImageMimeType };
+  return {
+    ok: true,
+    file,
+    normalizedType: normalizedType as SupportedImageMimeType,
+    buffer: fileBuffer,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -409,7 +422,7 @@ export async function POST(request: NextRequest) {
       const fileValidation = await validateFileUpload(request);
       if (!fileValidation.ok) return fileValidation.response;
 
-      const { file, normalizedType } = fileValidation;
+      const { file, normalizedType, buffer } = fileValidation;
 
       const dbUser = await getUserByClerkId(tx, userIdFromSession);
       if (!dbUser) {
@@ -438,7 +451,7 @@ export async function POST(request: NextRequest) {
           .where(eq(profilePhotos.id, photoRecord.id));
 
         const optimized = await withTimeout(
-          optimizeImageToAvif(file),
+          optimizeImageToAvif(file, buffer),
           PROCESSING_TIMEOUT_MS,
           'Image processing'
         );
@@ -451,7 +464,12 @@ export async function POST(request: NextRequest) {
         const put = await getVercelBlobUploader();
 
         const avatarUrl = await withTimeout(
-          uploadBufferToBlob(put, blobPath, optimized.avatar.data, AVIF_MIME_TYPE),
+          uploadBufferToBlob(
+            put,
+            blobPath,
+            optimized.avatar.data,
+            AVIF_MIME_TYPE
+          ),
           PROCESSING_TIMEOUT_MS,
           'Blob upload'
         );
@@ -469,7 +487,8 @@ export async function POST(request: NextRequest) {
             largeUrl: avatarUrl,
             status: 'ready',
             mimeType: AVIF_MIME_TYPE,
-            fileSize: optimized.avatar.info.size ?? optimized.avatar.data.length,
+            fileSize:
+              optimized.avatar.info.size ?? optimized.avatar.data.length,
             width: optimized.width ?? null,
             height: optimized.height ?? null,
             processedAt: new Date(),
@@ -483,7 +502,10 @@ export async function POST(request: NextRequest) {
           .where(eq(creatorProfiles.userId, dbUser.id))
           .limit(1);
 
-        await invalidateAvatarCache(dbUser.id, profile?.usernameNormalized ?? null);
+        await invalidateAvatarCache(
+          dbUser.id,
+          profile?.usernameNormalized ?? null
+        );
 
         return NextResponse.json(
           {
@@ -499,7 +521,8 @@ export async function POST(request: NextRequest) {
           { status: 202, headers: NO_STORE_HEADERS }
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Upload failed';
+        const message =
+          error instanceof Error ? error.message : 'Upload failed';
         logger.error('[upload] Finalize failed', {
           photoId: photoRecord.id,
           message,

@@ -34,11 +34,15 @@ function handleArrowNavigation(
 
   if (key === 'ArrowDown') {
     const nextIndex =
-      selectedIndex === -1 ? 0 : Math.min(selectedIndex + 1, itemIds.length - 1);
+      selectedIndex === -1
+        ? 0
+        : Math.min(selectedIndex + 1, itemIds.length - 1);
     onSelect(itemIds[nextIndex] ?? null);
   } else {
     const prevIndex =
-      selectedIndex === -1 ? itemIds.length - 1 : Math.max(selectedIndex - 1, 0);
+      selectedIndex === -1
+        ? itemIds.length - 1
+        : Math.max(selectedIndex - 1, 0);
     onSelect(itemIds[prevIndex] ?? null);
   }
 }
@@ -88,7 +92,15 @@ export function useAdminTableKeyboardNavigation<ItemType>(
         onCloseSidebar();
       }
     },
-    [isSidebarOpen, itemIds, onCloseSidebar, onSelect, onToggleSidebar, selectedId, selectedIndex]
+    [
+      isSidebarOpen,
+      itemIds,
+      onCloseSidebar,
+      onSelect,
+      onToggleSidebar,
+      selectedId,
+      selectedIndex,
+    ]
   );
 
   return { selectedIndex, handleKeyDown };
