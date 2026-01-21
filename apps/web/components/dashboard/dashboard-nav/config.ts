@@ -53,15 +53,6 @@ export const primaryNavigation: NavItem[] = [
   },
 ];
 
-export const navShortcuts: Record<string, string> = {
-  overview: '1',
-  links: '2',
-  contacts: '3',
-  releases: '4',
-  audience: '5',
-  earnings: '6',
-};
-
 export const secondaryNavigation: NavItem[] = [
   {
     name: 'Earnings',

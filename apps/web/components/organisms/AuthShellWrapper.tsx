@@ -11,8 +11,14 @@ import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
 } from '@/contexts/HeaderActionsContext';
+import {
+  KeyboardShortcutsProvider,
+  useKeyboardShortcuts,
+} from '@/contexts/KeyboardShortcutsContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
+import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
+import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 
 // TableMetaContext for audience/creators tables
 type TableMeta = {
@@ -39,6 +45,15 @@ export function useTableMeta(): TableMetaContextValue {
 export interface AuthShellWrapperProps {
   persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   children: ReactNode;
+}
+
+/**
+ * KeyboardShortcutsHandler - Handles keyboard shortcuts with access to context
+ */
+function KeyboardShortcutsHandler() {
+  const { open } = useKeyboardShortcuts();
+  useSequentialShortcuts({ onOpenShortcutsModal: open });
+  return <KeyboardShortcutsSheet />;
 }
 
 /**
@@ -117,9 +132,10 @@ function AuthShellWrapperInner({
  *
  * This component:
  * 1. Uses useAuthRouteConfig hook to get all routing-based configuration
- * 2. Provides HeaderActionsProvider, PreviewPanelProvider and TableMetaContext
+ * 2. Provides HeaderActionsProvider, PreviewPanelProvider, KeyboardShortcutsProvider, and TableMetaContext
  * 3. Renders AuthShell with configuration from the hook
  * 4. Allows pages to override header actions via HeaderActionsContext
+ * 5. Handles keyboard navigation shortcuts (G then X pattern)
  *
  * Separates routing concerns (hook) from layout (AuthShell).
  */
@@ -128,10 +144,15 @@ export function AuthShellWrapper({
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
-    <HeaderActionsProvider>
-      <AuthShellWrapperInner persistSidebarCollapsed={persistSidebarCollapsed}>
-        {children}
-      </AuthShellWrapperInner>
-    </HeaderActionsProvider>
+    <KeyboardShortcutsProvider>
+      <HeaderActionsProvider>
+        <AuthShellWrapperInner
+          persistSidebarCollapsed={persistSidebarCollapsed}
+        >
+          {children}
+        </AuthShellWrapperInner>
+        <KeyboardShortcutsHandler />
+      </HeaderActionsProvider>
+    </KeyboardShortcutsProvider>
   );
 }
