@@ -14,6 +14,78 @@ const HOVER_SCALE = 1.02;
 const HOVER_Y_OFFSET = -5;
 const HOVER_Y_OFFSET_REDUCED = -2;
 
+interface MotionConfig {
+  interactive: boolean;
+  reducedMotion: boolean | null;
+}
+
+function getContainerHoverProps({ interactive, reducedMotion }: MotionConfig) {
+  if (!interactive) return { whileHover: undefined, whileFocus: undefined };
+  const hoverState = reducedMotion
+    ? { y: HOVER_Y_OFFSET_REDUCED }
+    : { scale: HOVER_SCALE, y: HOVER_Y_OFFSET };
+  return { whileHover: hoverState, whileFocus: hoverState };
+}
+
+function getContainerTransition({
+  interactive,
+  reducedMotion,
+}: MotionConfig): MotionProps['transition'] {
+  if (!interactive) return undefined;
+  return reducedMotion
+    ? { duration: REDUCED_MOTION_DURATION }
+    : {
+        type: 'spring',
+        stiffness: ANIMATION_STIFFNESS,
+        damping: ANIMATION_DAMPING,
+        mass: ANIMATION_MASS,
+      };
+}
+
+function getCardHoverProps({
+  interactive,
+  reducedMotion,
+}: MotionConfig): MotionProps['whileHover'] {
+  if (!interactive) return undefined;
+  return reducedMotion
+    ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
+    : {
+        boxShadow:
+          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        borderColor: 'rgb(209, 213, 219)',
+      };
+}
+
+function getCardTransition({
+  interactive,
+  reducedMotion,
+}: MotionConfig): MotionProps['transition'] {
+  if (!interactive) return undefined;
+  return reducedMotion
+    ? { duration: REDUCED_MOTION_DURATION }
+    : {
+        type: 'spring',
+        stiffness: ANIMATION_STIFFNESS,
+        damping: ANIMATION_DAMPING,
+      };
+}
+
+function getGlowProps({ interactive, reducedMotion }: MotionConfig) {
+  if (!interactive)
+    return { initial: undefined, whileHover: undefined, transition: undefined };
+  return {
+    initial: { opacity: 0 },
+    whileHover: {
+      opacity: reducedMotion ? GLOW_OPACITY_REDUCED : GLOW_OPACITY_FULL,
+    },
+    transition: {
+      duration: reducedMotion
+        ? REDUCED_MOTION_DURATION
+        : GLOW_TRANSITION_DURATION,
+    },
+  };
+}
+
 export interface FeatureCardProps {
   /** Feature title */
   title: string;
@@ -49,83 +121,33 @@ export function FeatureCard({
     gray: 'from-gray-500 to-gray-600',
   };
 
-  // Check if user prefers reduced motion
   const prefersReducedMotion = useReducedMotion();
+  const config: MotionConfig = {
+    interactive,
+    reducedMotion: prefersReducedMotion,
+  };
 
-  const containerWhileHover: MotionProps['whileHover'] = interactive
-    ? prefersReducedMotion
-      ? { y: HOVER_Y_OFFSET_REDUCED }
-      : { scale: HOVER_SCALE, y: HOVER_Y_OFFSET }
-    : undefined;
-
-  const containerWhileFocus: MotionProps['whileFocus'] = interactive
-    ? prefersReducedMotion
-      ? { y: HOVER_Y_OFFSET_REDUCED }
-      : { scale: HOVER_SCALE, y: HOVER_Y_OFFSET }
-    : undefined;
-
-  const containerTransition: MotionProps['transition'] = interactive
-    ? prefersReducedMotion
-      ? { duration: REDUCED_MOTION_DURATION }
-      : {
-          type: 'spring',
-          stiffness: ANIMATION_STIFFNESS,
-          damping: ANIMATION_DAMPING,
-          mass: ANIMATION_MASS,
-        }
-    : undefined;
-
-  const cardWhileHover: MotionProps['whileHover'] = interactive
-    ? prefersReducedMotion
-      ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
-      : {
-          boxShadow:
-            '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          borderColor: 'rgb(209, 213, 219)',
-        }
-    : undefined;
-
-  const cardTransition: MotionProps['transition'] = interactive
-    ? prefersReducedMotion
-      ? { duration: REDUCED_MOTION_DURATION }
-      : {
-          type: 'spring',
-          stiffness: ANIMATION_STIFFNESS,
-          damping: ANIMATION_DAMPING,
-        }
-    : undefined;
-
-  const glowInitial: MotionProps['initial'] = interactive
-    ? { opacity: 0 }
-    : undefined;
-
-  const glowWhileHover: MotionProps['whileHover'] = interactive
-    ? prefersReducedMotion
-      ? { opacity: GLOW_OPACITY_REDUCED }
-      : { opacity: GLOW_OPACITY_FULL }
-    : undefined;
-
-  const glowTransition: MotionProps['transition'] = interactive
-    ? prefersReducedMotion
-      ? { duration: REDUCED_MOTION_DURATION }
-      : { duration: GLOW_TRANSITION_DURATION }
-    : undefined;
+  const containerHoverProps = getContainerHoverProps(config);
+  const containerTransition = getContainerTransition(config);
+  const cardWhileHover = getCardHoverProps(config);
+  const cardTransition = getCardTransition(config);
+  const glowProps = getGlowProps(config);
 
   return (
     <motion.div
       className={`relative ${className}`}
       initial={{ scale: 1, y: 0 }}
-      whileHover={containerWhileHover}
-      whileFocus={containerWhileFocus}
+      whileHover={containerHoverProps.whileHover}
+      whileFocus={containerHoverProps.whileFocus}
       transition={containerTransition}
     >
       {/* Hover glow effect */}
       {interactive && (
         <motion.div
           className='absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur'
-          initial={glowInitial}
-          whileHover={glowWhileHover}
-          transition={glowTransition}
+          initial={glowProps.initial}
+          whileHover={glowProps.whileHover}
+          transition={glowProps.transition}
         />
       )}
 

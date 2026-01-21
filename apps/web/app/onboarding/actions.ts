@@ -30,103 +30,131 @@ function getRequestBaseUrl(headersList: Headers): string {
   return publicEnv.NEXT_PUBLIC_APP_URL;
 }
 
+interface UploadResult {
+  blobUrl: string;
+  photoId: string;
+}
+
+type AttemptResult =
+  | { status: 'success'; data: UploadResult }
+  | { status: 'retry'; error: Error }
+  | { status: 'abort'; error: Error };
+
+async function fetchAvatarImage(imageUrl: string): Promise<AttemptResult> {
+  const source = await fetch(imageUrl, { signal: AbortSignal.timeout(10000) });
+  if (!source.ok) {
+    return {
+      status: 'retry',
+      error: new Error(`Failed to fetch avatar: ${source.status}`),
+    };
+  }
+
+  const contentType =
+    source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? null;
+  if (!contentType?.startsWith('image/')) {
+    return {
+      status: 'abort',
+      error: new Error(`Invalid content type: ${contentType}`),
+    };
+  }
+
+  const buffer = await source.arrayBuffer();
+  const file = new File([buffer], 'oauth-avatar', { type: contentType });
+  return {
+    status: 'success',
+    data: { blobUrl: '', photoId: '', file } as UploadResult & { file: File },
+  };
+}
+
+async function uploadAvatarFile(
+  file: File,
+  baseUrl: string,
+  cookieHeader: string | null
+): Promise<AttemptResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const upload = await fetch(`${baseUrl}/api/images/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!upload.ok) {
+    const errorBody = await upload.text().catch(() => 'Unknown error');
+    return {
+      status: 'retry',
+      error: new Error(`Upload failed: ${upload.status} - ${errorBody}`),
+    };
+  }
+
+  const data = (await upload.json()) as {
+    blobUrl?: string;
+    photoId?: string;
+    jobId?: string;
+  };
+  const blobUrl = data.blobUrl ?? null;
+  const photoId = data.photoId ?? data.jobId ?? null;
+
+  if (!blobUrl || !photoId) {
+    return {
+      status: 'retry',
+      error: new Error('Upload response missing required fields'),
+    };
+  }
+
+  return { status: 'success', data: { blobUrl, photoId } };
+}
+
+async function attemptAvatarUpload(params: {
+  imageUrl: string;
+  baseUrl: string;
+  cookieHeader: string | null;
+}): Promise<AttemptResult> {
+  const fetchResult = await fetchAvatarImage(params.imageUrl);
+  if (fetchResult.status !== 'success') return fetchResult;
+
+  const file = (fetchResult.data as UploadResult & { file: File }).file;
+  return uploadAvatarFile(file, params.baseUrl, params.cookieHeader);
+}
+
 /**
  * Upload a remote avatar with retry mechanism.
- *
- * Implements exponential backoff retry for reliability.
- * Logs failures for monitoring and debugging.
- *
- * @returns Upload result or null if all retries fail
  */
 async function uploadRemoteAvatar(params: {
   imageUrl: string;
   baseUrl: string;
   cookieHeader: string | null;
   maxRetries?: number;
-}): Promise<{
-  blobUrl: string;
-  photoId: string;
-  retriesUsed: number;
-} | null> {
+}): Promise<{ blobUrl: string; photoId: string; retriesUsed: number } | null> {
   const maxRetries = params.maxRetries ?? 3;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Exponential backoff: 0ms, 1000ms, 2000ms
       if (attempt > 0) {
-        const delay = Math.min(1000 * attempt, 5000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-
-      const source = await fetch(params.imageUrl, {
-        signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
-      });
-
-      if (!source.ok) {
-        lastError = new Error(`Failed to fetch avatar: ${source.status}`);
-        console.warn(
-          `[AVATAR_UPLOAD] Fetch failed (attempt ${attempt + 1}/${maxRetries}):`,
-          lastError.message
+        await new Promise(resolve =>
+          setTimeout(resolve, Math.min(1000 * attempt, 5000))
         );
-        continue;
       }
 
-      const contentType =
-        source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ??
-        null;
-      if (!contentType?.startsWith('image/')) {
-        lastError = new Error(`Invalid content type: ${contentType}`);
-        console.warn('[AVATAR_UPLOAD] Invalid content type:', contentType);
-        // Don't retry for invalid content type - it won't change
-        break;
-      }
+      const result = await attemptAvatarUpload(params);
 
-      const buffer = await source.arrayBuffer();
-      const file = new File([buffer], 'oauth-avatar', { type: contentType });
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
-        method: 'POST',
-        body: formData,
-        headers: params.cookieHeader
-          ? { cookie: params.cookieHeader }
-          : undefined,
-        signal: AbortSignal.timeout(30000), // 30s timeout for upload
-      });
-
-      if (!upload.ok) {
-        const errorBody = await upload.text().catch(() => 'Unknown error');
-        lastError = new Error(`Upload failed: ${upload.status} - ${errorBody}`);
-        console.warn(
-          `[AVATAR_UPLOAD] Upload failed (attempt ${attempt + 1}/${maxRetries}):`,
-          lastError.message
+      if (result.status === 'success') {
+        console.info(
+          `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
         );
-        continue;
+        return { ...result.data, retriesUsed: attempt };
       }
 
-      const data = (await upload.json()) as {
-        blobUrl?: string;
-        photoId?: string;
-        jobId?: string;
-      };
-
-      const blobUrl = data.blobUrl ?? null;
-      const photoId = data.photoId ?? data.jobId ?? null;
-
-      if (!blobUrl || !photoId) {
-        lastError = new Error('Upload response missing required fields');
-        console.warn('[AVATAR_UPLOAD] Invalid response:', data);
-        continue;
-      }
-
-      // Success - always log for monitoring
-      console.info(
-        `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
+      lastError = result.error;
+      console.warn(
+        `[AVATAR_UPLOAD] ${result.status === 'abort' ? 'Aborted' : 'Failed'} (attempt ${attempt + 1}/${maxRetries}):`,
+        lastError.message
       );
-      return { blobUrl, photoId, retriesUsed: attempt };
+
+      if (result.status === 'abort') break;
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
@@ -137,7 +165,6 @@ async function uploadRemoteAvatar(params: {
     }
   }
 
-  // All retries exhausted
   console.error(
     `[AVATAR_UPLOAD] Failed after ${maxRetries} attempts:`,
     lastError?.message

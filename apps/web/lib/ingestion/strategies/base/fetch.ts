@@ -285,26 +285,32 @@ export async function fetchDocument(
       );
 }
 
+function validateContentLength(
+  contentLengthHeader: string | null,
+  maxBytes: number
+): void {
+  if (!contentLengthHeader) return;
+  const contentLength = Number(contentLengthHeader);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new ExtractionError('Response too large', 'FETCH_FAILED');
+  }
+}
+
+function throwIfTooLarge(size: number, maxBytes: number): void {
+  if (size > maxBytes) {
+    throw new ExtractionError('Response too large', 'FETCH_FAILED');
+  }
+}
+
 async function readResponseTextWithLimit(
   response: Response,
   maxBytes: number
 ): Promise<string> {
-  const contentLengthHeader = response.headers.get('content-length');
-  const contentLength = contentLengthHeader
-    ? Number(contentLengthHeader)
-    : null;
-
-  if (typeof contentLength === 'number' && Number.isFinite(contentLength)) {
-    if (contentLength > maxBytes) {
-      throw new ExtractionError('Response too large', 'FETCH_FAILED');
-    }
-  }
+  validateContentLength(response.headers.get('content-length'), maxBytes);
 
   if (!response.body) {
     const text = await response.text();
-    if (text.length > maxBytes) {
-      throw new ExtractionError('Response too large', 'FETCH_FAILED');
-    }
+    throwIfTooLarge(text.length, maxBytes);
     return text;
   }
 
@@ -316,13 +322,10 @@ async function readResponseTextWithLimit(
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (value) {
-      received += value.byteLength;
-      if (received > maxBytes) {
-        throw new ExtractionError('Response too large', 'FETCH_FAILED');
-      }
-      out += decoder.decode(value, { stream: true });
-    }
+    if (!value) continue;
+    received += value.byteLength;
+    throwIfTooLarge(received, maxBytes);
+    out += decoder.decode(value, { stream: true });
   }
 
   out += decoder.decode();
