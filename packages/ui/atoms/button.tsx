@@ -51,6 +51,45 @@ export interface ButtonProps
   loading?: boolean;
 }
 
+// Helper to compute data-state attribute
+function getDataState(loading: boolean, isDisabled: boolean): string {
+  if (loading) return 'loading';
+  if (isDisabled) return 'disabled';
+  return 'idle';
+}
+
+// Loading spinner component
+function LoadingSpinner() {
+  return (
+    <span
+      className='absolute inset-0 flex items-center justify-center'
+      data-testid='spinner'
+    >
+      <span className='h-4 w-4 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent' />
+    </span>
+  );
+}
+
+// Button content wrapper
+function ButtonContent({
+  loading,
+  children,
+}: {
+  loading: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center',
+        loading ? 'opacity-0' : 'opacity-100'
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
@@ -67,80 +106,41 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
+    const dataState = getDataState(loading, isDisabled);
+
+    const sharedProps = {
+      ref,
+      className: cn(
+        buttonVariants({ variant, size, className }),
+        isDisabled && 'pointer-events-none'
+      ),
+      'aria-disabled': isDisabled || undefined,
+      'aria-busy': loading || undefined,
+      'data-state': dataState,
+    };
 
     // In asChild mode (Radix Slot), React.Children.only requires a single child.
     // Do NOT render additional wrappers/spinner here; apply styles/props to the child.
     if (asChild) {
       return (
-        <Comp
-          ref={ref}
-          className={cn(
-            buttonVariants({ variant, size, className }),
-            isDisabled && 'pointer-events-none'
-          )}
-          aria-disabled={isDisabled || undefined}
-          aria-busy={loading || undefined}
-          data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
-          {...props}
-        >
+        <Comp {...sharedProps} {...props}>
           {children}
         </Comp>
       );
     }
 
-    // Normal button/anchor rendering with optional loading spinner and content opacity
+    // Normal button rendering with optional loading spinner
+    const buttonProps = {
+      disabled: isDisabled,
+      type:
+        (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
+        'button',
+    };
+
     return (
-      <Comp
-        ref={ref}
-        className={cn(
-          buttonVariants({ variant, size, className }),
-          isDisabled && 'pointer-events-none'
-        )}
-        aria-disabled={isDisabled || undefined}
-        aria-busy={loading || undefined}
-        data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
-        {...(Comp === 'button'
-          ? {
-              disabled: isDisabled,
-              type:
-                (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
-                'button',
-            }
-          : {})}
-        {...props}
-      >
-        {Comp === 'button' ? (
-          <>
-            {loading && (
-              <span
-                className='absolute inset-0 flex items-center justify-center'
-                data-testid='spinner'
-              >
-                <span className='h-4 w-4 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent' />
-              </span>
-            )}
-            <span
-              className={cn(
-                'inline-flex items-center',
-                loading ? 'opacity-0' : 'opacity-100'
-              )}
-            >
-              {children}
-            </span>
-          </>
-        ) : // asChild case (Slot) — must render exactly one element child
-        React.isValidElement(children) ? (
-          children
-        ) : (
-          <span
-            className={cn(
-              'inline-flex items-center',
-              loading ? 'opacity-0' : 'opacity-100'
-            )}
-          >
-            {children}
-          </span>
-        )}
+      <Comp {...sharedProps} {...buttonProps} {...props}>
+        {loading && <LoadingSpinner />}
+        <ButtonContent loading={loading}>{children}</ButtonContent>
       </Comp>
     );
   }

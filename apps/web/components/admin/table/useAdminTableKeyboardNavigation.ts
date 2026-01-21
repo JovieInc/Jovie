@@ -48,48 +48,63 @@ export function useAdminTableKeyboardNavigation<ItemType>(
     [itemIds, selectedId]
   );
 
+  const handleArrowNavigation = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>, key: 'ArrowDown' | 'ArrowUp') => {
+      if (itemIds.length === 0) return;
+      event.preventDefault();
+
+      const isDown = key === 'ArrowDown';
+      if (selectedIndex === -1) {
+        const targetIndex = isDown ? 0 : itemIds.length - 1;
+        onSelect(itemIds[targetIndex] ?? null);
+        return;
+      }
+
+      const nextIndex = isDown
+        ? Math.min(selectedIndex + 1, itemIds.length - 1)
+        : Math.max(selectedIndex - 1, 0);
+      onSelect(itemIds[nextIndex] ?? null);
+    },
+    [itemIds, onSelect, selectedIndex]
+  );
+
+  const handleSpaceKey = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (!selectedId || !onToggleSidebar) return;
+      event.preventDefault();
+      onToggleSidebar();
+    },
+    [onToggleSidebar, selectedId]
+  );
+
+  const handleEscapeKey = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (!isSidebarOpen || !onCloseSidebar) return;
+      event.preventDefault();
+      onCloseSidebar();
+    },
+    [isSidebarOpen, onCloseSidebar]
+  );
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (isFormElement(event.target)) return;
 
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        if (itemIds.length === 0) return;
-        event.preventDefault();
-
-        if (event.key === 'ArrowDown') {
-          if (selectedIndex === -1) {
-            onSelect(itemIds[0] ?? null);
-          } else {
-            const nextIndex = Math.min(selectedIndex + 1, itemIds.length - 1);
-            onSelect(itemIds[nextIndex] ?? null);
-          }
-        } else if (event.key === 'ArrowUp') {
-          if (selectedIndex === -1) {
-            onSelect(itemIds[itemIds.length - 1] ?? null);
-          } else {
-            const previousIndex = Math.max(selectedIndex - 1, 0);
-            onSelect(itemIds[previousIndex] ?? null);
-          }
-        }
-      } else if (event.key === ' ' || event.key === 'Spacebar') {
-        if (!selectedId || !onToggleSidebar) return;
-        event.preventDefault();
-        onToggleSidebar();
-      } else if (event.key === 'Escape') {
-        if (!isSidebarOpen || !onCloseSidebar) return;
-        event.preventDefault();
-        onCloseSidebar();
+      switch (event.key) {
+        case 'ArrowDown':
+        case 'ArrowUp':
+          handleArrowNavigation(event, event.key);
+          break;
+        case ' ':
+        case 'Spacebar':
+          handleSpaceKey(event);
+          break;
+        case 'Escape':
+          handleEscapeKey(event);
+          break;
       }
     },
-    [
-      isSidebarOpen,
-      itemIds,
-      onCloseSidebar,
-      onSelect,
-      onToggleSidebar,
-      selectedId,
-      selectedIndex,
-    ]
+    [handleArrowNavigation, handleEscapeKey, handleSpaceKey]
   );
 
   return { selectedIndex, handleKeyDown };
