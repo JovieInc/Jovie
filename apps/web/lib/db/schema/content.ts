@@ -55,6 +55,7 @@ export const discogReleases = pgTable(
     totalTracks: integer('total_tracks').default(0).notNull(),
     isExplicit: boolean('is_explicit').default(false).notNull(),
     artworkUrl: text('artwork_url'),
+    spotifyPopularity: integer('spotify_popularity'),
     sourceType: ingestionSourceTypeEnum('source_type')
       .default('manual')
       .notNull(),
@@ -72,6 +73,10 @@ export const discogReleases = pgTable(
       .where(drizzleSql`upc IS NOT NULL`),
     releaseDateIndex: index('discog_releases_release_date_idx').on(
       table.releaseDate
+    ),
+    spotifyPopularityRange: check(
+      'discog_releases_spotify_popularity_range',
+      drizzleSql`spotify_popularity >= 0 AND spotify_popularity <= 100`
     ),
   })
 );

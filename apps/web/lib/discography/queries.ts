@@ -34,6 +34,7 @@ export interface UpsertReleaseInput {
   totalTracks?: number;
   isExplicit?: boolean;
   artworkUrl?: string | null;
+  spotifyPopularity?: number | null;
   sourceType?: 'manual' | 'admin' | 'ingested';
   metadata?: Record<string, unknown>;
 }
@@ -207,6 +208,7 @@ export async function upsertRelease(
     totalTracks: input.totalTracks ?? 0,
     isExplicit: input.isExplicit ?? false,
     artworkUrl: input.artworkUrl ?? null,
+    spotifyPopularity: input.spotifyPopularity ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     createdAt: now,
@@ -228,6 +230,7 @@ export async function upsertRelease(
         totalTracks: input.totalTracks ?? 0,
         isExplicit: input.isExplicit ?? false,
         artworkUrl: input.artworkUrl ?? null,
+        spotifyPopularity: input.spotifyPopularity ?? null,
         sourceType: input.sourceType ?? 'ingested',
         metadata: input.metadata ?? {},
         updatedAt: now,
