@@ -18,6 +18,29 @@ export interface CTAButtonProps extends Omit<ButtonProps, 'loading' | 'size'> {
   prefetch?: boolean;
 }
 
+// Helper to compute data-state attribute
+function getDataState(
+  isLoading: boolean | undefined,
+  isSuccess: boolean | undefined,
+  disabled: boolean | undefined
+): string {
+  if (isLoading) return 'loading';
+  if (isSuccess) return 'success';
+  if (disabled) return 'disabled';
+  return 'idle';
+}
+
+// Helper to render the icon based on state
+function renderStateIcon(
+  isLoading: boolean | undefined,
+  isSuccess: boolean | undefined,
+  icon: React.ReactNode
+): React.ReactNode {
+  if (isLoading) return <LoadingSpinner size='sm' tone='inverse' />;
+  if (isSuccess) return <Check aria-hidden className='h-4 w-4' />;
+  return icon;
+}
+
 export const CTAButton = React.forwardRef<
   HTMLButtonElement | HTMLAnchorElement,
   CTAButtonProps
@@ -43,24 +66,11 @@ export const CTAButton = React.forwardRef<
       size === 'md' ? 'default' : size;
 
     const isDisabled = props.disabled || isLoading;
-
-    const dataState = isLoading
-      ? 'loading'
-      : isSuccess
-        ? 'success'
-        : props.disabled
-          ? 'disabled'
-          : 'idle';
+    const dataState = getDataState(isLoading, isSuccess, props.disabled);
 
     const content = (
       <span className='inline-flex items-center gap-2'>
-        {isLoading ? (
-          <LoadingSpinner size='sm' tone='inverse' />
-        ) : isSuccess ? (
-          <Check aria-hidden className='h-4 w-4' />
-        ) : (
-          icon
-        )}
+        {renderStateIcon(isLoading, isSuccess, icon)}
         <span className={cn(isLoading && 'opacity-80')}>{children}</span>
       </span>
     );

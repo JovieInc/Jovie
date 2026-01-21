@@ -35,6 +35,50 @@ export function sanitizeUsernameInput(raw: string): string {
   return withoutAt;
 }
 
+// Platform-specific hostname sets
+const TIKTOK_HOSTS = new Set(['tiktok.com']);
+const SNAPCHAT_HOSTS = new Set(['snapchat.com']);
+const YOUTUBE_HOSTS = new Set(['youtube.com']);
+const SPOTIFY_HOSTS = new Set(['spotify.com', 'open.spotify.com']);
+
+// Common path segments that aren't usernames
+const IGNORED_SEGMENTS = new Set([
+  'artist',
+  'user',
+  'channel',
+  'c',
+  'profile',
+  'watch',
+]);
+
+// Helper to strip @ prefix from username
+function stripAtPrefix(value: string): string {
+  return value.startsWith('@') ? value.slice(1) : value;
+}
+
+// Platform-specific username extractors
+function extractFromTikTok(first: string): string | null {
+  const candidate = stripAtPrefix(first);
+  return candidate || null;
+}
+
+function extractFromSnapchat(first: string, second: string): string | null {
+  const candidate = first === 'add' || first === 'u' ? second : first;
+  const cleaned = stripAtPrefix(candidate);
+  return cleaned || null;
+}
+
+function extractFromYouTube(first: string): string | null {
+  if (first.startsWith('@')) return first.slice(1) || null;
+  return null;
+}
+
+function extractFromSpotify(first: string, second: string): string | null {
+  if (first === 'artist') return null;
+  if (first === 'user' && second) return second;
+  return null;
+}
+
 /**
  * Extract username from a social media URL
  */
@@ -51,55 +95,16 @@ export function extractUsernameFromUrl(value: string): string | null {
     const first = segments[0] ?? '';
     const second = segments[1] ?? '';
 
-    // Common path segments that aren't usernames
-    const ignoredSegments = [
-      'artist',
-      'user',
-      'channel',
-      'c',
-      'profile',
-      'watch',
-    ];
+    // Dispatch to platform-specific extractors
+    if (TIKTOK_HOSTS.has(host)) return extractFromTikTok(first);
+    if (SNAPCHAT_HOSTS.has(host)) return extractFromSnapchat(first, second);
+    if (YOUTUBE_HOSTS.has(host)) return extractFromYouTube(first);
+    if (SPOTIFY_HOSTS.has(host)) return extractFromSpotify(first, second);
 
-    // Define allowed hostnames for each platform (no partials)
-    const tiktokHosts = ['tiktok.com'];
-    const snapchatHosts = ['snapchat.com'];
-    const youtubeHosts = ['youtube.com'];
-    const spotifyHosts = ['spotify.com', 'open.spotify.com'];
+    // Filter out common ignored segments for generic URLs
+    if (IGNORED_SEGMENTS.has(first.toLowerCase())) return null;
 
-    if (tiktokHosts.includes(host)) {
-      const candidate = first.startsWith('@') ? first.slice(1) : first;
-      return candidate || null;
-    }
-
-    if (snapchatHosts.includes(host)) {
-      const candidate = first === 'add' || first === 'u' ? second : first;
-      const cleaned = candidate.startsWith('@')
-        ? candidate.slice(1)
-        : candidate;
-      return cleaned || null;
-    }
-
-    if (youtubeHosts.includes(host)) {
-      if (first.startsWith('@')) return first.slice(1) || null;
-      return null;
-    }
-
-    // Spotify URLs: /artist/ID or /user/username
-    if (spotifyHosts.includes(host)) {
-      // Skip artist IDs, return null (no displayable username)
-      if (first === 'artist') return null;
-      // For user profiles, use the second segment
-      if (first === 'user' && second) return second;
-      return null;
-    }
-
-    // Filter out common ignored segments
-    if (ignoredSegments.includes(first.toLowerCase())) {
-      return null;
-    }
-
-    const candidate = first.startsWith('@') ? first.slice(1) : first;
+    const candidate = stripAtPrefix(first);
     return candidate || null;
   } catch {
     return null;
