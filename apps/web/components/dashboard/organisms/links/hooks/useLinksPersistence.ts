@@ -17,6 +17,34 @@ import {
 } from '../utils/link-transformers';
 import { isIngestableUrl } from '../utils/platform-category';
 
+const VALID_CATEGORIES = new Set<PlatformType>([
+  'dsp',
+  'social',
+  'earnings',
+  'websites',
+  'custom',
+]);
+
+function normalizeCategory(
+  rawCategory: PlatformType | undefined
+): PlatformType {
+  return rawCategory && VALID_CATEGORIES.has(rawCategory)
+    ? rawCategory
+    : 'custom';
+}
+
+function normalizeLinkItem(item: LinkItem, index: number): LinkItem {
+  const category = normalizeCategory(
+    item.platform.category as PlatformType | undefined
+  );
+  return {
+    ...item,
+    platform: { ...item.platform, category },
+    category,
+    order: typeof item.order === 'number' ? item.order : index,
+  };
+}
+
 /**
  * Options for the useLinksPersistence hook
  */
@@ -151,28 +179,7 @@ export function useLinksPersistence({
   // Persist links to server
   const persistLinks = useCallback(
     async (input: LinkItem[]): Promise<void> => {
-      // Normalize the input
-      const normalized: LinkItem[] = input.map((item, index) => {
-        const rawCategory = item.platform.category as PlatformType | undefined;
-        const category: PlatformType =
-          rawCategory === 'dsp' ||
-          rawCategory === 'social' ||
-          rawCategory === 'earnings' ||
-          rawCategory === 'websites' ||
-          rawCategory === 'custom'
-            ? rawCategory
-            : 'custom';
-
-        return {
-          ...item,
-          platform: {
-            ...item.platform,
-            category,
-          },
-          category,
-          order: typeof item.order === 'number' ? item.order : index,
-        };
-      });
+      const normalized = input.map(normalizeLinkItem);
 
       try {
         const payload = normalized.map((l, index) => ({

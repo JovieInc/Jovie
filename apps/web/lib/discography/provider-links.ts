@@ -195,6 +195,25 @@ export async function lookupAppleMusicByIsrc(
   }
 }
 
+function processOverrides(
+  overrides: ResolveProviderLinksOptions['overrides'],
+  links: ProviderLink[],
+  seenProviders: Set<ProviderKey>
+): void {
+  if (!overrides) return;
+  for (const [provider, override] of Object.entries(overrides)) {
+    if (!override) continue;
+    const key = provider as ProviderKey;
+    seenProviders.add(key);
+    links.push({
+      provider: key,
+      url: override.url,
+      quality: 'manual_override',
+      discovered_from: override.discovered_from ?? 'manual_override',
+    });
+  }
+}
+
 export async function resolveProviderLinks(
   track: TrackDescriptor,
   options: ResolveProviderLinksOptions = {}
@@ -207,19 +226,7 @@ export async function resolveProviderLinks(
   const seenProviders = new Set<ProviderKey>();
 
   // Manual overrides take precedence
-  if (options.overrides) {
-    for (const [provider, override] of Object.entries(options.overrides)) {
-      if (!override) continue;
-      const key = provider as ProviderKey;
-      seenProviders.add(key);
-      links.push({
-        provider: key,
-        url: override.url,
-        quality: 'manual_override',
-        discovered_from: override.discovered_from ?? 'manual_override',
-      });
-    }
-  }
+  processOverrides(options.overrides, links, seenProviders);
 
   // Run ISRC lookups in parallel for speed
   if (track.isrc) {

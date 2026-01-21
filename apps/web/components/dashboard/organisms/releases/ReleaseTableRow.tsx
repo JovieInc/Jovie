@@ -22,11 +22,22 @@ interface ProviderConfig {
   accent: string;
 }
 
+type ProviderStatus = 'available' | 'manual' | 'missing';
+
+function getProviderStatus(
+  available: boolean,
+  isManual: boolean
+): ProviderStatus {
+  if (isManual) return 'manual';
+  if (available) return 'available';
+  return 'missing';
+}
+
 function ProviderStatusDot({
   status,
   accent,
 }: Readonly<{
-  status: 'available' | 'manual' | 'missing';
+  status: ProviderStatus;
   accent: string;
 }>) {
   if (status === 'missing') {
@@ -329,11 +340,7 @@ export function ReleaseTableRow({
         const isManual = provider?.source === 'manual';
         const testId = `provider-copy-${release.id}-${providerKey}`;
         const isCopied = copiedId === testId;
-        const status = isManual
-          ? 'manual'
-          : available
-            ? 'available'
-            : 'missing';
+        const status = getProviderStatus(available, isManual);
 
         return (
           <td key={providerKey} className='px-4 py-4 align-middle sm:px-6'>
