@@ -21,7 +21,7 @@ A polished tooltip component with Radix primitives, tokenized design, and compre
 - **Disabled Elements**: Guidance for proper tooltip usage with disabled controls
 
 ### ⚡ **Performance & UX**
-- **Sensible Delays**: 700ms initial delay, 300ms skip delay for smooth experience
+- **Sensible Delays**: 1000ms initial delay, 300ms skip delay for smooth experience
 - **Pointer Safety**: Prevents accidental triggers when cursor passes over tooltip
 - **Collision Detection**: Automatic positioning to stay within viewport
 - **Minimal DOM**: Optimized rendering with efficient updates
@@ -47,6 +47,22 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@jovie
     <span>This is a tooltip</span>
   </TooltipContent>
 </Tooltip>
+```
+
+### Simple API (Recommended for common use cases)
+
+For most tooltips, use `SimpleTooltip` for a cleaner API:
+
+```tsx
+import { SimpleTooltip } from '@jovie/ui';
+
+<SimpleTooltip content="Save changes">
+  <button>Save</button>
+</SimpleTooltip>
+
+<SimpleTooltip content={<span>Custom <strong>content</strong></span>} side="right">
+  <IconButton />
+</SimpleTooltip>
 ```
 
 ### With Keyboard Shortcut
@@ -120,7 +136,7 @@ Global provider for tooltip configuration. Place at app level.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `delayDuration` | `number` | `700` | Delay before showing tooltip (ms) |
+| `delayDuration` | `number` | `1000` | Delay before showing tooltip (ms) |
 | `skipDelayDuration` | `number` | `300` | Skip delay for subsequent tooltips (ms) |
 
 ### TooltipContent
@@ -130,8 +146,8 @@ The tooltip content with styling and positioning.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `side` | `'top' \| 'right' \| 'bottom' \| 'left'` | `'top'` | Preferred placement |
-| `sideOffset` | `number` | `8` | Distance from trigger (px) |
-| `showArrow` | `boolean` | `true` | Whether to show the pointer arrow |
+| `sideOffset` | `number` | `6` | Distance from trigger (px) |
+| `showArrow` | `boolean` | `false` | Whether to show the pointer arrow |
 | `className` | `string` | - | Additional CSS classes |
 
 ### TooltipTrigger
@@ -141,6 +157,19 @@ Wraps the element that triggers the tooltip.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `asChild` | `boolean` | `true` | Render as child component |
+
+### SimpleTooltip
+
+Convenience wrapper for common tooltip use cases. Requires `TooltipProvider` in the tree.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `content` | `ReactNode` | - | The tooltip content |
+| `side` | `'top' \| 'right' \| 'bottom' \| 'left'` | `'top'` | Preferred placement |
+| `sideOffset` | `number` | `6` | Distance from trigger (px) |
+| `showArrow` | `boolean` | `false` | Whether to show the pointer arrow |
+| `className` | `string` | - | Additional CSS classes |
+| `children` | `ReactNode` | - | The trigger element |
 
 ## Accessibility Guidelines
 
@@ -160,13 +189,13 @@ Wraps the element that triggers the tooltip.
 
 ## Design Tokens
 
-The tooltip uses semantic design tokens that adapt to light/dark themes:
+The tooltip uses Tailwind classes that adapt to light/dark themes:
 
-- **Background**: `bg-surface-1` (elevated surface color)
-- **Text**: `text-primary-token` (primary text color)
-- **Border**: `border-default` (default border color)
-- **Shadow**: `shadow-md` (medium shadow)
-- **Arrow**: `fill-surface-1` (matches background)
+- **Background**: `bg-white` / `dark:bg-neutral-900`
+- **Text**: `text-neutral-900` / `dark:text-white`
+- **Border**: `border-black/10` / `dark:border-white/10`
+- **Shadow**: `shadow-lg`
+- **Arrow**: `fill-white` / `dark:fill-neutral-900`
 
 ## Browser Support
 
