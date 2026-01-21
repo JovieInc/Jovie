@@ -2,74 +2,20 @@
 
 import { Input } from '@jovie/ui';
 import Image from 'next/image';
-import { useCallback, useReducer, useRef, useTransition } from 'react';
-import { connectSpotifyArtist } from '@/app/app/dashboard/releases/actions';
+import { useCallback, useReducer, useRef } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
-
-interface ReleasesEmptyStateState {
-  searchQuery: string;
-  showResults: boolean;
-  activeResultIndex: number;
-  manualMode: boolean;
-  manualUrl: string;
-  error: string | null;
-}
-
-type ReleasesEmptyStateAction =
-  | { type: 'SET_SEARCH_QUERY'; payload: string }
-  | { type: 'SET_SHOW_RESULTS'; payload: boolean }
-  | { type: 'SET_ACTIVE_RESULT_INDEX'; payload: number }
-  | { type: 'SET_MANUAL_MODE'; payload: boolean }
-  | { type: 'SET_MANUAL_URL'; payload: string }
-  | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'CLEAR_SEARCH' }
-  | { type: 'RESET_MANUAL_MODE' };
-
-function releasesEmptyStateReducer(
-  state: ReleasesEmptyStateState,
-  action: ReleasesEmptyStateAction
-): ReleasesEmptyStateState {
-  switch (action.type) {
-    case 'SET_SEARCH_QUERY':
-      return {
-        ...state,
-        searchQuery: action.payload,
-        activeResultIndex: -1,
-        error: null,
-      };
-    case 'SET_SHOW_RESULTS':
-      return { ...state, showResults: action.payload };
-    case 'SET_ACTIVE_RESULT_INDEX':
-      return { ...state, activeResultIndex: action.payload };
-    case 'SET_MANUAL_MODE':
-      return { ...state, manualMode: action.payload };
-    case 'SET_MANUAL_URL':
-      return { ...state, manualUrl: action.payload, error: null };
-    case 'SET_ERROR':
-      return { ...state, error: action.payload };
-    case 'CLEAR_SEARCH':
-      return { ...state, searchQuery: '', showResults: false };
-    case 'RESET_MANUAL_MODE':
-      return { ...state, manualUrl: '', manualMode: false, error: null };
-    default:
-      return state;
-  }
-}
-
-function formatFollowers(count: number): string {
-  if (count >= 1_000_000) {
-    return `${(count / 1_000_000).toFixed(1)}M followers`;
-  }
-  if (count >= 1_000) {
-    return `${(count / 1_000).toFixed(1)}K followers`;
-  }
-  return `${count} followers`;
-}
+import {
+  formatFollowers,
+  initialState,
+  releasesEmptyStateReducer,
+  useSearchKeyboard,
+  useSpotifyConnect,
+} from './releases-empty-state';
 
 interface ReleasesEmptyStateProps {
   onConnected?: (releases: ReleaseViewModel[], artistName: string) => void;
@@ -80,16 +26,10 @@ export function ReleasesEmptyState({
   onConnected,
   onImportStart,
 }: ReleasesEmptyStateProps) {
-  const [formState, dispatch] = useReducer(releasesEmptyStateReducer, {
-    searchQuery: '',
-    showResults: false,
-    activeResultIndex: -1,
-    manualMode: false,
-    manualUrl: '',
-    error: null,
-  });
-
-  const [isPending, startTransition] = useTransition();
+  const [formState, dispatch] = useReducer(
+    releasesEmptyStateReducer,
+    initialState
+  );
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
@@ -105,14 +45,26 @@ export function ReleasesEmptyState({
     limit: 5,
   });
 
-  // Check if a string is a Spotify artist URL and extract the ID
-  const extractSpotifyArtistId = useCallback((input: string): string | null => {
-    const trimmed = input.trim();
-    const artistMatch = trimmed.match(
-      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/
-    );
-    return artistMatch ? artistMatch[1] : null;
-  }, []);
+  const {
+    isPending,
+    extractSpotifyArtistId,
+    connectFromUrl,
+    handleArtistSelect,
+    handleManualSubmit,
+  } = useSpotifyConnect({
+    dispatch,
+    searchClear: clear,
+    onConnected,
+    onImportStart,
+  });
+
+  const { handleKeyDown } = useSearchKeyboard({
+    showResults: formState.showResults,
+    activeResultIndex: formState.activeResultIndex,
+    results,
+    dispatch,
+    onSelect: handleArtistSelect,
+  });
 
   const handleSearchInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,31 +77,7 @@ export function ReleasesEmptyState({
         // It's a Spotify URL - connect directly instead of searching
         clear();
         dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
-        const artistUrl = `https://open.spotify.com/artist/${artistId}`;
-        onImportStart?.('');
-
-        startTransition(async () => {
-          try {
-            const result = await connectSpotifyArtist({
-              spotifyArtistId: artistId,
-              spotifyArtistUrl: artistUrl,
-              artistName: '',
-            });
-
-            if (result.success) {
-              dispatch({ type: 'CLEAR_SEARCH' });
-              onConnected?.(result.releases, result.artistName);
-            } else {
-              dispatch({ type: 'SET_ERROR', payload: result.message });
-            }
-          } catch (err) {
-            dispatch({
-              type: 'SET_ERROR',
-              payload:
-                err instanceof Error ? err.message : 'Failed to connect artist',
-            });
-          }
-        });
+        connectFromUrl(artistId);
         return;
       }
 
@@ -157,147 +85,15 @@ export function ReleasesEmptyState({
       search(value);
       dispatch({ type: 'SET_SHOW_RESULTS', payload: true });
     },
-    [search, clear, extractSpotifyArtistId, onConnected, onImportStart]
+    [search, clear, extractSpotifyArtistId, connectFromUrl]
   );
 
-  const handleArtistSelect = useCallback(
-    (artist: { id: string; name: string; url: string }) => {
-      dispatch({ type: 'SET_ERROR', payload: null });
-
-      // Clear the search UI and show importing state immediately
-      dispatch({ type: 'CLEAR_SEARCH' });
-      clear();
-      onImportStart?.(artist.name);
-
-      startTransition(async () => {
-        try {
-          const result = await connectSpotifyArtist({
-            spotifyArtistId: artist.id,
-            spotifyArtistUrl: artist.url,
-            artistName: artist.name,
-          });
-
-          if (result.success) {
-            onConnected?.(result.releases, result.artistName);
-          } else {
-            dispatch({ type: 'SET_ERROR', payload: result.message });
-          }
-        } catch (err) {
-          dispatch({
-            type: 'SET_ERROR',
-            payload:
-              err instanceof Error ? err.message : 'Failed to connect artist',
-          });
-        }
-      });
-    },
-    [clear, onConnected, onImportStart]
-  );
-
-  const handleManualSubmit = useCallback(
+  const onManualSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      dispatch({ type: 'SET_ERROR', payload: null });
-
-      const trimmedUrl = formState.manualUrl.trim();
-      if (!trimmedUrl) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Please enter a Spotify artist URL',
-        });
-        return;
-      }
-
-      // Extract artist ID from URL using the same helper as paste detection
-      const artistId = extractSpotifyArtistId(trimmedUrl);
-      if (!artistId) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Please enter a valid Spotify artist URL',
-        });
-        return;
-      }
-
-      const artistUrl = `https://open.spotify.com/artist/${artistId}`;
-
-      // Clear the form and show importing state
-      dispatch({ type: 'RESET_MANUAL_MODE' });
-      onImportStart?.('');
-
-      startTransition(async () => {
-        try {
-          const result = await connectSpotifyArtist({
-            spotifyArtistId: artistId,
-            spotifyArtistUrl: artistUrl,
-            artistName: '', // Will be empty for manual mode
-          });
-
-          if (result.success) {
-            onConnected?.(result.releases, result.artistName);
-          } else {
-            dispatch({ type: 'SET_ERROR', payload: result.message });
-          }
-        } catch (err) {
-          dispatch({
-            type: 'SET_ERROR',
-            payload:
-              err instanceof Error ? err.message : 'Failed to connect artist',
-          });
-        }
-      });
+      handleManualSubmit(formState.manualUrl);
     },
-    [formState.manualUrl, onConnected, onImportStart, extractSpotifyArtistId]
-  );
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (!formState.showResults || results.length === 0) {
-        return;
-      }
-
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          dispatch({
-            type: 'SET_ACTIVE_RESULT_INDEX',
-            payload:
-              formState.activeResultIndex < results.length - 1
-                ? formState.activeResultIndex + 1
-                : 0,
-          });
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          dispatch({
-            type: 'SET_ACTIVE_RESULT_INDEX',
-            payload:
-              formState.activeResultIndex > 0
-                ? formState.activeResultIndex - 1
-                : results.length - 1,
-          });
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (
-            formState.activeResultIndex >= 0 &&
-            results[formState.activeResultIndex]
-          ) {
-            handleArtistSelect(results[formState.activeResultIndex]);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
-          dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
-          break;
-      }
-    },
-    [
-      formState.activeResultIndex,
-      formState.showResults,
-      handleArtistSelect,
-      results,
-    ]
+    [formState.manualUrl, handleManualSubmit]
   );
 
   return (
@@ -318,7 +114,7 @@ export function ReleasesEmptyState({
 
       <div className='mt-6 w-full max-w-md'>
         {formState.manualMode ? (
-          <form onSubmit={handleManualSubmit} className='space-y-3'>
+          <form onSubmit={onManualSubmit} className='space-y-3'>
             <div className='relative'>
               <Input
                 type='url'
