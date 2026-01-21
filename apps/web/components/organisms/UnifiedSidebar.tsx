@@ -33,10 +33,116 @@ import { cn } from '@/lib/utils';
 
 // Delay before hiding floating sidebar (milliseconds)
 const FLOATING_SIDEBAR_HIDE_DELAY_MS = 150;
+const TRIGGER_ZONE = 20; // pixels from left edge
+const SIDEBAR_WIDTH = 250; // keep visible while over sidebar
 
 export interface UnifiedSidebarProps {
   section: 'admin' | 'dashboard' | 'settings';
   navigation: NavItem[];
+}
+
+/**
+ * Custom hook to manage floating sidebar visibility on desktop
+ */
+function useFloatingSidebar(isCollapsed: boolean, isMobile: boolean) {
+  const [isFloatingVisible, setIsFloatingVisible] = useState(false);
+
+  useEffect(() => {
+    if (isMobile || !isCollapsed) {
+      setIsFloatingVisible(false);
+      return;
+    }
+
+    let hideTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (hideTimeout !== undefined) clearTimeout(hideTimeout);
+
+      if (e.clientX <= TRIGGER_ZONE) {
+        setIsFloatingVisible(true);
+      } else if (e.clientX > SIDEBAR_WIDTH) {
+        hideTimeout = setTimeout(
+          () => setIsFloatingVisible(false),
+          FLOATING_SIDEBAR_HIDE_DELAY_MS
+        );
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (hideTimeout !== undefined) clearTimeout(hideTimeout);
+    };
+  }, [isCollapsed, isMobile]);
+
+  return isFloatingVisible;
+}
+
+/**
+ * Extract profile data from dashboard context
+ */
+function useProfileData(isDashboardOrAdmin: boolean) {
+  const dashboardDataRaw = useDashboardData();
+  const dashboardData = isDashboardOrAdmin ? dashboardDataRaw : null;
+
+  const username = dashboardData
+    ? (dashboardData.selectedProfile?.usernameNormalized ??
+      dashboardData.selectedProfile?.username)
+    : undefined;
+
+  return {
+    username,
+    profileHref: username ? `/${username}` : undefined,
+    displayName: dashboardData
+      ? dashboardData.selectedProfile?.displayName?.trim() ||
+        dashboardData.selectedProfile?.username ||
+        'Your profile'
+      : 'Your profile',
+    avatarUrl: dashboardData?.selectedProfile?.avatarUrl,
+  };
+}
+
+/** Navigation list for settings section */
+function SettingsNavigation({
+  navigation,
+  pathname,
+  section,
+}: {
+  navigation: NavItem[];
+  pathname: string;
+  section: string;
+}) {
+  return (
+    <nav
+      aria-label={`${section} navigation`}
+      className='flex flex-1 flex-col overflow-hidden'
+    >
+      <SidebarMenu>
+        {navigation.map(item => {
+          const isActive =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <SidebarMenuItem key={item.id}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive}
+                className='font-medium'
+              >
+                <Link
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className='flex w-full min-w-0 items-center gap-3'
+                >
+                  <item.icon className='size-4' />
+                  <span className='truncate'>{item.name}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
+    </nav>
+  );
 }
 
 /**
@@ -61,60 +167,11 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
   const isInSettings = section === 'settings';
   const isDashboard = section === 'dashboard';
   const isAdmin = section === 'admin';
+  const isDashboardOrAdmin = isDashboard || isAdmin;
 
-  // Floating sidebar state for collapsed mode
-  const [isFloatingVisible, setIsFloatingVisible] = useState(false);
-
-  // Hover detection for floating sidebar
-  useEffect(() => {
-    // Only enable floating sidebar on desktop when collapsed
-    if (isMobile || !isCollapsed) {
-      setIsFloatingVisible(false);
-      return;
-    }
-
-    const TRIGGER_ZONE = 20; // pixels from left edge
-    const SIDEBAR_WIDTH = 250; // keep visible while over sidebar
-    let hideTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (hideTimeout !== undefined) clearTimeout(hideTimeout);
-
-      // Show when near left edge
-      if (e.clientX <= TRIGGER_ZONE) {
-        setIsFloatingVisible(true);
-      }
-      // Hide when mouse moves away from sidebar area
-      else if (e.clientX > SIDEBAR_WIDTH) {
-        hideTimeout = setTimeout(
-          () => setIsFloatingVisible(false),
-          FLOATING_SIDEBAR_HIDE_DELAY_MS
-        );
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      if (hideTimeout !== undefined) clearTimeout(hideTimeout);
-    };
-  }, [isCollapsed, isMobile]);
-
-  // Dashboard-specific data (needed for both dashboard and admin sections)
-  // Note: Hook must be called unconditionally; we conditionally use its result below
-  const dashboardDataRaw = useDashboardData();
-  const dashboardData = isDashboard || isAdmin ? dashboardDataRaw : null;
-  const username = dashboardData
-    ? (dashboardData.selectedProfile?.usernameNormalized ??
-      dashboardData.selectedProfile?.username)
-    : undefined;
-  const profileHref = username ? `/${username}` : undefined;
-  const displayName = dashboardData
-    ? dashboardData.selectedProfile?.displayName?.trim() ||
-      dashboardData.selectedProfile?.username ||
-      'Your profile'
-    : 'Your profile';
-  const avatarUrl = dashboardData?.selectedProfile?.avatarUrl;
+  const isFloatingVisible = useFloatingSidebar(isCollapsed, isMobile);
+  const { username, profileHref, displayName, avatarUrl } =
+    useProfileData(isDashboardOrAdmin);
 
   return (
     <>
@@ -182,7 +239,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
           </div>
 
           {/* Mobile profile card - for dashboard and admin */}
-          {(isDashboard || isAdmin) && (
+          {isDashboardOrAdmin && (
             <div className='px-2 pb-3 pt-2 lg:hidden'>
               <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
                 <OptimizedAvatar
@@ -235,47 +292,21 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>
           <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
             <SidebarGroupContent className='flex-1'>
-              {/* Dashboard and Admin use DashboardNav, Settings uses custom */}
-              {isDashboard || isAdmin ? (
+              {isDashboardOrAdmin ? (
                 <DashboardNav />
               ) : (
-                <nav
-                  aria-label={`${section} navigation`}
-                  className='flex flex-1 flex-col overflow-hidden'
-                >
-                  <SidebarMenu>
-                    {navigation.map(item => {
-                      const isActive =
-                        pathname === item.href ||
-                        pathname.startsWith(`${item.href}/`);
-                      return (
-                        <SidebarMenuItem key={item.id}>
-                          <SidebarMenuButton
-                            asChild
-                            isActive={isActive}
-                            className='font-medium'
-                          >
-                            <Link
-                              href={item.href}
-                              aria-current={isActive ? 'page' : undefined}
-                              className='flex w-full min-w-0 items-center gap-3'
-                            >
-                              <item.icon className='size-4' />
-                              <span className='truncate'>{item.name}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </nav>
+                <SettingsNavigation
+                  navigation={navigation}
+                  pathname={pathname}
+                  section={section}
+                />
               )}
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
 
         {/* Footer - for dashboard and admin (branding + user button) */}
-        {(isDashboard || isAdmin) && (
+        {isDashboardOrAdmin && (
           <SidebarFooter className='mt-auto'>
             <SidebarSeparator className='mx-0' />
             <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
@@ -323,37 +354,19 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
 
             {/* Content */}
             <div className='flex-1 overflow-y-auto px-2'>
-              {isDashboard || isAdmin ? (
+              {isDashboardOrAdmin ? (
                 <DashboardNav />
               ) : (
-                <nav aria-label={`${section} navigation`}>
-                  <SidebarMenu>
-                    {navigation.map(item => {
-                      const isActive =
-                        pathname === item.href ||
-                        pathname.startsWith(`${item.href}/`);
-                      return (
-                        <SidebarMenuItem key={item.id}>
-                          <SidebarMenuButton asChild isActive={isActive}>
-                            <Link
-                              href={item.href}
-                              aria-current={isActive ? 'page' : undefined}
-                              className='flex w-full min-w-0 items-center gap-3'
-                            >
-                              <item.icon className='size-4' />
-                              <span className='truncate'>{item.name}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </nav>
+                <SettingsNavigation
+                  navigation={navigation}
+                  pathname={pathname}
+                  section={section}
+                />
               )}
             </div>
 
             {/* Footer */}
-            {(isDashboard || isAdmin) && (
+            {isDashboardOrAdmin && (
               <div className='mt-auto border-t border-subtle'>
                 <div className='px-2 pt-3'>
                   <DashboardRemoveBrandingCard />

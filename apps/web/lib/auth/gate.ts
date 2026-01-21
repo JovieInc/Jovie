@@ -60,6 +60,54 @@ export interface AuthGateResult {
   };
 }
 
+/** User status type alias for user lifecycle states */
+type UserLifecycleStatus =
+  | 'waitlist_pending'
+  | 'waitlist_approved'
+  | 'profile_claimed'
+  | 'onboarding_incomplete'
+  | 'active';
+
+/** Data structure for existing user profile information */
+interface ExistingUserData {
+  profileId: string | null;
+  profileClaimed: boolean | null;
+  onboardingComplete: Date | null;
+}
+
+/**
+ * Determine user status based on waitlist entry and profile state.
+ * Implements the state progression: waitlist_pending → waitlist_approved → active
+ */
+function determineUserStatus(
+  waitlistEntryId: string | undefined,
+  existingUserData: ExistingUserData | undefined
+): UserLifecycleStatus {
+  if (!waitlistEntryId) {
+    return 'waitlist_pending';
+  }
+
+  const hasClaimedProfile =
+    existingUserData?.profileId && existingUserData.profileClaimed;
+  if (!hasClaimedProfile) {
+    return 'waitlist_approved';
+  }
+
+  return existingUserData.onboardingComplete
+    ? 'active'
+    : 'onboarding_incomplete';
+}
+
+/**
+ * Check if an error is a permanent error that should not be retried.
+ */
+function isPermanentError(error: Error): boolean {
+  return (
+    error.message?.includes('duplicate key') ||
+    error.message?.includes('constraint')
+  );
+}
+
 /**
  * Helper function to create a DB user with exponential backoff retry logic.
  *
@@ -88,16 +136,6 @@ async function createUserWithRetry(
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      // Derive userStatus based on actual user lifecycle state
-      // This implements the proper state progression defined in migration 0034:
-      // waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
-      let userStatus:
-        | 'waitlist_pending'
-        | 'waitlist_approved'
-        | 'profile_claimed'
-        | 'onboarding_incomplete'
-        | 'active';
-
       // Check if user already has an existing DB record with a claimed profile
       const [existingUserData] = await db
         .select({
@@ -118,25 +156,7 @@ async function createUserWithRetry(
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      if (!waitlistEntryId) {
-        // User just signed up but hasn't joined waitlist yet
-        userStatus = 'waitlist_pending';
-      } else if (
-        existingUserData?.profileId &&
-        existingUserData.profileClaimed
-      ) {
-        // User has a claimed profile (linked on admin approval)
-        // Profile is auto-created on waitlist submission and linked on approval
-        // Onboarding is skipped (onboardingCompletedAt set on approval), so user is active
-        if (existingUserData.onboardingComplete) {
-          userStatus = 'active';
-        } else {
-          userStatus = 'onboarding_incomplete';
-        }
-      } else {
-        // User has waitlist entry but no claimed profile yet
-        userStatus = 'waitlist_approved';
-      }
+      const userStatus = determineUserStatus(waitlistEntryId, existingUserData);
 
       const [createdUser] = await db
         .insert(users)
@@ -175,11 +195,7 @@ async function createUserWithRetry(
         }
       );
 
-      // Don't retry on constraint violations or permanent errors
-      if (
-        lastError.message?.includes('duplicate key') ||
-        lastError.message?.includes('constraint')
-      ) {
+      if (isPermanentError(lastError)) {
         break;
       }
     }
@@ -196,6 +212,91 @@ async function createUserWithRetry(
     }
   );
   return null;
+}
+
+/** Context for handling missing DB user scenarios */
+interface MissingDbUserContext {
+  createDbUserIfMissing: boolean;
+  clerkUserId: string;
+  email: string | null;
+  baseContext: { isAdmin: boolean; isPro: boolean; email: string | null };
+}
+
+/**
+ * Handle the case where no DB user exists for an authenticated Clerk user.
+ * Returns either a complete AuthGateResult (for early return) or the new user ID.
+ */
+async function handleMissingDbUser(
+  ctx: MissingDbUserContext
+): Promise<AuthGateResult | { dbUserId: string }> {
+  const { createDbUserIfMissing, clerkUserId, email, baseContext } = ctx;
+
+  // Don't create user - return NEEDS_DB_USER state
+  if (!createDbUserIfMissing) {
+    return {
+      state: UserState.NEEDS_DB_USER,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/onboarding?fresh_signup=true',
+      context: { ...baseContext, email },
+    };
+  }
+
+  // Need email to proceed
+  if (!email) {
+    await captureError(
+      'Cannot create user without email',
+      new Error('Email is required for user creation'),
+      { clerkUserId, operation: 'resolveUserState' }
+    );
+    throw new Error('Email is required for user creation');
+  }
+
+  // Check waitlist status before creating user
+  const waitlistResult = await checkWaitlistAccessInternal(email);
+
+  if (waitlistResult.status === 'new' || !waitlistResult.status) {
+    return {
+      state: UserState.NEEDS_WAITLIST_SUBMISSION,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
+  }
+
+  // Create the user
+  const newUserId = await createUserWithRetry(
+    clerkUserId,
+    email,
+    waitlistResult.entryId ?? undefined
+  );
+
+  if (!newUserId) {
+    await captureCriticalError(
+      'User creation failed after retries',
+      new Error('User creation failed after maximum retry attempts'),
+      {
+        clerkUserId,
+        email,
+        waitlistEntryId: waitlistResult.entryId,
+        context: 'resolveUserState',
+      }
+    );
+
+    return {
+      state: UserState.USER_CREATION_FAILED,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/error/user-creation-failed',
+      context: { ...baseContext, email, errorCode: 'USER_CREATION_FAILED' },
+    };
+  }
+
+  return { dbUserId: newUserId };
 }
 
 /**
@@ -294,89 +395,20 @@ export async function resolveUserState(
   let dbUserId: string | null = dbUser?.id ?? null;
 
   if (!dbUserId) {
-    if (createDbUserIfMissing) {
-      if (!email) {
-        await captureError(
-          'Cannot create user without email',
-          new Error('Email is required for user creation'),
-          {
-            clerkUserId,
-            operation: 'resolveUserState',
-          }
-        );
-        throw new Error('Email is required for user creation');
-      }
+    const creationResult = await handleMissingDbUser({
+      createDbUserIfMissing,
+      clerkUserId,
+      email,
+      baseContext,
+    });
 
-      // Check waitlist status before creating user
-      const waitlistResult = await checkWaitlistAccessInternal(email);
-
-      if (waitlistResult.status === 'new' || !waitlistResult.status) {
-        // Not on waitlist or still in application review - need to submit
-        return {
-          state: UserState.NEEDS_WAITLIST_SUBMISSION,
-          clerkUserId,
-          dbUserId: null,
-          profileId: null,
-          redirectTo: '/waitlist',
-          context: { ...baseContext, email },
-        };
-      }
-
-      // User is claimed (profile already linked on approval)
-      // Profile is auto-created on waitlist submission and linked on approval
-      // Onboarding is skipped, so user just needs DB user row to access the app
-      dbUserId = await createUserWithRetry(
-        clerkUserId,
-        email,
-        waitlistResult.entryId ?? undefined
-      );
-
-      if (!dbUserId) {
-        // Capture to Sentry for monitoring
-        await captureCriticalError(
-          'User creation failed after retries',
-          new Error('User creation failed after maximum retry attempts'),
-          {
-            clerkUserId,
-            email,
-            waitlistEntryId: waitlistResult.entryId,
-            context: 'resolveUserState',
-          }
-        );
-
-        return {
-          state: UserState.USER_CREATION_FAILED,
-          clerkUserId,
-          dbUserId: null,
-          profileId: null,
-          redirectTo: '/error/user-creation-failed',
-          context: {
-            ...baseContext,
-            email,
-            errorCode: 'USER_CREATION_FAILED',
-          },
-        };
-      }
-    } else if (!createDbUserIfMissing) {
-      return {
-        state: UserState.NEEDS_DB_USER,
-        clerkUserId,
-        dbUserId: null,
-        profileId: null,
-        redirectTo: '/onboarding?fresh_signup=true',
-        context: { ...baseContext, email },
-      };
-    } else {
-      // No email available - send to waitlist
-      return {
-        state: UserState.NEEDS_WAITLIST_SUBMISSION,
-        clerkUserId,
-        dbUserId: null,
-        profileId: null,
-        redirectTo: '/waitlist',
-        context: baseContext,
-      };
+    // If creationResult is a full AuthGateResult, return it early
+    if ('state' in creationResult) {
+      return creationResult;
     }
+
+    // Otherwise, we got the new user ID
+    dbUserId = creationResult.dbUserId;
   }
 
   // 3. Query creator profile first to determine if user is mid-onboarding
