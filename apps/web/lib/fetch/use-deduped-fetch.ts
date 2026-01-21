@@ -127,6 +127,7 @@ export function useDedupedFetch<T = unknown>(
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchOptionsRef = useRef(fetchOptions);
 
   // Store callbacks in refs to avoid re-running effect
   const onSuccessRef = useRef(onSuccess);
@@ -135,6 +136,10 @@ export function useDedupedFetch<T = unknown>(
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
   }, [onSuccess, onError]);
+
+  useEffect(() => {
+    fetchOptionsRef.current = fetchOptions;
+  }, [fetchOptions]);
 
   // Core fetch function
   const fetchData = useCallback(
@@ -157,7 +162,7 @@ export function useDedupedFetch<T = unknown>(
 
       try {
         const result = await dedupedFetchWithMeta<T>(url, {
-          ...fetchOptions,
+          ...fetchOptionsRef.current,
           forceRefresh,
           signal: controller.signal,
         });
@@ -205,7 +210,7 @@ export function useDedupedFetch<T = unknown>(
         }
       }
     },
-    [url, skip, fetchOptions]
+    [url, skip]
   );
 
   // Initial fetch on mount/URL change
