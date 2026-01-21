@@ -137,7 +137,7 @@ export function useOnboardingSubmit({
           setState(prev => ({
             ...prev,
             error:
-              'We had trouble setting up your account. Please try again in a moment.',
+              "We couldn't finish setting up your account. Please try again in a moment.",
             step: 'validating',
             progress: 0,
             isSubmitting: false,
