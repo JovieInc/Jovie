@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, doesTableExist } from '@/lib/db';
 import {
   type ProviderLink as DbProviderLink,
   type DiscogRelease,
@@ -14,6 +14,18 @@ import {
 // Types for release data with provider links
 export interface ReleaseWithProviders extends DiscogRelease {
   providerLinks: DbProviderLink[];
+}
+
+async function hasDiscogReleasesTable(): Promise<boolean> {
+  return doesTableExist('discog_releases');
+}
+
+async function hasDiscogTracksTable(): Promise<boolean> {
+  return doesTableExist('discog_tracks');
+}
+
+async function hasProviderLinksTable(): Promise<boolean> {
+  return doesTableExist('provider_links');
 }
 
 export interface UpsertReleaseInput {
@@ -72,6 +84,10 @@ export type UpsertProviderLinkInput =
 export async function getReleasesForProfile(
   creatorProfileId: string
 ): Promise<ReleaseWithProviders[]> {
+  if (!(await hasDiscogReleasesTable())) {
+    return [];
+  }
+
   // Fetch releases
   const releases = await db
     .select()
@@ -81,6 +97,13 @@ export async function getReleasesForProfile(
 
   if (releases.length === 0) {
     return [];
+  }
+
+  if (!(await hasProviderLinksTable())) {
+    return releases.map(release => ({
+      ...release,
+      providerLinks: [],
+    }));
   }
 
   // Fetch all provider links for these releases
@@ -124,6 +147,10 @@ export async function getReleaseBySlug(
   creatorProfileId: string,
   slug: string
 ): Promise<ReleaseWithProviders | null> {
+  if (!(await hasDiscogReleasesTable())) {
+    return null;
+  }
+
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -137,6 +164,13 @@ export async function getReleaseBySlug(
 
   if (!release) {
     return null;
+  }
+
+  if (!(await hasProviderLinksTable())) {
+    return {
+      ...release,
+      providerLinks: [],
+    };
   }
 
   // Fetch provider links for this release
@@ -162,6 +196,10 @@ export async function getReleaseBySlug(
 export async function getReleaseById(
   releaseId: string
 ): Promise<ReleaseWithProviders | null> {
+  if (!(await hasDiscogReleasesTable())) {
+    return null;
+  }
+
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -170,6 +208,13 @@ export async function getReleaseById(
 
   if (!release) {
     return null;
+  }
+
+  if (!(await hasProviderLinksTable())) {
+    return {
+      ...release,
+      providerLinks: [],
+    };
   }
 
   // Fetch provider links for this release
@@ -426,6 +471,10 @@ export async function upsertTrack(input: {
 export async function getTracksForRelease(
   releaseId: string
 ): Promise<(typeof discogTracks.$inferSelect)[]> {
+  if (!(await hasDiscogTracksTable())) {
+    return [];
+  }
+
   return db
     .select()
     .from(discogTracks)
