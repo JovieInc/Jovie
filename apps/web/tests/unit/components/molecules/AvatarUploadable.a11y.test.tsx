@@ -16,15 +16,17 @@ import {
 
 describe('AvatarUploadable - Accessibility', () => {
   const { mockOnUpload } = createMockCallbacks();
+  let restoreUrlMocks: (() => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    setupUrlMocks();
+    restoreUrlMocks = setupUrlMocks();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreUrlMocks?.();
   });
 
   it('has proper ARIA labels and roles', () => {

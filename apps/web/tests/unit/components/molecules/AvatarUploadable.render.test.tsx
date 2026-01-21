@@ -14,14 +14,17 @@ import {
 } from './AvatarUploadable.test-utils';
 
 describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
+  let restoreUrlMocks: (() => void) | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    setupUrlMocks();
+    restoreUrlMocks = setupUrlMocks();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreUrlMocks?.();
   });
 
   it('renders as regular avatar when uploadable is false', () => {

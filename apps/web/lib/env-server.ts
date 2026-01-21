@@ -9,32 +9,46 @@ import { RUNTIME_VALIDATION_RULES } from './env-validation-rules';
 // The `server-only` import above enforces that constraint at build time.
 
 /**
- * Extract environment variables from process.env based on ENV_KEYS.
- * Eliminates duplication by programmatically building the object.
+ * Resolve the current server env snapshot from `process.env`.
+ *
+ * Note: we intentionally resolve values at call time (not module load time) so
+ * test suites can safely mutate `process.env` between tests.
  */
-const rawServerEnv = Object.fromEntries(
-  ENV_KEYS.map(key => [key, process.env[key]])
-) as Record<keyof z.infer<typeof ServerEnvSchema>, string | undefined>;
+type ServerEnv = Record<
+  keyof z.infer<typeof ServerEnvSchema>,
+  string | undefined
+>;
 
-const parsed = ServerEnvSchema.safeParse(rawServerEnv);
+function getRawServerEnv(): ServerEnv {
+  return Object.fromEntries(
+    ENV_KEYS.map(key => [key, process.env[key]])
+  ) as ServerEnv;
+}
 
-if (!parsed.success && process.env.NODE_ENV === 'development') {
+const parsedAtLoad = ServerEnvSchema.safeParse(getRawServerEnv());
+
+if (!parsedAtLoad.success && process.env.NODE_ENV === 'development') {
   console.warn(
     '[env-server] Validation issues:',
-    parsed.error.flatten().fieldErrors
+    parsedAtLoad.error.flatten().fieldErrors
   );
 }
 
 /**
- * Build environment object with fallback to process.env on validation failure.
- * Eliminates duplication by programmatically constructing the export object.
+ * Dynamic environment proxy.
+ *
+ * Reads values from `process.env` at access time to keep runtime and tests in sync.
  */
-export const env = Object.fromEntries(
-  ENV_KEYS.map(key => [
-    key,
-    parsed.success ? parsed.data[key] : process.env[key],
-  ])
-) as Record<keyof z.infer<typeof ServerEnvSchema>, string | undefined>;
+const ENV_KEY_SET = new Set<string>(ENV_KEYS as unknown as readonly string[]);
+
+export const env = new Proxy({} as ServerEnv, {
+  get: (_target, prop) => {
+    if (typeof prop !== 'string') return undefined;
+    if (!ENV_KEY_SET.has(prop)) return undefined;
+    if (prop === 'NODE_ENV') return process.env.NODE_ENV ?? 'development';
+    return process.env[prop];
+  },
+}) as ServerEnv;
 
 // Environment validation utilities
 export interface EnvironmentValidationResult {
@@ -115,6 +129,7 @@ function runRuntimeValidations(
 export function validateEnvironment(
   context: 'runtime' | 'build' = 'runtime'
 ): EnvironmentValidationResult {
+  const rawServerEnv = getRawServerEnv();
   const result = ServerEnvSchema.safeParse(rawServerEnv);
   const schemaIssues = processSchemaErrors(result, context);
 

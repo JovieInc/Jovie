@@ -150,7 +150,7 @@ function fixDomainMisspellings(url: string): string {
  */
 function fixMissingDots(url: string): string {
   for (const [pattern, replacement] of DOT_FIX_PATTERNS) {
-    url = url.replaceAll(pattern, replacement);
+    url = url.replace(pattern, replacement);
   }
   return url;
 }

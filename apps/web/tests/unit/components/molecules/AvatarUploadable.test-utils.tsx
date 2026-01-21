@@ -57,9 +57,36 @@ export function createMockCallbacks() {
  * Setup URL mocks for blob preview
  */
 export function setupUrlMocks() {
-  // @ts-expect-error partial URL mock
-  global.URL = {
-    createObjectURL: vi.fn(() => 'blob:preview'),
-    revokeObjectURL: vi.fn(),
+  // Don't replace `global.URL` (Next.js uses it as a constructor). Only stub
+  // the static methods used by blob preview logic, and return a cleanup fn.
+  const originalCreateObjectURL = global.URL?.createObjectURL;
+  const originalRevokeObjectURL = global.URL?.revokeObjectURL;
+
+  Object.defineProperty(global.URL, 'createObjectURL', {
+    value: vi.fn(() => 'blob:preview'),
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(global.URL, 'revokeObjectURL', {
+    value: vi.fn(),
+    configurable: true,
+    writable: true,
+  });
+
+  return () => {
+    if (originalCreateObjectURL) {
+      Object.defineProperty(global.URL, 'createObjectURL', {
+        value: originalCreateObjectURL,
+        configurable: true,
+        writable: true,
+      });
+    }
+    if (originalRevokeObjectURL) {
+      Object.defineProperty(global.URL, 'revokeObjectURL', {
+        value: originalRevokeObjectURL,
+        configurable: true,
+        writable: true,
+      });
+    }
   };
 }

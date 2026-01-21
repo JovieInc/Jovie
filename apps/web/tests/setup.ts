@@ -5,6 +5,17 @@ import { afterEach, expect, vi } from 'vitest';
 
 expect.extend(matchers);
 
+// Provide baseline env vars for unit tests. These are intentionally lightweight
+// defaults that keep server-only helpers from failing fast when environment
+// variables aren't configured in the test runtime.
+process.env.VITEST ??= 'true';
+(process.env as Record<string, string | undefined>).NODE_ENV = 'test';
+process.env.URL_ENCRYPTION_KEY ??= 'test-encryption-key-32-chars!!';
+process.env.STRIPE_PRICE_STANDARD_MONTHLY ??= 'price_pro_monthly';
+process.env.STRIPE_PRICE_STANDARD_YEARLY ??= 'price_pro_yearly';
+process.env.STRIPE_PRICE_INTRO_MONTHLY ??= 'price_pro';
+process.env.STRIPE_PRICE_INTRO_YEARLY ??= 'price_pro_yearly';
+
 // Mock React's cache function globally for all tests
 // React cache() is used in server components but doesn't work in test environment
 // We mock it to pass through the function unchanged
@@ -15,6 +26,9 @@ vi.mock('react', async () => {
     cache: (fn: (...args: unknown[]) => unknown) => fn,
   };
 });
+
+// `server-only` throws when imported in non-Next runtimes; tests should noop it.
+vi.mock('server-only', () => ({}));
 
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {

@@ -17,15 +17,17 @@ import {
 
 describe('AvatarUploadable - Progress States', () => {
   const { mockOnUpload, mockOnSuccess, mockOnError } = createMockCallbacks();
+  let restoreUrlMocks: (() => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    setupUrlMocks();
+    restoreUrlMocks = setupUrlMocks();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreUrlMocks?.();
   });
 
   it('shows progress ring during upload', async () => {
