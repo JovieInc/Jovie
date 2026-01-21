@@ -2,20 +2,24 @@
  * Customer Sync Tests - Edge Cases, Constants, & Type Exports
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import module once after mocks are set up
-import {
-  BILLING_FIELDS_CUSTOMER,
-  BILLING_FIELDS_FULL,
-  BILLING_FIELDS_STATUS,
-  fetchUserBillingData,
-} from '@/lib/stripe/customer-sync';
 import { mockDbSelect } from './customer-sync.test-utils';
 
-describe('fetchUserBillingData - Edge Cases', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+let fetchUserBillingData: typeof import('@/lib/stripe/customer-sync').fetchUserBillingData;
+let BILLING_FIELDS_CUSTOMER: typeof import('@/lib/stripe/customer-sync').BILLING_FIELDS_CUSTOMER;
+let BILLING_FIELDS_FULL: typeof import('@/lib/stripe/customer-sync').BILLING_FIELDS_FULL;
+let BILLING_FIELDS_STATUS: typeof import('@/lib/stripe/customer-sync').BILLING_FIELDS_STATUS;
 
+beforeEach(async () => {
+  vi.clearAllMocks();
+  ({
+    BILLING_FIELDS_CUSTOMER,
+    BILLING_FIELDS_FULL,
+    BILLING_FIELDS_STATUS,
+    fetchUserBillingData,
+  } = await import('@/lib/stripe/customer-sync'));
+});
+
+describe('fetchUserBillingData - Edge Cases', () => {
   describe('edge cases', () => {
     it('handles null email correctly', async () => {
       const mockUser = {

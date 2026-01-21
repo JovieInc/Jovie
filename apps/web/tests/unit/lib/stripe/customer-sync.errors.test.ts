@@ -2,19 +2,20 @@
  * Customer Sync Tests - User Not Found & Database Error Handling
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import module once after mocks are set up
-import {
-  BILLING_FIELDS_STATUS,
-  fetchUserBillingData,
-} from '@/lib/stripe/customer-sync';
 import {
   mockCaptureCriticalError,
   mockDbSelect,
 } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Errors', () => {
-  beforeEach(() => {
+  let fetchUserBillingData: typeof import('@/lib/stripe/customer-sync').fetchUserBillingData;
+  let BILLING_FIELDS_STATUS: typeof import('@/lib/stripe/customer-sync').BILLING_FIELDS_STATUS;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    ({ BILLING_FIELDS_STATUS, fetchUserBillingData } = await import(
+      '@/lib/stripe/customer-sync'
+    ));
   });
 
   describe('user not found', () => {

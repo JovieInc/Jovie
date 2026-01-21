@@ -2,16 +2,17 @@
  * Customer Sync Tests - Migration Fallback Behavior
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import module once after mocks are set up
-import {
-  BILLING_FIELDS_STATUS,
-  fetchUserBillingData,
-} from '@/lib/stripe/customer-sync';
 import { mockDbSelect } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Migration Fallback', () => {
-  beforeEach(() => {
+  let fetchUserBillingData: typeof import('@/lib/stripe/customer-sync').fetchUserBillingData;
+  let BILLING_FIELDS_STATUS: typeof import('@/lib/stripe/customer-sync').BILLING_FIELDS_STATUS;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    ({ BILLING_FIELDS_STATUS, fetchUserBillingData } = await import(
+      '@/lib/stripe/customer-sync'
+    ));
   });
 
   describe('migration fallback behavior', () => {
