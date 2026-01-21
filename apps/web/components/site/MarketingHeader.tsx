@@ -12,7 +12,6 @@
 import { usePathname } from 'next/navigation';
 import { Header } from '@/components/site/Header';
 import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
-import { cn } from '@/lib/utils';
 
 export interface MarketingHeaderProps {
   logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -32,12 +31,11 @@ export function MarketingHeader({
   const pathname = usePathname();
 
   // Use the shared throttled scroll hook
-  const { isScrolled } = useThrottledScroll({
+  // Note: _isScrolled available for future scroll-aware styling
+  const { isScrolled: _isScrolled } = useThrottledScroll({
     threshold: scrollThresholdPx,
     wait: PACER_TIMING.SCROLL_THROTTLE_MS,
   });
-
-  const showSolid = pathname !== '/' || isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';
   const hidePricingLink = pathname === '/';
 
@@ -49,12 +47,7 @@ export function MarketingHeader({
       hideNav={resolvedHideNav}
       hidePricingLink={hidePricingLink}
       containerSize='homepage'
-      className={cn(
-        'transition-colors duration-300 border-b',
-        showSolid
-          ? 'bg-[#08090a] border-subtle backdrop-blur'
-          : 'bg-transparent! border-transparent!'
-      )}
+      className='bg-base border-b border-subtle'
     />
   );
 }

@@ -32,7 +32,7 @@ export default function CheckoutSuccessPage() {
 
         <div className='mt-8 flex justify-center'>
           <Button asChild>
-            <Link href='/app/dashboard'>Go to Dashboard</Link>
+            <Link href='/app'>Go to Dashboard</Link>
           </Button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+
 import { requireAdmin } from '@/lib/admin';
 import {
   endImpersonation,
@@ -11,6 +12,10 @@ import {
   startImpersonation,
 } from '@/lib/admin/impersonation';
 import { captureCriticalError } from '@/lib/error-tracking';
+import {
+  adminImpersonateLimiter,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
 const StartImpersonationSchema = z.object({
@@ -28,6 +33,28 @@ export async function GET() {
   // Require admin privileges
   const authError = await requireAdmin();
   if (authError) return authError;
+
+  // Apply rate limiting (5 attempts per hour per admin)
+  const { userId: adminClerkId } = await auth();
+  if (!adminClerkId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      {
+        error: 'Too many impersonation attempts. Please try again later.',
+        retryAfter: Math.ceil(
+          (rateLimitResult.reset.getTime() - Date.now()) / 1000
+        ),
+      },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimitResult),
+      }
+    );
+  }
 
   try {
     if (!isImpersonationEnabled()) {
@@ -87,6 +114,28 @@ export async function POST(request: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
+  // Apply rate limiting (5 attempts per hour per admin)
+  const { userId: adminClerkId } = await auth();
+  if (!adminClerkId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      {
+        error: 'Too many impersonation attempts. Please try again later.',
+        retryAfter: Math.ceil(
+          (rateLimitResult.reset.getTime() - Date.now()) / 1000
+        ),
+      },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimitResult),
+      }
+    );
+  }
+
   try {
     if (!isImpersonationEnabled()) {
       return NextResponse.json(
@@ -110,11 +159,6 @@ export async function POST(request: Request) {
     }
 
     const { targetClerkId } = validation.data;
-    const { userId: adminClerkId } = await auth();
-
-    if (!adminClerkId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    }
 
     // Get request metadata for audit logging
     const headersList = await headers();
@@ -166,6 +210,28 @@ export async function DELETE() {
   // Require admin privileges
   const authError = await requireAdmin();
   if (authError) return authError;
+
+  // Apply rate limiting (5 attempts per hour per admin)
+  const { userId: adminClerkId } = await auth();
+  if (!adminClerkId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      {
+        error: 'Too many impersonation attempts. Please try again later.',
+        retryAfter: Math.ceil(
+          (rateLimitResult.reset.getTime() - Date.now()) / 1000
+        ),
+      },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimitResult),
+      }
+    );
+  }
 
   try {
     // Get request metadata for audit logging

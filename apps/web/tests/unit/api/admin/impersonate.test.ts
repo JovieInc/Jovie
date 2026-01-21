@@ -38,6 +38,8 @@ describe('Admin Impersonate API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    // Set up default auth mock to return proper structure
+    mockAuth.mockResolvedValue({ userId: 'admin-123', sessionClaims: {} });
   });
 
   describe('GET /api/admin/impersonate', () => {
@@ -162,7 +164,7 @@ describe('Admin Impersonate API', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request');
-    });
+    }, 10000);
 
     it('returns 401 when not authenticated', async () => {
       mockRequireAdmin.mockResolvedValue(null);

@@ -61,7 +61,8 @@ import type {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
-const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F]/g;
+/** Matches C0 control characters (U+0000-U+001F) and DEL (U+007F) using Unicode property escapes */
+const CONTROL_CHAR_REGEX = /\p{Cc}/gu;
 
 const getHeader = (headers: Headers | undefined, key: string) =>
   headers?.get(key) ?? null;
@@ -73,14 +74,16 @@ const sanitizeCity = (raw: string | null | undefined) => {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  const cleaned = trimmed.replace(CONTROL_CHAR_REGEX, '').replace(/\s+/g, ' ');
+  const cleaned = trimmed
+    .replaceAll(CONTROL_CHAR_REGEX, '')
+    .replaceAll(/\s+/g, ' ');
   return cleaned || null;
 };
 
 const sanitizeCountryCode = (raw: string | null | undefined) => {
   if (!raw) return null;
   const trimmed = raw.trim().slice(0, 2).toUpperCase();
-  const normalized = trimmed.replace(/[^A-Z]/g, '');
+  const normalized = trimmed.replaceAll(/[^A-Z]/g, '');
   return normalized.length === 2 ? normalized : null;
 };
 

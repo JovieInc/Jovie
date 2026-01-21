@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useTransition } from 'react';
 import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
@@ -43,10 +43,17 @@ export interface AuthShellWrapperProps {
 /**
  * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
-function AuthShellWrapperInner({ children }: { children: ReactNode }) {
+function AuthShellWrapperInner({
+  persistSidebarCollapsed,
+  children,
+}: Readonly<{
+  persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
+  children: ReactNode;
+}>) {
   const config = useAuthRouteConfig();
   const pathname = usePathname();
   const headerActionsContext = useOptionalHeaderActions();
+  const [, startTransition] = useTransition();
 
   // TableMeta state for audience/creators tables
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -69,6 +76,17 @@ function AuthShellWrapperInner({ children }: { children: ReactNode }) {
       <PreviewToggleButton />
     ) : null);
 
+  // Header badge from context (shown after breadcrumb on left side)
+  const headerBadge = headerActionsContext?.headerBadge ?? null;
+
+  const onSidebarOpenChange = persistSidebarCollapsed
+    ? (open: boolean) => {
+        startTransition(() => {
+          void persistSidebarCollapsed(!open);
+        });
+      }
+    : undefined;
+
   return (
     <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
       <PreviewPanelProvider enabled={previewEnabled}>
@@ -76,11 +94,13 @@ function AuthShellWrapperInner({ children }: { children: ReactNode }) {
           section={config.section}
           navigation={config.navigation}
           breadcrumbs={config.breadcrumbs}
+          headerBadge={headerBadge}
           headerAction={headerAction}
           showMobileTabs={config.showMobileTabs}
           drawerContent={config.drawerContent}
           drawerWidth={config.drawerWidth ?? undefined}
           isTableRoute={config.isTableRoute}
+          onSidebarOpenChange={onSidebarOpenChange}
         >
           {children}
         </AuthShell>
@@ -103,10 +123,12 @@ function AuthShellWrapperInner({ children }: { children: ReactNode }) {
 export function AuthShellWrapper({
   persistSidebarCollapsed,
   children,
-}: AuthShellWrapperProps) {
+}: Readonly<AuthShellWrapperProps>) {
   return (
     <HeaderActionsProvider>
-      <AuthShellWrapperInner>{children}</AuthShellWrapperInner>
+      <AuthShellWrapperInner persistSidebarCollapsed={persistSidebarCollapsed}>
+        {children}
+      </AuthShellWrapperInner>
     </HeaderActionsProvider>
   );
 }

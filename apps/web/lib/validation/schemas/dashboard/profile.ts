@@ -6,7 +6,7 @@
 
 import { Buffer } from 'buffer';
 import { z } from 'zod';
-import { httpUrlSchema } from '../base';
+import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 
 /**
  * Profile settings validation schema.
@@ -140,8 +140,8 @@ export const profileUpdateSchema = z
       .optional(),
     /** Creator category type */
     creatorType: creatorTypeSchema.optional(),
-    /** Avatar image URL */
-    avatarUrl: httpUrlSchema.optional(),
+    /** Avatar image URL (SSRF-safe, blocks private/internal addresses) */
+    avatarUrl: safeHttpUrlSchema.optional(),
     /** Spotify profile URL */
     spotifyUrl: httpUrlSchema.optional(),
     /** Apple Music profile URL */

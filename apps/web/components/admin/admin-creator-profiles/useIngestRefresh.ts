@@ -7,7 +7,7 @@ import type { IngestRefreshStatus } from './types';
 
 interface UseIngestRefreshOptions {
   selectedId: string | null;
-  onRefreshComplete?: (profileId: string) => void;
+  onRefreshComplete?: (profileId: string) => void | Promise<void>;
 }
 
 interface UseIngestRefreshReturn {

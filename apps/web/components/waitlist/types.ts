@@ -18,6 +18,8 @@ export const WAITLIST_STORAGE_KEYS = {
   primarySocialUrl: 'waitlist_primary_social_url',
   spotifyUrl: 'waitlist_spotify_url',
   heardAbout: 'waitlist_heard_about',
+  submitted: 'waitlist_submitted',
+  userId: 'waitlist_user_id',
 } as const;
 
 export const SOCIAL_PLATFORM_OPTIONS: Array<{

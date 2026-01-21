@@ -8,7 +8,7 @@ import { LoadingSkeleton as Skeleton } from '@/components/molecules/LoadingSkele
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import { useCreator } from '@/hooks/useCreator';
 
-export function CreatorProfile({ username }: { username: string }) {
+export function CreatorProfile({ username }: Readonly<{ username: string }>) {
   const { creator, loading, error } = useCreator(username);
 
   if (loading) {

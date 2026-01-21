@@ -33,6 +33,62 @@ import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types';
 
 import type { DashboardData } from './actions';
+
+// ============================================================================
+// Breadcrumb Helper Functions (extracted to reduce cognitive complexity)
+// ============================================================================
+
+type BreadcrumbMode = 'dashboard' | 'admin' | 'settings';
+
+function determineBreadcrumbMode(
+  adminIndex: number,
+  settingsIndex: number
+): BreadcrumbMode {
+  if (settingsIndex >= 0) return 'settings';
+  if (adminIndex >= 0) return 'admin';
+  return 'dashboard';
+}
+
+function extractSubPaths(
+  parts: string[],
+  mode: BreadcrumbMode,
+  dashboardIndex: number,
+  adminIndex: number,
+  settingsIndex: number,
+  appIndex: number
+): string[] {
+  if (mode === 'dashboard' && dashboardIndex >= 0) {
+    return parts.slice(dashboardIndex + 1);
+  }
+  if (mode === 'admin' && adminIndex >= 0) {
+    return parts.slice(adminIndex + 1);
+  }
+  if (mode === 'settings' && settingsIndex >= 0) {
+    return parts.slice(settingsIndex + 1);
+  }
+  // Handle /app root - no sub-paths
+  if (mode === 'dashboard' && appIndex >= 0 && dashboardIndex < 0) {
+    return [];
+  }
+  return [];
+}
+
+function getBaseBreadcrumb(mode: BreadcrumbMode): DashboardBreadcrumbItem {
+  if (mode === 'admin') return { label: 'Admin', href: '/app/admin' };
+  if (mode === 'settings') return { label: 'Settings', href: '/app/settings' };
+  return { label: 'Dashboard', href: '/app' };
+}
+
+function getBasePath(mode: BreadcrumbMode): string {
+  if (mode === 'admin') return '/app/admin';
+  if (mode === 'settings') return '/app/settings';
+  return '/app/dashboard';
+}
+
+function toTitleCase(s: string): string {
+  return s.replaceAll('-', ' ').replaceAll(/\b\w/g, ch => ch.toUpperCase());
+}
+
 import {
   PreviewPanelProvider,
   usePreviewPanelContext,
@@ -100,57 +156,29 @@ export default function DashboardLayoutClient({
 
   // Build a simple breadcrumb from the current path
   const crumbs = useMemo(() => {
-    const parts = (pathname || '/app/dashboard').split('/').filter(Boolean);
+    const parts = (pathname || '/app').split('/').filter(Boolean);
     const dashboardIndex = parts.indexOf('dashboard');
     const adminIndex = parts.indexOf('admin');
     const settingsIndex = parts.indexOf('settings');
+    const appIndex = parts.indexOf('app');
 
-    // Determine the mode based on which section is active
-    const getMode = (): 'dashboard' | 'admin' | 'settings' => {
-      if (settingsIndex >= 0) return 'settings';
-      if (adminIndex >= 0) return 'admin';
-      return 'dashboard';
-    };
-    const mode = getMode();
-
-    // Extract sub-paths based on the current mode
-    const getSubPaths = (): string[] => {
-      if (mode === 'dashboard' && dashboardIndex >= 0) {
-        return parts.slice(dashboardIndex + 1);
-      }
-      if (mode === 'admin' && adminIndex >= 0) {
-        return parts.slice(adminIndex + 1);
-      }
-      if (mode === 'settings' && settingsIndex >= 0) {
-        return parts.slice(settingsIndex + 1);
-      }
-      return [];
-    };
-    const subs = getSubPaths();
-    const toTitle = (s: string): string =>
-      s.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
-
-    // Build base breadcrumb item based on mode
-    const getBaseBreadcrumb = (): DashboardBreadcrumbItem => {
-      if (mode === 'admin') return { label: 'Admin', href: '/app/admin' };
-      if (mode === 'settings')
-        return { label: 'Settings', href: '/app/settings' };
-      return { label: 'Dashboard', href: '/app/dashboard' };
-    };
-    const items: DashboardBreadcrumbItem[] = [getBaseBreadcrumb()];
+    const mode = determineBreadcrumbMode(adminIndex, settingsIndex);
+    const subs = extractSubPaths(
+      parts,
+      mode,
+      dashboardIndex,
+      adminIndex,
+      settingsIndex,
+      appIndex
+    );
+    const items: DashboardBreadcrumbItem[] = [getBaseBreadcrumb(mode)];
 
     if (subs.length > 0) {
-      // Build base path for accumulating breadcrumb URLs
-      const getBasePath = (): string => {
-        if (mode === 'admin') return '/app/admin';
-        if (mode === 'settings') return '/app/settings';
-        return '/app/dashboard';
-      };
-      let acc = getBasePath();
+      let acc = getBasePath(mode);
       subs.forEach((seg, i) => {
         acc += `/${seg}`;
         const isLast = i === subs.length - 1;
-        items.push({ label: toTitle(seg), href: isLast ? undefined : acc });
+        items.push({ label: toTitleCase(seg), href: isLast ? undefined : acc });
       });
     }
     return items;
@@ -174,28 +202,24 @@ export default function DashboardLayoutClient({
   // Sync with localStorage
   useEffect(() => {
     const serverValue = !(dashboardData.sidebarCollapsed ?? false);
+    const storageKey = 'dashboard.sidebarCollapsed';
+
     try {
-      const stored = localStorage.getItem('dashboard.sidebarCollapsed');
-      if (stored === null) {
-        localStorage.setItem(
-          'dashboard.sidebarCollapsed',
-          serverValue ? '0' : '1'
-        );
+      const stored = localStorage.getItem(storageKey);
+      const storedIsOpen = stored === '0';
+      const storageValue = serverValue ? '0' : '1';
+
+      // If no stored value or values differ, sync storage with server
+      if (stored === null || storedIsOpen !== serverValue) {
+        localStorage.setItem(storageKey, storageValue);
         setSidebarOpen(serverValue);
-      } else {
-        const storedBool = stored === '0';
-        if (storedBool !== serverValue) {
-          localStorage.setItem(
-            'dashboard.sidebarCollapsed',
-            serverValue ? '0' : '1'
-          );
-          setSidebarOpen(serverValue);
-        } else {
-          setSidebarOpen(storedBool);
-        }
+        return;
       }
+
+      // Use stored value
+      setSidebarOpen(storedIsOpen);
     } catch {
-      // ignore storage errors
+      // Ignore storage errors (private browsing, quota exceeded, etc.)
     }
   }, [dashboardData.sidebarCollapsed]);
 
@@ -205,7 +229,9 @@ export default function DashboardLayoutClient({
       <PendingClaimHandler />
 
       <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
+        <TableMetaContext.Provider
+          value={useMemo(() => ({ tableMeta, setTableMeta }), [tableMeta])}
+        >
           <DashboardLayoutInner
             crumbs={crumbs}
             useFullWidth={useFullWidth}

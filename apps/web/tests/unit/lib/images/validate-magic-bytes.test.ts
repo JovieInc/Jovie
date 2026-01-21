@@ -139,22 +139,98 @@ describe('validateMagicBytes', () => {
   });
 
   describe('HEIC/HEIF/AVIF validation', () => {
-    it('should skip validation for HEIC (complex container format)', () => {
-      // HEIC has complex container format, validated by Sharp
-      const anyBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-      expect(validateMagicBytes(anyBuffer, 'image/heic')).toBe(true);
-      expect(validateMagicBytes(anyBuffer, 'image/heif')).toBe(true);
-      expect(validateMagicBytes(anyBuffer, 'image/heic-sequence')).toBe(true);
-      expect(validateMagicBytes(anyBuffer, 'image/heif-sequence')).toBe(true);
-      expect(validateMagicBytes(anyBuffer, 'image/avif')).toBe(true);
+    it('should accept valid HEIC with proper ftyp box', () => {
+      // ftyp box: size (4) + "ftyp" (4) + brand (4) + minor_version (4)
+      const heicBuffer = Buffer.from([
+        0x00,
+        0x00,
+        0x00,
+        0x14, // size
+        0x66,
+        0x74,
+        0x79,
+        0x70, // "ftyp"
+        0x68,
+        0x65,
+        0x69,
+        0x63, // "heic" brand
+        0x00,
+        0x00,
+        0x00,
+        0x00, // minor version
+      ]);
+      expect(validateMagicBytes(heicBuffer, 'image/heic')).toBe(true);
+      expect(validateMagicBytes(heicBuffer, 'image/heic-sequence')).toBe(true);
+    });
+
+    it('should accept valid HEIF with proper ftyp box', () => {
+      const heifBuffer = Buffer.from([
+        0x00,
+        0x00,
+        0x00,
+        0x14,
+        0x66,
+        0x74,
+        0x79,
+        0x70, // "ftyp"
+        0x68,
+        0x65,
+        0x69,
+        0x66, // "heif" brand
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+      ]);
+      expect(validateMagicBytes(heifBuffer, 'image/heif')).toBe(true);
+      expect(validateMagicBytes(heifBuffer, 'image/heif-sequence')).toBe(true);
+    });
+
+    it('should accept valid AVIF with proper ftyp box', () => {
+      const avifBuffer = Buffer.from([
+        0x00,
+        0x00,
+        0x00,
+        0x14,
+        0x66,
+        0x74,
+        0x79,
+        0x70, // "ftyp"
+        0x61,
+        0x76,
+        0x69,
+        0x66, // "avif" brand
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+      ]);
+      expect(validateMagicBytes(avifBuffer, 'image/avif')).toBe(true);
+      expect(validateMagicBytes(avifBuffer, 'image/avif-sequence')).toBe(true);
+    });
+
+    it('should reject invalid ISOBMFF without proper ftyp box', () => {
+      const invalidBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+      expect(validateMagicBytes(invalidBuffer, 'image/heic')).toBe(false);
+      expect(validateMagicBytes(invalidBuffer, 'image/heif')).toBe(false);
+      expect(validateMagicBytes(invalidBuffer, 'image/avif')).toBe(false);
+      expect(validateMagicBytes(invalidBuffer, 'image/heic-sequence')).toBe(
+        false
+      );
+      expect(validateMagicBytes(invalidBuffer, 'image/heif-sequence')).toBe(
+        false
+      );
+      expect(validateMagicBytes(invalidBuffer, 'image/avif-sequence')).toBe(
+        false
+      );
     });
   });
 
   describe('Unknown MIME types', () => {
-    it('should skip validation for unknown MIME types', () => {
+    it('should reject unknown MIME types for security', () => {
       const anyBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-      expect(validateMagicBytes(anyBuffer, 'image/unknown')).toBe(true);
-      expect(validateMagicBytes(anyBuffer, 'application/pdf')).toBe(true);
+      expect(validateMagicBytes(anyBuffer, 'image/unknown')).toBe(false);
+      expect(validateMagicBytes(anyBuffer, 'application/pdf')).toBe(false);
     });
   });
 

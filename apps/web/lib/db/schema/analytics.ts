@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -59,9 +61,6 @@ export const audienceMembers = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
-    creatorProfileFingerprintIdx: index(
-      'audience_members_creator_profile_id_fingerprint_idx'
-    ).on(table.creatorProfileId, table.fingerprint),
     creatorProfileFingerprintUnique: uniqueIndex(
       'audience_members_creator_profile_id_fingerprint_unique'
     ).on(table.creatorProfileId, table.fingerprint),
@@ -108,6 +107,14 @@ export const clickEvents = pgTable(
   })
 );
 
+/**
+ * Fan notification preferences for release alerts
+ */
+export interface FanNotificationPreferences {
+  releasePreview?: boolean;
+  releaseDay?: boolean;
+}
+
 // Notification subscriptions table
 export const notificationSubscriptions = pgTable(
   'notification_subscriptions',
@@ -123,6 +130,14 @@ export const notificationSubscriptions = pgTable(
     city: text('city'),
     ipAddress: text('ip_address'),
     source: text('source'),
+    // Fan notification preferences for granular control
+    preferences: jsonb('preferences')
+      .$type<FanNotificationPreferences>()
+      .default({
+        releasePreview: true,
+        releaseDay: true,
+      }),
+    unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
@@ -132,6 +147,10 @@ export const notificationSubscriptions = pgTable(
     creatorProfilePhoneUnique: uniqueIndex(
       'notification_subscriptions_creator_profile_id_phone_unique'
     ).on(table.creatorProfileId, table.phone),
+    contactRequired: check(
+      'notification_subscriptions_contact_required',
+      sql`${table.email} IS NOT NULL OR ${table.phone} IS NOT NULL`
+    ),
   })
 );
 

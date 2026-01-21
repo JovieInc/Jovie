@@ -1,3 +1,0 @@
-CREATE INDEX "audience_members_creator_profile_id_fingerprint_idx" ON "audience_members" USING btree ("creator_profile_id","fingerprint");--> statement-breakpoint
-CREATE INDEX "click_events_creator_profile_id_created_at_idx" ON "click_events" USING btree ("creator_profile_id","created_at");--> statement-breakpoint
-CREATE INDEX "tips_creator_profile_id_idx" ON "tips" USING btree ("creator_profile_id");

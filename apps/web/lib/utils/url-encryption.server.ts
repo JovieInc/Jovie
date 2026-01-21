@@ -35,7 +35,7 @@ if (!isBuildTime && !ENCRYPTION_KEY) {
   if (vercelEnv === 'development') {
     console.warn(
       '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set. ' +
-        'URL encryption will use base64 fallback. Generate a secure key with: openssl rand -base64 32'
+        'URL encryption will fail in this environment. Generate a secure key with: openssl rand -base64 32'
     );
   }
 }
@@ -44,16 +44,10 @@ export function encryptUrl(url: string): EncryptionResult {
   const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
 
   if (!keyMaterial) {
-    console.warn(
-      '[url-encryption] Using base64 fallback due to missing encryption key'
+    throw new Error(
+      '[url-encryption] Cannot encrypt URL: encryption key not configured. ' +
+        'Set URL_ENCRYPTION_KEY environment variable.'
     );
-
-    return {
-      encrypted: Buffer.from(url).toString('base64'),
-      iv: '',
-      authTag: '',
-      salt: '',
-    };
   }
 
   try {
@@ -88,7 +82,15 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
       !encryptionResult.authTag ||
       !encryptionResult.salt
     ) {
-      return Buffer.from(encryptionResult.encrypted, 'base64').toString('utf8');
+      // Log warning for legacy unencrypted data and throw error
+      console.warn(
+        '[url-encryption] Attempted to decrypt legacy unencrypted URL data. ' +
+          'This data should be re-encrypted with proper encryption.'
+      );
+      throw new Error(
+        '[url-encryption] Cannot decrypt: missing encryption metadata (iv, authTag, or salt). ' +
+          'This may be legacy unencrypted data that needs migration.'
+      );
     }
 
     const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;

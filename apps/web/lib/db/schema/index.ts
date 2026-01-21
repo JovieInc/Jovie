@@ -18,6 +18,8 @@ export * from './auth';
 export * from './billing';
 // Content (Providers, Releases, Tracks)
 export * from './content';
+// DSP Enrichment (Cross-platform matches, enrichment data)
+export * from './dsp-enrichment';
 // Enums
 export * from './enums';
 // Ingestion
@@ -26,6 +28,8 @@ export * from './ingestion';
 export * from './links';
 // Creator Profiles
 export * from './profiles';
+// Suppression (Email Suppressions, Webhook Events, Delivery Logs)
+export * from './suppression';
 
 // Waitlist
 export * from './waitlist';

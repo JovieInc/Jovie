@@ -381,16 +381,41 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const entitlements = await getCurrentUserEntitlements();
-    if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
+    if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const fitScoreThreshold = Number(searchParams.get('threshold') ?? 50);
-    const limit = Math.min(Number(searchParams.get('limit') ?? 50), 100);
+    // Strict number parsing to prevent NaN and Infinity injection
+    const rawThreshold = searchParams.get('threshold');
+    const rawLimit = searchParams.get('limit');
+
+    const parsedThreshold = rawThreshold
+      ? Number.parseInt(rawThreshold, 10)
+      : 50;
+    const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+
+    // Validate parsed values are finite numbers within expected range
+    const fitScoreThreshold =
+      Number.isFinite(parsedThreshold) &&
+      parsedThreshold >= 0 &&
+      parsedThreshold <= 100
+        ? parsedThreshold
+        : 50;
+    const limit =
+      Number.isFinite(parsedLimit) && parsedLimit >= 1
+        ? Math.min(parsedLimit, 100)
+        : 50;
 
     // Get eligible profiles count and sample
     const eligibleProfiles = await db

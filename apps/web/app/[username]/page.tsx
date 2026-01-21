@@ -1,9 +1,12 @@
+import { type Metadata } from 'next';
 import { unstable_cache, unstable_noStore } from 'next/cache';
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
+import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
@@ -22,6 +25,82 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
+
+/**
+ * Generate JSON-LD structured data for artist profile SEO.
+ * Implements schema.org MusicGroup and BreadcrumbList schemas.
+ */
+function generateProfileStructuredData(
+  profile: CreatorProfile,
+  genres: string[] | null,
+  socialLinks: LegacySocialLink[]
+) {
+  const artistName = profile.display_name || profile.username;
+  const profileUrl = `${PROFILE_URL}/${profile.username}`;
+  const imageUrl = profile.avatar_url || `${PROFILE_URL}/og/default.png`;
+
+  // Extract social profile URLs for sameAs
+  const socialUrls = socialLinks
+    .filter(link =>
+      [
+        'instagram',
+        'twitter',
+        'facebook',
+        'youtube',
+        'tiktok',
+        'spotify',
+      ].includes(link.platform.toLowerCase())
+    )
+    .map(link => link.url);
+
+  // Add DSP profile URLs if available
+  if (profile.spotify_url) socialUrls.push(profile.spotify_url);
+  if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
+  if (profile.youtube_url) socialUrls.push(profile.youtube_url);
+
+  // Remove duplicates
+  const uniqueSocialUrls = [...new Set(socialUrls)];
+
+  const musicGroupSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'MusicGroup',
+    '@id': `${profileUrl}#musicgroup`,
+    name: artistName,
+    description: profile.bio || `Music by ${artistName}`,
+    url: profileUrl,
+    image: imageUrl,
+    sameAs: uniqueSocialUrls,
+    genre: genres && genres.length > 0 ? genres : ['Music'],
+    ...(profile.is_verified && {
+      additionalProperty: {
+        '@type': 'PropertyValue',
+        name: 'verified',
+        value: true,
+      },
+    }),
+  };
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: PROFILE_URL,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: artistName,
+        item: profileUrl,
+      },
+    ],
+  };
+
+  return { musicGroupSchema, breadcrumbSchema };
+}
 
 // Feature flag check timeout (ms) - don't block render for slow flag checks
 const FLAG_CHECK_TIMEOUT_MS = 100;
@@ -45,6 +124,7 @@ const fetchProfileAndLinks = async (
   contacts: DbCreatorContact[];
   creatorIsPro: boolean;
   creatorClerkId: string | null;
+  genres: string[] | null;
   status: 'ok' | 'not_found' | 'error';
 }> => {
   try {
@@ -57,6 +137,7 @@ const fetchProfileAndLinks = async (
         contacts: [],
         creatorIsPro: false,
         creatorClerkId: null,
+        genres: null,
         status: 'not_found',
       };
     }
@@ -116,6 +197,7 @@ const fetchProfileAndLinks = async (
       contacts,
       creatorIsPro,
       creatorClerkId,
+      genres: result.genres ?? null,
       status: 'ok',
     };
   } catch (error) {
@@ -126,6 +208,7 @@ const fetchProfileAndLinks = async (
       contacts: [],
       creatorIsPro: false,
       creatorClerkId: null,
+      genres: null,
       status: 'error',
     };
   }
@@ -206,10 +289,17 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   // via the StaticArtistPage component which reads cookies on hydration.
 
   const normalizedUsername = username.toLowerCase();
-  const { profile, links, contacts, status, creatorIsPro, creatorClerkId } =
-    await getProfileAndLinks(normalizedUsername, {
-      forceNoStore: Boolean(claimTokenParam),
-    });
+  const {
+    profile,
+    links,
+    contacts,
+    genres,
+    status,
+    creatorIsPro,
+    creatorClerkId,
+  } = await getProfileAndLinks(normalizedUsername, {
+    forceNoStore: Boolean(claimTokenParam),
+  });
 
   if (status === 'error') {
     return (
@@ -284,8 +374,32 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     }
   }
 
+  // Generate structured data for SEO
+  const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
+    profile,
+    genres,
+    socialLinks
+  );
+
   return (
     <>
+      {/* JSON-LD Structured Data for SEO */}
+      <Script
+        id='musicgroup-schema'
+        type='application/ld+json'
+        strategy='afterInteractive'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(musicGroupSchema) }}
+      />
+      <Script
+        id='breadcrumb-schema'
+        type='application/ld+json'
+        strategy='afterInteractive'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+
+      <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       {showClaimBanner && (
         <ClaimBanner
           claimToken={claimTokenParam!}
@@ -308,10 +422,10 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   );
 }
 
-// Generate metadata for the page
-export async function generateMetadata({ params }: Props) {
+// Generate metadata for the page with comprehensive SEO
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-  const { profile, status } = await getProfileAndLinks(username);
+  const { profile, genres, status } = await getProfileAndLinks(username);
 
   if (status === 'error') {
     return {
@@ -327,40 +441,101 @@ export async function generateMetadata({ params }: Props) {
     };
   }
 
-  const title = `${profile.display_name || profile.username} - Artist Profile`;
-  const description = profile.bio
-    ? `${profile.bio.slice(0, 160)}${profile.bio.length > 160 ? '...' : ''}`
-    : `Check out ${profile.display_name || profile.username}'s artist profile on Jovie.`;
-
+  const artistName = profile.display_name || profile.username;
   const profileUrl = `${PROFILE_URL}/${profile.username}`;
+
+  // Build SEO-optimized title with genre context if available
+  const genreContext =
+    genres && genres.length > 0
+      ? ` | ${genres.slice(0, 2).join(', ')} Artist`
+      : '';
+  const title = `${artistName}${genreContext} - Music & Links`;
+
+  // Build rich description with bio and genre information
+  const bioSnippet = profile.bio
+    ? profile.bio.slice(0, 120).trim()
+    : `Discover ${artistName}'s music`;
+  const genreText =
+    genres && genres.length > 0
+      ? `. ${genres.slice(0, 3).join(', ')} artist`
+      : '';
+  const description = `${bioSnippet}${profile.bio && profile.bio.length > 120 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more.`;
+
+  // Build dynamic keywords based on artist data
+  const baseKeywords = [
+    artistName,
+    `${artistName} music`,
+    `${artistName} songs`,
+    `${artistName} artist`,
+    'music artist',
+    'streaming links',
+    'spotify',
+    'apple music',
+  ];
+  const genreKeywords = genres?.slice(0, 5) ?? [];
+  const keywords = [...baseKeywords, ...genreKeywords];
 
   return {
     title,
     description,
+    keywords,
+    authors: [{ name: artistName }],
+    creator: artistName,
     metadataBase: new URL(PROFILE_URL),
     alternates: {
       canonical: profileUrl,
     },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     openGraph: {
-      title,
+      type: 'profile',
+      title: `${artistName} - Artist Profile`,
       description,
       url: profileUrl,
+      siteName: 'Jovie',
+      locale: 'en_US',
       images: profile.avatar_url
         ? [
             {
               url: profile.avatar_url,
               width: 400,
               height: 400,
-              alt: `${profile.display_name || profile.username} profile picture`,
+              alt: `${artistName} profile picture`,
             },
           ]
         : undefined,
     },
     twitter: {
-      card: 'summary',
-      title,
+      card: 'summary_large_image',
+      title: `${artistName} - Artist Profile`,
       description,
-      images: profile.avatar_url ? [profile.avatar_url] : undefined,
+      creator: '@jovieapp',
+      site: '@jovieapp',
+      images: profile.avatar_url
+        ? [
+            {
+              url: profile.avatar_url,
+              alt: `${artistName} profile picture`,
+            },
+          ]
+        : undefined,
+    },
+    other: {
+      'music:musician': artistName,
+      ...(genres &&
+        genres.length > 0 && {
+          'music:genre': genres.slice(0, 3).join(', '),
+        }),
+      ...(profile.is_verified && { 'profile:verified': 'true' }),
     },
   };
 }

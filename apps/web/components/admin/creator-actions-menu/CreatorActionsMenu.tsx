@@ -24,12 +24,6 @@ import {
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
 
-import {
-  geistTableMenuContentClass,
-  geistTableMenuDestructiveItemClass,
-  geistTableMenuItemClass,
-  geistTableMenuSeparatorClass,
-} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { CreatorActionsMenuProps } from './types';
@@ -91,30 +85,20 @@ export function CreatorActionsMenu({
               <MoreVertical className='h-4 w-4' />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align='end'
-            sideOffset={8}
-            className={geistTableMenuContentClass}
-          >
+          <DropdownMenuContent align='end' sideOffset={8}>
             {onRefreshIngest ? (
               <>
                 <DropdownMenuItem
                   onClick={onRefreshIngest}
-                  className={geistTableMenuItemClass}
                   disabled={isLoading}
                 >
                   <RefreshCw className='h-4 w-4' />
                   Refresh ingest
                 </DropdownMenuItem>
-                <DropdownMenuSeparator
-                  className={geistTableMenuSeparatorClass}
-                />
+                <DropdownMenuSeparator />
               </>
             ) : null}
-            <DropdownMenuItem
-              onClick={onToggleVerification}
-              className={geistTableMenuItemClass}
-            >
+            <DropdownMenuItem onClick={onToggleVerification}>
               {profile.isVerified ? (
                 <>
                   <X className='h-4 w-4' />
@@ -128,10 +112,7 @@ export function CreatorActionsMenu({
               )}
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-              onClick={onToggleFeatured}
-              className={geistTableMenuItemClass}
-            >
+            <DropdownMenuItem onClick={onToggleFeatured}>
               <Star
                 className={cn(
                   'h-4 w-4',
@@ -141,12 +122,9 @@ export function CreatorActionsMenu({
               {profile.isFeatured ? 'Unfeature' : 'Feature'}
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+            <DropdownMenuSeparator />
 
-            <DropdownMenuItem
-              onClick={onToggleMarketing}
-              className={geistTableMenuItemClass}
-            >
+            <DropdownMenuItem onClick={onToggleMarketing}>
               {profile.marketingOptOut ? (
                 <>
                   <Mail className='h-4 w-4' />
@@ -160,7 +138,7 @@ export function CreatorActionsMenu({
               )}
             </DropdownMenuItem>
 
-            <DropdownMenuItem asChild className={geistTableMenuItemClass}>
+            <DropdownMenuItem asChild>
               <Link
                 href={`/${profile.username}`}
                 target='_blank'
@@ -174,18 +152,12 @@ export function CreatorActionsMenu({
 
             {!profile.isClaimed && profile.claimToken && (
               <>
-                <DropdownMenuItem
-                  onClick={handleCopyClaimLink}
-                  className={geistTableMenuItemClass}
-                >
+                <DropdownMenuItem onClick={handleCopyClaimLink}>
                   <Copy className='h-4 w-4' />
                   {copySuccess ? 'Copied!' : 'Copy claim link'}
                 </DropdownMenuItem>
                 {onSendInvite && (
-                  <DropdownMenuItem
-                    onClick={onSendInvite}
-                    className={geistTableMenuItemClass}
-                  >
+                  <DropdownMenuItem onClick={onSendInvite}>
                     <Send className='h-4 w-4' />
                     Send invite
                   </DropdownMenuItem>
@@ -193,13 +165,10 @@ export function CreatorActionsMenu({
               </>
             )}
 
-            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={onDelete}
-              className={cn(
-                geistTableMenuItemClass,
-                geistTableMenuDestructiveItemClass
-              )}
+              className='text-destructive hover:text-destructive hover:bg-destructive/10 data-highlighted:text-destructive data-highlighted:bg-destructive/10 [&_svg]:text-destructive'
             >
               <Trash2 className='h-4 w-4' />
               {profile.isClaimed ? 'Delete user' : 'Delete creator'}
@@ -224,28 +193,17 @@ export function CreatorActionsMenu({
           <MoreVertical className='h-4 w-4 ml-1' />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align='end'
-        sideOffset={8}
-        className={cn('w-56', geistTableMenuContentClass)}
-      >
+      <DropdownMenuContent align='end' sideOffset={8} className='w-56'>
         {onRefreshIngest ? (
           <>
-            <DropdownMenuItem
-              onClick={onRefreshIngest}
-              className={geistTableMenuItemClass}
-              disabled={isLoading}
-            >
+            <DropdownMenuItem onClick={onRefreshIngest} disabled={isLoading}>
               <RefreshCw className='h-4 w-4' />
               Refresh ingest
             </DropdownMenuItem>
-            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+            <DropdownMenuSeparator />
           </>
         ) : null}
-        <DropdownMenuItem
-          onClick={onToggleVerification}
-          className={geistTableMenuItemClass}
-        >
+        <DropdownMenuItem onClick={onToggleVerification}>
           {profile.isVerified ? (
             <>
               <X className='h-4 w-4' />
@@ -259,10 +217,7 @@ export function CreatorActionsMenu({
           )}
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          onClick={onToggleFeatured}
-          className={geistTableMenuItemClass}
-        >
+        <DropdownMenuItem onClick={onToggleFeatured}>
           <Star
             className={cn(
               'h-4 w-4',
@@ -272,10 +227,7 @@ export function CreatorActionsMenu({
           {profile.isFeatured ? 'Unfeature' : 'Feature'}
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          onClick={onToggleMarketing}
-          className={geistTableMenuItemClass}
-        >
+        <DropdownMenuItem onClick={onToggleMarketing}>
           {profile.marketingOptOut ? (
             <>
               <Mail className='h-4 w-4' />
@@ -289,9 +241,9 @@ export function CreatorActionsMenu({
           )}
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+        <DropdownMenuSeparator />
 
-        <DropdownMenuItem asChild className={geistTableMenuItemClass}>
+        <DropdownMenuItem asChild>
           <Link
             href={`/${profile.username}`}
             target='_blank'
@@ -305,19 +257,13 @@ export function CreatorActionsMenu({
 
         {!profile.isClaimed && profile.claimToken && (
           <>
-            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
-            <DropdownMenuItem
-              onClick={handleCopyClaimLink}
-              className={geistTableMenuItemClass}
-            >
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleCopyClaimLink}>
               <Copy className='h-4 w-4' />
               {copySuccess ? 'Copied!' : 'Copy claim link'}
             </DropdownMenuItem>
             {onSendInvite && (
-              <DropdownMenuItem
-                onClick={onSendInvite}
-                className={geistTableMenuItemClass}
-              >
+              <DropdownMenuItem onClick={onSendInvite}>
                 <Send className='h-4 w-4' />
                 Send invite
               </DropdownMenuItem>
@@ -325,14 +271,11 @@ export function CreatorActionsMenu({
           </>
         )}
 
-        <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+        <DropdownMenuSeparator />
 
         <DropdownMenuItem
           onClick={onDelete}
-          className={cn(
-            geistTableMenuItemClass,
-            geistTableMenuDestructiveItemClass
-          )}
+          className='text-destructive hover:text-destructive hover:bg-destructive/10 data-highlighted:text-destructive data-highlighted:bg-destructive/10 [&_svg]:text-destructive'
         >
           <Trash2 className='h-4 w-4' />
           {profile.isClaimed ? 'Delete user' : 'Delete creator'}

@@ -112,6 +112,38 @@ export const queryKeys = {
     list: (profileId: string) =>
       [...queryKeys.suggestions.all, 'list', profileId] as const,
   },
+
+  // DSP enrichment queries
+  dspEnrichment: {
+    all: ['dsp-enrichment'] as const,
+    matches: (profileId: string, status?: string) =>
+      [
+        ...queryKeys.dspEnrichment.all,
+        'matches',
+        profileId,
+        status ?? 'all',
+      ] as const,
+    matchDetail: (matchId: string) =>
+      [...queryKeys.dspEnrichment.all, 'match', matchId] as const,
+    status: (profileId: string) =>
+      [...queryKeys.dspEnrichment.all, 'status', profileId] as const,
+    providerData: (profileId: string, providerId: string) =>
+      [
+        ...queryKeys.dspEnrichment.all,
+        'provider',
+        profileId,
+        providerId,
+      ] as const,
+  },
+
+  // Releases queries
+  releases: {
+    all: ['releases'] as const,
+    matrix: (profileId: string) =>
+      [...queryKeys.releases.all, 'matrix', profileId] as const,
+    dspStatus: (releaseId: string) =>
+      [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

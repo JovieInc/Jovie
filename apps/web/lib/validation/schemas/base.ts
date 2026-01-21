@@ -64,12 +64,95 @@ const hasSafeHttpProtocol = (value: string): boolean => {
  * HTTP URL validation schema.
  * Validates that a string is a properly formatted URL with http or https protocol.
  * Includes trimming, max length validation, and protocol verification.
+ *
+ * NOTE: This schema only validates protocol. For SSRF-safe URLs (e.g., avatar URLs),
+ * use safeHttpUrlSchema which also blocks private/internal IPs.
  */
 export const httpUrlSchema = z
   .string()
   .trim()
   .max(2048)
   .refine(hasSafeHttpProtocol, 'URL must start with http or https');
+
+/**
+ * Private IP patterns for SSRF protection.
+ * Covers both IPv4 and IPv6 private/internal address ranges.
+ */
+const PRIVATE_IP_PATTERNS = [
+  // IPv4 patterns
+  /^127\./, // Loopback (127.0.0.0/8)
+  /^10\./, // Class A private (10.0.0.0/8)
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private (172.16.0.0/12)
+  /^192\.168\./, // Class C private (192.168.0.0/16)
+  /^169\.254\./, // Link-local (169.254.0.0/16)
+  /^0\./, // Current network (0.0.0.0/8)
+  // IPv6 patterns
+  /^::1$/, // IPv6 loopback
+  /^fe80:/i, // IPv6 link-local (fe80::/10)
+  /^fc[0-9a-f]{2}:/i, // IPv6 unique local fc00::/7 (fc00::/8)
+  /^fd[0-9a-f]{2}:/i, // IPv6 unique local fc00::/7 (fd00::/8)
+  /^\[::1\]$/, // IPv6 loopback in bracket notation
+  /^\[fe80:/i, // IPv6 link-local in bracket notation
+  /^\[fc[0-9a-f]{2}:/i, // IPv6 unique local in bracket notation
+  /^\[fd[0-9a-f]{2}:/i, // IPv6 unique local in bracket notation
+];
+
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  '127.0.0.1',
+  '::1',
+]);
+
+/**
+ * Validates a URL is safe from SSRF attacks by checking for private IPs and internal hosts.
+ */
+const isSsrfSafeUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+
+    // Block known internal hostnames
+    if (BLOCKED_HOSTNAMES.has(hostname)) {
+      return false;
+    }
+
+    // Block private IP addresses
+    if (PRIVATE_IP_PATTERNS.some(pattern => pattern.test(hostname))) {
+      return false;
+    }
+
+    // Block internal domain suffixes
+    if (
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.localhost')
+    ) {
+      return false;
+    }
+
+    // Block cloud metadata endpoints
+    if (hostname === '169.254.169.254' || hostname.includes('metadata')) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * SSRF-safe HTTP URL validation schema.
+ * Validates URL format, protocol, AND blocks private/internal addresses.
+ * Use this for any URL that will be fetched server-side (e.g., avatar URLs).
+ */
+export const safeHttpUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(hasSafeHttpProtocol, 'URL must start with http or https')
+  .refine(isSsrfSafeUrl, 'URL must not point to internal or private addresses');
 
 /**
  * Generic metadata schema for extensible key-value pairs.

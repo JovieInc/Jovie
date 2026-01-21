@@ -28,7 +28,7 @@ export function AccessibleStepWrapper({
   totalSteps,
   stepTitle,
   children,
-}: AccessibleStepWrapperProps) {
+}: Readonly<AccessibleStepWrapperProps>) {
   return (
     <div>
       {/* Screen reader only announcement */}

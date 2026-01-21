@@ -7,6 +7,11 @@ interface MetricsChartClientProps {
   points: AdminUsagePoint[];
 }
 
+const METRICS_CHART_LOADING_CARD_KEYS = Array.from(
+  { length: 3 },
+  (_, i) => `metrics-loading-card-${i + 1}`
+);
+
 /**
  * Client-side wrapper for MetricsChart with lazy-loaded Recharts.
  *
@@ -30,8 +35,8 @@ const MetricsChartImpl = dynamic(
         </div>
         <div className='h-64 animate-pulse rounded-lg bg-surface-1' />
         <div className='grid gap-4 sm:grid-cols-3'>
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className='space-y-2'>
+          {METRICS_CHART_LOADING_CARD_KEYS.map(key => (
+            <div key={key} className='space-y-2'>
               <div className='h-3 w-20 animate-pulse rounded bg-surface-1' />
               <div className='h-8 w-16 animate-pulse rounded bg-surface-1' />
             </div>

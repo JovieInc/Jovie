@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -19,7 +20,7 @@ const NO_STORE_HEADERS = {
  * Security Measures Implemented:
  * 1. Rate limiting: 30 checks per IP per minute (Redis-backed with in-memory fallback)
  * 2. Constant-time responses: All responses padded to ~100ms to prevent timing attacks
- * 3. Random delay injection: ±10ms jitter to prevent statistical analysis
+ * 3. Cryptographically secure random jitter: ±10ms jitter to prevent statistical analysis
  *
  * This prevents:
  * - Username enumeration attacks
@@ -32,12 +33,22 @@ const TARGET_RESPONSE_TIME_MS = 100;
 const RESPONSE_JITTER_MS = 10;
 
 /**
+ * Generate cryptographically secure random jitter.
+ * Returns a value between -RESPONSE_JITTER_MS and +RESPONSE_JITTER_MS.
+ */
+function getSecureJitter(): number {
+  // crypto.randomInt generates integers in range [min, max)
+  // We want -10 to +10, so generate 0-20 and subtract 10
+  return crypto.randomInt(0, RESPONSE_JITTER_MS * 2 + 1) - RESPONSE_JITTER_MS;
+}
+
+/**
  * Calculate delay needed to reach constant response time.
- * Adds random jitter to prevent statistical analysis.
+ * Uses cryptographically secure random jitter to prevent statistical analysis.
  */
 function calculateConstantTimeDelay(startTime: number): number {
   const elapsed = Date.now() - startTime;
-  const jitter = Math.random() * RESPONSE_JITTER_MS * 2 - RESPONSE_JITTER_MS;
+  const jitter = getSecureJitter();
   const targetTime = TARGET_RESPONSE_TIME_MS + jitter;
   return Math.max(0, targetTime - elapsed);
 }

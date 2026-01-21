@@ -1,4 +1,0 @@
-- [x] Make migrations idempotent to avoid failures on existing tables/enums (click_events, audience_members, enums).
-- [x] Update migration files to use IF NOT EXISTS / conditional guards and safe enum handling.
-- [ ] Ensure future migrations follow the same pattern (avoid CREATE TABLE without guard).
-- [x] Re-run migrations after updates (dev/empty DB acceptable).

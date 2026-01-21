@@ -11,6 +11,43 @@ export interface ErrorMappingResult {
 }
 
 /**
+ * Extracts error message from various error types.
+ *
+ * Server action errors in Next.js are serialized and may not be
+ * actual Error instances. This function handles:
+ * - Error instances
+ * - Serialized errors (objects with message property)
+ * - String errors
+ * - Unknown values
+ *
+ * @param error - The error to extract message from
+ * @returns The error message string
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    // Handle serialized errors from Next.js server actions
+    const errorObj = error as Record<string, unknown>;
+    if (typeof errorObj.message === 'string') {
+      return errorObj.message;
+    }
+    // Some errors have a digest property but no message in production
+    if (typeof errorObj.digest === 'string') {
+      return 'An error occurred';
+    }
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return 'Unknown error';
+}
+
+/**
  * Maps error messages to user-friendly messages and actions.
  *
  * @param error - The error object from submission
@@ -21,7 +58,7 @@ export function mapErrorToUserMessage(
   error: unknown,
   redirectUrl: string
 ): ErrorMappingResult {
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const errorMessage = getErrorMessage(error);
   const message = errorMessage.toUpperCase();
 
   // Invalid session - needs refresh
@@ -83,8 +120,7 @@ export function mapErrorToUserMessage(
 
   // In development, include error code if available
   if (process.env.NODE_ENV === 'development') {
-    const errorCodeMatch =
-      error instanceof Error ? error.message.match(/^\[([A-Z_]+)\]/) : null;
+    const errorCodeMatch = errorMessage.match(/^\[([A-Z_]+)\]/);
     const errorCode = errorCodeMatch?.[1];
     if (errorCode) {
       userMessage = `Could not save (${errorCode}). Please try again.`;
@@ -101,8 +137,11 @@ export function mapErrorToUserMessage(
  * @returns Error code if found, undefined otherwise
  */
 export function extractErrorCode(error: unknown): string | undefined {
-  if (!(error instanceof Error)) return undefined;
-  const match = error.message.match(/^\[([A-Z_]+)\]/);
+  const message = getErrorMessage(error);
+  if (message === 'Unknown error' || message === 'An error occurred') {
+    return undefined;
+  }
+  const match = message.match(/^\[([A-Z_]+)\]/);
   return match?.[1];
 }
 
@@ -113,7 +152,12 @@ export function extractErrorCode(error: unknown): string | undefined {
  * @returns True if database error
  */
 export function isDatabaseError(error: unknown): boolean {
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const errorMessage = getErrorMessage(error);
   const message = errorMessage.toUpperCase();
-  return message.includes('DATABASE_ERROR');
+  return (
+    message.includes('DATABASE_ERROR') ||
+    message.includes('TRANSACTION_FAILED') ||
+    message.includes('CONSTRAINT_VIOLATION') ||
+    message.includes('NETWORK_ERROR')
+  );
 }

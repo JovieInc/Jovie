@@ -55,7 +55,7 @@ const DEFAULT_APPLE_STOREFRONT = 'us';
 
 function buildSearchQuery(track: TrackDescriptor): string {
   const parts = [track.isrc, track.artistName, track.title]
-    .filter((value): value is string => Boolean(value && value.trim()))
+    .filter((value): value is string => Boolean(value?.trim()))
     .map(value => value.trim());
 
   return encodeURIComponent(parts.join(' '));
@@ -171,12 +171,14 @@ export async function lookupAppleMusicByIsrc(
     if (!match || typeof match.trackViewUrl !== 'string') return null;
 
     const rawTrackId = match.trackId;
-    const trackId =
-      typeof rawTrackId === 'number'
-        ? String(rawTrackId)
-        : typeof rawTrackId === 'string'
-          ? rawTrackId
-          : null;
+    let trackId: string | null;
+    if (typeof rawTrackId === 'number') {
+      trackId = String(rawTrackId);
+    } else if (typeof rawTrackId === 'string') {
+      trackId = rawTrackId;
+    } else {
+      trackId = null;
+    }
 
     const canonicalUrl = match.trackViewUrl.replace(
       'itunes.apple.com',

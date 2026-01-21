@@ -6,6 +6,9 @@ import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
+import { syncEmailFromClerk } from './clerk-sync';
+import { resolveProfileState } from './profile-state-resolver';
+import { checkUserStatus } from './status-checker';
 
 /**
  * Centralized user state enum for auth gating decisions.
@@ -55,26 +58,6 @@ export interface AuthGateResult {
     email: string | null;
     errorCode?: string;
   };
-}
-
-/**
- * Determines if a creator profile is considered "complete" for access purposes.
- * A complete profile has: username, display name, is public, and has completed onboarding.
- */
-function isProfileComplete(profile: {
-  username: string | null;
-  usernameNormalized: string | null;
-  displayName: string | null;
-  isPublic: boolean | null;
-  onboardingCompletedAt: Date | null;
-}): boolean {
-  const hasHandle =
-    Boolean(profile.usernameNormalized) && Boolean(profile.username);
-  const hasName = Boolean(profile.displayName?.trim());
-  const isPublic = profile.isPublic !== false;
-  const hasCompleted = Boolean(profile.onboardingCompletedAt);
-
-  return hasHandle && hasName && isPublic && hasCompleted;
 }
 
 /**
@@ -262,6 +245,7 @@ export async function resolveUserState(
   const [dbUser] = await db
     .select({
       id: users.id,
+      email: users.email,
       userStatus: users.userStatus,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
@@ -277,26 +261,31 @@ export async function resolveUserState(
     email,
   };
 
-  // Handle soft-deleted users
-  if (dbUser?.deletedAt) {
-    return {
-      state: UserState.BANNED,
-      clerkUserId,
-      dbUserId: dbUser.id,
-      profileId: null,
-      redirectTo: '/banned',
-      context: baseContext,
-    };
+  // Sync email from Clerk if different (Clerk is source of truth for identity)
+  // Only sync verified emails to prevent hijacking
+  const verifiedClerkEmail = clerkUser?.emailAddresses?.find(
+    e => e.verification?.status === 'verified'
+  )?.emailAddress;
+
+  if (dbUser && verifiedClerkEmail && dbUser.email !== verifiedClerkEmail) {
+    // Best-effort sync - don't block auth on sync failure
+    await syncEmailFromClerk(dbUser.id, verifiedClerkEmail).catch(err => {
+      console.warn('[gate] Email sync failed:', err);
+    });
   }
 
-  // Handle explicitly banned or suspended users
-  if (dbUser?.userStatus === 'banned' || dbUser?.userStatus === 'suspended') {
+  // Check if user is blocked (banned, suspended, or deleted)
+  const statusCheck = checkUserStatus(
+    dbUser?.userStatus ?? null,
+    dbUser?.deletedAt ?? null
+  );
+  if (statusCheck.isBlocked && statusCheck.blockedState) {
     return {
-      state: UserState.BANNED,
+      state: statusCheck.blockedState,
       clerkUserId,
-      dbUserId: dbUser.id,
+      dbUserId: dbUser?.id ?? null,
       profileId: null,
-      redirectTo: '/banned',
+      redirectTo: statusCheck.redirectTo,
       context: baseContext,
     };
   }
@@ -412,37 +401,15 @@ export async function resolveUserState(
     )
     .limit(1);
 
-  // No profile or incomplete profile
-  if (!profile) {
-    return {
-      state: UserState.NEEDS_ONBOARDING,
-      clerkUserId,
-      dbUserId,
-      profileId: null,
-      redirectTo: '/onboarding?fresh_signup=true',
-      context: { ...baseContext, email },
-    };
-  }
+  // Resolve user state based on profile status
+  const profileState = resolveProfileState(profile);
 
-  // Profile exists but is incomplete
-  if (!isProfileComplete(profile)) {
-    return {
-      state: UserState.NEEDS_ONBOARDING,
-      clerkUserId,
-      dbUserId,
-      profileId: profile.id,
-      redirectTo: '/onboarding?fresh_signup=true',
-      context: { ...baseContext, email },
-    };
-  }
-
-  // 5. Fully active user
   return {
-    state: UserState.ACTIVE,
+    state: profileState.state,
     clerkUserId,
     dbUserId,
-    profileId: profile.id,
-    redirectTo: null,
+    profileId: profileState.profileId,
+    redirectTo: profileState.redirectTo,
     context: {
       isAdmin: dbUser?.isAdmin ?? false,
       isPro: dbUser?.isPro ?? false,
@@ -509,30 +476,25 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
 // =============================================================================
 
 /**
+ * Lookup map for user state redirects.
+ */
+const STATE_REDIRECT_MAP: Record<UserState, string | null> = {
+  [UserState.UNAUTHENTICATED]: '/signin',
+  [UserState.NEEDS_DB_USER]: '/onboarding?fresh_signup=true',
+  [UserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
+  [UserState.WAITLIST_PENDING]: '/waitlist',
+  [UserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
+  [UserState.BANNED]: '/banned',
+  [UserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
+  [UserState.ACTIVE]: null,
+};
+
+/**
  * Returns redirect paths for each user state.
  * Used by routes to determine where to redirect users based on their state.
  */
 export function getRedirectForState(state: UserState): string | null {
-  switch (state) {
-    case UserState.UNAUTHENTICATED:
-      return '/signin';
-    case UserState.NEEDS_DB_USER:
-      return '/onboarding?fresh_signup=true';
-    case UserState.NEEDS_WAITLIST_SUBMISSION:
-      return '/waitlist';
-    case UserState.WAITLIST_PENDING:
-      return '/waitlist';
-    case UserState.NEEDS_ONBOARDING:
-      return '/onboarding?fresh_signup=true';
-    case UserState.BANNED:
-      return '/banned';
-    case UserState.USER_CREATION_FAILED:
-      return '/error/user-creation-failed';
-    case UserState.ACTIVE:
-      return null;
-    default:
-      return null;
-  }
+  return STATE_REDIRECT_MAP[state] ?? null;
 }
 
 /**

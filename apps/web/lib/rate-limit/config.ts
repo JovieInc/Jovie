@@ -11,12 +11,12 @@ import type { RateLimitConfig } from './types';
 // Environment-configurable limits
 // ============================================================================
 
-const TRACKING_CLICKS_PER_HOUR = parseInt(
+const TRACKING_CLICKS_PER_HOUR = Number.parseInt(
   process.env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR ?? '10000',
   10
 );
 
-const TRACKING_VISITS_PER_HOUR = parseInt(
+const TRACKING_VISITS_PER_HOUR = Number.parseInt(
   process.env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR ?? '50000',
   10
 );
@@ -96,6 +96,19 @@ export const RATE_LIMITERS = {
     limit: 10,
     window: '1 h',
     prefix: 'payment_intent',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Admin Operations
+  // ---------------------------------------------------------------------------
+
+  /** Admin impersonation: 5 attempts per hour per admin - CRITICAL for security */
+  adminImpersonate: {
+    name: 'Admin Impersonate',
+    limit: 5,
+    window: '1 h',
+    prefix: 'admin:impersonate',
     analytics: true,
   } satisfies RateLimitConfig,
 
@@ -231,6 +244,64 @@ export const RATE_LIMITERS = {
     prefix: 'spotify:public-search',
     analytics: false,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // DSP Enrichment Operations
+  // ---------------------------------------------------------------------------
+
+  /** Apple Music ISRC lookup: 80 requests per minute (conservative limit for MusicKit API) */
+  appleMusicLookup: {
+    name: 'Apple Music Lookup',
+    limit: 80,
+    window: '1 m',
+    prefix: 'dsp:apple-music:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Apple Music bulk ISRC lookup: 20 batch requests per minute (each batch = up to 25 ISRCs) */
+  appleMusicBulkIsrc: {
+    name: 'Apple Music Bulk ISRC',
+    limit: 20,
+    window: '1 m',
+    prefix: 'dsp:apple-music:bulk-isrc',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Deezer lookup: 40 requests per minute (conservative limit for Deezer API) */
+  deezerLookup: {
+    name: 'Deezer Lookup',
+    limit: 40,
+    window: '1 m',
+    prefix: 'dsp:deezer:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** MusicBrainz: 1 request per second (be respectful of free service) */
+  musicBrainzLookup: {
+    name: 'MusicBrainz Lookup',
+    limit: 1,
+    window: '1 s',
+    prefix: 'dsp:musicbrainz:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** DSP discovery: 10 discoveries per minute per user */
+  dspDiscovery: {
+    name: 'DSP Discovery',
+    limit: 10,
+    window: '1 m',
+    prefix: 'dsp:discovery',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** DSP enrichment: 100 enrichments per hour (global) */
+  dspEnrichment: {
+    name: 'DSP Enrichment',
+    limit: 100,
+    window: '1 h',
+    prefix: 'dsp:enrichment',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;
@@ -245,7 +316,7 @@ export function parseWindowToMs(window: string): number {
     throw new Error(`Invalid window format: ${window}`);
   }
 
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   const unit = match[2];
 
   const multipliers: Record<string, number> = {

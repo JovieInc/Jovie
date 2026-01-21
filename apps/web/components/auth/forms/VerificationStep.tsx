@@ -119,93 +119,94 @@ export function VerificationStep({
   }, [onBack, isLoading]);
 
   return (
-    <div className={AUTH_CLASSES.stepTransition}>
-      {/* Back button - fixed positioning in browser chrome */}
+    <>
+      {/* Back button - rendered outside animated container to maintain fixed viewport positioning */}
       <AuthBackButton onClick={onBack} ariaLabel='Use a different email' />
 
-      <h1 className='text-xl leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
-        Check your email
-      </h1>
+      <div className={AUTH_CLASSES.stepTransition}>
+        <h1 className='text-[18px] leading-[22px] font-medium text-[#1f2023] dark:text-[#e3e4e6] mb-0 text-center'>
+          Check your email
+        </h1>
 
-      <p
-        className='mt-6 mb-10 sm:mb-12 text-base sm:text-sm leading-relaxed text-secondary-token text-center px-2'
-        id='otp-description'
-      >
-        We&apos;ve sent you a 6-digit{' '}
-        {mode === 'signin' ? 'login' : 'verification'} code.{' '}
-        {email && (
-          <>
-            Please check your inbox at{' '}
-            <span className='text-primary-token font-medium break-all'>
-              {email}
-            </span>
-            .
-          </>
-        )}
-        {!email && <>Codes expire after 10 minutes.</>}
-      </p>
-
-      <form
-        onSubmit={handleSubmit}
-        className='space-y-5 sm:space-y-4 pt-4 sm:pt-0'
-      >
-        <div>
-          <label className='sr-only' htmlFor='otp-input'>
-            Verification code
-          </label>
-          <OtpInput
-            value={code}
-            onChange={onCodeChange}
-            onComplete={handleComplete}
-            disabled={isLoading}
-            error={!!error}
-            errorId={error ? errorId : undefined}
-            aria-label='Enter 6-digit verification code'
-          />
-
-          <FormError message={error} id={errorId} />
-
-          {resendSuccess && !error && (
-            <p className='mt-3 text-sm text-green-600 dark:text-green-400 text-center animate-in fade-in-0 duration-200'>
-              New code sent! Check your email.
-            </p>
-          )}
-        </div>
-
-        <AuthButton
-          type='submit'
-          variant='primary'
-          disabled={isLoading || code.length !== 6}
-          aria-busy={isVerifying}
-          className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
+        <p
+          className='mt-6 mb-8 text-[13px] font-[450] leading-5 text-[#6b6f76] dark:text-[#969799] text-center px-2'
+          id='otp-description'
         >
-          {isCompleting ? (
+          We&apos;ve sent you a 6-digit{' '}
+          {mode === 'signin' ? 'login' : 'verification'} code.{' '}
+          {email && (
             <>
-              <ButtonSpinner />
-              <span>Completing signup...</span>
+              Please check your inbox at{' '}
+              <span className='text-[#1f2023] dark:text-[#e3e4e6] font-[450] break-all'>
+                {email}
+              </span>
+              .
             </>
-          ) : isVerifying ? (
-            <>
-              <ButtonSpinner />
-              <span>Verifying...</span>
-            </>
-          ) : (
-            'Verify code'
           )}
-        </AuthButton>
+          {!email && <>Codes expire after 10 minutes.</>}
+        </p>
 
-        <div className='flex items-center justify-center gap-2 text-sm'>
-          <span className='text-secondary-token'>Didn&apos;t receive it?</span>
-          <button
-            type='button'
-            onClick={handleResend}
-            disabled={isLoading}
-            className='text-primary-token hover:underline focus-ring-themed rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
+        <form onSubmit={handleSubmit} className='space-y-6'>
+          <div>
+            <label className='sr-only' htmlFor='otp-input'>
+              Verification code
+            </label>
+            <OtpInput
+              value={code}
+              onChange={onCodeChange}
+              onComplete={handleComplete}
+              disabled={isLoading}
+              error={!!error}
+              errorId={error ? errorId : undefined}
+              aria-label='Enter 6-digit verification code'
+            />
+
+            <FormError message={error} id={errorId} />
+
+            {resendSuccess && !error && (
+              <p className='mt-3 text-sm text-green-600 dark:text-green-400 text-center animate-in fade-in-0 duration-200'>
+                New code sent! Check your email.
+              </p>
+            )}
+          </div>
+
+          <AuthButton
+            type='submit'
+            variant='primary'
+            disabled={isLoading || code.length !== 6}
+            aria-busy={isVerifying}
+            className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
           >
-            {isResending ? 'Sending...' : 'Resend code'}
-          </button>
-        </div>
-      </form>
-    </div>
+            {isCompleting ? (
+              <>
+                <ButtonSpinner />
+                <span>Completing signup...</span>
+              </>
+            ) : isVerifying ? (
+              <>
+                <ButtonSpinner />
+                <span>Verifying...</span>
+              </>
+            ) : (
+              'Verify code'
+            )}
+          </AuthButton>
+
+          <div className='flex items-center justify-center gap-2 text-[13px] font-[450]'>
+            <span className='text-[#6b6f76] dark:text-[#969799]'>
+              Didn&apos;t receive it?
+            </span>
+            <button
+              type='button'
+              onClick={handleResend}
+              disabled={isLoading}
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
+            >
+              {isResending ? 'Sending...' : 'Resend code'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </>
   );
 }

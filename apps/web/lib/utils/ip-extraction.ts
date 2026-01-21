@@ -4,6 +4,30 @@
  * Provides robust IP address extraction from HTTP headers with proper fallback chain.
  * Supports multiple proxy/CDN configurations (Cloudflare, Vercel, generic proxies).
  *
+ * SECURITY CONSIDERATIONS:
+ * - In Vercel deployments, x-real-ip and x-forwarded-for are set by Vercel's edge network
+ * - Cloudflare deployments use cf-connecting-ip which is set by Cloudflare's edge
+ * - The priority order ensures trusted proxy headers are checked first:
+ *   1. cf-connecting-ip (set by Cloudflare edge, trusted when traffic routes through CF)
+ *   2. x-real-ip (set by Vercel/nginx, trusted when behind reverse proxy)
+ *   3. x-forwarded-for (most common, can be spoofed in direct connections)
+ *
+ * TRUST BOUNDARIES:
+ * - These headers are ONLY trustworthy when traffic routes through the CDN/proxy
+ * - Direct connections to the origin can spoof any of these headers
+ * - Vercel and Cloudflare strip/override client-provided headers at the edge
+ * - For security-critical decisions, ensure traffic cannot bypass the CDN
+ *
+ * IP Spoofing Protection:
+ * - Direct connections (bypassing CDN) are rare in production deployments
+ * - Rate limiting uses 'unknown' bucket for requests without valid IPs
+ *
+ * For maximum security in self-hosted deployments:
+ * - Always deploy behind a trusted reverse proxy (nginx, Caddy)
+ * - Configure proxy to override x-forwarded-for with actual client IP
+ * - Block direct access to origin servers
+ * - Never trust client-provided headers without proxy sanitization
+ *
  * Usage:
  *   import { extractClientIP } from '@/lib/utils/ip-extraction'
  *

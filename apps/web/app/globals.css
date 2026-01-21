@@ -49,7 +49,7 @@ body {
 
 @layer base {
   :root {
-    --font-geist-sans: "Geist Sans";
+    --font-inter: "Inter Variable";
 
     /* Safe area inset custom properties for iOS device support */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -71,7 +71,7 @@ body {
 
 @theme {
   --font-sans:
-    var(--font-geist-sans), "Geist Sans", -apple-system, BlinkMacSystemFont,
+    var(--font-inter), "Inter Variable", -apple-system, BlinkMacSystemFont,
     "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
 
   --color-gray-50: #f9fafb;
@@ -450,6 +450,16 @@ body {
   @apply relative inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors;
 }
 
+/* Hide scrollbar utility - for premium horizontal scroll sections */
+@utility scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
 @layer base {
   .marketing-mono {
     /* Light mode - Linear-inspired minimal aesthetic */
@@ -510,18 +520,17 @@ body {
   gap: 0.5rem;
   height: 2.5rem; /* 40px */
   padding: 0 1.5rem;
-  border-radius: 10px;
+  border-radius: 8px; /* Linear uses 8px */
   font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.011em;
   background-color: var(--color-btn-primary-bg);
   color: var(--color-btn-primary-fg);
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid rgba(255, 255, 255, 0.1); /* subtle white border */
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    opacity: 0.95;
-    transform: translateY(-1px);
+    opacity: 0.9;
   }
 }
 
@@ -660,6 +669,27 @@ body {
   background-color: var(--color-bg-base);
 }
 
+/* Safe utilities with hardcoded fallbacks for critical above-the-fold content (ENG-001) */
+@utility bg-base-safe {
+  background-color: #f6f6f6;
+  background-color: var(--color-bg-base, #f6f6f6);
+}
+
+@utility text-primary-safe {
+  color: #0c0c0c;
+  color: var(--color-text-primary-token, #0c0c0c);
+}
+
+:root.dark .bg-base-safe {
+  background-color: #090909;
+  background-color: var(--color-bg-base, #090909);
+}
+
+:root.dark .text-primary-safe {
+  color: #f4f4f5;
+  color: var(--color-text-primary-token, #f4f4f5);
+}
+
 /* Enhanced border utilities */
 @utility border-subtle {
   border-color: var(--color-border-subtle);
@@ -751,6 +781,24 @@ body {
   animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Infinite scroll carousel animation */
+@keyframes scroll-infinite {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@utility animate-scroll-infinite {
+  animation: scroll-infinite 30s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* Micro-animations */
 @utility card-hover {
   @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
@@ -818,6 +866,112 @@ body {
   html[data-doc-page="true"] * {
     box-shadow: none !important;
     text-shadow: none !important;
+  }
+}
+
+/* Auth logo spin animation */
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility animate-logo-spin {
+  animation: logo-spin 1.2s ease-in-out 0s 1 forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-logo-spin {
+    animation: none !important;
+  }
+}
+
+/* Claim handle shake and available animations */
+@keyframes jv-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes jv-available-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes jv-available-fade {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.jv-shake {
+  animation: jv-shake 150ms ease-in-out;
+}
+
+.jv-available {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35);
+  animation: jv-available-pulse 900ms ease-out 1;
+}
+
+/* Reduced motion: disable shake, use opacity fade instead of box-shadow pulse */
+@media (prefers-reduced-motion: reduce) {
+  .jv-shake {
+    animation: none;
+  }
+  .jv-available {
+    box-shadow: none;
+    animation: jv-available-fade 900ms ease-out 1;
+  }
+}
+
+/* Parallax grid item hover styles */
+.grid-item {
+  transition:
+    transform 0.3s ease-out,
+    box-shadow 0.3s ease-out;
+  transform-style: preserve-3d;
+}
+
+.grid-item:hover {
+  transform: translateY(-2px) translateZ(10px);
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-item {
+    transition: none;
+  }
+  .grid-item:hover {
+    transform: none;
+    box-shadow: none;
   }
 }
 

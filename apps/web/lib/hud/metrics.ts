@@ -24,22 +24,40 @@ function normalizeIso(value: unknown): string {
   return new Date().toISOString();
 }
 
+/**
+ * Map of status values to their deployment state.
+ */
+const STATUS_TO_DEPLOYMENT_STATE: Record<string, HudDeploymentState> = {
+  in_progress: 'in_progress',
+  queued: 'in_progress',
+};
+
+/**
+ * Map of conclusion values to their deployment state (when status is 'completed').
+ */
+const CONCLUSION_TO_DEPLOYMENT_STATE: Record<string, HudDeploymentState> = {
+  success: 'success',
+  failure: 'failure',
+  cancelled: 'failure',
+  timed_out: 'failure',
+};
+
 function formatDeploymentState(
   status: unknown,
   conclusion: unknown
 ): HudDeploymentState {
-  if (status === 'in_progress' || status === 'queued') return 'in_progress';
-  if (status === 'completed') {
-    if (conclusion === 'success') return 'success';
-    if (
-      conclusion === 'failure' ||
-      conclusion === 'cancelled' ||
-      conclusion === 'timed_out'
-    ) {
-      return 'failure';
-    }
-    return 'unknown';
+  const statusStr = String(status);
+  const conclusionStr = String(conclusion);
+
+  // Check status-based states first
+  const statusState = STATUS_TO_DEPLOYMENT_STATE[statusStr];
+  if (statusState) return statusState;
+
+  // For completed status, check conclusion
+  if (statusStr === 'completed') {
+    return CONCLUSION_TO_DEPLOYMENT_STATE[conclusionStr] ?? 'unknown';
   }
+
   return 'unknown';
 }
 
@@ -130,6 +148,112 @@ async function getHudDeployments(): Promise<HudDeployments> {
   }
 }
 
+/**
+ * Result of financial status calculation.
+ */
+interface FinancialStatus {
+  runwayMonths: number | null;
+  isDefaultAlive: boolean;
+  defaultStatusDetail: string;
+}
+
+/**
+ * Determines the default status detail message based on financial metrics.
+ */
+function getDefaultStatusDetail(
+  netBurn: number,
+  monthsToProfitability: number | null,
+  runwayMonths: number | null,
+  isDefaultAlive: boolean
+): string {
+  if (netBurn <= 0) {
+    return 'Revenue already exceeds spend at the current run rate.';
+  }
+  if (monthsToProfitability == null) {
+    return 'Revenue growth is not yet outpacing burn at the current trajectory.';
+  }
+  if (runwayMonths == null) {
+    return 'Runway is currently unlimited based on cash flow.';
+  }
+  if (isDefaultAlive) {
+    return `Runway covers roughly ${monthsToProfitability.toFixed(1)} months to profitability.`;
+  }
+  return 'At the current growth rate, runway ends before profitability.';
+}
+
+/**
+ * Gets the service availability status string for a service.
+ */
+function getServiceStatus(
+  name: string,
+  isConfigured: boolean,
+  isAvailable: boolean
+): string | null {
+  if (!isConfigured) return `${name} (not configured)`;
+  if (!isAvailable) return `${name} (unavailable)`;
+  return null;
+}
+
+/**
+ * Calculates financial status from Stripe and Mercury metrics.
+ */
+function calculateFinancialStatus(
+  stripeMetrics: Awaited<ReturnType<typeof getAdminStripeOverviewMetrics>>,
+  mercuryMetrics: Awaited<ReturnType<typeof getAdminMercuryMetrics>>
+): FinancialStatus {
+  const canCalculate = stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+
+  if (!canCalculate) {
+    const missingServices = [
+      getServiceStatus(
+        'Stripe',
+        stripeMetrics.isConfigured,
+        stripeMetrics.isAvailable
+      ),
+      getServiceStatus(
+        'Mercury',
+        mercuryMetrics.isConfigured,
+        mercuryMetrics.isAvailable
+      ),
+    ].filter((s): s is string => s !== null);
+
+    return {
+      runwayMonths: null,
+      isDefaultAlive: false,
+      defaultStatusDetail:
+        missingServices.length > 0
+          ? `Cannot calculate status: ${missingServices.join(', ')}`
+          : 'Financial data sources unavailable.',
+    };
+  }
+
+  const monthlyRevenue = stripeMetrics.mrrUsd;
+  const monthlyExpense = mercuryMetrics.burnRateUsd;
+  const netBurn = monthlyExpense - monthlyRevenue;
+  const runwayMonths = netBurn > 0 ? mercuryMetrics.balanceUsd / netBurn : null;
+
+  const revenueGrowth30d = stripeMetrics.mrrGrowth30dUsd;
+  const monthsToProfitability =
+    netBurn > 0 && revenueGrowth30d > 0 ? netBurn / revenueGrowth30d : null;
+
+  const isDefaultAlive =
+    netBurn <= 0 ||
+    (monthsToProfitability != null &&
+      runwayMonths != null &&
+      monthsToProfitability <= runwayMonths);
+
+  return {
+    runwayMonths,
+    isDefaultAlive,
+    defaultStatusDetail: getDefaultStatusDetail(
+      netBurn,
+      monthsToProfitability,
+      runwayMonths,
+      isDefaultAlive
+    ),
+  };
+}
+
 export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
   const generatedAt = new Date();
 
@@ -152,63 +276,10 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     getHudDeployments(),
   ]);
 
-  const canCalculateFinancials =
-    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
-
-  let runwayMonths: number | null = null;
-  let netBurn = 0;
-  let monthsToProfitability: number | null = null;
-  let isDefaultAlive = false;
-  let defaultStatusDetail = '';
-
-  if (canCalculateFinancials) {
-    const monthlyRevenue = stripeMetrics.mrrUsd;
-    const monthlyExpense = mercuryMetrics.burnRateUsd;
-    netBurn = monthlyExpense - monthlyRevenue;
-    runwayMonths = netBurn > 0 ? mercuryMetrics.balanceUsd / netBurn : null;
-
-    const revenueGrowth30d = stripeMetrics.mrrGrowth30dUsd;
-    monthsToProfitability =
-      netBurn > 0 && revenueGrowth30d > 0 ? netBurn / revenueGrowth30d : null;
-
-    isDefaultAlive =
-      netBurn <= 0 ||
-      (monthsToProfitability != null &&
-        runwayMonths != null &&
-        monthsToProfitability <= runwayMonths);
-
-    if (netBurn <= 0) {
-      defaultStatusDetail =
-        'Revenue already exceeds spend at the current run rate.';
-    } else if (monthsToProfitability == null) {
-      defaultStatusDetail =
-        'Revenue growth is not yet outpacing burn at the current trajectory.';
-    } else if (runwayMonths == null) {
-      defaultStatusDetail = 'Runway is currently unlimited based on cash flow.';
-    } else if (isDefaultAlive) {
-      defaultStatusDetail = `Runway covers roughly ${monthsToProfitability.toFixed(1)} months to profitability.`;
-    } else {
-      defaultStatusDetail =
-        'At the current growth rate, runway ends before profitability.';
-    }
-  } else {
-    const missingServices: string[] = [];
-    if (!stripeMetrics.isConfigured) {
-      missingServices.push('Stripe (not configured)');
-    } else if (!stripeMetrics.isAvailable) {
-      missingServices.push('Stripe (unavailable)');
-    }
-    if (!mercuryMetrics.isConfigured) {
-      missingServices.push('Mercury (not configured)');
-    } else if (!mercuryMetrics.isAvailable) {
-      missingServices.push('Mercury (unavailable)');
-    }
-
-    defaultStatusDetail =
-      missingServices.length > 0
-        ? `Cannot calculate status: ${missingServices.join(', ')}`
-        : 'Financial data sources unavailable.';
-  }
+  const financialStatus = calculateFinancialStatus(
+    stripeMetrics,
+    mercuryMetrics
+  );
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',
@@ -231,9 +302,9 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
       activeSubscribers: stripeMetrics.activeSubscribers,
       balanceUsd: mercuryMetrics.balanceUsd,
       burnRateUsd: mercuryMetrics.burnRateUsd,
-      runwayMonths,
-      defaultStatus: isDefaultAlive ? 'alive' : 'dead',
-      defaultStatusDetail,
+      runwayMonths: financialStatus.runwayMonths,
+      defaultStatus: financialStatus.isDefaultAlive ? 'alive' : 'dead',
+      defaultStatusDetail: financialStatus.defaultStatusDetail,
     },
     operations: operationsStatus,
     reliability: {

@@ -4,6 +4,11 @@ import { QRCode } from '@/components/atoms/QRCode';
 import { publicEnv } from '@/lib/env-public';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import {
+  getDefaultStatusTone,
+  getDeploymentLabel,
+  getDeploymentTone,
+} from '@/lib/hud/tone-determination';
 import { HudAutoRefreshClient } from './HudAutoRefreshClient';
 import { HudClockClient } from './HudClockClient';
 import { HudStatusPill } from './HudStatusPill';
@@ -109,28 +114,9 @@ export default async function HudPage({
   const metrics = await getHudMetrics(auth.mode);
   const hudUrl = await getHudAbsoluteUrl(kioskToken);
 
-  const defaultTone =
-    metrics.overview.defaultStatus === 'alive' ? 'good' : 'bad';
-
-  const deploymentsTone =
-    metrics.deployments.availability === 'not_configured'
-      ? 'neutral'
-      : metrics.deployments.current?.status === 'success'
-        ? 'good'
-        : metrics.deployments.current?.status === 'in_progress'
-          ? 'warning'
-          : metrics.deployments.current?.status === 'failure'
-            ? 'bad'
-            : 'neutral';
-
-  const deploymentLabel =
-    metrics.deployments.availability === 'not_configured'
-      ? 'Deploy: not configured'
-      : metrics.deployments.availability === 'error'
-        ? 'Deploy: error'
-        : metrics.deployments.current
-          ? `Deploy: ${metrics.deployments.current.status}`
-          : 'Deploy: unknown';
+  const defaultTone = getDefaultStatusTone(metrics.overview.defaultStatus);
+  const deploymentsTone = getDeploymentTone(metrics.deployments);
+  const deploymentLabel = getDeploymentLabel(metrics.deployments);
 
   return (
     <main className='min-h-screen bg-black text-white'>
@@ -189,11 +175,17 @@ export default async function HudPage({
                     tone={deploymentsTone}
                   />
                   <div className='text-right text-lg text-white/50'>
-                    {metrics.deployments.current?.branch
-                      ? `Branch ${metrics.deployments.current.branch}`
-                      : metrics.deployments.availability === 'not_configured'
-                        ? 'Deploy not configured'
-                        : (metrics.deployments.errorMessage ?? '—')}
+                    {(() => {
+                      if (metrics.deployments.current?.branch) {
+                        return `Branch ${metrics.deployments.current.branch}`;
+                      }
+                      if (
+                        metrics.deployments.availability === 'not_configured'
+                      ) {
+                        return 'Deploy not configured';
+                      }
+                      return metrics.deployments.errorMessage ?? '—';
+                    })()}
                   </div>
                 </div>
               </div>

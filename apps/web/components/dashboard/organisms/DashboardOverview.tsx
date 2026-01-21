@@ -2,12 +2,21 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
 import { DashboardOverviewControlsProvider } from '@/components/dashboard/organisms/DashboardOverviewControlsProvider';
 import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/organisms/DashboardOverviewHeaderToolbarClient';
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
+import {
+  getTaskContainerClass,
+  getTaskIndicatorClass,
+  getTaskIndicatorContent,
+  getTaskLabelClass,
+} from '@/components/dashboard/organisms/dashboard-overview-helpers';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { PROFILE_URL } from '@/constants/app';
+import {
+  trimLeadingSlashes,
+  trimTrailingSlashes,
+} from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -26,7 +35,7 @@ export function DashboardOverview({
       <StarterEmptyState
         title='We could not load your profile'
         description='The dashboard data did not include your Jovie profile. Refresh or reopen onboarding to finish setup.'
-        primaryAction={{ label: 'Refresh dashboard', href: '/app/dashboard' }}
+        primaryAction={{ label: 'Refresh dashboard', href: '/app' }}
         secondaryAction={{ label: 'Restart onboarding', href: '/onboarding' }}
         testId='dashboard-missing-profile'
       />
@@ -52,8 +61,8 @@ export function DashboardOverview({
 
   const profileUrl = (() => {
     if (!artist.handle) return undefined;
-    const base = PROFILE_URL.replace(/\/+$/, '');
-    const path = artist.handle.replace(/^\/+/, '');
+    const base = trimTrailingSlashes(PROFILE_URL);
+    const path = trimLeadingSlashes(artist.handle);
     return `${base}/${path}`;
   })();
 
@@ -116,91 +125,79 @@ export function DashboardOverview({
   if (!allTasksComplete) {
     return (
       <DashboardOverviewControlsProvider>
-        <div className='space-y-2' data-testid='dashboard-overview'>
-          {header}
+        <div
+          className='flex min-h-[60vh] items-center justify-center'
+          data-testid='dashboard-overview'
+        >
+          <div className='w-full max-w-sm space-y-5'>
+            <div className='space-y-0.5 text-center'>
+              <h1 className='text-lg font-normal text-primary-token'>
+                Complete your setup
+              </h1>
+              <p className='text-[13px] text-tertiary-token'>
+                {completedCount} of {totalSteps} complete
+              </p>
+            </div>
 
-          <DashboardOverviewMetricsClient
-            profileId={artist.id}
-            profileUrl={profileUrl}
-          />
-
-          <section className='rounded-2xl border-0 bg-transparent'>
-            <div className='space-y-2 rounded-2xl bg-surface-1/40 p-3 shadow-none'>
-              <div className='flex items-center justify-between gap-2.5'>
-                <div className='space-y-0.5'>
-                  <p className='text-xs uppercase tracking-[0.18em] text-secondary-token'>
-                    Complete your setup
-                  </p>
-                  <h3 className='text-lg font-semibold text-primary-token'>
-                    Finish the essentials
-                  </h3>
-                  <p className='text-sm text-secondary-token'>
-                    {completedCount}/{totalSteps} complete
+            <ul className='space-y-1'>
+              <li className={getTaskContainerClass(isHandleClaimed)}>
+                <span className={getTaskIndicatorClass(isHandleClaimed)}>
+                  {getTaskIndicatorContent(isHandleClaimed, 1)}
+                </span>
+                <div className='flex-1 min-w-0'>
+                  <p className={getTaskLabelClass(isHandleClaimed)}>
+                    Claim your handle
                   </p>
                 </div>
-                {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for screen reader accessibility */}
-                <p
-                  className='sr-only'
-                  aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
-                >
-                  {completedCount} of {totalSteps} tasks done
-                </p>
-              </div>
+                {!isHandleClaimed && (
+                  <Link
+                    href='/app/settings'
+                    className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
+                  >
+                    Claim →
+                  </Link>
+                )}
+              </li>
 
-              <ol className='grid list-none grid-cols-1 gap-2.5 pl-0 md:grid-cols-3'>
-                <SetupTaskItem
-                  index={1}
-                  title='Claim your handle'
-                  complete={isHandleClaimed}
-                  completeLabel='Handle claimed'
-                  incompleteLabel='Secure your unique profile URL'
-                  action={
-                    <Link
-                      href='/app/settings'
-                      aria-label='Claim handle'
-                      className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
-                    >
-                      Claim handle
-                    </Link>
-                  }
-                />
+              <li className={getTaskContainerClass(hasMusicLink)}>
+                <span className={getTaskIndicatorClass(hasMusicLink)}>
+                  {getTaskIndicatorContent(hasMusicLink, 2)}
+                </span>
+                <div className='flex-1 min-w-0'>
+                  <p className={getTaskLabelClass(hasMusicLink)}>
+                    Add a music link
+                  </p>
+                </div>
+                {!hasMusicLink && (
+                  <Link
+                    href='/app/dashboard/profile'
+                    className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
+                  >
+                    Add →
+                  </Link>
+                )}
+              </li>
 
-                <SetupTaskItem
-                  index={2}
-                  title='Add a music link'
-                  complete={hasMusicLink}
-                  completeLabel='Music link added'
-                  incompleteLabel='Connect Spotify, Apple Music, or YouTube'
-                  action={
-                    <Link
-                      href='/app/dashboard/profile'
-                      aria-label='Add music link'
-                      className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
-                    >
-                      Add music link
-                    </Link>
-                  }
-                />
-
-                <SetupTaskItem
-                  index={3}
-                  title='Add social links'
-                  complete={hasSocialLinks}
-                  completeLabel='Social links added'
-                  incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
-                  action={
-                    <Link
-                      href='/app/dashboard/profile'
-                      aria-label='Add social links'
-                      className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
-                    >
-                      Add social links
-                    </Link>
-                  }
-                />
-              </ol>
-            </div>
-          </section>
+              <li className={getTaskContainerClass(hasSocialLinks)}>
+                <span className={getTaskIndicatorClass(hasSocialLinks)}>
+                  {getTaskIndicatorContent(hasSocialLinks, 3)}
+                </span>
+                <div className='flex-1 min-w-0'>
+                  <p className={getTaskLabelClass(hasSocialLinks)}>
+                    Add social links
+                  </p>
+                </div>
+                {!hasSocialLinks && (
+                  <Link
+                    href='/app/dashboard/profile'
+                    className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
+                  >
+                    Add →
+                  </Link>
+                )}
+              </li>
+            </ul>
+          </div>
         </div>
       </DashboardOverviewControlsProvider>
     );

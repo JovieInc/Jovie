@@ -8,16 +8,17 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
+  TableCheckboxCell,
   UnifiedTable,
+  useRowSelection,
 } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import {
@@ -272,9 +273,9 @@ export function AdminWaitlistTableUnified({
     ]
   );
 
-  // Get row className
+  // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group hover:bg-base dark:hover:bg-surface-2';
+    return 'group hover:bg-surface-2/50';
   }, []);
 
   // Render unified table with optional grouping
@@ -298,8 +299,7 @@ export function AdminWaitlistTableUnified({
       getRowId={row => row.id}
       getRowClassName={getRowClassName}
       enableVirtualization={true}
-      rowHeight={52}
-      minWidth='1100px'
+      minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
       className='text-[13px]'
       rowSelection={rowSelection}
       onRowSelectionChange={handleRowSelectionChange}

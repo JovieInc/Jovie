@@ -48,7 +48,7 @@ function safeDecodeLocationPart(value: string): string {
   const maybeEncoded = value.includes('%') || value.includes('+');
   if (!maybeEncoded) return value;
   try {
-    return decodeURIComponent(value.replace(/\+/g, ' '));
+    return decodeURIComponent(value.replaceAll('+', ' '));
   } catch {
     return value;
   }
@@ -80,7 +80,7 @@ function platformLabel(value: string | null): string {
   if (normalized === 'tiktok') return 'TikTok';
   if (normalized === 'instagram') return 'Instagram';
   if (normalized === 'spotify') return 'Spotify';
-  return titleCase(value.replace(/[_-]/g, ' '));
+  return titleCase(value.replaceAll(/[_-]/g, ' '));
 }
 
 function getClickPhrase(linkType: string, target: string | null): string {
@@ -115,12 +115,12 @@ export async function GET(request: NextRequest) {
 
       const { profileId, limit, range } = parsed.data;
 
-      const rangeMs =
-        range === '90d'
-          ? 90 * 24 * 60 * 60 * 1000
-          : range === '30d'
-            ? 30 * 24 * 60 * 60 * 1000
-            : 7 * 24 * 60 * 60 * 1000;
+      const RANGE_MS_MAP: Record<string, number> = {
+        '90d': 90 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+      };
+      const rangeMs = RANGE_MS_MAP[range] ?? 7 * 24 * 60 * 60 * 1000;
       const since = new Date(Date.now() - rangeMs);
 
       // Verify user owns the profile
@@ -234,11 +234,12 @@ export async function GET(request: NextRequest) {
         });
 
       const subscribeActivities: ActivityRow[] = subscribeRows.map(row => {
-        const locationLabel = row.city
-          ? ` from ${safeDecodeLocationPart(row.city)}`
-          : row.countryCode
-            ? ` from ${row.countryCode.toUpperCase()}`
-            : '';
+        const resolveLocationLabel = (): string => {
+          if (row.city) return ` from ${safeDecodeLocationPart(row.city)}`;
+          if (row.countryCode) return ` from ${row.countryCode.toUpperCase()}`;
+          return '';
+        };
+        const locationLabel = resolveLocationLabel();
         return {
           id: `subscribe:${row.id}`,
           description: `Someone${locationLabel} just subscribed.`,

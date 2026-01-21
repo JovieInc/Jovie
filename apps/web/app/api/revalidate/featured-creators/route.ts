@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { revalidateTag, updateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
@@ -8,7 +8,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Timing-safe comparison of Bearer tokens to prevent timing attacks.
  */
 function verifyBearerToken(authHeader: string | null, secret: string): boolean {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return false;
   }
   const provided = authHeader.slice(7); // Remove 'Bearer ' prefix

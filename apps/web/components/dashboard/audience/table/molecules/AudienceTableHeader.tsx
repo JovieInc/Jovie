@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
-import type { HeaderCheckboxState } from '@/components/admin/table/useRowSelection';
+import type { HeaderCheckboxState } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import type { AudienceMode } from '../types';
 
@@ -92,7 +92,7 @@ export function AudienceTableHeader({
   return (
     <thead
       className={cn(
-        'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
+        'sticky top-0 z-20 bg-surface-1',
         headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
       )}
     >
@@ -159,9 +159,9 @@ export function AudienceTableHeader({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='end'>
-                          {bulkActions.map((action, actionIndex) => (
+                          {bulkActions.map(action => (
                             <DropdownMenuItem
-                              key={actionIndex}
+                              key={action.label}
                               disabled={action.disabled}
                               onClick={action.onClick}
                             >
@@ -173,7 +173,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/50 px-2.5 py-0.5 text-xs font-medium text-secondary-token transition-all duration-150 whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

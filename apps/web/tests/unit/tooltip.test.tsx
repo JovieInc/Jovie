@@ -54,7 +54,7 @@ const TooltipWrapper = ({
 );
 
 const BasicTooltip = ({
-  showArrow = true,
+  showArrow = false,
   content = 'Test tooltip content',
   triggerText = 'Trigger',
   defaultOpen = false,
@@ -222,7 +222,7 @@ describe('Tooltip', () => {
   });
 
   describe('Arrow Display', () => {
-    it('shows arrow by default', () => {
+    it('shows arrow when showArrow is true', () => {
       render(<BasicTooltip showArrow={true} defaultOpen={true} />);
 
       flushTimers();
@@ -236,8 +236,8 @@ describe('Tooltip', () => {
       expect(arrow).toBeInTheDocument();
     });
 
-    it('hides arrow when showArrow is false', () => {
-      render(<BasicTooltip showArrow={false} defaultOpen={true} />);
+    it('hides arrow by default', () => {
+      render(<BasicTooltip defaultOpen={true} />);
 
       flushTimers();
 
@@ -245,7 +245,7 @@ describe('Tooltip', () => {
       const tooltipContent = tooltips[0].closest('[data-state]');
       expect(tooltipContent).toBeInTheDocument();
 
-      // Arrow should not be rendered
+      // Arrow should not be rendered by default
       const arrow = tooltipContent?.querySelector('svg');
       expect(arrow).not.toBeInTheDocument();
     });

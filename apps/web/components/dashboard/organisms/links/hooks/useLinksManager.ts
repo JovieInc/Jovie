@@ -6,11 +6,19 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
+import { popularityIndex } from '@/constants/app';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { findDuplicate, mergeDuplicate } from '../services/duplicate-detection';
+import { enrichLink, getSections } from '../services/link-enrichment';
 import {
-  canonicalIdentity,
-  type DetectedLink,
-} from '@/lib/utils/platform-detection';
+  applyVisibility,
+  isLinkVisible as checkLinkVisibility,
+  shouldLinkBeVisible,
+} from '../services/visibility-enforcement';
+import {
+  checkYouTubeCrossCategory,
+  shouldMergeYouTubeDuplicate,
+} from '../services/youtube-handler';
 import { sectionOf } from '../utils';
 
 /**
@@ -135,8 +143,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
 
   // Check if a link is visible
   const linkIsVisible = useCallback(
-    (l: T): boolean =>
-      ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false,
+    (l: T): boolean => checkLinkVisibility(l),
     []
   );
 
@@ -165,7 +172,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       const sectionIndexes: number[] = [];
 
       next.forEach((link, index) => {
-        if (sectionOf(link as T) === targetSection) {
+        if (sectionOf(link) === targetSection) {
           sectionIndexes.push(index);
         }
       });
@@ -178,10 +185,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       const insertionIdx = sectionIndexes.find(index => {
         const existingLink = next[index];
         if (!existingLink) return false;
-        return (
-          popularityIndex((existingLink as DetectedLink).platform.id) >
-          targetPopularity
-        );
+        return popularityIndex(existingLink.platform.id) > targetPopularity;
       });
 
       const insertAt = insertionIdx ?? Math.max(...sectionIndexes) + 1;
@@ -196,200 +200,156 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
    */
   const handleAdd = useCallback(
     async (link: DetectedLink) => {
-      const enriched = {
-        isVisible: true,
-        ...link,
-      } as unknown as T;
+      // Step 1: Enrich link with defaults and platform-specific adjustments
+      const enriched = enrichLink<T>(link);
+      const { section, otherSection } = getSections(enriched as T);
 
-      // Special handling for Venmo - force earnings category
-      if ((enriched as DetectedLink).platform.id === 'venmo') {
-        (enriched as DetectedLink).platform = {
-          ...(enriched as DetectedLink).platform,
-          category: 'earnings' as unknown as 'social',
-        } as DetectedLink['platform'];
-      }
+      // Step 2: Apply visibility rules
+      const isVisible = shouldLinkBeVisible(links, section);
+      const visibilityApplied = applyVisibility(enriched, isVisible);
 
-      const section = sectionOf(enriched as T);
+      // Step 3: Check for duplicates and existing platform links
+      const {
+        duplicateIndex,
+        duplicate,
+        duplicateSection,
+        hasCrossSectionDuplicate,
+      } = findDuplicate(visibilityApplied as DetectedLink, links, section);
 
-      // Enforce MAX_SOCIAL_LINKS visibility
-      const socialVisibleCount = links.filter(
-        l => sectionOf(l as T) === 'social' && linkIsVisible(l as T)
-      ).length;
-      if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
-        (enriched as unknown as { isVisible?: boolean }).isVisible = false;
-      }
-
-      // Check for existing links in same/other sections
-      const otherSection: 'social' | 'dsp' | null =
-        section === 'social' ? 'dsp' : section === 'dsp' ? 'social' : null;
       const sameSectionHas = links.some(
-        l => l.platform.id === enriched.platform.id && sectionOf(l) === section
+        l =>
+          l.platform.id === visibilityApplied.platform.id &&
+          sectionOf(l) === section
       );
       const otherSectionHas = otherSection
         ? links.some(
             l =>
-              l.platform.id === enriched.platform.id &&
+              l.platform.id === visibilityApplied.platform.id &&
               sectionOf(l) === otherSection
           )
         : false;
 
-      // Duplicate detection
-      const canonicalId = canonicalIdentity({
-        platform: (enriched as DetectedLink).platform,
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-      });
-      const dupAt = links.findIndex(
-        l =>
-          canonicalIdentity({
-            platform: (l as DetectedLink).platform,
-            normalizedUrl: (l as DetectedLink).normalizedUrl,
-          }) === canonicalId
-      );
-      const duplicate = dupAt !== -1 ? links[dupAt] : null;
-      const duplicateSection = duplicate ? sectionOf(duplicate as T) : null;
-      const hasCrossSectionDuplicate =
-        enriched.platform.id === 'youtube' &&
-        duplicateSection !== null &&
-        duplicateSection !== section;
-
-      // YouTube: already in this section, prompt for other section
-      if (
-        enriched.platform.id === 'youtube' &&
-        sameSectionHas &&
-        !otherSectionHas &&
+      // Step 4: Check YouTube cross-category logic
+      const ytCrossCategory = checkYouTubeCrossCategory(
+        visibilityApplied.platform.id,
+        sameSectionHas,
+        otherSectionHas,
         otherSection
-      ) {
-        setYtPrompt({ candidate: enriched, target: otherSection });
+      );
+
+      if (ytCrossCategory.shouldPrompt && ytCrossCategory.targetSection) {
+        setYtPrompt({
+          candidate: visibilityApplied,
+          target: ytCrossCategory.targetSection,
+        });
         return;
       }
 
-      // YouTube: same section duplicate - merge URL/title
+      if (ytCrossCategory.shouldSkip) {
+        return;
+      }
+
+      // Step 5: Handle YouTube same-section duplicate merge
       if (
-        enriched.platform.id === 'youtube' &&
-        dupAt !== -1 &&
-        duplicateSection === section
+        shouldMergeYouTubeDuplicate(
+          visibilityApplied.platform.id,
+          duplicateIndex,
+          duplicateSection,
+          section,
+          hasCrossSectionDuplicate
+        )
       ) {
-        const merged = {
-          ...links[dupAt],
-          normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-          suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-        } as T;
-        const next = links.map((l, i) => (i === dupAt ? merged : l));
+        const merged = mergeDuplicate(
+          links[duplicateIndex] as T,
+          visibilityApplied as DetectedLink
+        );
+        const next = links.map((l, i) => (i === duplicateIndex ? merged : l));
         setLinks(next);
         onLinkAdded?.([merged]);
         return;
       }
 
-      // Non-YouTube duplicate - merge
-      if (dupAt !== -1 && !hasCrossSectionDuplicate) {
-        const merged = {
-          ...links[dupAt],
-          normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-          suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-        } as T;
-        const next = links.map((l, i) => (i === dupAt ? merged : l));
+      // Step 6: Handle non-YouTube duplicate merge
+      if (duplicateIndex !== -1 && !hasCrossSectionDuplicate) {
+        const merged = mergeDuplicate(
+          duplicate as T,
+          visibilityApplied as DetectedLink
+        );
+        const next = links.map((l, i) => (i === duplicateIndex ? merged : l));
         setLinks(next);
         onLinkAdded?.([merged]);
         return;
       }
 
-      // YouTube: already in both sections
-      if (enriched.platform.id === 'youtube') {
-        if (sameSectionHas && otherSectionHas) {
-          return;
-        }
-      } else if (sameSectionHas) {
+      // Step 7: Skip if already exists in section (non-YouTube)
+      if (visibilityApplied.platform.id !== 'youtube' && sameSectionHas) {
         return;
       }
 
-      // Show loading placeholder
-      setAddingLink(enriched);
+      // Step 8: Show loading placeholder
+      setAddingLink(visibilityApplied);
       await new Promise(resolve => setTimeout(resolve, 600));
 
+      // Step 9: Re-check for duplicates after delay
       const prev = linksRef.current;
-      const currentSection = sectionOf(enriched as T);
-      const canonicalIdAfterDelay = canonicalIdentity({
-        platform: (enriched as DetectedLink).platform,
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-      });
-
-      const dupAtAfterDelay = prev.findIndex(
-        existing =>
-          canonicalIdentity({
-            platform: (existing as DetectedLink).platform,
-            normalizedUrl: (existing as DetectedLink).normalizedUrl,
-          }) === canonicalIdAfterDelay
-      );
+      const { duplicateIndex: dupAfterDelay, duplicate: duplicateAfterDelay } =
+        findDuplicate(visibilityApplied as DetectedLink, prev, section);
 
       let next = prev;
-      let didAdd = false;
-      let didMerge = false;
       let emittedLink: T | null = null;
 
-      if (dupAtAfterDelay !== -1) {
-        const duplicate = prev[dupAtAfterDelay];
-        if (duplicate) {
-          const duplicateSection = sectionOf(duplicate);
+      // Step 10: Handle duplicate found after delay
+      if (dupAfterDelay !== -1 && duplicateAfterDelay) {
+        const dupSection = sectionOf(duplicateAfterDelay);
 
-          if (
-            (enriched as DetectedLink).platform.id !== 'youtube' &&
-            duplicateSection !== currentSection
-          ) {
-            // Cross-section duplicates are not allowed (except YouTube)
-            emittedLink = null;
-          } else if (
-            (enriched as DetectedLink).platform.id === 'youtube' &&
-            duplicateSection !== currentSection
-          ) {
-            // Allow YouTube to exist in both social + dsp: treat as add
-          } else {
-            const merged = {
-              ...duplicate,
-              normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-              suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-            } as T;
-            next = prev.map((l, i) => (i === dupAtAfterDelay ? merged : l));
-            emittedLink = merged;
-            didMerge = true;
-          }
+        // Non-YouTube cross-section duplicates not allowed
+        if (
+          visibilityApplied.platform.id !== 'youtube' &&
+          dupSection !== section
+        ) {
+          emittedLink = null;
+        }
+        // YouTube cross-section: allow as add (skip merge)
+        else if (
+          visibilityApplied.platform.id === 'youtube' &&
+          dupSection !== section
+        ) {
+          emittedLink = null; // Will add below
+        }
+        // Same section: merge
+        else {
+          const merged = mergeDuplicate(
+            duplicateAfterDelay,
+            visibilityApplied as DetectedLink
+          );
+          next = prev.map((l, i) => (i === dupAfterDelay ? merged : l));
+          emittedLink = merged;
         }
       }
 
+      // Step 11: Add new link if no merge happened
       if (!emittedLink) {
-        const socialVisibleCount = prev.filter(
-          existing =>
-            sectionOf(existing) === 'social' && linkIsVisible(existing)
-        ).length;
-
-        const adjusted = { ...enriched } as unknown as T;
-        if (
-          currentSection === 'social' &&
-          socialVisibleCount >= MAX_SOCIAL_LINKS
-        ) {
-          (adjusted as unknown as { isVisible?: boolean }).isVisible = false;
-        }
-
+        const adjusted = applyVisibility(
+          visibilityApplied,
+          shouldLinkBeVisible(prev, section)
+        );
         next = [...prev, adjusted];
         emittedLink = adjusted;
-        didAdd = true;
       }
 
+      // Step 12: Update state and notify
       if (emittedLink) {
         setLinks(next);
         setLastAddedId(idFor(emittedLink));
-        if (didAdd || didMerge) {
-          onLinkAdded?.([emittedLink]);
-        }
+        onLinkAdded?.([emittedLink]);
       }
       setAddingLink(null);
 
-      // Non-blocking: enable tipping if Venmo was added
-      try {
-        if ((enriched as DetectedLink).platform.id === 'venmo') {
-          void fetch('/api/dashboard/tipping/enable', { method: 'POST' });
-        }
-      } catch {
-        // non-blocking
+      // Step 13: Enable tipping if Venmo (non-blocking)
+      if (visibilityApplied.platform.id === 'venmo') {
+        fetch('/api/dashboard/tipping/enable', { method: 'POST' }).catch(() => {
+          // Non-blocking: ignore errors
+        });
       }
     },
     [links, linkIsVisible, idFor, onLinkAdded]

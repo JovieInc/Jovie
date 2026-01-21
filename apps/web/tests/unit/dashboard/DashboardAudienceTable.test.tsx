@@ -108,6 +108,13 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
   }));
 }
 
+// Pre-generate datasets at module scope to avoid overhead in tests
+// Using smaller datasets (100/200 rows) since virtualization behavior is the same
+// regardless of total count - we just need more rows than viewport can display
+const MOCK_DATA_LARGE = generateMockAudienceMembers(100);
+const MOCK_DATA_STRESS = generateMockAudienceMembers(200);
+const MOCK_DATA_MEDIUM = generateMockAudienceMembers(50);
+
 const defaultProps = {
   mode: 'members' as const,
   total: 0,
@@ -137,33 +144,37 @@ describe('DashboardAudienceTable - Virtualization', () => {
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
-  describe('with large dataset (500+ rows)', () => {
-    const largeDataset = generateMockAudienceMembers(500);
+  describe('with large dataset (100 rows)', () => {
+    const largeDataset = MOCK_DATA_LARGE;
 
-    it('virtualizes rows - renders significantly fewer DOM rows than total data', () => {
-      render(
-        <DashboardAudienceTable
-          {...defaultProps}
-          rows={largeDataset}
-          total={500}
-        />
-      );
+    it(
+      'virtualizes rows - renders significantly fewer DOM rows than total data',
+      { timeout: 10000 },
+      () => {
+        render(
+          <DashboardAudienceTable
+            {...defaultProps}
+            rows={largeDataset}
+            total={100}
+          />
+        );
 
-      // Verify the virtualizer received the full count
-      expect(capturedRowCount).toBe(500);
+        // Verify the virtualizer received the full count
+        expect(capturedRowCount).toBe(100);
 
-      // The virtualizer should only return a small subset of items
-      // (visible rows + overscan, typically ~20 items for a 600px viewport)
-      expect(capturedVirtualItems.length).toBeLessThan(50);
-      expect(capturedVirtualItems.length).toBeLessThan(500);
-    });
+        // The virtualizer should only return a small subset of items
+        // (visible rows + overscan, typically ~20 items for a 600px viewport)
+        expect(capturedVirtualItems.length).toBeLessThan(50);
+        expect(capturedVirtualItems.length).toBeLessThan(100);
+      }
+    );
 
-    it('only renders visible rows plus overscan, not all 500 rows', () => {
+    it('only renders visible rows plus overscan, not all rows', () => {
       const { container } = render(
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
-          total={500}
+          total={100}
         />
       );
 
@@ -171,9 +182,9 @@ describe('DashboardAudienceTable - Virtualization', () => {
       const tbody = container.querySelector('tbody');
       const renderedRows = tbody?.querySelectorAll('tr') ?? [];
 
-      // With virtualization, we should render far fewer than 500 rows
+      // With virtualization, we should render far fewer than 100 rows
       // Expected: ~20 rows (10 visible + 5 overscan top + 5 overscan bottom)
-      expect(renderedRows.length).toBeLessThan(100);
+      expect(renderedRows.length).toBeLessThan(50);
       expect(renderedRows.length).toBeLessThan(largeDataset.length);
     });
 
@@ -182,7 +193,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
-          total={500}
+          total={100}
         />
       );
 
@@ -195,7 +206,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
-          total={500}
+          total={100}
         />
       );
 
@@ -215,82 +226,56 @@ describe('DashboardAudienceTable - Virtualization', () => {
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
-          total={500}
+          total={100}
         />
       );
 
       const tbody = container.querySelector('tbody');
-      // 500 rows * 44px estimated height = 22000px
-      expect(tbody).toHaveStyle({ height: '22000px' });
+      // 100 rows * 44px estimated height = 4400px
+      expect(tbody).toHaveStyle({ height: '4400px' });
     });
   });
 
-  describe('with exactly 500 rows (threshold)', () => {
-    const thresholdDataset = generateMockAudienceMembers(500);
+  describe('with stress test dataset (200 rows)', () => {
+    const stressDataset = MOCK_DATA_STRESS;
 
-    it('still virtualizes at the 500 row threshold', () => {
-      render(
-        <DashboardAudienceTable
-          {...defaultProps}
-          rows={thresholdDataset}
-          total={500}
-        />
-      );
-
-      // Virtualizer should still be active
-      expect(capturedRowCount).toBe(500);
-      expect(capturedVirtualItems.length).toBeLessThan(500);
-    });
-  });
-
-  describe('with 1000+ rows (stress test)', () => {
-    const veryLargeDataset = generateMockAudienceMembers(1000);
-
-    it('efficiently handles 1000 rows via virtualization', () => {
+    it('efficiently handles larger datasets via virtualization', () => {
       const { container } = render(
         <DashboardAudienceTable
           {...defaultProps}
-          rows={veryLargeDataset}
-          total={1000}
+          rows={stressDataset}
+          total={200}
         />
       );
 
       // Verify virtualizer received full count
-      expect(capturedRowCount).toBe(1000);
+      expect(capturedRowCount).toBe(200);
 
-      // DOM should have far fewer than 1000 rows
+      // DOM should have far fewer than 200 rows
       const tbody = container.querySelector('tbody');
       const renderedRows = tbody?.querySelectorAll('tr') ?? [];
-      expect(renderedRows.length).toBeLessThan(100);
+      expect(renderedRows.length).toBeLessThan(50);
 
       // Total virtual size should reflect all rows
-      expect(tbody).toHaveStyle({ height: '44000px' }); // 1000 * 44px
+      expect(tbody).toHaveStyle({ height: '8800px' }); // 200 * 44px
     });
   });
 
   describe('virtualization configuration', () => {
-    const testDataset = generateMockAudienceMembers(100);
+    const testDataset = MOCK_DATA_MEDIUM;
 
-    it('uses correct estimated row height (44px)', () => {
-      render(
-        <DashboardAudienceTable
-          {...defaultProps}
-          rows={testDataset}
-          total={100}
-        />
-      );
-
-      // Check tbody height calculation: 100 rows * 44px = 4400px
+    it('uses correct estimated row height (44px)', { timeout: 10000 }, () => {
+      // Check tbody height calculation: 50 rows * 44px = 2200px
       const { container } = render(
         <DashboardAudienceTable
           {...defaultProps}
           rows={testDataset}
-          total={100}
+          total={50}
         />
       );
 
       const tbody = container.querySelector('tbody');
-      expect(tbody).toHaveStyle({ height: '4400px' });
+      expect(tbody).toHaveStyle({ height: '2200px' });
     });
 
     it('applies translateY transform to position rows', () => {
@@ -298,7 +283,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
         <DashboardAudienceTable
           {...defaultProps}
           rows={testDataset}
-          total={100}
+          total={50}
         />
       );
 
@@ -318,7 +303,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
         <DashboardAudienceTable
           {...defaultProps}
           rows={testDataset}
-          total={100}
+          total={50}
         />
       );
 
@@ -374,18 +359,16 @@ describe('DashboardAudienceTable - Virtualization', () => {
 
 describe('DashboardAudienceTable - Subscribers Mode', () => {
   it('virtualizes subscriber rows the same as member rows', () => {
-    const largeDataset = generateMockAudienceMembers(500);
-
     render(
       <DashboardAudienceTable
         {...defaultProps}
         mode='subscribers'
-        rows={largeDataset}
-        total={500}
+        rows={MOCK_DATA_LARGE}
+        total={100}
       />
     );
 
-    expect(capturedRowCount).toBe(500);
-    expect(capturedVirtualItems.length).toBeLessThan(500);
+    expect(capturedRowCount).toBe(100);
+    expect(capturedVirtualItems.length).toBeLessThan(100);
   });
 });

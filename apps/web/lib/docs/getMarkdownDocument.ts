@@ -9,11 +9,12 @@ import { LEGAL_ENTITY_NAME } from '@/constants/app';
 import type { MarkdownDocument, TocEntry } from '@/types/docs';
 
 const slugifyHeading = (value: string): string => {
-  return value
+  const safeValue = value.slice(0, 200);
+  return safeValue
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-+)|(-+$)/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/(^-+)|(-+$)/g, '');
 };
 
 type HeadingNode = {
@@ -28,7 +29,7 @@ type HeadingNode = {
 };
 
 const applyMarkdownTemplate = (raw: string): string => {
-  return raw.replace(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
+  return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
 
 export async function getMarkdownDocument(

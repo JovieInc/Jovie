@@ -4,8 +4,10 @@
  * Creates Upstash Redis-backed rate limiters with consistent configuration.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { Ratelimit } from '@upstash/ratelimit';
-import { redis } from '@/lib/redis';
+
+import { getRedis } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 
 /**
@@ -15,7 +17,7 @@ import type { RateLimitConfig } from './types';
 function toUpstashWindow(
   window: string
 ): Parameters<typeof Ratelimit.slidingWindow>[1] {
-  const normalized = window.replace(/\s+/g, '');
+  const normalized = window.replaceAll(/\s+/g, '');
 
   // Map our format to Upstash format
   const match = normalized.match(/^(\d+)(s|m|h|d)$/);
@@ -23,7 +25,7 @@ function toUpstashWindow(
     throw new Error(`Invalid window format: ${window}`);
   }
 
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   const unit = match[2];
 
   // Upstash uses 'ms' for milliseconds, 's' for seconds, 'm' for minutes, etc.
@@ -32,17 +34,24 @@ function toUpstashWindow(
 
 /**
  * Create a Redis-backed rate limiter
- * Returns null if Redis is not configured
+ * Returns null if Redis is not configured or unavailable
  */
 export function createRedisRateLimiter(
   config: RateLimitConfig
 ): Ratelimit | null {
-  if (!redis) {
+  const redisClient = getRedis();
+  if (!redisClient) {
+    if (process.env.NODE_ENV === 'production') {
+      Sentry.captureMessage(
+        `Rate limiter "${config.name}" falling back to memory - Redis unavailable`,
+        'warning'
+      );
+    }
     return null;
   }
 
   return new Ratelimit({
-    redis,
+    redis: redisClient,
     limiter: Ratelimit.slidingWindow(
       config.limit,
       toUpstashWindow(config.window)
@@ -56,12 +65,12 @@ export function createRedisRateLimiter(
  * Check if Redis is available for rate limiting
  */
 export function isRedisAvailable(): boolean {
-  return redis !== null;
+  return getRedis() !== null;
 }
 
 /**
  * Get the Redis client (for advanced use cases)
  */
 export function getRedisClient() {
-  return redis;
+  return getRedis();
 }

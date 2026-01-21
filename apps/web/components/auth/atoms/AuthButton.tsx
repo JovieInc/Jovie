@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-[--radius-xl] flex items-center justify-center gap-3',
+    'w-full rounded-[6px] flex items-center justify-center gap-2',
     'disabled:opacity-70 disabled:cursor-not-allowed',
-    'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
-    // Mobile-optimized height (min 48px for touch targets)
-    'h-12 sm:h-12 min-h-[48px]',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]',
+    // Mobile-optimized height (min 44px for touch targets)
+    'h-11 sm:h-11 min-h-[44px]',
     // Touch-optimized transitions
     'transition-all duration-150 ease-out',
     // Active press state for mobile
@@ -26,32 +26,24 @@ const authButtonVariants = cva(
     variants: {
       variant: {
         primary: [
-          'bg-btn-primary px-4 text-base sm:text-sm leading-5 font-medium text-btn-primary-foreground',
-          'shadow-(--shadow-sm)',
-          'hover:opacity-90',
-          'active:shadow-none',
+          'bg-[#2a2d32] border border-[#34383f] px-[14px] text-[13px] leading-5 font-medium text-[#f0f1f3]',
+          'hover:bg-[#30343a] active:bg-[#23262b]',
         ].join(' '),
         primaryLight: [
-          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
-          'shadow-(--shadow-sm)',
-          'hover:bg-surface-1',
-          'active:bg-surface-2 active:shadow-none',
+          'bg-[#2a2d32] border border-[#34383f] px-[14px] text-[13px] leading-5 font-medium text-[#f0f1f3]',
+          'hover:bg-[#30343a] active:bg-[#23262b]',
         ].join(' '),
         oauthPrimary: [
-          'bg-btn-primary px-4 text-base sm:text-sm leading-5 font-medium text-btn-primary-foreground',
-          'shadow-(--shadow-sm)',
-          'hover:opacity-90',
-          'active:shadow-none',
+          'bg-[#5b5fc9] border border-[#6c78e6] px-[14px] text-[13px] leading-5 font-medium text-[#fefeff]',
+          'hover:bg-[#5256bf] active:bg-[#474bb3]',
         ].join(' '),
         secondary: [
-          'border border-subtle bg-surface-0 px-4 text-base sm:text-sm leading-5 font-medium text-primary-token',
-          'shadow-(--shadow-sm)',
-          'hover:bg-surface-1',
-          'active:bg-surface-2 active:shadow-none',
+          'bg-[#1f2227] border border-[#2c2e33] px-[14px] text-[13px] leading-5 font-medium text-[#e3e4e6]',
+          'hover:bg-[#25282d] active:bg-[#1a1d21]',
         ].join(' '),
         link: [
-          'bg-transparent p-0 h-auto min-h-0 text-sm text-secondary-token',
-          'hover:text-primary-token',
+          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799]',
+          'hover:text-[#1f2023] dark:hover:text-[#e3e4e6]',
           'active:scale-100 active:opacity-70',
         ].join(' '),
       },

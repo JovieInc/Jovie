@@ -13,6 +13,19 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 
+import {
+  CHECKBOX_RADIO_ITEM_BASE,
+  CONTEXT_TRANSFORM_ORIGIN,
+  contextMenuContentClasses,
+  DROPDOWN_TRANSFORM_ORIGIN,
+  dropdownMenuContentClasses,
+  MENU_ITEM_BASE,
+  MENU_ITEM_DESTRUCTIVE,
+  MENU_LABEL_BASE,
+  MENU_SEPARATOR_BASE,
+  MENU_SHORTCUT_BASE,
+  subMenuContentClasses,
+} from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 import type {
   CommonDropdownActionItem,
@@ -32,29 +45,17 @@ import {
   isSubmenu,
 } from './common-dropdown-types';
 
-// Shared style constants
-const GLASS_BASE_TRANSITIONS =
-  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0';
-
-const GLASS_POSITIONING =
-  'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 ' +
-  'data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ' +
-  'origin-[--radix-dropdown-menu-content-transform-origin]';
-
-const DROPDOWN_CONTENT_BASE =
-  'z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[10rem] overflow-y-auto overflow-x-hidden rounded-xl border border-subtle bg-surface-1 p-2 text-primary-token shadow-[0_12px_40px_rgba(0,0,0,0.12)] ring-1 ring-black/5 dark:shadow-[0_18px_60px_rgba(0,0,0,0.55)] dark:ring-white/5';
-
-const CONTEXT_CONTENT_BASE =
-  'z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-[10rem] overflow-y-auto overflow-x-hidden rounded-xl border border-subtle bg-surface-1 p-2 text-primary-token shadow-[0_12px_40px_rgba(0,0,0,0.12)] ring-1 ring-black/5 dark:shadow-[0_18px_60px_rgba(0,0,0,0.55)] dark:ring-white/5';
-
-const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-sidebar-accent hover:text-primary-token data-highlighted:bg-sidebar-accent data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1) [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0';
-
-const MENU_ITEM_DESTRUCTIVE =
-  'text-destructive hover:text-destructive hover:bg-destructive/10 data-highlighted:text-destructive data-highlighted:bg-destructive/10 focus-visible:ring-destructive [&_svg]:text-destructive';
-
-const CHECKBOX_RADIO_BASE =
-  'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-10 pr-3 text-sm outline-none transition-colors duration-150 ease-out text-secondary-token hover:bg-sidebar-accent hover:text-primary-token data-highlighted:bg-sidebar-accent data-highlighted:text-primary-token data-disabled:pointer-events-none data-disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-1)';
+/** Renders an icon component, handling both function components and JSX elements */
+function renderIcon(
+  IconComponent: React.ComponentType<{ className?: string }> | React.ReactNode,
+  className: string
+): React.ReactNode {
+  if (!IconComponent) return null;
+  if (typeof IconComponent === 'function') {
+    return <IconComponent className={className} />;
+  }
+  return IconComponent;
+}
 
 /**
  * CommonDropdown - Unified dropdown component supporting multiple variants
@@ -190,10 +191,10 @@ export function CommonDropdown(props: CommonDropdownProps) {
         <button
           type='button'
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-md border border-default bg-surface-1 px-3 py-2',
+            'flex h-10 w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3 py-2',
             'text-sm ring-offset-background',
-            'placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'placeholder:text-tertiary-token',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
             triggerClassName
           )}
@@ -209,7 +210,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <button
         type='button'
         className={cn(
-          'inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+          'inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
           triggerClassName
         )}
         aria-label={ariaLabel || 'More actions'}
@@ -227,12 +228,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         align={align}
         side={side}
         sideOffset={sideOffset}
-        className={cn(
-          DROPDOWN_CONTENT_BASE,
-          GLASS_BASE_TRANSITIONS,
-          GLASS_POSITIONING,
-          contentClassName
-        )}
+        className={cn(dropdownMenuContentClasses, contentClassName)}
       >
         {searchable && (
           <div className='relative mb-2'>
@@ -242,7 +238,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
               placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='w-full rounded-md border border-subtle bg-surface-2 py-2 pl-9 pr-3 text-sm text-primary-token placeholder:text-tertiary-token focus:outline-none focus:ring-2 focus:ring-accent'
+              className='w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-3 text-sm text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             />
           </div>
         )}
@@ -275,12 +271,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
   function renderContextMenuContent() {
     const content = (
       <ContextMenuPrimitive.Content
-        className={cn(
-          CONTEXT_CONTENT_BASE,
-          GLASS_BASE_TRANSITIONS,
-          GLASS_POSITIONING,
-          contentClassName
-        )}
+        className={cn(contextMenuContentClasses, contentClassName)}
       >
         {isLoading ? (
           <div className='flex items-center justify-center py-6'>
@@ -322,10 +313,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         return (
           <Separator
             key={item.id}
-            className={cn(
-              '-mx-1 my-1 h-px bg-[var(--color-border-subtle)]/70',
-              item.className
-            )}
+            className={cn(MENU_SEPARATOR_BASE, item.className)}
           />
         );
       }
@@ -340,7 +328,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
           <Label
             key={item.id}
             className={cn(
-              'px-3 py-1 text-xs font-semibold uppercase tracking-wide text-tertiary-token/80',
+              MENU_LABEL_BASE,
               item.inset && 'pl-10',
               item.className
             )}
@@ -405,12 +393,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
           item.className
         )}
       >
-        {IconComponent &&
-          (typeof IconComponent === 'function' ? (
-            <IconComponent className='h-3.5 w-3.5' />
-          ) : (
-            IconComponent
-          ))}
+        {renderIcon(IconComponent, 'h-3.5 w-3.5')}
         <span className='flex-1'>{item.label}</span>
         {item.badge && (
           <span
@@ -429,16 +412,9 @@ export function CommonDropdown(props: CommonDropdownProps) {
           </span>
         )}
         {item.shortcut && (
-          <span className='ml-auto text-[10px] tracking-[0.35em] text-tertiary-token/70'>
-            {item.shortcut}
-          </span>
+          <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
         )}
-        {IconAfterComponent &&
-          (typeof IconAfterComponent === 'function' ? (
-            <IconAfterComponent className='ml-auto h-3.5 w-3.5' />
-          ) : (
-            IconAfterComponent
-          ))}
+        {renderIcon(IconAfterComponent, 'ml-auto h-3.5 w-3.5')}
       </MenuItem>
     );
   }
@@ -464,7 +440,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         checked={item.checked}
         onCheckedChange={item.onCheckedChange}
         disabled={item.disabled}
-        className={cn(CHECKBOX_RADIO_BASE, item.className)}
+        className={cn(CHECKBOX_RADIO_ITEM_BASE, item.className)}
       >
         <span className='absolute left-2 flex h-3.5 w-3.5 items-center justify-center'>
           <ItemIndicator>
@@ -508,19 +484,14 @@ export function CommonDropdown(props: CommonDropdownProps) {
               key={radioItem.id}
               value={radioItem.value}
               disabled={radioItem.disabled}
-              className={cn(CHECKBOX_RADIO_BASE, radioItem.className)}
+              className={cn(CHECKBOX_RADIO_ITEM_BASE, radioItem.className)}
             >
               <span className='absolute left-2 flex h-3.5 w-3.5 items-center justify-center'>
                 <ItemIndicator>
                   <Circle className='h-2 w-2 fill-current' />
                 </ItemIndicator>
               </span>
-              {IconComponent &&
-                (typeof IconComponent === 'function' ? (
-                  <IconComponent className='h-3.5 w-3.5' />
-                ) : (
-                  IconComponent
-                ))}
+              {renderIcon(IconComponent, 'h-3.5 w-3.5')}
               {radioItem.label}
             </RadioItem>
           );
@@ -534,58 +505,38 @@ export function CommonDropdown(props: CommonDropdownProps) {
     item: CommonDropdownSubmenu,
     isContextMenu: boolean
   ): React.ReactNode {
-    if (isContextMenu) {
-      const IconComponent = item.icon;
-
-      return (
-        <ContextMenuPrimitive.Sub key={item.id}>
-          <ContextMenuPrimitive.SubTrigger
-            disabled={item.disabled}
-            className={cn(MENU_ITEM_BASE, item.className)}
-          >
-            {IconComponent && <IconComponent className='h-3.5 w-3.5' />}
-            {item.label}
-            <ChevronRight className='ml-auto' />
-          </ContextMenuPrimitive.SubTrigger>
-          <ContextMenuPrimitive.Portal>
-            <ContextMenuPrimitive.SubContent
-              className={cn(
-                CONTEXT_CONTENT_BASE,
-                GLASS_BASE_TRANSITIONS,
-                GLASS_POSITIONING
-              )}
-            >
-              {renderItems(item.items, true)}
-            </ContextMenuPrimitive.SubContent>
-          </ContextMenuPrimitive.Portal>
-        </ContextMenuPrimitive.Sub>
-      );
-    }
-
-    const IconComponent = item.icon;
+    const Sub = isContextMenu
+      ? ContextMenuPrimitive.Sub
+      : DropdownMenuPrimitive.Sub;
+    const SubTrigger = isContextMenu
+      ? ContextMenuPrimitive.SubTrigger
+      : DropdownMenuPrimitive.SubTrigger;
+    const Portal = isContextMenu
+      ? ContextMenuPrimitive.Portal
+      : DropdownMenuPrimitive.Portal;
+    const SubContent = isContextMenu
+      ? ContextMenuPrimitive.SubContent
+      : DropdownMenuPrimitive.SubContent;
+    const transformOrigin = isContextMenu
+      ? CONTEXT_TRANSFORM_ORIGIN
+      : DROPDOWN_TRANSFORM_ORIGIN;
 
     return (
-      <DropdownMenuPrimitive.Sub key={item.id}>
-        <DropdownMenuPrimitive.SubTrigger
+      <Sub key={item.id}>
+        <SubTrigger
           disabled={item.disabled}
           className={cn(MENU_ITEM_BASE, item.className)}
         >
-          {IconComponent && <IconComponent className='h-3.5 w-3.5' />}
+          {renderIcon(item.icon, 'h-3.5 w-3.5')}
           {item.label}
           <ChevronRight className='ml-auto' />
-        </DropdownMenuPrimitive.SubTrigger>
-        <DropdownMenuPrimitive.Portal>
-          <DropdownMenuPrimitive.SubContent
-            className={cn(
-              DROPDOWN_CONTENT_BASE,
-              GLASS_BASE_TRANSITIONS,
-              GLASS_POSITIONING
-            )}
-          >
-            {renderItems(item.items, false)}
-          </DropdownMenuPrimitive.SubContent>
-        </DropdownMenuPrimitive.Portal>
-      </DropdownMenuPrimitive.Sub>
+        </SubTrigger>
+        <Portal>
+          <SubContent className={cn(subMenuContentClasses, transformOrigin)}>
+            {renderItems(item.items, isContextMenu)}
+          </SubContent>
+        </Portal>
+      </Sub>
     );
   }
 }

@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TableCountBadge } from '../atoms/TableCountBadge';
 
 export interface BulkAction {
   label: string;
@@ -38,10 +39,12 @@ export function TableBulkActionsToolbar({
         className
       )}
     >
-      {/* Selected count */}
-      <span className='text-sm font-medium text-primary-token'>
-        {selectedCount} selected
-      </span>
+      {/* Selected count - totalCount is unused since this toolbar only renders when selectedCount > 0 */}
+      <TableCountBadge
+        selectedCount={selectedCount}
+        totalCount={0}
+        variant='text'
+      />
 
       {/* Actions dropdown */}
       {actions.length > 0 && (
@@ -52,9 +55,9 @@ export function TableBulkActionsToolbar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start'>
-            {actions.map((action, index) => (
+            {actions.map(action => (
               <DropdownMenuItem
-                key={index}
+                key={action.label}
                 onClick={action.onClick}
                 className='flex items-center gap-2'
               >

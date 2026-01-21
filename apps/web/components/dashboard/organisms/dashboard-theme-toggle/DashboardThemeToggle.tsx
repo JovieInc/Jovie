@@ -6,7 +6,7 @@ import { MoonIcon, SunIcon } from './ThemeIcons';
 import { type DashboardThemeToggleProps, THEME_OPTIONS } from './types';
 import { useDashboardTheme } from './useDashboardTheme';
 
-function SystemIcon({ className }: { className: string }) {
+function SystemIcon({ className }: Readonly<{ className: string }>) {
   return (
     <svg
       aria-hidden='true'
@@ -61,7 +61,7 @@ export function DashboardThemeToggle({
   onThemeSave,
   showSystemOption = false,
   variant = 'default',
-}: DashboardThemeToggleProps) {
+}: Readonly<DashboardThemeToggleProps>) {
   const {
     mounted,
     isUpdating,
@@ -82,12 +82,9 @@ export function DashboardThemeToggle({
   if (showSystemOption) {
     return (
       <div className='space-y-3'>
-        {
-          // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with control via DOM structure
-          <label className='text-sm font-medium text-primary-token'>
-            Theme Preference
-          </label>
-        }
+        <span className='text-sm font-medium text-primary-token'>
+          Theme Preference
+        </span>
         <div className='grid grid-cols-3 gap-2'>
           {THEME_OPTIONS.map(option => (
             <button

@@ -9,12 +9,18 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
-import { MARKETING_HOSTNAME, PROFILE_HOSTNAME } from '@/constants/domains';
+import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { getUserState } from '@/lib/auth/proxy-state';
 import {
   buildContentSecurityPolicy,
+  buildContentSecurityPolicyReportOnly,
   SCRIPT_NONCE_HEADER,
 } from '@/lib/security/content-security-policy';
+import {
+  buildReportingEndpointsHeader,
+  buildReportToHeader,
+  getCspReportUri,
+} from '@/lib/security/csp-reporting';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
@@ -38,15 +44,6 @@ function isProfileHost(hostname: string): boolean {
 }
 
 /**
- * Check if a hostname matches the marketing domain (jov.ie - same as profile)
- */
-function isMarketingHost(hostname: string): boolean {
-  return (
-    hostname === MARKETING_HOSTNAME || hostname === `www.${MARKETING_HOSTNAME}`
-  );
-}
-
-/**
  * Check if a hostname matches the app subdomain (app.jov.ie)
  */
 function isAppSubdomain(hostname: string): boolean {
@@ -66,6 +63,18 @@ function isDevOrPreview(hostname: string): boolean {
     hostname.includes('vercel.app') ||
     hostname.startsWith('main.')
   );
+}
+
+/**
+ * Get the dashboard URL based on environment.
+ * In production on app.jov.ie, dashboard is at '/'.
+ * In dev/preview, dashboard is at '/app'.
+ */
+function getDashboardUrl(hostname: string): string {
+  if (isDevOrPreview(hostname) && !isAppSubdomain(hostname)) {
+    return '/app';
+  }
+  return '/';
 }
 
 const EU_EEA_UK = [
@@ -138,10 +147,18 @@ async function handleRequest(req: NextRequest, userId: string | null) {
   try {
     // Start performance timing
     const startTime = Date.now();
+
     const nonce = generateNonce();
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
     const contentSecurityPolicy = buildContentSecurityPolicy({ nonce });
+    // Compute CSP report URI once and pass to report-only builder
+    const cspReportUri = getCspReportUri();
+    const contentSecurityPolicyReportOnly =
+      buildContentSecurityPolicyReportOnly({
+        nonce,
+        reportUri: cspReportUri,
+      });
 
     // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
@@ -220,7 +237,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
 
       // jov.ie root: Marketing + Profiles
-      if (isProfileHost(hostname) || isMarketingHost(hostname)) {
+      if (isProfileHost(hostname)) {
         // Redirect app paths to app subdomain (legacy /app/* or direct app paths)
         const appPaths = [
           '/settings',
@@ -287,18 +304,21 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathname === '/signup/sso-callback' ||
       pathname === '/signin/sso-callback';
 
-    const normalizeRedirectPath = (path: string): string => {
-      // No longer need to add /app prefix - paths are clean
-      // Legacy /app/* paths are already redirected in domain routing above
-      return path;
-    };
+    // Detect RSC prefetch requests - these should NOT trigger redirects
+    // RSC prefetch happens when Link components preload routes in the background
+    // Redirecting prefetch requests causes "too many redirects" errors
+    // Note: RSC header alone indicates RSC navigation, not prefetch
+    // Only Next-Router-Prefetch='1' or _rsc param indicates actual prefetch
+    const isRSCPrefetch =
+      req.headers.get('Next-Router-Prefetch') === '1' ||
+      req.nextUrl.searchParams.has('_rsc');
 
     // Let SSO callback routes complete without middleware interference
     // The AuthenticateWithRedirectCallback component will handle routing based on user state
-    if (userId && isAuthPath && !isAuthCallbackPath) {
+    // Skip redirects for RSC prefetch requests to avoid "too many redirects" errors
+    if (userId && isAuthPath && !isAuthCallbackPath && !isRSCPrefetch) {
       // Check complete user state to determine where authenticated user should go
       const userState = await getUserState(userId);
-
       const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
 
       // If user needs waitlist/onboarding, send them there (ignore redirect_url)
@@ -312,12 +332,12 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !redirectUrl.startsWith('//')
       ) {
         // User is fully active - honor redirect_url for things like /claim/token
-        res = NextResponse.redirect(
-          new URL(normalizeRedirectPath(redirectUrl), req.url)
-        );
+        res = NextResponse.redirect(new URL(redirectUrl, req.url));
       } else {
-        // Fully active user, no redirect_url - go to dashboard at app.jov.ie/
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        // Fully active user, no redirect_url - go to dashboard
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -349,23 +369,53 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname !== '/onboarding' &&
         !pathname.startsWith('/api/')
       ) {
-        // User needs onboarding - rewrite to onboarding page
-        res = NextResponse.rewrite(new URL('/onboarding', req.url), {
-          request: { headers: requestHeaders },
-        });
-      } else if (!userState.needsWaitlist && pathname === '/waitlist') {
-        // Active user trying to access waitlist → redirect to dashboard
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
-      } else if (!userState.needsOnboarding && pathname === '/onboarding') {
-        // Active user trying to access onboarding → redirect to dashboard
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        // ENG-002: Check for recent onboarding completion cookie to prevent redirect loop
+        // This cookie is set after completing onboarding to bypass the race condition
+        // where the DB query might see stale data before transaction is fully visible
+        const onboardingJustCompleted =
+          req.cookies.get('jovie_onboarding_complete')?.value === '1';
+
+        if (onboardingJustCompleted) {
+          // User just completed onboarding - let them through to dashboard
+          // The cookie will expire in 30s, and by then DB will have fresh data
+          res = NextResponse.next({ request: { headers: requestHeaders } });
+          // Clear the cookie since it's a one-time bypass
+          res.cookies.delete('jovie_onboarding_complete');
+        } else {
+          // User needs onboarding - rewrite to onboarding page
+          res = NextResponse.rewrite(new URL('/onboarding', req.url), {
+            request: { headers: requestHeaders },
+          });
+        }
       } else if (
-        pathname === '/' ||
-        pathname === '/signin' ||
-        pathname === '/signup'
+        !userState.needsWaitlist &&
+        pathname === '/waitlist' &&
+        !isRSCPrefetch
+      ) {
+        // Active user trying to access waitlist → redirect to dashboard
+        // Skip for RSC prefetch to avoid "too many redirects" errors
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
+      } else if (
+        !userState.needsOnboarding &&
+        pathname === '/onboarding' &&
+        !isRSCPrefetch
+      ) {
+        // Active user trying to access onboarding → redirect to dashboard
+        // Skip for RSC prefetch to avoid "too many redirects" errors
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
+      } else if (
+        (pathname === '/signin' || pathname === '/signup') &&
+        !isRSCPrefetch
       ) {
         // Fully authenticated user hitting auth pages → redirect to dashboard
-        res = NextResponse.redirect(new URL('https://app.jov.ie/', req.url));
+        // Skip for RSC prefetch to avoid "too many redirects" errors
+        res = NextResponse.redirect(
+          new URL(getDashboardUrl(hostname), req.url)
+        );
       } else {
         // All other paths - user is authenticated and on correct page
         res = NextResponse.next({ request: { headers: requestHeaders } });
@@ -395,7 +445,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         // Redirect to signup for waitlist (new users creating accounts)
         // Redirect to signin for everything else (existing users)
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
-        const authUrl = new URL(authPage, 'https://jov.ie');
+        const authUrl = new URL(authPage, req.url);
         authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
         res = NextResponse.redirect(authUrl);
       } else {
@@ -431,6 +481,19 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const duration = Date.now() - startTime;
     res.headers.set('Server-Timing', `middleware;dur=${duration}`);
     res.headers.set('Content-Security-Policy', contentSecurityPolicy);
+
+    // Add CSP violation reporting headers (report-only mode)
+    if (contentSecurityPolicyReportOnly && cspReportUri) {
+      res.headers.set(
+        'Content-Security-Policy-Report-Only',
+        contentSecurityPolicyReportOnly
+      );
+      res.headers.set('Report-To', buildReportToHeader(cspReportUri));
+      res.headers.set(
+        'Reporting-Endpoints',
+        buildReportingEndpointsHeader(cspReportUri)
+      );
+    }
 
     // Add performance monitoring for API routes
     if (pathname.startsWith('/api/')) {

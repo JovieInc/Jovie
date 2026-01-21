@@ -1,9 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { put as uploadBlob } from '@vercel/blob';
-import { randomUUID } from 'crypto';
-import { and, eq, max } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { type DbType } from '@/lib/db';
-import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   calculateAndStoreFitScore,
@@ -16,6 +16,22 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
+import {
+  detectFullExtractionPlatform,
+  fetchFullExtractionProfile,
+  resolveFullExtractionContext,
+} from '@/lib/ingestion/flows/full-extraction-flow';
+import {
+  checkExistingProfile,
+  findAvailableHandle,
+  markReingestFailure,
+} from '@/lib/ingestion/flows/profile-operations';
+import {
+  createNewSocialProfile,
+  generateClaimToken,
+  handleExistingUnclaimedProfile,
+  type SocialPlatformContext,
+} from '@/lib/ingestion/flows/social-platform-flow';
 import { maybeCopyIngestionAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
   enqueueFollowupIngestionJobs,
@@ -24,161 +40,13 @@ import {
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import {
-  extractLaylo,
-  extractLayloHandle,
-  fetchLayloProfile,
-  isLayloUrl,
-  normalizeLayloHandle,
-  validateLayloUrl,
-} from '@/lib/ingestion/strategies/laylo';
-import {
-  extractLinktree,
-  extractLinktreeHandle,
-  fetchLinktreeDocument,
   isValidHandle,
   normalizeHandle,
-  validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { normalizeUrl } from '@/lib/utils/platform-detection/normalizer';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
-
-// Default claim token expiration: 30 days
-const CLAIM_TOKEN_EXPIRY_DAYS = 30;
-
-// Music platforms that should have empty link display text by default
-const MUSIC_PLATFORMS = [
-  'spotify',
-  'apple_music',
-  'soundcloud',
-  'tidal',
-] as const;
-
-/**
- * Determine the display text for a social link based on platform type.
- * Music platforms get empty display text (unless a specific name is provided),
- * while other platforms use the platform name.
- *
- * @param platformId - Platform identifier (e.g., 'spotify', 'instagram')
- * @param platformName - Default platform name to use
- * @param customName - Optional custom name (e.g., Spotify artist name)
- * @returns Display text for the link
- */
-function getLinkDisplayText(
-  platformId: string,
-  platformName: string,
-  customName?: string | null
-): string {
-  if (customName) return customName;
-  const isMusicPlatform = MUSIC_PLATFORMS.includes(
-    platformId as (typeof MUSIC_PLATFORMS)[number]
-  );
-  return isMusicPlatform ? '' : platformName;
-}
-
-/**
- * Generate a claim token with expiration date.
- * Claim tokens allow creators to claim unclaimed profiles.
- *
- * @returns Object with claimToken UUID and claimTokenExpiresAt date
- */
-function generateClaimToken(): {
-  claimToken: string;
-  claimTokenExpiresAt: Date;
-} {
-  const claimToken = randomUUID();
-  const claimTokenExpiresAt = new Date();
-  claimTokenExpiresAt.setDate(
-    claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-  );
-  return { claimToken, claimTokenExpiresAt };
-}
-
-async function findAvailableHandle(
-  tx: DbType,
-  baseHandle: string
-): Promise<string | null> {
-  const MAX_LEN = 30;
-  const normalizedBase = baseHandle.slice(0, MAX_LEN);
-  const maxAttempts = 20;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    const suffix = i === 0 ? '' : `-${i}`;
-    const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
-    const candidate = `${trimmedBase}${suffix}`;
-    if (!isValidHandle(candidate)) continue;
-
-    const [existing] = await tx
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, candidate))
-      .limit(1);
-
-    if (!existing) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Idempotently add a social link to a creator profile.
- * Checks if the link already exists, and if not, computes the next sortOrder.
- * Returns true if a new link was added, false if it already existed.
- */
-async function addSocialLinkIdempotent(
-  tx: DbType,
-  creatorProfileId: string,
-  platform: string,
-  url: string,
-  title: string
-): Promise<boolean> {
-  // Check if link already exists
-  const [existingLink] = await tx
-    .select({ id: socialLinks.id })
-    .from(socialLinks)
-    .where(
-      and(
-        eq(socialLinks.creatorProfileId, creatorProfileId),
-        eq(socialLinks.platform, platform),
-        eq(socialLinks.url, url)
-      )
-    )
-    .limit(1);
-
-  if (existingLink) {
-    // Link already exists, skip insertion
-    return false;
-  }
-
-  // Compute next sortOrder (max + 1, or 0 if no links exist)
-  const [result] = await tx
-    .select({ maxOrder: max(socialLinks.sortOrder) })
-    .from(socialLinks)
-    .where(eq(socialLinks.creatorProfileId, creatorProfileId));
-
-  const nextSortOrder =
-    result?.maxOrder !== null && result?.maxOrder !== undefined
-      ? result.maxOrder + 1
-      : 0;
-
-  // Insert the new link
-  await tx.insert(socialLinks).values({
-    creatorProfileId,
-    platform,
-    platformType: platform,
-    url,
-    displayText: title,
-    sortOrder: nextSortOrder,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return true;
-}
 
 export const runtime = 'nodejs';
 
@@ -519,6 +387,241 @@ async function processProfileExtraction(
   return { mergeError };
 }
 
+async function resolveHostedAvatarUrl(
+  handle: string,
+  extraction: { avatarUrl?: string | null; links: Array<{ url?: string }> }
+) {
+  const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
+
+  const hostedAvatarUrlFromProfile = externalAvatarUrl
+    ? await copyAvatarToBlob(externalAvatarUrl, handle)
+    : null;
+
+  const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
+    ? null
+    : await maybeCopyIngestionAvatarFromLinks({
+        handle,
+        links: extraction.links
+          .map(link => link.url)
+          .filter((url): url is string => typeof url === 'string'),
+      });
+
+  return hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
+}
+
+async function handleReingestProfile({
+  existing,
+  extraction,
+  displayName,
+}: {
+  existing: NonNullable<
+    Awaited<ReturnType<typeof checkExistingProfile>>['existing']
+  >;
+  extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
+  displayName: string;
+}) {
+  return withSystemIngestionSession(async tx => {
+    const { mergeError } = await processProfileExtraction(
+      tx,
+      {
+        id: existing.id,
+        usernameNormalized: existing.usernameNormalized,
+        avatarUrl: existing.avatarUrl ?? null,
+        displayName: existing.displayName,
+        avatarLockedByUser: existing.avatarLockedByUser ?? false,
+        displayNameLocked: existing.displayNameLocked ?? false,
+      },
+      extraction,
+      displayName
+    );
+
+    return NextResponse.json(
+      {
+        ok: !mergeError,
+        profile: {
+          id: existing.id,
+          username: existing.usernameNormalized,
+          usernameNormalized: existing.usernameNormalized,
+          claimToken: existing.claimToken,
+        },
+        links: extraction.links.length,
+        warning: mergeError
+          ? `Profile updated but link extraction had issues: ${mergeError}`
+          : undefined,
+      },
+      {
+        status: mergeError ? 207 : 200,
+        headers: { 'Cache-Control': 'no-store' },
+      }
+    );
+  });
+}
+
+async function handleNewProfileIngest({
+  finalHandle,
+  displayName,
+  hostedAvatarUrl,
+  extraction,
+}: {
+  finalHandle: string;
+  displayName: string;
+  hostedAvatarUrl: string | null;
+  extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
+}) {
+  return withSystemIngestionSession(async tx => {
+    const { claimToken, claimTokenExpiresAt } = generateClaimToken();
+
+    const [created] = await tx
+      .insert(creatorProfiles)
+      .values({
+        creatorType: 'creator',
+        username: finalHandle,
+        usernameNormalized: finalHandle,
+        displayName,
+        avatarUrl: hostedAvatarUrl,
+        isPublic: true,
+        isVerified: false,
+        isFeatured: false,
+        marketingOptOut: false,
+        isClaimed: false,
+        claimToken,
+        claimTokenExpiresAt,
+        settings: {},
+        theme: {},
+        ingestionStatus: 'processing',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+        displayName: creatorProfiles.displayName,
+        avatarUrl: creatorProfiles.avatarUrl,
+        claimToken: creatorProfiles.claimToken,
+        isClaimed: creatorProfiles.isClaimed,
+        claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+        avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+        displayNameLocked: creatorProfiles.displayNameLocked,
+      });
+
+    if (!created) {
+      return NextResponse.json(
+        { error: 'Failed to create creator profile' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { mergeError } = await processProfileExtraction(
+      tx,
+      {
+        id: created.id,
+        usernameNormalized: created.usernameNormalized,
+        avatarUrl: created.avatarUrl ?? null,
+        displayName: created.displayName,
+        avatarLockedByUser: created.avatarLockedByUser ?? false,
+        displayNameLocked: created.displayNameLocked ?? false,
+      },
+      extraction,
+      displayName
+    );
+
+    logger.info('Creator profile ingested', {
+      profileId: created.id,
+      handle: created.username,
+      linksExtracted: extraction.links.length,
+      hadError: !!mergeError,
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        profile: {
+          id: created.id,
+          username: created.username,
+          usernameNormalized: created.usernameNormalized,
+          claimToken: created.claimToken,
+        },
+        links: extraction.links.length,
+        warning: mergeError
+          ? `Profile created but link extraction had issues: ${mergeError}`
+          : undefined,
+      },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+    );
+  });
+}
+
+async function fetchSpotifyArtistName(
+  handle: string,
+  platformId: string
+): Promise<string | null> {
+  const isSpotifyArtist =
+    handle.startsWith('artist-') && platformId === 'spotify';
+  if (!isSpotifyArtist) {
+    return null;
+  }
+
+  try {
+    const { getSpotifyArtist } = await import('@/lib/spotify');
+    const artistId = handle.replace('artist-', '');
+    const artist = await getSpotifyArtist(artistId);
+    if (artist?.name) {
+      logger.info('Fetched Spotify artist name', {
+        artistId,
+        name: artist.name,
+      });
+      return artist.name;
+    }
+  } catch (error) {
+    logger.warn('Failed to fetch Spotify artist name', {
+      handle,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+
+  return null;
+}
+
+function validateSocialHandle(
+  inputUrl: string,
+  detectedPlatformName: string
+):
+  | { ok: true; handle: string; normalizedHandle: string }
+  | { ok: false; response: NextResponse } {
+  const handle = extractHandleFromSocialUrl(inputUrl);
+
+  if (!handle) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: 'Unable to extract username from URL',
+          details: `Could not parse a valid username from the ${detectedPlatformName} URL. Please ensure the URL points to a valid profile.`,
+        },
+        { status: 422, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  const normalizedHandle = normalizeHandle(handle);
+  if (!isValidHandle(normalizedHandle)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: 'Invalid username format',
+          details:
+            'Username must be 1-30 characters, alphanumeric and underscores only',
+        },
+        { status: 422, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  return { ok: true, handle, normalizedHandle };
+}
+
 /**
  * Admin endpoint to ingest a creator profile from any social platform URL.
  *
@@ -575,93 +678,25 @@ export async function POST(request: Request) {
     const normalizedUrl = detected.normalizedUrl;
 
     // Check if this is a full-extraction platform (Linktree/Laylo)
-    const isLayloProfile = isLayloUrl(inputUrl);
-    const linktreeValidatedUrl = validateLinktreeUrl(inputUrl);
-    const isLinktreeProfile = linktreeValidatedUrl !== null;
+    const { isLinktree, isLaylo, linktreeValidatedUrl } =
+      detectFullExtractionPlatform(inputUrl);
 
     // For full-extraction platforms, use existing logic
-    if (isLinktreeProfile || isLayloProfile) {
-      const validatedUrl = isLayloProfile
-        ? validateLayloUrl(inputUrl)
-        : linktreeValidatedUrl;
+    if (isLinktree || isLaylo) {
+      const context = resolveFullExtractionContext(
+        inputUrl,
+        isLaylo,
+        linktreeValidatedUrl
+      );
 
-      if (!validatedUrl) {
-        return NextResponse.json(
-          {
-            error: 'Invalid profile URL',
-            details: isLayloProfile
-              ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
-              : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
-          },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
+      if (!context.ok) {
+        return context.response;
       }
 
-      // Extract and validate handle
-      const rawHandle = isLayloProfile
-        ? extractLayloHandle(validatedUrl)
-        : extractLinktreeHandle(validatedUrl);
-
-      if (!rawHandle) {
-        return NextResponse.json(
-          { error: 'Unable to parse profile handle from URL.' },
-          { status: 422, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      // Normalize handle for storage
-      const handle = isLayloProfile
-        ? normalizeLayloHandle(rawHandle)
-        : normalizeHandle(rawHandle);
-
-      if (!isValidHandle(handle)) {
-        return NextResponse.json(
-          {
-            error: 'Invalid handle format',
-            details:
-              'Handle must be 1-30 characters, alphanumeric and underscores only',
-          },
-          { status: 422, headers: NO_STORE_HEADERS }
-        );
-      }
-
+      const { validatedUrl, handle } = context;
       const usernameNormalized = handle;
+      const existingCheck = await checkExistingProfile(usernameNormalized);
 
-      // TRANSACTION 1: Check for existing profile and allocate handle (DB-only)
-      const existingCheck = await withSystemIngestionSession(async tx => {
-        const [existing] = await tx
-          .select({
-            id: creatorProfiles.id,
-            isClaimed: creatorProfiles.isClaimed,
-            usernameNormalized: creatorProfiles.usernameNormalized,
-            avatarUrl: creatorProfiles.avatarUrl,
-            displayName: creatorProfiles.displayName,
-            avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-            displayNameLocked: creatorProfiles.displayNameLocked,
-            claimToken: creatorProfiles.claimToken,
-            claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
-          })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-          .limit(1);
-
-        const isReingest = !!existing && !existing.isClaimed;
-
-        const finalHandle = existing
-          ? existing.isClaimed
-            ? await findAvailableHandle(tx, usernameNormalized)
-            : existing.usernameNormalized
-          : usernameNormalized;
-
-        // Mark as processing if re-ingesting
-        if (isReingest && existing) {
-          await IngestionStatusManager.markProcessing(tx, existing.id);
-        }
-
-        return { existing, isReingest, finalHandle };
-      });
-
-      // Handle error cases from first transaction
       if (!existingCheck.finalHandle) {
         return NextResponse.json(
           {
@@ -672,7 +707,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (existingCheck.existing && existingCheck.existing.isClaimed) {
+      if (existingCheck.existing?.isClaimed) {
         return NextResponse.json(
           {
             error: 'Profile already claimed',
@@ -682,19 +717,13 @@ export async function POST(request: Request) {
         );
       }
 
-      // EXTERNAL WORK (outside transaction): Fetch profile and copy avatar
-      let extraction:
-        | ReturnType<typeof extractLinktree>
-        | ReturnType<typeof extractLaylo>;
+      let extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
       try {
-        if (isLayloProfile) {
-          const { profile: layloProfile, user } =
-            await fetchLayloProfile(handle);
-          extraction = extractLaylo(layloProfile, user);
-        } else {
-          const html = await fetchLinktreeDocument(validatedUrl);
-          extraction = extractLinktree(html);
-        }
+        extraction = await fetchFullExtractionProfile(
+          isLaylo,
+          validatedUrl,
+          handle
+        );
       } catch (fetchError) {
         const errorMessage =
           fetchError instanceof Error
@@ -704,19 +733,10 @@ export async function POST(request: Request) {
         logger.error('Profile fetch failed', {
           url: validatedUrl,
           error: errorMessage,
-          platform: isLayloProfile ? 'laylo' : 'linktree',
+          platform: isLaylo ? 'laylo' : 'linktree',
         });
 
-        // Mark as failed if re-ingesting
-        if (existingCheck.isReingest && existingCheck.existing) {
-          await withSystemIngestionSession(async tx => {
-            await IngestionStatusManager.markIdleOrFailed(
-              tx,
-              existingCheck.existing!.id,
-              errorMessage
-            );
-          });
-        }
+        await markReingestFailure(existingCheck, errorMessage);
 
         return NextResponse.json(
           { error: 'Failed to fetch profile', details: errorMessage },
@@ -725,211 +745,48 @@ export async function POST(request: Request) {
       }
 
       const displayName = extraction.displayName?.trim() || handle;
-      const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
 
-      // Copy avatar (external I/O, outside transaction)
-      const hostedAvatarUrlFromProfile = externalAvatarUrl
-        ? await copyAvatarToBlob(externalAvatarUrl, handle)
-        : null;
-
-      const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
-        ? null
-        : await maybeCopyIngestionAvatarFromLinks({
-            handle,
-            links: extraction.links
-              .map(link => link.url)
-              .filter((url): url is string => typeof url === 'string'),
-          });
-
-      const hostedAvatarUrl =
-        hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
+      const hostedAvatarUrl = await resolveHostedAvatarUrl(handle, extraction);
 
       const extractionWithHostedAvatar = {
         ...extraction,
         avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
       };
 
-      // TRANSACTION 2: Insert/update profile and merge links (DB-only)
       if (existingCheck.isReingest && existingCheck.existing) {
-        const existing = existingCheck.existing;
-
-        return await withSystemIngestionSession(async tx => {
-          // Process extraction: merge links, enqueue jobs, calculate fit score
-          const { mergeError } = await processProfileExtraction(
-            tx,
-            {
-              id: existing.id,
-              usernameNormalized: existing.usernameNormalized,
-              avatarUrl: existing.avatarUrl ?? null,
-              displayName: existing.displayName,
-              avatarLockedByUser: existing.avatarLockedByUser ?? false,
-              displayNameLocked: existing.displayNameLocked ?? false,
-            },
-            extractionWithHostedAvatar,
-            displayName
-          );
-
-          return NextResponse.json(
-            {
-              ok: !mergeError,
-              profile: {
-                id: existing.id,
-                username: existing.usernameNormalized,
-                usernameNormalized: existing.usernameNormalized,
-                claimToken: existing.claimToken,
-              },
-              links: extraction.links.length,
-              warning: mergeError
-                ? `Profile updated but link extraction had issues: ${mergeError}`
-                : undefined,
-            },
-            {
-              status: mergeError ? 207 : 200,
-              headers: { 'Cache-Control': 'no-store' },
-            }
-          );
+        return handleReingestProfile({
+          existing: existingCheck.existing,
+          extraction: extractionWithHostedAvatar,
+          displayName,
         });
       }
 
-      // New profile creation
-      const finalHandle = existingCheck.finalHandle;
-
-      return await withSystemIngestionSession(async tx => {
-        // Generate claim token at creation time
-        const { claimToken, claimTokenExpiresAt } = generateClaimToken();
-
-        // Insert profile with claim token
-        const [created] = await tx
-          .insert(creatorProfiles)
-          .values({
-            creatorType: 'creator',
-            username: finalHandle,
-            usernameNormalized: finalHandle,
-            displayName,
-            avatarUrl: hostedAvatarUrl,
-            isPublic: true,
-            isVerified: false,
-            isFeatured: false,
-            marketingOptOut: false,
-            isClaimed: false,
-            claimToken,
-            claimTokenExpiresAt,
-            settings: {},
-            theme: {},
-            ingestionStatus: 'processing',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning({
-            id: creatorProfiles.id,
-            username: creatorProfiles.username,
-            usernameNormalized: creatorProfiles.usernameNormalized,
-            displayName: creatorProfiles.displayName,
-            avatarUrl: creatorProfiles.avatarUrl,
-            claimToken: creatorProfiles.claimToken,
-            isClaimed: creatorProfiles.isClaimed,
-            claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
-            avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-            displayNameLocked: creatorProfiles.displayNameLocked,
-          });
-
-        if (!created) {
-          return NextResponse.json(
-            { error: 'Failed to create creator profile' },
-            { status: 500, headers: NO_STORE_HEADERS }
-          );
-        }
-
-        // Process extraction: merge links, enqueue jobs, calculate fit score
-        const { mergeError } = await processProfileExtraction(
-          tx,
-          {
-            id: created.id,
-            usernameNormalized: created.usernameNormalized,
-            avatarUrl: created.avatarUrl ?? null,
-            displayName: created.displayName,
-            avatarLockedByUser: created.avatarLockedByUser ?? false,
-            displayNameLocked: created.displayNameLocked ?? false,
-          },
-          extractionWithHostedAvatar,
-          displayName
-        );
-
-        logger.info('Creator profile ingested', {
-          profileId: created.id,
-          handle: created.username,
-          linksExtracted: extraction.links.length,
-          hadError: !!mergeError,
-        });
-
-        return NextResponse.json(
-          {
-            ok: true,
-            profile: {
-              id: created.id,
-              username: created.username,
-              usernameNormalized: created.usernameNormalized,
-              claimToken: created.claimToken,
-            },
-            links: extraction.links.length,
-            warning: mergeError
-              ? `Profile created but link extraction had issues: ${mergeError}`
-              : undefined,
-          },
-          { status: 200, headers: { 'Cache-Control': 'no-store' } }
-        );
+      return handleNewProfileIngest({
+        finalHandle: existingCheck.finalHandle,
+        displayName,
+        hostedAvatarUrl,
+        extraction: extractionWithHostedAvatar,
       });
     }
 
     // For other social platforms, create a minimal profile with the URL as a link
-    const handle = extractHandleFromSocialUrl(inputUrl);
-
-    if (!handle) {
-      return NextResponse.json(
-        {
-          error: 'Unable to extract username from URL',
-          details: `Could not parse a valid username from the ${detected.platform.name} URL. Please ensure the URL points to a valid profile.`,
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      );
+    const handleResult = validateSocialHandle(inputUrl, detected.platform.name);
+    if (!handleResult.ok) {
+      return handleResult.response;
     }
 
-    // Validate handle format
-    const normalizedHandle = normalizeHandle(handle);
-    if (!isValidHandle(normalizedHandle)) {
-      return NextResponse.json(
-        {
-          error: 'Invalid username format',
-          details:
-            'Username must be 1-30 characters, alphanumeric and underscores only',
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      );
-    }
+    const { handle, normalizedHandle } = handleResult;
+    const spotifyArtistName = await fetchSpotifyArtistName(handle, platformId);
 
-    // For Spotify artists, fetch the artist name from the API
-    let spotifyArtistName: string | null = null;
-    const isSpotifyArtist =
-      handle.startsWith('artist-') && platformId === 'spotify';
-    if (isSpotifyArtist) {
-      try {
-        const { getSpotifyArtist } = await import('@/lib/spotify');
-        const artistId = handle.replace('artist-', '');
-        const artist = await getSpotifyArtist(artistId);
-        if (artist?.name) {
-          spotifyArtistName = artist.name;
-          logger.info('Fetched Spotify artist name', {
-            artistId,
-            name: artist.name,
-          });
-        }
-      } catch (error) {
-        logger.warn('Failed to fetch Spotify artist name', {
-          handle,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    }
+    // Build context for social platform flow
+    const socialContext: SocialPlatformContext = {
+      handle,
+      normalizedHandle,
+      platformId,
+      platformName: detected.platform.name,
+      normalizedUrl,
+      spotifyArtistName,
+    };
 
     return await withSystemIngestionSession(async tx => {
       // Check for existing profile
@@ -959,172 +816,11 @@ export async function POST(request: Request) {
         finalHandle = altHandle;
       } else if (existing && !existing.isClaimed) {
         // Profile exists but unclaimed - add the link to existing profile
-        const linkDisplayText = getLinkDisplayText(
-          platformId,
-          detected.platform.name,
-          spotifyArtistName
-        );
-        try {
-          // Add the social link to existing profile (idempotent)
-          const linkAdded = await addSocialLinkIdempotent(
-            tx,
-            existing.id,
-            platformId,
-            normalizedUrl,
-            linkDisplayText
-          );
-
-          if (linkAdded) {
-            logger.info('Added link to existing unclaimed profile', {
-              profileId: existing.id,
-              platform: platformId,
-              url: normalizedUrl,
-            });
-          } else {
-            logger.info('Link already exists on unclaimed profile', {
-              profileId: existing.id,
-              platform: platformId,
-              url: normalizedUrl,
-            });
-          }
-
-          return NextResponse.json(
-            {
-              ok: true,
-              profile: {
-                id: existing.id,
-                username: existing.usernameNormalized,
-                usernameNormalized: existing.usernameNormalized,
-              },
-              links: linkAdded ? 1 : 0,
-              note: linkAdded
-                ? 'Added link to existing unclaimed profile'
-                : 'Link already exists on profile',
-            },
-            { status: 200, headers: { 'Cache-Control': 'no-store' } }
-          );
-        } catch (linkError) {
-          logger.warn('Failed to add link to existing profile', {
-            profileId: existing.id,
-            error: linkError,
-          });
-          // Continue to return success since profile exists
-          return NextResponse.json(
-            {
-              ok: true,
-              profile: {
-                id: existing.id,
-                username: existing.usernameNormalized,
-                usernameNormalized: existing.usernameNormalized,
-              },
-              links: 0,
-              warning: 'Profile exists but failed to add link',
-            },
-            { status: 200, headers: { 'Cache-Control': 'no-store' } }
-          );
-        }
+        return handleExistingUnclaimedProfile(tx, existing, socialContext);
       }
 
-      // Generate claim token
-      const { claimToken, claimTokenExpiresAt } = generateClaimToken();
-
-      // For Spotify artist IDs, use the fetched artist name if available
-      const displayName =
-        spotifyArtistName ||
-        (isSpotifyArtist ? detected.platform.name : handle);
-
-      // Create new profile
-      const [created] = await tx
-        .insert(creatorProfiles)
-        .values({
-          creatorType: 'creator',
-          username: finalHandle,
-          usernameNormalized: finalHandle,
-          displayName: displayName, // Use original handle casing as display name
-          avatarUrl: null,
-          isPublic: true,
-          isVerified: false,
-          isFeatured: false,
-          marketingOptOut: false,
-          isClaimed: false,
-          claimToken,
-          claimTokenExpiresAt,
-          settings: {},
-          theme: {},
-          ingestionStatus: 'idle',
-          ingestionSourcePlatform: platformId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-          claimToken: creatorProfiles.claimToken,
-        });
-
-      if (!created) {
-        return NextResponse.json(
-          { error: 'Failed to create creator profile' },
-          { status: 500, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      // Add the social link (idempotent, though new profile shouldn't have duplicates)
-      const linkDisplayText = getLinkDisplayText(
-        platformId,
-        detected.platform.name,
-        spotifyArtistName
-      );
-      try {
-        await addSocialLinkIdempotent(
-          tx,
-          created.id,
-          platformId,
-          normalizedUrl,
-          linkDisplayText
-        );
-      } catch (linkError) {
-        logger.warn('Failed to add link to new profile', {
-          profileId: created.id,
-          error: linkError,
-        });
-      }
-
-      // Calculate fit score for the new profile
-      try {
-        await calculateAndStoreFitScore(tx, created.id);
-      } catch (fitScoreError) {
-        logger.warn('Fit score calculation failed', {
-          profileId: created.id,
-          error:
-            fitScoreError instanceof Error
-              ? fitScoreError.message
-              : 'Unknown error',
-        });
-      }
-
-      logger.info('Creator profile created from social URL', {
-        profileId: created.id,
-        handle: created.username,
-        platform: platformId,
-        sourceUrl: normalizedUrl,
-      });
-
-      return NextResponse.json(
-        {
-          ok: true,
-          profile: {
-            id: created.id,
-            username: created.username,
-            usernameNormalized: created.usernameNormalized,
-            claimToken: created.claimToken,
-          },
-          links: 1,
-          platform: detected.platform.name,
-        },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
-      );
+      // Create new profile with the social link
+      return createNewSocialProfile(tx, finalHandle, socialContext);
     });
   } catch (error) {
     const errorMessage =

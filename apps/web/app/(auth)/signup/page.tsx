@@ -12,7 +12,6 @@ export default function SignUpPage() {
       formTitle='Create your account'
       showFormTitle={false}
       showFooterPrompt={false}
-      showLegalLinks
     >
       <SignUpForm />
     </AuthLayout>

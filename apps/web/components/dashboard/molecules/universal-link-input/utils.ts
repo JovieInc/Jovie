@@ -12,7 +12,7 @@ type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
  * Normalize a query string for comparison.
  */
 export function normalizeQuery(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+  return value.toLowerCase().replaceAll(/\s+/g, ' ').trim();
 }
 
 /**
@@ -129,7 +129,7 @@ export function rankPlatformOptions(
     })
     .map(option => {
       const byName = fuzzyScore(query, option.name);
-      const byId = fuzzyScore(query, option.id.replace(/-/g, ' '));
+      const byId = fuzzyScore(query, option.id.replaceAll('-', ' '));
       const best = Math.max(byName ?? -Infinity, byId ?? -Infinity);
       return { option, score: Number.isFinite(best) ? best : null };
     })

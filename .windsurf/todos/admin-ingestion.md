@@ -1,5 +1,0 @@
-- [ ] Reproduce admin ingestion error for creator_profiles insert (check logs/route).
-- [ ] Identify ingestion code path (admin ingestion utility/route) and values sent.
-- [ ] Compare failing columns with current schema/migrations (claim_token_expires_at, last_ingestion_error, settings, theme, timestamps defaults).
-- [ ] Patch schema or adjust insert to match columns/defaults.
-- [ ] Verify ingestion succeeds with sample (selenagomez) and run relevant tests if available.

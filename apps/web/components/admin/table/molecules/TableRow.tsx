@@ -48,15 +48,15 @@ export function TableRow({
         // Fixed height to prevent layout shift
         'h-[60px]',
         // Hover and selected states matching creator table
-        checked
-          ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
-          : selected
-            ? 'bg-base dark:bg-surface-2'
-            : 'hover:bg-base dark:hover:bg-surface-2',
+        (() => {
+          if (checked) return 'bg-[#ebebf6] dark:bg-[#1b1d38]';
+          if (selected) return 'bg-base dark:bg-surface-2';
+          return 'hover:bg-base dark:hover:bg-surface-2';
+        })(),
         // Clickable cursor
         onClick && 'cursor-pointer',
         // Remove focus outline for clickable rows
-        onClick && 'focus:outline-none',
+        onClick && 'focus-visible:outline-none',
         // Virtual positioning
         isVirtual && 'absolute left-0 right-0',
         // Custom classes

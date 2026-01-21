@@ -27,6 +27,12 @@ describe('Platform Detection', () => {
       const input = 'javascript:alert(1)';
       expect(normalizeUrl(input)).toBe(input);
     });
+
+    it('rejects overly long URLs', () => {
+      const longUrl = `https://x.com/${'a'.repeat(5000)}`;
+      const detected = detectPlatform(longUrl);
+      expect(detected.isValid).toBe(false);
+    });
   });
 
   describe('Domain dot-fix normalization', () => {

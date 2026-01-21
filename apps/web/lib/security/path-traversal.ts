@@ -8,6 +8,12 @@
 import path from 'path';
 
 /**
+ * Matches C0 control characters (U+0000-U+001F) and C1 control characters (U+0080-U+009F).
+ * Uses Unicode property escapes for clarity and to avoid SonarCloud S6324 warnings.
+ */
+const CONTROL_CHARACTER_REGEX = /\p{Cc}/gu;
+
+/**
  * Validates that a file path is within an allowed base directory.
  * Prevents path traversal attacks like "../../../etc/passwd".
  *
@@ -71,15 +77,15 @@ export function sanitizeFilename(filename: string): string {
   return (
     filename
       // Remove path separators
-      .replace(/[\/\\]/g, '')
+      .replaceAll(/[\/\\]/g, '')
       // Remove parent directory references
-      .replace(/\.\./g, '')
+      .replaceAll('..', '')
       // Remove null bytes
-      .replace(/\0/g, '')
+      .replaceAll('\0', '')
       // Remove control characters
-      .replace(/[\x00-\x1f\x80-\x9f]/g, '')
+      .replaceAll(CONTROL_CHARACTER_REGEX, '')
       // Remove other potentially dangerous characters
-      .replace(/[<>:"|?*]/g, '')
+      .replaceAll(/[<>:"|?*]/g, '')
       // Trim whitespace
       .trim()
       // Limit length

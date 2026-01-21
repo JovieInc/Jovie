@@ -12,8 +12,17 @@ import {
   validateBeaconsUrl,
 } from '@/lib/ingestion/strategies/beacons';
 
-const readFixture = (name: string) =>
-  readFileSync(path.join(__dirname, 'fixtures', 'beacons', name), 'utf-8');
+// Load fixtures at module scope to avoid I/O overhead in tests
+const FIXTURES = {
+  structured: readFileSync(
+    path.join(__dirname, 'fixtures', 'beacons', 'structured.html'),
+    'utf-8'
+  ),
+  edgeCase: readFileSync(
+    path.join(__dirname, 'fixtures', 'beacons', 'edge-case.html'),
+    'utf-8'
+  ),
+} as const;
 
 describe('Beacons Strategy', () => {
   describe('isBeaconsUrl', () => {
@@ -315,7 +324,7 @@ describe('Beacons Strategy', () => {
     });
 
     it('prefers structured data sources before href scanning', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractBeacons(html);
 
       const platforms = result.links.map(link => link.platformId).sort();
@@ -336,7 +345,7 @@ describe('Beacons Strategy', () => {
     });
 
     it('falls back when structured data is absent', () => {
-      const html = readFixture('edge-case.html');
+      const html = FIXTURES.edgeCase;
       const result = extractBeacons(html);
 
       const platforms = result.links.map(link => link.platformId).sort();
@@ -346,10 +355,14 @@ describe('Beacons Strategy', () => {
 
   describe('fetchBeaconsDocument', () => {
     beforeEach(() => {
+      vi.useFakeTimers();
       vi.stubGlobal('fetch', vi.fn());
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+      // Run any pending timers before cleanup to avoid unhandled rejections
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
       vi.unstubAllGlobals();
     });
 
@@ -366,10 +379,13 @@ describe('Beacons Strategy', () => {
     });
 
     it('throws ExtractionError on 404', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle all retry attempts
+      vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        url: 'https://beacons.ai/username',
+        headers: new Headers(),
       } as Response);
 
       await expect(
@@ -378,10 +394,13 @@ describe('Beacons Strategy', () => {
     });
 
     it('throws ExtractionError on 429 rate limit', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle all retry attempts
+      vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 429,
         statusText: 'Too Many Requests',
+        url: 'https://beacons.ai/username',
+        headers: new Headers(),
       } as Response);
 
       await expect(

@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
+import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { resolveUserState } from '@/lib/auth/gate';
@@ -60,6 +61,8 @@ export default async function AppShellLayout({
 
     return (
       <MyStatsig userId={userId}>
+        {/* ENG-004: Show environment issues to admins in non-production */}
+        <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
         <DashboardDataProvider value={dashboardData}>
           <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>

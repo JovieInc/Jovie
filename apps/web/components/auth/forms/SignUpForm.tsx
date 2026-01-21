@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
+import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
-import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AUTH_STORAGE_KEYS, sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
+import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
@@ -41,6 +43,7 @@ export function SignUpForm() {
   const [lastAuthMethod] = useLastAuthMethod();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isClerkStalled = useLoadingStall(isLoaded);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -48,10 +51,11 @@ export function SignUpForm() {
       const redirectUrl = new URL(window.location.href).searchParams.get(
         'redirect_url'
       );
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
         window.sessionStorage.setItem(
           AUTH_STORAGE_KEYS.REDIRECT_URL,
-          redirectUrl
+          sanitized
         );
       }
     } catch {
@@ -67,10 +71,11 @@ export function SignUpForm() {
       if (emailToPass) {
         signInUrl.searchParams.set('email', emailToPass);
       }
-      // Preserve original redirect URL
+      // Preserve original redirect URL (sanitized to strip hash fragments)
       const redirectUrl = searchParams.get('redirect_url');
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
-        signInUrl.searchParams.set('redirect_url', redirectUrl);
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
+        signInUrl.searchParams.set('redirect_url', sanitized);
       }
       return signInUrl.pathname + signInUrl.search;
     },
@@ -96,27 +101,12 @@ export function SignUpForm() {
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
-    return (
-      <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-3 p-0'>
-          <div className='animate-pulse space-y-4'>
-            <div className='h-6 w-48 mx-auto bg-subtle rounded' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <AuthLoadingState mode='signup' isStalled={isClerkStalled} />;
   }
 
   const handleEmailClick = () => {
     clearError();
     setStep('email');
-  };
-
-  const handleBack = () => {
-    goBack();
   };
 
   return (
@@ -148,7 +138,7 @@ export function SignUpForm() {
               onSubmit={startEmailFlow}
               isLoading={loadingState.type === 'submitting'}
               error={error}
-              onBack={handleBack}
+              onBack={goBack}
               mode='signup'
             />
           </AccessibleStepWrapper>
@@ -174,7 +164,7 @@ export function SignUpForm() {
               isCompleting={loadingState.type === 'completing'}
               isResending={loadingState.type === 'resending'}
               error={error}
-              onBack={handleBack}
+              onBack={goBack}
               mode='signup'
             />
           </AccessibleStepWrapper>
@@ -196,6 +186,26 @@ export function SignUpForm() {
                 </Link>
               </>
             )}
+          </p>
+        )}
+
+        {step === 'method' && (
+          <p className='mt-6 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center'>
+            By signing up, you agree to our{' '}
+            <Link
+              href='/legal/terms'
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+            >
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link
+              href='/legal/privacy'
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+            >
+              Privacy Policy
+            </Link>
+            .
           </p>
         )}
       </CardContent>

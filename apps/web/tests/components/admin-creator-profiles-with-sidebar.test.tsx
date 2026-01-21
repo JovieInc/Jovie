@@ -33,13 +33,34 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/admin/CreatorAvatarCell', () => ({
-  CreatorAvatarCell: ({ username }: { username: string }) => (
-    <div data-testid='creator-avatar-cell'>avatar-{username}</div>
+  CreatorAvatarCell: ({
+    username,
+    verified,
+  }: {
+    username: string;
+    verified: boolean;
+  }) => (
+    <div data-testid='creator-avatar-cell'>
+      avatar-{username}
+      {verified ? null : <span>Not verified</span>}
+    </div>
   ),
 }));
 
 vi.mock('@/components/organisms/ContactSidebar', () => ({
   ContactSidebar: () => null,
+}));
+
+vi.mock('@/components/admin/table/TableRowActions', () => ({
+  TableRowActions: ({ isClaimed }: { isClaimed: boolean }) => (
+    <button
+      type='button'
+      aria-label={isClaimed ? 'Claimed' : 'Not claimed'}
+      disabled
+    >
+      {isClaimed ? 'Claimed' : 'Unclaimed'}
+    </button>
+  ),
 }));
 
 vi.mock('@/components/admin/creator-actions-menu', () => ({

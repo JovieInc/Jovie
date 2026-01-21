@@ -12,8 +12,17 @@ import {
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 
-const readFixture = (name: string) =>
-  readFileSync(path.join(__dirname, 'fixtures', 'linktree', name), 'utf-8');
+// Load fixtures at module scope to avoid I/O overhead in tests
+const FIXTURES = {
+  structured: readFileSync(
+    path.join(__dirname, 'fixtures', 'linktree', 'structured.html'),
+    'utf-8'
+  ),
+  edgeCase: readFileSync(
+    path.join(__dirname, 'fixtures', 'linktree', 'edge-case.html'),
+    'utf-8'
+  ),
+} as const;
 
 describe('Linktree Strategy', () => {
   describe('isLinktreeUrl', () => {
@@ -268,7 +277,7 @@ describe('Linktree Strategy', () => {
     });
 
     it('prefers structured Next.js data when available', () => {
-      const html = readFixture('structured.html');
+      const html = FIXTURES.structured;
       const result = extractLinktree(html);
 
       expect(result.displayName).toBe('Casey Stone');
@@ -297,7 +306,7 @@ describe('Linktree Strategy', () => {
     });
 
     it('falls back to href scanning when structured data is missing', () => {
-      const html = readFixture('edge-case.html');
+      const html = FIXTURES.edgeCase;
       const result = extractLinktree(html);
 
       const platforms = result.links.map(link => link.platformId).sort();
@@ -307,10 +316,14 @@ describe('Linktree Strategy', () => {
 
   describe('fetchLinktreeDocument', () => {
     beforeEach(() => {
+      vi.useFakeTimers();
       vi.stubGlobal('fetch', vi.fn());
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+      // Run any pending timers before cleanup to avoid unhandled rejections
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
       vi.unstubAllGlobals();
     });
 
@@ -321,10 +334,13 @@ describe('Linktree Strategy', () => {
     });
 
     it('throws ExtractionError on 404', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle all retry attempts
+      vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        url: 'https://linktr.ee/username',
+        headers: new Headers(),
       } as Response);
 
       await expect(
@@ -333,10 +349,13 @@ describe('Linktree Strategy', () => {
     });
 
     it('throws ExtractionError on 429 rate limit', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle all retry attempts
+      vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 429,
         statusText: 'Too Many Requests',
+        url: 'https://linktr.ee/username',
+        headers: new Headers(),
       } as Response);
 
       await expect(

@@ -28,7 +28,7 @@ interface KpiCardsProps {
   mercuryAvailability?: DataAvailability;
 }
 
-function UnavailableBadge({ message }: { message?: string }) {
+function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
       className='inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 line-clamp-1'
@@ -41,7 +41,7 @@ function UnavailableBadge({ message }: { message?: string }) {
   );
 }
 
-function NotConfiguredBadge({ message }: { message?: string }) {
+function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
       className='inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-1'
@@ -62,7 +62,7 @@ export function KpiCards({
   activeSubscribers,
   stripeAvailability,
   mercuryAvailability,
-}: KpiCardsProps) {
+}: Readonly<KpiCardsProps>) {
   const formatUsd = (value: number) =>
     value.toLocaleString('en-US', {
       style: 'currency',
@@ -97,16 +97,19 @@ export function KpiCards({
     stripeIsAvailable &&
     mercuryIsConfigured &&
     mercuryIsAvailable;
-  const runwayLabel = canCalculateRunway
-    ? runwayMonths == null
-      ? '∞ mo'
-      : `${runwayMonths.toFixed(1)} mo`
-    : '—';
-  const runwayMetadata = canCalculateRunway
-    ? runwayMonths == null
-      ? 'Profitable at the current run rate'
-      : 'Estimated months of runway'
-    : 'Requires Stripe and Mercury data';
+  const getRunwayLabel = (): string => {
+    if (!canCalculateRunway) return '—';
+    if (runwayMonths == null) return '∞ mo';
+    return `${runwayMonths.toFixed(1)} mo`;
+  };
+  const runwayLabel = getRunwayLabel();
+
+  const getRunwayMetadata = (): string => {
+    if (!canCalculateRunway) return 'Requires Stripe and Mercury data';
+    if (runwayMonths == null) return 'Profitable at the current run rate';
+    return 'Estimated months of runway';
+  };
+  const runwayMetadata = getRunwayMetadata();
 
   const waitlistLabel = waitlistCount.toLocaleString('en-US');
 

@@ -9,6 +9,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 interface ReleasesEmptyStateState {
   searchQuery: string;
@@ -91,7 +92,7 @@ export function ReleasesEmptyState({
   const [isPending, startTransition] = useTransition();
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const resultsListRef = useRef<HTMLUListElement>(null);
+  const resultsListRef = useRef<HTMLDivElement>(null);
 
   const {
     results,
@@ -422,9 +423,12 @@ export function ReleasesEmptyState({
               <div className='absolute z-100 w-full mt-2 rounded-xl border border-subtle bg-surface-1 shadow-lg overflow-hidden'>
                 {searchState === 'loading' && results.length === 0 && (
                   <div className='p-3 space-y-2'>
-                    {[...Array(3)].map((_, i) => (
+                    {Array.from(
+                      { length: 3 },
+                      (_, i) => `releases-empty-loading-${i + 1}`
+                    ).map(key => (
                       <div
-                        key={i}
+                        key={key}
                         className='flex items-center gap-3 animate-pulse'
                       >
                         <div className='w-10 h-10 rounded-full bg-surface-3' />
@@ -470,19 +474,16 @@ export function ReleasesEmptyState({
                 )}
 
                 {results.length > 0 && (
-                  <ul
+                  <div
                     ref={resultsListRef}
                     id='artist-search-results'
-                    // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: listbox role on ul is correct for ARIA combobox pattern
                     role='listbox'
                     className='max-h-64 overflow-y-auto'
                   >
                     {results.map((artist, index) => (
-                      // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys
-                      <li
+                      <div
                         key={artist.id}
                         id={`artist-result-${index}`}
-                        // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: option role on li is correct for ARIA listbox pattern
                         role='option'
                         tabIndex={-1}
                         aria-selected={index === formState.activeResultIndex}
@@ -493,6 +494,11 @@ export function ReleasesEmptyState({
                             : 'hover:bg-surface-2/50'
                         )}
                         onClick={() => handleArtistSelect(artist)}
+                        onKeyDown={event =>
+                          handleActivationKeyDown(event, () =>
+                            handleArtistSelect(artist)
+                          )
+                        }
                         onMouseEnter={() =>
                           dispatch({
                             type: 'SET_ACTIVE_RESULT_INDEX',
@@ -547,9 +553,9 @@ export function ReleasesEmptyState({
                             </svg>
                           </div>
                         )}
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </div>
             )}

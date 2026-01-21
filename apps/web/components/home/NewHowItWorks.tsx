@@ -52,7 +52,7 @@ export function NewHowItWorks() {
               const Icon = step.icon;
               return (
                 <div
-                  key={index}
+                  key={step.number}
                   className='relative flex flex-col items-center text-center'
                 >
                   {/* Connector line (desktop only) */}

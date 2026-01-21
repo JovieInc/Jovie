@@ -7,6 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
 import Link from 'next/link';
 import { type ReactNode, useCallback, useState } from 'react';
@@ -17,24 +18,17 @@ import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-me
 import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import {
-  geistTableMenuContentClass,
-  geistTableMenuDestructiveItemClass,
-  geistTableMenuItemClass,
-  geistTableMenuSeparatorClass,
-} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
-const getRowClassName = (isChecked: boolean, isSelected: boolean) =>
-  cn(
-    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-    isChecked
-      ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
-      : isSelected
-        ? 'bg-base dark:bg-surface-2'
-        : 'hover:bg-base dark:hover:bg-surface-2'
-  );
+const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
+  const baseClasses =
+    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
+  if (isChecked) return cn(baseClasses, 'bg-[#ebebf6] dark:bg-[#1b1d38]');
+  if (isSelected) return cn(baseClasses, 'bg-base dark:bg-surface-2');
+  return cn(baseClasses, 'hover:bg-base dark:hover:bg-surface-2');
+};
 
 const renderContextMenuItem = ({
   onClick,
@@ -51,7 +45,7 @@ const renderContextMenuItem = ({
 }) => {
   if (href) {
     return (
-      <ContextMenuItem asChild className={geistTableMenuItemClass}>
+      <ContextMenuItem asChild>
         <Link
           href={href}
           target='_blank'
@@ -68,10 +62,7 @@ const renderContextMenuItem = ({
     <ContextMenuItem
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        geistTableMenuItemClass,
-        destructive && geistTableMenuDestructiveItemClass
-      )}
+      className={cn(destructive && MENU_ITEM_DESTRUCTIVE)}
     >
       {children}
     </ContextMenuItem>
@@ -118,7 +109,7 @@ export function CreatorProfileTableRow({
   onToggleMarketing,
   onSendInvite,
   onDelete,
-}: CreatorProfileTableRowProps) {
+}: Readonly<CreatorProfileTableRowProps>) {
   const displayName =
     'displayName' in profile ? (profile.displayName ?? null) : null;
 
@@ -141,15 +132,21 @@ export function CreatorProfileTableRow({
     <tr
       className={getRowClassName(isChecked, isSelected)}
       onClick={() => onRowClick(profile.id)}
+      onKeyDown={event =>
+        handleActivationKeyDown(event, _e => onRowClick(profile.id))
+      }
+      tabIndex={0}
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
+          onKeyDown={event =>
+            handleActivationKeyDown(event, e => e.stopPropagation())
+          }
+          role='presentation'
         >
           <span
             className={cn(
@@ -225,10 +222,12 @@ export function CreatorProfileTableRow({
           : '—'}
       </td>
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
       <td
         className='px-4 py-3 align-middle text-right'
         onClick={e => e.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, e => e.stopPropagation())
+        }
       >
         <div className='flex items-center justify-end gap-2'>
           {/* Icon action buttons - always visible on hover */}
@@ -279,7 +278,7 @@ export function CreatorProfileTableRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
-      <ContextMenuContent className={geistTableMenuContentClass}>
+      <ContextMenuContent>
         <CreatorActionsMenuContent
           profile={profile}
           status={verificationStatus}
@@ -295,9 +294,7 @@ export function CreatorProfileTableRow({
           copySuccess={copySuccess}
           onCopyClaimLink={handleCopyClaimLink}
           renderItem={renderContextMenuItem}
-          renderSeparator={() => (
-            <ContextMenuSeparator className={geistTableMenuSeparatorClass} />
-          )}
+          renderSeparator={() => <ContextMenuSeparator />}
         />
       </ContextMenuContent>
     </ContextMenu>

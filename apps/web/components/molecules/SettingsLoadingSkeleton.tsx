@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 /**
  * Reusable loading skeleton for settings pages.
  * Reduces duplication across settings loading.tsx files.
@@ -28,7 +30,7 @@ export function SettingsLoadingSkeleton({
   titleWidth = 'w-48',
   descriptionWidth = 'w-80',
   children,
-}: SettingsLoadingSkeletonProps) {
+}: Readonly<SettingsLoadingSkeletonProps>) {
   return (
     <div className='mx-auto max-w-2xl'>
       <div className='space-y-8 pb-8'>
@@ -47,21 +49,25 @@ export function SettingsLoadingSkeleton({
 }
 
 /** Skeleton for a single input field */
-export function InputSkeleton({ width = 'w-full' }: { width?: string }) {
+export function InputSkeleton({
+  width = 'w-full',
+}: Readonly<{ width?: string }>) {
   return <div className={`h-10 ${width} rounded skeleton`} />;
 }
 
 /** Skeleton for a button */
-export function ButtonSkeleton({ width = 'w-40' }: { width?: string }) {
+export function ButtonSkeleton({
+  width = 'w-40',
+}: Readonly<{ width?: string }>) {
   return <div className={`h-10 ${width} rounded skeleton`} />;
 }
 
 /** Skeleton for a toggle row (label + switch) */
 export function ToggleRowSkeleton({
   labelWidth = 'w-56',
-}: {
+}: Readonly<{
   labelWidth?: string;
-}) {
+}>) {
   return (
     <div className='flex items-center justify-between gap-4'>
       <div className={`h-4 ${labelWidth} rounded skeleton`} />
@@ -74,10 +80,10 @@ export function ToggleRowSkeleton({
 export function CardSkeleton({
   height = 'h-20',
   width = 'w-full',
-}: {
+}: Readonly<{
   height?: string;
   width?: string;
-}) {
+}>) {
   return <div className={`${height} ${width} rounded-xl skeleton`} />;
 }
 
@@ -131,13 +137,18 @@ export function AppearanceSettingsLoading() {
 /** Generic form settings loading skeleton */
 export function FormSettingsLoading({
   inputCount = 3,
-}: {
+}: Readonly<{
   inputCount?: number;
-}) {
+}>) {
+  const inputKeys = useMemo(
+    () => Array.from({ length: inputCount }, (_, i) => `form-input-${i}`),
+    [inputCount]
+  );
+
   return (
     <SettingsLoadingSkeleton>
-      {Array.from({ length: inputCount }).map((_, i) => (
-        <InputSkeleton key={`input-${i}`} />
+      {inputKeys.map(key => (
+        <InputSkeleton key={key} />
       ))}
       <ButtonSkeleton />
     </SettingsLoadingSkeleton>

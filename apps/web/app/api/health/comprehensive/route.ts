@@ -14,9 +14,11 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+type CheckStatus = 'ok' | 'warning' | 'error';
+
 interface ComprehensiveHealthResponse {
   service: 'comprehensive';
-  status: 'ok' | 'warning' | 'error';
+  status: CheckStatus;
   ok: boolean;
   timestamp: string;
   summary: {
@@ -51,160 +53,284 @@ interface ComprehensiveHealthResponse {
   };
 }
 
+function evaluateEnvironmentStatus(
+  validation: ReturnType<typeof validateEnvironment>
+): CheckStatus {
+  if (validation.critical.length > 0 || validation.errors.length > 0) {
+    return 'error';
+  }
+  if (validation.warnings.length > 0) {
+    return 'warning';
+  }
+  return 'ok';
+}
+
+async function runEnvironmentCheck() {
+  const envValidation = validateEnvironment('runtime');
+  const status = evaluateEnvironmentStatus(envValidation);
+
+  return {
+    status,
+    details: envValidation,
+  };
+}
+
+async function runDatabaseCheck() {
+  const envInfo = getEnvironmentInfo();
+  if (!envInfo.hasDatabase) {
+    return {
+      status: 'ok' as const,
+      connection: false,
+    };
+  }
+
+  const validation = validateDatabaseEnvironment();
+  if (!validation.valid) {
+    return {
+      status: 'error' as const,
+      connection: false,
+      validation,
+    };
+  }
+
+  const connectionResult = await validateDbConnection();
+  if (!connectionResult.connected) {
+    return {
+      status: 'error' as const,
+      connection: false,
+      validation,
+      latency: connectionResult.latency,
+    };
+  }
+
+  try {
+    const health = await checkDbHealth();
+    const resolveHealthStatus = (): CheckStatus => {
+      if (!health.healthy) return 'error';
+      if (health.latency && health.latency > 500) return 'warning';
+      return 'ok';
+    };
+    const status: CheckStatus = resolveHealthStatus();
+
+    return {
+      status,
+      connection: true,
+      validation,
+      health,
+      latency: connectionResult.latency,
+    };
+  } catch {
+    return {
+      status: 'warning' as const,
+      connection: true,
+      validation,
+      latency: connectionResult.latency,
+    };
+  }
+}
+
+async function runSystemCheck() {
+  const memUsage = process.memoryUsage();
+  return {
+    status: 'ok' as const,
+    nodeVersion: process.version,
+    platform: process.platform,
+    uptime: process.uptime(),
+    memory: {
+      used: memUsage.heapUsed,
+      total: memUsage.heapTotal,
+      percentage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
+    },
+  };
+}
+
+function summarizeStatuses(statuses: CheckStatus[]) {
+  const totalChecks = statuses.length;
+  const passedChecks = statuses.filter(status => status === 'ok').length;
+  const warningChecks = statuses.filter(status => status === 'warning').length;
+  const failedChecks = statuses.filter(status => status === 'error').length;
+
+  const resolveOverallStatus = (): CheckStatus => {
+    if (failedChecks > 0) return 'error';
+    if (warningChecks > 0) return 'warning';
+    return 'ok';
+  };
+  const overallStatus: CheckStatus = resolveOverallStatus();
+
+  return {
+    totalChecks,
+    passedChecks,
+    warningChecks,
+    failedChecks,
+    overallStatus,
+  };
+}
+
+function buildRateLimitedResponse(
+  now: string,
+  rateLimitStatus: ReturnType<typeof getRateLimitStatus>
+) {
+  return NextResponse.json(
+    {
+      service: 'comprehensive',
+      status: 'error',
+      ok: false,
+      timestamp: now,
+      error: 'Rate limit exceeded',
+      summary: {
+        totalChecks: 0,
+        passedChecks: 0,
+        failedChecks: 1,
+        warningChecks: 0,
+      },
+      checks: {},
+    },
+    {
+      status: 429,
+      headers: {
+        ...HEALTH_CHECK_CONFIG.cacheHeaders,
+        ...createRateLimitHeaders(rateLimitStatus),
+      },
+    }
+  );
+}
+
+function buildErrorResponse(
+  now: string,
+  errorMessage: string,
+  totalLatency: number,
+  rateLimitStatus: ReturnType<typeof getRateLimitStatus>
+) {
+  const errorResponse: ComprehensiveHealthResponse = {
+    service: 'comprehensive',
+    status: 'error',
+    ok: false,
+    timestamp: now,
+    summary: {
+      totalChecks: 0,
+      passedChecks: 0,
+      failedChecks: 1,
+      warningChecks: 0,
+    },
+    checks: {
+      environment: {
+        status: 'error',
+        details: {
+          valid: false,
+          errors: [errorMessage],
+          warnings: [],
+          critical: ['Health check system failure'],
+        },
+      },
+      database: {
+        status: 'error',
+        connection: false,
+      },
+      system: {
+        status: 'ok',
+        nodeVersion:
+          typeof process !== 'undefined' && 'version' in process
+            ? process.version
+            : 'unknown',
+        platform:
+          typeof process !== 'undefined' && 'platform' in process
+            ? process.platform
+            : 'unknown',
+        uptime:
+          typeof process !== 'undefined' && 'uptime' in process
+            ? process.uptime()
+            : 0,
+        memory: {
+          used: 0,
+          total: 0,
+          percentage: 0,
+        },
+      },
+    },
+  };
+
+  return NextResponse.json(errorResponse, {
+    status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
+    headers: {
+      ...HEALTH_CHECK_CONFIG.cacheHeaders,
+      'X-Health-Check-Duration': totalLatency.toString(),
+      ...createRateLimitHeaders(rateLimitStatus),
+    },
+  });
+}
+
 export async function GET(request: Request) {
   const now = new Date().toISOString();
   const startTime = Date.now();
 
-  // Rate limiting check
   const clientIP = getClientIP(request);
-  const isRateLimited = checkRateLimit(clientIP, true); // true for health endpoint
+  const isRateLimited = checkRateLimit(clientIP, true);
   const rateLimitStatus = getRateLimitStatus(clientIP, true);
 
   if (isRateLimited) {
-    return NextResponse.json(
-      {
-        service: 'comprehensive',
-        status: 'error',
-        ok: false,
-        timestamp: now,
-        error: 'Rate limit exceeded',
-        summary: {
-          totalChecks: 0,
-          passedChecks: 0,
-          failedChecks: 1,
-          warningChecks: 0,
-        },
-        checks: {},
-      },
-      {
-        status: 429,
-        headers: {
-          ...HEALTH_CHECK_CONFIG.cacheHeaders,
-          ...createRateLimitHeaders(rateLimitStatus),
-        },
-      }
-    );
+    return buildRateLimitedResponse(now, rateLimitStatus);
   }
 
   try {
-    // 1. Environment validation
     logger.info('[HEALTH] Running comprehensive health check...');
-    const envValidation = validateEnvironment('runtime');
-    const envInfo = getEnvironmentInfo();
 
-    let envStatus: 'ok' | 'warning' | 'error' = 'ok';
-    if (envValidation.critical.length > 0 || envValidation.errors.length > 0) {
-      envStatus = 'error';
-    } else if (envValidation.warnings.length > 0) {
-      envStatus = 'warning';
+    const settledResults = await Promise.allSettled([
+      runEnvironmentCheck(),
+      runDatabaseCheck(),
+      runSystemCheck(),
+    ]);
+
+    const [envResult, dbResult, systemResult] = settledResults;
+    if (envResult.status === 'rejected') {
+      throw envResult.reason;
+    }
+    if (dbResult.status === 'rejected') {
+      throw dbResult.reason;
+    }
+    if (systemResult.status === 'rejected') {
+      throw systemResult.reason;
     }
 
-    // 2. Database checks
-    let dbStatus: 'ok' | 'warning' | 'error' = 'ok';
-    let dbConnection = false;
-    let dbHealth: Awaited<ReturnType<typeof checkDbHealth>> | undefined;
-    let dbValidation:
-      | ReturnType<typeof validateDatabaseEnvironment>
-      | undefined;
-    let dbLatency: number | undefined;
+    const environment = envResult.value;
+    const database = dbResult.value;
+    const system = systemResult.value;
 
-    if (envInfo.hasDatabase) {
-      // Database validation
-      dbValidation = validateDatabaseEnvironment();
-
-      if (!dbValidation.valid) {
-        dbStatus = 'error';
-      } else {
-        // Connection test
-        const connectionResult = await validateDbConnection();
-        dbConnection = connectionResult.connected;
-        dbLatency = connectionResult.latency;
-
-        if (!dbConnection) {
-          dbStatus = 'error';
-        } else {
-          // Comprehensive health check
-          try {
-            dbHealth = await checkDbHealth();
-            if (!dbHealth.healthy) {
-              dbStatus = 'error';
-            } else if (dbHealth.latency && dbHealth.latency > 500) {
-              // Warning if slow but healthy
-              dbStatus = 'warning';
-            }
-          } catch {
-            dbStatus = 'warning'; // Health check failed but connection works
-          }
-        }
-      }
-    }
-
-    // 3. System information
-    const memUsage = process.memoryUsage();
-    const systemInfo = {
-      status: 'ok' as const,
-      nodeVersion: process.version,
-      platform: process.platform,
-      uptime: process.uptime(),
-      memory: {
-        used: memUsage.heapUsed,
-        total: memUsage.heapTotal,
-        percentage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
-      },
-    };
-
-    // 4. Calculate overall status and summary
-    const checks = [envStatus, dbStatus, systemInfo.status];
-    const totalChecks = checks.length;
-    const passedChecks = checks.filter(s => s === 'ok').length;
-    const warningChecks = checks.filter(s => s === 'warning').length;
-    const failedChecks = checks.filter(s => s === 'error').length;
-
-    let overallStatus: 'ok' | 'warning' | 'error' = 'ok';
-    if (failedChecks > 0) {
-      overallStatus = 'error';
-    } else if (warningChecks > 0) {
-      overallStatus = 'warning';
-    }
+    const summary = summarizeStatuses([
+      environment.status,
+      database.status,
+      system.status,
+    ]);
 
     const totalLatency = Date.now() - startTime;
 
     const response: ComprehensiveHealthResponse = {
       service: 'comprehensive',
-      status: overallStatus,
-      ok: overallStatus !== 'error',
+      status: summary.overallStatus,
+      ok: summary.overallStatus !== 'error',
       timestamp: now,
       summary: {
-        totalChecks,
-        passedChecks,
-        failedChecks,
-        warningChecks,
+        totalChecks: summary.totalChecks,
+        passedChecks: summary.passedChecks,
+        failedChecks: summary.failedChecks,
+        warningChecks: summary.warningChecks,
       },
       checks: {
-        environment: {
-          status: envStatus,
-          details: envValidation,
-        },
-        database: {
-          status: dbStatus,
-          connection: dbConnection,
-          health: dbHealth,
-          validation: dbValidation,
-          latency: dbLatency,
-        },
-        system: systemInfo,
+        environment,
+        database,
+        system,
       },
     };
 
-    // Log results
     logger.info(
       'Comprehensive health check completed',
       {
-        status: overallStatus,
+        status: summary.overallStatus,
         latency: totalLatency,
         summary: response.summary,
-        dbConnection,
-        envIssues: envValidation.critical.length + envValidation.errors.length,
+        dbConnection: database.connection,
+        envIssues:
+          environment.details.critical.length +
+          environment.details.errors.length,
       },
       'health/comprehensive'
     );
@@ -233,61 +359,6 @@ export async function GET(request: Request) {
       'health/comprehensive'
     );
 
-    const errorResponse: ComprehensiveHealthResponse = {
-      service: 'comprehensive',
-      status: 'error',
-      ok: false,
-      timestamp: now,
-      summary: {
-        totalChecks: 0,
-        passedChecks: 0,
-        failedChecks: 1,
-        warningChecks: 0,
-      },
-      checks: {
-        environment: {
-          status: 'error',
-          details: {
-            valid: false,
-            errors: [errorMessage],
-            warnings: [],
-            critical: ['Health check system failure'],
-          },
-        },
-        database: {
-          status: 'error',
-          connection: false,
-        },
-        system: {
-          status: 'ok',
-          nodeVersion:
-            typeof process !== 'undefined' && 'version' in process
-              ? process.version
-              : 'unknown',
-          platform:
-            typeof process !== 'undefined' && 'platform' in process
-              ? process.platform
-              : 'unknown',
-          uptime:
-            typeof process !== 'undefined' && 'uptime' in process
-              ? process.uptime()
-              : 0,
-          memory: {
-            used: 0,
-            total: 0,
-            percentage: 0,
-          },
-        },
-      },
-    };
-
-    return NextResponse.json(errorResponse, {
-      status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
-      headers: {
-        ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        'X-Health-Check-Duration': totalLatency.toString(),
-        ...createRateLimitHeaders(rateLimitStatus),
-      },
-    });
+    return buildErrorResponse(now, errorMessage, totalLatency, rateLimitStatus);
   }
 }

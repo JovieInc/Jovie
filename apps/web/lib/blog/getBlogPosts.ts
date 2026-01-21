@@ -29,7 +29,8 @@ export interface BlogPostSummary extends BlogPostMetadata {
 const DEFAULT_AUTHOR = 'Jovie';
 
 function createExcerpt(content: string): string {
-  const blocks = content
+  const safeContent = content.slice(0, 20000);
+  const blocks = safeContent
     .split(/\n\s*\n/)
     .map(block => block.trim())
     .filter(Boolean);
@@ -38,10 +39,10 @@ function createExcerpt(content: string): string {
     blocks.find(block => !block.startsWith('#')) ?? blocks[0] ?? '';
 
   return paragraph
-    .replace(/^#+\s*/g, '')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-    .replace(/[*_`>]/g, '')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/^#+\s*/g, '')
+    .replaceAll(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replaceAll(/[*_`>]/g, '')
+    .replaceAll(/\s+/g, ' ')
     .trim()
     .slice(0, 200);
 }

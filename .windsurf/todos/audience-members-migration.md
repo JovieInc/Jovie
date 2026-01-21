@@ -1,5 +1,0 @@
-- [ ] Identify why `CREATE TABLE audience_members` fails (likely exists or conflicting enums/types).
-- [ ] Check migration order/history: audience_members appears in 0000 initial schema; reconcile current DB state vs migrations.
-- [ ] Decide safe fix: adjust migration to IF NOT EXISTS, or split out into idempotent checks, or mark migration applied if table already present.
-- [ ] Verify enums (audience_member_type, audience_intent_level, audience_device_type) existence/compatibility in prod.
-- [ ] Re-run migrations safely after fix.

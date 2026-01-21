@@ -1,4 +1,4 @@
 {
-  "unit": [],
+  "unit": ["tests/contracts/dashboard-apis.spec.ts"],
   "e2e": []
 }

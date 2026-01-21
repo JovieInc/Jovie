@@ -24,8 +24,9 @@ export function buildPillLabel(link: DetectedLink): string {
       .filter(Boolean)
       .filter(s => s.length <= 28);
     if (filtered.length === 0) return platform;
-    return filtered.reduce((best, next) =>
-      next.length < best.length ? next : best
+    return filtered.reduce(
+      (best, next) => (next.length < best.length ? next : best),
+      filtered[0]
     );
   };
 

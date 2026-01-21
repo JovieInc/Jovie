@@ -44,8 +44,11 @@ export function DashboardNav(_props: DashboardNavProps) {
 
   const isInSettings = pathname.startsWith('/app/settings');
   const navSections = isInSettings
-    ? [settingsNavigation]
-    : [primaryItems, secondaryNavigation];
+    ? [{ key: 'settings', items: settingsNavigation }]
+    : [
+        { key: 'primary', items: primaryItems },
+        { key: 'secondary', items: secondaryNavigation },
+      ];
 
   const renderSection = (items: NavItem[]) => (
     <SidebarMenu>
@@ -57,10 +60,10 @@ export function DashboardNav(_props: DashboardNavProps) {
         const tooltip = shortcut
           ? {
               children: (
-                <div className='flex items-center gap-2'>
+                <>
                   <span>{item.name}</span>
-                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
-                </div>
+                  <Kbd variant='tooltip'>{shortcut}</Kbd>
+                </>
               ),
             }
           : item.name;
@@ -127,9 +130,9 @@ export function DashboardNav(_props: DashboardNavProps) {
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
       <SidebarGroup className='mb-1 space-y-1.5'>
         <SidebarGroupContent className='space-y-1'>
-          {navSections.map((section, idx) => (
-            <div key={idx} data-nav-section>
-              {renderSection(section)}
+          {navSections.map(section => (
+            <div key={section.key} data-nav-section>
+              {renderSection(section.items)}
             </div>
           ))}
         </SidebarGroupContent>

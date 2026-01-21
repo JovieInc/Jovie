@@ -1,3 +1,6 @@
+import { isDevelopment } from '@/lib/utils/platform-detection/environment';
+import { CSP_REPORT_GROUP, getCspReportUri } from './csp-reporting';
+
 export const SCRIPT_NONCE_HEADER = 'x-nonce';
 
 type BuildCspOptions = {
@@ -5,11 +8,15 @@ type BuildCspOptions = {
   isDev?: boolean;
 };
 
-export const buildContentSecurityPolicy = ({
+/**
+ * Builds the array of CSP directives (without report directives).
+ * This is the core policy shared by both enforcing and report-only modes.
+ */
+const buildCspDirectives = ({
   nonce,
-  isDev = process.env.NODE_ENV === 'development',
-}: BuildCspOptions): string => {
-  const directives = [
+  isDev = isDevelopment(),
+}: BuildCspOptions): string[] => {
+  return [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
@@ -25,7 +32,10 @@ export const buildContentSecurityPolicy = ({
       'https://vitals.vercel-insights.com',
       'https://vercel.live',
       'https://clerk.jov.ie',
+      'https://clerk.com',
+      'https://cdn.clerk.com',
       'https://*.clerk.com',
+      'https://*.clerk.services',
       'https://*.clerk.accounts.dev',
       'https://cdn.statsig.com',
       'https://*.statsigcdn.com',
@@ -58,19 +68,64 @@ export const buildContentSecurityPolicy = ({
       'https://va.vercel-scripts.com',
       'https://vitals.vercel-insights.com',
       'https://clerk.jov.ie',
+      'https://clerk.com',
+      'https://cdn.clerk.com',
       'https://*.clerk.com',
+      'https://*.clerk.services',
       'https://*.clerk.accounts.dev',
       'https://api.stripe.com',
       'https://*.ingest.sentry.io',
       'wss://*.clerk.com', // Clerk WebSocket connections
-      'https://jov.ie', // Monitoring endpoint
+      'wss://clerk.jov.ie', // Clerk proxy WebSocket
+      'https://jov.ie',
+      'https://app.jov.ie',
       'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
     ].join(' '),
     "font-src 'self' data:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://clerk.jov.ie https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];
+};
+
+/**
+ * Builds the enforcing Content-Security-Policy header value.
+ * This is the main CSP that blocks resources violating the policy.
+ */
+export const buildContentSecurityPolicy = (
+  options: BuildCspOptions
+): string => {
+  const directives = buildCspDirectives(options);
+  return directives.join('; ');
+};
+
+interface BuildCspReportOnlyOptions extends BuildCspOptions {
+  /** Pre-computed report URI to avoid duplicate calls to getCspReportUri */
+  reportUri?: string | null;
+}
+
+/**
+ * Builds the Content-Security-Policy-Report-Only header value.
+ * This CSP reports violations to Sentry without blocking resources.
+ * Useful for monitoring and identifying issues before enforcement.
+ */
+export const buildContentSecurityPolicyReportOnly = (
+  options: BuildCspReportOnlyOptions
+): string | null => {
+  // Use provided reportUri if explicitly set (including null to disable),
+  // otherwise fall back to fetching it
+  const reportUri =
+    options.reportUri !== undefined ? options.reportUri : getCspReportUri();
+  if (!reportUri) {
+    // No reporting configured - skip report-only header
+    return null;
+  }
+
+  const directives = buildCspDirectives(options);
+
+  // Add reporting directives
+  directives.push(`report-uri ${reportUri}`);
+  directives.push(`report-to ${CSP_REPORT_GROUP}`);
 
   return directives.join('; ');
 };

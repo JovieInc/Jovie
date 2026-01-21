@@ -57,7 +57,7 @@ export function escapeCSVValue(value: unknown): string {
 
   if (needsQuoting) {
     // Escape double quotes by doubling them
-    const escaped = stringValue.replace(/"/g, '""');
+    const escaped = stringValue.replaceAll('"', '""');
     return `"${escaped}"`;
   }
 
@@ -126,7 +126,7 @@ export function formatDateValue(
   date: Date,
   format: 'iso' | 'locale' = 'iso'
 ): string {
-  if (!(date instanceof Date) || isNaN(date.getTime())) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return '';
   }
 

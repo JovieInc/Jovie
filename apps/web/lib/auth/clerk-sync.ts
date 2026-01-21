@@ -1,7 +1,9 @@
 'use server';
 
 import { clerkClient } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
+
 import { db } from '@/lib/db';
 import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
@@ -64,7 +66,12 @@ export async function syncClerkMetadata(
       publicMetadata: updatedMetadata,
     });
 
-    console.info(`[clerk-sync] Synced metadata for user ${clerkUserId}:`, data);
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced metadata for user',
+      level: 'info',
+      data: { clerkUserId, metadata: data },
+    });
     return { success: true };
   } catch (error) {
     const errorMessage =
@@ -138,22 +145,21 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
 
     // Determine if profile is complete
     const hasCompleteProfile = Boolean(
-      profile &&
-        profile.onboardingCompletedAt &&
-        profile.username &&
-        profile.displayName &&
-        profile.isPublic !== false
+      profile?.onboardingCompletedAt &&
+        profile?.username &&
+        profile?.displayName &&
+        profile?.isPublic !== false
     );
 
     // Map userStatus lifecycle enum to Clerk's simpler status
-    const clerkStatus: 'active' | 'pending' | 'banned' =
-      dbUser.userStatus === 'banned'
-        ? 'banned'
-        : dbUser.userStatus === 'suspended'
-          ? 'banned'
-          : dbUser.userStatus === 'waitlist_pending'
-            ? 'pending'
-            : 'active';
+    let clerkStatus: 'active' | 'pending' | 'banned';
+    if (dbUser.userStatus === 'banned' || dbUser.userStatus === 'suspended') {
+      clerkStatus = 'banned';
+    } else if (dbUser.userStatus === 'waitlist_pending') {
+      clerkStatus = 'pending';
+    } else {
+      clerkStatus = 'active';
+    }
 
     const metadata: JovieClerkMetadata = {
       jovie_role: dbUser.isAdmin ? 'admin' : 'user',
@@ -210,7 +216,12 @@ export async function handleClerkUserDeleted(
     }
 
     if (dbUser.deletedAt) {
-      console.info(`[clerk-sync] User ${clerkUserId} already soft-deleted`);
+      Sentry.addBreadcrumb({
+        category: 'clerk-sync',
+        message: 'User already soft-deleted',
+        level: 'info',
+        data: { clerkUserId },
+      });
       return { success: true }; // Already deleted
     }
 
@@ -247,9 +258,12 @@ export async function handleClerkUserDeleted(
       }
     }
 
-    console.info(
-      `[clerk-sync] Soft-deleted user ${clerkUserId} from Clerk deletion event`
-    );
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Soft-deleted user from Clerk deletion event',
+      level: 'info',
+      data: { clerkUserId },
+    });
     return { success: true };
   } catch (error) {
     const errorMessage =
@@ -352,9 +366,12 @@ export async function syncAdminRoleChange(
       );
     }
 
-    console.info(
-      `[clerk-sync] Synced admin role for ${targetClerkUserId}: isAdmin=${isAdmin}`
-    );
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced admin role change',
+      level: 'info',
+      data: { targetClerkUserId, isAdmin },
+    });
     return { success: true };
   } catch (error) {
     const errorMessage =
@@ -403,4 +420,97 @@ export async function syncUserStatus(
   return syncClerkMetadata(clerkUserId, {
     jovie_status: status,
   });
+}
+
+/**
+ * Syncs email from Clerk to DB user record.
+ *
+ * Called from:
+ * - resolveUserState() on auth check (if email changed)
+ * - Webhook handler on user.updated event
+ *
+ * Clerk is the source of truth for identity (email, name, avatar).
+ * This function ensures the DB stays in sync when email changes in Clerk.
+ *
+ * @param userId - Database user ID (NOT clerk ID)
+ * @param newEmail - The verified email from Clerk
+ */
+export async function syncEmailFromClerk(
+  userId: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!userId || !newEmail) {
+    return { success: false, error: 'Missing userId or newEmail' };
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ email: newEmail, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced email from Clerk',
+      level: 'info',
+      data: { userId, newEmail },
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    await captureError('Failed to sync email from Clerk', error, {
+      component: 'clerk-sync',
+      userId,
+      newEmail,
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Syncs email from Clerk to DB user record by Clerk ID.
+ *
+ * Used by webhook handler which only has clerk_id available.
+ *
+ * @param clerkId - The Clerk user ID
+ * @param newEmail - The verified email from Clerk
+ */
+export async function syncEmailFromClerkByClerkId(
+  clerkId: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!clerkId || !newEmail) {
+    return { success: false, error: 'Missing clerkId or newEmail' };
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ email: newEmail, updatedAt: new Date() })
+      .where(eq(users.clerkId, clerkId));
+
+    Sentry.addBreadcrumb({
+      category: 'clerk-sync',
+      message: 'Synced email from Clerk by clerkId',
+      level: 'info',
+      data: { clerkId, newEmail },
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    await captureError('Failed to sync email from Clerk by clerkId', error, {
+      component: 'clerk-sync',
+      clerkId,
+      newEmail,
+    });
+
+    return { success: false, error: errorMessage };
+  }
 }

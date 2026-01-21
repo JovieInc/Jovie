@@ -14,6 +14,11 @@ const syncMocks = vi.hoisted(() => ({
   syncUsernameFromClerkEvent: vi.fn(),
 }));
 
+const clerkSyncMocks = vi.hoisted(() => ({
+  syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
+  syncEmailFromClerkByClerkId: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: vi.fn(() => Promise.resolve(mockClerkClient)),
 }));
@@ -26,10 +31,17 @@ vi.mock('svix', () => ({
   Webhook: vi.fn(),
 }));
 
-vi.mock('@/lib/username/sync', () => syncMocks);
+vi.mock('@/lib/env', () => ({
+  env: new Proxy(
+    {},
+    {
+      get: (_target, prop) => (process.env as any)[prop as any],
+    }
+  ) as any,
+}));
 
-const { headers } = await import('next/headers');
-const { Webhook } = await import('svix');
+vi.mock('@/lib/auth/clerk-sync', () => clerkSyncMocks);
+vi.mock('@/lib/username/sync', () => syncMocks);
 const { syncUsernameFromClerkEvent } = syncMocks;
 
 describe('/api/clerk/webhook', () => {
@@ -37,13 +49,16 @@ describe('/api/clerk/webhook', () => {
     verify: vi.fn(),
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Set required environment variable
     process.env.CLERK_WEBHOOK_SECRET = 'test_webhook_secret';
 
+    clerkSyncMocks.syncAllClerkMetadata.mockResolvedValue({ success: true });
+
     // Mock headers
+    const { headers } = await import('next/headers');
     vi.mocked(headers).mockResolvedValue(
       new Map([
         ['svix-id', 'svix_123'],
@@ -53,6 +68,7 @@ describe('/api/clerk/webhook', () => {
     );
 
     // Mock webhook verification
+    const { Webhook } = await import('svix');
     vi.mocked(Webhook).mockImplementation(() => mockWebhook as any);
   });
 
@@ -233,6 +249,7 @@ describe('/api/clerk/webhook', () => {
 
   describe('webhook security', () => {
     it('should reject requests with missing headers', async () => {
+      const { headers } = await import('next/headers');
       vi.mocked(headers).mockResolvedValue(new Map() as any);
 
       const request = new NextRequest(
@@ -272,8 +289,7 @@ describe('/api/clerk/webhook', () => {
     });
 
     it('should return error when webhook secret is missing', async () => {
-      // Mock missing webhook secret
-      const originalEnv = process.env.CLERK_WEBHOOK_SECRET;
+      // Re-import route after clearing the env so env-server sees it missing
       delete process.env.CLERK_WEBHOOK_SECRET;
 
       const request = new NextRequest(
@@ -289,11 +305,6 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(500);
       expect(result.error).toBe('Webhook secret not configured');
-
-      // Restore environment
-      if (originalEnv) {
-        process.env.CLERK_WEBHOOK_SECRET = originalEnv;
-      }
     });
   });
 
@@ -396,7 +407,7 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to sync username from Clerk');
+      expect(result.error).toBe('Failed to sync from Clerk');
       expect(syncUsernameFromClerkEvent).toHaveBeenCalledWith(
         'user_123',
         'new-handle',

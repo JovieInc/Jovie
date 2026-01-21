@@ -32,7 +32,7 @@ function renderContent(
   enableDynamicEngagement: boolean
 ) {
   const mapSocialPlatformToDSPKey = (platform: string): string | null => {
-    const normalized = platform.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 
     // Map of platform keywords to DSP keys
     const platformMappings: Array<{ keywords: string[]; dspKey: string }> = [
@@ -207,7 +207,6 @@ export function StaticArtistPage({
         showBackButton={showBackButton}
         showFooter={showFooter}
         showNotificationButton={true}
-        forceNotificationsEnabled={isPublicProfileMode}
       >
         <div>
           {mode === 'profile' ? (

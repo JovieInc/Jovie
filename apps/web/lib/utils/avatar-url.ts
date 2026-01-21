@@ -221,28 +221,91 @@ function upgradeGravatarUrl(url: string): string {
 }
 
 /**
- * Helper to check if a hostname matches known OAuth avatar providers.
- * Eliminates duplication between upgrade and validation functions.
+ * Provider keys for avatar URL upgrade functions.
  */
-function matchesKnownProvider(hostname: string): {
-  isGoogle: boolean;
-  isFacebook: boolean;
-  isTwitter: boolean;
-  isGitHub: boolean;
-  isClerk: boolean;
-  isGravatar: boolean;
-} {
-  return {
-    isGoogle: hostname.endsWith('.googleusercontent.com'),
-    isFacebook:
-      hostname.includes('fbsbx.com') ||
-      hostname.includes('fbcdn.net') ||
-      hostname.includes('facebook.com'),
-    isTwitter: hostname === 'pbs.twimg.com',
-    isGitHub: hostname === 'avatars.githubusercontent.com',
-    isClerk: hostname === 'img.clerk.com' || hostname === 'images.clerk.dev',
-    isGravatar: hostname.includes('gravatar.com'),
-  };
+type AvatarProvider =
+  | 'google'
+  | 'facebook'
+  | 'twitter'
+  | 'github'
+  | 'clerk'
+  | 'gravatar';
+
+/**
+ * Map of provider keys to their upgrade functions.
+ */
+const PROVIDER_UPGRADE_MAP: Record<AvatarProvider, (url: string) => string> = {
+  google: upgradeGoogleAvatarUrl,
+  facebook: upgradeFacebookAvatarUrl,
+  twitter: upgradeTwitterAvatarUrl,
+  github: upgradeGitHubAvatarUrl,
+  clerk: upgradeClerkAvatarUrl,
+  gravatar: upgradeGravatarUrl,
+};
+
+/**
+ * Detect the provider key from a hostname using exact domain matching.
+ *
+ * Security: Uses exact domain matching to prevent subdomain injection attacks.
+ * For example, "evil.fbsbx.com.attacker.com" will NOT match "fbsbx.com".
+ */
+function detectProviderKey(hostname: string): AvatarProvider | null {
+  const lowerHostname = hostname.toLowerCase();
+
+  // Google: exact domain or subdomain match only
+  if (
+    lowerHostname === 'googleusercontent.com' ||
+    lowerHostname.endsWith('.googleusercontent.com')
+  ) {
+    return 'google';
+  }
+
+  // Facebook: exact domain or subdomain matches only
+  if (
+    lowerHostname === 'fbsbx.com' ||
+    lowerHostname.endsWith('.fbsbx.com') ||
+    lowerHostname === 'fbcdn.net' ||
+    lowerHostname.endsWith('.fbcdn.net') ||
+    lowerHostname === 'facebook.com' ||
+    lowerHostname.endsWith('.facebook.com')
+  ) {
+    return 'facebook';
+  }
+
+  // Twitter: exact match only (no subdomains)
+  if (lowerHostname === 'pbs.twimg.com') {
+    return 'twitter';
+  }
+
+  // GitHub: exact match only (no subdomains)
+  if (lowerHostname === 'avatars.githubusercontent.com') {
+    return 'github';
+  }
+
+  // Clerk: exact matches only (no subdomains)
+  if (
+    lowerHostname === 'img.clerk.com' ||
+    lowerHostname === 'images.clerk.dev'
+  ) {
+    return 'clerk';
+  }
+
+  // Gravatar: exact domain or subdomain match only
+  if (
+    lowerHostname === 'gravatar.com' ||
+    lowerHostname.endsWith('.gravatar.com')
+  ) {
+    return 'gravatar';
+  }
+
+  return null;
+}
+
+/**
+ * Check if a provider key is valid (for use in isUpgradeableAvatarUrl).
+ */
+function isKnownProvider(hostname: string): boolean {
+  return detectProviderKey(hostname) !== null;
 }
 
 /**
@@ -268,24 +331,14 @@ export function upgradeOAuthAvatarUrl(
 
   try {
     const urlObj = new URL(url);
-    const hostname = urlObj.hostname.toLowerCase();
-    const providers = matchesKnownProvider(hostname);
+    const providerKey = detectProviderKey(urlObj.hostname);
 
-    const upgradeFn = providers.isGoogle
-      ? upgradeGoogleAvatarUrl
-      : providers.isFacebook
-        ? upgradeFacebookAvatarUrl
-        : providers.isTwitter
-          ? upgradeTwitterAvatarUrl
-          : providers.isGitHub
-            ? upgradeGitHubAvatarUrl
-            : providers.isClerk
-              ? upgradeClerkAvatarUrl
-              : providers.isGravatar
-                ? upgradeGravatarUrl
-                : undefined;
+    if (!providerKey) {
+      return url;
+    }
 
-    return upgradeFn ? upgradeFn(url) : url;
+    const upgradeFn = PROVIDER_UPGRADE_MAP[providerKey];
+    return upgradeFn(url);
   } catch {
     // Invalid URL - return as-is
     return url;
@@ -304,17 +357,7 @@ export function isUpgradeableAvatarUrl(
 
   try {
     const urlObj = new URL(url);
-    const hostname = urlObj.hostname.toLowerCase();
-    const providers = matchesKnownProvider(hostname);
-
-    return (
-      providers.isGoogle ||
-      providers.isFacebook ||
-      providers.isTwitter ||
-      providers.isGitHub ||
-      providers.isClerk ||
-      providers.isGravatar
-    );
+    return isKnownProvider(urlObj.hostname);
   } catch {
     return false;
   }

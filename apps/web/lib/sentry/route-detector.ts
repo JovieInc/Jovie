@@ -295,7 +295,7 @@ export function isPublicRoute(pathname: string): boolean {
  * @returns true if it appears to be a dynamic route pattern
  */
 export function hasDynamicSegments(pathname: string): boolean {
-  return /\[.*\]/.test(pathname);
+  return /\[[^\]]*\]/.test(pathname);
 }
 
 /**
@@ -306,7 +306,7 @@ export function hasDynamicSegments(pathname: string): boolean {
  * @returns true if it contains route group syntax
  */
 export function isRouteGroupPath(pathname: string): boolean {
-  return /\(.*\)/.test(pathname);
+  return /\([^)]*\)/.test(pathname);
 }
 
 /**

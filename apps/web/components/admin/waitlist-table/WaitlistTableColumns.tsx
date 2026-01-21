@@ -118,12 +118,12 @@ export function useWaitlistColumns({
         id: 'heardAbout',
         header: 'Heard About',
         cell: entry => {
-          const heardAboutTruncated =
-            entry.heardAbout && entry.heardAbout.length > 30
-              ? entry.heardAbout.slice(0, 30) + '…'
-              : entry.heardAbout;
-          return entry.heardAbout ? (
-            entry.heardAbout.length > 30 ? (
+          if (!entry.heardAbout) {
+            return <span className='text-tertiary-token'>—</span>;
+          }
+          if (entry.heardAbout.length > 30) {
+            const heardAboutTruncated = entry.heardAbout.slice(0, 30) + '…';
+            return (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className='cursor-help text-secondary-token'>
@@ -134,11 +134,10 @@ export function useWaitlistColumns({
                   {entry.heardAbout}
                 </TooltipContent>
               </Tooltip>
-            ) : (
-              <span className='text-secondary-token'>{entry.heardAbout}</span>
-            )
-          ) : (
-            <span className='text-tertiary-token'>—</span>
+            );
+          }
+          return (
+            <span className='text-secondary-token'>{entry.heardAbout}</span>
           );
         },
         width: 'w-[160px]',
@@ -192,11 +191,11 @@ export function useWaitlistColumns({
                   void onApprove(entry.id);
                 }}
               >
-                {isApproved
-                  ? 'Approved'
-                  : isApproving
-                    ? 'Approving…'
-                    : 'Approve'}
+                {(() => {
+                  if (isApproved) return 'Approved';
+                  if (isApproving) return 'Approving…';
+                  return 'Approve';
+                })()}
               </Button>
             </div>
           );

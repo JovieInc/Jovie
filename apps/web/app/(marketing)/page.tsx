@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
+import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { InsightSection } from '@/components/home/InsightSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
+import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
@@ -122,7 +123,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Helper to safely serialize JSON-LD with XSS protection
 const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replace(/</g, '\\u003c');
+  JSON.stringify(value).replaceAll('<', '\\u003c');
 
 // Pre-serialized JSON-LD structured data for static generation
 const WEBSITE_SCHEMA = jsonLd({
@@ -209,7 +210,14 @@ const ORGANIZATION_SCHEMA = jsonLd({
 
 export default function HomePage() {
   return (
-    <div className='relative min-h-screen bg-base text-primary-token'>
+    <div
+      className='relative min-h-screen bg-base text-primary-token'
+      style={{
+        // Inline fallbacks prevent blank/black flash before CSS loads (ENG-001)
+        backgroundColor: 'var(--color-bg-base, #f6f6f6)',
+        color: 'var(--color-text-primary-token, #0c0c0c)',
+      }}
+    >
       {/* Structured Data */}
       <script
         type='application/ld+json'
@@ -230,16 +238,19 @@ export default function HomePage() {
       {/* 1. Hero Section */}
       <RedesignedHero />
 
-      {/* 2. Problem Section */}
+      {/* 2. See It In Action Section */}
+      <SeeItInAction />
+
+      {/* 3. Problem Section */}
       <ProblemSection />
 
-      {/* 3. Insight Section */}
-      <InsightSection />
+      {/* 4. Comparison Section */}
+      <ComparisonSection />
 
-      {/* 4. What You Get Section */}
+      {/* 5. What You Get Section */}
       <WhatYouGetSection />
 
-      {/* 5. Final CTA Section */}
+      {/* 6. Final CTA Section */}
       <FinalCTASection />
     </div>
   );

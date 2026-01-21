@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSecureEnv } from '@/lib/env-server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   AUDIENCE_COOKIE_NAME,
   buildInvalidRequestResponse,
@@ -14,8 +16,6 @@ import {
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * POST handler for notification subscriptions
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (result.audienceIdentified) {
       response.cookies.set(AUDIENCE_COOKIE_NAME, '1', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isSecureEnv(),
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 365,
         path: '/',

@@ -1,5 +1,18 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const AUDIENCE_TABLE_HEADER_KEYS = Array.from(
+  { length: 7 },
+  (_, i) => `audience-header-${i + 1}`
+);
+const AUDIENCE_TABLE_ROW_KEYS = Array.from(
+  { length: 10 },
+  (_, i) => `audience-row-${i + 1}`
+);
+const AUDIENCE_TABLE_COL_KEYS = Array.from(
+  { length: 7 },
+  (_, i) => `audience-col-${i + 1}`
+);
+
 export default function Loading() {
   return (
     <div className='flex h-full min-h-0 flex-col'>
@@ -19,9 +32,9 @@ export default function Loading() {
             <div className='px-4 py-4 sm:px-6'>
               <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
                 <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
-                  {Array.from({ length: 7 }).map((_, index) => (
+                  {AUDIENCE_TABLE_HEADER_KEYS.map(key => (
                     <LoadingSkeleton
-                      key={`header-${index}`}
+                      key={key}
                       height='h-4'
                       width='w-24'
                       rounded='md'
@@ -29,16 +42,16 @@ export default function Loading() {
                   ))}
                 </div>
                 <ul>
-                  {Array.from({ length: 10 }).map((_, rowIndex) => (
+                  {AUDIENCE_TABLE_ROW_KEYS.map(rowKey => (
                     <li
-                      key={`row-${rowIndex}`}
+                      key={rowKey}
                       className='grid grid-cols-7 gap-4 border-b border-subtle px-4 last:border-b-0'
                       style={{ height: '60px' }}
                       aria-hidden='true'
                     >
-                      {Array.from({ length: 7 }).map((__, colIndex) => (
+                      {AUDIENCE_TABLE_COL_KEYS.map(colKey => (
                         <LoadingSkeleton
-                          key={`cell-${rowIndex}-${colIndex}`}
+                          key={`${rowKey}-${colKey}`}
                           height='h-4'
                           width='w-full'
                           rounded='md'

@@ -182,9 +182,9 @@ export const AvatarUploadable = React.memo(
       uploadStatus === 'success' || uploadStatus === 'error' ? 100 : progress;
 
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive avatar upload component
-      // biome-ignore lint/a11y/noStaticElementInteractions: Custom interactive avatar upload component
-      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA props needed for drag and drop accessibility
+      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Role is dynamically 'button' or 'presentation'
+      // biome-ignore lint/a11y/noStaticElementInteractions: Role is dynamically 'button' when interactive
+      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label only present when role='button'
       <div
         ref={mergedRef}
         className={cn(
@@ -199,10 +199,10 @@ export const AvatarUploadable = React.memo(
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         tabIndex={isInteractive ? 0 : undefined}
-        role={isInteractive ? 'button' : undefined}
+        role={isInteractive ? 'button' : 'presentation'}
         aria-label={isInteractive ? 'Upload profile photo' : undefined}
-        aria-disabled={!isInteractive}
-        aria-busy={isUploading}
+        aria-disabled={isInteractive ? !isInteractive : undefined}
+        aria-busy={isUploading || undefined}
       >
         <Avatar
           src={previewUrl ?? src}

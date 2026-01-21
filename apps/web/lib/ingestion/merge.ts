@@ -1,47 +1,24 @@
 import { eq } from 'drizzle-orm';
 import { type DbType, socialLinks } from '@/lib/db';
 import { logger } from '@/lib/utils/logger';
-import {
-  canonicalIdentity,
-  detectPlatform,
-} from '@/lib/utils/platform-detection';
+import { detectPlatform } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
-import { copyExternalAvatarToStorage } from './magic-profile-avatar';
 import { applyProfileEnrichment } from './profile';
+import { processAvatarIfNeeded } from './services/avatar-processor';
+import {
+  ensureEvidenceDefaults,
+  mergeEvidence,
+} from './services/evidence-merger';
+import {
+  buildCanonicalIndex,
+  getCanonicalIdentity,
+} from './services/link-deduplication';
 import type { ExtractionResult } from './types';
 
 type SocialLinkRow = typeof socialLinks.$inferSelect;
 
-/**
- * Merge evidence from existing and incoming sources.
- */
-export function mergeEvidence(
-  existing: Record<string, unknown> | null,
-  incoming?: { sources?: string[]; signals?: string[] }
-): { sources: string[]; signals: string[] } {
-  const baseSources =
-    Array.isArray((existing as { sources?: string[] })?.sources) &&
-    ((existing as { sources?: unknown[] }).sources ?? []).every(
-      item => typeof item === 'string'
-    )
-      ? ((existing as { sources?: string[] }).sources as string[])
-      : [];
-  const baseSignals =
-    Array.isArray((existing as { signals?: string[] })?.signals) &&
-    ((existing as { signals?: unknown[] }).signals ?? []).every(
-      item => typeof item === 'string'
-    )
-      ? ((existing as { signals?: string[] }).signals as string[])
-      : [];
-
-  const nextSources = new Set([...baseSources, ...(incoming?.sources ?? [])]);
-  const nextSignals = new Set([...baseSignals, ...(incoming?.signals ?? [])]);
-
-  return {
-    sources: Array.from(nextSources),
-    signals: Array.from(nextSignals),
-  };
-}
+// Re-export for backward compatibility
+export { mergeEvidence } from './services/evidence-merger';
 
 /**
  * Create an in-memory social link row for tracking during merge.
@@ -93,6 +70,7 @@ export function createInMemorySocialLinkRow({
 
 /**
  * Normalize extracted links and merge them with existing social links.
+ * Uses modular services to reduce cognitive complexity.
  */
 export async function normalizeAndMergeExtraction(
   tx: DbType,
@@ -106,26 +84,15 @@ export async function normalizeAndMergeExtraction(
   },
   extraction: ExtractionResult
 ): Promise<{ inserted: number; updated: number }> {
+  // Step 1: Load existing links and build canonical index
   const existingRows = await tx
     .select()
     .from(socialLinks)
     .where(eq(socialLinks.creatorProfileId, profile.id));
 
-  const existingByCanonical = new Map<string, SocialLinkRow>();
+  const existingByCanonical = buildCanonicalIndex(existingRows);
 
-  for (const row of existingRows) {
-    try {
-      const detected = detectPlatform(row.url);
-      const canonical = canonicalIdentity({
-        platform: detected.platform,
-        normalizedUrl: detected.normalizedUrl,
-      });
-      existingByCanonical.set(canonical, row);
-    } catch {
-      // Skip rows with unparseable URLs; ingestion will not mutate them
-    }
-  }
-
+  // Step 2: Process each extracted link
   let inserted = 0;
   let updated = 0;
   const sortStart = existingRows.length;
@@ -135,25 +102,27 @@ export async function normalizeAndMergeExtraction(
       const detected = detectPlatform(link.url);
       if (!detected.isValid) continue;
 
-      const canonical = canonicalIdentity({
-        platform: detected.platform,
-        normalizedUrl: detected.normalizedUrl,
-      });
-      const evidence = mergeEvidence(null, link.evidence);
+      const canonical = getCanonicalIdentity(link.url);
+      if (!canonical) continue;
+
+      // Prepare evidence with defaults
+      const evidence = ensureEvidenceDefaults(
+        mergeEvidence(null, link.evidence),
+        {
+          sources: ['ingestion'],
+          signals: ['ingestion_profile_link'],
+        }
+      );
+
       const { confidence, state } = computeLinkConfidence({
         sourceType: 'ingested',
-        signals:
-          evidence.signals && evidence.signals.length > 0
-            ? (evidence.signals as string[])
-            : ['ingestion_profile_link'],
-        sources:
-          evidence.sources && evidence.sources.length > 0
-            ? (evidence.sources as string[])
-            : ['ingestion'],
+        signals: evidence.signals,
+        sources: evidence.sources,
         usernameNormalized: profile.usernameNormalized,
         url: detected.normalizedUrl,
       });
 
+      // Check if link already exists
       const existing = existingByCanonical.get(canonical);
       if (existing) {
         const existingState =
@@ -238,23 +207,13 @@ export async function normalizeAndMergeExtraction(
     }
   }
 
-  // Copy external avatar to Jovie storage before applying enrichment
-  // This ensures we don't store third-party URLs in the database
-  let hostedAvatarUrl: string | null = null;
-  if (
-    extraction.avatarUrl &&
-    !profile.avatarUrl &&
-    !profile.avatarLockedByUser &&
-    profile.usernameNormalized
-  ) {
-    hostedAvatarUrl = await copyExternalAvatarToStorage({
-      externalUrl: extraction.avatarUrl,
-      handle: profile.usernameNormalized,
-      sourcePlatform: 'ingestion',
-    });
-  }
+  // Step 3: Process avatar if needed
+  const hostedAvatarUrl = await processAvatarIfNeeded(
+    profile,
+    extraction.avatarUrl ?? null
+  );
 
-  // Apply basic enrichment for display name and avatar (phase 3 rules: respect locks)
+  // Step 4: Apply profile enrichment (respects user locks)
   await applyProfileEnrichment(tx, {
     profileId: profile.id,
     displayNameLocked: profile.displayNameLocked,

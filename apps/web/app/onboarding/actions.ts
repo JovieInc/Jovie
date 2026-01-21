@@ -4,7 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
@@ -75,7 +75,7 @@ async function uploadRemoteAvatar(params: {
       const contentType =
         source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ??
         null;
-      if (!contentType || !contentType.startsWith('image/')) {
+      if (!contentType?.startsWith('image/')) {
         lastError = new Error(`Invalid content type: ${contentType}`);
         console.warn('[AVATAR_UPLOAD] Invalid content type:', contentType);
         // Don't retry for invalid content type - it won't change
@@ -151,7 +151,7 @@ function profileIsPublishable(
   if (!profile) return false;
   const hasHandle =
     Boolean(profile.username) && Boolean(profile.usernameNormalized);
-  const hasName = Boolean(profile.displayName && profile.displayName.trim());
+  const hasName = Boolean(profile.displayName?.trim());
   const isPublic = profile.isPublic !== false;
   const hasCompleted = Boolean(profile.onboardingCompletedAt);
 
@@ -470,10 +470,25 @@ export async function completeOnboarding({
       // Continue with onboarding - metadata sync is not critical
     }
 
+    // ENG-002: Set completion cookie to prevent redirect loop race condition
+    // The proxy checks this cookie and bypasses needsOnboarding check for 30s
+    // This handles the race between transaction commit and proxy's DB read
+    // IMPORTANT: Always set this cookie on success, even when redirectToDashboard=false,
+    // because the user will navigate to dashboard after seeing the completion step
+    const cookieStore = await cookies();
+    cookieStore.set('jovie_onboarding_complete', '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
+      path: '/',
+    });
+
+    // Invalidate dashboard data cache to prevent stale data causing redirect loops
+    // This ensures the app layout gets fresh data showing onboarding is complete
+    revalidatePath('/app', 'layout');
+
     if (redirectToDashboard) {
-      // Invalidate dashboard data cache to prevent stale data causing redirect loops
-      // This ensures the app layout gets fresh data showing onboarding is complete
-      revalidatePath('/app', 'layout');
       redirect('/app/dashboard');
     }
 

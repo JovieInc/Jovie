@@ -403,7 +403,7 @@ export function InviteCampaignManager() {
           Send Invites
         </h2>
 
-        {sendResult && sendResult.ok && (
+        {sendResult?.ok && (
           <div className='mb-4 flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3'>
             <Icon
               name='CheckCircle'

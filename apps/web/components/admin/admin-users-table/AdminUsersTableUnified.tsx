@@ -6,25 +6,26 @@ import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
-import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
-import { ExportCSVButton } from '@/components/admin/table/molecules/ExportCSVButton';
-import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
+  AdminPageSizeSelect,
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
+  ExportCSVButton,
+  TableBulkActionsToolbar,
+  TableCheckboxCell,
   UnifiedTable,
+  useRowSelection,
 } from '@/components/organisms/table';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminUsersTableProps } from './types';
 import { useAdminUsersTable } from './useAdminUsersTable';
@@ -34,12 +35,7 @@ const columnHelper = createColumnHelper<AdminUserRow>();
 export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const { users, page, pageSize, total, search, sort } = props;
 
-  const {
-    router,
-    openMenuUserId: _openMenuUserId,
-    setOpenMenuUserId: _setOpenMenuUserId,
-    pagination,
-  } = useAdminUsersTable(props);
+  const { router, pagination } = useAdminUsersTable(props);
 
   const {
     totalPages,
@@ -246,7 +242,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           ) : (
             <Badge size='sm' variant='success'>
               <span className='flex items-center gap-1.5'>
-                <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />
+                <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />{' '}
                 Active
               </span>
             </Badge>
@@ -284,9 +280,9 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     ]
   );
 
-  // Get row className
+  // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group hover:bg-base dark:hover:bg-surface-2';
+    return 'group hover:bg-surface-2/50';
   }, []);
 
   return (
@@ -405,8 +401,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
             getRowClassName={getRowClassName}
             getContextMenuItems={getContextMenuItems}
             enableVirtualization={true}
-            rowHeight={60}
-            minWidth='960px'
+            minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
             className='text-[13px]'
           />
         )}

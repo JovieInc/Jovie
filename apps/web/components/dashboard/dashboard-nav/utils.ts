@@ -12,7 +12,7 @@ export function fallbackCopy(text: string): boolean {
     textarea.focus();
     textarea.select();
     const successful = document.execCommand('copy');
-    document.body.removeChild(textarea);
+    textarea.remove();
     return successful;
   } catch {
     return false;
@@ -24,7 +24,7 @@ export function fallbackCopy(text: string): boolean {
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
       return true;
     }

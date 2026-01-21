@@ -65,23 +65,23 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   return (
     <Sidebar variant='sidebar' className={className}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild size='lg' className='gap-3'>
-              <Link href='/app/admin' className='flex items-center gap-3'>
-                <div className='flex aspect-square size-9 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground'>
-                  <BrandLogo size={18} tone='auto' className='size-4' />
-                </div>
-                <div className='grid flex-1 text-left leading-tight'>
-                  <span className='truncate text-sm font-semibold'>Jovie</span>
-                  <span className='truncate text-xs text-sidebar-muted'>
-                    Admin Console
-                  </span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className='flex items-center gap-3 px-2 py-1'>
+          <Link
+            href='/app/admin'
+            aria-label='Go to admin dashboard'
+            className='flex size-9 items-center justify-center rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+          >
+            <BrandLogo size={18} tone='auto' className='size-4' />
+          </Link>
+          <div className='grid flex-1 text-left leading-tight'>
+            <span className='truncate text-sm font-semibold text-sidebar-foreground'>
+              Jovie
+            </span>
+            <span className='truncate text-xs text-sidebar-muted'>
+              Admin Console
+            </span>
+          </div>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>

@@ -25,7 +25,7 @@ export interface UseReleaseSidebarReturn {
   handleAddLink: () => Promise<void>;
   handleRemoveLink: (provider: ProviderKey) => Promise<void>;
   handleNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-  handleKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
+  handleKeyDown: (event: KeyboardEvent) => void;
 }
 
 export function useReleaseSidebar({
@@ -161,7 +161,7 @@ export function useReleaseSidebar({
   );
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
+    (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !isFormElement(event.target)) {
         onClose?.();
       }

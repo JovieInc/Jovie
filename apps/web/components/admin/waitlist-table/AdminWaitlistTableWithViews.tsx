@@ -2,18 +2,24 @@
 
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableBulkActionsToolbar } from '@/components/admin/table/molecules/TableBulkActionsToolbar';
 import {
   KanbanBoard,
   type KanbanColumn,
 } from '@/components/admin/table/organisms/KanbanBoard';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
   DisplayMenuDropdown,
+  ExportCSVButton,
+  TableBulkActionsToolbar,
+  useRowSelection,
   type ViewMode,
 } from '@/components/organisms/table';
+import {
+  WAITLIST_CSV_FILENAME_PREFIX,
+  waitlistCSVColumns,
+} from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
@@ -188,7 +194,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
         if (!response.ok || !payload?.success) {
           console.error('Failed to update waitlist status:', payload?.error);
-          // TODO: Show error toast to user
+          toast.error('Failed to update status', {
+            description: payload?.error ?? 'Please try again',
+          });
           return;
         }
 
@@ -196,7 +204,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         // No need to manually update state here
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
-        // TODO: Show error toast to user
+        toast.error('Failed to update status', {
+          description: 'A network error occurred. Please try again.',
+        });
       }
     },
     []
@@ -225,6 +235,13 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                 <span className='hidden sm:inline'> entries</span>
               </div>
               <div className='flex items-center gap-2'>
+                <ExportCSVButton<WaitlistEntryRow>
+                  getData={() => entries}
+                  columns={waitlistCSVColumns}
+                  filename={WAITLIST_CSV_FILENAME_PREFIX}
+                  disabled={entries.length === 0}
+                  ariaLabel='Export waitlist to CSV file'
+                />
                 <DisplayMenuDropdown
                   viewMode={viewMode}
                   availableViewModes={['list', 'board']}

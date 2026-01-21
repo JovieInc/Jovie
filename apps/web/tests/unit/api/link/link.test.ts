@@ -35,6 +35,18 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  apiLimiter: {
+    limit: vi.fn().mockResolvedValue({
+      success: true,
+      limit: 100,
+      remaining: 100,
+      reset: Math.floor(Date.now() / 1000) + 60,
+    }),
+  },
+  createRateLimitHeaders: vi.fn().mockReturnValue({}),
+}));
+
 describe('POST /api/link/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();

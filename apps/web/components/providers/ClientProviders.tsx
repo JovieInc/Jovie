@@ -5,6 +5,8 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
+import { PacerProvider } from '@/lib/pacer';
+import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
@@ -159,24 +161,37 @@ function ClientProvidersInnerBase({
     <React.StrictMode>
       <NuqsProvider>
         <QueryProvider>
-          <ThemeProvider
-            attribute='class'
-            defaultTheme={initialThemeMode}
-            enableSystem={true}
-            disableTransitionOnChange
-            storageKey='jovie-theme'
+          <PacerProvider
+            defaultOptions={{
+              debouncer: { wait: PACER_TIMING.DEBOUNCE_MS },
+              throttler: {
+                wait: PACER_TIMING.THROTTLE_MS,
+                leading: true,
+                trailing: true,
+              },
+            }}
           >
-            <ThemeKeyboardShortcut />
-            {enableStatsig ? (
-              <StatsigProviders userId={userId}>
-                <LazyProviders enableAnalytics={enableStatsig}>
+            <ThemeProvider
+              attribute='class'
+              defaultTheme={initialThemeMode}
+              enableSystem={true}
+              disableTransitionOnChange
+              storageKey='jovie-theme'
+            >
+              <ThemeKeyboardShortcut />
+              {enableStatsig ? (
+                <StatsigProviders userId={userId}>
+                  <LazyProviders enableAnalytics={enableStatsig}>
+                    {children}
+                  </LazyProviders>
+                </StatsigProviders>
+              ) : (
+                <LazyProviders enableAnalytics={false}>
                   {children}
                 </LazyProviders>
-              </StatsigProviders>
-            ) : (
-              <LazyProviders enableAnalytics={false}>{children}</LazyProviders>
-            )}
-          </ThemeProvider>
+              )}
+            </ThemeProvider>
+          </PacerProvider>
         </QueryProvider>
       </NuqsProvider>
     </React.StrictMode>
@@ -260,7 +275,7 @@ const clerkAppearance = {
 
     // OTP input
     otpCodeFieldInput:
-      'bg-surface-0 border border-subtle text-primary-token focus:border-default focus:ring-2 focus:ring-[rgb(var(--focus-ring))]/30',
+      'bg-surface-0 border border-subtle text-primary-token focus-visible:border-default focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]/30',
 
     // Modal overlays
     modalBackdrop: 'bg-black/50 dark:bg-black/70 backdrop-blur-sm',
@@ -277,8 +292,8 @@ const clerkAppearance = {
   },
 };
 
-// Get the Clerk proxy URL for custom domain setup (e.g., clerk.meetjovie.com)
-const clerkProxyUrl = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API;
+// Custom domain is configured via CNAME (clerk.jov.ie → frontend-api.clerk.services)
+// No proxyUrl needed - Clerk SDK uses the domain from publishable key configuration
 
 // Main export - wraps children with ClerkProvider (client-side only)
 // Uses hydration guard to prevent SSR of ClerkProvider which accesses window
@@ -323,7 +338,6 @@ export function ClientProviders({
     <ClerkProvider
       publishableKey={publishableKey!}
       appearance={clerkAppearance}
-      proxyUrl={clerkProxyUrl}
     >
       <ClientProvidersInner
         initialThemeMode={initialThemeMode}

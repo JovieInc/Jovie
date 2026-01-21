@@ -4,6 +4,10 @@
       {
         "command": "bash .windsurf/scripts/format-on-edit.sh",
         "show_output": false
+      },
+      {
+        "command": "bash .windsurf/scripts/post-write-checks.sh",
+        "show_output": true
       }
     ]
   }

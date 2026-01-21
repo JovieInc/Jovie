@@ -1,5 +1,10 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const CONTACTS_LOADING_ROW_KEYS = Array.from(
+  { length: 6 },
+  (_, i) => `contacts-row-${i + 1}`
+);
+
 export default function ContactsLoading() {
   return (
     <div className='min-h-screen'>
@@ -21,9 +26,9 @@ export default function ContactsLoading() {
 
         {/* Contact list */}
         <div className='mt-6 space-y-3'>
-          {Array.from({ length: 6 }).map((_, index) => (
+          {CONTACTS_LOADING_ROW_KEYS.map(key => (
             <div
-              key={index}
+              key={key}
               className='flex items-center gap-4 rounded-lg border border-subtle bg-surface-0 p-4'
             >
               <LoadingSkeleton

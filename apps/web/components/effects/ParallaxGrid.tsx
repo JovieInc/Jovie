@@ -52,16 +52,6 @@ export function ParallaxGrid() {
           willChange: 'transform',
         }}
       />
-      <style jsx global>{`
-        .grid-item {
-          transition: transform 0.3s ease-out, box-shadow 0.3s ease-out;
-          transform-style: preserve-3d;
-        }
-        .grid-item:hover {
-          transform: translateY(-2px) translateZ(10px);
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        }
-      `}</style>
     </div>
   );
 }

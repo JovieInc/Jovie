@@ -8,53 +8,26 @@ import {
   socialLinks,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  createRateLimitHeaders,
+  trackingIpClicksLimiter,
+} from '@/lib/rate-limit';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-import { normalizeString } from '@/lib/utils/string-utils';
-import { LinkType } from '@/types/db';
 import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
   trimHistory,
 } from '../audience/lib/audience-utils';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import { validateTrackRequest } from './validation';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
-
-/**
- * Rate Limiting Status: NOT IMPLEMENTED
- * Following YC principle: "do things that don't scale until you have to"
- * Will add rate limiting when:
- * - Track events exceed ~50k/day
- * - Abuse/spam becomes measurable problem
- *
- * For now: basic input validation prevents most abuse
- */
-
-// Valid link types enum for validation
-const VALID_LINK_TYPES = ['listen', 'social', 'tip', 'other'] as const;
-
-// Username validation regex
-// (alphanumeric, underscore, hyphen, 3-30 chars)
-const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
-
-/**
- * Validate if a string is a valid URL
- */
-function isValidURL(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function inferAudienceDeviceType(
   userAgent: string | null
@@ -84,86 +57,45 @@ const ACTION_LABELS: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: Check IP-based rate limit for track events
+    const ipAddress = extractClientIP(request.headers);
+    const rateLimitResult = await trackingIpClicksLimiter.limit(ipAddress);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many tracking requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
+
+    // Validate request using extracted validation module
+    const validationResult = validateTrackRequest(body);
+    if ('error' in validationResult) {
+      return NextResponse.json(
+        { error: validationResult.error.error },
+        { status: validationResult.error.status, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const {
       handle,
       linkType,
       target,
       linkId,
-      source,
-    }: {
-      handle: string;
-      linkType: LinkType;
-      target: string;
-      linkId?: string;
-      source?: unknown;
-    } = body;
-
-    const resolvedSource = (() => {
-      if (typeof source !== 'string') return undefined;
-      const normalized = normalizeString(source);
-      if (normalized === 'qr') return 'qr';
-      if (normalized === 'link') return 'link';
-      return undefined;
-    })();
-
-    // Validate required fields
-    if (!handle || !linkType || !target) {
-      return NextResponse.json(
-        {
-          error:
-            'Missing required fields: handle, linkType, and target ' +
-            'are required',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Validate handle format
-    if (!USERNAME_REGEX.test(handle)) {
-      return NextResponse.json(
-        {
-          error:
-            'Invalid handle format. Must be 3-30 alphanumeric ' +
-            'characters, underscores, or hyphens',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Validate linkType is a valid enum value
-    if (
-      !VALID_LINK_TYPES.includes(linkType as (typeof VALID_LINK_TYPES)[number])
-    ) {
-      return NextResponse.json(
-        {
-          error: `Invalid linkType. Must be one of: ${VALID_LINK_TYPES.join(
-            ', '
-          )}`,
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const looksLikeUrl =
-      typeof target === 'string' &&
-      (target.includes('://') || target.startsWith('www.'));
-    if (looksLikeUrl && !isValidURL(target)) {
-      return NextResponse.json(
-        { error: 'Invalid target URL format' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-    if (typeof target !== 'string' || target.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Invalid target' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+      source: resolvedSource,
+    } = validationResult.data;
 
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
-    const ipAddress = extractClientIP(request.headers);
+    // ipAddress already extracted above for rate limiting
     const referrer = request.headers.get('referer') ?? undefined;
     const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
     const geoCountry =

@@ -271,3 +271,123 @@ export async function enqueueLayloIngestionJob(params: {
 
   return inserted?.id ?? null;
 }
+
+/**
+ * Enqueue a DSP artist discovery job.
+ *
+ * Discovers matching artist profiles on other DSPs (like Apple Music)
+ * for a creator profile using ISRC-based matching.
+ *
+ * @param params - Job parameters
+ * @returns Job ID if created, null if deduplicated
+ */
+export async function enqueueDspArtistDiscoveryJob(params: {
+  creatorProfileId: string;
+  spotifyArtistId: string;
+  targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
+}): Promise<string | null> {
+  const dedupKey = `dsp_discovery:${params.creatorProfileId}:${Date.now()}`;
+
+  const payload = {
+    creatorProfileId: params.creatorProfileId,
+    spotifyArtistId: params.spotifyArtistId,
+    targetProviders: params.targetProviders ?? ['apple_music'],
+    dedupKey,
+  };
+
+  // Check for recent pending/processing jobs for this profile
+  const recentJob = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${params.creatorProfileId}`,
+        or(
+          eq(ingestionJobs.status, 'pending'),
+          eq(ingestionJobs.status, 'processing')
+        )
+      )
+    )
+    .limit(1);
+
+  // If there's already a pending/processing job, don't create another
+  if (recentJob.length > 0) {
+    return recentJob[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'dsp_artist_discovery',
+      payload,
+      dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 1, // Higher priority for user-triggered discovery
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
+
+/**
+ * Enqueue a DSP track enrichment job.
+ *
+ * Called after a DSP artist match is confirmed to enrich tracks with
+ * links to the matched artist's profile on that provider.
+ *
+ * @param params - Job parameters
+ * @returns Job ID if created, null if deduplicated
+ */
+export async function enqueueDspTrackEnrichmentJob(params: {
+  creatorProfileId: string;
+  matchId: string;
+  providerId: 'apple_music' | 'deezer' | 'musicbrainz';
+  externalArtistId: string;
+}): Promise<string | null> {
+  const dedupKey = `dsp_track_enrichment:${params.matchId}`;
+
+  const payload = {
+    creatorProfileId: params.creatorProfileId,
+    matchId: params.matchId,
+    providerId: params.providerId,
+    externalArtistId: params.externalArtistId,
+  };
+
+  // Check for existing pending/processing job for this match
+  const existingJob = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'dsp_track_enrichment'),
+        eq(ingestionJobs.dedupKey, dedupKey),
+        or(
+          eq(ingestionJobs.status, 'pending'),
+          eq(ingestionJobs.status, 'processing')
+        )
+      )
+    )
+    .limit(1);
+
+  if (existingJob.length > 0) {
+    return existingJob[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'dsp_track_enrichment',
+      payload,
+      dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 2, // Medium priority for enrichment
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}

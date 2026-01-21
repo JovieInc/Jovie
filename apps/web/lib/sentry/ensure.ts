@@ -13,6 +13,11 @@ const SENTRY_INIT_TIMEOUT_MS = 100;
  * If initialization times out, Sentry will continue initializing in the background.
  */
 export function ensureSentry(): Promise<void> {
+  // Skip Sentry entirely in development to avoid noisy init timeouts
+  if (process.env.NODE_ENV === 'development') {
+    return Promise.resolve();
+  }
+
   if (!initializationPromise) {
     const sentryInit = register().catch(error => {
       console.error('[Sentry] Failed to initialize SDK', error);

@@ -1,5 +1,14 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const EARNINGS_LOADING_STAT_KEYS = Array.from(
+  { length: 3 },
+  (_, i) => `earnings-stat-${i + 1}`
+);
+const EARNINGS_LOADING_TX_KEYS = Array.from(
+  { length: 4 },
+  (_, i) => `earnings-tx-${i + 1}`
+);
+
 export default function EarningsLoading() {
   return (
     <div className='min-h-screen'>
@@ -12,9 +21,9 @@ export default function EarningsLoading() {
 
         {/* Stats cards */}
         <div className='mt-6 grid gap-4 sm:grid-cols-3'>
-          {Array.from({ length: 3 }).map((_, index) => (
+          {EARNINGS_LOADING_STAT_KEYS.map(key => (
             <div
-              key={index}
+              key={key}
               className='rounded-lg border border-subtle bg-surface-0 p-4'
             >
               <LoadingSkeleton height='h-4' width='w-24' />
@@ -32,9 +41,9 @@ export default function EarningsLoading() {
         {/* Transactions list */}
         <div className='mt-6 space-y-3'>
           <LoadingSkeleton height='h-5' width='w-32' />
-          {Array.from({ length: 4 }).map((_, index) => (
+          {EARNINGS_LOADING_TX_KEYS.map(key => (
             <div
-              key={index}
+              key={key}
               className='flex items-center justify-between rounded-lg border border-subtle bg-surface-0 p-4'
             >
               <div className='space-y-1'>

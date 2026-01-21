@@ -24,11 +24,11 @@ export function OnboardingCompleteStep({
   return (
     <div className='flex flex-col items-center justify-center h-full space-y-8'>
       <div className='text-center space-y-3 max-w-xl px-4'>
-        <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
+        <h1 className='text-lg font-medium text-primary-token text-center'>
           {title}
         </h1>
         {prompt ? (
-          <p className='text-(--muted) text-sm sm:text-base'>{prompt}</p>
+          <p className='text-sm text-secondary-token text-center'>{prompt}</p>
         ) : null}
       </div>
 

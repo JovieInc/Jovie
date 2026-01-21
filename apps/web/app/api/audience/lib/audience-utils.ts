@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 
 const ACTION_WEIGHTS: Record<string, number> = {
   listen: 3,

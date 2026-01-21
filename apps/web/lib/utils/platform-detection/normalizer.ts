@@ -67,6 +67,8 @@ const TRACKING_PARAMS = [
   'source',
 ];
 
+const MAX_URL_LENGTH = 2048;
+
 /**
  * Dangerous URL schemes that should be rejected
  */
@@ -137,8 +139,8 @@ export function isUnsafeUrl(url: string): boolean {
  */
 function fixDomainMisspellings(url: string): string {
   for (const [misspelled, correct] of Object.entries(DOMAIN_MISSPELLINGS)) {
-    const regex = new RegExp(misspelled.replace('.', '\\.'), 'gi');
-    url = url.replace(regex, correct);
+    const regex = new RegExp(misspelled.replaceAll('.', '\\.'), 'gi');
+    url = url.replaceAll(regex, correct);
   }
   return url;
 }
@@ -148,7 +150,7 @@ function fixDomainMisspellings(url: string): string {
  */
 function fixMissingDots(url: string): string {
   for (const [pattern, replacement] of DOT_FIX_PATTERNS) {
-    url = url.replace(pattern, replacement);
+    url = url.replaceAll(pattern, replacement);
   }
   return url;
 }
@@ -197,20 +199,25 @@ function canonicalizeTwitterDomain(parsedUrl: URL): void {
  */
 export function normalizeUrl(url: string): string {
   try {
-    const lowered = url.trim().toLowerCase();
+    const trimmed = url.trim();
+    if (trimmed.length > MAX_URL_LENGTH) {
+      return trimmed;
+    }
+
+    const lowered = trimmed.toLowerCase();
 
     if (isUnsafeUrl(lowered)) {
       throw new Error('Unsafe URL');
     }
 
     // Normalize stray spaces around dots
-    url = url.replace(/\s*\.\s*/g, '.');
+    url = trimmed.replaceAll(/\s*\.\s*/g, '.');
 
     // Fix common domain misspellings
     url = fixDomainMisspellings(url);
 
     // Comma instead of dot before common TLDs (e.g., youtube,com)
-    url = url.replace(/,(?=\s*(com|net|tv|be|gg|me)\b)/gi, '.');
+    url = url.replaceAll(/,(?=\s*(com|net|tv|be|gg|me)\b)/gi, '.');
 
     // Fix missing dots before TLDs
     url = fixMissingDots(url);

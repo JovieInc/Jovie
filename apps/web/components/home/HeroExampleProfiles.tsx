@@ -14,7 +14,7 @@ export async function HeroExampleProfiles() {
     }
 
     return (
-      <div className='py-10 sm:py-12'>
+      <div className='py-10 sm:py-12 max-w-full overflow-hidden'>
         {/* Section header */}
         <div className='flex items-center gap-3 mb-6'>
           <div className='h-px flex-1 bg-neutral-200 dark:bg-neutral-800' />

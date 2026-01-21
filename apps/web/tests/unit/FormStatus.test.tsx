@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FormStatus } from '@/components/molecules/FormStatus';
 
 // Mock the LoadingSpinner component
-vi.mock('@/components/ui/LoadingSpinner', () => ({
+vi.mock('@/components/atoms/LoadingSpinner', () => ({
   LoadingSpinner: ({ size }: { size?: string }) => (
     <div data-testid='loading-spinner' data-size={size}>
       Loading...

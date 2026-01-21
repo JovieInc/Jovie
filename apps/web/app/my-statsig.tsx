@@ -7,6 +7,7 @@ import {
   StatsigProvider,
   useClientAsyncInit,
 } from '@statsig/react-bindings';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import React from 'react';
 import { publicEnv } from '@/lib/env-public';
@@ -23,7 +24,7 @@ interface MyStatsigEnabledProps {
   plugins: StatsigPlugin<StatsigClient>[];
 }
 
-function MyStatsigEnabled({
+function MyStatsigEnabledInner({
   children,
   sdkKey,
   user,
@@ -76,6 +77,11 @@ function MyStatsigEnabled({
   );
 }
 
+// Dynamically import with SSR disabled to avoid hydration mismatches
+const MyStatsigEnabled = dynamic(() => Promise.resolve(MyStatsigEnabledInner), {
+  ssr: false,
+});
+
 export function MyStatsig({ children, userId }: MyStatsigProps) {
   const sdkKey = publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY;
   const pathname = usePathname();
@@ -91,8 +97,15 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   );
 
   // Dynamically import session replay plugin only on client and for dashboard
+  // Note: Session replay requires 'unsafe-eval' which is only allowed in development
+  // due to CSP restrictions. In production, eval-based replay would violate CSP.
   React.useEffect(() => {
-    if (!pathname.startsWith('/app/dashboard')) {
+    // Only load session replay in development (when unsafe-eval is allowed in CSP)
+    // and on dashboard routes
+    if (
+      process.env.NODE_ENV !== 'development' ||
+      !pathname.startsWith('/app/dashboard')
+    ) {
       setPlugins([]);
       return;
     }
@@ -113,7 +126,7 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
     };
   }, [pathname]);
 
-  // If we don't have a configured key, bail out quietly (previews/staging)
+  // If we don't have a configured key, render children without Statsig
   if (!sdkKey) {
     return <>{children}</>;
   }

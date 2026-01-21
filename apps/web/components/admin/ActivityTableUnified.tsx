@@ -3,12 +3,13 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { UnifiedTable } from '@/components/organisms/table';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
 } from '@/lib/admin/overview';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
 const statusVariant: Record<
   AdminActivityStatus,
@@ -96,11 +97,6 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
     []
   );
 
-  // Get row className
-  const getRowClassName = useCallback(() => {
-    return 'group hover:bg-base dark:hover:bg-surface-2';
-  }, []);
-
   return (
     <Card className='h-full border-subtle bg-surface-1/80'>
       <CardHeader className='space-y-1'>
@@ -125,11 +121,9 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
               </div>
             }
             getRowId={row => row.id}
-            getRowClassName={getRowClassName}
             enableVirtualization={true}
-            rowHeight={60}
-            minWidth='800px'
-            className='text-[13px] border-0'
+            minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+            className='text-[13px]'
           />
         </div>
       </CardContent>

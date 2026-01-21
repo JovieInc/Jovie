@@ -13,6 +13,7 @@
 
 import type { DbType } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema';
+import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processBeaconsJob } from './jobs/beacons';
 import { processLayloJob } from './jobs/laylo';
@@ -76,6 +77,19 @@ export async function processJob(
       return processBeaconsJob(tx, job.payload);
     case 'send_claim_invite':
       return processSendClaimInviteJob(tx, job.payload);
+    case 'dsp_artist_discovery':
+      return processDspArtistDiscoveryJob(tx, job.payload);
+    case 'dsp_track_enrichment':
+      // Track enrichment logic will be implemented in a future PR
+      // For now, return success to avoid blocking the queue
+      console.log(
+        '[DSP Track Enrichment] Job enqueued, processor not yet implemented:',
+        job.payload
+      );
+      return {
+        success: true,
+        message: 'Track enrichment pending implementation',
+      };
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }

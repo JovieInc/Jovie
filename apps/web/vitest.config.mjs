@@ -17,8 +17,20 @@ export default defineConfig({
     ],
     // Use forks pool to prevent JS heap OOM in worker threads
     pool: 'forks',
+    poolOptions: {
+      forks: {
+        isolate: true,
+        singleFork: false,
+      },
+    },
+    maxWorkers: process.env.CI ? 2 : undefined,
+    minWorkers: 1,
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    teardownTimeout: 5000,
     // Coverage optimization
     coverage: {
+      enabled: false,
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: [
@@ -31,9 +43,7 @@ export default defineConfig({
         'dist/**',
       ],
     },
-    // Test timeout - increased for database operations
-    testTimeout: 30000,
-    hookTimeout: 30000,
+    reporters: process.env.CI ? ['basic'] : ['default'],
     globals: true,
   },
   resolve: {

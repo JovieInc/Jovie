@@ -47,8 +47,14 @@ export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
 export { TableCell } from './atoms/TableCell';
-export type { TableCheckboxCellProps } from './atoms/TableCheckboxCell';
+export type {
+  TableCheckboxCellLegacyProps,
+  TableCheckboxCellProps,
+  TableCheckboxCellTanStackProps,
+} from './atoms/TableCheckboxCell';
 export { TableCheckboxCell } from './atoms/TableCheckboxCell';
+export type { TableCountBadgeProps } from './atoms/TableCountBadge';
+export { TableCountBadge } from './atoms/TableCountBadge';
 export type { TableEmptyStateProps } from './atoms/TableEmptyState';
 export { TableEmptyState } from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
@@ -61,12 +67,19 @@ export { TableRow } from './atoms/TableRow';
 // Molecules
 // =============================================================================
 
+export type { AdminPageSizeSelectProps } from './AdminPageSizeSelect';
+export { AdminPageSizeSelect } from './AdminPageSizeSelect';
 export { ContextMenuSubmenu } from './molecules/ContextMenuSubmenu';
 export type { ViewMode } from './molecules/DisplayMenuDropdown';
 export { DisplayMenuDropdown } from './molecules/DisplayMenuDropdown';
 export type { ExportCSVButtonProps } from './molecules/ExportCSVButton';
 export { ExportCSVButton } from './molecules/ExportCSVButton';
 export { GroupedTableBody } from './molecules/GroupedTableBody';
+export type {
+  BulkAction as HeaderBulkAction,
+  HeaderBulkActionsProps,
+} from './molecules/HeaderBulkActions';
+export { HeaderBulkActions } from './molecules/HeaderBulkActions';
 export { LoadingTableBody } from './molecules/LoadingTableBody';
 export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
 export { SocialLinksCell } from './molecules/SocialLinksCell';
@@ -83,6 +96,13 @@ export type { TablePaginationFooterProps } from './molecules/TablePaginationFoot
 export { TablePaginationFooter } from './molecules/TablePaginationFooter';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
+export type { TableStandardFooterProps } from './molecules/TableStandardFooter';
+export { TableStandardFooter } from './molecules/TableStandardFooter';
+export type {
+  BulkAction as TableStandardToolbarBulkAction,
+  TableStandardToolbarProps,
+} from './molecules/TableStandardToolbar';
+export { TableStandardToolbar } from './molecules/TableStandardToolbar';
 
 // =============================================================================
 // Organisms

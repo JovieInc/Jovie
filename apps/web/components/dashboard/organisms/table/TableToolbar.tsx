@@ -1,5 +1,6 @@
 import { Checkbox } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { TableCountBadge } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 export interface TableToolbarProps {
@@ -29,6 +30,15 @@ export interface TableToolbarProps {
  *
  * Can be used with sticky positioning by adding 'sticky top-0 z-20' via className
  */
+function getSelectionState(
+  selectedCount: number,
+  totalCount: number
+): boolean | 'indeterminate' {
+  if (selectedCount === 0) return false;
+  if (selectedCount === totalCount) return true;
+  return 'indeterminate';
+}
+
 export function TableToolbar({
   selectedCount = 0,
   totalCount,
@@ -51,13 +61,7 @@ export function TableToolbar({
       <div className='flex items-center gap-2'>
         {onSelectAll && onDeselectAll && (
           <Checkbox
-            checked={
-              selectedCount === 0
-                ? false
-                : selectedCount === totalCount
-                  ? true
-                  : 'indeterminate'
-            }
+            checked={getSelectionState(selectedCount, totalCount)}
             onCheckedChange={checked => {
               checked ? onSelectAll() : onDeselectAll();
             }}
@@ -66,9 +70,10 @@ export function TableToolbar({
         )}
 
         <div className='flex items-center gap-1.5'>
-          <span className='rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium tabular-nums'>
-            {hasSelection ? `${selectedCount} selected` : `${totalCount} total`}
-          </span>
+          <TableCountBadge
+            selectedCount={selectedCount}
+            totalCount={totalCount}
+          />
         </div>
       </div>
 

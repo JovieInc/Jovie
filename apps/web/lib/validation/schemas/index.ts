@@ -39,6 +39,8 @@ export {
   optionalHttpUrlSchema,
   optionalMetadataSchema,
   optionalUuidSchema,
+  // SSRF-safe URL schema for server-side fetches
+  safeHttpUrlSchema,
   uuidSchema,
 } from './base';
 

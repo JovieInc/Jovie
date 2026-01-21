@@ -1,17 +1,16 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
+import { applyVipBoost, parseLimit } from './helpers';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Query constraints
 const MIN_QUERY_LENGTH = 2;
@@ -30,15 +29,16 @@ export interface SpotifyArtistResult {
   verified?: boolean;
 }
 
-// Simple in-memory cache for API responses
+// Simple in-memory cache for API responses with proactive cleanup
 const searchCache = new Map<
   string,
   { data: SpotifyArtistResult[]; timestamp: number }
 >();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100; // Maximum entries to prevent memory exhaustion
 
 /**
- * In-memory rate limiting per IP
+ * In-memory rate limiting per IP with proactive cleanup
  *
  * LIMITATION: This rate limiting resets on each deployment and is per-instance
  * in a serverless environment. This means:
@@ -56,6 +56,53 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX = 30; // 30 requests per minute per IP
+const MAX_RATE_LIMIT_ENTRIES = 500; // Maximum IPs to track to prevent memory exhaustion
+
+/**
+ * Proactively clean expired rate limit entries to prevent memory exhaustion.
+ * Uses LRU-style eviction when limit is reached.
+ */
+function cleanupRateLimitMap(): void {
+  const now = Date.now();
+
+  // First, remove all expired entries
+  for (const [ip, entry] of rateLimitMap.entries()) {
+    if (now > entry.resetAt) {
+      rateLimitMap.delete(ip);
+    }
+  }
+
+  // If still over limit, remove oldest entries (LRU eviction)
+  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+    const entries = Array.from(rateLimitMap.entries());
+    entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
+    const toDelete = entries.slice(0, entries.length - MAX_RATE_LIMIT_ENTRIES);
+    toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
+  }
+}
+
+/**
+ * Proactively clean expired cache entries to prevent memory exhaustion.
+ * Uses LRU-style eviction when limit is reached.
+ */
+function cleanupSearchCache(): void {
+  const now = Date.now();
+
+  // First, remove all expired entries
+  for (const [key, entry] of searchCache.entries()) {
+    if (now - entry.timestamp > CACHE_DURATION) {
+      searchCache.delete(key);
+    }
+  }
+
+  // If still over limit, remove oldest entries (LRU eviction)
+  if (searchCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(searchCache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+    toDelete.forEach(([key]) => searchCache.delete(key));
+  }
+}
 
 function getClientIp(request: NextRequest): string {
   // Priority: CF > Real IP > Forwarded
@@ -148,13 +195,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Parse and clamp limit
-  let limit = DEFAULT_LIMIT;
-  if (limitParam) {
-    const parsed = Number.parseInt(limitParam, 10);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      limit = Math.min(parsed, MAX_LIMIT);
-    }
-  }
+  const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
 
   // Rate limiting with headers for client visibility
   const clientIp = getClientIp(request);
@@ -194,7 +235,7 @@ export async function GET(request: NextRequest) {
     const artists = await spotifyClient.searchArtists(q, limit);
 
     // Normalize response shape (data already sanitized by client)
-    let results: SpotifyArtistResult[] = artists.map(artist => ({
+    const normalizedResults: SpotifyArtistResult[] = artists.map(artist => ({
       id: artist.spotifyId,
       name: artist.name,
       url: buildSpotifyArtistUrl(artist.spotifyId),
@@ -206,64 +247,13 @@ export async function GET(request: NextRequest) {
     }));
 
     // VIP boost: Prioritize featured creators for exact name matches
-    try {
-      const vipMap = await getFeaturedCreatorsForSearch();
-      const normalizedQuery = q.toLowerCase().trim();
-      const vipArtist = vipMap.get(normalizedQuery);
-
-      if (vipArtist) {
-        // Check if VIP artist is already in results
-        const existingIndex = results.findIndex(
-          r => r.id === vipArtist.spotifyId
-        );
-
-        if (existingIndex > 0) {
-          // Move to top if already in results but not first
-          const [vipResult] = results.splice(existingIndex, 1);
-          results = [vipResult, ...results];
-        } else if (existingIndex === -1) {
-          // Add to top if not in results at all
-          const vipResult: SpotifyArtistResult = {
-            id: vipArtist.spotifyId,
-            name: vipArtist.name,
-            url: buildSpotifyArtistUrl(vipArtist.spotifyId),
-            imageUrl: vipArtist.imageUrl ?? undefined,
-            followers: vipArtist.followers,
-            popularity: vipArtist.popularity,
-            verified: undefined,
-          };
-          results = [vipResult, ...results.slice(0, limit - 1)];
-        }
-        // If existingIndex === 0, already at top, no action needed
-      }
-    } catch (vipError) {
-      // VIP lookup failure should not break search - log and continue
-      logger.warn('[Spotify Search] VIP lookup failed:', vipError);
-    }
+    const results = await applyVipBoost(normalizedResults, q, limit);
 
     // Cache the results
     searchCache.set(cacheKey, {
       data: results,
       timestamp: Date.now(),
     });
-
-    // Clean up old cache entries (keep only last 100 entries)
-    if (searchCache.size > 100) {
-      const entries = Array.from(searchCache.entries());
-      entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
-      const toDelete = entries.slice(100);
-      toDelete.forEach(([key]) => searchCache.delete(key));
-    }
-
-    // Clean up expired rate limit entries
-    if (rateLimitMap.size > 1000) {
-      const now = Date.now();
-      for (const [ip, entry] of rateLimitMap.entries()) {
-        if (now > entry.resetAt) {
-          rateLimitMap.delete(ip);
-        }
-      }
-    }
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
@@ -298,5 +288,10 @@ export async function GET(request: NextRequest) {
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
     );
+  } finally {
+    // Proactively clean up cache and rate limit entries to prevent memory exhaustion
+    // Run cleanup on every request for better memory management
+    cleanupSearchCache();
+    cleanupRateLimitMap();
   }
 }

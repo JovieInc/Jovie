@@ -172,12 +172,13 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   const initials = generateInitials(name);
 
   // Map avatar size to a sensible badge size
-  const badgeSize: 'sm' | 'md' | 'lg' =
-    size === 'xs' || size === 'sm'
-      ? 'sm'
-      : size === 'md' || size === 'lg' || size === 'xl' || size === '2xl'
-        ? 'md'
-        : 'lg';
+  const getBadgeSize = (): 'sm' | 'md' | 'lg' => {
+    if (size === 'xs' || size === 'sm') return 'sm';
+    if (size === 'md' || size === 'lg' || size === 'xl' || size === '2xl')
+      return 'md';
+    return 'lg';
+  };
+  const badgeSize = getBadgeSize();
 
   // Show fallback if no src or error occurred
   const shouldShowFallback = !src || hasError;

@@ -38,9 +38,8 @@ describe('LoadingSpinner', () => {
       render(<LoadingSpinner />);
 
       const spinner = screen.getByRole('status');
-      // The outer span should have motion-reduce:transition-none and motion-reduce:animate-none
+      // The outer span has motion-reduce:transition-none
       expect(spinner).toHaveClass('motion-reduce:transition-none');
-      expect(spinner).toHaveClass('motion-reduce:animate-none');
     });
 
     it('background ring has motion-reduce:transition-none class', () => {

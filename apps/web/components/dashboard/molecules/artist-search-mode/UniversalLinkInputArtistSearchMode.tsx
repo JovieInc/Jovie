@@ -4,10 +4,16 @@ import Image from 'next/image';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 import type { ArtistSearchModeProps } from './types';
 import { useArtistSearchMode } from './useArtistSearchMode';
 import { formatFollowers } from './utils';
+
+const ARTIST_SEARCH_LOADING_KEYS = Array.from(
+  { length: 3 },
+  (_, i) => `artist-search-loading-${i + 1}`
+);
 
 export function UniversalLinkInputArtistSearchMode({
   provider,
@@ -28,7 +34,6 @@ export function UniversalLinkInputArtistSearchMode({
     error,
     resultsListRef,
     searchPlatform,
-    brandHex,
     iconColor,
     iconBg,
     handleSearchInputChange,
@@ -50,8 +55,9 @@ export function UniversalLinkInputArtistSearchMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 rounded-full border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
-          'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          'focus-within:ring-2 focus-within:ring-accent',
+          showResults ? 'rounded-t-3xl border-b-0' : 'rounded-full',
           disabled && 'opacity-50'
         )}
       >
@@ -114,15 +120,12 @@ export function UniversalLinkInputArtistSearchMode({
       </div>
 
       {showResults && (
-        <div
-          className='absolute z-50 w-full mt-1 rounded-lg border border-subtle bg-surface-1 shadow-lg overflow-hidden'
-          style={{ borderColor: `${brandHex}30` }}
-        >
+        <div className='absolute z-50 w-full rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-lg overflow-hidden'>
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
-              {[...Array(3)].map((_, i) => (
+              {ARTIST_SEARCH_LOADING_KEYS.map(key => (
                 <div
-                  key={i}
+                  key={key}
                   className='flex items-center gap-3 animate-pulse motion-reduce:animate-none'
                 >
                   <div className='w-10 h-10 rounded-full bg-surface-3' />
@@ -162,19 +165,16 @@ export function UniversalLinkInputArtistSearchMode({
           )}
 
           {results.length > 0 && (
-            <ul
+            <div
               ref={resultsListRef}
               id='artist-search-results'
-              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: listbox role on ul is correct for ARIA combobox pattern
               role='listbox'
               className='max-h-64 overflow-y-auto'
             >
               {results.map((artist, index) => (
-                // biome-ignore lint/a11y/useKeyWithClickEvents: Keyboard navigation handled by parent input with arrow keys
-                <li
+                <div
                   key={artist.id}
                   id={`artist-result-${index}`}
-                  // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: option role on li is correct for ARIA listbox pattern
                   role='option'
                   tabIndex={-1}
                   aria-selected={index === activeResultIndex}
@@ -186,6 +186,11 @@ export function UniversalLinkInputArtistSearchMode({
                       : 'hover:bg-surface-2/50'
                   )}
                   onClick={() => handleArtistSelect(artist)}
+                  onKeyDown={event =>
+                    handleActivationKeyDown(event, () =>
+                      handleArtistSelect(artist)
+                    )
+                  }
                   onMouseEnter={() => setActiveResultIndex(index)}
                 >
                   <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>
@@ -235,9 +240,9 @@ export function UniversalLinkInputArtistSearchMode({
                       </svg>
                     </div>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}

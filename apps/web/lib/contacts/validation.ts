@@ -35,9 +35,9 @@ export function normalizePhone(
   phone: string | null | undefined
 ): string | null {
   if (!phone) return null;
-  const digits = phone.replace(/[^\d+]/g, '');
+  const digits = phone.replaceAll(/[^\d+]/g, '');
   const numeric = digits.startsWith('+') ? digits.slice(1) : digits;
-  const cleanDigits = numeric.replace(/[^\d]/g, '');
+  const cleanDigits = numeric.replaceAll(/[^\d]/g, '');
 
   if (cleanDigits.length === 0) return null;
   if (cleanDigits.length < 7 || cleanDigits.length > 15) {

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       .json()
       .catch(() => null)) as AdminAvatarPayload | null;
 
-    if (!body || !body.profileId || !body.avatarUrl) {
+    if (!body?.profileId || !body?.avatarUrl) {
       return NextResponse.json(
         { error: 'profileId and avatarUrl are required' },
         { status: 400, headers: NO_STORE_HEADERS }

@@ -5,7 +5,14 @@ import {
   createColumnHelper,
   type RowSelectionState,
 } from '@tanstack/react-table';
-import { CheckCircle, Copy, Star, Trash2, XCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  Copy,
+  Star,
+  Trash2,
+  UserCircle2,
+  XCircle,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -13,10 +20,8 @@ import { toast } from 'sonner';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableCheckboxCell } from '@/components/admin/table/atoms/TableCheckboxCell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -27,11 +32,12 @@ import {
   convertContextMenuItems,
   DateCell,
   SocialLinksCell,
+  TableCheckboxCell,
   UnifiedTable,
+  useRowSelection,
 } from '@/components/organisms/table';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -79,11 +85,8 @@ export function AdminCreatorProfilesUnified({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
-  const {
-    profiles,
-    statuses: _verificationStatuses,
-    toggleVerification,
-  } = useCreatorVerification(initialProfiles);
+  const { profiles, toggleVerification } =
+    useCreatorVerification(initialProfiles);
 
   const {
     profiles: profilesWithActions,
@@ -93,12 +96,8 @@ export function AdminCreatorProfilesUnified({
   } = useCreatorActions(profiles);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [_openMenuProfileId, _setOpenMenuProfileId] = useState<string | null>(
-    null
-  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const _isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<
     (typeof profilesWithActions)[number] | null
@@ -217,10 +216,11 @@ export function AdminCreatorProfilesUnified({
           .map(([id]) => id)
       );
 
-      // Toggle all if different count
-      if (newSelectedIds.size === filteredProfiles.length) {
-        toggleSelectAll();
-      } else if (newSelectedIds.size === 0 && selectedIds.size > 0) {
+      // Toggle all if all selected or all deselected
+      if (
+        newSelectedIds.size === filteredProfiles.length ||
+        (newSelectedIds.size === 0 && selectedIds.size > 0)
+      ) {
         toggleSelectAll();
       }
     },
@@ -614,7 +614,7 @@ export function AdminCreatorProfilesUnified({
     toggleSelectAll();
   }, [toggleSelectAll]);
 
-  // Get row className based on selection state
+  // Get row className based on selection state - uses unified tokens
   const getRowClassName = useCallback(
     (profile: AdminCreatorProfileRow) => {
       const isChecked = selectedIds.has(profile.id);
@@ -623,10 +623,10 @@ export function AdminCreatorProfilesUnified({
       return cn(
         'group',
         isChecked
-          ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+          ? 'bg-surface-2/70 hover:bg-surface-2'
           : isSelected
-            ? 'bg-base dark:bg-surface-2'
-            : 'hover:bg-base dark:hover:bg-surface-2'
+            ? 'bg-surface-2'
+            : 'hover:bg-surface-2/50'
       );
     },
     [selectedIds, selectedId]
@@ -680,8 +680,14 @@ export function AdminCreatorProfilesUnified({
               columns={columns}
               isLoading={false}
               emptyState={
-                <div className='px-4 py-10 text-center text-sm text-secondary-token'>
-                  No creator profiles found.
+                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                  <UserCircle2 className='h-6 w-6' />
+                  <div>
+                    <div className='font-medium'>No creator profiles found</div>
+                    <div className='text-xs'>
+                      Creator profiles will appear here once created.
+                    </div>
+                  </div>
                 </div>
               }
               rowSelection={rowSelection}
@@ -691,8 +697,7 @@ export function AdminCreatorProfilesUnified({
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
-              rowHeight={52}
-              minWidth='960px'
+              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[13px]'
             />
           )}

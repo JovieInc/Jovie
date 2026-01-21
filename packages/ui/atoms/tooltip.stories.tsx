@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Button } from './button';
+import { Kbd } from './kbd';
 import {
   Tooltip,
   TooltipContent,
@@ -15,7 +16,7 @@ const meta: Meta<typeof Tooltip> = {
     docs: {
       description: {
         component:
-          'A polished tooltip component with Radix primitives, tokenized design, and comprehensive accessibility. Includes sensible delays, pointer safety, reduced motion support, and optional arrow.',
+          'A Linear-style tooltip with always-dark appearance for consistent visibility. Features sensible delays, pointer safety, reduced motion support, and optional arrow (hidden by default).',
       },
     },
   },
@@ -52,23 +53,23 @@ export const Basic: Story = {
 };
 
 /**
- * Tooltip with arrow disabled
+ * Tooltip with arrow enabled (arrow is hidden by default)
  */
-export const NoArrow: Story = {
+export const WithArrow: Story = {
   render: () => (
     <Tooltip>
       <TooltipTrigger>
-        <Button variant='outline'>No arrow tooltip</Button>
+        <Button variant='outline'>With arrow tooltip</Button>
       </TooltipTrigger>
-      <TooltipContent showArrow={false}>
-        <span>Tooltip without arrow pointer</span>
+      <TooltipContent showArrow={true}>
+        <span>Tooltip with arrow pointer</span>
       </TooltipContent>
     </Tooltip>
   ),
 };
 
 /**
- * Tooltip with rich content and keyboard shortcut
+ * Tooltip with keyboard shortcut using the Kbd component
  */
 export const WithKeyboardShortcut: Story = {
   render: () => (
@@ -77,12 +78,8 @@ export const WithKeyboardShortcut: Story = {
         <Button variant='outline'>Save Document</Button>
       </TooltipTrigger>
       <TooltipContent>
-        <div className='flex items-center gap-2'>
-          <span>Save your changes</span>
-          <kbd className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide bg-surface-2 text-secondary-token'>
-            ⌘S
-          </kbd>
-        </div>
+        <span>Save your changes</span>
+        <Kbd variant='tooltip'>⌘S</Kbd>
       </TooltipContent>
     </Tooltip>
   ),
@@ -208,25 +205,31 @@ export const LongContent: Story = {
 };
 
 /**
- * Dark mode demonstration (controlled via Storybook theme toggle)
+ * Always-dark tooltip appearance (same in both light and dark themes)
  */
-export const DarkMode: Story = {
-  parameters: {
-    backgrounds: {
-      default: 'dark',
-      values: [{ name: 'dark', value: '#0a0a0a' }],
-    },
-  },
+export const AlwaysDark: Story = {
   render: () => (
-    <div className='dark'>
-      <Tooltip>
-        <TooltipTrigger>
-          <Button variant='outline'>Dark Mode Tooltip</Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <span>This tooltip adapts to dark mode</span>
-        </TooltipContent>
-      </Tooltip>
+    <div className='flex gap-8'>
+      <div className='light'>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant='outline'>Light Theme</Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span>Same dark tooltip in light theme</span>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      <div className='dark'>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant='outline'>Dark Theme</Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span>Same dark tooltip in dark theme</span>
+          </TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   ),
 };

@@ -21,7 +21,6 @@
 export * from '@/components/organisms/table';
 
 // Admin-specific utilities (kept for now)
-export { AdminPageSizeSelect } from './AdminPageSizeSelect';
 export { AdminTableShell } from './AdminTableShell';
 export { SortableHeaderButton } from './SortableHeaderButton';
 export {

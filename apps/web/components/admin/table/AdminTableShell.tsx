@@ -59,13 +59,13 @@ export function AdminTableShell({
     >
       <div
         ref={tableContainerRef}
-        className='min-h-0 flex-1 overflow-auto flex flex-col rounded-xl focus:outline-none'
+        className='min-h-0 flex-1 overflow-auto flex flex-col rounded-xl focus-visible:outline-none'
         {...scrollContainerProps}
       >
         {toolbar ? (
           <div
             className={cn(
-              'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+              'sticky top-0 z-30 border-b border-subtle bg-surface-1',
               headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
             )}
           >

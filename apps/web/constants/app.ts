@@ -1,8 +1,4 @@
-import {
-  APP_URL as DOMAINS_APP_URL,
-  MARKETING_URL,
-  PROFILE_URL,
-} from './domains';
+import { APP_URL as DOMAINS_APP_URL, PROFILE_URL } from './domains';
 
 export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
@@ -20,7 +16,7 @@ export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
 export const APP_URL = DOMAINS_APP_URL;
 
 // Re-export domain URLs for convenience
-export { PROFILE_URL, MARKETING_URL, DOMAINS_APP_URL as DASHBOARD_URL };
+export { PROFILE_URL, DOMAINS_APP_URL as DASHBOARD_URL };
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
 export const AUDIENCE_ANON_COOKIE = 'jv_aid';

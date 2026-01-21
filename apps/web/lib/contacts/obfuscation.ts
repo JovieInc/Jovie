@@ -9,7 +9,7 @@ function rotateCharacters(input: string, direction: 1 | -1): string {
   const offset = 3 * direction;
   return input
     .split('')
-    .map(char => String.fromCharCode(char.charCodeAt(0) + offset))
+    .map(char => String.fromCodePoint((char.codePointAt(0) ?? 0) + offset))
     .join('');
 }
 

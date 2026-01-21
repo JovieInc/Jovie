@@ -159,9 +159,11 @@ function AddProviderUrlPopover({
             className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
             aria-hidden='true'
           />
-          <span className='line-clamp-1 group-hover/add:hidden'>Not found</span>
+          <span className='line-clamp-1 text-tertiary-token/50 group-hover/add:hidden'>
+            —
+          </span>
           <span className='line-clamp-1 hidden group-hover/add:inline'>
-            Click to add
+            Add link
           </span>
         </button>
       </PopoverTrigger>
@@ -307,35 +309,70 @@ export function ProviderCell({
       <ProviderStatusDot status={status} accent={config.accent} />
 
       {available ? (
-        <button
-          type='button'
-          data-testid={testId}
-          data-url={
-            provider?.path ? `${getBaseUrl()}${provider.path}` : undefined
-          }
-          onClick={() => {
-            if (!provider?.path) return;
-            void handleCopyWithFeedback(
-              provider.path,
-              `${release.title} – ${config.label}`,
-              testId
-            );
-          }}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
-            isCopied &&
-              'text-green-600 hover:text-green-600 dark:text-green-400'
-          )}
-        >
-          <Icon
-            name={isCopied ? 'Check' : 'ExternalLink'}
-            className='h-3.5 w-3.5'
-            aria-hidden='true'
-          />
-          <span className='line-clamp-1'>
-            {isCopied ? 'Copied' : 'Copy link'}
-          </span>
-        </button>
+        <div className='inline-flex items-center overflow-hidden rounded-md border border-subtle'>
+          {/* Open button (left) */}
+          <button
+            type='button'
+            title='Open'
+            onClick={() => {
+              if (provider?.url) {
+                window.open(provider.url, '_blank', 'noopener,noreferrer');
+              }
+            }}
+            className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+          >
+            <Icon
+              name='ExternalLink'
+              className='h-3.5 w-3.5'
+              aria-hidden='true'
+            />
+            <span className='sr-only'>Open</span>
+          </button>
+
+          {/* Divider */}
+          <div className='h-4 w-px bg-subtle' />
+
+          {/* Copy button (right) */}
+          <button
+            type='button'
+            title={isCopied ? 'Copied' : 'Copy'}
+            data-testid={testId}
+            data-url={
+              provider?.path ? `${getBaseUrl()}${provider.path}` : undefined
+            }
+            onClick={() => {
+              if (!provider?.path) return;
+              handleCopyWithFeedback(
+                provider.path,
+                `${release.title} – ${config.label}`,
+                testId
+              ).catch(() => {});
+            }}
+            className={cn(
+              'inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
+              isCopied &&
+                'text-green-600 hover:text-green-600 dark:text-green-400'
+            )}
+          >
+            <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+              <Icon
+                name='Copy'
+                className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+                  isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+                }`}
+                aria-hidden='true'
+              />
+              <Icon
+                name='Check'
+                className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
+                  isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+                }`}
+                aria-hidden='true'
+              />
+            </span>
+            <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
+          </button>
+        </div>
       ) : onAddUrl ? (
         <AddProviderUrlPopover
           providerLabel={config.label}
@@ -345,8 +382,8 @@ export function ProviderCell({
           isSaving={isAddingUrl}
         />
       ) : (
-        <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token'>
-          Not found
+        <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token/50'>
+          —
         </span>
       )}
     </div>

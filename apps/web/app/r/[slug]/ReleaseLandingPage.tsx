@@ -72,40 +72,36 @@ export function ReleaseLandingPage({
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
         year: 'numeric',
-        month: 'long',
+        month: 'short',
         day: 'numeric',
       })
     : null;
 
   return (
     <div className='min-h-screen bg-black text-white'>
-      {/* Background gradient */}
-      <div
-        className='fixed inset-0 opacity-30'
-        style={{
-          background:
-            'radial-gradient(ellipse at top, rgba(64, 64, 64, 0.5) 0%, transparent 50%)',
-        }}
-      />
+      {/* Ambient glow background */}
+      <div className='pointer-events-none fixed inset-0'>
+        <div className='absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/3 blur-3xl' />
+      </div>
 
-      <main className='relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12'>
-        <div className='w-full max-w-md space-y-8'>
+      <main className='relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8'>
+        <div className='w-full max-w-sm space-y-5'>
           {/* Release Artwork */}
-          <div className='relative mx-auto aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10'>
+          <div className='relative aspect-square w-full overflow-hidden rounded-[20px] bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
             {release.artworkUrl ? (
               <Image
                 src={release.artworkUrl}
                 alt={`${release.title} artwork`}
                 fill
                 className='object-cover'
-                sizes='(max-width: 320px) 100vw, 320px'
+                sizes='(max-width: 384px) 100vw, 384px'
                 priority
               />
             ) : (
               <div className='flex h-full w-full items-center justify-center'>
                 <Icon
                   name='Disc3'
-                  className='h-24 w-24 text-white/20'
+                  className='h-20 w-20 text-white/20'
                   aria-hidden='true'
                 />
               </div>
@@ -114,86 +110,75 @@ export function ReleaseLandingPage({
 
           {/* Release Info */}
           <div className='text-center'>
-            <h1 className='text-2xl font-bold tracking-tight sm:text-3xl'>
+            <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
               {release.title}
             </h1>
-            <p className='mt-2 text-lg text-white/70'>{artist.name}</p>
+            <p className='mt-1.5 text-base text-white/60'>{artist.name}</p>
             {formattedDate && (
-              <p className='mt-1 text-sm text-white/50'>{formattedDate}</p>
+              <p className='mt-1 text-xs text-white/40'>{formattedDate}</p>
             )}
           </div>
 
           {/* Streaming Platform Buttons */}
-          <div className='space-y-3'>
-            <p className='text-center text-xs font-medium uppercase tracking-widest text-white/40'>
-              Listen on
-            </p>
-            <div className='space-y-2'>
-              {providers.map(provider => (
-                <a
-                  key={provider.key}
-                  href={provider.url ?? '#'}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='group flex w-full items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 transition-all hover:border-white/20 hover:bg-white/10'
-                  style={
-                    {
-                      '--provider-accent': provider.accent,
-                    } as React.CSSProperties
-                  }
+          <div className='space-y-2.5'>
+            {providers.map(provider => (
+              <a
+                key={provider.key}
+                href={provider.url ?? '#'}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='group flex w-full items-center gap-3 rounded-2xl bg-white/4 px-4 py-3 ring-1 ring-inset ring-white/8 backdrop-blur-sm transition-all hover:bg-white/8 hover:ring-white/12'
+              >
+                <span
+                  className='flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-lg'
+                  style={{
+                    background: `linear-gradient(135deg, ${provider.accent}25, ${provider.accent}10)`,
+                    boxShadow: `0 4px 12px ${provider.accent}15`,
+                    color: provider.accent,
+                  }}
                 >
-                  <span
-                    className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
-                    style={{
-                      backgroundColor: `${provider.accent}20`,
-                      color: provider.accent,
-                    }}
-                  >
-                    <SocialIcon
-                      platform={getIconPlatform(provider.key)}
-                      className='h-5 w-5'
-                    />
-                  </span>
-                  <span className='flex-1 text-left'>
-                    <span className='block text-sm font-semibold'>
-                      {provider.label}
-                    </span>
-                    <span className='block text-xs text-white/50'>
-                      Stream now
-                    </span>
-                  </span>
-                  <Icon
-                    name='ExternalLink'
-                    className='h-4 w-4 text-white/30 transition-colors group-hover:text-white/60'
-                    aria-hidden='true'
+                  <SocialIcon
+                    platform={getIconPlatform(provider.key)}
+                    className='h-5 w-5'
                   />
-                </a>
-              ))}
-            </div>
+                </span>
+                <span className='flex-1 text-left'>
+                  <span className='block text-[15px] font-medium text-white/90'>
+                    {provider.label}
+                  </span>
+                  <span className='block text-xs text-white/40'>Play</span>
+                </span>
+                <Icon
+                  name='ChevronRight'
+                  className='h-4 w-4 text-white/20 transition-transform group-hover:translate-x-0.5'
+                  aria-hidden='true'
+                />
+              </a>
+            ))}
           </div>
 
           {/* Empty state if no providers */}
           {providers.length === 0 && (
-            <div className='rounded-xl border border-white/10 bg-white/5 p-6 text-center'>
+            <div className='rounded-2xl bg-white/4 p-6 text-center ring-1 ring-inset ring-white/8'>
               <Icon
                 name='Music'
-                className='mx-auto h-10 w-10 text-white/30'
+                className='mx-auto h-10 w-10 text-white/20'
                 aria-hidden='true'
               />
-              <p className='mt-3 text-sm text-white/50'>
+              <p className='mt-3 text-sm text-white/40'>
                 No streaming links available yet.
               </p>
             </div>
           )}
 
           {/* Jovie Branding */}
-          <footer className='pt-8 text-center'>
+          <footer className='pt-6 text-center'>
             <Link
               href='/'
-              className='inline-flex items-center gap-2 text-xs text-white/30 transition-colors hover:text-white/50'
+              className='inline-flex items-center gap-1.5 text-[11px] text-white/25 transition-colors hover:text-white/40'
             >
               <span>Powered by</span>
-              <span className='font-semibold'>Jovie</span>
+              <span className='font-medium'>Jovie</span>
             </Link>
           </footer>
         </div>

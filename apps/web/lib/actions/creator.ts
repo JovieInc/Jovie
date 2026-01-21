@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/dashboard/actions';

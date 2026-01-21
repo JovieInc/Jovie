@@ -1,5 +1,5 @@
+import { randomUUID } from 'node:crypto';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { randomUUID } from 'crypto';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, type TransactionType, waitlistEntries } from '@/lib/db';
@@ -69,7 +69,7 @@ function normalizeSpotifyUrl(url: string): string {
  * Generate a safe random handle for creator profiles
  */
 function safeRandomHandle(): string {
-  const token = randomUUID().replace(/-/g, '').slice(0, 12);
+  const token = randomUUID().replaceAll('-', '').slice(0, 12);
   return `c${token}`;
 }
 

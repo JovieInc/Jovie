@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
+import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
-import { AUTH_STORAGE_KEYS } from '@/lib/auth/constants';
+import { AUTH_STORAGE_KEYS, sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
+import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
@@ -39,6 +41,7 @@ export function SignInForm() {
   const searchParams = useSearchParams();
   const [lastAuthMethod] = useLastAuthMethod();
   const hasHandledEmailParam = useRef(false);
+  const isClerkStalled = useLoadingStall(isLoaded);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -46,10 +49,11 @@ export function SignInForm() {
       const redirectUrl = new URL(window.location.href).searchParams.get(
         'redirect_url'
       );
-      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
+      const sanitized = sanitizeRedirectUrl(redirectUrl);
+      if (sanitized) {
         window.sessionStorage.setItem(
           AUTH_STORAGE_KEYS.REDIRECT_URL,
-          redirectUrl
+          sanitized
         );
       }
     } catch {
@@ -61,7 +65,7 @@ export function SignInForm() {
   useEffect(() => {
     if (hasHandledEmailParam.current) return;
     const emailParam = searchParams.get('email');
-    if (emailParam && emailParam.includes('@')) {
+    if (emailParam?.includes('@')) {
       hasHandledEmailParam.current = true;
       setEmail(emailParam);
       setStep('email');
@@ -70,18 +74,7 @@ export function SignInForm() {
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
-    return (
-      <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-3 p-0'>
-          <div className='animate-pulse space-y-4'>
-            <div className='h-6 w-48 mx-auto bg-subtle rounded' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-            <div className='h-12 w-full bg-subtle rounded-[--radius-xl]' />
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <AuthLoadingState mode='signin' isStalled={isClerkStalled} />;
   }
 
   const handleEmailClick = () => {
@@ -152,11 +145,11 @@ export function SignInForm() {
 
         {/* Sign up suggestion when account not found */}
         {shouldSuggestSignUp && step === 'email' && (
-          <p className='text-sm text-secondary-token text-center mt-4'>
+          <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center mt-4'>
             No account found.{' '}
             <Link
               href='/signup'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
+              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
             >
               Sign up instead
             </Link>

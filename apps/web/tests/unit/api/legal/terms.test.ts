@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextResponse } from 'next/server';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/utils/rate-limit', () => ({
   checkRateLimit: vi.fn().mockReturnValue(false),
@@ -11,20 +12,22 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   }),
 }));
 
-vi.mock('fs', () => ({
-  default: {
-    readFileSync: vi.fn().mockReturnValue('# Terms of Service\n\nTest content'),
-  },
+vi.mock('@/lib/legal/route-factory', () => ({
+  createLegalDocumentRoute: vi.fn(() => async () => {
+    return new NextResponse('<h1>Terms of Service</h1><p>Test content</p>', {
+      headers: {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
+  }),
 }));
 
-describe('GET /api/legal/terms', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
-  });
+// Static import - mocks are already set up above
+import { GET } from '@/app/api/legal/terms/route';
 
+describe('GET /api/legal/terms', () => {
   it('returns terms of service content', async () => {
-    const { GET } = await import('@/app/api/legal/terms/route');
     const response = await GET();
     const contentType = response.headers.get('Content-Type');
 

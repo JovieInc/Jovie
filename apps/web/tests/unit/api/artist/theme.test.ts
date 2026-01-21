@@ -12,6 +12,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     update: mockDbUpdate,
   },
+  eq: vi.fn(),
 }));
 
 vi.mock('@/lib/db/schema', () => ({
@@ -21,6 +22,11 @@ vi.mock('@/lib/db/schema', () => ({
 
 vi.mock('@/lib/cache/profile', () => ({
   invalidateProfileCache: vi.fn().mockResolvedValue(undefined),
+}));
+
+const mockVerifyProfileOwnership = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/db/queries/shared', () => ({
+  verifyProfileOwnership: mockVerifyProfileOwnership,
 }));
 
 vi.mock('@/lib/http/parse-json', () => ({
@@ -74,16 +80,20 @@ describe('POST /api/artist/theme', () => {
     mockWithDbSession.mockImplementation(async callback => {
       return callback('user_123');
     });
+
+    mockVerifyProfileOwnership.mockResolvedValue({
+      id: 'artist_123',
+      usernameNormalized: 'testuser',
+    });
+
     mockDbUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi
-              .fn()
-              .mockResolvedValue([
-                { theme: { mode: 'dark' }, usernameNormalized: 'testuser' },
-              ]),
-          }),
+        where: vi.fn().mockReturnValue({
+          returning: vi
+            .fn()
+            .mockResolvedValue([
+              { theme: { mode: 'dark' }, usernameNormalized: 'testuser' },
+            ]),
         }),
       }),
     });

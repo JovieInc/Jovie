@@ -14,11 +14,11 @@ import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsTool
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { useRowSelection } from '@/components/organisms/table';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -293,8 +293,11 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle verification',
                               result.error
                             );
+                            const errorSuffix = result.error
+                              ? `: ${result.error}`
+                              : '';
                             notifications.error(
-                              `Failed to update verification status${result.error ? `: ${result.error}` : ''}`
+                              `Failed to update verification status${errorSuffix}`
                             );
                           }
                         }}
@@ -308,8 +311,11 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle featured',
                               result.error
                             );
+                            const errorSuffix = result.error
+                              ? `: ${result.error}`
+                              : '';
                             notifications.error(
-                              `Failed to update featured status${result.error ? `: ${result.error}` : ''}`
+                              `Failed to update featured status${errorSuffix}`
                             );
                           }
                         }}
@@ -323,8 +329,11 @@ export function AdminCreatorProfilesWithSidebar({
                               'Failed to toggle marketing',
                               result.error
                             );
+                            const errorSuffix = result.error
+                              ? `: ${result.error}`
+                              : '';
                             notifications.error(
-                              `Failed to update marketing preferences${result.error ? `: ${result.error}` : ''}`
+                              `Failed to update marketing preferences${errorSuffix}`
                             );
                           }
                         }}
@@ -353,7 +362,7 @@ export function AdminCreatorProfilesWithSidebar({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex bg-surface-0 border-subtle'
+        className='hidden md:flex bg-surface-2 border-subtle'
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <ContactSidebar

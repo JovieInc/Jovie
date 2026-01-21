@@ -3,6 +3,9 @@ import { LegalPage } from '@/components/organisms/LegalPage';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
+// Static generation with hourly revalidation - legal content rarely changes
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: `Privacy Policy | ${APP_NAME}`,
   description:

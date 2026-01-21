@@ -55,11 +55,18 @@ export {
   FetchError,
   fetchWithTimeout,
 } from './fetch';
-
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
 // Query key factories
 export { type QueryKeys, queryKeys } from './keys';
+// Mutation utilities
+export {
+  createMutationCallbacks,
+  getErrorMessage,
+  handleMutationError,
+  handleMutationSuccess,
+  type MutationCallbackOptions,
+} from './mutation-utils';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
 
@@ -88,6 +95,53 @@ export {
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
 } from './useDashboardProfileQuery';
+// DSP enrichment queries and mutations
+export {
+  type ConfirmDspMatchInput,
+  type ConfirmDspMatchResponse,
+  type RejectDspMatchInput,
+  type RejectDspMatchResponse,
+  type TriggerDiscoveryInput,
+  type TriggerDiscoveryResponse,
+  useConfirmDspMatchMutation,
+  useDspEnrichmentMutations,
+  useRejectDspMatchMutation,
+  useTriggerDiscoveryMutation,
+} from './useDspEnrichmentMutations';
+export {
+  type EnrichmentPhase,
+  type EnrichmentStatus,
+  getPhaseLabel,
+  getTotalTracksEnriched,
+  isEnrichmentComplete,
+  isEnrichmentInProgress,
+  type ProviderEnrichmentStatus,
+  type UseDspEnrichmentStatusQueryOptions,
+  useDspEnrichmentStatusQuery,
+} from './useDspEnrichmentStatusQuery';
+export {
+  countMatchesByStatus,
+  type DspMatch,
+  getBestMatchPerProvider,
+  groupMatchesByProvider,
+  type UseDspMatchesQueryOptions,
+  useDspMatchesQuery,
+} from './useDspMatchesQuery';
+// Settings mutations
+export {
+  type SettingsUpdateInput,
+  useNotificationSettingsMutation,
+  useThemeMutation,
+  useUpdateSettingsMutation,
+} from './useSettingsMutation';
+// Social links mutations
+export {
+  type AcceptSuggestionInput,
+  type DismissSuggestionInput,
+  useAcceptSuggestionMutation,
+  useDismissSuggestionMutation,
+  useSuggestionMutations,
+} from './useSocialLinksMutation';
 export {
   type SuggestionsQueryResult,
   type UseSuggestionsQueryOptions,

@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "audience_members_creator_profile_id_fingerprint_unique" ON "audience_members" USING btree ("creator_profile_id","fingerprint");

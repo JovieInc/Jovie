@@ -83,21 +83,13 @@ describe('DashboardOverview', () => {
     expect(screen.getByText(/Add a music link/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Add social links/i).length).toBeGreaterThan(0);
 
-    // CTA links (styled buttons) for incomplete items
-    expect(
-      screen.getByRole('link', { name: /Claim handle/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /Add music link/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /Add social links/i })
-    ).toBeInTheDocument();
+    // CTA links for incomplete items (shown as "Claim →" and "Add →")
+    expect(screen.getByRole('link', { name: /Claim →/i })).toBeInTheDocument();
+    // Multiple "Add →" links for music and social
+    expect(screen.getAllByRole('link', { name: /Add →/i }).length).toBe(2);
 
-    // Progress indicator
-    expect(
-      screen.getByLabelText('Setup progress: 0 of 3 steps completed')
-    ).toBeInTheDocument();
+    // Progress indicator text
+    expect(screen.getByText('0 of 3 complete')).toBeInTheDocument();
   });
 
   it('marks tasks complete based on data', () => {
@@ -109,24 +101,22 @@ describe('DashboardOverview', () => {
 
     expect(screen.getByText('Complete your setup')).toBeInTheDocument();
 
-    // Completed labels for first two tasks
-    expect(screen.getByText('Handle claimed')).toBeInTheDocument();
-    expect(screen.getByText('Music link added')).toBeInTheDocument();
+    // Task labels are the same regardless of completion state;
+    // completion is indicated visually via checkmarks and styling
+    expect(screen.getByText('Claim your handle')).toBeInTheDocument();
+    expect(screen.getByText('Add a music link')).toBeInTheDocument();
+    expect(screen.getByText('Add social links')).toBeInTheDocument();
 
-    // Third task still incomplete
+    // Completed tasks should NOT have CTA links (Claim →)
     expect(
-      screen.getByText('Connect Instagram, TikTok, Twitter, etc.')
-    ).toBeInTheDocument();
+      screen.queryByRole('link', { name: /Claim →/i })
+    ).not.toBeInTheDocument();
 
-    // CTA link for remaining social links
-    expect(
-      screen.getByRole('link', { name: /Add social links/i })
-    ).toBeInTheDocument();
+    // Only the "Add →" link for social links should be present (incomplete task)
+    expect(screen.getByRole('link', { name: /Add →/i })).toBeInTheDocument();
 
     // Progress indicator reflects 2/3
-    expect(
-      screen.getByLabelText('Setup progress: 2 of 3 steps completed')
-    ).toBeInTheDocument();
+    expect(screen.getByText('2 of 3 complete')).toBeInTheDocument();
   });
 
   it('supports copy-to-clipboard with aria-live status', async () => {

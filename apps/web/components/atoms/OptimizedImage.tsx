@@ -46,6 +46,16 @@ const shapeClasses = {
   rounded: 'rounded-lg',
 };
 
+const sizeDimensions = {
+  sm: 32,
+  md: 48,
+  lg: 64,
+  xl: 96,
+  '2xl': 128,
+};
+
+type ImageSize = keyof typeof sizeDimensions;
+
 // Pre-generated blur placeholders for crisp loading states
 const BLUR_PLACEHOLDERS = {
   square:
@@ -100,6 +110,80 @@ function generateAltText(
   });
 }
 
+function getSizeDimension(size: ImageSize): number {
+  return sizeDimensions[size];
+}
+
+function getDefaultSizes({
+  sizes,
+  fill,
+  size,
+}: {
+  sizes?: string;
+  fill: boolean;
+  size: ImageSize;
+}): string {
+  if (sizes) return sizes;
+  if (fill) {
+    return '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
+  }
+  const dimension = getSizeDimension(size);
+  return `(max-width: 640px) ${dimension}px, ${dimension}px`;
+}
+
+function useOptimizedImageSource({
+  src,
+  fallbackSrc,
+  hasError,
+  enableVersioning,
+}: {
+  src?: string | null;
+  fallbackSrc: string;
+  hasError: boolean;
+  enableVersioning: boolean;
+}): string {
+  return useMemo(() => {
+    const baseSource = hasError || !src ? fallbackSrc : src;
+    if (
+      enableVersioning &&
+      baseSource &&
+      !baseSource.includes('/android-chrome-')
+    ) {
+      return versionImageUrl(baseSource);
+    }
+    return baseSource;
+  }, [src, hasError, fallbackSrc, enableVersioning]);
+}
+
+function useOptimizedImageComputedValues({
+  imageSrc,
+  alt,
+  artistName,
+  imageType,
+  aspectRatio,
+  blurDataURL,
+}: {
+  imageSrc: string;
+  alt: string;
+  artistName?: string;
+  imageType?: OptimizedImageProps['imageType'];
+  aspectRatio?: OptimizedImageProps['aspectRatio'];
+  blurDataURL?: string;
+}) {
+  return useMemo(() => {
+    const computedAlt = generateAltText(
+      imageSrc ?? '',
+      alt,
+      artistName,
+      imageType
+    );
+    const aspectRatioValue = getAspectRatioValue(aspectRatio);
+    const defaultBlur = blurDataURL || getBlurPlaceholder(aspectRatio);
+
+    return { computedAlt, aspectRatioValue, defaultBlur };
+  }, [imageSrc, alt, artistName, imageType, aspectRatio, blurDataURL]);
+}
+
 // Memoize the OptimizedImage component to prevent unnecessary re-renders
 export const OptimizedImage = React.memo(function OptimizedImage({
   src,
@@ -123,41 +207,32 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   artistName,
   imageType,
   enableVersioning = true,
-}: OptimizedImageProps) {
+}: Readonly<OptimizedImageProps>) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   // Memoize the image source to prevent unnecessary re-renders
-  const imageSrc = useMemo(() => {
-    let source = hasError || !src ? fallbackSrc : src;
-
-    // Apply versioning for cache busting if enabled
-    if (enableVersioning && source && !source.includes('/android-chrome-')) {
-      source = versionImageUrl(source);
-    }
-
-    return source;
-  }, [src, hasError, fallbackSrc, enableVersioning]);
+  const imageSrc = useOptimizedImageSource({
+    src,
+    fallbackSrc,
+    hasError,
+    enableVersioning,
+  });
 
   // Memoize computed values to prevent unnecessary re-renders
-  const computedValues = useMemo(() => {
-    const computedAlt = generateAltText(imageSrc, alt, artistName, imageType);
-    const aspectRatioValue = getAspectRatioValue(aspectRatio);
-    const defaultBlur = blurDataURL || getBlurPlaceholder(aspectRatio);
-
-    return { computedAlt, aspectRatioValue, defaultBlur };
-  }, [imageSrc, alt, artistName, imageType, aspectRatio, blurDataURL]);
-
-  const { computedAlt, aspectRatioValue, defaultBlur } = computedValues;
+  const { computedAlt, aspectRatioValue, defaultBlur } =
+    useOptimizedImageComputedValues({
+      imageSrc,
+      alt,
+      artistName,
+      imageType,
+      aspectRatio,
+      blurDataURL,
+    });
 
   // Memoize sizes and classes to prevent unnecessary re-renders - must be before conditional returns
   const { defaultSizes, containerClasses, imageProps } = useMemo(() => {
-    // Generate intelligent sizes if not provided
-    const defaultSizes =
-      !sizes && !fill
-        ? `(max-width: 640px) ${size === 'sm' ? '32px' : size === 'md' ? '48px' : size === 'lg' ? '64px' : size === 'xl' ? '96px' : '128px'}, ${size === 'sm' ? '32px' : size === 'md' ? '48px' : size === 'lg' ? '64px' : size === 'xl' ? '96px' : '128px'}`
-        : sizes || '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
-
+    const defaultSizes = getDefaultSizes({ sizes, fill, size });
     const containerClasses = cn(
       'relative overflow-hidden',
       !fill && sizeClasses[size],
@@ -215,6 +290,8 @@ export const OptimizedImage = React.memo(function OptimizedImage({
     return <PlaceholderImage size={size} shape={shape} className={className} />;
   }
 
+  const dimension = getSizeDimension(size);
+
   return (
     <div className={containerClasses}>
       {fill ? (
@@ -223,30 +300,8 @@ export const OptimizedImage = React.memo(function OptimizedImage({
         <Image
           {...imageProps}
           alt={computedAlt}
-          width={
-            width ||
-            (size === 'sm'
-              ? 32
-              : size === 'md'
-                ? 48
-                : size === 'lg'
-                  ? 64
-                  : size === 'xl'
-                    ? 96
-                    : 128)
-          }
-          height={
-            height ||
-            (size === 'sm'
-              ? 32
-              : size === 'md'
-                ? 48
-                : size === 'lg'
-                  ? 64
-                  : size === 'xl'
-                    ? 96
-                    : 128)
-          }
+          width={width || dimension}
+          height={height || dimension}
           sizes={defaultSizes}
         />
       )}

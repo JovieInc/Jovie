@@ -1,12 +1,9 @@
 import { expect, test } from '@playwright/test';
 import {
   assertNoCriticalErrors,
-  assertValidPageState,
-  isCriticalNetworkFailure,
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
   smokeNavigate,
-  waitForUrlStable,
 } from './utils/smoke-test-utils';
 
 /**
@@ -31,319 +28,98 @@ function hasRealClerkConfig(): boolean {
  * These tests verify authentication routes and protected page redirects.
  * Tests will skip if Clerk is not properly configured.
  *
- * Consolidates:
- * - auth-smoke.spec.ts (signin/signup pages, dashboard redirect)
- * - smoke.onboarding.spec.ts (dashboard/onboarding redirects)
- * - smoke.billing.spec.ts (billing/account page redirects)
+ * Optimized for speed: 2 consolidated tests covering critical auth paths.
+ * Previous tests merged for efficiency (was 6, now 2).
+ * Billing routes moved to billing.spec.ts (full suite only).
  *
  * @smoke
  */
 test.describe('Auth Smoke Tests @smoke', () => {
   // =========================================================================
-  // AUTH PAGE TESTS
+  // AUTH PAGES - Consolidated test (was 2 separate tests)
   // =========================================================================
-  test.describe('Auth Pages', () => {
-    test('signin page loads without server errors', async ({
-      page,
-    }, testInfo) => {
-      if (!hasRealClerkConfig()) {
-        test.skip();
-      }
+  test('auth pages (signin/signup) load without server errors', async ({
+    page,
+  }, testInfo) => {
+    if (!hasRealClerkConfig()) {
+      test.skip();
+    }
 
-      const { getContext, cleanup } = setupPageMonitoring(page);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+    const authPages = ['/signin', '/sign-up'];
 
-      try {
-        const response = await smokeNavigate(page, '/signin');
+    try {
+      for (const route of authPages) {
+        const response = await smokeNavigate(page, route);
 
         const status = response?.status() ?? 0;
         expect(
           status,
-          'Signin page should not return server error'
+          `${route} page should not return server error`
         ).toBeLessThan(500);
 
         await page.waitForLoadState('domcontentloaded');
 
         const bodyContent = await page.locator('body').textContent();
-        expect(bodyContent, 'Signin page should have content').toBeTruthy();
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('signup page loads without server errors', async ({
-      page,
-    }, testInfo) => {
-      if (!hasRealClerkConfig()) {
-        test.skip();
+        expect(bodyContent, `${route} page should have content`).toBeTruthy();
       }
 
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        const response = await smokeNavigate(page, '/sign-up');
-
-        const status = response?.status() ?? 0;
-        expect(
-          status,
-          'Signup page should not return server error'
-        ).toBeLessThan(500);
-
-        await page.waitForLoadState('domcontentloaded');
-
-        const bodyContent = await page.locator('body').textContent();
-        expect(bodyContent, 'Signup page should have content').toBeTruthy();
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
+      const context = getContext();
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
+    }
   });
 
   // =========================================================================
-  // PROTECTED ROUTE REDIRECT TESTS
+  // PROTECTED ROUTE REDIRECTS - Consolidated test (was 2 separate tests)
   // =========================================================================
-  test.describe('Protected Route Redirects', () => {
-    test('unauthenticated /app/dashboard redirects to /signin', async ({
-      page,
-    }, testInfo) => {
-      if (!hasRealClerkConfig()) {
-        test.skip();
-      }
+  test('protected routes redirect unauthenticated users to signin', async ({
+    page,
+  }, testInfo) => {
+    if (!hasRealClerkConfig()) {
+      test.skip();
+    }
 
-      const { getContext, cleanup } = setupPageMonitoring(page);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+    const protectedRoutes = ['/app/dashboard', '/onboarding'];
 
-      try {
-        const res = await smokeNavigate(page, '/app/dashboard');
-
-        await expect(page).toHaveURL(/\/signin/, {
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-        expect(
-          res?.ok(),
-          'Expected the sign-in page to respond OK'
-        ).toBeTruthy();
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('unauthenticated /onboarding redirects to auth', async ({
-      page,
-    }, testInfo) => {
-      if (!hasRealClerkConfig()) {
-        test.skip();
-      }
-
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        const res = await smokeNavigate(page, '/onboarding');
+    try {
+      for (const route of protectedRoutes) {
+        const res = await smokeNavigate(page, route);
 
         const url = page.url();
         const isAuthPage = url.includes('/signin') || url.includes('/sign-in');
         const status = res?.status() ?? 0;
+        const isUnauthorized = status === 401 || status === 403;
 
-        // Either redirected to auth or got a valid response
+        // Either redirected to auth or got an explicit unauthorized response.
         expect(
-          isAuthPage || status < 500,
-          'Should redirect to auth or respond without error'
+          isAuthPage || isUnauthorized,
+          `${route}: Should redirect to auth or return 401/403`
         ).toBe(true);
 
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
+        // If redirected to sign-in, verify it loaded; otherwise assert 401/403 explicitly.
+        if (isAuthPage) {
+          await expect(page).toHaveURL(/\/sign-?in/, {
+            timeout: SMOKE_TIMEOUTS.VISIBILITY,
+          });
+          expect(
+            res?.ok(),
+            `${route}: Sign-in page should respond OK`
+          ).toBeTruthy();
+        } else {
+          expect([401, 403]).toContain(status);
+        }
       }
-    });
+
+      const context = getContext();
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
+    }
   });
 
-  // =========================================================================
-  // BILLING ROUTE TESTS
-  // =========================================================================
-  test.describe('Billing Routes', () => {
-    test('/billing redirects or loads without errors', async ({
-      page,
-    }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        await smokeNavigate(page, '/billing');
-
-        await waitForUrlStable(
-          page,
-          url =>
-            url.pathname.includes('/signin') ||
-            url.pathname.includes('/signup') ||
-            url.pathname.includes('/billing')
-        );
-
-        const { isOnAuthPage } = await assertValidPageState(page, {
-          expectedPaths: ['/billing'],
-          allowAuthRedirect: true,
-        });
-
-        // In mock Clerk mode, redirect to sign-in is sufficient
-        if (isOnAuthPage) {
-          await expect(page.locator('body')).toBeVisible();
-          return;
-        }
-
-        const context = getContext();
-        const criticalFailures =
-          context.networkDiagnostics.failedResponses.filter(
-            isCriticalNetworkFailure
-          );
-        expect(
-          criticalFailures.length,
-          `Critical API failures: ${JSON.stringify(criticalFailures)}`
-        ).toBe(0);
-
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('/account redirects or loads without errors', async ({
-      page,
-    }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        await smokeNavigate(page, '/account');
-
-        await waitForUrlStable(
-          page,
-          url =>
-            url.pathname.includes('/signin') ||
-            url.pathname.includes('/signup') ||
-            url.pathname.includes('/account')
-        );
-
-        const { isOnAuthPage } = await assertValidPageState(page, {
-          expectedPaths: ['/account'],
-          allowAuthRedirect: true,
-        });
-
-        if (isOnAuthPage) {
-          await expect(page.locator('body')).toBeVisible();
-          return;
-        }
-
-        const context = getContext();
-        const criticalFailures =
-          context.networkDiagnostics.failedResponses.filter(
-            isCriticalNetworkFailure
-          );
-        expect(criticalFailures.length).toBe(0);
-
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('/billing/success redirects or loads without errors', async ({
-      page,
-    }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        await smokeNavigate(page, '/billing/success');
-
-        await waitForUrlStable(
-          page,
-          url =>
-            url.pathname.includes('/signin') ||
-            url.pathname.includes('/signup') ||
-            url.pathname.includes('/billing/success')
-        );
-
-        const { isOnAuthPage, isOnExpectedPath } = await assertValidPageState(
-          page,
-          {
-            expectedPaths: ['/billing/success'],
-            allowAuthRedirect: true,
-          }
-        );
-
-        if (isOnAuthPage) {
-          await expect(page.locator('body')).toBeVisible();
-          return;
-        }
-
-        if (isOnExpectedPath) {
-          await page.waitForLoadState('domcontentloaded');
-          const bodyText = await page.textContent('body');
-          expect(bodyText).toBeTruthy();
-          expect(
-            bodyText?.length,
-            'Page should have meaningful content'
-          ).toBeGreaterThan(100);
-        }
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-
-    test('/billing/cancel redirects or loads without errors', async ({
-      page,
-    }, testInfo) => {
-      const { getContext, cleanup } = setupPageMonitoring(page);
-
-      try {
-        await smokeNavigate(page, '/billing/cancel');
-
-        await waitForUrlStable(
-          page,
-          url =>
-            url.pathname.includes('/signin') ||
-            url.pathname.includes('/signup') ||
-            url.pathname.includes('/billing/cancel')
-        );
-
-        const { isOnAuthPage, isOnExpectedPath } = await assertValidPageState(
-          page,
-          {
-            expectedPaths: ['/billing/cancel'],
-            allowAuthRedirect: true,
-          }
-        );
-
-        if (isOnAuthPage) {
-          await expect(page.locator('body')).toBeVisible();
-          return;
-        }
-
-        if (isOnExpectedPath) {
-          const bodyText = await page.textContent('body');
-          const hasCancelContent =
-            bodyText !== null &&
-            (bodyText.toLowerCase().includes('cancel') ||
-              bodyText.toLowerCase().includes('dashboard') ||
-              bodyText.toLowerCase().includes('worry'));
-          expect(
-            hasCancelContent,
-            'Cancel page should have relevant content'
-          ).toBe(true);
-        }
-
-        const context = getContext();
-        await assertNoCriticalErrors(context, testInfo);
-      } finally {
-        cleanup();
-      }
-    });
-  });
+  // NOTE: Billing route tests moved to billing.spec.ts (full suite only)
+  // They test feature details, not critical paths for smoke testing
 });

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { AuthButton, AuthTextInput } from '@/components/auth';
+import { AuthButton } from '@/components/auth';
 
 interface HandleValidationState {
   available: boolean;
@@ -40,29 +40,31 @@ export function OnboardingHandleStep({
   onSubmit,
 }: OnboardingHandleStepProps) {
   return (
-    <div className='flex flex-col items-center justify-center h-full space-y-8'>
-      <div className='text-center space-y-3 max-w-xl px-4'>
-        <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
+    <div className='flex flex-col items-center justify-center h-full space-y-5'>
+      <div className='text-center space-y-2 max-w-xl px-4'>
+        <h1 className='text-lg font-normal text-primary-token text-center'>
           {title}
         </h1>
         {prompt ? (
-          <p className='text-(--muted) text-sm sm:text-base'>{prompt}</p>
+          <p className='text-sm text-secondary-token text-center'>{prompt}</p>
         ) : null}
       </div>
 
       <div className='w-full max-w-md space-y-6'>
         <form className='space-y-4' onSubmit={onSubmit}>
-          <label
-            className='text-sm font-medium text-(--muted)'
-            htmlFor='handle-input'
+          <div
+            className={[
+              'w-full flex items-center gap-2 rounded-[6px] border bg-white dark:bg-[#0f1011] px-4 py-2.5',
+              'focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]',
+              stateError || handleValidation.error
+                ? 'border-error'
+                : 'border-gray-200 dark:border-[#1f2123]',
+            ].join(' ')}
           >
-            @handle
-          </label>
-          <div className='relative'>
-            <div className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#6b6f76]'>
+            <span className='text-sm text-secondary-token whitespace-nowrap'>
               @
-            </div>
-            <AuthTextInput
+            </span>
+            <input
               id='handle-input'
               ref={inputRef}
               name='username'
@@ -73,7 +75,7 @@ export function OnboardingHandleStep({
                 onHandleChange(
                   e.target.value
                     .toLowerCase()
-                    .replace(/\s+/g, '')
+                    .replaceAll(/\s+/g, '')
                     .replace(/^@+/, '')
                 )
               }
@@ -83,18 +85,9 @@ export function OnboardingHandleStep({
               autoCorrect='off'
               spellCheck={false}
               aria-invalid={handleValidation.error ? 'true' : undefined}
-              className={[
-                'pl-10 pr-10',
-                stateError || handleValidation.error
-                  ? 'border-error'
-                  : !stateError && handleValidation.available
-                    ? 'border-success'
-                    : undefined,
-              ]
-                .filter(Boolean)
-                .join(' ')}
+              className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
             />
-            <div className='absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center'>
+            <div className='h-5 w-5 flex items-center justify-center'>
               {handleValidation.checking ? (
                 <LoadingSpinner size='sm' className='text-secondary-token' />
               ) : stateError || handleValidation.error ? (
@@ -158,14 +151,11 @@ export function OnboardingHandleStep({
           >
             {handleInput && !stateError ? (
               handleValidation.checking ? (
-                <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
                   Checking…
                 </div>
-              ) : handleValidation.clientValid && handleValidation.available ? (
-                <div className='text-success text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                  Available
-                </div>
-              ) : handleValidation.error ? (
+              ) : handleValidation.clientValid &&
+                handleValidation.available ? null : handleValidation.error ? (
                 <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
                   Not available
                 </div>
@@ -190,7 +180,7 @@ export function OnboardingHandleStep({
 
           {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for error message */}
           <div
-            className='min-h-[40px] flex items-center justify-center text-center text-xs text-[#6b6f76]'
+            className='min-h-[40px] flex items-center justify-center text-center text-xs text-secondary-token'
             role='status'
             aria-live='polite'
           >

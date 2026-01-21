@@ -8,7 +8,8 @@ const benefits = [
   },
   {
     title: 'One clear action',
-    description: 'Personalized CTAs that adapt to each fan automatically.',
+    description:
+      'AI picks the right CTA for each fan. Stream, buy tickets, or grab merch.',
   },
   {
     title: 'Continuous optimization',
@@ -27,11 +28,11 @@ export function ProblemSection() {
           </h2>
 
           <div className='space-y-8'>
-            {benefits.map((benefit, index) => (
-              <div key={index} className='flex items-start gap-4'>
+            {benefits.map(benefit => (
+              <div key={benefit.title} className='flex items-start gap-4'>
                 {/* Icon - Linear 24px treatment */}
                 <div className='flex items-center justify-center w-6 h-6 shrink-0'>
-                  <CheckCircle2 className='w-5 h-5 text-primary-token' />
+                  <CheckCircle2 className='w-5 h-5 text-success' />
                 </div>
                 <div className='space-y-1'>
                   <h3 className='text-lg font-medium text-primary-token'>

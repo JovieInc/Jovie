@@ -7,6 +7,9 @@ import { defineConfig } from 'vitest/config';
 // standard configuration while using the optimized defaults locally.
 dotenv.config({ path: '.env.test' });
 
+// Detect CI environment
+const isCI = process.env.CI === 'true';
+
 /**
  * Optimized Vitest Configuration for Fast Test Execution
  *
@@ -41,23 +44,40 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    pool: 'threads', // Use threads instead of forks for better performance
+    // Use forks for better memory isolation
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        // Optimize thread pool
-        minThreads: 1,
-        maxThreads: 4,
-        useAtomics: true,
+      forks: {
+        isolate: true,
+        singleFork: false,
       },
     },
+    // CI stability: reduce memory pressure
+    maxWorkers: isCI ? 2 : undefined,
+    minWorkers: 1,
+    fileParallelism: !isCI,
+    maxConcurrency: isCI ? 1 : undefined,
 
-    // Aggressive timeouts to catch slow tests
-    testTimeout: 5000, // 5s instead of 30s
-    hookTimeout: 2000, // 2s for setup/teardown
+    // Timeouts
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    teardownTimeout: 5000,
 
-    // Disable coverage for speed (enable separately if needed)
+    // Coverage disabled by default for speed (enable with --coverage flag)
     coverage: {
       enabled: false,
+      provider: 'v8',
+      reporter: ['text', 'json', 'lcov'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'node_modules/**',
+        'tests/**',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/coverage/**',
+        '.next/**',
+        'dist/**',
+      ],
     },
 
     // Enable isolation to prevent mock conflicts between tests
@@ -65,14 +85,7 @@ export default defineConfig({
     isolate: true,
 
     // Reduce reporter overhead
-    reporters: [
-      [
-        'default',
-        {
-          summary: false,
-        },
-      ],
-    ],
+    reporters: isCI ? ['basic'] : ['default'],
 
     // Optimize file watching
     watch: false,

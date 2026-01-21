@@ -1,13 +1,18 @@
 /**
  * Release Smart Link Landing Page (/r/[slug])
  *
- * Public-facing page that shows release artwork, title, and streaming platform buttons.
- * When a `?dsp=` query param is present, redirects directly to that provider.
+ * LEGACY ROUTE: This route handles the old URL format ({releaseSlug}--{profileId}).
+ * New URLs use the format /{handle}/{slug} instead.
+ *
+ * This route will:
+ * 1. Check if the slug is in legacy format (contains '--')
+ * 2. If legacy, redirect to the new canonical URL
+ * 3. Otherwise, render the landing page (for backwards compatibility)
  */
 
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { UNKNOWN_ARTIST } from '@/constants/app';
 import { db } from '@/lib/db';
@@ -80,6 +85,7 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
       .select({
         displayName: creatorProfiles.displayName,
         username: creatorProfiles.username,
+        usernameNormalized: creatorProfiles.usernameNormalized,
         avatarUrl: creatorProfiles.avatarUrl,
       })
       .from(creatorProfiles)
@@ -111,8 +117,10 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
     creator: creator ?? {
       displayName: null,
       username: UNKNOWN_ARTIST,
+      usernameNormalized: null,
       avatarUrl: null,
     },
+    creatorHandle: creator?.usernameNormalized ?? null,
   };
 });
 
@@ -123,14 +131,15 @@ function pickProviderUrl(
   providerLinksData: { providerId: string; url: string }[],
   forcedProvider?: ProviderKey | null
 ): string | null {
-  const providerOrder: ProviderKey[] = forcedProvider
-    ? [
-        forcedProvider,
-        ...PRIMARY_PROVIDER_KEYS.filter(key => key !== forcedProvider),
-      ]
-    : PRIMARY_PROVIDER_KEYS;
+  // When a provider is explicitly requested (?dsp=), do not fall back to others.
+  if (forcedProvider) {
+    return (
+      providerLinksData.find(link => link.providerId === forcedProvider)?.url ??
+      null
+    );
+  }
 
-  for (const key of providerOrder) {
+  for (const key of PRIMARY_PROVIDER_KEYS) {
     const match = providerLinksData.find(link => link.providerId === key);
     if (match?.url) return match.url;
   }
@@ -151,7 +160,7 @@ export default async function ReleaseSmartLinkPage({
     notFound();
   }
 
-  // Parse the slug
+  // Parse the slug (legacy format: {releaseSlug}--{profileId})
   const parsed = parseSmartLinkSlug(slug);
   if (!parsed) {
     notFound();
@@ -164,6 +173,16 @@ export default async function ReleaseSmartLinkPage({
   if (!data) {
     notFound();
   }
+
+  // REDIRECT TO NEW URL FORMAT
+  // Look up the creator's handle and redirect to the new canonical URL
+  if (data.creatorHandle) {
+    // Build new URL with query params preserved
+    const newPath = `/${data.creatorHandle}/${data.release.slug}`;
+    const newUrl = dsp ? `${newPath}?dsp=${encodeURIComponent(dsp)}` : newPath;
+    permanentRedirect(newUrl);
+  }
+  // If creator not found, fall through to render the page (shouldn't happen)
 
   const { release, providerLinks: links, creator } = data;
 

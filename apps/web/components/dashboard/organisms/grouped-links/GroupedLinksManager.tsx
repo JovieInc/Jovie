@@ -1,7 +1,6 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link as LinkIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
@@ -9,7 +8,6 @@ import {
 } from '@/components/dashboard/molecules/universal-link-input';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { cn } from '@/lib/utils';
-import '@/lib/utils/color';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import {
   type SuggestedLink,
@@ -110,28 +108,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       handleDismissSuggestionFromHook,
     });
 
-  // Memoized pill label builder
-  const memoizedBuildPillLabel = useCallback(buildPillLabel, []);
-
   const existingPlatforms = useMemo(
     () => new Set(links.map(l => l.platform.id)),
     [links]
   );
 
   const hasAnyLinks = links.length > 0;
-
-  const focusLinkInput = useCallback(() => {
-    const input = linkInputRef.current?.getInputElement();
-    if (input) {
-      input.focus();
-      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    containerRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }, []);
 
   // Hint state for drag-and-drop validation messages
   const [hint, setHint] = useState<string | null>(null);
@@ -211,18 +193,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       <div className='mx-auto w-full max-w-3xl'>
         {!hasAnyLinks && (
           <EmptyState
-            icon={<LinkIcon className='h-6 w-6' aria-hidden='true' />}
             heading='Add your first link'
             description='Start with your most important link — music, socials, or a landing page.'
-            action={{
-              label: 'Add link',
-              onClick: focusLinkInput,
-            }}
-            secondaryAction={{
-              label: 'Learn about links',
-              href: '/support',
-            }}
-            className='mt-3 w-full rounded-2xl border border-dashed border-subtle bg-surface-1/40'
+            size='sm'
+            className='mt-3 w-full'
           />
         )}
 
@@ -239,7 +213,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             openMenuId={openMenuId}
             onAnyMenuOpen={handleAnyMenuOpen}
             lastAddedId={lastAddedId}
-            buildPillLabel={memoizedBuildPillLabel}
+            buildPillLabel={buildPillLabel}
             addingLink={addingLink}
             pendingPreview={pendingPreview}
             onAddPendingPreview={handleAddPendingPreview}

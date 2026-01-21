@@ -17,12 +17,6 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'failed',
 ]);
 
-export const userStatusEnum = pgEnum('user_status', [
-  'active',
-  'pending',
-  'banned',
-]);
-
 // Link & Social Enums
 export const linkTypeEnum = pgEnum('link_type', [
   'listen',
@@ -152,12 +146,6 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
-// User waitlist approval status (simpler than separate waitlistEntries table)
-export const userWaitlistApprovalEnum = pgEnum('user_waitlist_approval', [
-  'pending',
-  'approved',
-]);
-
 // User status lifecycle enum - single source of truth for user state
 export const userStatusLifecycleEnum = pgEnum('user_status_lifecycle', [
   'waitlist_pending',
@@ -178,6 +166,32 @@ export const claimInviteStatusEnum = pgEnum('claim_invite_status', [
   'bounced',
   'failed',
   'unsubscribed',
+]);
+
+// DSP Enrichment Enums
+export const dspMatchStatusEnum = pgEnum('dsp_match_status', [
+  'suggested',
+  'confirmed',
+  'rejected',
+  'auto_confirmed',
+]);
+
+export const releaseNotificationTypeEnum = pgEnum('release_notification_type', [
+  'preview',
+  'release_day',
+]);
+
+export const releaseNotificationStatusEnum = pgEnum(
+  'release_notification_status',
+  ['pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled']
+);
+
+export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
+  'pending',
+  'accepted',
+  'rejected',
+  'email_sent',
+  'expired',
 ]);
 
 // Audience & Analytics Enums
@@ -206,4 +220,56 @@ export const audienceIntentLevelEnum = pgEnum('audience_intent_level', [
   'high',
   'medium',
   'low',
+]);
+
+// Email Suppression Enums
+export const suppressionReasonEnum = pgEnum('suppression_reason', [
+  'hard_bounce',
+  'soft_bounce',
+  'spam_complaint',
+  'invalid_address',
+  'user_request',
+  'abuse',
+  'legal',
+]);
+
+export const deliveryStatusEnum = pgEnum('delivery_status', [
+  'pending',
+  'sent',
+  'delivered',
+  'bounced',
+  'complained',
+  'failed',
+  'suppressed',
+]);
+
+// Multi-Artist Support Enums (DDEX/MusicBrainz aligned)
+export const artistTypeEnum = pgEnum('artist_type', [
+  'person',
+  'group',
+  'orchestra',
+  'choir',
+  'character',
+  'other',
+]);
+
+export const artistRoleEnum = pgEnum('artist_role', [
+  'main_artist',
+  'featured_artist',
+  'remixer',
+  'producer',
+  'co_producer',
+  'composer',
+  'lyricist',
+  'arranger',
+  'conductor',
+  'vs',
+  'with',
+  'other',
+]);
+
+// Content Slug Enums
+export const contentSlugTypeEnum = pgEnum('content_slug_type', [
+  'release',
+  'track',
 ]);

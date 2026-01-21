@@ -20,11 +20,15 @@ export interface AuthShellProps {
   section: 'admin' | 'dashboard' | 'settings';
   navigation: NavItem[];
   breadcrumbs: DashboardBreadcrumbItem[];
+  /** Badge/pill shown after breadcrumb (left side) */
+  headerBadge?: ReactNode;
+  /** Actions shown on right side of header */
   headerAction?: ReactNode;
   showMobileTabs?: boolean;
   drawerContent?: ReactNode;
   drawerWidth?: number;
   isTableRoute?: boolean;
+  onSidebarOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }
 
@@ -35,13 +39,14 @@ function AuthShellInner({
   section,
   navigation,
   breadcrumbs,
+  headerBadge,
   headerAction,
   showMobileTabs = false,
   drawerContent,
   drawerWidth,
   isTableRoute = false,
   children,
-}: Omit<AuthShellProps, 'children'> & { children: ReactNode }) {
+}: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
 
   // Mobile menu button (only on mobile)
@@ -68,12 +73,13 @@ function AuthShellInner({
 
       <SidebarInset>
         <div className='mt-2 mb-2 mr-2 ml-0 h-full'>
-          <main className='flex-1 min-h-0 overflow-hidden border border-subtle rounded-md bg-base h-full'>
+          <main className='flex-1 min-h-0 min-w-0 overflow-hidden border border-subtle rounded-md bg-base h-full'>
             <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>
               <DashboardHeader
                 breadcrumbs={breadcrumbs}
                 leading={MobileMenuButton}
                 sidebarTrigger={SidebarExpandButton}
+                breadcrumbSuffix={headerBadge}
                 action={headerAction}
                 showDivider={isTableRoute}
                 mobileTabs={
@@ -83,7 +89,9 @@ function AuthShellInner({
                 }
               />
               {isTableRoute ? (
-                <div className='flex-1 min-h-0 overflow-hidden'>{children}</div>
+                <div className='flex-1 min-h-0 min-w-0 overflow-hidden'>
+                  {children}
+                </div>
               ) : (
                 <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
                   {children}
@@ -111,11 +119,13 @@ function AuthShellInner({
  *
  * Replaces: DashboardLayoutClient, AdminShell
  */
-export function AuthShell(props: AuthShellProps) {
+export function AuthShell(props: Readonly<AuthShellProps>) {
+  const { onSidebarOpenChange, ...rest } = props;
+
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
-      <SidebarProvider>
-        <AuthShellInner {...props} />
+      <SidebarProvider onOpenChange={onSidebarOpenChange}>
+        <AuthShellInner {...rest} />
       </SidebarProvider>
     </div>
   );

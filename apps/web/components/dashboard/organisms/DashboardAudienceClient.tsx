@@ -8,6 +8,11 @@ import { audienceSortFields } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 
+const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
+  { length: 10 },
+  (_, i) => `dashboard-audience-loading-row-${i + 1}`
+);
+
 const DashboardAudienceTable = dynamic(
   () =>
     import('@/components/dashboard/organisms/dashboard-audience-table').then(
@@ -23,9 +28,9 @@ const DashboardAudienceTable = dynamic(
           <div className='h-8 w-32 animate-pulse rounded bg-surface-1' />
         </div>
         <div className='space-y-2'>
-          {Array.from({ length: 10 }).map((_, i) => (
+          {DASHBOARD_AUDIENCE_LOADING_ROW_KEYS.map(key => (
             <div
-              key={i}
+              key={key}
               className='h-14 animate-pulse rounded-lg bg-surface-1'
             />
           ))}

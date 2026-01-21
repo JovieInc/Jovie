@@ -352,6 +352,9 @@ export const HEADER_KEYS = {
   CROSS_ORIGIN_OPENER_POLICY: 'Cross-Origin-Opener-Policy',
   CROSS_ORIGIN_RESOURCE_POLICY: 'Cross-Origin-Resource-Policy',
   CONTENT_SECURITY_POLICY: 'Content-Security-Policy',
+  CONTENT_SECURITY_POLICY_REPORT_ONLY: 'Content-Security-Policy-Report-Only',
+  REPORT_TO: 'Report-To',
+  REPORTING_ENDPOINTS: 'Reporting-Endpoints',
   X_ROBOTS_TAG: 'X-Robots-Tag',
   CACHE_CONTROL: 'Cache-Control',
 } as const;

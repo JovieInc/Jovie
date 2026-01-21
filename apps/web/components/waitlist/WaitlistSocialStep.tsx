@@ -70,6 +70,7 @@ export function WaitlistSocialStep({
         className='flex items-center justify-center gap-2'
         role='radiogroup'
         aria-label='Social platform'
+        tabIndex={0}
         onKeyDown={onPlatformKeyDown}
       >
         {SOCIAL_PLATFORM_OPTIONS.map((option, index) => (
@@ -85,10 +86,10 @@ export function WaitlistSocialStep({
             aria-checked={socialPlatform === option.value}
             tabIndex={socialPlatform === option.value ? 0 : -1}
             onClick={() => onPlatformSelect(option.value)}
-            className={`rounded-[--radius-full] px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] ${
               socialPlatform === option.value
-                ? 'bg-surface-2 text-primary-token border-border'
-                : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1'
+                ? 'bg-[#1e2025] text-[#e3e4e6] border-[#2c2e33]'
+                : 'bg-transparent text-[#6b6f76] dark:text-[#969799] border-[#d7d9de] dark:border-[#2c2e33] hover:bg-[#f0f0f0] dark:hover:bg-[#1e2025]'
             }`}
             disabled={isSubmitting}
           >
@@ -125,7 +126,7 @@ export function WaitlistSocialStep({
           />
         </>
       ) : (
-        <div className='w-full flex items-center gap-2 rounded-[--radius-lg] border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--color-bg-base)'>
+        <div className='w-full flex items-center gap-2 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3 focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]'>
           <span className='text-sm text-secondary-token whitespace-nowrap'>
             {getSocialPlatformPrefix(socialPlatform).display}
           </span>
@@ -147,7 +148,7 @@ export function WaitlistSocialStep({
                 ? 'waitlist-primary-social-url-error'
                 : undefined
             }
-            className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
+            className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
             placeholder='yourusername'
             disabled={isSubmitting}
             onKeyDown={handleKeyDown}
