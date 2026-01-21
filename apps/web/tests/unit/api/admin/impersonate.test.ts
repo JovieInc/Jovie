@@ -7,6 +7,11 @@ const mockEndImpersonation = vi.hoisted(() => vi.fn());
 const mockGetImpersonationState = vi.hoisted(() => vi.fn());
 const mockGetImpersonationTimeRemaining = vi.hoisted(() => vi.fn());
 const mockIsImpersonationEnabled = vi.hoisted(() => vi.fn());
+const mockAdminImpersonateLimiter = vi.hoisted(() => ({
+  limit: vi.fn(),
+}));
+const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn());
+const mockGetClientIP = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -34,12 +39,26 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: vi.fn(),
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  adminImpersonateLimiter: mockAdminImpersonateLimiter,
+  createRateLimitHeaders: mockCreateRateLimitHeaders,
+  getClientIP: mockGetClientIP,
+}));
+
 describe('Admin Impersonate API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
     // Set up default auth mock to return proper structure
     mockAuth.mockResolvedValue({ userId: 'admin-123', sessionClaims: {} });
+    mockAdminImpersonateLimiter.limit.mockResolvedValue({
+      success: true,
+      limit: 5,
+      remaining: 4,
+      reset: new Date(Date.now() + 60_000),
+    });
+    mockCreateRateLimitHeaders.mockReturnValue({});
+    mockGetClientIP.mockReturnValue('203.0.113.10');
   });
 
   describe('GET /api/admin/impersonate', () => {
@@ -183,6 +202,33 @@ describe('Admin Impersonate API', () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe('Not authenticated');
+    });
+
+    it('returns 429 when rate limit is exceeded', async () => {
+      mockRequireAdmin.mockResolvedValue(null);
+      mockIsImpersonationEnabled.mockReturnValue(true);
+      mockAuth.mockResolvedValue({ userId: 'admin-123' });
+      mockAdminImpersonateLimiter.limit.mockResolvedValue({
+        success: false,
+        limit: 5,
+        remaining: 0,
+        reset: new Date(Date.now() + 60_000),
+      });
+
+      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const request = new Request('http://localhost/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetClerkId: 'target-123' }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(data.error).toBe(
+        'Too many impersonation attempts. Please try again later.'
+      );
     });
 
     it('returns 400 when impersonation fails', async () => {
