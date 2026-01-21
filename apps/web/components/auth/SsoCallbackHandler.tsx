@@ -6,6 +6,19 @@ import { useEffect, useState } from 'react';
 import { captureError } from '@/lib/error-tracking';
 
 /**
+ * Hash fragments that indicate Clerk wants password-related action.
+ * Since Jovie is passwordless, we intercept and redirect these cases.
+ */
+const PASSWORD_HASH_FRAGMENTS = [
+  '#reset-password',
+  '#/reset-password',
+  '#forgot-password',
+  '#/forgot-password',
+  '#set-password',
+  '#/set-password',
+] as const;
+
+/**
  * Props for SsoCallbackHandler component.
  */
 interface SsoCallbackHandlerProps {
@@ -54,18 +67,7 @@ export function SsoCallbackHandler({
     // Check for unexpected hash fragments that Clerk might add
     const hash = window.location.hash;
 
-    // List of hash fragments that indicate Clerk wants password-related action
-    // Since Jovie is passwordless, we redirect to dashboard/onboarding instead
-    const passwordHashFragments = [
-      '#reset-password',
-      '#/reset-password',
-      '#forgot-password',
-      '#/forgot-password',
-      '#set-password',
-      '#/set-password',
-    ];
-
-    if (passwordHashFragments.some(fragment => hash.startsWith(fragment))) {
+    if (PASSWORD_HASH_FRAGMENTS.some(fragment => hash.startsWith(fragment))) {
       setIsHandlingHash(true);
 
       // Clear the hash and redirect to dashboard

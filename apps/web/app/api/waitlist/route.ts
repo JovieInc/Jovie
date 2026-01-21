@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { auth, currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { db, type TransactionType, waitlistEntries } from '@/lib/db';
 import { creatorProfiles, users, waitlistInvites } from '@/lib/db/schema';
 import { env } from '@/lib/env';
-import { sanitizeErrorResponse } from '@/lib/error-tracking';
+import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -101,7 +101,7 @@ async function findAvailableHandle(
 
 export async function GET() {
   logger.info('Waitlist API GET request received');
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json(
       { hasEntry: false, status: null, inviteToken: null },
@@ -109,7 +109,7 @@ export async function GET() {
     );
   }
 
-  const user = await currentUser();
+  const user = await getCachedCurrentUser();
   const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
   if (!emailRaw) {
     return NextResponse.json(
@@ -126,16 +126,17 @@ export async function GET() {
     .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
     .limit(1);
 
-  const inviteToken = await (async () => {
-    if (!entry?.id || entry.status !== 'invited') return null;
+  // Fetch invite token only if user has been invited
+  let inviteToken: string | null = null;
+  if (entry?.id && entry.status === 'invited') {
     const [invite] = await db
       .select({ claimToken: waitlistInvites.claimToken })
       .from(waitlistInvites)
       .where(eq(waitlistInvites.waitlistEntryId, entry.id))
       .orderBy(desc(waitlistInvites.createdAt))
       .limit(1);
-    return invite?.claimToken ?? null;
-  })();
+    inviteToken = invite?.claimToken ?? null;
+  }
 
   return NextResponse.json(
     {
@@ -204,7 +205,11 @@ async function checkDatabaseAvailability(): Promise<NextResponse | null> {
 
     return null;
   } catch (error) {
-    logger.error('Waitlist API DB connectivity error', error);
+    void captureError('Waitlist API DB connectivity error', error, {
+      route: '/api/waitlist',
+      operation: 'checkDatabaseAvailability',
+      dbHost,
+    });
     const debugMsg =
       error instanceof Error
         ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
@@ -357,7 +362,7 @@ async function createNewEntry(
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -375,7 +380,7 @@ export async function POST(request: Request) {
     const dbError = await checkDatabaseAvailability();
     if (dbError) return dbError;
 
-    const user = await currentUser();
+    const user = await getCachedCurrentUser();
     const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
     if (!emailRaw) {
       return NextResponse.json(
@@ -438,7 +443,10 @@ export async function POST(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    logger.error('Waitlist API error', error);
+    void captureError('Waitlist API error', error, {
+      route: '/api/waitlist',
+      operation: 'POST',
+    });
     const isDev = env.NODE_ENV === 'development';
     const errorMessage =
       isDev && error instanceof Error
