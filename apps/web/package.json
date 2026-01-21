@@ -24,7 +24,7 @@
     "test:ci": "vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --config=vitest.config.mts",
-    "test:fast": "vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 --shard=1/2 && vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 --shard=2/2",
+    "test:fast": "CI=true vitest run --config=vitest.config.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
