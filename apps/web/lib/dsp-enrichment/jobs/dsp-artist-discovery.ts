@@ -256,10 +256,27 @@ async function discoverAppleMusicMatch(
   }
 
   // Convert to ISRC match results
-  const isrcMatches = convertAppleMusicToIsrcMatches(allTracks, selectedTracks);
+  const rawIsrcMatches = convertAppleMusicToIsrcMatches(
+    allTracks,
+    selectedTracks
+  );
+
+  // Filter out Various Artists and compilation matches to prevent false positives
+  const isrcMatches = rawIsrcMatches.filter(m => {
+    const name = m.matchedTrack.artistName.toLowerCase();
+    return (
+      !name.includes('various artists') &&
+      !name.includes('various artist') &&
+      !name.includes('compilation')
+    );
+  });
 
   if (isrcMatches.length === 0) {
-    return { match: null, status: null, error: 'No ISRC matches found' };
+    return {
+      match: null,
+      status: null,
+      error: 'No valid ISRC matches found (filtered compilations)',
+    };
   }
 
   // Fetch artist profiles for enrichment
@@ -287,13 +304,13 @@ async function discoverAppleMusicMatch(
     }
   }
 
-  // Orchestrate matching
+  // Orchestrate matching with minimum 3 ISRC matches for safer auto-confirmation
   const matchingResult = orchestrateMatching(
     'apple_music',
     isrcMatches,
     localArtist,
     {
-      minIsrcMatches: 1,
+      minIsrcMatches: 3,
       artistProfiles,
     }
   );
@@ -329,6 +346,14 @@ async function discoverAppleMusicMatch(
     matchingResult.bestMatch,
     status
   );
+
+  // If auto-confirmed, update the creator profile with Apple Music artist ID
+  if (status === 'auto_confirmed') {
+    await tx
+      .update(creatorProfiles)
+      .set({ appleMusicId: matchingResult.bestMatch.externalArtistId })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+  }
 
   return { match: matchingResult.bestMatch, status };
 }
