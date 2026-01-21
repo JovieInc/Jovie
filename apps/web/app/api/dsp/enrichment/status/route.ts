@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 import { db, ingestionJobs } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { captureError } from '@/lib/error-tracking';
 import type { EnrichmentPhase, ProviderEnrichmentStatus } from '@/lib/queries';
 
 // ============================================================================
@@ -247,7 +248,9 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error('[DSP Enrichment Status] Error:', error);
+    await captureError('DSP Enrichment status check failed', error, {
+      route: '/api/dsp/enrichment/status',
+    });
 
     return NextResponse.json(
       {

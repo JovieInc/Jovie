@@ -15,6 +15,7 @@ import { z } from 'zod';
 
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 
 // ============================================================================
@@ -104,7 +105,9 @@ export async function POST(request: Request) {
       message: 'Discovery job enqueued successfully',
     });
   } catch (error) {
-    console.error('[DSP Discovery] Error:', error);
+    await captureError('DSP Discovery failed', error, {
+      route: '/api/dsp/discover',
+    });
 
     return NextResponse.json(
       {
