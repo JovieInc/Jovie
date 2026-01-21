@@ -270,7 +270,7 @@ interface WaitlistRequestData {
   fullName: string;
   primaryGoal: string | null;
   primarySocialUrl: string;
-  platform: string | null;
+  platform: string;
   normalizedUrl: string;
   spotifyUrl: string | null;
   spotifyUrlNormalized: string | null;
@@ -278,11 +278,18 @@ interface WaitlistRequestData {
   selectedPlan: string | null;
 }
 
+function nullableText(
+  value: string | null
+): string | ReturnType<typeof drizzleSql> {
+  return value ?? drizzleSql`null`;
+}
+
 /**
  * Validate user and parse request body
  */
 async function validateAndParseRequest(
-  request: Request
+  request: Request,
+  userId: string
 ): Promise<
   | { ok: true; data: WaitlistRequestData }
   | { ok: false; response: NextResponse }
@@ -336,7 +343,7 @@ async function validateAndParseRequest(
   return {
     ok: true,
     data: {
-      userId: '', // Will be set by caller
+      userId,
       email,
       emailRaw,
       fullName,
@@ -365,14 +372,14 @@ async function handleExistingEntry(
         .update(waitlistEntries)
         .set({
           fullName: data.fullName,
-          primaryGoal: data.primaryGoal,
+          primaryGoal: nullableText(data.primaryGoal),
           primarySocialUrl: data.primarySocialUrl,
           primarySocialPlatform: data.platform,
           primarySocialUrlNormalized: data.normalizedUrl,
-          spotifyUrl: data.spotifyUrl,
-          spotifyUrlNormalized: data.spotifyUrlNormalized,
-          heardAbout: data.heardAbout,
-          selectedPlan: data.selectedPlan,
+          spotifyUrl: nullableText(data.spotifyUrl),
+          spotifyUrlNormalized: nullableText(data.spotifyUrlNormalized),
+          heardAbout: nullableText(data.heardAbout),
+          selectedPlan: nullableText(data.selectedPlan),
           updatedAt: new Date(),
         })
         .where(eq(waitlistEntries.id, existing.id));
@@ -413,14 +420,14 @@ async function createNewWaitlistEntry(
         .values({
           fullName: data.fullName,
           email: data.email,
-          primaryGoal: data.primaryGoal,
+          primaryGoal: nullableText(data.primaryGoal),
           primarySocialUrl: data.primarySocialUrl,
           primarySocialPlatform: data.platform,
           primarySocialUrlNormalized: data.normalizedUrl,
-          spotifyUrl: data.spotifyUrl,
-          spotifyUrlNormalized: data.spotifyUrlNormalized,
-          heardAbout: data.heardAbout,
-          selectedPlan: data.selectedPlan,
+          spotifyUrl: nullableText(data.spotifyUrl),
+          spotifyUrlNormalized: nullableText(data.spotifyUrlNormalized),
+          heardAbout: nullableText(data.heardAbout),
+          selectedPlan: nullableText(data.selectedPlan),
           status: 'new' as const,
         })
         .returning({ id: waitlistEntries.id });
@@ -510,10 +517,13 @@ export async function POST(request: Request) {
     const dbError = await checkDatabaseHealth();
     if (dbError) return dbError;
 
-    const parseResult = await validateAndParseRequest(request);
+    const parseResult = await validateAndParseRequest(
+      request,
+      authResult.userId
+    );
     if (!parseResult.ok) return parseResult.response;
 
-    const data = { ...parseResult.data, userId: authResult.userId };
+    const data = parseResult.data;
 
     const [existing] = await db
       .select({ id: waitlistEntries.id, status: waitlistEntries.status })

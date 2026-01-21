@@ -2,7 +2,13 @@
 
 import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/organisms/EmptyState';
@@ -12,6 +18,9 @@ import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
 type CityRange = Extract<AnalyticsRange, '7d' | '30d' | '90d'>;
+type EmptyStateAction = NonNullable<
+  ComponentProps<typeof EmptyState>['action']
+>;
 
 // Clipboard feedback delay in milliseconds
 const CLIPBOARD_FEEDBACK_DELAY_MS = 1500;
@@ -73,7 +82,7 @@ function buildEmptyStateAction(
   profileUrl: string | undefined,
   copied: boolean,
   onCopy: () => void
-): { label: string; onClick?: () => void; href?: string } {
+): EmptyStateAction {
   if (profileUrl) {
     return {
       label: copied ? 'Copied!' : 'Copy profile link',
