@@ -1,9 +1,38 @@
-import { Badge } from '@jovie/ui';
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { DateCell } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS } from '../constants';
+
+/**
+ * Renders a name cell with primary token styling
+ */
+export function renderNameCell(value: string) {
+  return <span className='font-medium text-primary-token'>{value}</span>;
+}
+
+/**
+ * Renders an email cell as a mailto link
+ */
+export function renderEmailCell(value: string) {
+  return (
+    <a
+      href={`mailto:${value}`}
+      className='text-secondary-token hover:underline'
+    >
+      {value}
+    </a>
+  );
+}
+
+/**
+ * Renders a date cell using the DateCell component
+ */
+export function renderDateCellWrapper(date: Date | null) {
+  return <DateCell date={date} />;
+}
 
 /**
  * Renders the primary goal cell with appropriate icon and badge
@@ -76,27 +105,31 @@ export function renderSpotifyCell(spotifyUrl: string | null) {
 }
 
 /**
- * Renders the "Heard About" cell with proper label
+ * Renders the "Heard About" cell with truncation and tooltip for long text
  */
 export function renderHeardAboutCell(value: string | null) {
   if (!value) {
     return <span className='text-tertiary-token'>—</span>;
   }
 
-  const heardAboutLabels: Record<string, string> = {
-    socialmedia: 'Social Media',
-    friend: 'Friend',
-    search: 'Search',
-    other: 'Other',
-  };
+  const truncatedValue = value.length > 30 ? value.slice(0, 30) + '…' : value;
 
-  const label = heardAboutLabels[value] ?? value;
+  if (value.length > 30) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className='cursor-help text-secondary-token'>
+            {truncatedValue}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side='top' className='max-w-xs'>
+          {value}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
 
-  return (
-    <span className='text-xs text-secondary-token whitespace-nowrap'>
-      {label}
-    </span>
-  );
+  return <span className='text-secondary-token'>{value}</span>;
 }
 
 /**
