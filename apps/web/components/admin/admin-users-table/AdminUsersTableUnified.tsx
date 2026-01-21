@@ -1,7 +1,12 @@
 'use client';
 
 import { Badge, Button, Input } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type Row,
+  type Table,
+} from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
@@ -15,6 +20,7 @@ import {
   convertContextMenuItems,
   DateCell,
   ExportCSVButton,
+  type HeaderCheckboxState,
   TableBulkActionsToolbar,
   TableCheckboxCell,
   UnifiedTable,
@@ -31,6 +37,106 @@ import type { AdminUsersTableProps } from './types';
 import { useAdminUsersTable } from './useAdminUsersTable';
 
 const columnHelper = createColumnHelper<AdminUserRow>();
+
+interface AdminUsersSelectionHeaderProps {
+  table: Table<AdminUserRow>;
+  headerCheckboxState: HeaderCheckboxState;
+  onToggleSelectAll: () => void;
+}
+
+function AdminUsersSelectionHeader({
+  table,
+  headerCheckboxState,
+  onToggleSelectAll,
+}: AdminUsersSelectionHeaderProps) {
+  return (
+    <TableCheckboxCell
+      table={table}
+      headerCheckboxState={headerCheckboxState}
+      onToggleSelectAll={onToggleSelectAll}
+    />
+  );
+}
+
+interface AdminUsersSelectionCellProps {
+  row: Row<AdminUserRow>;
+  rowNumber: number;
+  isChecked: boolean;
+  onToggleSelect: () => void;
+}
+
+function AdminUsersSelectionCell({
+  row,
+  rowNumber,
+  isChecked,
+  onToggleSelect,
+}: AdminUsersSelectionCellProps) {
+  return (
+    <TableCheckboxCell
+      row={row}
+      rowNumber={rowNumber}
+      isChecked={isChecked}
+      onToggleSelect={onToggleSelect}
+    />
+  );
+}
+
+interface AdminUsersNameCellProps {
+  name?: string | null;
+  email?: string | null;
+}
+
+function AdminUsersNameCell({ name, email }: AdminUsersNameCellProps) {
+  return (
+    <div>
+      <div className='font-semibold text-primary-token'>{name ?? 'User'}</div>
+      <div className='text-xs text-secondary-token'>{email ?? '—'}</div>
+    </div>
+  );
+}
+
+interface AdminUsersPlanCellProps {
+  plan: AdminUserRow['plan'];
+}
+
+function AdminUsersPlanCell({ plan }: AdminUsersPlanCellProps) {
+  return (
+    <Badge size='sm' variant={plan === 'pro' ? 'primary' : 'secondary'}>
+      {plan}
+    </Badge>
+  );
+}
+
+interface AdminUsersStatusCellProps {
+  deletedAt: AdminUserRow['deletedAt'];
+}
+
+function AdminUsersStatusCell({ deletedAt }: AdminUsersStatusCellProps) {
+  return deletedAt ? (
+    <Badge size='sm' variant='warning'>
+      Deleted
+    </Badge>
+  ) : (
+    <Badge size='sm' variant='success'>
+      <span className='flex items-center gap-1.5'>
+        <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />{' '}
+        Active
+      </span>
+    </Badge>
+  );
+}
+
+interface AdminUsersActionsCellProps {
+  items: ReturnType<typeof convertContextMenuItems>;
+}
+
+function AdminUsersActionsCell({ items }: AdminUsersActionsCellProps) {
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
+}
 
 export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const { users, page, pageSize, total, search, sort } = props;
@@ -163,7 +269,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       columnHelper.display({
         id: 'select',
         header: ({ table }) => (
-          <TableCheckboxCell
+          <AdminUsersSelectionHeader
             table={table}
             headerCheckboxState={headerCheckboxState}
             onToggleSelectAll={toggleSelectAll}
@@ -175,7 +281,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           const rowNumber = (page - 1) * pageSize + row.index + 1;
 
           return (
-            <TableCheckboxCell
+            <AdminUsersSelectionCell
               row={row}
               rowNumber={rowNumber}
               isChecked={isChecked}
@@ -192,16 +298,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         header: 'Name',
         cell: ({ getValue, row }) => {
           const user = row.original;
-          return (
-            <div>
-              <div className='font-semibold text-primary-token'>
-                {getValue() ?? 'User'}
-              </div>
-              <div className='text-xs text-secondary-token'>
-                {user.email ?? '—'}
-              </div>
-            </div>
-          );
+          return <AdminUsersNameCell name={getValue()} email={user.email} />;
         },
         size: 320,
       }),
@@ -220,11 +317,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         header: 'Plan',
         cell: ({ getValue }) => {
           const plan = getValue();
-          return (
-            <Badge size='sm' variant={plan === 'pro' ? 'primary' : 'secondary'}>
-              {plan}
-            </Badge>
-          );
+          return <AdminUsersPlanCell plan={plan} />;
         },
         size: 140,
       }),
@@ -235,18 +328,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
         header: 'Status',
         cell: ({ row }) => {
           const user = row.original;
-          return user.deletedAt ? (
-            <Badge size='sm' variant='warning'>
-              Deleted
-            </Badge>
-          ) : (
-            <Badge size='sm' variant='success'>
-              <span className='flex items-center gap-1.5'>
-                <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />{' '}
-                Active
-              </span>
-            </Badge>
-          );
+          return <AdminUsersStatusCell deletedAt={user.deletedAt} />;
         },
         size: 120,
       }),
@@ -260,11 +342,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           const contextMenuItems = getContextMenuItems(user);
           const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
+          return <AdminUsersActionsCell items={actionMenuItems} />;
         },
         size: 48,
       }),

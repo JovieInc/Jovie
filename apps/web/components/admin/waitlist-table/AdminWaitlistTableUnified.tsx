@@ -4,7 +4,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
+  type Row,
   type RowSelectionState,
+  type Table,
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -13,6 +15,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
+  type HeaderCheckboxState,
   TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
@@ -37,6 +40,112 @@ const STATUS_LABELS: Record<string, string> = {
   invited: 'Invited',
   claimed: 'Claimed',
 };
+
+interface WaitlistSelectionHeaderProps {
+  table: Table<WaitlistEntryRow>;
+  headerCheckboxState: HeaderCheckboxState;
+  onToggleSelectAll: () => void;
+}
+
+function WaitlistSelectionHeader({
+  table,
+  headerCheckboxState,
+  onToggleSelectAll,
+}: WaitlistSelectionHeaderProps) {
+  return (
+    <TableCheckboxCell
+      table={table}
+      headerCheckboxState={headerCheckboxState}
+      onToggleSelectAll={onToggleSelectAll}
+    />
+  );
+}
+
+interface WaitlistSelectionCellProps {
+  row: Row<WaitlistEntryRow>;
+  rowNumber: number;
+  isChecked: boolean;
+  onToggleSelect: () => void;
+}
+
+function WaitlistSelectionCell({
+  row,
+  rowNumber,
+  isChecked,
+  onToggleSelect,
+}: WaitlistSelectionCellProps) {
+  return (
+    <TableCheckboxCell
+      row={row}
+      rowNumber={rowNumber}
+      isChecked={isChecked}
+      onToggleSelect={onToggleSelect}
+    />
+  );
+}
+
+interface WaitlistNameCellProps {
+  name?: string | null;
+}
+
+function WaitlistNameCell({ name }: WaitlistNameCellProps) {
+  return <span className='font-medium text-primary-token'>{name}</span>;
+}
+
+interface WaitlistEmailCellProps {
+  email?: string | null;
+}
+
+function WaitlistEmailCell({ email }: WaitlistEmailCellProps) {
+  return (
+    <a
+      href={`mailto:${email}`}
+      className='text-secondary-token hover:underline'
+    >
+      {email}
+    </a>
+  );
+}
+
+function WaitlistHeardAboutCell({ value }: { value?: string | null }) {
+  const heardAboutTruncated =
+    value && value.length > 30 ? `${value.slice(0, 30)}…` : value;
+
+  if (!value) {
+    return <span className='text-tertiary-token'>—</span>;
+  }
+
+  return value.length > 30 ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className='cursor-help text-secondary-token'>
+          {heardAboutTruncated}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side='top' className='max-w-xs'>
+        {value}
+      </TooltipContent>
+    </Tooltip>
+  ) : (
+    <span className='text-secondary-token'>{value}</span>
+  );
+}
+
+function WaitlistCreatedCell({ date }: { date: Date | null }) {
+  return <DateCell date={date} />;
+}
+
+interface WaitlistActionsCellProps {
+  items: ReturnType<typeof convertContextMenuItems>;
+}
+
+function WaitlistActionsCell({ items }: WaitlistActionsCellProps) {
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
+}
 
 export function AdminWaitlistTableUnified({
   entries,
@@ -124,7 +233,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.display({
         id: 'select',
         header: ({ table }) => (
-          <TableCheckboxCell
+          <WaitlistSelectionHeader
             table={table}
             headerCheckboxState={headerCheckboxState}
             onToggleSelectAll={toggleSelectAll}
@@ -136,7 +245,7 @@ export function AdminWaitlistTableUnified({
           const rowNumber = (page - 1) * pageSize + row.index + 1;
 
           return (
-            <TableCheckboxCell
+            <WaitlistSelectionCell
               row={row}
               rowNumber={rowNumber}
               isChecked={isChecked}
@@ -151,9 +260,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('fullName', {
         id: 'name',
         header: 'Name',
-        cell: ({ getValue }) => (
-          <span className='font-medium text-primary-token'>{getValue()}</span>
-        ),
+        cell: ({ getValue }) => <WaitlistNameCell name={getValue()} />,
         size: 180,
       }),
 
@@ -161,14 +268,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.accessor('email', {
         id: 'email',
         header: 'Email',
-        cell: ({ getValue }) => (
-          <a
-            href={`mailto:${getValue()}`}
-            className='text-secondary-token hover:underline'
-          >
-            {getValue()}
-          </a>
-        ),
+        cell: ({ getValue }) => <WaitlistEmailCell email={getValue()} />,
         size: 220,
       }),
 
@@ -202,26 +302,7 @@ export function AdminWaitlistTableUnified({
         header: 'Heard About',
         cell: ({ getValue }) => {
           const value = getValue();
-          const heardAboutTruncated =
-            value && value.length > 30 ? value.slice(0, 30) + '…' : value;
-          return value ? (
-            value.length > 30 ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className='cursor-help text-secondary-token'>
-                    {heardAboutTruncated}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side='top' className='max-w-xs'>
-                  {value}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <span className='text-secondary-token'>{value}</span>
-            )
-          ) : (
-            <span className='text-tertiary-token'>—</span>
-          );
+          return <WaitlistHeardAboutCell value={value} />;
         },
         size: 160,
       }),
@@ -239,7 +320,7 @@ export function AdminWaitlistTableUnified({
         id: 'created',
         header: 'Created',
         cell: ({ getValue }) => {
-          return <DateCell date={getValue()} />;
+          return <WaitlistCreatedCell date={getValue()} />;
         },
         size: 160,
       }),
@@ -253,11 +334,7 @@ export function AdminWaitlistTableUnified({
           const contextMenuItems = createContextMenuItems(entry);
           const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
+          return <WaitlistActionsCell items={actionMenuItems} />;
         },
         size: 48,
       }),

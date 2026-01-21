@@ -46,6 +46,64 @@ function getSrDescription(
     : 'Notification signups from your notification modal.';
 }
 
+interface AudienceSelectionCellProps {
+  rowNumber: number;
+  isChecked: boolean;
+  displayName: AudienceMember['displayName'];
+  onToggle: () => void;
+}
+
+function AudienceSelectionCell({
+  rowNumber,
+  isChecked,
+  displayName,
+  onToggle,
+}: AudienceSelectionCellProps) {
+  return (
+    <AudienceRowSelectionCell
+      rowNumber={rowNumber}
+      isChecked={isChecked}
+      displayName={displayName}
+      onToggle={onToggle}
+    />
+  );
+}
+
+function AudienceLastSeenMenuCell({
+  row,
+  isMenuOpen,
+  onMenuOpenChange,
+}: {
+  row: AudienceMember;
+  isMenuOpen: boolean;
+  onMenuOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <AudienceLastSeenCell
+      row={row}
+      lastSeenAt={row.lastSeenAt}
+      isMenuOpen={isMenuOpen}
+      onMenuOpenChange={onMenuOpenChange}
+    />
+  );
+}
+
+function AudienceEmailCell({ email }: { email?: string | null }) {
+  return <span className='text-secondary-token'>{email ?? '—'}</span>;
+}
+
+function AudienceMenuCell({
+  items,
+}: {
+  items: ReturnType<typeof convertContextMenuItems>;
+}) {
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
+}
+
 export function DashboardAudienceTableUnified({
   mode,
   rows,
@@ -162,7 +220,7 @@ export function DashboardAudienceTableUnified({
         cell: ({ row }) => {
           const rowNumber = (page - 1) * pageSize + row.index + 1;
           return (
-            <AudienceRowSelectionCell
+            <AudienceSelectionCell
               rowNumber={rowNumber}
               isChecked={selectedIds.has(row.original.id)}
               displayName={row.original.displayName}
@@ -245,9 +303,8 @@ export function DashboardAudienceTableUnified({
         id: 'lastSeen',
         header: 'Last Seen',
         cell: ({ row }) => (
-          <AudienceLastSeenCell
+          <AudienceLastSeenMenuCell
             row={row.original}
-            lastSeenAt={row.original.lastSeenAt}
             isMenuOpen={openMenuRowId === row.original.id}
             onMenuOpenChange={open =>
               setOpenMenuRowId(open ? row.original.id : null)
@@ -265,11 +322,7 @@ export function DashboardAudienceTableUnified({
           const contextMenuItems = getContextMenuItems(row.original);
           const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
+          return <AudienceMenuCell items={actionMenuItems} />;
         },
         size: 48,
       }),
@@ -295,7 +348,7 @@ export function DashboardAudienceTableUnified({
         cell: ({ row }) => {
           const rowNumber = (page - 1) * pageSize + row.index + 1;
           return (
-            <AudienceRowSelectionCell
+            <AudienceSelectionCell
               rowNumber={rowNumber}
               isChecked={selectedIds.has(row.original.id)}
               displayName={row.original.displayName}
@@ -325,9 +378,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('email', {
         id: 'email',
         header: 'Email',
-        cell: ({ getValue }) => (
-          <span className='text-secondary-token'>{getValue() ?? '—'}</span>
-        ),
+        cell: ({ getValue }) => <AudienceEmailCell email={getValue()} />,
         size: 240,
       }),
 
@@ -336,9 +387,8 @@ export function DashboardAudienceTableUnified({
         id: 'subscribedAt',
         header: 'Subscribed',
         cell: ({ row }) => (
-          <AudienceLastSeenCell
+          <AudienceLastSeenMenuCell
             row={row.original}
-            lastSeenAt={row.original.lastSeenAt}
             isMenuOpen={openMenuRowId === row.original.id}
             onMenuOpenChange={open =>
               setOpenMenuRowId(open ? row.original.id : null)
@@ -356,11 +406,7 @@ export function DashboardAudienceTableUnified({
           const contextMenuItems = getContextMenuItems(row.original);
           const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
+          return <AudienceMenuCell items={actionMenuItems} />;
         },
         size: 48,
       }),
