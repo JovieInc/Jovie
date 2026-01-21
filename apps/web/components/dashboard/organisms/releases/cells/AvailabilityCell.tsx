@@ -293,7 +293,7 @@ export function AvailabilityCell({
                   <div className='flex items-center gap-1'>
                     <button
                       type='button'
-                      title='Open'
+                      aria-label={`Open ${config.label} in new tab`}
                       onClick={() =>
                         window.open(
                           provider.url,
@@ -301,13 +301,21 @@ export function AvailabilityCell({
                           'noopener,noreferrer'
                         )
                       }
-                      className='rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                      className='rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
                     >
-                      <Icon name='ExternalLink' className='h-3.5 w-3.5' />
+                      <Icon
+                        name='ExternalLink'
+                        className='h-4 w-4'
+                        aria-hidden='true'
+                      />
                     </button>
                     <button
                       type='button'
-                      title={isCopied ? 'Copied' : 'Copy'}
+                      aria-label={
+                        isCopied
+                          ? `Copied ${config.label} link`
+                          : `Copy ${config.label} link`
+                      }
                       onClick={() => {
                         if (provider.path) {
                           handleCopyWithFeedback(
@@ -318,13 +326,14 @@ export function AvailabilityCell({
                         }
                       }}
                       className={cn(
-                        'rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token',
+                        'rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                         isCopied && 'text-green-600 dark:text-green-400'
                       )}
                     >
                       <Icon
                         name={isCopied ? 'Check' : 'Copy'}
-                        className='h-3.5 w-3.5'
+                        className='h-4 w-4'
+                        aria-hidden='true'
                       />
                     </button>
                   </div>
@@ -351,15 +360,21 @@ export function AvailabilityCell({
                       type='submit'
                       variant='ghost'
                       size='sm'
+                      aria-label='Confirm URL'
                       disabled={!urlInput.trim() || isAddingUrl}
                       className='h-6 px-1.5'
                     >
-                      <Icon name='Check' className='h-3 w-3' />
+                      <Icon
+                        name='Check'
+                        className='h-4 w-4'
+                        aria-hidden='true'
+                      />
                     </Button>
                     <Button
                       type='button'
                       variant='ghost'
                       size='sm'
+                      aria-label='Cancel adding URL'
                       onClick={() => {
                         setAddingProvider(null);
                         setUrlInput('');
@@ -367,7 +382,7 @@ export function AvailabilityCell({
                       }}
                       className='h-6 px-1.5'
                     >
-                      <Icon name='X' className='h-3 w-3' />
+                      <Icon name='X' className='h-4 w-4' aria-hidden='true' />
                     </Button>
                   </form>
                 ) : onAddUrl ? (

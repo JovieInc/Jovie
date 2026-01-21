@@ -512,8 +512,12 @@ export function UnifiedTable<TData>({
                         setFocusedIndex(index);
                       }}
                       onKeyDown={e => handleKeyDown(e, index, rowData)}
-                      onFocus={() => setFocusedIndex(index)}
-                      onMouseEnter={() => setFocusedIndex(index)}
+                      onFocus={() =>
+                        shouldEnableKeyboardNav && setFocusedIndex(index)
+                      }
+                      onMouseEnter={() =>
+                        shouldEnableKeyboardNav && setFocusedIndex(index)
+                      }
                       onContextMenu={e => onRowContextMenu?.(rowData, e)}
                     >
                       {row.getVisibleCells().map(cell => (
@@ -656,8 +660,12 @@ export function UnifiedTable<TData>({
                   setFocusedIndex(rowIndex);
                 }}
                 onKeyDown={e => handleKeyDown(e, rowIndex, rowData)}
-                onFocus={() => setFocusedIndex(rowIndex)}
-                onMouseEnter={() => setFocusedIndex(rowIndex)}
+                onFocus={() =>
+                  shouldEnableKeyboardNav && setFocusedIndex(rowIndex)
+                }
+                onMouseEnter={() =>
+                  shouldEnableKeyboardNav && setFocusedIndex(rowIndex)
+                }
                 onContextMenu={e => onRowContextMenu?.(rowData, e)}
                 style={
                   shouldVirtualize && virtualItem
