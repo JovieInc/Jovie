@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 
 // ============================================================================
@@ -144,9 +145,10 @@ export async function POST(
         });
       } catch (enrichmentError) {
         // Log but don't fail the confirmation - enrichment can be retried
-        console.error(
-          '[DSP Match Confirm] Failed to enqueue enrichment job:',
-          enrichmentError
+        await captureWarning(
+          'Failed to enqueue track enrichment job after match confirmation',
+          enrichmentError,
+          { route: '/api/dsp/matches/[id]/confirm', matchId, profileId }
         );
       }
     }
@@ -157,7 +159,9 @@ export async function POST(
       message: 'Match confirmed successfully',
     });
   } catch (error) {
-    console.error('[DSP Match Confirm] Error:', error);
+    await captureError('DSP Match confirmation failed', error, {
+      route: '/api/dsp/matches/[id]/confirm',
+    });
 
     return NextResponse.json(
       {

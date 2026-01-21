@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { captureError } from '@/lib/error-tracking';
 
 // ============================================================================
 // Request Schema
@@ -134,7 +135,9 @@ export async function POST(
       message: 'Match rejected successfully',
     });
   } catch (error) {
-    console.error('[DSP Match Reject] Error:', error);
+    await captureError('DSP Match rejection failed', error, {
+      route: '/api/dsp/matches/[id]/reject',
+    });
 
     return NextResponse.json(
       {
