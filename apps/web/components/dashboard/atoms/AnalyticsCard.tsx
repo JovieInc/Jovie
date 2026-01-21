@@ -1,7 +1,6 @@
 import { BarChart3 } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { cn } from '@/lib/utils';
-import { cardTokens } from '../tokens/card-tokens';
 
 interface AnalyticsCardProps {
   title: string;
@@ -32,54 +31,37 @@ export function AnalyticsCard({
 
   return (
     <section className={cn('h-full', order)} aria-label={`${title} metric`}>
-      <div
-        className={cn(
-          cardTokens.variants.analytics,
-          cardTokens.interactive.focus,
-          'flex h-full flex-col'
-        )}
-      >
-        <dl className='flex h-full flex-col'>
-          <div className='flex items-start justify-between gap-3'>
-            <dt className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-              {title}
-            </dt>
-            {headerRight ? <div className='shrink-0'>{headerRight}</div> : null}
-          </div>
-
-          <div className='mt-3 flex items-end justify-between gap-4'>
-            <dd className='text-[2.25rem] font-semibold tracking-tight text-primary-token tabular-nums leading-none'>
-              {value}
-            </dd>
-            <div
-              className={cn(
-                'shrink-0 flex h-10 w-10 items-center justify-center rounded-full',
-                iconChipClassName
-              )}
-              aria-hidden='true'
-            >
-              <IconToRender
-                className={cn('h-5 w-5', iconClassName ?? 'text-accent-token')}
-              />
-            </div>
-          </div>
-
+      <dl className='flex h-full flex-col py-1'>
+        <div className='flex items-center gap-2'>
           <div
-            className='mt-4 h-px w-full bg-foreground/6'
-            aria-hidden='true'
-          />
-
-          <div className='mt-auto pt-3'>
-            {children ? (
-              children
-            ) : metadata ? (
-              <dd className='text-xs text-tertiary-token'>{metadata}</dd>
-            ) : (
-              <div className='h-4' aria-hidden='true' />
+            className={cn(
+              'shrink-0 flex h-7 w-7 items-center justify-center rounded-lg',
+              iconChipClassName
             )}
+            aria-hidden='true'
+          >
+            <IconToRender
+              className={cn('h-4 w-4', iconClassName ?? 'text-accent-token')}
+            />
           </div>
-        </dl>
-      </div>
+          <dt className='text-xs font-medium text-secondary-token'>{title}</dt>
+          {headerRight ? (
+            <div className='shrink-0 ml-auto'>{headerRight}</div>
+          ) : null}
+        </div>
+
+        <dd className='mt-2 text-3xl font-semibold tracking-tight text-primary-token tabular-nums leading-none'>
+          {value}
+        </dd>
+
+        <div className='mt-2'>
+          {children ? (
+            children
+          ) : metadata ? (
+            <dd className='text-xs text-tertiary-token'>{metadata}</dd>
+          ) : null}
+        </div>
+      </dl>
     </section>
   );
 }

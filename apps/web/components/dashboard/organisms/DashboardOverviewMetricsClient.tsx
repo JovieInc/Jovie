@@ -18,19 +18,15 @@ export function DashboardOverviewMetricsClient({
   const { range, refreshSignal } = useDashboardOverviewControls();
 
   return (
-    <div className='space-y-4'>
-      <section className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
-        <AnalyticsCards
-          profileUrl={profileUrl}
-          range={range}
-          refreshSignal={refreshSignal}
-        />
-      </section>
+    <div className='space-y-6 px-3'>
+      <AnalyticsCards
+        profileUrl={profileUrl}
+        range={range}
+        refreshSignal={refreshSignal}
+      />
 
       {showActivity ? (
-        <section className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
-          <DashboardActivityFeed profileId={profileId} range={range} />
-        </section>
+        <DashboardActivityFeed profileId={profileId} range={range} />
       ) : null}
     </div>
   );

@@ -10,9 +10,9 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
+import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
-  navShortcuts,
   primaryNavigation,
   secondaryNavigation,
   settingsNavigation,
@@ -60,7 +60,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   function renderNavItem(item: NavItem) {
     const isActive = isItemActive(pathname, item);
-    const shortcut = navShortcuts[item.id];
+    const shortcut = NAV_SHORTCUTS[item.id];
     const isProfileItem = item.href === PROFILE_HREF;
 
     return (

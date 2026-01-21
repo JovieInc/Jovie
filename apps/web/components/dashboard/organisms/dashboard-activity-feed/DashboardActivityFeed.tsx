@@ -2,7 +2,6 @@
 
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Activity, DashboardActivityFeedProps } from './types';
@@ -66,47 +65,40 @@ export function DashboardActivityFeed({
   const isRefreshing = isFetching && !isLoading;
 
   return (
-    <div className='space-y-4' data-testid='dashboard-activity-feed'>
-      <div className='flex items-start justify-between gap-4'>
-        <div className='min-w-0'>
-          <h3 className='text-sm font-semibold leading-5 text-primary-token'>
-            Activity
-          </h3>
+    <div className='space-y-3' data-testid='dashboard-activity-feed'>
+      <div className='flex items-center justify-between gap-4'>
+        <div className='flex items-center gap-2'>
+          <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10 dark:bg-violet-500/15'>
+            <Zap className='h-4 w-4 text-violet-600 dark:text-violet-400' />
+          </div>
+          <h3 className='text-xs font-medium text-secondary-token'>Activity</h3>
         </div>
-        <span className='inline-flex shrink-0 items-center gap-2 rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-secondary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='h-1.5 w-1.5 rounded-full bg-emerald-500'
-          />{' '}
-          Live
+            className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
+          />
+          <span>Live</span>
         </span>
       </div>
 
-      <div className='min-h-[220px]'>
+      <div className='min-h-[180px]'>
         {error ? (
-          <div className='rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-500'>
+          <p className='text-sm text-error-token'>
             {error.message || 'Failed to load activity'}
-          </div>
+          </p>
         ) : isLoading ? (
-          <div
-            className='space-y-3 rounded-xl border border-subtle bg-surface-1/20 p-4'
-            aria-busy='true'
-          >
+          <div className='space-y-2' aria-busy='true'>
             {DASHBOARD_ACTIVITY_LOADING_KEYS.map(key => (
               <div
                 key={key}
-                className='flex items-center gap-3'
+                className='flex items-center gap-3 animate-pulse'
                 aria-hidden='true'
               >
-                <LoadingSkeleton
-                  height='h-8'
-                  width='h-8'
-                  rounded='lg'
-                  className='w-8'
-                />
-                <div className='flex-1 space-y-2'>
-                  <LoadingSkeleton height='h-4' width='w-3/4' />
-                  <LoadingSkeleton height='h-3' width='w-1/3' />
+                <div className='h-7 w-7 rounded-lg bg-surface-2' />
+                <div className='flex-1 space-y-1.5'>
+                  <div className='h-3 w-3/4 rounded bg-surface-2' />
+                  <div className='h-2.5 w-1/3 rounded bg-surface-2' />
                 </div>
               </div>
             ))}
@@ -117,22 +109,9 @@ export function DashboardActivityFeed({
               isRefreshing ? 'opacity-70 transition-opacity' : undefined
             }
           >
-            <div className='rounded-xl border border-subtle bg-surface-1/20 p-4'>
-              <div className='flex items-start gap-3'>
-                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'>
-                  <Zap className='h-5 w-5 text-secondary-token' />
-                </div>
-
-                <div className='min-w-0 flex-1'>
-                  <p className='text-sm font-semibold leading-5 text-primary-token'>
-                    No activity yet
-                  </p>
-                  <p className='mt-1 text-sm leading-5 text-secondary-token'>
-                    Share your profile link to start tracking fan activity.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <p className='text-sm text-tertiary-token'>
+              No recent activity. Share your profile to see engagement here.
+            </p>
           </div>
         ) : (
           <div
@@ -140,7 +119,7 @@ export function DashboardActivityFeed({
               isRefreshing ? 'opacity-70 transition-opacity' : undefined
             }
           >
-            <ul className='divide-y divide-white/5 overflow-hidden rounded-xl border border-subtle bg-surface-1/20'>
+            <ul className='space-y-1'>
               {activities.map(activity => (
                 <ActivityItem key={activity.id} activity={activity} />
               ))}

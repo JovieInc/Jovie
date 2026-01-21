@@ -1,12 +1,13 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button, CommonDropdown } from '@jovie/ui';
+import { Button, CommonDropdown, Kbd } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
 import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { Badge } from '@/components/ui/Badge';
+import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { cn } from '@/lib/utils';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
@@ -32,6 +33,7 @@ interface BuildDropdownItemsParams {
   handleUpgrade: () => void;
   handleSignOut: () => void;
   setIsFeedbackOpen: (open: boolean) => void;
+  handleOpenShortcuts?: () => void;
 }
 
 function buildDropdownItems({
@@ -48,6 +50,7 @@ function buildDropdownItems({
   handleUpgrade,
   handleSignOut,
   setIsFeedbackOpen,
+  handleOpenShortcuts,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [
     // Profile card
@@ -114,6 +117,31 @@ function buildDropdownItems({
       className: SIDEBAR_ITEM_CLASS,
     },
   ];
+
+  // Add keyboard shortcuts item if handler is provided
+  if (handleOpenShortcuts) {
+    items.push({
+      type: 'custom',
+      id: 'keyboard-shortcuts',
+      render: () => (
+        <button
+          type='button'
+          onClick={handleOpenShortcuts}
+          className={SIDEBAR_ITEM_CLASS}
+        >
+          <Icon
+            name='Keyboard'
+            className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+          />
+          <span className='flex-1 text-left'>Keyboard shortcuts</span>
+          <span className='flex items-center gap-0.5 ml-auto'>
+            <Kbd variant='default'>⌘</Kbd>
+            <Kbd variant='default'>/</Kbd>
+          </span>
+        </button>
+      ),
+    });
+  }
 
   // Add billing item based on status
   if (billingStatus.loading) {
@@ -205,6 +233,7 @@ export function UserButton({
   showUserInfo = false,
 }: UserButtonProps) {
   const router = useRouter();
+  const keyboardShortcuts = useKeyboardShortcutsSafe();
   const {
     isLoaded,
     user,
@@ -292,6 +321,7 @@ export function UserButton({
     handleUpgrade,
     handleSignOut,
     setIsFeedbackOpen,
+    handleOpenShortcuts: keyboardShortcuts?.open,
   });
 
   // Custom trigger

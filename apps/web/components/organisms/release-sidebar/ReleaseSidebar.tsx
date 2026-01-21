@@ -80,7 +80,7 @@ export function ReleaseSidebar({
       id: 'copy-url',
       label: 'Copy smart link',
       icon: <Copy className='h-4 w-4' />,
-      onClick: handleCopySmartLink,
+      onClick: () => void handleCopySmartLink(),
       className: CONTEXT_MENU_ITEM_CLASS,
     });
 

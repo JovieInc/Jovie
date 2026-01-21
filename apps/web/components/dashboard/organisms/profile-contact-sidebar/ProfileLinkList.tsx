@@ -17,7 +17,7 @@ export interface ProfileLinkListProps {
 function compactUrlDisplay(platform: string, url: string): string {
   try {
     const parsed = new URL(url);
-    const pathname = parsed.pathname.replace(/^\/+|\/+$/g, '');
+    const pathname = parsed.pathname.replaceAll(/(?:^\/+)|(?:\/+$)/g, '');
     if (pathname) {
       // Show handle/username if it looks like one
       if (pathname.startsWith('@')) {

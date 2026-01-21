@@ -7,18 +7,46 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
+import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
   item: NavItem;
   isActive: boolean;
-  shortcut?: string;
+  shortcut?: KeyboardShortcut;
   actions?: ReactNode;
+}
+
+/**
+ * Render shortcut keys in tooltip format
+ * Handles both "G then D" sequential and single key formats
+ */
+function ShortcutKeys({ shortcut }: { shortcut: KeyboardShortcut }) {
+  const { keys } = shortcut;
+
+  // Handle "G then D" style sequential shortcuts
+  if (keys.includes(' then ')) {
+    const [first, second] = keys.split(' then ');
+    return (
+      <span className='inline-flex items-center gap-1 ml-2'>
+        <Kbd variant='tooltip'>{first}</Kbd>
+        <span className='text-[10px] opacity-70'>then</span>
+        <Kbd variant='tooltip'>{second}</Kbd>
+      </span>
+    );
+  }
+
+  // Handle space-separated keys (like "⌘ K")
+  return (
+    <Kbd variant='tooltip' className='ml-2'>
+      {keys}
+    </Kbd>
+  );
 }
 
 function buildTooltip(
   name: string,
-  shortcut?: string
+  shortcut?: KeyboardShortcut
 ): string | { children: ReactNode } {
   if (!shortcut) {
     return name;
@@ -28,7 +56,7 @@ function buildTooltip(
     children: (
       <>
         <span>{name}</span>
-        <Kbd variant='tooltip'>{shortcut}</Kbd>
+        <ShortcutKeys shortcut={shortcut} />
       </>
     ),
   };
