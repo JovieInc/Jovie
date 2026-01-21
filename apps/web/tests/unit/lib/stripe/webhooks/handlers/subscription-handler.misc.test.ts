@@ -3,10 +3,6 @@
  */
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  SubscriptionHandler,
-  subscriptionHandler,
-} from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockInvalidateBillingCache,
@@ -15,12 +11,19 @@ import {
 } from './subscription-handler.test-utils';
 
 describe('@critical SubscriptionHandler - Misc', () => {
-  let handler: SubscriptionHandler;
+  let handler: import('@/lib/stripe/webhooks/handlers/subscription-handler').SubscriptionHandler;
+  let SubscriptionHandlerCtor: typeof import('@/lib/stripe/webhooks/handlers/subscription-handler').SubscriptionHandler;
+  let subscriptionHandlerInstance: import('@/lib/stripe/webhooks/handlers/subscription-handler').subscriptionHandler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    handler = new SubscriptionHandler();
     setupDefaultMocks();
+    const mod = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    SubscriptionHandlerCtor = mod.SubscriptionHandler;
+    subscriptionHandlerInstance = mod.subscriptionHandler;
+    handler = new mod.SubscriptionHandler();
   });
 
   describe('eventTypes', () => {
@@ -144,14 +147,16 @@ describe('@critical SubscriptionHandler - Misc', () => {
 
   describe('singleton instance', () => {
     it('exports a singleton handler instance', () => {
-      expect(subscriptionHandler).toBeInstanceOf(SubscriptionHandler);
-      expect(subscriptionHandler.eventTypes).toContain(
+      expect(subscriptionHandlerInstance).toBeInstanceOf(
+        SubscriptionHandlerCtor
+      );
+      expect(subscriptionHandlerInstance.eventTypes).toContain(
         'customer.subscription.created'
       );
-      expect(subscriptionHandler.eventTypes).toContain(
+      expect(subscriptionHandlerInstance.eventTypes).toContain(
         'customer.subscription.updated'
       );
-      expect(subscriptionHandler.eventTypes).toContain(
+      expect(subscriptionHandlerInstance.eventTypes).toContain(
         'customer.subscription.deleted'
       );
     });
