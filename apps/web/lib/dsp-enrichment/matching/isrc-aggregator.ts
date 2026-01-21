@@ -30,6 +30,46 @@ interface ArtistAggregation {
 }
 
 // ============================================================================
+// Compilation Detection
+// ============================================================================
+
+/**
+ * Known compilation artist name patterns.
+ * These indicate the match is likely from a compilation album rather than
+ * the artist's own release.
+ */
+const COMPILATION_PATTERNS = [
+  'various artists',
+  'various artist',
+  'compilation',
+  'soundtrack',
+  'original cast',
+  'original broadway cast',
+  'original london cast',
+  'v/a',
+  'v.a.',
+] as const;
+
+/**
+ * Check if an artist name indicates a compilation or various artists release.
+ * These should be filtered out to prevent false positive matches.
+ *
+ * @param artistName - The artist name to check
+ * @returns True if the name indicates a compilation
+ */
+export function isLikelyCompilation(artistName: string): boolean {
+  const normalizedName = artistName.toLowerCase().trim();
+
+  for (const pattern of COMPILATION_PATTERNS) {
+    if (normalizedName.includes(pattern)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ============================================================================
 // Aggregation Functions
 // ============================================================================
 
@@ -70,10 +110,15 @@ export function aggregateIsrcMatches(
     aggregation.tracksChecked.add(match.localTrackId);
   }
 
-  // Convert aggregations to candidates
+  // Convert aggregations to candidates, filtering out compilations
   const candidates: ArtistMatchCandidate[] = [];
 
   for (const aggregation of artistMap.values()) {
+    // Skip compilation/various artists matches
+    if (isLikelyCompilation(aggregation.externalArtistName)) {
+      continue;
+    }
+
     candidates.push({
       providerId,
       externalArtistId: aggregation.externalArtistId,

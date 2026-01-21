@@ -331,6 +331,7 @@ describe('Match Validation', () => {
       matchingUpcs: [],
       totalTracksChecked: 10,
       confidenceScore: 0.2,
+      confidenceBand: 'low' as const,
       confidenceBreakdown: {
         isrcMatchScore: 0.1,
         upcMatchScore: 0,
@@ -361,6 +362,7 @@ describe('Match Validation', () => {
       matchingUpcs: [],
       totalTracksChecked: 10,
       confidenceScore: 0.5,
+      confidenceBand: 'medium' as const,
       confidenceBreakdown: {
         isrcMatchScore: 0.3,
         upcMatchScore: 0,
@@ -391,6 +393,7 @@ describe('Match Validation', () => {
       matchingUpcs: [],
       totalTracksChecked: 10,
       confidenceScore: 0.85,
+      confidenceBand: 'very_high' as const,
       confidenceBreakdown: {
         isrcMatchScore: 0.8,
         upcMatchScore: 0,
