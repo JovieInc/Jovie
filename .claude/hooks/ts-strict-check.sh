@@ -1,8 +1,14 @@
 #!/bin/bash
 # Warn on TypeScript anti-patterns
 
-file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
-content=$(jq -r '.tool_input.content // .tool_input.new_string // empty' 2>/dev/null)
+# Parse from TOOL_INPUT (supports jq and fallback)
+if command -v jq &> /dev/null; then
+  file_path=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty' 2>/dev/null)
+  content=$(echo "$TOOL_INPUT" | jq -r '.content // .new_string // empty' 2>/dev/null)
+else
+  file_path=$(echo "$TOOL_INPUT" | grep -oP '"file_path"\s*:\s*"\K[^"]+' 2>/dev/null || true)
+  content=$(echo "$TOOL_INPUT" | grep -oP '"(content|new_string)"\s*:\s*"\K[^"]+' 2>/dev/null || true)
+fi
 
 if [ -z "$file_path" ] || [ -z "$content" ]; then
   exit 0

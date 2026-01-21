@@ -19,16 +19,20 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write # Required for Claude to commit and push changes
+      pull-requests: write # Required for Claude to create/update PRs
+      issues: write # Required for Claude to respond to issues
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 1
+          fetch-depth: 0 # Full history for better git operations
+
+      # Setup Node.js and pnpm for Claude Code hooks and tools
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Run Claude Code
         id: claude
@@ -45,5 +49,5 @@ jobs:
 
           # Use Opus 4.5 for GitHub-triggered tasks (complex by nature)
           # Per agents.md section 6.1: Use Opus for multi-file changes and architectural decisions
-          claude_args: '--model claude-opus-4-5-20250805'
+          claude_args: '--model claude-opus-4-5-20251101'
 

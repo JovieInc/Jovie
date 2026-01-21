@@ -2,8 +2,14 @@
 # Warn before dangerous bash commands
 # Based on agents.md guardrails
 
-# Get the command from the tool input
-command=$(jq -r '.tool_input.command' 2>/dev/null)
+# Get the command from the tool input (TOOL_INPUT is a JSON string passed via env)
+# Support both jq and fallback parsing for environments without jq
+if command -v jq &> /dev/null; then
+  command=$(echo "$TOOL_INPUT" | jq -r '.command // empty' 2>/dev/null)
+else
+  # Fallback: try to extract command with grep/sed (less reliable but works without jq)
+  command=$(echo "$TOOL_INPUT" | grep -oP '"command"\s*:\s*"\K[^"]+' 2>/dev/null || true)
+fi
 
 if [ -z "$command" ]; then
   exit 0

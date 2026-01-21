@@ -4,9 +4,16 @@
 # - Prevent creation of middleware.ts (use proxy.ts instead, line 11)
 # - Check for biome-ignore suppressions (never allowed, line 52)
 
-# Get file path and operation from tool input
-file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
-content=$(jq -r '.tool_input.content // .tool_input.new_string // empty' 2>/dev/null)
+# Get file path and content from tool input (TOOL_INPUT is a JSON string)
+# Support both jq and fallback for environments without jq
+if command -v jq &> /dev/null; then
+  file_path=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty' 2>/dev/null)
+  content=$(echo "$TOOL_INPUT" | jq -r '.content // .new_string // empty' 2>/dev/null)
+else
+  # Fallback: basic grep extraction (less reliable but works without jq)
+  file_path=$(echo "$TOOL_INPUT" | grep -oP '"file_path"\s*:\s*"\K[^"]+' 2>/dev/null || true)
+  content=$(echo "$TOOL_INPUT" | grep -oP '"(content|new_string)"\s*:\s*"\K[^"]+' 2>/dev/null || true)
+fi
 
 if [ -z "$file_path" ]; then
   exit 0

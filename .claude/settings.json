@@ -1,5 +1,12 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+        "timeout": 120
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -74,6 +81,8 @@
       "Skill(generate-migration:*)",
       "Skill(neon-backup)",
       "Skill(neon-backup:*)",
+      "Skill(session-start-hook)",
+      "Skill(session-start-hook:*)",
       "SlashCommand(/pr)",
       "SlashCommand(/verify)",
       "SlashCommand(/ship)",
@@ -206,6 +215,7 @@
         "lsof *",
         "uuidgen *",
         "bun *",
+        "corepack *",
         "NODE_OPTIONS=* pnpm *",
         "NODE_OPTIONS=* npx *",
         "mkdir *",
