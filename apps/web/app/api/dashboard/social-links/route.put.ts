@@ -18,31 +18,71 @@ import {
   validateUpdateSocialLinksPayload,
 } from './route.shared';
 
+const IDEMPOTENCY_ROUTE = 'PUT:/api/dashboard/social-links' as const;
+
+async function storeAndReturnError(
+  idempotencyKey: string | null | undefined,
+  clerkUserId: string,
+  status: number,
+  response: { error: string },
+  headers: HeadersInit
+): Promise<NextResponse> {
+  await storeIdempotencyKey(
+    idempotencyKey ?? '',
+    clerkUserId,
+    IDEMPOTENCY_ROUTE,
+    status,
+    response
+  );
+  return NextResponse.json(response, { status, headers });
+}
+
+async function updateIngestedLinksVersion(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  existingLinks: Array<{ id: string; sourceType: string | null }>,
+  removableIds: string[],
+  nextVersion: number
+): Promise<void> {
+  if (existingLinks.length <= removableIds.length) return;
+
+  const ingestedIds = existingLinks
+    .filter(link => link.sourceType === 'ingested')
+    .map(link => link.id);
+
+  if (ingestedIds.length > 0) {
+    await tx
+      .update(socialLinks)
+      .set({ version: nextVersion, updatedAt: new Date() })
+      .where(inArray(socialLinks.id, ingestedIds));
+  }
+}
+
 export async function PUT(req: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const { allowed, headers: rateLimitHeaders } =
         await applyRateLimiting(clerkUserId);
+      const headers = { ...NO_STORE_HEADERS, ...rateLimitHeaders };
+
       if (!allowed) {
         return NextResponse.json(
           { error: 'Rate limit exceeded. Please try again later.' },
-          { status: 429, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+          { status: 429, headers }
         );
       }
+
       const parsedBody = await parseJsonBody<unknown>(req, {
         route: 'PUT /api/dashboard/social-links',
-        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+        headers,
       });
-      if (!parsedBody.ok) {
-        return parsedBody.response;
-      }
+      if (!parsedBody.ok) return parsedBody.response;
+
       const validationResult = validateUpdateSocialLinksPayload(
         parsedBody.data,
-        { ...NO_STORE_HEADERS, ...rateLimitHeaders }
+        headers
       );
-      if (!validationResult.ok) {
-        return validationResult.response;
-      }
+      if (!validationResult.ok) return validationResult.response;
+
       const {
         profileId,
         links: parsedLinks,
@@ -50,52 +90,45 @@ export async function PUT(req: Request) {
         expectedVersion,
       } = validationResult.data;
       const links = parsedLinks ?? [];
+
       if (!profileId) {
         return NextResponse.json(
           { error: 'Profile ID is required' },
-          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+          { status: 400, headers }
         );
       }
+
       if (idempotencyKey) {
         const { cached, response } = await checkIdempotencyKey(
           idempotencyKey,
           clerkUserId,
-          'PUT:/api/dashboard/social-links'
+          IDEMPOTENCY_ROUTE
         );
-        if (cached && response) {
-          return response;
-        }
+        if (cached && response) return response;
       }
+
       const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
       if (!profile) {
-        const response = { error: 'Profile not found' };
-        await storeIdempotencyKey(
-          idempotencyKey ?? '',
+        return storeAndReturnError(
+          idempotencyKey,
           clerkUserId,
-          'PUT:/api/dashboard/social-links',
           404,
-          response
+          { error: 'Profile not found' },
+          headers
         );
-        return NextResponse.json(response, {
-          status: 404,
-          headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
-        });
       }
+
       const validation = processLinkValidation(links);
       if (!validation.ok) {
-        const response = { error: validation.error };
-        await storeIdempotencyKey(
-          idempotencyKey ?? '',
+        return storeAndReturnError(
+          idempotencyKey,
           clerkUserId,
-          'PUT:/api/dashboard/social-links',
           400,
-          response
+          { error: validation.error },
+          headers
         );
-        return NextResponse.json(response, {
-          status: 400,
-          headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
-        });
       }
+
       const existingLinks = await tx
         .select({
           id: socialLinks.id,
@@ -104,25 +137,27 @@ export async function PUT(req: Request) {
         })
         .from(socialLinks)
         .where(eq(socialLinks.creatorProfileId, profileId));
+
       const versioning = computeLinkVersioning({
         existingVersions: existingLinks.map(link => link.version),
         expectedVersion,
-        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+        headers,
         conflictMessage:
           'Conflict: Links have been modified by another request',
         emptyVersion: 0,
       });
-      if (!versioning.ok) {
-        return versioning.response;
-      }
+      if (!versioning.ok) return versioning.response;
+
       const removableIds = existingLinks
         .filter(link => (link.sourceType ?? 'manual') !== 'ingested')
         .map(link => link.id);
+
       if (removableIds.length > 0) {
         await tx
           .delete(socialLinks)
           .where(inArray(socialLinks.id, removableIds));
       }
+
       const insertPayloadResult =
         links.length > 0
           ? buildSocialLinksInsertPayload(
@@ -132,63 +167,57 @@ export async function PUT(req: Request) {
               versioning.nextVersion
             )
           : { payload: [], linkUrls: [] };
+
       if (insertPayloadResult.payload.length > 0) {
         await tx.insert(socialLinks).values(insertPayloadResult.payload);
       }
-      if (existingLinks.length > removableIds.length) {
-        const ingestedIds = existingLinks
-          .filter(link => link.sourceType === 'ingested')
-          .map(link => link.id);
-        if (ingestedIds.length > 0) {
-          await tx
-            .update(socialLinks)
-            .set({ version: versioning.nextVersion, updatedAt: new Date() })
-            .where(inArray(socialLinks.id, ingestedIds));
-        }
-      }
+
+      await updateIngestedLinksVersion(
+        tx,
+        existingLinks,
+        removableIds,
+        versioning.nextVersion
+      );
+
       const successResponse = { ok: true, version: versioning.nextVersion };
       await storeIdempotencyKey(
         idempotencyKey ?? '',
         clerkUserId,
-        'PUT:/api/dashboard/social-links',
+        IDEMPOTENCY_ROUTE,
         200,
         successResponse
       );
+
       await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
-      const enrichmentPromise = enqueueProfileEnrichment({
+
+      enqueueProfileEnrichment({
         links: insertPayloadResult.linkUrls,
         profileId,
         clerkUserId,
         userId: profile.userId ?? null,
         avatarUrl: profile.avatarUrl ?? null,
         avatarLockedByUser: profile.avatarLockedByUser ?? null,
-      });
-      enrichmentPromise.catch(error =>
+      }).catch(error =>
         captureError('Social links enrichment failed', error, {
           route: '/api/dashboard/social-links',
           profileId,
           action: 'background_processing',
         })
       );
-      return NextResponse.json(successResponse, {
-        status: 200,
-        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
-      });
+
+      return NextResponse.json(successResponse, { status: 200, headers });
     });
   } catch (error) {
     captureError('Error updating social links', error, {
       route: '/api/dashboard/social-links',
       action: 'update',
     });
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+
+    const isUnauthorized =
+      error instanceof Error && error.message === 'Unauthorized';
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { error: isUnauthorized ? 'Unauthorized' : 'Internal server error' },
+      { status: isUnauthorized ? 401 : 500, headers: NO_STORE_HEADERS }
     );
   }
 }

@@ -17,15 +17,30 @@ interface UseAdminTableKeyboardNavigationResult {
   handleKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
 }
 
+const FORM_ELEMENTS = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON']);
+
 function isFormElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  const tagName = target.tagName;
-  return (
-    tagName === 'INPUT' ||
-    tagName === 'TEXTAREA' ||
-    tagName === 'SELECT' ||
-    tagName === 'BUTTON'
-  );
+  return FORM_ELEMENTS.has(target.tagName);
+}
+
+function handleArrowNavigation(
+  key: string,
+  selectedIndex: number,
+  itemIds: string[],
+  onSelect: (id: string | null) => void
+): void {
+  if (itemIds.length === 0) return;
+
+  if (key === 'ArrowDown') {
+    const nextIndex =
+      selectedIndex === -1 ? 0 : Math.min(selectedIndex + 1, itemIds.length - 1);
+    onSelect(itemIds[nextIndex] ?? null);
+  } else {
+    const prevIndex =
+      selectedIndex === -1 ? itemIds.length - 1 : Math.max(selectedIndex - 1, 0);
+    onSelect(itemIds[prevIndex] ?? null);
+  }
 }
 
 export function useAdminTableKeyboardNavigation<ItemType>(
@@ -52,44 +67,28 @@ export function useAdminTableKeyboardNavigation<ItemType>(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (isFormElement(event.target)) return;
 
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        if (itemIds.length === 0) return;
-        event.preventDefault();
+      const { key } = event;
 
-        if (event.key === 'ArrowDown') {
-          if (selectedIndex === -1) {
-            onSelect(itemIds[0] ?? null);
-          } else {
-            const nextIndex = Math.min(selectedIndex + 1, itemIds.length - 1);
-            onSelect(itemIds[nextIndex] ?? null);
-          }
-        } else if (event.key === 'ArrowUp') {
-          if (selectedIndex === -1) {
-            onSelect(itemIds[itemIds.length - 1] ?? null);
-          } else {
-            const previousIndex = Math.max(selectedIndex - 1, 0);
-            onSelect(itemIds[previousIndex] ?? null);
-          }
-        }
-      } else if (event.key === ' ' || event.key === 'Spacebar') {
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        event.preventDefault();
+        handleArrowNavigation(key, selectedIndex, itemIds, onSelect);
+        return;
+      }
+
+      if (key === ' ' || key === 'Spacebar') {
         if (!selectedId || !onToggleSidebar) return;
         event.preventDefault();
         onToggleSidebar();
-      } else if (event.key === 'Escape') {
+        return;
+      }
+
+      if (key === 'Escape') {
         if (!isSidebarOpen || !onCloseSidebar) return;
         event.preventDefault();
         onCloseSidebar();
       }
     },
-    [
-      isSidebarOpen,
-      itemIds,
-      onCloseSidebar,
-      onSelect,
-      onToggleSidebar,
-      selectedId,
-      selectedIndex,
-    ]
+    [isSidebarOpen, itemIds, onCloseSidebar, onSelect, onToggleSidebar, selectedId, selectedIndex]
   );
 
   return { selectedIndex, handleKeyDown };

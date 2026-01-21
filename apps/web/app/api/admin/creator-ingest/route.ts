@@ -623,6 +623,243 @@ function validateSocialHandle(
 }
 
 /**
+ * Verify admin authentication and authorization.
+ */
+async function verifyAdminAccess(): Promise<
+  { ok: true } | { ok: false; response: NextResponse }
+> {
+  const entitlements = await getCurrentUserEntitlements();
+
+  if (!entitlements.isAuthenticated) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  if (!entitlements.isAdmin) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Parse and validate the request body for creator ingestion.
+ */
+async function parseIngestRequest(
+  request: Request
+): Promise<{ ok: true; url: string } | { ok: false; response: NextResponse }> {
+  const parsedBody = await parseJsonBody<unknown>(request, {
+    route: 'POST /api/admin/creator-ingest',
+    headers: NO_STORE_HEADERS,
+  });
+
+  if (!parsedBody.ok) {
+    return { ok: false, response: parsedBody.response };
+  }
+
+  const parsed = creatorIngestSchema.safeParse(parsedBody.data);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  return { ok: true, url: parsed.data.url };
+}
+
+/**
+ * Handle full-extraction platform ingestion (Linktree/Laylo).
+ */
+async function handleFullExtractionIngest(
+  inputUrl: string,
+  isLaylo: boolean,
+  linktreeValidatedUrl: string | null
+): Promise<NextResponse> {
+  const context = resolveFullExtractionContext(
+    inputUrl,
+    isLaylo,
+    linktreeValidatedUrl
+  );
+
+  if (!context.ok) {
+    return context.response;
+  }
+
+  const { validatedUrl, handle } = context;
+  const existingCheck = await checkExistingProfile(handle);
+
+  if (!existingCheck.finalHandle) {
+    return NextResponse.json(
+      {
+        error: 'Unable to allocate unique username',
+        details: 'All fallback username attempts exhausted.',
+      },
+      { status: 409, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (existingCheck.existing?.isClaimed) {
+    return NextResponse.json(
+      {
+        error: 'Profile already claimed',
+        details: 'Cannot overwrite a claimed profile.',
+      },
+      { status: 409, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  let extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
+  try {
+    extraction = await fetchFullExtractionProfile(isLaylo, validatedUrl, handle);
+  } catch (fetchError) {
+    const errorMessage =
+      fetchError instanceof Error
+        ? fetchError.message
+        : 'Failed to fetch profile';
+
+    logger.error('Profile fetch failed', {
+      url: validatedUrl,
+      error: errorMessage,
+      platform: isLaylo ? 'laylo' : 'linktree',
+    });
+
+    await markReingestFailure(existingCheck, errorMessage);
+
+    return NextResponse.json(
+      { error: 'Failed to fetch profile', details: errorMessage },
+      { status: 502, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const displayName = extraction.displayName?.trim() || handle;
+  const hostedAvatarUrl = await resolveHostedAvatarUrl(handle, extraction);
+  const extractionWithHostedAvatar = {
+    ...extraction,
+    avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
+  };
+
+  if (existingCheck.isReingest && existingCheck.existing) {
+    return handleReingestProfile({
+      existing: existingCheck.existing,
+      extraction: extractionWithHostedAvatar,
+      displayName,
+    });
+  }
+
+  return handleNewProfileIngest({
+    finalHandle: existingCheck.finalHandle,
+    displayName,
+    hostedAvatarUrl,
+    extraction: extractionWithHostedAvatar,
+  });
+}
+
+/**
+ * Handle social platform ingestion for non-full-extraction platforms.
+ */
+async function handleSocialPlatformIngest(
+  inputUrl: string,
+  detected: ReturnType<typeof detectPlatform>
+): Promise<NextResponse> {
+  const handleResult = validateSocialHandle(inputUrl, detected.platform.name);
+  if (!handleResult.ok) {
+    return handleResult.response;
+  }
+
+  const { handle, normalizedHandle } = handleResult;
+  const spotifyArtistName = await fetchSpotifyArtistName(
+    handle,
+    detected.platform.id
+  );
+
+  const socialContext: SocialPlatformContext = {
+    handle,
+    normalizedHandle,
+    platformId: detected.platform.id,
+    platformName: detected.platform.name,
+    normalizedUrl: detected.normalizedUrl,
+    spotifyArtistName,
+  };
+
+  return withSystemIngestionSession(async tx => {
+    const [existing] = await tx
+      .select({
+        id: creatorProfiles.id,
+        isClaimed: creatorProfiles.isClaimed,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, normalizedHandle))
+      .limit(1);
+
+    if (existing?.isClaimed) {
+      const altHandle = await findAvailableHandle(tx, normalizedHandle);
+      if (!altHandle) {
+        return NextResponse.json(
+          {
+            error: 'Unable to allocate unique username',
+            details: 'All fallback username attempts exhausted.',
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+      return createNewSocialProfile(tx, altHandle, socialContext);
+    }
+
+    if (existing && !existing.isClaimed) {
+      return handleExistingUnclaimedProfile(tx, existing, socialContext);
+    }
+
+    return createNewSocialProfile(tx, normalizedHandle, socialContext);
+  });
+}
+
+/**
+ * Handle ingestion errors and return appropriate response.
+ */
+function handleIngestionError(error: unknown): NextResponse {
+  const errorMessage =
+    error instanceof Error ? error.message : 'Unknown error';
+
+  logger.error('Admin ingestion failed', {
+    error: errorMessage,
+    stack: error instanceof Error ? error.stack : undefined,
+    raw: error,
+    route: 'creator-ingest',
+  });
+
+  if (
+    errorMessage.includes('unique constraint') ||
+    errorMessage.includes('duplicate key')
+  ) {
+    return NextResponse.json(
+      { error: 'A creator profile with that handle already exists' },
+      { status: 409, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return NextResponse.json(
+    { error: 'Failed to ingest profile', details: errorMessage },
+    { status: 500, headers: NO_STORE_HEADERS }
+  );
+}
+
+/**
  * Admin endpoint to ingest a creator profile from any social platform URL.
  *
  * Supported platforms:
@@ -639,214 +876,27 @@ function validateSocialHandle(
  */
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
+    const authResult = await verifyAdminAccess();
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
+    const parseResult = await parseIngestRequest(request);
+    if (!parseResult.ok) {
+      return parseResult.response;
     }
 
-    const parsedBody = await parseJsonBody<unknown>(request, {
-      route: 'POST /api/admin/creator-ingest',
-      headers: NO_STORE_HEADERS,
-    });
-    if (!parsedBody.ok) {
-      return parsedBody.response;
-    }
-    const body = parsedBody.data;
-    const parsed = creatorIngestSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid request body', details: parsed.error.flatten() },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const inputUrl = parsed.data.url;
-
-    // Detect platform from URL
+    const inputUrl = parseResult.url;
     const detected = detectPlatform(inputUrl);
-    const platformId = detected.platform.id;
-    const normalizedUrl = detected.normalizedUrl;
-
-    // Check if this is a full-extraction platform (Linktree/Laylo)
     const { isLinktree, isLaylo, linktreeValidatedUrl } =
       detectFullExtractionPlatform(inputUrl);
 
-    // For full-extraction platforms, use existing logic
     if (isLinktree || isLaylo) {
-      const context = resolveFullExtractionContext(
-        inputUrl,
-        isLaylo,
-        linktreeValidatedUrl
-      );
-
-      if (!context.ok) {
-        return context.response;
-      }
-
-      const { validatedUrl, handle } = context;
-      const usernameNormalized = handle;
-      const existingCheck = await checkExistingProfile(usernameNormalized);
-
-      if (!existingCheck.finalHandle) {
-        return NextResponse.json(
-          {
-            error: 'Unable to allocate unique username',
-            details: 'All fallback username attempts exhausted.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      if (existingCheck.existing?.isClaimed) {
-        return NextResponse.json(
-          {
-            error: 'Profile already claimed',
-            details: 'Cannot overwrite a claimed profile.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      let extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
-      try {
-        extraction = await fetchFullExtractionProfile(
-          isLaylo,
-          validatedUrl,
-          handle
-        );
-      } catch (fetchError) {
-        const errorMessage =
-          fetchError instanceof Error
-            ? fetchError.message
-            : 'Failed to fetch profile';
-
-        logger.error('Profile fetch failed', {
-          url: validatedUrl,
-          error: errorMessage,
-          platform: isLaylo ? 'laylo' : 'linktree',
-        });
-
-        await markReingestFailure(existingCheck, errorMessage);
-
-        return NextResponse.json(
-          { error: 'Failed to fetch profile', details: errorMessage },
-          { status: 502, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      const displayName = extraction.displayName?.trim() || handle;
-
-      const hostedAvatarUrl = await resolveHostedAvatarUrl(handle, extraction);
-
-      const extractionWithHostedAvatar = {
-        ...extraction,
-        avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
-      };
-
-      if (existingCheck.isReingest && existingCheck.existing) {
-        return handleReingestProfile({
-          existing: existingCheck.existing,
-          extraction: extractionWithHostedAvatar,
-          displayName,
-        });
-      }
-
-      return handleNewProfileIngest({
-        finalHandle: existingCheck.finalHandle,
-        displayName,
-        hostedAvatarUrl,
-        extraction: extractionWithHostedAvatar,
-      });
+      return handleFullExtractionIngest(inputUrl, isLaylo, linktreeValidatedUrl);
     }
 
-    // For other social platforms, create a minimal profile with the URL as a link
-    const handleResult = validateSocialHandle(inputUrl, detected.platform.name);
-    if (!handleResult.ok) {
-      return handleResult.response;
-    }
-
-    const { handle, normalizedHandle } = handleResult;
-    const spotifyArtistName = await fetchSpotifyArtistName(handle, platformId);
-
-    // Build context for social platform flow
-    const socialContext: SocialPlatformContext = {
-      handle,
-      normalizedHandle,
-      platformId,
-      platformName: detected.platform.name,
-      normalizedUrl,
-      spotifyArtistName,
-    };
-
-    return await withSystemIngestionSession(async tx => {
-      // Check for existing profile
-      const [existing] = await tx
-        .select({
-          id: creatorProfiles.id,
-          isClaimed: creatorProfiles.isClaimed,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-        })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.usernameNormalized, normalizedHandle))
-        .limit(1);
-
-      // If profile exists and is claimed, allocate alternative handle
-      let finalHandle = normalizedHandle;
-      if (existing?.isClaimed) {
-        const altHandle = await findAvailableHandle(tx, normalizedHandle);
-        if (!altHandle) {
-          return NextResponse.json(
-            {
-              error: 'Unable to allocate unique username',
-              details: 'All fallback username attempts exhausted.',
-            },
-            { status: 409, headers: NO_STORE_HEADERS }
-          );
-        }
-        finalHandle = altHandle;
-      } else if (existing && !existing.isClaimed) {
-        // Profile exists but unclaimed - add the link to existing profile
-        return handleExistingUnclaimedProfile(tx, existing, socialContext);
-      }
-
-      // Create new profile with the social link
-      return createNewSocialProfile(tx, finalHandle, socialContext);
-    });
+    return handleSocialPlatformIngest(inputUrl, detected);
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-
-    logger.error('Admin ingestion failed', {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-      raw: error,
-      route: 'creator-ingest',
-    });
-
-    // Check for unique constraint violation (race condition fallback)
-    if (
-      errorMessage.includes('unique constraint') ||
-      errorMessage.includes('duplicate key')
-    ) {
-      return NextResponse.json(
-        { error: 'A creator profile with that handle already exists' },
-        { status: 409, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to ingest profile', details: errorMessage },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+    return handleIngestionError(error);
   }
 }

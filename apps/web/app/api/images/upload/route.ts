@@ -244,8 +244,126 @@ async function withTimeout<T>(
   }
 }
 
+async function checkRateLimit(
+  userIdFromSession: string
+): Promise<NextResponse | null> {
+  if (!avatarUploadRateLimit) {
+    if (process.env.NODE_ENV === 'production') {
+      logger.warn(
+        '[upload] Rate limiting disabled - Redis not configured. User:',
+        userIdFromSession.slice(0, 10) + '...'
+      );
+    }
+    return null;
+  }
+
+  const rateLimitResult = await avatarUploadRateLimit.limit(userIdFromSession);
+  if (rateLimitResult.success) return null;
+
+  const retryAfter = Math.round((rateLimitResult.reset - Date.now()) / 1000);
+  return errorResponse(
+    'Too many upload attempts. Please wait before trying again.',
+    UPLOAD_ERROR_CODES.RATE_LIMITED,
+    429,
+    {
+      retryable: true,
+      retryAfter,
+      headers: {
+        'Retry-After': retryAfter.toString(),
+        'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+        'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+        'X-RateLimit-Reset': new Date(rateLimitResult.reset).toISOString(),
+      },
+    }
+  );
+}
+
+async function validateFileUpload(
+  request: NextRequest
+): Promise<
+  | { ok: true; file: File; normalizedType: SupportedImageMimeType }
+  | { ok: false; response: NextResponse }
+> {
+  const contentType = request.headers.get('content-type');
+  if (!contentType?.startsWith('multipart/form-data')) {
+    return {
+      ok: false,
+      response: errorResponse(
+        'Invalid content type. Expected multipart/form-data.',
+        UPLOAD_ERROR_CODES.INVALID_CONTENT_TYPE,
+        400
+      ),
+    };
+  }
+
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+
+  if (!file) {
+    return {
+      ok: false,
+      response: errorResponse(
+        'No file provided. Please select an image to upload.',
+        UPLOAD_ERROR_CODES.NO_FILE,
+        400
+      ),
+    };
+  }
+
+  const normalizedType = (file.type.toLowerCase?.() ?? '') as
+    | SupportedImageMimeType
+    | '';
+
+  const validation = imageUploadSchema.safeParse({
+    filename: file.name,
+    contentType: normalizedType,
+  });
+
+  if (!validation.success) {
+    const supportedTypes = SUPPORTED_IMAGE_MIME_TYPES.map(t =>
+      t.replace('image/', '').toUpperCase()
+    ).join(', ');
+    return {
+      ok: false,
+      response: errorResponse(
+        `Invalid file type. Supported formats: ${supportedTypes}`,
+        UPLOAD_ERROR_CODES.INVALID_FILE,
+        400
+      ),
+    };
+  }
+
+  const fileBuffer = await fileToBuffer(file);
+  if (!validateMagicBytes(fileBuffer, normalizedType as SupportedImageMimeType)) {
+    logger.warn(
+      `[upload] Magic bytes mismatch for claimed type ${normalizedType}`
+    );
+    return {
+      ok: false,
+      response: errorResponse(
+        'File content does not match declared type. Please upload a valid image.',
+        UPLOAD_ERROR_CODES.INVALID_FILE,
+        400
+      ),
+    };
+  }
+
+  if (file.size > AVATAR_MAX_FILE_SIZE_BYTES) {
+    const maxMB = Math.round(AVATAR_MAX_FILE_SIZE_BYTES / (1024 * 1024));
+    return {
+      ok: false,
+      response: errorResponse(
+        `File too large. Maximum ${maxMB}MB allowed.`,
+        UPLOAD_ERROR_CODES.FILE_TOO_LARGE,
+        400
+      ),
+    };
+  }
+
+  return { ok: true, file, normalizedType: normalizedType as SupportedImageMimeType };
+}
+
 export async function POST(request: NextRequest) {
-  // Auth check first to avoid wrapping in transaction when unauthorized
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
     return errorResponse(
@@ -255,7 +373,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Early check for blob token in production
   if (
     process.env.NODE_ENV === 'production' &&
     !process.env.BLOB_READ_WRITE_TOKEN
@@ -270,7 +387,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Some test environments may mock withDbSessionTx away; provide fallback
     const runWithSession =
       typeof withDbSessionTx === 'function'
         ? withDbSessionTx
@@ -287,107 +403,15 @@ export async function POST(request: NextRequest) {
           };
 
     return await runWithSession(async (tx, userIdFromSession) => {
-      // Rate limiting - 3 uploads per minute per user
-      if (avatarUploadRateLimit) {
-        const rateLimitResult =
-          await avatarUploadRateLimit.limit(userIdFromSession);
-        if (!rateLimitResult.success) {
-          const retryAfter = Math.round(
-            (rateLimitResult.reset - Date.now()) / 1000
-          );
-          return errorResponse(
-            'Too many upload attempts. Please wait before trying again.',
-            UPLOAD_ERROR_CODES.RATE_LIMITED,
-            429,
-            {
-              retryable: true,
-              retryAfter,
-              headers: {
-                'Retry-After': retryAfter.toString(),
-                'X-RateLimit-Limit': rateLimitResult.limit.toString(),
-                'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-                'X-RateLimit-Reset': new Date(
-                  rateLimitResult.reset
-                ).toISOString(),
-              },
-            }
-          );
-        }
-      } else if (process.env.NODE_ENV === 'production') {
-        // Log warning in production when rate limiting is disabled
-        logger.warn(
-          '[upload] Rate limiting disabled - Redis not configured. User:',
-          userIdFromSession.slice(0, 10) + '...'
-        );
-      }
+      const rateLimitResponse = await checkRateLimit(userIdFromSession);
+      if (rateLimitResponse) return rateLimitResponse;
 
-      // Validate content type and size
-      const contentType = request.headers.get('content-type');
-      if (!contentType?.startsWith('multipart/form-data')) {
-        return errorResponse(
-          'Invalid content type. Expected multipart/form-data.',
-          UPLOAD_ERROR_CODES.INVALID_CONTENT_TYPE,
-          400
-        );
-      }
+      const fileValidation = await validateFileUpload(request);
+      if (!fileValidation.ok) return fileValidation.response;
 
-      const formData = await request.formData();
-      const file = formData.get('file') as File | null;
-      const normalizedType = (file?.type.toLowerCase?.() ?? '') as
-        | SupportedImageMimeType
-        | '';
+      const { file, normalizedType } = fileValidation;
 
-      if (!file) {
-        return errorResponse(
-          'No file provided. Please select an image to upload.',
-          UPLOAD_ERROR_CODES.NO_FILE,
-          400
-        );
-      }
-
-      // Validate file
-      const validation = imageUploadSchema.safeParse({
-        filename: file.name,
-        contentType: normalizedType,
-      });
-
-      if (!validation.success) {
-        const supportedTypes = SUPPORTED_IMAGE_MIME_TYPES.map(t =>
-          t.replace('image/', '').toUpperCase()
-        ).join(', ');
-        return errorResponse(
-          `Invalid file type. Supported formats: ${supportedTypes}`,
-          UPLOAD_ERROR_CODES.INVALID_FILE,
-          400
-        );
-      }
-
-      // Validate magic bytes to prevent MIME type spoofing
-      const fileBuffer = await fileToBuffer(file);
-      if (!validateMagicBytes(fileBuffer, normalizedType)) {
-        logger.warn(
-          `[upload] Magic bytes mismatch for claimed type ${normalizedType}`
-        );
-        return errorResponse(
-          'File content does not match declared type. Please upload a valid image.',
-          UPLOAD_ERROR_CODES.INVALID_FILE,
-          400
-        );
-      }
-
-      // Check file size (4MB limit)
-      if (file.size > AVATAR_MAX_FILE_SIZE_BYTES) {
-        const maxMB = Math.round(AVATAR_MAX_FILE_SIZE_BYTES / (1024 * 1024));
-        return errorResponse(
-          `File too large. Maximum ${maxMB}MB allowed.`,
-          UPLOAD_ERROR_CODES.FILE_TOO_LARGE,
-          400
-        );
-      }
-
-      // Look up the internal user ID (UUID) for the authenticated Clerk user
       const dbUser = await getUserByClerkId(tx, userIdFromSession);
-
       if (!dbUser) {
         return errorResponse(
           'User account not found. Please sign in again.',
@@ -396,7 +420,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Create database record first
       const [photoRecord] = await tx
         .insert(profilePhotos)
         .values({
@@ -411,13 +434,9 @@ export async function POST(request: NextRequest) {
       try {
         await tx
           .update(profilePhotos)
-          .set({
-            status: 'processing',
-            updatedAt: new Date(),
-          })
+          .set({ status: 'processing', updatedAt: new Date() })
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        // Process image with timeout protection (single canonical AVIF)
         const optimized = await withTimeout(
           optimizeImageToAvif(file),
           PROCESSING_TIMEOUT_MS,
@@ -432,22 +451,15 @@ export async function POST(request: NextRequest) {
         const put = await getVercelBlobUploader();
 
         const avatarUrl = await withTimeout(
-          uploadBufferToBlob(
-            put,
-            blobPath,
-            optimized.avatar.data,
-            AVIF_MIME_TYPE
-          ),
+          uploadBufferToBlob(put, blobPath, optimized.avatar.data, AVIF_MIME_TYPE),
           PROCESSING_TIMEOUT_MS,
           'Blob upload'
         );
 
-        // Validate that we got real URLs back
         if (!avatarUrl?.startsWith('https://')) {
           throw new Error('Invalid blob URL returned from storage');
         }
 
-        // Update record with optimized URLs
         await tx
           .update(profilePhotos)
           .set({
@@ -455,11 +467,9 @@ export async function POST(request: NextRequest) {
             smallUrl: avatarUrl,
             mediumUrl: avatarUrl,
             largeUrl: avatarUrl,
-            // Use legacy-friendly status that exists in both old/new enums
             status: 'ready',
             mimeType: AVIF_MIME_TYPE,
-            fileSize:
-              optimized.avatar.info.size ?? optimized.avatar.data.length,
+            fileSize: optimized.avatar.info.size ?? optimized.avatar.data.length,
             width: optimized.width ?? null,
             height: optimized.height ?? null,
             processedAt: new Date(),
@@ -467,18 +477,13 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        // Get the user's profile username for cache invalidation
         const [profile] = await tx
           .select({ usernameNormalized: creatorProfiles.usernameNormalized })
           .from(creatorProfiles)
           .where(eq(creatorProfiles.userId, dbUser.id))
           .limit(1);
 
-        // Invalidate avatar caches so profile shows updated image
-        await invalidateAvatarCache(
-          dbUser.id,
-          profile?.usernameNormalized ?? null
-        );
+        await invalidateAvatarCache(dbUser.id, profile?.usernameNormalized ?? null);
 
         return NextResponse.json(
           {
@@ -494,18 +499,13 @@ export async function POST(request: NextRequest) {
           { status: 202, headers: NO_STORE_HEADERS }
         );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Upload failed';
-        const pgError = extractPgError(error);
-
+        const message = error instanceof Error ? error.message : 'Upload failed';
         logger.error('[upload] Finalize failed', {
           photoId: photoRecord.id,
           message,
           stack: error instanceof Error ? error.stack : undefined,
-          pgError,
+          pgError: extractPgError(error),
         });
-
-        // Propagate so outer catch handles generic error response
         throw error;
       }
     });

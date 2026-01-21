@@ -262,13 +262,111 @@ export default function DashboardLayoutClient({
   );
 }
 
+function getMobileTabsPadding(showMobileTabs: boolean): string | undefined {
+  return showMobileTabs
+    ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+    : undefined;
+}
+
+function getContainerClass(useFullWidth: boolean): string {
+  return cn(
+    'p-1',
+    useFullWidth ? 'w-full h-full min-h-0' : 'container mx-auto max-w-7xl h-full'
+  );
+}
+
+function ContactTableLayout({
+  crumbs,
+  useFullWidth,
+  showMobileTabs,
+  mobileMenuButton,
+  sidebarExpandButton,
+  contactToggleButton,
+  children,
+}: {
+  crumbs: DashboardBreadcrumbItem[];
+  useFullWidth: boolean;
+  showMobileTabs: boolean;
+  mobileMenuButton: React.ReactNode;
+  sidebarExpandButton: React.ReactNode;
+  contactToggleButton: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={getContainerClass(useFullWidth)}>
+      <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
+        <DashboardHeader
+          breadcrumbs={crumbs}
+          leading={mobileMenuButton}
+          sidebarTrigger={sidebarExpandButton}
+          showDivider={true}
+          action={contactToggleButton}
+        />
+        <div className='flex-1 min-h-0 overflow-hidden flex'>
+          <div
+            className={cn(
+              'flex-1 min-h-0 overflow-hidden',
+              getMobileTabsPadding(showMobileTabs)
+            )}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StandardLayout({
+  crumbs,
+  useFullWidth,
+  showMobileTabs,
+  previewEnabled,
+  showPreview,
+  mobileMenuButton,
+  sidebarExpandButton,
+  children,
+}: {
+  crumbs: DashboardBreadcrumbItem[];
+  useFullWidth: boolean;
+  showMobileTabs: boolean;
+  previewEnabled: boolean;
+  showPreview: boolean;
+  mobileMenuButton: React.ReactNode;
+  sidebarExpandButton: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={getContainerClass(useFullWidth)}>
+      <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
+        <DashboardHeader
+          breadcrumbs={crumbs}
+          leading={mobileMenuButton}
+          sidebarTrigger={sidebarExpandButton}
+          action={previewEnabled ? <PreviewToggleButton /> : null}
+        />
+        <div className='flex-1 min-h-0 overflow-hidden flex relative'>
+          <div
+            className={cn(
+              'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6',
+              getMobileTabsPadding(showMobileTabs)
+            )}
+          >
+            {children}
+          </div>
+          {showPreview && <PreviewPanel />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Inner component that can access preview panel context */
 function DashboardLayoutInner({
   crumbs,
   useFullWidth,
   isContactTableRoute,
   isProfileRoute,
-  isAudienceRoute,
   previewEnabled,
   showMobileTabs,
   children,
@@ -286,22 +384,18 @@ function DashboardLayoutInner({
   const previewOpen = previewContext?.isOpen ?? false;
   const closePreview = previewContext?.close;
   const { tableMeta } = useTableMeta();
-  const { toggleSidebar, openMobile, isMobile } = useSidebar();
+  const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
 
   const showPreview =
-    previewEnabled &&
-    !!previewContext &&
-    isProfileRoute &&
-    !isContactTableRoute;
+    previewEnabled && !!previewContext && isProfileRoute && !isContactTableRoute;
 
-  // Ensure preview is closed/hidden on contact-table routes
   useEffect(() => {
     if (isContactTableRoute && previewOpen) {
       closePreview?.();
     }
   }, [isContactTableRoute, previewOpen, closePreview]);
 
-  const ContactToggleButton = isContactTableRoute ? (
+  const contactToggleButton = isContactTableRoute ? (
     <Button
       variant='ghost'
       size='icon'
@@ -314,7 +408,7 @@ function DashboardLayoutInner({
     </Button>
   ) : null;
 
-  const MobileMenuButton = isMobile ? (
+  const mobileMenuButton = isMobile ? (
     <Button
       variant='ghost'
       size='icon'
@@ -327,82 +421,37 @@ function DashboardLayoutInner({
     </Button>
   ) : null;
 
-  const { state } = useSidebar();
-
-  const SidebarExpandButton =
-    !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+  const sidebarExpandButton = !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <SkipToContent />
       <DashboardSidebar />
       <SidebarInset className='flex flex-1 flex-col overflow-hidden bg-base'>
-        <main
-          id='main-content'
-          className='flex-1 min-h-0 overflow-hidden bg-base'
-        >
+        <main id='main-content' className='flex-1 min-h-0 overflow-hidden bg-base'>
           {isContactTableRoute ? (
-            <div
-              className={cn(
-                'p-1',
-                useFullWidth
-                  ? 'w-full h-full min-h-0'
-                  : 'container mx-auto max-w-7xl h-full'
-              )}
+            <ContactTableLayout
+              crumbs={crumbs}
+              useFullWidth={useFullWidth}
+              showMobileTabs={showMobileTabs}
+              mobileMenuButton={mobileMenuButton}
+              sidebarExpandButton={sidebarExpandButton}
+              contactToggleButton={contactToggleButton}
             >
-              <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
-                <DashboardHeader
-                  breadcrumbs={crumbs}
-                  leading={MobileMenuButton}
-                  sidebarTrigger={SidebarExpandButton}
-                  showDivider={true}
-                  action={ContactToggleButton}
-                />
-                <div className='flex-1 min-h-0 overflow-hidden flex'>
-                  <div
-                    className={cn(
-                      'flex-1 min-h-0 overflow-hidden',
-                      showMobileTabs
-                        ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                        : undefined
-                    )}
-                  >
-                    {children}
-                  </div>
-                </div>
-              </div>
-            </div>
+              {children}
+            </ContactTableLayout>
           ) : (
-            <div
-              className={cn(
-                'p-1',
-                useFullWidth
-                  ? 'w-full h-full min-h-0'
-                  : 'container mx-auto max-w-7xl h-full'
-              )}
+            <StandardLayout
+              crumbs={crumbs}
+              useFullWidth={useFullWidth}
+              showMobileTabs={showMobileTabs}
+              previewEnabled={previewEnabled}
+              showPreview={showPreview}
+              mobileMenuButton={mobileMenuButton}
+              sidebarExpandButton={sidebarExpandButton}
             >
-              <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
-                <DashboardHeader
-                  breadcrumbs={crumbs}
-                  leading={MobileMenuButton}
-                  sidebarTrigger={SidebarExpandButton}
-                  action={previewEnabled ? <PreviewToggleButton /> : null}
-                />
-                <div className='flex-1 min-h-0 overflow-hidden flex relative'>
-                  <div
-                    className={cn(
-                      'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6',
-                      showMobileTabs
-                        ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                        : undefined
-                    )}
-                  >
-                    {children}
-                  </div>
-                  {showPreview && <PreviewPanel />}
-                </div>
-              </div>
-            </div>
+              {children}
+            </StandardLayout>
           )}
         </main>
         {showMobileTabs ? <DashboardMobileTabs /> : null}
