@@ -2,7 +2,7 @@ export interface AuthSpotifyIconProps {
   className?: string;
 }
 
-export function AuthSpotifyIcon({ className }: AuthSpotifyIconProps) {
+export function AuthSpotifyIcon({ className }: Readonly<AuthSpotifyIconProps>) {
   return (
     <svg
       viewBox='0 0 24 24'

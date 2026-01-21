@@ -15,7 +15,7 @@ export function AuthLinkPreviewCard({
   hrefText,
   trailing,
   className,
-}: AuthLinkPreviewCardProps) {
+}: Readonly<AuthLinkPreviewCardProps>) {
   return (
     <div
       className={cn(

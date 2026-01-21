@@ -11,7 +11,7 @@ export function AuthFooterLink({
   prompt,
   href,
   linkText,
-}: AuthFooterLinkProps) {
+}: Readonly<AuthFooterLinkProps>) {
   return (
     <div className='text-center text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799]'>
       {prompt} <AuthLink href={href}>{linkText}</AuthLink>
