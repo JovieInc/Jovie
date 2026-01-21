@@ -40,7 +40,7 @@
  */
 
 // Cache strategy presets
-export {
+import {
   FREQUENT_CACHE,
   PAGINATED_CACHE,
   REALTIME_CACHE,
@@ -48,6 +48,15 @@ export {
   STANDARD_CACHE,
   STATIC_CACHE,
 } from './cache-strategies';
+
+export {
+  FREQUENT_CACHE,
+  PAGINATED_CACHE,
+  REALTIME_CACHE,
+  STABLE_CACHE,
+  STANDARD_CACHE,
+  STATIC_CACHE,
+};
 // Fetch utilities (Edge-compatible)
 export {
   createMutationFn,
