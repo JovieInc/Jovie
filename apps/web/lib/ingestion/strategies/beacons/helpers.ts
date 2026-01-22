@@ -234,8 +234,8 @@ function buildCandidateCollections(
  * Add a link to the collector if not already seen.
  */
 function addToCollector(state: LinkCollectorState, link: StructuredLink): void {
-  if (!link.url) return;
-  const key = link.url.trim();
+  const key = link.url?.trim();
+  if (!key) return;
   if (state.seen.has(key)) return;
   state.seen.add(key);
   state.structured.push(link);
