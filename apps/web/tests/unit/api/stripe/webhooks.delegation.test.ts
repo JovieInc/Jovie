@@ -3,8 +3,8 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
+  getPost,
   mockConstructEvent,
   mockGetHandler,
   mockGetPlanFromPriceId,
@@ -54,7 +54,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.received).toBe(true);
@@ -91,7 +91,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.received).toBe(true);
@@ -137,7 +137,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(200);
 
     expect(mockGetHandler).toHaveBeenCalledWith(
@@ -179,7 +179,7 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(200);
 
     expect(mockGetHandler).toHaveBeenCalledWith('invoice.payment_failed');

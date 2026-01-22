@@ -9,37 +9,32 @@ config({ path: '.env.development.local' });
 const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 
+const SENSITIVE_PATTERNS = [
+  'dummy',
+  'mock',
+  '1234567890',
+  'test-key',
+  'placeholder',
+];
+
+function isRealKey(key: string | undefined): key is string {
+  if (!key) return false;
+  const lowerKey = key.toLowerCase();
+  return !SENSITIVE_PATTERNS.some(pattern => lowerKey.includes(pattern));
+}
+
 async function globalSetup() {
   const startTime = Date.now();
   console.log('🚀 Starting E2E global setup...');
 
-  // When running against an external BASE_URL in CI (e.g., Preview), skip local env overrides and warmup.
-  if (isCI && process.env.BASE_URL) {
-    console.log(`ℹ CI mode with external BASE_URL: ${process.env.BASE_URL}`);
-    console.log('  Skipping local env overrides and warmup');
-    return;
-  }
-
-  // Set up Clerk testing token if we have real Clerk keys
-  const SENSITIVE_PATTERNS = [
-    'dummy',
-    'mock',
-    '1234567890',
-    'test-key',
-    'placeholder',
-  ];
+  // ALWAYS set up Clerk testing token if we have real Clerk keys
+  // This must happen before any early returns, as setupClerkTestingToken()
+  // in individual tests requires clerkSetup() to have been called
   const secretKey = process.env.CLERK_SECRET_KEY;
   const publishableKey =
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
     process.env.CLERK_PUBLISHABLE_KEY;
-  const hasRealClerkKeys =
-    Boolean(secretKey && publishableKey) &&
-    !SENSITIVE_PATTERNS.some(pattern =>
-      secretKey!.toLowerCase().includes(pattern)
-    ) &&
-    !SENSITIVE_PATTERNS.some(pattern =>
-      publishableKey!.toLowerCase().includes(pattern)
-    );
+  const hasRealClerkKeys = isRealKey(secretKey) && isRealKey(publishableKey);
 
   const hasTestUser =
     process.env.E2E_CLERK_USER_USERNAME && process.env.E2E_CLERK_USER_PASSWORD;
@@ -73,6 +68,14 @@ async function globalSetup() {
     console.log(
       '  Set E2E_CLERK_USER_USERNAME and E2E_CLERK_USER_PASSWORD for authenticated tests'
     );
+  }
+
+  // When running against an external BASE_URL in CI (e.g., Preview),
+  // skip local env overrides, seeding, and warmup (clerkSetup already done above)
+  if (isCI && process.env.BASE_URL) {
+    console.log(`ℹ CI mode with external BASE_URL: ${process.env.BASE_URL}`);
+    console.log('  Skipping local env overrides and warmup');
+    return;
   }
 
   // Set up environment variables for local testing defaults (do not override if already set)

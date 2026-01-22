@@ -22,6 +22,7 @@ import {
 } from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { useUpdateWaitlistStatusMutation } from '@/lib/queries/useWaitlistMutations';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
@@ -91,6 +92,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
       // No-op for now since we're using server-side refresh
     },
   });
+
+  // TanStack Query mutation for updating waitlist status
+  const updateStatusMutation = useUpdateWaitlistStatusMutation();
 
   // Row selection
   const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
@@ -172,44 +176,24 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   );
 
   const handleItemMove = useCallback(
-    async (itemId: string, fromColumnId: string, toColumnId: string) => {
+    async (itemId: string, _fromColumnId: string, toColumnId: string) => {
       try {
-        const response = await fetch('/app/admin/waitlist/update-status', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            entryId: itemId,
-            status: toColumnId,
-          }),
+        await updateStatusMutation.mutateAsync({
+          entryId: itemId,
+          status: toColumnId as 'new' | 'invited' | 'claimed',
         });
 
-        const payload = (await response.json().catch(() => null)) as {
-          success?: boolean;
-          status?: string;
-          error?: string;
-        } | null;
-
-        if (!response.ok || !payload?.success) {
-          console.error('Failed to update waitlist status:', payload?.error);
-          toast.error('Failed to update status', {
-            description: payload?.error ?? 'Please try again',
-          });
-          return;
-        }
-
         // The UI will update optimistically via the KanbanBoard component
-        // No need to manually update state here
+        // Cache invalidation is handled by the mutation
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
         toast.error('Failed to update status', {
-          description: 'A network error occurred. Please try again.',
+          description:
+            error instanceof Error ? error.message : 'Please try again',
         });
       }
     },
-    []
+    [updateStatusMutation]
   );
 
   return (

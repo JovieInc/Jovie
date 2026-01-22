@@ -7,7 +7,6 @@ import {
   StatsigProvider,
   useClientAsyncInit,
 } from '@statsig/react-bindings';
-import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import React from 'react';
 import { publicEnv } from '@/lib/env-public';
@@ -33,6 +32,12 @@ function MyStatsigEnabledInner({
   user,
   plugins,
 }: MyStatsigEnabledProps) {
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const { client } = useClientAsyncInit(sdkKey, user, {
     logLevel: LogLevel.Debug,
     plugins,
@@ -73,17 +78,17 @@ function MyStatsigEnabledInner({
       : null),
   });
 
+  // Don't render provider until mounted (avoids SSR hydration issues)
+  if (!isMounted) {
+    return <>{children}</>;
+  }
+
   return (
     <StatsigProvider client={client} loadingComponent={<div />}>
       {children}
     </StatsigProvider>
   );
 }
-
-// Dynamically import with SSR disabled to avoid hydration mismatches
-const MyStatsigEnabled = dynamic(() => Promise.resolve(MyStatsigEnabledInner), {
-  ssr: false,
-});
 
 export function MyStatsig({ children, userId }: MyStatsigProps) {
   const sdkKey = publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY;
@@ -136,8 +141,8 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   }
 
   return (
-    <MyStatsigEnabled sdkKey={sdkKey} user={user} plugins={plugins}>
+    <MyStatsigEnabledInner sdkKey={sdkKey} user={user} plugins={plugins}>
       {children}
-    </MyStatsigEnabled>
+    </MyStatsigEnabledInner>
   );
 }

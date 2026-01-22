@@ -41,6 +41,12 @@ export const TOAST_MESSAGES = {
   UNSAVED_CHANGES: 'You have unsaved changes',
   RATE_LIMIT: 'Too many requests. Please wait.',
   OFFLINE: 'You appear to be offline',
+
+  // Version update messages
+  VERSION_UPDATE: 'A new version is available',
+  VERSION_UPDATE_DESCRIPTION: 'Refresh to get the latest features and fixes.',
+  CHUNK_ERROR: 'The app has been updated',
+  CHUNK_ERROR_DESCRIPTION: 'Please refresh to continue.',
 } as const;
 
 /**

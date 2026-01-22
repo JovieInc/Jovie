@@ -346,7 +346,6 @@ describe('/api/clerk/webhook', () => {
       const eventData = {
         data: {
           id: 'user_123',
-          username: 'new-handle',
           email_addresses: [],
           primary_email_address_id: null,
           first_name: null,
@@ -377,15 +376,14 @@ describe('/api/clerk/webhook', () => {
       expect(clerkSyncMocks.syncEmailFromClerkByClerkId).not.toHaveBeenCalled();
     });
 
-    it('should sync verified primary email when present', async () => {
+    it('should sync verified primary email and return success', async () => {
       const eventData = {
         data: {
           id: 'user_123',
-          username: 'new-handle',
-          primary_email_address_id: 'email_123',
+          primary_email_address_id: 'email_1',
           email_addresses: [
             {
-              id: 'email_123',
+              id: 'email_1',
               email_address: 'new@example.com',
               verification: { status: 'verified' },
             },
@@ -417,6 +415,7 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
+      expect(result.type).toBe('user.updated');
       expect(clerkSyncMocks.syncEmailFromClerkByClerkId).toHaveBeenCalledWith(
         'user_123',
         'new@example.com'
@@ -427,11 +426,10 @@ describe('/api/clerk/webhook', () => {
       const eventData = {
         data: {
           id: 'user_123',
-          username: 'new-handle',
-          primary_email_address_id: 'email_123',
+          primary_email_address_id: 'email_1',
           email_addresses: [
             {
-              id: 'email_123',
+              id: 'email_1',
               email_address: 'new@example.com',
               verification: { status: 'verified' },
             },

@@ -31,6 +31,17 @@ import {
 } from './deduped-fetch';
 
 /**
+ * Check if an error is an abort error that should be ignored.
+ */
+function isAbortError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === 'AbortError' ||
+    (error as DOMException).code === DOMException.ABORT_ERR
+  );
+}
+
+/**
  * State returned by useDedupedFetch
  */
 export interface UseDedupedFetchState<T> {
@@ -183,31 +194,25 @@ export function useDedupedFetch<T = unknown>(
         }
       } catch (error) {
         // Ignore abort errors
-        if (
-          error instanceof Error &&
-          (error.name === 'AbortError' ||
-            (error as DOMException).code === DOMException.ABORT_ERR)
-        ) {
-          return;
-        }
+        if (isAbortError(error)) return;
 
-        if (mountedRef.current && !controller.signal.aborted) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'An error occurred';
-          const errorStatus = error instanceof FetchError ? error.status : null;
+        if (!mountedRef.current || controller.signal.aborted) return;
 
-          setState(prev => ({
-            ...prev,
-            loading: false,
-            refreshing: false,
-            error: errorMessage,
-            errorStatus,
-          }));
+        const errorMessage =
+          error instanceof Error ? error.message : 'An error occurred';
+        const errorStatus = error instanceof FetchError ? error.status : null;
 
-          onErrorRef.current?.(
-            error instanceof Error ? error : new Error(errorMessage)
-          );
-        }
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          refreshing: false,
+          error: errorMessage,
+          errorStatus,
+        }));
+
+        onErrorRef.current?.(
+          error instanceof Error ? error : new Error(errorMessage)
+        );
       }
     },
     [url, skip]

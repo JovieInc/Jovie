@@ -1,10 +1,9 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useFeatureFlag } from '@/lib/analytics';
+import { renderWithQueryClient } from '../utils/test-utils';
 
 // Mock the analytics
 vi.mock('@/lib/analytics', () => ({
@@ -36,18 +35,6 @@ Object.defineProperty(window, 'location', {
   writable: true,
 });
 
-function renderWithQueryClient(ui: ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
-}
-
 describe('Billing Components', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,12 +59,12 @@ describe('Billing Components', () => {
 
     it('handles successful portal creation', async () => {
       const mockUrl = 'https://billing.stripe.com/session/test';
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({ url: mockUrl }),
-      });
+      (global.fetch as any).mockResolvedValueOnce(
+        new Response(JSON.stringify({ url: mockUrl }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
 
       renderWithQueryClient(<BillingPortalLink />);
       const button = screen.getByRole('button');
@@ -92,6 +79,7 @@ describe('Billing Components', () => {
             headers: {
               'Content-Type': 'application/json',
             },
+            signal: expect.anything(),
           })
         );
         expect(window.location.href).toBe(mockUrl);
@@ -99,12 +87,12 @@ describe('Billing Components', () => {
     });
 
     it('handles portal creation error', async () => {
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        json: async () => ({ error: 'Portal creation failed' }),
-      });
+      (global.fetch as any).mockResolvedValueOnce(
+        new Response('Bad Request', {
+          status: 400,
+          statusText: 'Bad Request',
+        })
+      );
 
       renderWithQueryClient(<BillingPortalLink />);
       const button = screen.getByRole('button');
@@ -179,12 +167,12 @@ describe('Billing Components', () => {
       const mockUrl = 'https://checkout.stripe.com/session/test';
       const priceId = 'price_test123';
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({ url: mockUrl }),
-      });
+      (global.fetch as any).mockResolvedValueOnce(
+        new Response(JSON.stringify({ url: mockUrl }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
 
       renderWithQueryClient(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
@@ -200,6 +188,7 @@ describe('Billing Components', () => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ priceId }),
+            signal: expect.anything(),
           })
         );
         expect(window.location.href).toBe(mockUrl);
@@ -210,12 +199,12 @@ describe('Billing Components', () => {
       mockUseFeatureFlag.mockReturnValue(true);
       const priceId = 'price_test123';
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        json: async () => ({ error: 'Checkout creation failed' }),
-      });
+      (global.fetch as any).mockResolvedValueOnce(
+        new Response('Bad Request', {
+          status: 400,
+          statusText: 'Bad Request',
+        })
+      );
 
       renderWithQueryClient(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');

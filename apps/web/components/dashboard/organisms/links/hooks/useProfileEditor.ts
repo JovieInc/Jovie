@@ -2,18 +2,21 @@
  * useProfileEditor Hook
  *
  * Custom hook for managing profile editing state including display name,
- * username, and avatar. Handles debounced saving and inline editing mode.
+ * username, and avatar. Uses TanStack Query for mutations and Pacer for
+ * debounced auto-save.
  */
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
-import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
-import { debounce } from '@/lib/utils';
+import { PACER_TIMING, useAutoSave } from '@/lib/pacer';
+import {
+  useAvatarMutation,
+  useProfileSaveMutation,
+} from '@/lib/queries/useProfileMutation';
 import type { SaveStatus } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import type { ProfileUpdatePayload, ProfileUpdateResponse } from '../types';
 
 /**
  * Field being edited in inline mode
@@ -24,7 +27,7 @@ export type EditingField = 'displayName' | 'username' | null;
  * Options for the useProfileEditor hook
  */
 export interface UseProfileEditorOptions {
-  /** Debounce delay in ms for auto-save (default: 900) */
+  /** Debounce delay in ms for auto-save (default: 500 via PACER_TIMING.SAVE_DEBOUNCE_MS) */
   debounceMs?: number;
 }
 
@@ -57,8 +60,8 @@ export interface UseProfileEditorReturn {
   /** Profile save status */
   profileSaveStatus: SaveStatus;
   /** Debounced profile save function */
-  debouncedProfileSave: ReturnType<typeof debounce> & {
-    flush: () => void;
+  debouncedProfileSave: {
+    flush: () => Promise<void>;
     cancel: () => void;
   };
   /** Handle avatar upload */
@@ -85,7 +88,8 @@ export interface UseProfileEditorReturn {
  * Custom hook for managing profile editing
  *
  * Features:
- * - Display name and username editing with debounced save
+ * - Display name and username editing with Pacer-powered debounced save
+ * - TanStack Query mutations with optimistic updates
  * - Avatar upload handling
  * - Inline editing mode management
  * - Toast notifications for save status
@@ -105,9 +109,13 @@ export interface UseProfileEditorReturn {
 export function useProfileEditor(
   options: UseProfileEditorOptions = {}
 ): UseProfileEditorReturn {
-  const { debounceMs = 900 } = options;
+  const { debounceMs = PACER_TIMING.SAVE_DEBOUNCE_MS } = options;
   const router = useRouter();
   const dashboardData = useDashboardData();
+
+  // Profile mutation hooks
+  const profileMutation = useProfileSaveMutation();
+  const avatarMutation = useAvatarMutation();
 
   const [artist, setArtist] = useState<Artist | null>(
     dashboardData.selectedProfile
@@ -142,122 +150,15 @@ export function useProfileEditor(
     username: string;
   } | null>(null);
 
-  // Clear success status after delay
-  useEffect(() => {
-    if (!profileSaveStatus.success) return;
-    const timeoutId = setTimeout(() => {
-      setProfileSaveStatus(prev => ({ ...prev, success: null }));
-    }, 1500);
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [profileSaveStatus.success]);
+  // Track pending save data for comparison
+  const pendingDataRef = useRef<{
+    displayName: string;
+    username: string;
+  } | null>(null);
 
-  // Show toast notifications for save status
-  useProfileSaveToasts(profileSaveStatus);
-
-  // Sync state when selected profile changes
-  useEffect(() => {
-    if (!dashboardData.selectedProfile) {
-      setArtist(null);
-      setProfileDisplayName('');
-      setProfileUsername('');
-      setEditingField(null);
-      lastProfileSavedRef.current = null;
-      return;
-    }
-
-    setArtist(
-      convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
-    );
-    setProfileDisplayName(dashboardData.selectedProfile.displayName ?? '');
-    setProfileUsername(dashboardData.selectedProfile.username ?? '');
-
-    lastProfileSavedRef.current = {
-      displayName: dashboardData.selectedProfile.displayName ?? '',
-      username: dashboardData.selectedProfile.username ?? '',
-    };
-    setProfileSaveStatus({
-      saving: false,
-      success: null,
-      error: null,
-      lastSaved: null,
-    });
-  }, [dashboardData.selectedProfile]);
-
-  // Focus input when entering edit mode
-  useEffect(() => {
-    if (editingField === 'displayName') {
-      displayNameInputRef.current?.focus();
-      displayNameInputRef.current?.select();
-    }
-    if (editingField === 'username') {
-      usernameInputRef.current?.focus();
-      usernameInputRef.current?.select();
-    }
-  }, [editingField]);
-
-  // API call to update profile
-  const updateProfile = useCallback(
-    async (updates: ProfileUpdatePayload): Promise<ProfileUpdateResponse> => {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates }),
-      });
-
-      const body = (await response.json().catch(() => null)) as
-        | ProfileUpdateResponse
-        | { error?: string }
-        | null;
-
-      if (!response.ok) {
-        const message =
-          body && 'error' in body && typeof body.error === 'string'
-            ? body.error
-            : 'Failed to update profile';
-        throw new Error(message);
-      }
-
-      if (!body || !('profile' in body)) {
-        throw new Error('Failed to update profile');
-      }
-
-      return body;
-    },
-    []
-  );
-
-  // API call to upload avatar
-  const uploadAvatar = useCallback(async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch('/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const body = (await response.json().catch(() => null)) as {
-      blobUrl?: string;
-      error?: string;
-    } | null;
-
-    if (!response.ok) {
-      const message = body?.error ?? 'Upload failed';
-      throw new Error(message);
-    }
-
-    if (!body?.blobUrl) {
-      throw new Error('Upload failed');
-    }
-
-    return body.blobUrl;
-  }, []);
-
-  // Save profile (called by debounced function)
+  // Save profile using TanStack Query mutation
   const saveProfile = useCallback(
-    async (next: { displayName: string; username: string }): Promise<void> => {
+    async (data: { displayName: string; username: string }): Promise<void> => {
       if (!profileId) {
         setProfileSaveStatus({
           saving: false,
@@ -269,8 +170,8 @@ export function useProfileEditor(
         return;
       }
 
-      const username = next.username.trim();
-      const displayName = next.displayName.trim();
+      const username = data.username.trim();
+      const displayName = data.displayName.trim();
 
       if (displayName.length === 0 || username.length === 0) {
         return;
@@ -292,9 +193,8 @@ export function useProfileEditor(
       }));
 
       try {
-        const result = await updateProfile({
-          displayName,
-          username,
+        const result = await profileMutation.mutateAsync({
+          updates: { displayName, username },
         });
 
         const nextHandle = result.profile.username ?? artist?.handle;
@@ -347,54 +247,106 @@ export function useProfileEditor(
       artist?.image_url,
       artist?.name,
       profileId,
+      profileMutation,
       router,
-      updateProfile,
     ]
   );
 
-  // Debounced save function
-  const debouncedProfileSave = useMemo(
-    () =>
-      debounce(async (...args: unknown[]) => {
-        const [next] = args as [{ displayName: string; username: string }];
-        await saveProfile(next);
-      }, debounceMs),
-    [saveProfile, debounceMs]
-  );
+  // Use Pacer's useAutoSave for debounced saving
+  const autoSave = useAutoSave<{ displayName: string; username: string }>({
+    saveFn: saveProfile,
+    wait: debounceMs,
+    onSuccess: () => {
+      // Success handling is done in saveProfile
+    },
+    onError: () => {
+      // Error handling is done in saveProfile
+    },
+  });
 
-  // Cleanup debounced save on unmount
+  // Clear success status after delay
+  useEffect(() => {
+    if (!profileSaveStatus.success) return;
+    const timeoutId = setTimeout(() => {
+      setProfileSaveStatus(prev => ({ ...prev, success: null }));
+    }, 1500);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [profileSaveStatus.success]);
+
+  // Sync state when selected profile changes
+  useEffect(() => {
+    if (!dashboardData.selectedProfile) {
+      setArtist(null);
+      setProfileDisplayName('');
+      setProfileUsername('');
+      setEditingField(null);
+      lastProfileSavedRef.current = null;
+      return;
+    }
+
+    setArtist(
+      convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
+    );
+    setProfileDisplayName(dashboardData.selectedProfile.displayName ?? '');
+    setProfileUsername(dashboardData.selectedProfile.username ?? '');
+
+    lastProfileSavedRef.current = {
+      displayName: dashboardData.selectedProfile.displayName ?? '',
+      username: dashboardData.selectedProfile.username ?? '',
+    };
+    setProfileSaveStatus({
+      saving: false,
+      success: null,
+      error: null,
+      lastSaved: null,
+    });
+  }, [dashboardData.selectedProfile]);
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (editingField === 'displayName') {
+      displayNameInputRef.current?.focus();
+      displayNameInputRef.current?.select();
+    }
+    if (editingField === 'username') {
+      usernameInputRef.current?.focus();
+      usernameInputRef.current?.select();
+    }
+  }, [editingField]);
+
+  // Cleanup on unmount - flush pending saves
   useEffect(() => {
     return () => {
-      debouncedProfileSave.flush();
+      autoSave.flush();
     };
-  }, [debouncedProfileSave]);
+  }, [autoSave]);
 
-  // Handle avatar upload
+  // Handle avatar upload using TanStack Query mutation
   const handleAvatarUpload = useCallback(
     async (file: File): Promise<string> => {
-      try {
-        const blobUrl = await uploadAvatar(file);
-        const result = await updateProfile({ avatarUrl: blobUrl });
-        const nextAvatar = result.profile.avatarUrl ?? blobUrl;
-        setArtist(prev => {
-          if (!prev) return prev;
-          return { ...prev, image_url: nextAvatar };
+      return new Promise((resolve, reject) => {
+        avatarMutation.mutate(file, {
+          onSuccess: avatarUrl => {
+            setArtist(prev => {
+              if (!prev) return prev;
+              return { ...prev, image_url: avatarUrl };
+            });
+            toast.success('Profile photo updated');
+            router.refresh();
+            resolve(avatarUrl);
+          },
+          onError: error => {
+            reject(error);
+          },
         });
-        if (result.warning) {
-          toast.message(result.warning);
-        } else {
-          toast.success('Profile photo updated');
-        }
-        router.refresh();
-        return nextAvatar;
-      } finally {
-        // no-op
-      }
+      });
     },
-    [router, updateProfile, uploadAvatar]
+    [avatarMutation, router]
   );
 
-  // Handle display name change
+  // Handle display name change with auto-save
   const handleDisplayNameChange = useCallback(
     (nextValue: string) => {
       setProfileDisplayName(nextValue);
@@ -403,15 +355,19 @@ export function useProfileEditor(
         success: null,
         error: null,
       }));
-      debouncedProfileSave({
+      pendingDataRef.current = {
+        displayName: nextValue,
+        username: profileUsername,
+      };
+      autoSave.save({
         displayName: nextValue,
         username: profileUsername,
       });
     },
-    [debouncedProfileSave, profileUsername]
+    [autoSave, profileUsername]
   );
 
-  // Handle username change
+  // Handle username change with auto-save
   const handleUsername = useCallback(
     (rawValue: string) => {
       const nextValue = rawValue.startsWith('@') ? rawValue.slice(1) : rawValue;
@@ -421,12 +377,29 @@ export function useProfileEditor(
         success: null,
         error: null,
       }));
-      debouncedProfileSave({
+      pendingDataRef.current = {
+        displayName: profileDisplayName,
+        username: nextValue,
+      };
+      autoSave.save({
         displayName: profileDisplayName,
         username: nextValue,
       });
     },
-    [debouncedProfileSave, profileDisplayName]
+    [autoSave, profileDisplayName]
+  );
+
+  // Debounced save interface compatible with existing code
+  const debouncedProfileSave = useMemo(
+    () => ({
+      flush: async () => {
+        await autoSave.flush();
+      },
+      cancel: () => {
+        autoSave.cancel();
+      },
+    }),
+    [autoSave]
   );
 
   // Handle input key down (Enter to save, Escape to cancel)

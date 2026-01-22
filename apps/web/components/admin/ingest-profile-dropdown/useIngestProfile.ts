@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
 import type { UseIngestProfileReturn } from './types';
@@ -19,8 +20,10 @@ export function useIngestProfile({
 
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // TanStack Query mutation for cache invalidation
+  const ingestProfileMutation = useIngestProfileMutation();
 
   // Detect platform from URL in real-time
   const detectedPlatform: PlatformInfo | null = useMemo(() => {
@@ -55,25 +58,10 @@ export function useIngestProfile({
       return;
     }
 
-    setIsLoading(true);
-
     try {
-      const response = await fetch('/api/admin/creator-ingest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: trimmedUrl }),
+      const result = await ingestProfileMutation.mutateAsync({
+        url: trimmedUrl,
       });
-
-      const result = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        profile?: { id: string; username: string };
-        links?: number;
-      };
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || 'Failed to ingest profile');
-      }
 
       const profileId = result.profile?.id;
       const profileUsername = result.profile?.username;
@@ -108,8 +96,6 @@ export function useIngestProfile({
       notifications.error(
         error instanceof Error ? error.message : 'Failed to ingest profile'
       );
-    } finally {
-      setIsLoading(false);
       setIsSuccess(false);
     }
   };
@@ -119,7 +105,7 @@ export function useIngestProfile({
     setOpen,
     url,
     setUrl,
-    isLoading,
+    isLoading: ingestProfileMutation.isPending,
     isSuccess,
     detectedPlatform,
     handleSubmit,

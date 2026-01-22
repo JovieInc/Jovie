@@ -31,6 +31,8 @@ function getWorkers(): number | undefined {
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Exclude nightly tests - they run via playwright.config.nightly.ts on schedule
+  testIgnore: ['**/nightly/**'],
   fullyParallel: true,
   forbidOnly: isCI,
   // Smoke tests: fewer retries for faster feedback; full suite: more resilience

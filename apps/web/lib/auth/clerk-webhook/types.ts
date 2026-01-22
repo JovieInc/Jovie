@@ -61,8 +61,6 @@ export interface ClerkHandlerResult {
   message?: string;
   /** Full name (user.created only) */
   fullName?: string;
-  /** Suggested username (user.created only) */
-  suggestedUsername?: string;
 }
 
 /**

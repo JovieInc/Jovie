@@ -19,6 +19,10 @@ const ReactQueryDevtools = dynamic(
 );
 
 function DevToolsLoader() {
+  // Only render devtools in development to avoid any production overhead
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
   return (
     <ReactQueryDevtools initialIsOpen={false} buttonPosition='bottom-left' />
   );

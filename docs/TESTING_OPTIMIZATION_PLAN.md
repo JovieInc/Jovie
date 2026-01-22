@@ -174,4 +174,3 @@ Each PR should update the "Progress Tracking" section with:
 - Keep monitoring instrumentation documented and discoverable for observability teams, not as part of the app test matrix.
 - Add guardrails in future test plans to prevent monitoring-focused suites from re-entering the main test pipeline unless they validate user-facing behavior.
 - When introducing new monitoring features, record them alongside their alerting runbooks rather than test suites to avoid confusing operational coverage with product verification.
->>>>>>> bab376c0e (chore(tests): remove database performance monitoring suite)

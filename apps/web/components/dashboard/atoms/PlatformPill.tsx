@@ -148,11 +148,12 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
       className,
     });
 
-    const ariaLabel = isInteractive
-      ? collapsed
-        ? `${platformName}: ${primaryText}`
-        : `Select ${platformName}`
-      : undefined;
+    function getAriaLabel(): string | undefined {
+      if (!isInteractive) return undefined;
+      if (collapsed) return `${platformName}: ${primaryText}`;
+      return `Select ${platformName}`;
+    }
+    const ariaLabel = getAriaLabel();
 
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: Div with conditional role='button', tabIndex, and keyboard support when interactive
