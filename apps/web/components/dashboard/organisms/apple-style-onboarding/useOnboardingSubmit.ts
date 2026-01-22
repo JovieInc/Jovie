@@ -238,7 +238,8 @@ export function useOnboardingSubmit({
       !state.isSubmitting
     ) {
       setIsPendingSubmit(false);
-      void handleSubmit();
+      // Fire-and-forget: errors are handled within handleSubmit
+      handleSubmit().catch(() => {});
     }
   }, [
     isPendingSubmit,

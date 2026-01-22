@@ -109,7 +109,8 @@ function AuthShellWrapperInner({
   const handleSidebarOpenChange = useCallback(
     (open: boolean) => {
       startTransition(() => {
-        void persistSidebarCollapsed?.(!open);
+        // Fire-and-forget: persist sidebar preference in background
+        persistSidebarCollapsed?.(!open)?.catch?.(() => {});
       });
     },
     [persistSidebarCollapsed, startTransition]
