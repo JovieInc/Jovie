@@ -1,42 +1,19 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import {
+  type SendCampaignInvitesResponse,
+  useCampaignPreviewQuery,
+  useSendCampaignInvitesMutation,
+} from '@/lib/queries/useCampaignInvites';
 
 interface ThrottlingConfig {
   minDelayMs: number;
   maxDelayMs: number;
   maxPerHour: number;
-}
-
-interface EligibleProfile {
-  id: string;
-  username: string;
-  displayName: string | null;
-  fitScore: number | null;
-  email: string;
-}
-
-interface PreviewResponse {
-  ok: boolean;
-  threshold: number;
-  totalEligible: number;
-  sample: {
-    withEmails: number;
-    withoutEmails: number;
-    profiles: EligibleProfile[];
-  };
-}
-
-interface SendResponse {
-  ok: boolean;
-  sent?: number;
-  jobsEnqueued?: number;
-  skippedNoEmail?: number;
-  estimatedMinutes?: number;
-  error?: string;
 }
 
 const DEFAULT_THROTTLING: ThrottlingConfig = {
@@ -50,92 +27,45 @@ export function InviteCampaignManager() {
   const [limit, setLimit] = useState(20);
   const [throttling, setThrottling] =
     useState<ThrottlingConfig>(DEFAULT_THROTTLING);
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [sendResult, setSendResult] = useState<SendResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [sendResult, setSendResult] =
+    useState<SendCampaignInvitesResponse | null>(null);
 
-  const fetchPreview = useCallback(
-    async (signal?: AbortSignal) => {
-      setIsLoadingPreview(true);
-      setError(null);
-      try {
-        const response = await fetch(
-          `/api/admin/creator-invite/bulk?threshold=${fitScoreThreshold}&limit=${limit}`,
-          { signal }
-        );
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch preview');
-        }
-        setPreview(data);
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return;
-        setError(
-          err instanceof Error ? err.message : 'Failed to fetch preview'
-        );
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    },
-    [fitScoreThreshold, limit]
-  );
+  // TanStack Query for preview data
+  const {
+    data: preview,
+    isLoading: isLoadingPreview,
+    error: previewError,
+    refetch: refetchPreview,
+  } = useCampaignPreviewQuery({
+    threshold: fitScoreThreshold,
+    limit,
+  });
 
-  const handleRefreshClick = useCallback(() => {
-    fetchPreview();
-  }, [fetchPreview]);
+  // TanStack Query mutation for sending invites
+  const sendInvitesMutation = useSendCampaignInvitesMutation();
 
-  useEffect(() => {
-    const abortController = new AbortController();
-    fetchPreview(abortController.signal);
-
-    // Cleanup: abort fetch and clear timeout on unmount or dependency change
-    return () => {
-      abortController.abort();
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, [fetchPreview]);
+  const handleRefreshClick = () => {
+    refetchPreview();
+  };
 
   const handleSendInvites = async () => {
     if (!preview || preview.sample.withEmails === 0) return;
 
-    setIsSending(true);
-    setError(null);
     setSendResult(null);
 
     try {
-      const response = await fetch('/api/admin/creator-invite/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fitScoreThreshold,
-          limit,
-          minDelayMs: throttling.minDelayMs,
-          maxDelayMs: throttling.maxDelayMs,
-          maxPerHour: throttling.maxPerHour,
-          dryRun: false,
-        }),
+      const result = await sendInvitesMutation.mutateAsync({
+        fitScoreThreshold,
+        limit,
+        minDelayMs: throttling.minDelayMs,
+        maxDelayMs: throttling.maxDelayMs,
+        maxPerHour: throttling.maxPerHour,
+        dryRun: false,
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send invites');
-      }
-
-      setSendResult(data);
-      // Refresh preview after sending
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      refreshTimeoutRef.current = setTimeout(fetchPreview, 1000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send invites');
-    } finally {
-      setIsSending(false);
+      setSendResult(result);
+    } catch {
+      // Error is handled by the mutation
     }
   };
 
@@ -143,6 +73,9 @@ export function InviteCampaignManager() {
     (throttling.minDelayMs + throttling.maxDelayMs) / 2 / 1000
   );
   const effectiveRatePerHour = Math.round(3600 / avgDelaySeconds);
+
+  const error =
+    previewError?.message ?? (sendInvitesMutation.error?.message || null);
 
   return (
     <div className='space-y-8'>
@@ -425,13 +358,13 @@ export function InviteCampaignManager() {
             variant='primary'
             onClick={handleSendInvites}
             disabled={
-              isSending ||
+              sendInvitesMutation.isPending ||
               !preview ||
               preview.sample.withEmails === 0 ||
               isLoadingPreview
             }
           >
-            {isSending ? (
+            {sendInvitesMutation.isPending ? (
               <>
                 <Icon name='Loader2' className='mr-2 h-4 w-4 animate-spin' />
                 Sending...

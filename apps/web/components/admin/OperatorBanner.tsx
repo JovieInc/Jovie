@@ -1,19 +1,8 @@
 'use client';
 
 import { AlertTriangle, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
-interface EnvHealthResponse {
-  ok: boolean;
-  status: 'ok' | 'warning' | 'error';
-  details: {
-    currentValidation: {
-      critical: string[];
-      errors: string[];
-      warnings: string[];
-    };
-  };
-}
+import { useEffect, useMemo, useState } from 'react';
+import { useEnvHealthQuery } from '@/lib/queries/useEnvHealthQuery';
 
 /**
  * Operator Banner Component (ENG-004)
@@ -22,66 +11,50 @@ interface EnvHealthResponse {
  * Only visible to admin users in non-production environments, or when explicitly enabled.
  *
  * Features:
- * - Auto-fetches environment health on mount
+ * - Uses TanStack Query for caching and automatic refetching
  * - Shows critical/error issues prominently
  * - Dismissible (state persists in session storage)
  * - Styled consistently with the app's design system
  */
 export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
-  const [envIssues, setEnvIssues] = useState<string[]>([]);
-  const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
+  // Check dismissal state from session storage
   useEffect(() => {
-    // Check if already dismissed this session
     const dismissed = sessionStorage.getItem('operator-banner-dismissed');
     if (dismissed === 'true') {
       setIsDismissed(true);
-      return;
     }
+  }, []);
 
-    // Only show for admins
-    if (!isAdmin) return;
+  // Determine if we should show the banner
+  const showBanner =
+    isAdmin &&
+    (process.env.NODE_ENV !== 'production' ||
+      process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true');
 
-    // Only show in non-production or if explicitly enabled
-    const showBanner =
-      process.env.NODE_ENV !== 'production' ||
-      process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true';
+  // Use TanStack Query for fetching environment health
+  const { data: envHealth } = useEnvHealthQuery({
+    enabled: showBanner && !isDismissed,
+  });
 
-    if (!showBanner) return;
+  // Extract issues from the response
+  const envIssues = useMemo(() => {
+    if (!envHealth?.details?.currentValidation) return [];
+    return [
+      ...envHealth.details.currentValidation.critical,
+      ...envHealth.details.currentValidation.errors,
+    ];
+  }, [envHealth]);
 
-    async function checkEnvHealth() {
-      try {
-        const res = await fetch('/api/health/env', {
-          cache: 'no-store',
-        });
-        const data: EnvHealthResponse = await res.json();
-
-        if (!data.ok && data.details?.currentValidation) {
-          const issues = [
-            ...data.details.currentValidation.critical,
-            ...data.details.currentValidation.errors,
-          ];
-          if (issues.length > 0) {
-            setEnvIssues(issues);
-            setIsVisible(true);
-          }
-        }
-      } catch {
-        // Silently fail - don't block the UI for health check failures
-      }
-    }
-
-    checkEnvHealth();
-  }, [isAdmin]);
+  const isVisible = !envHealth?.ok && envIssues.length > 0;
 
   const handleDismiss = () => {
-    setIsVisible(false);
     setIsDismissed(true);
     sessionStorage.setItem('operator-banner-dismissed', 'true');
   };
 
-  if (!isVisible || isDismissed || envIssues.length === 0) {
+  if (!showBanner || isDismissed || !isVisible) {
     return null;
   }
 

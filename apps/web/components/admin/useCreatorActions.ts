@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import {
+  useDeleteCreatorMutation,
+  useToggleFeaturedMutation,
+  useToggleMarketingMutation,
+} from '@/lib/queries/useCreatorActionsMutation';
 
 export type CreatorActionStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -36,6 +41,11 @@ export function useCreatorActions(
     Record<string, ReturnType<typeof setTimeout>>
   >({});
 
+  // TanStack Query mutations for cache invalidation
+  const toggleFeaturedMutation = useToggleFeaturedMutation();
+  const toggleMarketingMutation = useToggleMarketingMutation();
+  const deleteCreatorMutation = useDeleteCreatorMutation();
+
   useEffect(() => {
     setProfiles(initialProfiles);
   }, [initialProfiles]);
@@ -47,254 +57,112 @@ export function useCreatorActions(
     };
   }, []);
 
-  const resetStatus = useCallback((profileId: string, delay = 2200) => {
-    const previousTimeout = statusTimeoutsRef.current[profileId];
-    if (previousTimeout) {
-      clearTimeout(previousTimeout);
-    }
+  const setStatus = useCallback(
+    (profileId: string, status: CreatorActionStatus) => {
+      setStatuses(prev => ({ ...prev, [profileId]: status }));
+    },
+    []
+  );
 
-    statusTimeoutsRef.current[profileId] = setTimeout(() => {
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'idle',
-      }));
-      delete statusTimeoutsRef.current[profileId];
-    }, delay);
-  }, []);
+  const resetStatus = useCallback(
+    (profileId: string, delay = 2200) => {
+      const previousTimeout = statusTimeoutsRef.current[profileId];
+      if (previousTimeout) {
+        clearTimeout(previousTimeout);
+      }
+
+      statusTimeoutsRef.current[profileId] = setTimeout(() => {
+        setStatus(profileId, 'idle');
+        delete statusTimeoutsRef.current[profileId];
+      }, delay);
+    },
+    [setStatus]
+  );
+
+  const updateProfile = useCallback(
+    <K extends keyof AdminCreatorProfileRow>(
+      profileId: string,
+      field: K,
+      value: AdminCreatorProfileRow[K]
+    ) => {
+      setProfiles(prev =>
+        prev.map(p => (p.id === profileId ? { ...p, [field]: value } : p))
+      );
+    },
+    []
+  );
 
   const toggleFeatured = useCallback(
     async (profileId: string, nextFeatured: boolean) => {
-      // Optimistic update
-      setProfiles(prev =>
-        prev.map(profile =>
-          profile.id === profileId
-            ? { ...profile, isFeatured: nextFeatured }
-            : profile
-        )
-      );
-
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'loading',
-      }));
+      updateProfile(profileId, 'isFeatured', nextFeatured);
+      setStatus(profileId, 'loading');
 
       try {
-        const response = await fetch('/app/admin/creators/toggle-featured', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ profileId, nextFeatured }),
-        });
-
-        const payload = (await response.json()) as {
-          success?: boolean;
-          isFeatured?: boolean;
-          error?: string;
-        };
-
-        if (!response.ok || !payload.success) {
-          const errorMessage =
-            payload.error ?? 'Failed to update featured status';
-
-          // Revert optimistic update
-          setProfiles(prev =>
-            prev.map(profile =>
-              profile.id === profileId
-                ? { ...profile, isFeatured: !nextFeatured }
-                : profile
-            )
-          );
-
-          setStatuses(prev => ({
-            ...prev,
-            [profileId]: 'error',
-          }));
-          resetStatus(profileId);
-          return { success: false, error: errorMessage };
-        }
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
+        await toggleFeaturedMutation.mutateAsync({ profileId, nextFeatured });
+        setStatus(profileId, 'success');
         resetStatus(profileId);
-
-        return {
-          success: true,
-        };
+        return { success: true };
       } catch (error) {
+        updateProfile(profileId, 'isFeatured', !nextFeatured);
+        setStatus(profileId, 'error');
+        resetStatus(profileId);
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Failed to update featured status';
-
-        // Revert optimistic update
-        setProfiles(prev =>
-          prev.map(profile =>
-            profile.id === profileId
-              ? { ...profile, isFeatured: !nextFeatured }
-              : profile
-          )
-        );
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'error',
-        }));
-        resetStatus(profileId);
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus]
+    [resetStatus, setStatus, updateProfile, toggleFeaturedMutation]
   );
 
   const toggleMarketing = useCallback(
     async (profileId: string, nextMarketingOptOut: boolean) => {
-      // Optimistic update
-      setProfiles(prev =>
-        prev.map(profile =>
-          profile.id === profileId
-            ? { ...profile, marketingOptOut: nextMarketingOptOut }
-            : profile
-        )
-      );
-
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'loading',
-      }));
+      updateProfile(profileId, 'marketingOptOut', nextMarketingOptOut);
+      setStatus(profileId, 'loading');
 
       try {
-        const response = await fetch('/app/admin/creators/toggle-marketing', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ profileId, nextMarketingOptOut }),
+        await toggleMarketingMutation.mutateAsync({
+          profileId,
+          nextMarketingOptOut,
         });
-
-        const payload = (await response.json()) as {
-          success?: boolean;
-          marketingOptOut?: boolean;
-          error?: string;
-        };
-
-        if (!response.ok || !payload.success) {
-          const errorMessage =
-            payload.error ?? 'Failed to update marketing preferences';
-
-          // Revert optimistic update
-          setProfiles(prev =>
-            prev.map(profile =>
-              profile.id === profileId
-                ? { ...profile, marketingOptOut: !nextMarketingOptOut }
-                : profile
-            )
-          );
-
-          setStatuses(prev => ({
-            ...prev,
-            [profileId]: 'error',
-          }));
-          resetStatus(profileId);
-          return { success: false, error: errorMessage };
-        }
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
+        setStatus(profileId, 'success');
         resetStatus(profileId);
-
-        return {
-          success: true,
-        };
+        return { success: true };
       } catch (error) {
+        updateProfile(profileId, 'marketingOptOut', !nextMarketingOptOut);
+        setStatus(profileId, 'error');
+        resetStatus(profileId);
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Failed to update marketing preferences';
-
-        // Revert optimistic update
-        setProfiles(prev =>
-          prev.map(profile =>
-            profile.id === profileId
-              ? { ...profile, marketingOptOut: !nextMarketingOptOut }
-              : profile
-          )
-        );
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'error',
-        }));
-        resetStatus(profileId);
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus]
+    [resetStatus, setStatus, updateProfile, toggleMarketingMutation]
   );
 
   const deleteCreatorOrUser = useCallback(
     async (profileId: string) => {
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'loading',
-      }));
+      setStatus(profileId, 'loading');
 
       try {
-        const response = await fetch('/app/admin/creators/delete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ profileId }),
-        });
-
-        const payload = (await response.json()) as {
-          success?: boolean;
-          error?: string;
-        };
-
-        if (!response.ok || !payload.success) {
-          const errorMessage = payload.error ?? 'Failed to delete creator/user';
-          setStatuses(prev => ({
-            ...prev,
-            [profileId]: 'error',
-          }));
-          resetStatus(profileId);
-          return { success: false, error: errorMessage };
-        }
-
-        // Remove from local state
+        await deleteCreatorMutation.mutateAsync({ profileId });
         setProfiles(prev => prev.filter(p => p.id !== profileId));
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
-
-        return {
-          success: true,
-        };
+        setStatus(profileId, 'success');
+        return { success: true };
       } catch (error) {
+        setStatus(profileId, 'error');
+        resetStatus(profileId);
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Failed to delete creator/user';
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'error',
-        }));
-        resetStatus(profileId);
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus]
+    [resetStatus, setStatus, deleteCreatorMutation]
   );
 
   return {

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { useCreateInviteMutation } from '@/lib/queries/useInviteMutation';
 import { normalizeEmail } from '@/lib/utils/email';
 
 interface SendInviteDialogProps {
@@ -22,11 +23,15 @@ export function SendInviteDialog({
   onSuccess,
 }: SendInviteDialogProps) {
   const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // TanStack Query mutation for cache invalidation
+  const createInviteMutation = useCreateInviteMutation();
+
   if (!profile) return null;
+
+  const isLoading = createInviteMutation.isPending;
 
   const handleClose = () => {
     if (!isLoading) {
@@ -62,27 +67,11 @@ export function SendInviteDialog({
       return;
     }
 
-    setIsLoading(true);
-
     try {
-      const response = await fetch('/api/admin/creator-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          creatorProfileId: profile.id,
-          email: trimmedEmail,
-        }),
+      await createInviteMutation.mutateAsync({
+        creatorProfileId: profile.id,
+        email: trimmedEmail,
       });
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        invite?: { id: string; email: string; status: string };
-      };
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'Failed to create invite');
-      }
 
       setSuccess(true);
       setEmail('');
@@ -96,8 +85,6 @@ export function SendInviteDialog({
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to send invite';
       setError(errorMessage);
-    } finally {
-      setIsLoading(false);
     }
   };
 
