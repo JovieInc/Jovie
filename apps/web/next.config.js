@@ -118,6 +118,15 @@ const nextConfig = {
     });
     return [
       {
+        source: '/api/health/build-info',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate',
+          },
+        ],
+      },
+      {
         source: '/api/(.*)',
         headers: [
           ...securityHeaders,
