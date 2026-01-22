@@ -3,7 +3,7 @@
 import { buttonVariants } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, getExternalLinkProps, isExternalUrl } from '@/lib/utils';
 
 export interface NavLinkProps
   extends Omit<React.ComponentProps<typeof Link>, 'href' | 'className'> {
@@ -39,7 +39,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
       ),
     });
 
-    const isExternal = external ?? /^https?:\/\//.test(href);
+    const isExternal = external ?? isExternalUrl(href);
 
     return (
       <Link
@@ -47,8 +47,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
         href={href}
         prefetch={prefetch}
         className={baseStyles}
-        target={isExternal ? '_blank' : undefined}
-        rel={isExternal ? 'noopener noreferrer' : undefined}
+        {...getExternalLinkProps(isExternal)}
         {...props}
       >
         <span className='inline-flex items-center gap-2'>{children}</span>

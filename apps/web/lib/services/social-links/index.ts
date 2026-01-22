@@ -5,8 +5,6 @@
  * Extracted from the monolithic API route for better testability and reuse.
  */
 
-// Existing modules
-export { checkIdempotencyKey, storeIdempotencyKey } from './idempotency';
 export { scheduleIngestionJobs } from './ingestion';
 // Mutations
 export {

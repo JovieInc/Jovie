@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, getExternalLinkProps, isExternalUrl } from '@/lib/utils';
 
 export interface FooterLinkProps
   extends Omit<React.ComponentProps<typeof Link>, 'href' | 'className'> {
@@ -17,8 +17,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
     { href, tone = 'dark', className, children, external, prefetch, ...props },
     ref
   ) => {
-    const isExternal = external ?? /^https?:\/\//.test(href);
-    // Use semantic tokens for proper dark mode support
+    const isExternal = external ?? isExternalUrl(href);
     const palette =
       tone === 'light'
         ? 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
@@ -39,8 +38,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
         href={href}
         prefetch={prefetch}
         className={linkClassName}
-        target={isExternal ? '_blank' : undefined}
-        rel={isExternal ? 'noopener noreferrer' : undefined}
+        {...getExternalLinkProps(isExternal)}
         {...props}
       >
         <span className='inline-flex items-center gap-2'>{children}</span>

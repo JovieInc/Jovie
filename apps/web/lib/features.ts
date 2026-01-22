@@ -6,66 +6,94 @@ export type Feature = {
   blurb: string;
   href: string;
   icon: IconName;
-  colorVar: string; // e.g., '--accent-conv'
-  aiPowered?: boolean; // Flag for AI-powered tag
+  colorVar: string;
+  aiPowered?: boolean;
 };
 
+type FeatureInput = {
+  slug: string;
+  title: string;
+  blurb: string;
+  anchor: string;
+  icon: IconName;
+  accent: string;
+  aiPowered?: boolean;
+};
+
+const feature = ({
+  slug,
+  title,
+  blurb,
+  anchor,
+  icon,
+  accent,
+  aiPowered,
+}: FeatureInput): Feature => ({
+  slug,
+  title,
+  blurb,
+  href: `/link-in-bio#${anchor}`,
+  icon,
+  colorVar: `--accent-${accent}`,
+  aiPowered,
+});
+
 export const FEATURES: Feature[] = [
-  {
+  feature({
     slug: 'smart-conversions',
     title: 'Smart Conversions',
     blurb: 'AI-optimized CTAs and layouts that adapt in real time.',
-    href: '/link-in-bio#smart-conversions',
+    anchor: 'smart-conversions',
     icon: 'TrendingUp',
-    colorVar: '--accent-conv',
+    accent: 'conv',
     aiPowered: true,
-  },
-  {
+  }),
+  feature({
     slug: 'real-time-analytics',
     title: 'Real-Time Analytics',
     blurb: 'Instant insights, always aligned with your ad platforms.',
-    href: '/link-in-bio#analytics',
+    anchor: 'analytics',
     icon: 'ChartBar',
-    colorVar: '--accent-analytics',
-  },
-  {
+    accent: 'analytics',
+  }),
+  feature({
     slug: 'blazing-fast',
     title: 'Blazing Fast',
     blurb: 'Sub-100ms loads. 99.99% uptime. Fans never wait.',
-    href: '/link-in-bio#performance',
+    anchor: 'performance',
     icon: 'Bolt',
-    colorVar: '--accent-speed',
-  },
-  {
+    accent: 'speed',
+  }),
+  feature({
     slug: 'pixel-perfect-by-default',
     title: 'Pixel-Perfect by Default',
     blurb: "Profiles auto-polished—you can't make them ugly.",
-    href: '/link-in-bio#design',
+    anchor: 'design',
     icon: 'Sparkles',
-    colorVar: '--accent-beauty',
-  },
-  {
+    accent: 'beauty',
+  }),
+  feature({
     slug: 'seo-boost',
     title: 'SEO Boost',
     blurb: 'Structured, discoverable, and lightning-fast by design.',
-    href: '/link-in-bio#seo',
+    anchor: 'seo',
     icon: 'Search',
-    colorVar: '--accent-seo',
-  },
-  {
+    accent: 'seo',
+  }),
+  feature({
     slug: 'deep-links',
     title: 'Deep Links',
     blurb: 'Send fans straight to /listen, /tip, or /subscribe.',
-    href: '/link-in-bio#deep-links',
+    anchor: 'deep-links',
     icon: 'Link',
-    colorVar: '--accent-links',
-  },
-  {
+    accent: 'links',
+  }),
+  feature({
     slug: 'pixels-remarketing',
     title: 'Pixels & Remarketing',
     blurb: 'Growth integrations that scale with you.',
-    href: '/link-in-bio#pro',
+    anchor: 'pro',
     icon: 'Rocket',
-    colorVar: '--accent-pro',
-  },
+    accent: 'pro',
+  }),
 ];
