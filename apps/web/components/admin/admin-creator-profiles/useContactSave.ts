@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { queryKeys } from '@/lib/queries';
 import type { Contact } from '@/types';
 import type { AdminCreatorSocialLinksResponse } from './types';
 
@@ -25,61 +27,78 @@ interface UseContactSaveReturn {
 export function useContactSave({
   onSaveSuccess,
 }: UseContactSaveOptions = {}): UseContactSaveReturn {
-  const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
 
-  const saveContact = useCallback(
-    async (contact: Contact): Promise<boolean> => {
+  const { mutateAsync, isPending: isSaving } = useMutation({
+    mutationKey: ['admin-contact-save'],
+    mutationFn: async (contact: Contact) => {
       if (!contact.id) {
-        toast.error('Cannot save contact without ID');
-        return false;
+        throw new Error('Cannot save contact without ID');
       }
 
-      setIsSaving(true);
-      const toastId = toast.loading('Saving contact...');
-
-      try {
-        // Save social links
-        const response = await fetch('/api/admin/creator-social-links', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            profileId: contact.id,
-            links: contact.socialLinks.map((link, index) => ({
-              id: link.id,
-              url: link.url,
-              label: link.label,
-              platformType: link.platformType,
-              sortOrder: index,
-            })),
-          }),
-        });
-
-        const result = (await response
-          .json()
-          .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
-
-        if (!response.ok || !result?.success) {
-          const errorMessage =
-            result && 'error' in result
-              ? result.error
-              : 'Failed to save contact';
-          toast.error(errorMessage, { id: toastId });
-          return false;
-        }
-
-        // Update contact with server-assigned IDs
-        const updatedContact: Contact = {
-          ...contact,
-          socialLinks: result.links.map(link => ({
+      const response = await fetch('/api/admin/creator-social-links', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: contact.id,
+          links: contact.socialLinks.map((link, index) => ({
             id: link.id,
             url: link.url,
             label: link.label,
             platformType: link.platformType,
+            sortOrder: index,
           })),
-        };
+        }),
+      });
 
+      const result = (await response
+        .json()
+        .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
+
+      if (!response.ok || !result?.success) {
+        const message =
+          result && 'error' in result ? result.error : 'Failed to save contact';
+        throw new Error(message);
+      }
+
+      const updatedContact: Contact = {
+        ...contact,
+        socialLinks: result.links.map(link => ({
+          id: link.id,
+          url: link.url,
+          label: link.label,
+          platformType: link.platformType,
+        })),
+      };
+
+      return updatedContact;
+    },
+    onSuccess: async (updatedContact, contact) => {
+      const toastId = toast.loading('Saving contact...');
+      toast.success('Contact saved', { id: toastId });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.creators.socialLinks(contact.id ?? ''),
+      });
+      onSaveSuccess?.(updatedContact);
+    },
+    onError: error => {
+      const toastId = toast.loading('Saving contact...');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to save contact',
+        {
+          id: toastId,
+        }
+      );
+    },
+  });
+
+  const saveContact = useCallback(
+    async (contact: Contact): Promise<boolean> => {
+      const toastId = toast.loading('Saving contact...');
+      try {
+        const updatedContact = await mutateAsync(contact);
         toast.success('Contact saved', { id: toastId });
         onSaveSuccess?.(updatedContact);
         return true;
@@ -87,11 +106,9 @@ export function useContactSave({
         console.error('Failed to save contact:', error);
         toast.error('Failed to save contact', { id: toastId });
         return false;
-      } finally {
-        setIsSaving(false);
       }
     },
-    [onSaveSuccess]
+    [mutateAsync, onSaveSuccess]
   );
 
   return {
