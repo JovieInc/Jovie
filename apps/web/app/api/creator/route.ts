@@ -4,6 +4,12 @@ import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+// Cache successful responses for 1 hour, allow stale-while-revalidate for 24 hours
+// Consistent with [username]/page.tsx which uses 1-hour revalidation
+const PUBLIC_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+} as const;
+
 // Username validation regex (alphanumeric, underscore, hyphen, 3-30 chars)
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 
@@ -74,7 +80,7 @@ export async function GET(
           sortOrder: link.sortOrder,
         })),
       },
-      { headers: NO_STORE_HEADERS }
+      { headers: PUBLIC_CACHE_HEADERS }
     );
   } catch (error) {
     logger.error('Error fetching creator profile:', error);
