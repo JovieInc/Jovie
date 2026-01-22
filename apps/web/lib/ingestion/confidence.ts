@@ -33,6 +33,21 @@ const SOURCE_BONUS = 0.15;
 const ACTIVE_THRESHOLD = 0.7;
 const SUGGESTED_THRESHOLD = 0.3;
 
+/**
+ * Extract the handle portion from a URL for comparison.
+ */
+function extractHandleFromUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const [first] = parsed.pathname.split('/').filter(Boolean);
+    if (!first) return null;
+    return first.replace(/^@/, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 export interface ConfidenceInput {
   sourceType: IngestionSourceType;
   signals?: Array<ConfidenceSignal | string>;
@@ -65,23 +80,9 @@ export function computeLinkConfidence(input: ConfidenceInput): {
 
   // Handle similarity bonus
   if (input.usernameNormalized) {
-    const handle = (() => {
-      if (!input.url) return null;
-      try {
-        const parsed = new URL(input.url);
-        const [first] = parsed.pathname.split('/').filter(Boolean);
-        if (!first) return null;
-        return first.replace(/^@/, '').toLowerCase();
-      } catch {
-        return null;
-      }
-    })();
-
-    if (handle) {
-      const normalizedUsername = input.usernameNormalized.toLowerCase();
-      if (handle === normalizedUsername) {
-        signals.add('handle_similarity');
-      }
+    const handle = extractHandleFromUrl(input.url);
+    if (handle && handle === input.usernameNormalized.toLowerCase()) {
+      signals.add('handle_similarity');
     }
   }
 

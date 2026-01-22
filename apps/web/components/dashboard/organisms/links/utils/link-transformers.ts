@@ -132,6 +132,25 @@ export function convertDbLinksToSuggestions(
 }
 
 /**
+ * Check if two LinkItems have equal key properties
+ * @internal Used by areLinkItemsEqual
+ */
+function areSingleLinkItemsEqual(
+  left: LinkItem,
+  right: LinkItem | undefined
+): boolean {
+  if (!right) return false;
+  return (
+    left.id === right.id &&
+    left.normalizedUrl === right.normalizedUrl &&
+    left.originalUrl === right.originalUrl &&
+    left.isVisible === right.isVisible &&
+    left.category === right.category &&
+    left.platform.id === right.platform.id
+  );
+}
+
+/**
  * Check if two LinkItem arrays are equal
  *
  * Used for optimistic update comparison to avoid unnecessary re-renders.
@@ -143,18 +162,7 @@ export function convertDbLinksToSuggestions(
 export function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    const left = a[i];
-    const right = b[i];
-    if (!right) return false;
-    if (left.id !== right.id) return false;
-    if (left.normalizedUrl !== right.normalizedUrl) return false;
-    if (left.originalUrl !== right.originalUrl) return false;
-    if (left.isVisible !== right.isVisible) return false;
-    if (left.category !== right.category) return false;
-    if (left.platform.id !== right.platform.id) return false;
-  }
-  return true;
+  return a.every((left, i) => areSingleLinkItemsEqual(left, b[i]));
 }
 
 /**
