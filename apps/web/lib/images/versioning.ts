@@ -283,6 +283,11 @@ export function preloadImage(
 
   // Limit total preloaded URLs to prevent memory issues
   if (preloadedUrls.size >= MAX_PRELOADED_URLS) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        `[preloadImage] Max preloaded URLs (${MAX_PRELOADED_URLS}) reached, skipping: ${url}`
+      );
+    }
     return;
   }
 
