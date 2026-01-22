@@ -81,6 +81,12 @@ export { QueryErrorBoundary } from './QueryErrorBoundary';
 
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
+// Admin social links query
+export {
+  type AdminSocialLink,
+  type UseAdminSocialLinksQueryOptions,
+  useAdminSocialLinksQuery,
+} from './useAdminSocialLinksQuery';
 export {
   type ArtistSearchState,
   type SpotifyArtistResult,
