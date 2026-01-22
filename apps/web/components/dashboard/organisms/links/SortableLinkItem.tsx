@@ -16,6 +16,32 @@ import {
 import { compactUrlDisplay } from './utils';
 
 /**
+ * Determine the pill state based on visibility and validity.
+ */
+function getPillState(
+  visible: boolean,
+  isValid: boolean | undefined
+): LinkPillState {
+  if (!visible) return 'hidden';
+  if (isValid === false) return 'error';
+  return 'connected';
+}
+
+/**
+ * Determine the badge text based on visibility, state, and recency.
+ */
+function getBadgeText(
+  visible: boolean,
+  pillState: LinkPillState,
+  isLastAdded: boolean
+): string | undefined {
+  if (!visible) return 'Hidden';
+  if (pillState === 'error') return 'Needs fix';
+  if (isLastAdded) return 'New';
+  return undefined;
+}
+
+/**
  * Props for the SortableLinkItem component
  */
 export interface SortableLinkItemProps<T extends DetectedLink = DetectedLink> {
@@ -117,19 +143,8 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
   const identity = canonicalIdentity(link);
   const secondaryText = identity.startsWith('@') ? identity : undefined;
 
-  const pillState: LinkPillState = !visible
-    ? 'hidden'
-    : link.isValid === false
-      ? 'error'
-      : 'connected';
-
-  const badgeText = !visible
-    ? 'Hidden'
-    : pillState === 'error'
-      ? 'Needs fix'
-      : isLastAdded
-        ? 'New'
-        : undefined;
+  const pillState = getPillState(visible, link.isValid);
+  const badgeText = getBadgeText(visible, pillState, isLastAdded);
 
   const menuItems: LinkPillMenuItem[] = [
     {

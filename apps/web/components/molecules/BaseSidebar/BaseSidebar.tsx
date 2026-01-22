@@ -21,6 +21,17 @@ import type {
 import { useSidebarState } from './useSidebarState';
 
 /**
+ * Get the transform class for sidebar visibility state.
+ */
+function getSidebarTransformClass(isOpen: boolean, isLeft: boolean): string {
+  if (isOpen) {
+    return 'translate-x-0 opacity-100';
+  }
+  const translateClass = isLeft ? '-translate-x-full' : 'translate-x-full';
+  return `${translateClass} opacity-0 pointer-events-none`;
+}
+
+/**
  * Main sidebar container component.
  */
 export const BaseSidebar = forwardRef<HTMLElement, BaseSidebarProps>(
@@ -69,11 +80,7 @@ export const BaseSidebar = forwardRef<HTMLElement, BaseSidebarProps>(
             'bg-surface-0 border-subtle shadow-xl',
             'transition-[transform,opacity] duration-200 ease-out',
             isLeft ? 'left-0 border-r' : 'right-0 border-l',
-            isOpen
-              ? 'translate-x-0 opacity-100'
-              : isLeft
-                ? '-translate-x-full opacity-0 pointer-events-none'
-                : 'translate-x-full opacity-0 pointer-events-none',
+            getSidebarTransformClass(isOpen, isLeft),
             className
           )}
           style={{ width }}

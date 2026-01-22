@@ -24,14 +24,25 @@ const isWebSocketAvailable = typeof WebSocket !== 'undefined';
 
 let nodeWebSocketConstructor: WebSocketConstructor | undefined;
 
-// Configure WebSocket for Node runtimes only, preferring the built-in WebSocket
-// to avoid bundling issues with `ws` in serverless/preview environments.
-const webSocketConstructor = !isEdgeRuntime
-  ? isWebSocketAvailable
-    ? (WebSocket as unknown as WebSocketConstructor)
-    : (nodeWebSocketConstructor =
-        nodeWebSocketConstructor || (require('ws') as WebSocketConstructor))
-  : undefined;
+/**
+ * Determine the WebSocket constructor for the current runtime.
+ * Edge runtime doesn't need WebSocket config (Neon handles it).
+ * Node runtime prefers built-in WebSocket, falls back to 'ws' package.
+ */
+function getWebSocketConstructor(): WebSocketConstructor | undefined {
+  if (isEdgeRuntime) {
+    return undefined;
+  }
+  if (isWebSocketAvailable) {
+    return WebSocket as unknown as WebSocketConstructor;
+  }
+  // Lazy-load ws package for Node.js environments without native WebSocket
+  nodeWebSocketConstructor =
+    nodeWebSocketConstructor || (require('ws') as WebSocketConstructor);
+  return nodeWebSocketConstructor;
+}
+
+const webSocketConstructor = getWebSocketConstructor();
 
 if (webSocketConstructor) {
   neonConfig.webSocketConstructor = webSocketConstructor;
