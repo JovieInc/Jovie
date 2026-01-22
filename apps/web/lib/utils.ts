@@ -9,8 +9,13 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Creates a debounced function using TanStack Pacer.
  *
- * The debounced function delays invoking `func` until after `wait` milliseconds
- * have elapsed since the last time the debounced function was invoked.
+ * @deprecated Prefer using TanStack Pacer hooks directly in React components:
+ * - `useAsyncDebouncer` for async operations (API calls)
+ * - `useDebouncer` for synchronous operations
+ * - `useAutoSave` for debounced save patterns
+ * All available from `@/lib/pacer`.
+ *
+ * This utility is kept for non-React contexts and tests only.
  *
  * @param func - The function to debounce
  * @param wait - The number of milliseconds to delay

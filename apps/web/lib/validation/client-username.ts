@@ -5,7 +5,6 @@
  * Uses shared validation core for consistency with server-side validation.
  */
 
-import { debounce as utilsDebounce } from '@/lib/utils';
 import {
   type DetailedValidationResult,
   generateUsernameSuggestions as generateSuggestions,
@@ -59,11 +58,3 @@ export function validateUsernameFormat(
  * Re-exported from core for client-side use.
  */
 export const generateUsernameSuggestions = generateSuggestions;
-
-/**
- * Debounce utility for API calls.
- * Re-exported from @/lib/utils for backwards compatibility.
- *
- * @see https://tanstack.com/pacer
- */
-export const debounce = utilsDebounce;
