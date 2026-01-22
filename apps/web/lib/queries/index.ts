@@ -181,6 +181,13 @@ export {
   type UsePublicProfileQueryOptions,
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
+export {
+  useResetProviderOverrideMutation,
+  useSaveProviderOverrideMutation,
+  useSyncReleasesFromSpotifyMutation,
+} from './useReleaseMutations';
+// Release queries and mutations
+export { useReleasesQuery } from './useReleasesQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,
