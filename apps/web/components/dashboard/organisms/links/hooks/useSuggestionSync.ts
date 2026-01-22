@@ -5,8 +5,9 @@
  * Uses TanStack Query for polling, version tracking, caching, and mutations.
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import {
   useAcceptSuggestionMutation,
   useDismissSuggestionMutation,
@@ -63,6 +64,11 @@ export interface UseSuggestionSyncOptions {
   setSuggestedLinks: React.Dispatch<React.SetStateAction<SuggestedLink[]>>;
   /** Whether the preview sidebar is open. Pauses polling when true. */
   sidebarOpen?: boolean;
+  /** Optional initial data to seed the suggestions query cache. */
+  initialSuggestionsData?: {
+    links: ProfileSocialLink[];
+    maxVersion: number;
+  };
 }
 
 /**
@@ -117,21 +123,35 @@ export function useSuggestionSync({
   setLinks,
   setSuggestedLinks,
   sidebarOpen = false,
+  initialSuggestionsData,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
-  // Polling interval depends on auto-refresh mode and sidebar state
-  // Pause polling when sidebar is open to reduce unnecessary requests
-  const refetchInterval = useMemo(
-    () => (sidebarOpen ? false : autoRefreshUntilMs ? 2000 : 4500),
-    [autoRefreshUntilMs, sidebarOpen]
-  );
+  const [fastPolling, setFastPolling] = useState(false);
+
+  // Determine polling behavior:
+  // - Sidebar open: disable polling entirely
+  // - Auto-refresh mode or fast polling: use fixed 2s interval
+  // - Otherwise: use adaptive polling with backoff
+  const refetchInterval = sidebarOpen
+    ? false
+    : autoRefreshUntilMs
+      ? 2000
+      : 'adaptive';
 
   // Use TanStack Query for fetching and polling suggestions
-  // Query stays enabled but polling pauses when sidebar is open
   const { data, refetch } = useSuggestionsQuery({
     profileId,
     enabled: suggestionsEnabled && !!profileId,
     refetchInterval,
+    fastPolling: fastPolling || !!autoRefreshUntilMs,
+    initialData: initialSuggestionsData,
   });
+
+  // Fast polling window after an action
+  useEffect(() => {
+    if (!fastPolling) return;
+    const timeout = setTimeout(() => setFastPolling(false), 6000);
+    return () => clearTimeout(timeout);
+  }, [fastPolling]);
 
   // Use mutation hooks for accept/dismiss actions
   // These handle toasts and cache invalidation automatically
@@ -190,6 +210,8 @@ export function useSuggestionSync({
           linkId: suggestionId,
         });
 
+        setFastPolling(true);
+
         if (!data.link) return null;
 
         const detected = convertAcceptedLinkToLinkItem(data);
@@ -225,6 +247,7 @@ export function useSuggestionSync({
         setSuggestedLinks(prev =>
           prev.filter(s => s.suggestionId !== suggestionId)
         );
+        setFastPolling(true);
       } catch {
         // Errors/toasts are handled by the mutation hook.
       }

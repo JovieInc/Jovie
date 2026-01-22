@@ -7,6 +7,7 @@
  */
 
 import { BadgeCheck } from 'lucide-react';
+import { memo } from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -22,7 +23,7 @@ interface ContactAvatarProps {
   onAvatarUpload?: (file: File) => Promise<string>;
 }
 
-export function ContactAvatar({
+export const ContactAvatar = memo(function ContactAvatar({
   avatarUrl,
   fullName,
   username,
@@ -64,4 +65,4 @@ export function ContactAvatar({
       </div>
     </div>
   );
-}
+});

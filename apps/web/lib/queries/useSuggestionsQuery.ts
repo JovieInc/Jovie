@@ -72,6 +72,8 @@ export interface UseSuggestionsQueryOptions {
   refetchInterval?: number | false | 'adaptive';
   /** Force fast polling mode (resets backoff). Useful after user actions. */
   fastPolling?: boolean;
+  /** Optional initial data to seed the cache and skip the first fetch. */
+  initialData?: SuggestionsQueryResult | undefined;
 }
 
 /**
@@ -107,6 +109,7 @@ export function useSuggestionsQuery({
   enabled = true,
   refetchInterval = 'adaptive',
   fastPolling = false,
+  initialData,
 }: UseSuggestionsQueryOptions) {
   // Track consecutive unchanged responses for backoff
   const stableCountRef = useRef(0);
@@ -153,18 +156,27 @@ export function useSuggestionsQuery({
     []
   );
 
+  const isDocumentVisible = () =>
+    typeof document === 'undefined' || document.visibilityState === 'visible';
+
   return useQuery<SuggestionsQueryResult>({
     queryKey: queryKeys.suggestions.list(profileId ?? ''),
     queryFn: ({ signal }) => fetchSuggestions(profileId!, signal),
     enabled: enabled && !!profileId,
+    initialData,
+    select: data => ({ links: data.links, maxVersion: data.maxVersion }),
     refetchInterval:
       refetchInterval === 'adaptive'
-        ? query => getAdaptiveInterval(query.state.data)
-        : refetchInterval,
+        ? query =>
+            isDocumentVisible() ? getAdaptiveInterval(query.state.data) : false
+        : isDocumentVisible() && typeof refetchInterval === 'number'
+          ? refetchInterval
+          : false,
     // Don't refetch on window focus since we're already polling
     refetchOnWindowFocus: false,
     staleTime: 1 * 60 * 1000, // 1 min
     gcTime: 10 * 60 * 1000, // 10 min
     refetchOnMount: true,
+    structuralSharing: true,
   });
 }

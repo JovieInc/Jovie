@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useMemo, useState } from 'react';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
@@ -364,20 +364,30 @@ export function AdminCreatorProfilesWithSidebar({
         className='hidden md:flex bg-surface-2 border-subtle'
       >
         <div className='flex-1 min-h-0 overflow-auto'>
-          <ContactSidebar
-            contact={effectiveContact}
-            mode={mode}
-            isOpen={sidebarOpen && Boolean(effectiveContact)}
-            onClose={handleSidebarClose}
-            onRefresh={() => {
-              router.refresh();
-              refetchSocialLinks();
-            }}
-            onContactChange={handleContactChange}
-            onSave={saveContact}
-            isSaving={isSaving}
-            onAvatarUpload={handleAvatarUpload}
-          />
+          <Suspense
+            fallback={
+              <div className='space-y-4 p-4'>
+                <div className='h-10 w-32 animate-pulse rounded-md bg-surface-1' />
+                <div className='h-20 w-full animate-pulse rounded-md bg-surface-1' />
+                <div className='h-40 w-full animate-pulse rounded-md bg-surface-1' />
+              </div>
+            }
+          >
+            <ContactSidebar
+              contact={effectiveContact}
+              mode={mode}
+              isOpen={sidebarOpen && Boolean(effectiveContact)}
+              onClose={handleSidebarClose}
+              onRefresh={() => {
+                router.refresh();
+                refetchSocialLinks();
+              }}
+              onContactChange={handleContactChange}
+              onSave={saveContact}
+              isSaving={isSaving}
+              onAvatarUpload={handleAvatarUpload}
+            />
+          </Suspense>
         </div>
       </RightDrawer>
       <DeleteCreatorDialog
