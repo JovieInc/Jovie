@@ -11,6 +11,54 @@ const DASHBOARD_ACTIVITY_LOADING_KEYS = Array.from(
   (_, i) => `dashboard-activity-loading-${i + 1}`
 );
 
+function ActivityLoadingSkeleton() {
+  return (
+    <div className='space-y-2' aria-busy='true'>
+      {DASHBOARD_ACTIVITY_LOADING_KEYS.map(key => (
+        <div
+          key={key}
+          className='flex items-center gap-3 animate-pulse'
+          aria-hidden='true'
+        >
+          <div className='h-7 w-7 rounded-lg bg-surface-2' />
+          <div className='flex-1 space-y-1.5'>
+            <div className='h-3 w-3/4 rounded bg-surface-2' />
+            <div className='h-2.5 w-1/3 rounded bg-surface-2' />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActivityEmptyState({ isRefreshing }: { isRefreshing: boolean }) {
+  return (
+    <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
+      <p className='text-sm text-tertiary-token'>
+        No recent activity. Share your profile to see engagement here.
+      </p>
+    </div>
+  );
+}
+
+function ActivityList({
+  activities,
+  isRefreshing,
+}: {
+  activities: Activity[];
+  isRefreshing: boolean;
+}) {
+  return (
+    <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
+      <ul className='space-y-1'>
+        {activities.map(activity => (
+          <ActivityItem key={activity.id} activity={activity} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ActivityItem({ activity }: { activity: Activity }) {
   const content = (
     <>
@@ -88,43 +136,11 @@ export function DashboardActivityFeed({
             {error.message || 'Failed to load activity'}
           </p>
         ) : isLoading ? (
-          <div className='space-y-2' aria-busy='true'>
-            {DASHBOARD_ACTIVITY_LOADING_KEYS.map(key => (
-              <div
-                key={key}
-                className='flex items-center gap-3 animate-pulse'
-                aria-hidden='true'
-              >
-                <div className='h-7 w-7 rounded-lg bg-surface-2' />
-                <div className='flex-1 space-y-1.5'>
-                  <div className='h-3 w-3/4 rounded bg-surface-2' />
-                  <div className='h-2.5 w-1/3 rounded bg-surface-2' />
-                </div>
-              </div>
-            ))}
-          </div>
+          <ActivityLoadingSkeleton />
         ) : activities.length === 0 ? (
-          <div
-            className={
-              isRefreshing ? 'opacity-70 transition-opacity' : undefined
-            }
-          >
-            <p className='text-sm text-tertiary-token'>
-              No recent activity. Share your profile to see engagement here.
-            </p>
-          </div>
+          <ActivityEmptyState isRefreshing={isRefreshing} />
         ) : (
-          <div
-            className={
-              isRefreshing ? 'opacity-70 transition-opacity' : undefined
-            }
-          >
-            <ul className='space-y-1'>
-              {activities.map(activity => (
-                <ActivityItem key={activity.id} activity={activity} />
-              ))}
-            </ul>
-          </div>
+          <ActivityList activities={activities} isRefreshing={isRefreshing} />
         )}
       </div>
       <div className='sr-only' aria-live='polite' aria-atomic='true'>

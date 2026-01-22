@@ -50,28 +50,43 @@ export function deriveFilenameFromUrl(url: string): string {
 }
 
 /**
+ * Validate content-length header against max bytes limit.
+ * Throws if content-length exceeds the limit.
+ */
+function validateContentLength(response: Response, maxBytes: number): void {
+  const contentLengthHeader = response.headers.get('content-length');
+  if (!contentLengthHeader) return;
+  const contentLength = Number(contentLengthHeader);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error('Response too large');
+  }
+}
+
+/**
+ * Read response body without streaming (fallback when body is null).
+ */
+async function readResponseArrayBuffer(
+  response: Response,
+  maxBytes: number
+): Promise<Buffer> {
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > maxBytes) {
+    throw new Error('Response too large');
+  }
+  return Buffer.from(arrayBuffer);
+}
+
+/**
  * Read response body with size limit.
  */
 export async function readResponseBytesWithLimit(
   response: Response,
   maxBytes: number
 ): Promise<Buffer> {
-  const contentLengthHeader = response.headers.get('content-length');
-  const contentLength = contentLengthHeader
-    ? Number(contentLengthHeader)
-    : null;
-  if (typeof contentLength === 'number' && Number.isFinite(contentLength)) {
-    if (contentLength > maxBytes) {
-      throw new Error('Response too large');
-    }
-  }
+  validateContentLength(response, maxBytes);
 
   if (!response.body) {
-    const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength > maxBytes) {
-      throw new Error('Response too large');
-    }
-    return Buffer.from(arrayBuffer);
+    return readResponseArrayBuffer(response, maxBytes);
   }
 
   const reader = response.body.getReader();
