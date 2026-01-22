@@ -2,12 +2,13 @@
  * Handler for Clerk user.created webhook events.
  *
  * Processes new user signups by:
- * - Generating a suggested username from name or email
- * - Storing full name in private metadata
+ * - Storing full name in private metadata (for display purposes)
  * - Syncing initial Jovie metadata to Clerk
+ *
+ * NOTE: Username suggestions are generated on-the-fly in the onboarding flow,
+ * not stored in Clerk metadata. Usernames are stored only in the database.
  */
 
-import { randomBytes } from 'node:crypto';
 import { clerkClient } from '@clerk/nextjs/server';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { logger } from '@/lib/utils/logger';
@@ -18,35 +19,6 @@ import type {
   ClerkWebhookHandler,
 } from '../types';
 
-function generateRandomSuffix(length: number): string {
-  return randomBytes(Math.ceil(length / 2))
-    .toString('hex')
-    .slice(0, length);
-}
-
-function generateUsernameFromName(firstName: string | null): string {
-  if (!firstName) return '';
-
-  const cleaned = firstName.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-
-  if (cleaned.length < 3) {
-    return cleaned + generateRandomSuffix(3);
-  }
-
-  return cleaned.substring(0, 20);
-}
-
-function generateUsernameFromEmail(email: string): string {
-  const localPart = email.split('@')[0];
-  const cleaned = localPart.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-
-  if (cleaned.length < 3) {
-    return 'user' + generateRandomSuffix(3);
-  }
-
-  return cleaned.substring(0, 20);
-}
-
 async function handleUserCreated(
   context: ClerkWebhookContext
 ): Promise<ClerkHandlerResult> {
@@ -54,34 +26,24 @@ async function handleUserCreated(
   const user = event.data;
 
   try {
-    // Generate suggested username
-    let suggestedUsername = '';
-
-    if (user.first_name) {
-      suggestedUsername = generateUsernameFromName(user.first_name);
-    } else if (user.email_addresses?.[0]?.email_address) {
-      suggestedUsername = generateUsernameFromEmail(
-        user.email_addresses[0].email_address
-      );
-    } else {
-      suggestedUsername = 'user' + generateRandomSuffix(6);
-    }
-
-    // Create full name from first + last name
+    // Create full name from first + last name (for display purposes)
     const fullName = [user.first_name, user.last_name]
       .filter(Boolean)
       .join(' ')
       .trim();
 
-    // Update user's private metadata
-    const client = await clerkClient();
-    await client.users.updateUser(user.id, {
-      privateMetadata: {
-        ...user.private_metadata,
-        fullName: fullName || undefined,
-        suggestedUsername,
-      },
-    });
+    // Update user's private metadata with full name only
+    // NOTE: suggestedUsername is no longer stored here - it's generated
+    // on-the-fly in the onboarding flow to eliminate sync overhead
+    if (fullName) {
+      const client = await clerkClient();
+      await client.users.updateUser(user.id, {
+        privateMetadata: {
+          ...user.private_metadata,
+          fullName,
+        },
+      });
+    }
 
     // Sync initial Jovie metadata to Clerk
     const syncResult = await syncAllClerkMetadata(user.id);
@@ -104,7 +66,6 @@ async function handleUserCreated(
       success: true,
       message: 'User post-signup processing completed',
       fullName,
-      suggestedUsername,
     };
   } catch (error) {
     logger.error(`Failed to process user.created event for ${user.id}:`, error);

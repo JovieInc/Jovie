@@ -405,102 +405,90 @@ export async function completeOnboarding({
       { isolationLevel: 'serializable' }
     );
 
-    // Step 7: Avatar upload (non-blocking, with retry and logging)
-    // Avatar upload failures are logged but don't block onboarding completion
+    // Step 7: Avatar upload (fire-and-forget, background processing)
+    // Avatar upload runs in background - don't block onboarding completion
     const profileId = completion.profileId;
 
     if (profileId && oauthAvatarUrl) {
-      try {
-        const uploaded = await uploadRemoteAvatar({
-          imageUrl: oauthAvatarUrl,
-          baseUrl,
-          cookieHeader,
-          maxRetries: 3,
-        });
-
-        if (uploaded) {
-          await withDbSessionTx(async tx => {
-            const [profile] = await tx
-              .select({
-                avatarUrl: creatorProfiles.avatarUrl,
-                avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-              })
-              .from(creatorProfiles)
-              .where(eq(creatorProfiles.id, profileId))
-              .limit(1);
-
-            await applyProfileEnrichment(tx, {
-              profileId,
-              avatarLockedByUser: profile?.avatarLockedByUser ?? null,
-              currentAvatarUrl: profile?.avatarUrl ?? null,
-              extractedAvatarUrl: uploaded.blobUrl,
-            });
-
-            await tx
-              .update(profilePhotos)
-              .set({
-                creatorProfileId: profileId,
-                sourcePlatform: 'clerk',
-                updatedAt: new Date(),
-              })
-              .where(eq(profilePhotos.id, uploaded.photoId));
+      void (async () => {
+        try {
+          const uploaded = await uploadRemoteAvatar({
+            imageUrl: oauthAvatarUrl,
+            baseUrl,
+            cookieHeader,
+            maxRetries: 3,
           });
-        } else {
-          console.warn(
-            '[ONBOARDING] Avatar upload failed for profile:',
-            profileId
+
+          if (uploaded) {
+            await withDbSessionTx(async tx => {
+              const [profile] = await tx
+                .select({
+                  avatarUrl: creatorProfiles.avatarUrl,
+                  avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+                })
+                .from(creatorProfiles)
+                .where(eq(creatorProfiles.id, profileId))
+                .limit(1);
+
+              await applyProfileEnrichment(tx, {
+                profileId,
+                avatarLockedByUser: profile?.avatarLockedByUser ?? null,
+                currentAvatarUrl: profile?.avatarUrl ?? null,
+                extractedAvatarUrl: uploaded.blobUrl,
+              });
+
+              await tx
+                .update(profilePhotos)
+                .set({
+                  creatorProfileId: profileId,
+                  sourcePlatform: 'clerk',
+                  updatedAt: new Date(),
+                })
+                .where(eq(profilePhotos.id, uploaded.photoId));
+            });
+          } else {
+            console.warn(
+              '[ONBOARDING] Avatar upload failed for profile:',
+              profileId
+            );
+          }
+        } catch (avatarError) {
+          console.error(
+            '[ONBOARDING] Avatar upload exception for profile:',
+            profileId,
+            avatarError
           );
+          Sentry.captureException(avatarError, {
+            tags: { context: 'onboarding_avatar_upload', profileId },
+            level: 'warning',
+          });
         }
-      } catch (avatarError) {
-        console.error(
-          '[ONBOARDING] Avatar upload exception for profile:',
-          profileId,
-          avatarError
-        );
-        // Capture to Sentry for monitoring (non-blocking, warning level)
-        Sentry.captureException(avatarError, {
-          tags: { context: 'onboarding_avatar_upload', profileId },
-          level: 'warning',
-        });
-      }
+      })();
     }
 
-    // Sync username to Clerk (best-effort - don't block onboarding on sync failure)
-    // This updates the Clerk user's username to match the Jovie handle
-    try {
-      await syncCanonicalUsernameFromApp(userId, completion.username);
-    } catch (usernameSyncError) {
-      console.error(
-        '[ONBOARDING] Failed to sync username to Clerk:',
-        usernameSyncError
-      );
-      Sentry.captureException(usernameSyncError, {
-        tags: {
-          context: 'onboarding_username_sync',
-          username: completion.username,
-        },
+    // Step 8: Sync operations (parallel, fire-and-forget)
+    // Run username sync and Clerk metadata sync in parallel without blocking
+    void Promise.allSettled([
+      // Sync username to database (no longer syncs to Clerk)
+      syncCanonicalUsernameFromApp(userId, completion.username),
+      // Sync Jovie metadata to Clerk (profile completion, status, etc.)
+      syncAllClerkMetadata(userId),
+    ]).then(results => {
+      // Log any failures for monitoring
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const context =
+            index === 0
+              ? 'onboarding_username_sync'
+              : 'onboarding_metadata_sync';
+          console.error(`[ONBOARDING] ${context} failed:`, result.reason);
+          Sentry.captureException(result.reason, {
+            tags: { context, username: completion.username },
+            level: 'warning',
+          });
+        }
       });
-      // Continue with onboarding - username sync is not critical
-      // The user can still use Jovie with their handle; Clerk username may differ
-    }
-
-    // Sync Jovie metadata to Clerk (profile completion, status, etc.)
-    // This is best-effort - don't block onboarding on sync failure
-    try {
-      await syncAllClerkMetadata(userId);
-    } catch (metadataSyncError) {
-      console.error(
-        '[ONBOARDING] Failed to sync Clerk metadata:',
-        metadataSyncError
-      );
-      Sentry.captureException(metadataSyncError, {
-        tags: {
-          context: 'onboarding_metadata_sync',
-          username: completion.username,
-        },
-      });
-      // Continue with onboarding - metadata sync is not critical
-    }
+    });
 
     // ENG-002: Set completion cookie to prevent redirect loop race condition
     // The proxy checks this cookie and bypasses needsOnboarding check for 30s
