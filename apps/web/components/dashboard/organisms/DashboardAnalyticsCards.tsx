@@ -14,6 +14,9 @@ type CityRange = Extract<AnalyticsRange, '7d' | '30d' | '90d'>;
 // Clipboard feedback delay in milliseconds
 const CLIPBOARD_FEEDBACK_DELAY_MS = 1500;
 
+// Reusable number formatter (created once, not on every render)
+const numberFormatter = new Intl.NumberFormat();
+
 interface DashboardAnalyticsCardsProps {
   profileUrl?: string;
   range?: CityRange;
@@ -57,11 +60,18 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     return 'Last 90 days';
   }, [range]);
 
-  // Run count-up animation when data changes
+  // Track the current displayed value for animation start
+  const displayedValueRef = useRef(0);
+
+  // Run count-up animation when profile_views changes
   useEffect(() => {
     const duration = 800; // ms
-    const startValue = displayProfileViews;
+    const startValue = displayedValueRef.current;
     const endValue = data?.profile_views ?? 0;
+
+    // Skip animation if no change
+    if (startValue === endValue) return;
+
     const startTime = performance.now();
     let raf = 0;
 
@@ -72,6 +82,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
       const nextValue = Math.round(
         startValue + (endValue - startValue) * eased
       );
+      displayedValueRef.current = nextValue;
       setDisplayProfileViews(nextValue);
       if (t < 1) {
         raf = requestAnimationFrame(step);
@@ -80,18 +91,17 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, displayProfileViews]);
+  }, [data?.profile_views]);
 
-  const profileViewsLabel = useMemo(() => {
-    const value = displayProfileViews;
-    return Intl.NumberFormat().format(value);
-  }, [displayProfileViews]);
+  const profileViewsLabel = useMemo(
+    () => numberFormatter.format(displayProfileViews),
+    [displayProfileViews]
+  );
 
-  const uniqueUsersLabel = useMemo(() => {
-    const value = data?.unique_users ?? 0;
-    return Intl.NumberFormat().format(value);
-  }, [data?.unique_users]);
+  const uniqueUsersLabel = useMemo(
+    () => numberFormatter.format(data?.unique_users ?? 0),
+    [data?.unique_users]
+  );
 
   const showInitialSkeleton = loading && !data;
   const showEmpty =

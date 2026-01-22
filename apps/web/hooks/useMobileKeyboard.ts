@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Detects when the mobile virtual keyboard is visible.
@@ -46,16 +46,33 @@ export function useMobileKeyboard() {
  * Should be called on input focus events.
  */
 export function useScrollIntoViewOnFocus() {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   const scrollIntoView = useCallback((element: HTMLElement | null) => {
     if (!element) return;
 
+    // Clear any pending scroll
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
     // Small delay to let keyboard appear
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       element.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
         inline: 'nearest',
       });
+      timeoutRef.current = null;
     }, 300);
   }, []);
 
