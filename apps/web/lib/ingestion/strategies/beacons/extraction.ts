@@ -94,8 +94,9 @@ function extractDisplayName(
     extractMetaContent(html, 'twitter:title');
 
   if (metaName) return cleanBeaconsDisplayName(metaName);
-  if (jsonLdData?.name) return jsonLdData.name;
-  if (beaconsData.displayName) return beaconsData.displayName;
+  if (jsonLdData?.name) return cleanBeaconsDisplayName(jsonLdData.name);
+  if (beaconsData.displayName)
+    return cleanBeaconsDisplayName(beaconsData.displayName);
   return null;
 }
 

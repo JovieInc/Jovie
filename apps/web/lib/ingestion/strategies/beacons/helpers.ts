@@ -239,14 +239,21 @@ function addToCollector(state: LinkCollectorState, link: StructuredLink): void {
   state.structured.push(link);
 }
 
+/** Maximum recursion depth for collecting nested links */
+const MAX_RECURSION_DEPTH = 20;
+
 /**
  * Recursively collect links from a value and its nested collections.
  */
-function collectLinks(state: LinkCollectorState, value: unknown): void {
-  if (!value) return;
+function collectLinks(
+  state: LinkCollectorState,
+  value: unknown,
+  depth = 0
+): void {
+  if (!value || depth >= MAX_RECURSION_DEPTH) return;
 
   if (Array.isArray(value)) {
-    for (const entry of value) collectLinks(state, entry);
+    for (const entry of value) collectLinks(state, entry, depth + 1);
     return;
   }
 
@@ -259,7 +266,7 @@ function collectLinks(state: LinkCollectorState, value: unknown): void {
   // Recurse into nested collections
   const nestedKeys = ['links', 'items', 'children', 'buttons'] as const;
   for (const key of nestedKeys) {
-    if (candidate[key]) collectLinks(state, candidate[key]);
+    if (candidate[key]) collectLinks(state, candidate[key], depth + 1);
   }
 }
 
