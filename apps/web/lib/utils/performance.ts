@@ -1,6 +1,6 @@
 // Simple performance monitoring utility
 class PerformanceMonitor {
-  private metrics: Map<string, number[]> = new Map();
+  private readonly metrics: Map<string, number[]> = new Map();
 
   startTimer(operation: string): () => void {
     const start = performance.now();

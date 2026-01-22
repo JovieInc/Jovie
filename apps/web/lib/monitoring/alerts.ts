@@ -5,6 +5,27 @@ import { track } from '@/lib/analytics';
 // Define alert severity levels
 export type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
 
+/**
+ * Non-mutating sort helper with a safe fallback for older runtimes.
+ * Uses `Array.prototype.toSorted` when available, otherwise clones and sorts.
+ */
+function toSorted<T>(
+  arr: readonly T[],
+  compareFn: (a: T, b: T) => number
+): T[] {
+  const maybeToSorted = (
+    arr as unknown as {
+      toSorted?: (compareFn: (a: T, b: T) => number) => T[];
+    }
+  ).toSorted;
+
+  if (typeof maybeToSorted === 'function') {
+    return maybeToSorted.call(arr, compareFn);
+  }
+
+  return [...arr].sort(compareFn);
+}
+
 // Define alert rule interface
 export interface AlertRule {
   metric: string;
@@ -176,9 +197,10 @@ export class PerformanceAlerts {
       }
 
       // Get the most recent metrics (up to 10)
-      const recentMetrics = relevantMetrics
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 10);
+      const recentMetrics = toSorted(
+        relevantMetrics,
+        (a, b) => b.timestamp - a.timestamp
+      ).slice(0, 10);
 
       // Calculate the average value
       const sum = recentMetrics.reduce((acc, m) => acc + m.value, 0);

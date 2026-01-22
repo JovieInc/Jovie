@@ -14,12 +14,6 @@ export interface BotDetectionResult {
   asn?: number;
 }
 
-// Meta/Facebook ASNs that should be handled carefully
-// const META_ASNS = [
-//   32934, // Facebook, Inc.
-//   63293, // Facebook, Inc.
-// ];
-
 // Conservative bot detection - only block obvious crawlers on sensitive endpoints
 const META_USER_AGENTS = [
   'facebookexternalhit',
@@ -54,7 +48,6 @@ export function detectBot(
   endpoint?: string
 ): BotDetectionResult {
   const userAgent = request.headers.get('user-agent') || '';
-  // const ip = request.headers.get('x-forwarded-for') || '';
 
   // Check for Meta crawlers
   const isMeta = META_USER_AGENTS.some(agent =>
@@ -81,7 +74,6 @@ export function detectBot(
   } else if (isKnownCrawler) {
     reason = 'Known crawler detected';
     // Don't block other crawlers to avoid anti-cloaking issues
-    shouldBlock = false;
   }
 
   return {
@@ -164,7 +156,6 @@ export function createBotResponse(status: number = 204): Response {
  */
 export function isSuspiciousRequest(request: NextRequest): boolean {
   const userAgent = request.headers.get('user-agent') || '';
-  // const referer = request.headers.get('referer') || '';
 
   // Check for suspicious patterns
   const suspiciousPatterns = [

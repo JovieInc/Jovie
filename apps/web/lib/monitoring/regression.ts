@@ -8,8 +8,8 @@ import { track } from '@/lib/analytics';
  */
 export class RegressionDetector {
   private metrics: Record<string, number[]> = {};
-  private thresholds: Record<string, number> = {};
-  private maxSamples: number = 100;
+  private readonly thresholds: Record<string, number> = {};
+  private readonly maxSamples: number = 100;
 
   /**
    * Create a new regression detector

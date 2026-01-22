@@ -43,7 +43,7 @@ export const fullNameSchema = z
   .string()
   .min(1, { message: 'Full name is required' })
   .max(50, { message: 'Must be no more than 50 characters' })
-  .regex(/^[\p{L}0-9\s\-'\.]+$/u, {
+  .regex(/^[\p{L}0-9\s\-'.]+$/u, {
     message:
       'Only letters, numbers, spaces, hyphens, apostrophes, and periods are allowed',
   });
