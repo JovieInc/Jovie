@@ -85,6 +85,7 @@ export function useAdminSocialLinksQuery({
     staleTime: 5 * MINUTE,
     gcTime: 30 * MINUTE,
     refetchOnMount: false,
+    placeholderData: previousData => previousData,
     refetchOnWindowFocus: process.env.NODE_ENV === 'production',
   });
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo } from 'react';
+import { startTransition, useCallback, useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { STATSIG_FLAGS } from '@/lib/flags';
@@ -95,6 +95,15 @@ export function EnhancedDashboardLinks({
     onSyncSuggestions: undefined, // Will be set after useSuggestionSync
   });
 
+  const initialSuggestionsData = useMemo(() => {
+    const suggested = (initialLinks || []).filter(l => l.state === 'suggested');
+    const versions = suggested
+      .map(l => l.version ?? 1)
+      .filter(v => typeof v === 'number');
+    const maxVersion = versions.length > 0 ? Math.max(...versions) : 1;
+    return suggested.length ? { links: suggested, maxVersion } : undefined;
+  }, [initialLinks]);
+
   // Suggestion sync hook - polling pauses when sidebar is open
   const { handleAcceptSuggestion, handleDismissSuggestion } = useSuggestionSync(
     {
@@ -107,6 +116,7 @@ export function EnhancedDashboardLinks({
       setLinks,
       setSuggestedLinks,
       sidebarOpen,
+      initialSuggestionsData,
     }
   );
 
@@ -155,13 +165,15 @@ export function EnhancedDashboardLinks({
 
   // Sync preview data
   useEffect(() => {
-    setPreviewData({
-      username,
-      displayName,
-      avatarUrl: avatarUrl || null,
-      links: dashboardLinks,
-      profilePath,
-    });
+    startTransition(() =>
+      setPreviewData({
+        username,
+        displayName,
+        avatarUrl: avatarUrl || null,
+        links: dashboardLinks,
+        profilePath,
+      })
+    );
   }, [
     avatarUrl,
     dashboardLinks,
