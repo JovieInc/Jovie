@@ -23,7 +23,7 @@ import type { AdminCreatorProfileRow, IngestRefreshStatus } from '../types';
 
 export interface ContextMenuDependencies {
   ingestRefreshStatuses: Record<string, IngestRefreshStatus>;
-  refreshIngest: (profileId: string) => Promise<void>;
+  refreshIngest: (profileId: string) => void;
   toggleVerification: (
     id: string,
     verified: boolean

@@ -159,6 +159,7 @@ export function AdminCreatorProfilesUnified({
   } = useContactHydration({
     profiles: filteredProfiles,
     selectedId,
+    enabled: sidebarOpen,
   });
 
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
@@ -209,10 +210,8 @@ export function AdminCreatorProfilesUnified({
     [setDraftContact]
   );
 
-  React.useEffect(() => {
-    if (!sidebarOpen || !selectedId) return;
-    void hydrateContactSocialLinks(selectedId);
-  }, [hydrateContactSocialLinks, selectedId, sidebarOpen]);
+  // Contact hydration now happens automatically via TanStack Query
+  // when selectedId changes and sidebarOpen is true (enabled prop)
 
   const { handleKeyDown } = useAdminTableKeyboardNavigation({
     items: filteredProfiles,
