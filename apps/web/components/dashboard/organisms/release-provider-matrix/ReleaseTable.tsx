@@ -357,39 +357,40 @@ export function ReleaseTable({
     toggleSelectAll,
   ]);
 
-  // Context menu items for right-click
-  const getContextMenuItems = (
-    release: ReleaseViewModel
-  ): ContextMenuItemType[] => {
-    return [
-      {
-        id: 'edit',
-        label: 'Edit links',
-        icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
-        onClick: () => onEdit(release),
-      },
-      {
-        id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void onCopy(
-            release.smartLinkPath,
-            `${release.title} smart link`,
-            `smart-link-copy-${release.id}`
-          );
+  // Context menu items for right-click - memoized to prevent recreation
+  const getContextMenuItems = useCallback(
+    (release: ReleaseViewModel): ContextMenuItemType[] => {
+      return [
+        {
+          id: 'edit',
+          label: 'Edit links',
+          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          onClick: () => onEdit(release),
         },
-      },
-      {
-        id: 'copy-release-id',
-        label: 'Copy release ID',
-        icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          navigator.clipboard.writeText(release.id);
+        {
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            );
+          },
         },
-      },
-    ];
-  };
+        {
+          id: 'copy-release-id',
+          label: 'Copy release ID',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.id);
+          },
+        },
+      ];
+    },
+    [onEdit, onCopy]
+  );
 
   // Fixed min width - availability column consolidates all providers
   const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
