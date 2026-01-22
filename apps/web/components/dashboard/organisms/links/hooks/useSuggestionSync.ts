@@ -131,11 +131,12 @@ export function useSuggestionSync({
   // - Sidebar open: disable polling entirely
   // - Auto-refresh mode or fast polling: use fixed 2s interval
   // - Otherwise: use adaptive polling with backoff
-  const refetchInterval = sidebarOpen
-    ? false
-    : autoRefreshUntilMs
-      ? 2000
-      : 'adaptive';
+  function getRefetchInterval(): false | number | 'adaptive' {
+    if (sidebarOpen) return false;
+    if (autoRefreshUntilMs) return 2000;
+    return 'adaptive';
+  }
+  const refetchInterval = getRefetchInterval();
 
   // Use TanStack Query for fetching and polling suggestions
   const { data, refetch } = useSuggestionsQuery({
