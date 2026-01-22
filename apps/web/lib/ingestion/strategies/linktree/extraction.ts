@@ -24,6 +24,29 @@ import {
 } from './helpers';
 import { detectLinktreePaidTier } from './paid-tier';
 
+/** Schemes that should be blocked for security and relevance */
+const BLOCKED_SCHEMES = [
+  'javascript:',
+  'mailto:',
+  'tel:',
+  'data:',
+  'vbscript:',
+] as const;
+
+/**
+ * Check if a normalized href is a valid extractable URL.
+ * Returns true if the URL should be extracted.
+ */
+function isExtractableHref(normalized: string): boolean {
+  // Block dangerous schemes (case-insensitive via normalization)
+  for (const scheme of BLOCKED_SCHEMES) {
+    if (normalized.startsWith(scheme)) return false;
+  }
+
+  // Require explicit https scheme (reject http or protocol-relative)
+  return normalized.startsWith('https://');
+}
+
 /**
  * Extracts profile data and links from Linktree HTML.
  *
@@ -107,18 +130,9 @@ export function extractLinktree(html: string): ExtractionResult {
     const rawHref = match[1];
     if (!rawHref || rawHref.startsWith('#')) continue;
 
-    // Normalize and trim to prevent bypass via whitespace/case
+    // Normalize and validate the href
     const normalized = normalizeString(rawHref);
-
-    // Block dangerous schemes (case-insensitive)
-    if (normalized.startsWith('javascript:')) continue;
-    if (normalized.startsWith('mailto:')) continue;
-    if (normalized.startsWith('tel:')) continue;
-    if (normalized.startsWith('data:')) continue;
-    if (normalized.startsWith('vbscript:')) continue;
-
-    // Require explicit https scheme (reject http or protocol-relative)
-    if (!normalized.startsWith('https://')) continue;
+    if (!isExtractableHref(normalized)) continue;
 
     addLink(rawHref);
   }
