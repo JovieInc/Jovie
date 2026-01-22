@@ -108,22 +108,20 @@ export function ArtistNotificationsCTA({
   const shouldShowCountrySelector = channel === 'sms' && phoneInput.length > 0;
 
   if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
-    if (variant === 'button') {
-      return (
-        <CTAButton
-          href={`/${artist.handle}?mode=listen`}
-          variant='primary'
-          size='lg'
-          className='w-full'
-        >
-          Listen Now
-        </CTAButton>
-      );
-    }
+    const listenHref = `/${artist.handle}?mode=listen`;
 
-    return (
+    return variant === 'button' ? (
+      <CTAButton
+        href={listenHref}
+        variant='primary'
+        size='lg'
+        className='w-full'
+      >
+        Listen Now
+      </CTAButton>
+    ) : (
       <Link
-        href={`/${artist.handle}?mode=listen`}
+        href={listenHref}
         prefetch
         className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
       >
@@ -154,34 +152,32 @@ export function ArtistNotificationsCTA({
     <div className='space-y-3'>
       <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
         <div className='flex items-center'>
-          {channel === 'sms' && shouldShowCountrySelector && (
+          {channel === 'sms' && shouldShowCountrySelector ? (
             <CountrySelector
               country={country}
               isOpen={isCountryOpen}
               onOpenChange={setIsCountryOpen}
               onSelect={setCountry}
             />
-          )}
-          {channel === 'sms' && !shouldShowCountrySelector && (
+          ) : (
             <button
               type='button'
               className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
-              aria-label='Switch to email updates'
-              onClick={() => handleChannelChange('email')}
+              aria-label={
+                channel === 'sms'
+                  ? 'Switch to email updates'
+                  : 'Switch to text updates'
+              }
+              onClick={() =>
+                handleChannelChange(channel === 'sms' ? 'email' : 'sms')
+              }
               disabled={isSubmitting}
             >
-              <Phone className='w-4 h-4' aria-hidden='true' />
-            </button>
-          )}
-          {channel !== 'sms' && (
-            <button
-              type='button'
-              className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
-              aria-label='Switch to text updates'
-              onClick={() => handleChannelChange('sms')}
-              disabled={isSubmitting}
-            >
-              <Mail className='w-4 h-4' aria-hidden='true' />
+              {channel === 'sms' ? (
+                <Phone className='w-4 h-4' aria-hidden='true' />
+              ) : (
+                <Mail className='w-4 h-4' aria-hidden='true' />
+              )}
             </button>
           )}
 

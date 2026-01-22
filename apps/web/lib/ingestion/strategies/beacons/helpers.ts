@@ -162,6 +162,30 @@ interface BeaconsPageProps {
 }
 
 /**
+ * Try to extract a URL from a candidate object.
+ * Returns the URL and optional title if found, null otherwise.
+ */
+function extractUrlFromCandidate(
+  candidate: Record<string, unknown>
+): StructuredLink | null {
+  const urlCandidate = (candidate.url ?? candidate.linkUrl ?? candidate.href) as
+    | string
+    | null
+    | undefined;
+
+  if (typeof urlCandidate !== 'string') return null;
+
+  return {
+    url: urlCandidate,
+    title:
+      (candidate.title as string | undefined) ??
+      (candidate.name as string | undefined) ??
+      (candidate.label as string | undefined) ??
+      (candidate.text as string | undefined),
+  };
+}
+
+/**
  * Extracts structured links from Beacons Next.js page data.
  */
 export function extractBeaconsStructuredLinks(html: string): StructuredLink[] {
@@ -194,38 +218,30 @@ export function extractBeaconsStructuredLinks(html: string): StructuredLink[] {
 
   const collect = (value: unknown) => {
     if (!value) return;
+
     if (Array.isArray(value)) {
-      for (const entry of value) {
-        collect(entry);
-      }
+      for (const entry of value) collect(entry);
       return;
     }
 
     if (typeof value !== 'object') return;
-    const candidate = value as Record<string, unknown>;
-    const urlCandidate = (candidate.url ??
-      candidate.linkUrl ??
-      candidate.href) as string | null | undefined;
 
-    if (typeof urlCandidate === 'string') {
-      const key = urlCandidate.trim();
+    const candidate = value as Record<string, unknown>;
+    const link = extractUrlFromCandidate(candidate);
+
+    if (link?.url) {
+      const key = link.url.trim();
       if (!seen.has(key)) {
         seen.add(key);
-        structured.push({
-          url: urlCandidate,
-          title:
-            (candidate.title as string | undefined) ??
-            (candidate.name as string | undefined) ??
-            (candidate.label as string | undefined) ??
-            (candidate.text as string | undefined),
-        });
+        structured.push(link);
       }
     }
 
-    if (candidate.links) collect(candidate.links);
-    if (candidate.items) collect(candidate.items);
-    if (candidate.children) collect(candidate.children);
-    if (candidate.buttons) collect(candidate.buttons);
+    // Recurse into nested collections
+    const nestedKeys = ['links', 'items', 'children', 'buttons'] as const;
+    for (const key of nestedKeys) {
+      if (candidate[key]) collect(candidate[key]);
+    }
   };
 
   for (const collection of candidateCollections) {
