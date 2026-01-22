@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import {
   type FormEvent,
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -70,7 +71,7 @@ interface AvailabilityCellProps {
  * Shows a compact summary of available providers with a popover
  * containing full details and actions for all providers.
  */
-export function AvailabilityCell({
+export const AvailabilityCell = memo(function AvailabilityCell({
   release,
   allProviders,
   providerConfig,
@@ -411,4 +412,4 @@ export function AvailabilityCell({
       </PopoverContent>
     </Popover>
   );
-}
+});
