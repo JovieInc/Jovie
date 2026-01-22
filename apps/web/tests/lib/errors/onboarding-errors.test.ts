@@ -62,4 +62,50 @@ describe('onboardingErrorToError', () => {
     expect(mapped.retryable).toBe(true);
     expect(mapped.message).toBe('Profile creation failed. Please try again');
   });
+
+  it('maps custom EMAIL_IN_USE exception from SQL function', () => {
+    const dbError = {
+      message: 'EMAIL_IN_USE: Email already belongs to another user',
+      code: '23505',
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
+    expect(mapped.message).toBe('Email is already in use');
+  });
+
+  it('extracts error details from deeply nested Neon error structure', () => {
+    const dbError = {
+      message: 'Database operation failed',
+      cause: {
+        error: {
+          code: '23505',
+          constraint: 'users_email_unique',
+          detail: 'Key (email)=(test@example.com) already exists.',
+        },
+      },
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
+  });
+
+  it('extracts error from errors array', () => {
+    const dbError = {
+      message: 'Multiple errors occurred',
+      errors: [
+        {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+          detail: 'Key (email)=(test@example.com) already exists.',
+        },
+      ],
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
+  });
 });
