@@ -17,4 +17,3 @@ if (result.signal) {
 }
 
 process.exit(result.status ?? 1);
-
