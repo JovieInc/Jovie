@@ -15,6 +15,93 @@ import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
 
+/**
+ * Listen Now CTA - shown when notifications are disabled or in idle state
+ */
+function ListenNowCTA({
+  variant,
+  handle,
+}: {
+  variant: 'button' | 'link';
+  handle: string;
+}) {
+  const listenHref = `/${handle}?mode=listen`;
+
+  if (variant === 'button') {
+    return (
+      <CTAButton
+        href={listenHref}
+        variant='primary'
+        size='lg'
+        className='w-full'
+      >
+        Listen Now
+      </CTAButton>
+    );
+  }
+
+  return (
+    <Link
+      href={listenHref}
+      prefetch
+      className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
+    >
+      Listen Now
+    </Link>
+  );
+}
+
+/**
+ * Success state - shown when user has subscribed
+ */
+function SubscriptionSuccess() {
+  return (
+    <div className='space-y-1'>
+      <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
+        <Bell className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
+        <span className='font-semibold'>Subscribed to notifications</span>
+      </div>
+      <p className='text-xs text-center text-secondary-token'>
+        You&apos;ll now receive updates from this artist. Tap the bell to add
+        another channel or unsubscribe.
+      </p>
+    </div>
+  );
+}
+
+interface ChannelToggleProps {
+  channel: 'email' | 'sms';
+  isSubmitting: boolean;
+  onChannelChange: (channel: 'email' | 'sms') => void;
+}
+
+/**
+ * Channel toggle button (Email <-> SMS)
+ */
+function ChannelToggle({
+  channel,
+  isSubmitting,
+  onChannelChange,
+}: ChannelToggleProps) {
+  return (
+    <button
+      type='button'
+      className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+      aria-label={
+        channel === 'sms' ? 'Switch to email updates' : 'Switch to text updates'
+      }
+      onClick={() => onChannelChange(channel === 'sms' ? 'email' : 'sms')}
+      disabled={isSubmitting}
+    >
+      {channel === 'sms' ? (
+        <Phone className='w-4 h-4' aria-hidden='true' />
+      ) : (
+        <Mail className='w-4 h-4' aria-hidden='true' />
+      )}
+    </button>
+  );
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -108,44 +195,11 @@ export function ArtistNotificationsCTA({
   const shouldShowCountrySelector = channel === 'sms' && phoneInput.length > 0;
 
   if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
-    const listenHref = `/${artist.handle}?mode=listen`;
-
-    return variant === 'button' ? (
-      <CTAButton
-        href={listenHref}
-        variant='primary'
-        size='lg'
-        className='w-full'
-      >
-        Listen Now
-      </CTAButton>
-    ) : (
-      <Link
-        href={listenHref}
-        prefetch
-        className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
-      >
-        Listen Now
-      </Link>
-    );
+    return <ListenNowCTA variant={variant} handle={artist.handle} />;
   }
 
   if (isSubscribed) {
-    return (
-      <div className='space-y-1'>
-        <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
-          <Bell
-            className='w-5 h-5 mr-2 text-accent-bright'
-            aria-hidden='true'
-          />
-          <span className='font-semibold'>Subscribed to notifications</span>
-        </div>
-        <p className='text-xs text-center text-secondary-token'>
-          You&apos;ll now receive updates from this artist. Tap the bell to add
-          another channel or unsubscribe.
-        </p>
-      </div>
-    );
+    return <SubscriptionSuccess />;
   }
 
   return (
@@ -160,25 +214,11 @@ export function ArtistNotificationsCTA({
               onSelect={setCountry}
             />
           ) : (
-            <button
-              type='button'
-              className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
-              aria-label={
-                channel === 'sms'
-                  ? 'Switch to email updates'
-                  : 'Switch to text updates'
-              }
-              onClick={() =>
-                handleChannelChange(channel === 'sms' ? 'email' : 'sms')
-              }
-              disabled={isSubmitting}
-            >
-              {channel === 'sms' ? (
-                <Phone className='w-4 h-4' aria-hidden='true' />
-              ) : (
-                <Mail className='w-4 h-4' aria-hidden='true' />
-              )}
-            </button>
+            <ChannelToggle
+              channel={channel}
+              isSubmitting={isSubmitting}
+              onChannelChange={handleChannelChange}
+            />
           )}
 
           <div className='flex-1 min-w-0'>
