@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -63,6 +64,15 @@ import WaitlistPage from '../../app/waitlist/page';
 
 global.fetch = mockFetch as unknown as typeof fetch;
 
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
 describe('WaitlistPage', () => {
   test('clears waitlist session storage when user changes', async () => {
     window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
@@ -70,7 +80,12 @@ describe('WaitlistPage', () => {
 
     mockUserId = 'user-two';
 
-    render(<WaitlistPage />);
+    const queryClient = createTestQueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WaitlistPage />
+      </QueryClientProvider>
+    );
 
     await waitFor(() => {
       expect(

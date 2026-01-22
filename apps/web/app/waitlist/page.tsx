@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
 import {
   ALLOWED_PLANS,
@@ -22,6 +22,8 @@ import { WaitlistPrimaryGoalStep } from '@/components/waitlist/WaitlistPrimaryGo
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
+import { captureWarning } from '@/lib/error-tracking';
+import { useWaitlistStatusQuery } from '@/lib/queries/useWaitlistStatusQuery';
 
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn, userId } = useAuth();
@@ -46,6 +48,11 @@ export default function WaitlistPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+
+  // TanStack Query for waitlist status (cached, deduplicated)
+  const { data: waitlistStatus } = useWaitlistStatusQuery(
+    isLoaded && isSignedIn === true
+  );
 
   const primaryGoalButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const socialPlatformButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -169,6 +176,7 @@ export default function WaitlistPage() {
     heardAbout,
   ]);
 
+  // Handle user ID changes and sync storage
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     try {
@@ -185,83 +193,74 @@ export default function WaitlistPage() {
     } catch {
       // Ignore storage errors
     }
-    void (async () => {
-      try {
-        const response = await fetch('/api/waitlist', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const data = (await response.json().catch(() => null)) as {
-          hasEntry: boolean;
-          status: string | null;
-          inviteToken: string | null;
-        } | null;
+  }, [isLoaded, isSignedIn, userId]);
 
-        if (!response.ok || !data) return;
+  // Handle waitlist status from TanStack Query (cached, deduplicated)
+  useEffect(() => {
+    if (!waitlistStatus) return;
 
-        if (data.hasEntry) {
-          if (data.status === 'invited' && data.inviteToken) {
-            clearWaitlistStorage();
-            router.replace(`/claim/${encodeURIComponent(data.inviteToken)}`);
-            return;
-          }
-
-          if (data.status === 'claimed') {
-            clearWaitlistStorage();
-            router.replace('/app/dashboard');
-            return;
-          }
-          clearWaitlistStorage();
-          try {
-            window.sessionStorage.setItem(
-              WAITLIST_STORAGE_KEYS.submitted,
-              'true'
-            );
-          } catch {
-            // Ignore storage errors
-          }
-          setIsSubmitted(true);
-          return;
-        }
-
+    if (waitlistStatus.hasEntry) {
+      if (waitlistStatus.status === 'invited' && waitlistStatus.inviteToken) {
         clearWaitlistStorage();
-        setIsSubmitted(false);
+        router.replace(
+          `/claim/${encodeURIComponent(waitlistStatus.inviteToken)}`
+        );
+        return;
+      }
+
+      if (waitlistStatus.status === 'claimed') {
+        clearWaitlistStorage();
+        router.replace('/app/dashboard');
+        return;
+      }
+
+      clearWaitlistStorage();
+      try {
+        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
       } catch {
-        // Ignore fetch errors; page can still be used.
+        // Ignore storage errors
       }
-    })();
-  }, [isLoaded, isSignedIn, router]);
-
-  const validateStep = (targetStep: 0 | 1 | 2): FormErrors => {
-    const errors: FormErrors = {};
-
-    if (targetStep === 0) {
-      if (!primaryGoal) {
-        errors.primaryGoal = ['Primary goal is required'];
-      }
+      setIsSubmitted(true);
+      return;
     }
 
-    if (targetStep === 1) {
-      const resolvedUrl = resolvePrimarySocialUrl(
-        primarySocialUrl,
-        socialPlatform
-      );
+    clearWaitlistStorage();
+    setIsSubmitted(false);
+  }, [waitlistStatus, router]);
 
-      if (!primarySocialUrl.trim()) {
-        errors.primarySocialUrl = ['Social profile link is required'];
-      } else if (!isValidUrl(resolvedUrl)) {
-        errors.primarySocialUrl = ['Please enter a valid URL'];
+  const validateStep = useCallback(
+    (targetStep: 0 | 1 | 2): FormErrors => {
+      const errors: FormErrors = {};
+
+      if (targetStep === 0) {
+        if (!primaryGoal) {
+          errors.primaryGoal = ['Primary goal is required'];
+        }
       }
-    }
 
-    if (targetStep === 2) {
-      if (spotifyUrl.trim() && !isValidUrl(spotifyUrl)) {
-        errors.spotifyUrl = ['Please enter a valid Spotify URL'];
+      if (targetStep === 1) {
+        const resolvedUrl = resolvePrimarySocialUrl(
+          primarySocialUrl,
+          socialPlatform
+        );
+
+        if (!primarySocialUrl.trim()) {
+          errors.primarySocialUrl = ['Social profile link is required'];
+        } else if (!isValidUrl(resolvedUrl)) {
+          errors.primarySocialUrl = ['Please enter a valid URL'];
+        }
       }
-    }
 
-    return errors;
-  };
+      if (targetStep === 2) {
+        if (spotifyUrl.trim() && !isValidUrl(spotifyUrl)) {
+          errors.spotifyUrl = ['Please enter a valid Spotify URL'];
+        }
+      }
+
+      return errors;
+    },
+    [primaryGoal, primarySocialUrl, socialPlatform, spotifyUrl]
+  );
 
   const handleNext = () => {
     setError('');
@@ -390,10 +389,10 @@ export default function WaitlistPage() {
 
       if (!contentType.includes('application/json')) {
         const text = await response.text();
-        console.error(
-          '[Waitlist Page] Received non-JSON response:',
-          text.substring(0, 500)
-        );
+        void captureWarning('Waitlist API returned non-JSON response', null, {
+          contentType,
+          responsePreview: text.substring(0, 500),
+        });
         throw new Error(`Expected JSON but got ${contentType}`);
       }
 
@@ -416,7 +415,10 @@ export default function WaitlistPage() {
       }
       setIsSubmitted(true);
     } catch (err) {
-      console.error('Waitlist signup error:', err);
+      void captureWarning('Waitlist signup error', err, {
+        primaryGoal,
+        socialPlatform,
+      });
       setError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);

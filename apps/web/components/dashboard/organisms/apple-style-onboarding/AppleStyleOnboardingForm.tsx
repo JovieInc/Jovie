@@ -110,6 +110,8 @@ export function AppleStyleOnboardingForm({
     return null;
   }, [handleInput, handleValidation, state.error, state.isSubmitting]);
 
+  // Trigger handle validation when input changes
+  // Pacer hook handles debouncing (400ms) and caching internally
   useEffect(() => {
     if (!handleInput) {
       setHandleValidation({
@@ -122,13 +124,8 @@ export function AppleStyleOnboardingForm({
       return;
     }
 
-    const timer = setTimeout(() => {
-      void validateHandle(handleInput);
-    }, 400);
-
-    return () => {
-      clearTimeout(timer);
-    };
+    // Call validateHandle directly - Pacer handles debouncing
+    validateHandle(handleInput);
   }, [handleInput, setHandleValidation, validateHandle]);
 
   const copyProfileLink = useCallback(() => {
