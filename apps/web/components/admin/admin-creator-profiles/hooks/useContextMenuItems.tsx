@@ -64,7 +64,7 @@ export function useContextMenuItems({
           id: 'refresh-ingest',
           label: 'Refresh ingest',
           icon: <RefreshCw className='h-3.5 w-3.5' />,
-          onClick: () => void refreshIngest(profile.id),
+          onClick: () => refreshIngest(profile.id),
           disabled: refreshIngestStatus === 'loading',
         });
         items.push({ type: 'separator' as const });
