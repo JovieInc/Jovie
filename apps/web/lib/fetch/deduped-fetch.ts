@@ -177,6 +177,9 @@ export async function dedupedFetchWithMeta<T = unknown>(
   if (!forceRefresh) {
     const cached = responseCache.get(key);
     if (cached && cached.expiresAt > now) {
+      // Refresh access order for true LRU semantics
+      responseCache.delete(key);
+      responseCache.set(key, cached);
       return {
         data: cached.data as T,
         fromCache: true,

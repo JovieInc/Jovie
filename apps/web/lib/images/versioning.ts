@@ -14,7 +14,11 @@ export function generateImageHash(url: string, timestamp?: number): string {
   const cacheKey = `${url}_${timestamp || ''}`;
 
   if (hashCache.has(cacheKey)) {
-    return hashCache.get(cacheKey)!;
+    const cached = hashCache.get(cacheKey)!;
+    // Refresh access order for true LRU semantics
+    hashCache.delete(cacheKey);
+    hashCache.set(cacheKey, cached);
+    return cached;
   }
 
   // Simple hash function that works in edge runtime
