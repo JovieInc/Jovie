@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -23,7 +23,9 @@ interface SmartLinkCellProps {
  * Note: Clipboard write is handled by CopyLinkInput component.
  * This component only shows the toast notification.
  */
-export function SmartLinkCell({ release }: SmartLinkCellProps) {
+export const SmartLinkCell = memo(function SmartLinkCell({
+  release,
+}: SmartLinkCellProps) {
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
   const smartLinkTestId = `smart-link-copy-${release.id}`;
 
@@ -43,4 +45,4 @@ export function SmartLinkCell({ release }: SmartLinkCellProps) {
       testId={smartLinkTestId}
     />
   );
-}
+});
