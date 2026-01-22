@@ -14,24 +14,33 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from './index';
 import { creatorProfiles, users } from './schema';
 
+// Common field selections to reduce duplication
+const userCoreFields = {
+  id: users.id,
+  clerkId: users.clerkId,
+  email: users.email,
+  isAdmin: users.isAdmin,
+  isPro: users.isPro,
+  userStatus: users.userStatus,
+} as const;
+
+const profileCoreFields = {
+  id: creatorProfiles.id,
+  userId: creatorProfiles.userId,
+  username: creatorProfiles.username,
+  usernameNormalized: creatorProfiles.usernameNormalized,
+  displayName: creatorProfiles.displayName,
+  avatarUrl: creatorProfiles.avatarUrl,
+  isPublic: creatorProfiles.isPublic,
+  isClaimed: creatorProfiles.isClaimed,
+} as const;
+
 /**
  * Prepared statement for user lookup by Clerk ID.
  * Used by: getDbUser(), authentication checks
- *
- * Usage:
- * ```typescript
- * const [user] = await getUserByClerkIdPrepared.execute({ clerkId: 'user_xxx' });
- * ```
  */
 export const getUserByClerkIdPrepared = db
-  .select({
-    id: users.id,
-    clerkId: users.clerkId,
-    email: users.email,
-    isAdmin: users.isAdmin,
-    isPro: users.isPro,
-    userStatus: users.userStatus,
-  })
+  .select(userCoreFields)
   .from(users)
   .where(eq(users.clerkId, sql.placeholder('clerkId')))
   .limit(1)
@@ -40,22 +49,10 @@ export const getUserByClerkIdPrepared = db
 /**
  * Prepared statement for profile lookup by user ID.
  * Used by: getProfileByDbUserId(), profile fetching
- *
- * Usage:
- * ```typescript
- * const [profile] = await getProfileByUserIdPrepared.execute({ userId: 'uuid' });
- * ```
  */
 export const getProfileByUserIdPrepared = db
   .select({
-    id: creatorProfiles.id,
-    userId: creatorProfiles.userId,
-    username: creatorProfiles.username,
-    usernameNormalized: creatorProfiles.usernameNormalized,
-    displayName: creatorProfiles.displayName,
-    avatarUrl: creatorProfiles.avatarUrl,
-    isPublic: creatorProfiles.isPublic,
-    isClaimed: creatorProfiles.isClaimed,
+    ...profileCoreFields,
     onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
   })
   .from(creatorProfiles)
@@ -72,22 +69,15 @@ export const getProfileByUserIdPrepared = db
  * Prepared statement for combined session context (single query).
  * Combines user and profile lookup into one database round trip.
  * Used by: getSessionContext()
- *
- * Usage:
- * ```typescript
- * const [result] = await getSessionContextPrepared.execute({ clerkId: 'user_xxx' });
- * ```
  */
 export const getSessionContextPrepared = db
   .select({
-    // User fields
     userId: users.id,
     userClerkId: users.clerkId,
     userEmail: users.email,
     userIsAdmin: users.isAdmin,
     userIsPro: users.isPro,
     userStatus: users.userStatus,
-    // Profile fields (nullable from LEFT JOIN)
     profileId: creatorProfiles.id,
     profileUserId: creatorProfiles.userId,
     profileUsername: creatorProfiles.username,
@@ -113,23 +103,11 @@ export const getSessionContextPrepared = db
 /**
  * Prepared statement for profile lookup by username.
  * Used by: public profile pages, profile fetching
- *
- * Usage:
- * ```typescript
- * const [profile] = await getProfileByUsernamePrepared.execute({ username: 'johndoe' });
- * ```
  */
 export const getProfileByUsernamePrepared = db
   .select({
-    id: creatorProfiles.id,
-    userId: creatorProfiles.userId,
-    username: creatorProfiles.username,
-    usernameNormalized: creatorProfiles.usernameNormalized,
-    displayName: creatorProfiles.displayName,
+    ...profileCoreFields,
     bio: creatorProfiles.bio,
-    avatarUrl: creatorProfiles.avatarUrl,
-    isPublic: creatorProfiles.isPublic,
-    isClaimed: creatorProfiles.isClaimed,
     isVerified: creatorProfiles.isVerified,
     venmoHandle: creatorProfiles.venmoHandle,
     creatorType: creatorProfiles.creatorType,
