@@ -20,7 +20,7 @@
     "check": "pnpm run validate && pnpm run build && pnpm run test",
     "check:ci": "pnpm run validate && pnpm run test:ci",
     "validate": "pnpm run next:proxy-guard && pnpm run biome:check && pnpm run typecheck",
-    "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest",
+    "test": "NODE_OPTIONS=--max-old-space-size=4096 node scripts/vitest-wrapper.mjs",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --config=vitest.config.mts",

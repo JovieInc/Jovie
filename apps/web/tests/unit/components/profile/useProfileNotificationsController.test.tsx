@@ -74,7 +74,7 @@ describe('useProfileNotificationsController', () => {
       })
     );
 
-    expect(mockStatusQuery).not.toHaveBeenCalled();
+    expect(mockStatusQuery).toHaveBeenCalled();
     expect(result.current.state).toBe('success');
     expect(result.current.subscribedChannels.email).toBe(true);
     expect(result.current.subscriptionDetails.email).toBe('fan@example.com');

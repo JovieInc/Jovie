@@ -2,7 +2,8 @@
  * Customer Sync Tests - Successful Queries & Selective Field Retrieval
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import module once after mocks are set up
+// Ensure mocks are registered before importing the module under test
+import './customer-sync.test-utils';
 import {
   BILLING_FIELDS_CUSTOMER,
   BILLING_FIELDS_FULL,

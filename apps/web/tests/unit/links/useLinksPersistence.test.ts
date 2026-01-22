@@ -56,6 +56,8 @@ import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links
 import { useLinksPersistence } from '@/components/dashboard/organisms/links/hooks/useLinksPersistence';
 import type { LinkItem } from '@/components/dashboard/organisms/links/types';
 
+const EMPTY_INITIAL_LINKS: ProfileSocialLink[] = [];
+
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
@@ -117,12 +119,14 @@ describe('useLinksPersistence', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    // Avoid restoreAllMocks here: this file relies on module-level vi.mock()
+    // overrides (debounce, toast). Restoring mocks can revert those mid-suite
+    // and lead to real timers/handles leaking across tests.
   });
 
   describe('initialization', () => {
     it('should initialize with active links from initialLinks', () => {
-      const initialLinks = [
+      const initialLinks: ProfileSocialLink[] = [
         createMockProfileLink({ state: 'active' }),
         createMockProfileLink({ state: 'suggested' }),
       ];
@@ -142,7 +146,7 @@ describe('useLinksPersistence', () => {
     });
 
     it('should initialize version from max version in initialLinks', () => {
-      const initialLinks = [
+      const initialLinks: ProfileSocialLink[] = [
         createMockProfileLink({ version: 3 }),
         createMockProfileLink({ version: 5 }),
         createMockProfileLink({ version: 2 }),
@@ -163,7 +167,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -177,7 +181,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -212,7 +216,9 @@ describe('useLinksPersistence', () => {
     });
 
     it('should include expectedVersion for optimistic locking', async () => {
-      const initialLinks = [createMockProfileLink({ version: 3 })];
+      const initialLinks: ProfileSocialLink[] = [
+        createMockProfileLink({ version: 3 }),
+      ];
 
       const { result } = renderHook(() =>
         useLinksPersistence({
@@ -238,7 +244,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -264,7 +270,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -293,11 +299,14 @@ describe('useLinksPersistence', () => {
       });
 
       const onSyncSuggestions = vi.fn().mockResolvedValue(undefined);
+      const initialLinks: ProfileSocialLink[] = [
+        createMockProfileLink({ version: 3 }),
+      ];
 
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [createMockProfileLink({ version: 3 })],
+          initialLinks,
           suggestionsEnabled: false,
           onSyncSuggestions,
         })
@@ -330,7 +339,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -350,7 +359,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -370,7 +379,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: undefined,
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -394,7 +403,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -409,7 +418,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -433,7 +442,7 @@ describe('useLinksPersistence', () => {
 
   describe('linksRef', () => {
     it('should provide ref to current links for async access', () => {
-      const initialLinks = [createMockProfileLink()];
+      const initialLinks: ProfileSocialLink[] = [createMockProfileLink()];
 
       const { result } = renderHook(() =>
         useLinksPersistence({
@@ -450,7 +459,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -473,7 +482,7 @@ describe('useLinksPersistence', () => {
 
   describe('suggestions', () => {
     it('should separate suggested links from active links', () => {
-      const initialLinks = [
+      const initialLinks: ProfileSocialLink[] = [
         createMockProfileLink({ state: 'active' }),
         createMockProfileLink({ state: 'suggested', platform: 'twitter' }),
         createMockProfileLink({ state: 'active', platform: 'tiktok' }),
