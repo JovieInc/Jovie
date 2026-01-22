@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { memo } from 'react';
 import { ContactItemActions } from '@/components/dashboard/atoms/ContactItemActions';
 import { ContactPreferredChannel } from '@/components/dashboard/atoms/ContactPreferredChannel';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
@@ -33,7 +34,7 @@ export interface ContactItemProps {
   onDelete: () => void;
 }
 
-export function ContactItem({
+export const ContactItem = memo(function ContactItem({
   contact,
   onUpdate,
   onToggleTerritory,
@@ -135,4 +136,4 @@ export function ContactItem({
       )}
     </div>
   );
-}
+});

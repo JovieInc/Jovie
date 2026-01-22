@@ -48,6 +48,7 @@ export const REALTIME_CACHE: Partial<UseQueryOptions> = {
   refetchOnMount: 'always',
   refetchOnWindowFocus: true,
   refetchInterval: 30 * SECOND, // Poll every 30s - see JSDoc for control guidance
+  refetchIntervalInBackground: false, // Stop polling when tab is not visible
 };
 
 /**
