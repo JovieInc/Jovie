@@ -26,6 +26,97 @@ import {
 import { detectBeaconsPaidTier } from './paid-tier';
 
 /**
+ * Validates and processes a raw URL for link extraction.
+ * Returns the normalized link data or null if invalid.
+ */
+function processLink(
+  rawUrl: string | undefined | null,
+  title: string | null | undefined,
+  seen: Set<string>
+): ExtractionResult['links'][number] | null {
+  if (!rawUrl) return null;
+
+  try {
+    const normalizedUrl = normalizeUrl(rawUrl);
+    const parsed = new URL(normalizedUrl);
+    if (parsed.protocol !== 'https:') return null;
+    if (SKIP_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+
+    const detected = detectPlatform(normalizedUrl);
+    if (!detected.isValid) return null;
+
+    const key = canonicalIdentity({
+      platform: detected.platform,
+      normalizedUrl: detected.normalizedUrl,
+    });
+    if (seen.has(key)) return null;
+    seen.add(key);
+
+    return {
+      url: detected.normalizedUrl,
+      platformId: detected.platform.id,
+      title: detected.suggestedTitle ?? title ?? undefined,
+      sourcePlatform: 'beacons',
+      evidence: {
+        sources: ['beacons'],
+        signals: ['beacons_profile_link'],
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts display name and avatar using fallback sources.
+ */
+function extractProfileMetadata(html: string): {
+  displayName: string | null;
+  avatarUrl: string | null;
+} {
+  // Try meta tags first
+  let displayName =
+    extractMetaContent(html, 'og:title') ??
+    extractMetaContent(html, 'twitter:title') ??
+    null;
+
+  if (displayName) {
+    displayName = cleanBeaconsDisplayName(displayName);
+  }
+
+  let avatarUrl =
+    extractMetaContent(html, 'og:image') ??
+    extractMetaContent(html, 'twitter:image') ??
+    null;
+
+  if (avatarUrl && isDefaultBeaconsImage(avatarUrl)) {
+    avatarUrl = null;
+  }
+
+  // Try JSON-LD fallback
+  if (!displayName || !avatarUrl) {
+    const jsonLdData = extractJsonLd(html);
+    displayName ??= jsonLdData?.name ?? null;
+    if (
+      !avatarUrl &&
+      jsonLdData?.image &&
+      !isDefaultBeaconsImage(jsonLdData.image)
+    ) {
+      avatarUrl = jsonLdData.image;
+    }
+  }
+
+  // Try Beacons-specific fallback
+  if (!displayName || !avatarUrl) {
+    const beaconsData = extractBeaconsSpecificData(html);
+    displayName ??= beaconsData.displayName ?? null;
+    avatarUrl ??= beaconsData.avatarUrl ?? null;
+  }
+
+  return { displayName, avatarUrl };
+}
+
+/**
  * Extracts profile data and links from Beacons.ai HTML.
  *
  * Handles multiple extraction methods:
@@ -38,109 +129,24 @@ export function extractBeacons(html: string): ExtractionResult {
   const links: ExtractionResult['links'] = [];
   const seen = new Set<string>();
 
-  const addLink = (
-    rawUrl: string | undefined | null,
-    title?: string | null
-  ) => {
-    if (!rawUrl) return;
-
-    try {
-      const normalizedUrl = normalizeUrl(rawUrl);
-      const parsed = new URL(normalizedUrl);
-      if (parsed.protocol !== 'https:') return;
-      if (SKIP_HOSTS.has(parsed.hostname.toLowerCase())) return;
-
-      const detected = detectPlatform(normalizedUrl);
-      if (!detected.isValid) return;
-
-      const key = canonicalIdentity({
-        platform: detected.platform,
-        normalizedUrl: detected.normalizedUrl,
-      });
-      if (seen.has(key)) return;
-      seen.add(key);
-
-      links.push({
-        url: detected.normalizedUrl,
-        platformId: detected.platform.id,
-        title: detected.suggestedTitle ?? title ?? undefined,
-        sourcePlatform: 'beacons',
-        evidence: {
-          sources: ['beacons'],
-          signals: ['beacons_profile_link'],
-        },
-      });
-    } catch {
-      return;
-    }
-  };
-
-  const structuredLinks = extractBeaconsStructuredLinks(html);
-  for (const link of structuredLinks) {
-    addLink(link.url, link.title);
+  // Extract structured links
+  for (const link of extractBeaconsStructuredLinks(html)) {
+    const processed = processLink(link.url, link.title, seen);
+    if (processed) links.push(processed);
   }
 
+  // Extract fallback links
   const fallbackLinks = extractLinks(html, {
     skipHosts: SKIP_HOSTS,
     sourcePlatform: 'beacons',
     sourceSignal: 'beacons_profile_link',
   });
-
   for (const link of fallbackLinks) {
-    addLink(link.url, link.title);
+    const processed = processLink(link.url, link.title, seen);
+    if (processed) links.push(processed);
   }
 
-  // Extract display name from meta tags
-  let displayName =
-    extractMetaContent(html, 'og:title') ??
-    extractMetaContent(html, 'twitter:title') ??
-    null;
-
-  // Clean up display name (remove " | Beacons" or similar suffixes)
-  if (displayName) {
-    displayName = cleanBeaconsDisplayName(displayName);
-  }
-
-  // Extract avatar from meta tags
-  let avatarUrl =
-    extractMetaContent(html, 'og:image') ??
-    extractMetaContent(html, 'twitter:image') ??
-    null;
-
-  // Beacons sometimes uses a default OG image, try to detect and skip it
-  if (avatarUrl && isDefaultBeaconsImage(avatarUrl)) {
-    avatarUrl = null;
-  }
-
-  // Try to extract from JSON-LD if meta tags are missing
-  if (!displayName || !avatarUrl) {
-    const jsonLdData = extractJsonLd(html);
-    if (jsonLdData) {
-      if (!displayName && jsonLdData.name) {
-        displayName = jsonLdData.name;
-      }
-      if (
-        !avatarUrl &&
-        jsonLdData.image &&
-        !isDefaultBeaconsImage(jsonLdData.image)
-      ) {
-        avatarUrl = jsonLdData.image;
-      }
-    }
-  }
-
-  // Try Beacons-specific extraction methods
-  if (!displayName || !avatarUrl) {
-    const beaconsData = extractBeaconsSpecificData(html);
-    if (!displayName && beaconsData.displayName) {
-      displayName = beaconsData.displayName;
-    }
-    if (!avatarUrl && beaconsData.avatarUrl) {
-      avatarUrl = beaconsData.avatarUrl;
-    }
-  }
-
-  // Detect paid tier by checking for branding
+  const { displayName, avatarUrl } = extractProfileMetadata(html);
   const hasPaidTier = detectBeaconsPaidTier(html);
 
   return createExtractionResult(links, displayName, avatarUrl, hasPaidTier);
