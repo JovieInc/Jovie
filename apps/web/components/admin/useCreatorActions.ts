@@ -57,161 +57,112 @@ export function useCreatorActions(
     };
   }, []);
 
-  const resetStatus = useCallback((profileId: string, delay = 2200) => {
-    const previousTimeout = statusTimeoutsRef.current[profileId];
-    if (previousTimeout) {
-      clearTimeout(previousTimeout);
-    }
+  const setStatus = useCallback(
+    (profileId: string, status: CreatorActionStatus) => {
+      setStatuses(prev => ({ ...prev, [profileId]: status }));
+    },
+    []
+  );
 
-    statusTimeoutsRef.current[profileId] = setTimeout(() => {
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'idle',
-      }));
-      delete statusTimeoutsRef.current[profileId];
-    }, delay);
-  }, []);
+  const resetStatus = useCallback(
+    (profileId: string, delay = 2200) => {
+      const previousTimeout = statusTimeoutsRef.current[profileId];
+      if (previousTimeout) {
+        clearTimeout(previousTimeout);
+      }
+
+      statusTimeoutsRef.current[profileId] = setTimeout(() => {
+        setStatus(profileId, 'idle');
+        delete statusTimeoutsRef.current[profileId];
+      }, delay);
+    },
+    [setStatus]
+  );
+
+  const updateProfile = useCallback(
+    <K extends keyof AdminCreatorProfileRow>(
+      profileId: string,
+      field: K,
+      value: AdminCreatorProfileRow[K]
+    ) => {
+      setProfiles(prev =>
+        prev.map(p => (p.id === profileId ? { ...p, [field]: value } : p))
+      );
+    },
+    []
+  );
 
   const toggleFeatured = useCallback(
     async (profileId: string, nextFeatured: boolean) => {
-      // Optimistic update
-      setProfiles(prev =>
-        prev.map(profile =>
-          profile.id === profileId
-            ? { ...profile, isFeatured: nextFeatured }
-            : profile
-        )
-      );
-
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'loading',
-      }));
+      updateProfile(profileId, 'isFeatured', nextFeatured);
+      setStatus(profileId, 'loading');
 
       try {
         await toggleFeaturedMutation.mutateAsync({ profileId, nextFeatured });
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
+        setStatus(profileId, 'success');
         resetStatus(profileId);
-
         return { success: true };
       } catch (error) {
+        updateProfile(profileId, 'isFeatured', !nextFeatured);
+        setStatus(profileId, 'error');
+        resetStatus(profileId);
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Failed to update featured status';
-
-        // Revert optimistic update
-        setProfiles(prev =>
-          prev.map(profile =>
-            profile.id === profileId
-              ? { ...profile, isFeatured: !nextFeatured }
-              : profile
-          )
-        );
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'error',
-        }));
-        resetStatus(profileId);
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus, toggleFeaturedMutation]
+    [resetStatus, setStatus, updateProfile, toggleFeaturedMutation]
   );
 
   const toggleMarketing = useCallback(
     async (profileId: string, nextMarketingOptOut: boolean) => {
-      // Optimistic update
-      setProfiles(prev =>
-        prev.map(profile =>
-          profile.id === profileId
-            ? { ...profile, marketingOptOut: nextMarketingOptOut }
-            : profile
-        )
-      );
-
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'loading',
-      }));
+      updateProfile(profileId, 'marketingOptOut', nextMarketingOptOut);
+      setStatus(profileId, 'loading');
 
       try {
         await toggleMarketingMutation.mutateAsync({
           profileId,
           nextMarketingOptOut,
         });
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
+        setStatus(profileId, 'success');
         resetStatus(profileId);
-
         return { success: true };
       } catch (error) {
+        updateProfile(profileId, 'marketingOptOut', !nextMarketingOptOut);
+        setStatus(profileId, 'error');
+        resetStatus(profileId);
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Failed to update marketing preferences';
-
-        // Revert optimistic update
-        setProfiles(prev =>
-          prev.map(profile =>
-            profile.id === profileId
-              ? { ...profile, marketingOptOut: !nextMarketingOptOut }
-              : profile
-          )
-        );
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'error',
-        }));
-        resetStatus(profileId);
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus, toggleMarketingMutation]
+    [resetStatus, setStatus, updateProfile, toggleMarketingMutation]
   );
 
   const deleteCreatorOrUser = useCallback(
     async (profileId: string) => {
-      setStatuses(prev => ({
-        ...prev,
-        [profileId]: 'loading',
-      }));
+      setStatus(profileId, 'loading');
 
       try {
         await deleteCreatorMutation.mutateAsync({ profileId });
-
-        // Remove from local state
         setProfiles(prev => prev.filter(p => p.id !== profileId));
-
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
-
+        setStatus(profileId, 'success');
         return { success: true };
       } catch (error) {
+        setStatus(profileId, 'error');
+        resetStatus(profileId);
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Failed to delete creator/user';
-        setStatuses(prev => ({
-          ...prev,
-          [profileId]: 'error',
-        }));
-        resetStatus(profileId);
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus, deleteCreatorMutation]
+    [resetStatus, setStatus, deleteCreatorMutation]
   );
 
   return {

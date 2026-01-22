@@ -31,84 +31,61 @@ interface ToggleMarketingResponse extends CreatorActionResponse {
   marketingOptOut?: boolean;
 }
 
-// Mutation functions
-async function toggleFeatured(
-  input: ToggleFeaturedInput
-): Promise<ToggleFeaturedResponse> {
-  const response = await fetch('/app/admin/creators/toggle-featured', {
+// Common fetch helper
+async function postJSON<T>(
+  url: string,
+  body: unknown,
+  errorMessage: string
+): Promise<T> {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(input),
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
   });
 
   const payload = (await response.json().catch(() => ({}))) as {
     success?: boolean;
-    isFeatured?: boolean;
     error?: string;
-  };
+  } & T;
 
   if (!response.ok || !payload.success) {
-    throw new Error(payload.error ?? 'Failed to update featured status');
+    throw new Error(payload.error ?? errorMessage);
   }
 
-  return {
-    success: true,
-    isFeatured: payload.isFeatured,
-  };
+  return payload;
+}
+
+// Mutation functions
+async function toggleFeatured(
+  input: ToggleFeaturedInput
+): Promise<ToggleFeaturedResponse> {
+  const payload = await postJSON<{ isFeatured?: boolean }>(
+    '/app/admin/creators/toggle-featured',
+    input,
+    'Failed to update featured status'
+  );
+  return { success: true, isFeatured: payload.isFeatured };
 }
 
 async function toggleMarketing(
   input: ToggleMarketingInput
 ): Promise<ToggleMarketingResponse> {
-  const response = await fetch('/app/admin/creators/toggle-marketing', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    success?: boolean;
-    marketingOptOut?: boolean;
-    error?: string;
-  };
-
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.error ?? 'Failed to update marketing preferences');
-  }
-
-  return {
-    success: true,
-    marketingOptOut: payload.marketingOptOut,
-  };
+  const payload = await postJSON<{ marketingOptOut?: boolean }>(
+    '/app/admin/creators/toggle-marketing',
+    input,
+    'Failed to update marketing preferences'
+  );
+  return { success: true, marketingOptOut: payload.marketingOptOut };
 }
 
 async function deleteCreator(
   input: DeleteCreatorInput
 ): Promise<CreatorActionResponse> {
-  const response = await fetch('/app/admin/creators/delete', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    success?: boolean;
-    error?: string;
-  };
-
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.error ?? 'Failed to delete creator/user');
-  }
-
+  await postJSON(
+    '/app/admin/creators/delete',
+    input,
+    'Failed to delete creator/user'
+  );
   return { success: true };
 }
 
