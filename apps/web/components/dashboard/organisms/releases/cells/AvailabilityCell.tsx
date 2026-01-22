@@ -103,6 +103,12 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const availableCount = release.providers.filter(p => p.url).length;
   const totalCount = allProviders.length;
 
+  // Memoize sliced providers for compact display
+  const compactProviders = useMemo(
+    () => allProviders.slice(0, 4),
+    [allProviders]
+  );
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -197,7 +203,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         >
           {/* Compact provider icons */}
           <div className='flex -space-x-1'>
-            {allProviders.slice(0, 4).map(providerKey => {
+            {compactProviders.map(providerKey => {
               const status = getProviderStatus(providerKey);
               const dspId = PROVIDER_TO_DSP[providerKey];
               const config = providerConfig[providerKey];
