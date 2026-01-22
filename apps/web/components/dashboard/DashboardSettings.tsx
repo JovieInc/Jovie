@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -23,7 +23,9 @@ export interface DashboardSettingsProps {
   focusSection?: string;
 }
 
-export function DashboardSettings({ focusSection }: DashboardSettingsProps) {
+export const DashboardSettings = memo(function DashboardSettings({
+  focusSection,
+}: DashboardSettingsProps) {
   const dashboardData = useDashboardData();
   const [artist, setArtist] = useState<Artist | null>(
     dashboardData.selectedProfile
@@ -46,4 +48,4 @@ export function DashboardSettings({ focusSection }: DashboardSettingsProps) {
       />
     </div>
   );
-}
+});

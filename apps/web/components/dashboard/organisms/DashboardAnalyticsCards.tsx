@@ -2,7 +2,7 @@
 
 import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -20,7 +20,7 @@ interface DashboardAnalyticsCardsProps {
   refreshSignal?: number;
 }
 
-export function DashboardAnalyticsCards({
+export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
   profileUrl,
   range = '7d',
   refreshSignal,
@@ -221,4 +221,4 @@ export function DashboardAnalyticsCards({
       </div>
     </div>
   );
-}
+});
