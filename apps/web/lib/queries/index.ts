@@ -175,6 +175,17 @@ export {
   type PricingOptionsResponse,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
+// Profile editor mutations (TanStack Query + Pacer integration)
+export {
+  type ProfileData,
+  type ProfileUpdateInput,
+  type ProfileUpdateResponse,
+  type UseAvatarMutationOptions,
+  type UseProfileMutationOptions,
+  useAvatarMutation,
+  useProfileMutation,
+  useProfileSaveMutation,
+} from './useProfileMutation';
 // Public profile query
 export {
   type PublicProfileData,
