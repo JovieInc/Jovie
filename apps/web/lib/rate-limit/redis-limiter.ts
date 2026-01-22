@@ -20,7 +20,7 @@ function toUpstashWindow(
   const normalized = window.replaceAll(/\s+/g, '');
 
   // Map our format to Upstash format
-  const match = normalized.match(/^(\d+)(s|m|h|d)$/);
+  const match = normalized.match(/^(\d+)([smhd])$/);
   if (!match) {
     throw new Error(`Invalid window format: ${window}`);
   }

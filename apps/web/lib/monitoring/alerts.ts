@@ -177,7 +177,7 @@ export class PerformanceAlerts {
 
       // Get the most recent metrics (up to 10)
       const recentMetrics = relevantMetrics
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .toSorted((a, b) => b.timestamp - a.timestamp)
         .slice(0, 10);
 
       // Calculate the average value
