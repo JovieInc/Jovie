@@ -2,6 +2,27 @@
 
 import { cn } from '@/lib/utils';
 
+/** Get color class based on contribution score threshold */
+function getContributionColorClass(contribution: number): string {
+  if (contribution >= 10) return 'text-green-600 dark:text-green-400';
+  if (contribution >= 5) return 'text-amber-600 dark:text-amber-400';
+  return 'text-tertiary-token';
+}
+
+/** Get color class based on percentage threshold */
+function getPercentageColorClass(percentage: number): string {
+  if (percentage >= 80) return 'bg-green-500';
+  if (percentage >= 50) return 'bg-amber-500';
+  return 'bg-red-500/60';
+}
+
+/** Get total score color class */
+function getTotalScoreColorClass(percentage: number): string {
+  if (percentage >= 80) return 'text-green-600 dark:text-green-400';
+  if (percentage >= 50) return 'text-amber-600 dark:text-amber-400';
+  return 'text-red-600 dark:text-red-400';
+}
+
 export interface ConfidenceBreakdownData {
   isrcMatchScore: number;
   upcMatchScore: number;
@@ -80,11 +101,7 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
           <span
             className={cn(
               'font-medium',
-              contribution >= 10
-                ? 'text-green-600 dark:text-green-400'
-                : contribution >= 5
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-tertiary-token'
+              getContributionColorClass(contribution)
             )}
           >
             +{contribution}%
@@ -97,11 +114,7 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
         <div
           className={cn(
             'h-full rounded-full transition-all',
-            percentage >= 80
-              ? 'bg-green-500'
-              : percentage >= 50
-                ? 'bg-amber-500'
-                : 'bg-red-500/60'
+            getPercentageColorClass(percentage)
           )}
           style={{ width: `${percentage}%` }}
         />
@@ -164,11 +177,7 @@ export function MatchConfidenceBreakdown({
           <span
             className={cn(
               'font-semibold',
-              totalPercentage >= 80
-                ? 'text-green-600 dark:text-green-400'
-                : totalPercentage >= 50
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-red-600 dark:text-red-400'
+              getTotalScoreColorClass(totalPercentage)
             )}
           >
             {totalPercentage}%

@@ -28,6 +28,107 @@ interface OnboardingHandleStepProps {
   isPendingSubmit?: boolean;
 }
 
+function ValidationIcon({
+  checking,
+  hasError,
+  isValid,
+}: {
+  checking: boolean;
+  hasError: boolean;
+  isValid: boolean;
+}) {
+  if (checking) {
+    return <LoadingSpinner size='sm' className='text-secondary-token' />;
+  }
+
+  if (hasError) {
+    return (
+      <svg
+        viewBox='0 0 20 20'
+        fill='none'
+        aria-hidden='true'
+        className='h-5 w-5'
+      >
+        <circle
+          cx='10'
+          cy='10'
+          r='9'
+          stroke='currentColor'
+          className='text-error'
+          strokeWidth='2'
+        />
+        <path
+          d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
+          stroke='currentColor'
+          className='text-error'
+          strokeWidth='2'
+          strokeLinecap='round'
+        />
+      </svg>
+    );
+  }
+
+  if (isValid) {
+    return (
+      <svg
+        viewBox='0 0 20 20'
+        fill='none'
+        aria-hidden='true'
+        className='h-5 w-5'
+      >
+        <circle
+          cx='10'
+          cy='10'
+          r='9'
+          stroke='currentColor'
+          className='text-success'
+          strokeWidth='2'
+        />
+        <path
+          d='M6 10.2l2.6 2.6L14 7.4'
+          stroke='currentColor'
+          className='text-success'
+          strokeWidth='2'
+          strokeLinecap='round'
+          strokeLinejoin='round'
+        />
+      </svg>
+    );
+  }
+
+  return null;
+}
+
+function ButtonContent({
+  isSubmitting,
+  isPendingSubmit,
+  isChecking,
+}: {
+  isSubmitting: boolean;
+  isPendingSubmit: boolean;
+  isChecking: boolean;
+}) {
+  if (isSubmitting) {
+    return (
+      <div className='flex items-center justify-center space-x-2'>
+        <LoadingSpinner size='sm' className='text-current' />
+        <span>Saving…</span>
+      </div>
+    );
+  }
+
+  if (isPendingSubmit && isChecking) {
+    return (
+      <div className='flex items-center justify-center space-x-2'>
+        <LoadingSpinner size='sm' className='text-current' />
+        <span>Checking…</span>
+      </div>
+    );
+  }
+
+  return <>Continue</>;
+}
+
 export function OnboardingHandleStep({
   title,
   prompt,
@@ -108,58 +209,15 @@ export function OnboardingHandleStep({
                 className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
               />
               <div className='h-5 w-5 flex items-center justify-center'>
-                {handleValidation.checking ? (
-                  <LoadingSpinner size='sm' className='text-secondary-token' />
-                ) : stateError || handleValidation.error ? (
-                  <svg
-                    viewBox='0 0 20 20'
-                    fill='none'
-                    aria-hidden='true'
-                    className='h-5 w-5'
-                  >
-                    <circle
-                      cx='10'
-                      cy='10'
-                      r='9'
-                      stroke='currentColor'
-                      className='text-error'
-                      strokeWidth='2'
-                    />
-                    <path
-                      d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
-                      stroke='currentColor'
-                      className='text-error'
-                      strokeWidth='2'
-                      strokeLinecap='round'
-                    />
-                  </svg>
-                ) : handleInput &&
-                  handleValidation.clientValid &&
-                  handleValidation.available ? (
-                  <svg
-                    viewBox='0 0 20 20'
-                    fill='none'
-                    aria-hidden='true'
-                    className='h-5 w-5'
-                  >
-                    <circle
-                      cx='10'
-                      cy='10'
-                      r='9'
-                      stroke='currentColor'
-                      className='text-success'
-                      strokeWidth='2'
-                    />
-                    <path
-                      d='M6 10.2l2.6 2.6L14 7.4'
-                      stroke='currentColor'
-                      className='text-success'
-                      strokeWidth='2'
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                    />
-                  </svg>
-                ) : null}
+                <ValidationIcon
+                  checking={handleValidation.checking}
+                  hasError={Boolean(stateError || handleValidation.error)}
+                  isValid={
+                    Boolean(handleInput) &&
+                    handleValidation.clientValid &&
+                    handleValidation.available
+                  }
+                />
               </div>
             </div>
 
@@ -178,19 +236,11 @@ export function OnboardingHandleStep({
             disabled={Boolean(ctaDisabledReason) || isTransitioning}
             variant='primary'
           >
-            {isSubmitting ? (
-              <div className='flex items-center justify-center space-x-2'>
-                <LoadingSpinner size='sm' className='text-current' />
-                <span>Saving…</span>
-              </div>
-            ) : isPendingSubmit && handleValidation.checking ? (
-              <div className='flex items-center justify-center space-x-2'>
-                <LoadingSpinner size='sm' className='text-current' />
-                <span>Checking…</span>
-              </div>
-            ) : (
-              'Continue'
-            )}
+            <ButtonContent
+              isSubmitting={isSubmitting}
+              isPendingSubmit={isPendingSubmit}
+              isChecking={handleValidation.checking}
+            />
           </AuthButton>
         </form>
 

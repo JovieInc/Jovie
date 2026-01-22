@@ -6,6 +6,16 @@ import { cn } from '@/lib/utils';
 import type { LinkActionsProps } from './types';
 import { useLinkActionsMenu } from './useLinkActionsMenu';
 
+/** Get icon name for menu item */
+function getMenuItemIcon(
+  itemId: string,
+  isVisible: boolean
+): 'Pencil' | 'Eye' | 'EyeOff' | 'Trash' {
+  if (itemId === 'edit') return 'Pencil';
+  if (itemId === 'toggle') return isVisible ? 'Eye' : 'EyeOff';
+  return 'Trash';
+}
+
 /**
  * LinkActions - Atomic component for link visibility toggle, remove, and drag actions.
  * Uses design system tokens for consistent theming.
@@ -111,15 +121,7 @@ export const LinkActions = memo(function LinkActions({
                 )}
               >
                 <Icon
-                  name={
-                    item.id === 'edit'
-                      ? 'Pencil'
-                      : item.id === 'toggle'
-                        ? isVisible
-                          ? 'Eye'
-                          : 'EyeOff'
-                        : 'Trash'
-                  }
+                  name={getMenuItemIcon(item.id, isVisible)}
                   className='h-4 w-4'
                 />
                 {item.label}
