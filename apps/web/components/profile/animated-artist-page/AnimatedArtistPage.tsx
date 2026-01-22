@@ -60,7 +60,7 @@ export function AnimatedArtistPage({
           </div>
         );
 
-      case 'tip':
+      case 'tip': {
         if (!tippingEnabled) {
           return (
             <motion.div {...fadeUpProps}>
@@ -106,6 +106,7 @@ export function AnimatedArtistPage({
             </main>
           </motion.div>
         );
+      }
 
       default:
         return (

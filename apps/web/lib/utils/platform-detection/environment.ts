@@ -23,9 +23,11 @@ export function getBaseUrl(): string {
     // Client-side: use current origin for local/preview environments
     const { protocol, hostname, port } = window.location;
 
+    const portSuffix = port ? `:${port}` : '';
+
     // For local development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+      return `${protocol}//${hostname}${portSuffix}`;
     }
 
     // For staging or non-production deployments (e.g., Vercel preview URLs)
@@ -33,7 +35,7 @@ export function getBaseUrl(): string {
       PREVIEW_HOSTNAMES.includes(hostname) ||
       hostname.includes('vercel.app')
     ) {
-      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+      return `${protocol}//${hostname}${portSuffix}`;
     }
   }
 

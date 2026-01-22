@@ -1,7 +1,14 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Artist } from '@/types/db';
 
 export type ArtistTheme = 'light' | 'dark' | 'auto';
@@ -46,34 +53,37 @@ export function ArtistThemeProvider({
     }
   }, [artist.theme, setSystemTheme]);
 
-  const handleSetTheme = async (newTheme: ArtistTheme) => {
-    setArtistTheme(newTheme);
-    setIsCustomTheme(true);
+  const handleSetTheme = useCallback(
+    async (newTheme: ArtistTheme) => {
+      setArtistTheme(newTheme);
+      setIsCustomTheme(true);
 
-    // Update the system theme
-    if (newTheme === 'auto') {
-      setSystemTheme('system');
-    } else {
-      setSystemTheme(newTheme);
-    }
+      // Update the system theme
+      if (newTheme === 'auto') {
+        setSystemTheme('system');
+      } else {
+        setSystemTheme(newTheme);
+      }
 
-    // Save theme preference to database
-    try {
-      await fetch('/api/artist/theme', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          artistId: artist.id,
-          theme: newTheme,
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to save theme preference:', error);
-      // Don't throw error - theme change still works locally
-    }
-  };
+      // Save theme preference to database
+      try {
+        await fetch('/api/artist/theme', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            artistId: artist.id,
+            theme: newTheme,
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to save theme preference:', error);
+        // Don't throw error - theme change still works locally
+      }
+    },
+    [artist.id, setSystemTheme]
+  );
 
   // Ensure resolvedTheme is always 'light' or 'dark'
   const safeResolvedTheme: 'light' | 'dark' =
@@ -81,15 +91,19 @@ export function ArtistThemeProvider({
       ? resolvedTheme
       : 'light';
 
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      theme: artistTheme,
+      setTheme: handleSetTheme,
+      resolvedTheme: safeResolvedTheme,
+      isCustomTheme,
+    }),
+    [artistTheme, handleSetTheme, safeResolvedTheme, isCustomTheme]
+  );
+
   return (
-    <ArtistThemeContext.Provider
-      value={{
-        theme: artistTheme,
-        setTheme: handleSetTheme,
-        resolvedTheme: safeResolvedTheme,
-        isCustomTheme,
-      }}
-    >
+    <ArtistThemeContext.Provider value={contextValue}>
       {children}
     </ArtistThemeContext.Provider>
   );

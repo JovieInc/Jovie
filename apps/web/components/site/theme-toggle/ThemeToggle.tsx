@@ -97,7 +97,7 @@ export function ThemeToggle({
       onClick={cycleTheme}
       aria-describedby={shortcutDescription ? shortcutDescriptionId : undefined}
       className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token transition-colors hover:bg-surface-1 focus-ring-themed focus-visible:ring-offset-transparent ${className}`}
-      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}${shortcutDisplay ? ` (${shortcutDisplay})` : ''}`}
+      title={`Current: ${theme === 'system' ? 'auto (' + resolvedTheme + ')' : theme}. Click to switch to ${getNextTheme()}${shortcutDisplay ? ' (' + shortcutDisplay + ')' : ''}`}
     >
       <span
         className='sr-only'

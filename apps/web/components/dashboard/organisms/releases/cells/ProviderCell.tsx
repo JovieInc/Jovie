@@ -126,9 +126,11 @@ function AddProviderUrlPopover({
     );
 
     if (!isValidDomain) {
-      setValidationError(
-        `URL must be from ${allowedDomains.length === 1 ? allowedDomains[0] : `one of: ${allowedDomains.join(', ')}`}`
-      );
+      const domainMsg =
+        allowedDomains.length === 1
+          ? allowedDomains[0]
+          : 'one of: ' + allowedDomains.join(', ');
+      setValidationError(`URL must be from ${domainMsg}`);
       return;
     }
 

@@ -6,7 +6,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -62,6 +62,14 @@ interface ReleaseTableProps {
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
 
+// Date format options (extracted to prevent inline object creation)
+const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
+const DATE_TOOLTIP_FORMAT_OPTIONS = {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+} as const;
+
 /**
  * ReleaseTable - Releases table using UnifiedTable
  *
@@ -105,7 +113,7 @@ export function ReleaseTable({
       if (rowIdSet.has(id)) count++;
     }
     return count;
-  }, [selectedIds, rowIdSet]);
+  }, [selectedIds.size, rowIds.length]);
 
   // Compute header checkbox state based on visible selection
   const headerCheckboxState = useMemo(() => {
@@ -124,21 +132,24 @@ export function ReleaseTable({
     rowIds.length,
   ]);
 
-  const toggleSelect = (id: string) => {
-    if (onSelectionChange) {
-      const newSet = new Set(selectedIds);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+  const toggleSelect = useCallback(
+    (id: string) => {
+      if (onSelectionChange) {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) {
+          newSet.delete(id);
+        } else {
+          newSet.add(id);
+        }
+        onSelectionChange(newSet);
       } else {
-        newSet.add(id);
+        internalSelection.toggleSelect(id);
       }
-      onSelectionChange(newSet);
-    } else {
-      internalSelection.toggleSelect(id);
-    }
-  };
+    },
+    [onSelectionChange, selectedIds.size, internalSelection.toggleSelect]
+  );
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     if (onSelectionChange) {
       // Check if all visible rows are selected
       if (visibleSelectedCount === rowIds.length) {
@@ -159,7 +170,13 @@ export function ReleaseTable({
     } else {
       internalSelection.toggleSelectAll();
     }
-  };
+  }, [
+    onSelectionChange,
+    visibleSelectedCount,
+    rowIds.length,
+    selectedIds.size,
+    internalSelection.toggleSelectAll,
+  ]);
 
   // Build dynamic column definitions
   const columns = useMemo(() => {
@@ -250,12 +267,8 @@ export function ReleaseTable({
           return date ? (
             <DateCell
               date={new Date(date)}
-              formatOptions={{ year: 'numeric' }}
-              tooltipFormatOptions={{
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              }}
+              formatOptions={DATE_FORMAT_OPTIONS}
+              tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
             />
           ) : (
             <span className='text-xs text-tertiary-token'>TBD</span>
@@ -334,13 +347,14 @@ export function ReleaseTable({
     onAddUrl,
     isAddingUrl,
     headerCheckboxState,
-    selectedIds,
-    rowIds,
+    selectedIds.size,
+    releases.length,
     bulkActions,
     onClearSelection,
-    releases.length,
     isSyncing,
     onSync,
+    toggleSelect,
+    toggleSelectAll,
   ]);
 
   // Context menu items for right-click

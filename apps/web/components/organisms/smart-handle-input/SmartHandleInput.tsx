@@ -65,6 +65,24 @@ export function SmartHandleInput({
     value,
   });
 
+  // Compute validation state for input
+  const getValidationState = (): 'invalid' | 'valid' | 'pending' | null => {
+    if (!value) return null;
+    if (handleValidation.error || clientValidation.error) return 'invalid';
+    if (handleValidation.available && clientValidation.valid) return 'valid';
+    if (handleValidation.checking) return 'pending';
+    return null;
+  };
+
+  // Compute status message class
+  const getStatusClass = (): string => {
+    if (!statusMessage) return 'opacity-0';
+    if (handleValidation.available && clientValidation.valid) {
+      return 'text-(--accent-speed) opacity-100';
+    }
+    return 'text-destructive opacity-100';
+  };
+
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Input with prefix and validation icon */}
@@ -81,17 +99,7 @@ export function SmartHandleInput({
           className='font-sans pl-20'
           inputClassName='font-sans'
           id={inputId}
-          validationState={
-            !value
-              ? null
-              : handleValidation.error || clientValidation.error
-                ? 'invalid'
-                : handleValidation.available && clientValidation.valid
-                  ? 'valid'
-                  : handleValidation.checking
-                    ? 'pending'
-                    : null
-          }
+          validationState={getValidationState()}
           statusIcon={
             <ValidationStatusIcon
               showAvailability={showAvailability}
@@ -122,13 +130,7 @@ export function SmartHandleInput({
       {/* Status message */}
       {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
       <div
-        className={`text-xs min-h-5 transition-all duration-300 ${
-          statusMessage
-            ? handleValidation.available && clientValidation.valid
-              ? 'text-(--accent-speed) opacity-100'
-              : 'text-destructive opacity-100'
-            : 'opacity-0'
-        }`}
+        className={`text-xs min-h-5 transition-all duration-300 ${getStatusClass()}`}
         id={statusId}
         role='status'
         aria-live='polite'

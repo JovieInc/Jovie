@@ -89,12 +89,13 @@ export function useLinkActionsMenu({
           setFocusedIndex(0);
           itemRefs.current[0]?.focus();
           break;
-        case 'End':
+        case 'End': {
           e.preventDefault();
           const lastIndex = menuItems.length - 1;
           setFocusedIndex(lastIndex);
           itemRefs.current[lastIndex]?.focus();
           break;
+        }
       }
     },
     [open, menuItems.length, setOpen]

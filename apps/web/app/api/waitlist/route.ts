@@ -103,10 +103,11 @@ async function checkDatabaseConfiguration(
     return { isConfigured: true, hasTable, dbHost };
   } catch (error) {
     logger.error('Waitlist API DB connectivity error', error);
+    const hostSuffix = dbHost ? ` (host: ${dbHost})` : '';
     const debugMsg =
       error instanceof Error
-        ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
-        : `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`;
+        ? `${error.message}${hostSuffix}`
+        : `Database connection failed${hostSuffix}. Check Neon is reachable and credentials are valid.`;
     return {
       isConfigured: true,
       hasTable: false,
@@ -275,9 +276,10 @@ export async function POST(request: Request) {
       return dbCheck.errorResponse;
     }
     if (!dbCheck.hasTable) {
+      const hostInfo = dbCheck.dbHost ? ` (host: ${dbCheck.dbHost})` : '';
       return serviceUnavailableResponse(
         'Waitlist is temporarily unavailable.',
-        `Run pnpm drizzle:migrate to create/update waitlist tables.${dbCheck.dbHost ? ` (host: ${dbCheck.dbHost})` : ''}`,
+        `Run pnpm drizzle:migrate to create/update waitlist tables.${hostInfo}`,
         'waitlist_table_missing'
       );
     }
