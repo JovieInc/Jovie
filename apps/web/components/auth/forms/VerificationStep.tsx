@@ -158,13 +158,12 @@ export function VerificationStep({
                 aria-label='Enter 6-digit verification code'
               />
               <div className={FORM_LAYOUT.errorContainer}>
-                {error ? (
-                  <FormError message={error} id={errorId} />
-                ) : resendSuccess ? (
+                {error && <FormError message={error} id={errorId} />}
+                {!error && resendSuccess && (
                   <p className='text-sm text-green-600 dark:text-green-400 text-center animate-in fade-in-0 duration-200'>
                     New code sent! Check your email.
                   </p>
-                ) : null}
+                )}
               </div>
             </div>
 
@@ -175,19 +174,25 @@ export function VerificationStep({
               aria-busy={isVerifying}
               className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
             >
-              {isCompleting ? (
-                <>
-                  <ButtonSpinner />
-                  <span>Completing signup...</span>
-                </>
-              ) : isVerifying ? (
-                <>
-                  <ButtonSpinner />
-                  <span>Verifying...</span>
-                </>
-              ) : (
-                'Verify code'
-              )}
+              {(() => {
+                if (isCompleting) {
+                  return (
+                    <>
+                      <ButtonSpinner />
+                      <span>Completing signup...</span>
+                    </>
+                  );
+                }
+                if (isVerifying) {
+                  return (
+                    <>
+                      <ButtonSpinner />
+                      <span>Verifying...</span>
+                    </>
+                  );
+                }
+                return 'Verify code';
+              })()}
             </AuthButton>
           </div>
 

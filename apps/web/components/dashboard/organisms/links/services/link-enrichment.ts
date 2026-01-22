@@ -50,8 +50,12 @@ export function getSections<T extends DetectedLink>(
   otherSection: 'social' | 'dsp' | null;
 } {
   const section = sectionOf(link);
-  const otherSection: 'social' | 'dsp' | null =
-    section === 'social' ? 'dsp' : section === 'dsp' ? 'social' : null;
+  let otherSection: 'social' | 'dsp' | null = null;
+  if (section === 'social') {
+    otherSection = 'dsp';
+  } else if (section === 'dsp') {
+    otherSection = 'social';
+  }
 
   return { section, otherSection };
 }

@@ -152,9 +152,10 @@ function ThemeToggleButton({
     );
   }
 
+  const targetMode = isDark ? 'light' : 'dark';
   const srText = isUpdating
     ? 'Updating theme...'
-    : `Switch to ${isDark ? 'light' : 'dark'} mode`;
+    : `Switch to ${targetMode} mode`;
 
   return (
     <Tooltip>

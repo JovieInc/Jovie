@@ -52,36 +52,42 @@ export function TableHeaderCell<TData>({
         width: header.getSize() !== 150 ? header.getSize() : undefined,
       }}
     >
-      {header.isPlaceholder ? null : canSort ? (
-        <button
-          type='button'
-          onClick={onToggleSort}
-          className={cn(
-            tableHeaderClass,
-            'flex w-full items-center gap-2',
-            'hover:bg-surface-2/50 transition-colors rounded-md',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-          )}
-        >
-          {flexRender(header.column.columnDef.header, header.getContext())}
-          {sortDirection && (
-            <Icon
-              name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
-              className={cn('shrink-0', iconColors.sortIndicator)}
-              ariaLabel={
-                sortDirection === 'asc'
-                  ? 'Sorted ascending'
-                  : 'Sorted descending'
-              }
-              size={12}
-            />
-          )}
-        </button>
-      ) : (
-        <div className={cn(tableHeaderClass)}>
-          {flexRender(header.column.columnDef.header, header.getContext())}
-        </div>
-      )}
+      {(() => {
+        if (header.isPlaceholder) return null;
+        if (canSort) {
+          return (
+            <button
+              type='button'
+              onClick={onToggleSort}
+              className={cn(
+                tableHeaderClass,
+                'flex w-full items-center gap-2',
+                'hover:bg-surface-2/50 transition-colors rounded-md',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              )}
+            >
+              {flexRender(header.column.columnDef.header, header.getContext())}
+              {sortDirection && (
+                <Icon
+                  name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
+                  className={cn('shrink-0', iconColors.sortIndicator)}
+                  ariaLabel={
+                    sortDirection === 'asc'
+                      ? 'Sorted ascending'
+                      : 'Sorted descending'
+                  }
+                  size={12}
+                />
+              )}
+            </button>
+          );
+        }
+        return (
+          <div className={cn(tableHeaderClass)}>
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </div>
+        );
+      })()}
     </th>
   );
 }

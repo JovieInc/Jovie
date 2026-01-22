@@ -93,11 +93,14 @@ export async function checkExistingProfile(
 
     const isReingest = !!existing && !existing.isClaimed;
 
-    const finalHandle = existing
-      ? existing.isClaimed
-        ? await findAvailableHandle(tx, usernameNormalized)
-        : existing.usernameNormalized
-      : usernameNormalized;
+    let finalHandle: string | null;
+    if (!existing) {
+      finalHandle = usernameNormalized;
+    } else if (existing.isClaimed) {
+      finalHandle = await findAvailableHandle(tx, usernameNormalized);
+    } else {
+      finalHandle = existing.usernameNormalized;
+    }
 
     if (isReingest && existing) {
       await IngestionStatusManager.markProcessing(tx, existing.id);
