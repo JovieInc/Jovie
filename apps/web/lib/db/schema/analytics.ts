@@ -104,6 +104,12 @@ export const clickEvents = pgTable(
     creatorProfileIsBotCreatedAtIdx: index(
       'click_events_creator_profile_id_is_bot_created_at_idx'
     ).on(table.creatorProfileId, table.isBot, table.createdAt),
+    // Performance index: analytics aggregation by link type
+    linkTypeAnalyticsIndex: index('idx_click_events_link_type').on(
+      table.creatorProfileId,
+      table.linkType,
+      table.createdAt
+    ),
   })
 );
 
@@ -175,6 +181,11 @@ export const tips = pgTable(
   table => ({
     creatorProfileIdx: index('tips_creator_profile_id_idx').on(
       table.creatorProfileId
+    ),
+    // Performance index: monthly tipping stats queries
+    createdAtIndex: index('idx_tips_created_at').on(
+      table.creatorProfileId,
+      table.createdAt
     ),
   })
 );
