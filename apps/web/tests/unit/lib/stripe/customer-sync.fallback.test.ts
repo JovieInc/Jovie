@@ -2,11 +2,12 @@
  * Customer Sync Tests - Migration Fallback Behavior
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+// Ensure mocks are registered before importing the module under test
+import './customer-sync.test-utils';
 import {
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,
 } from '@/lib/stripe/customer-sync';
-// IMPORTANT: Import mocks before importing module-under-test
 import { mockDbSelect } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Migration Fallback', () => {
