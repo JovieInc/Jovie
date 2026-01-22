@@ -72,7 +72,7 @@ export function useContactHydration({
   }, [selectedId, enabled, socialLinks, selectedProfile]);
 
   const refetchSocialLinks = useCallback(() => {
-    void refetch();
+    refetch();
   }, [refetch]);
 
   const effectiveContact = useMemo(() => {
