@@ -5,7 +5,7 @@
  * Uses TanStack Query for polling, version tracking, caching, and mutations.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import {
@@ -126,20 +126,23 @@ export function useSuggestionSync({
   initialSuggestionsData,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
   const [fastPolling, setFastPolling] = useState(false);
-  // Polling interval depends on auto-refresh mode and sidebar state
-  // Pause polling when sidebar is open to reduce unnecessary requests
-  const refetchInterval = useMemo(
-    () => (sidebarOpen ? false : autoRefreshUntilMs ? 2000 : 4500),
-    [autoRefreshUntilMs, sidebarOpen]
-  );
+
+  // Determine polling behavior:
+  // - Sidebar open: disable polling entirely
+  // - Auto-refresh mode or fast polling: use fixed 2s interval
+  // - Otherwise: use adaptive polling with backoff
+  const refetchInterval = sidebarOpen
+    ? false
+    : autoRefreshUntilMs
+      ? 2000
+      : 'adaptive';
 
   // Use TanStack Query for fetching and polling suggestions
-  // Query stays enabled but polling pauses when sidebar is open
   const { data, refetch } = useSuggestionsQuery({
     profileId,
     enabled: suggestionsEnabled && !!profileId,
     refetchInterval,
-    fastPolling,
+    fastPolling: fastPolling || !!autoRefreshUntilMs,
     initialData: initialSuggestionsData,
   });
 

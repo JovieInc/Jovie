@@ -10,7 +10,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { toast } from 'sonner';
 
 import { RightDrawer } from '@/components/organisms/RightDrawer';
@@ -26,7 +26,7 @@ import { useContactSidebar } from './useContactSidebar';
 const CONTEXT_MENU_ITEM_CLASS =
   'rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] [&_svg]:text-tertiary-token hover:[&_svg]:text-secondary-token data-[highlighted]:[&_svg]:text-secondary-token focus-visible:[&_svg]:text-secondary-token';
 
-export function ContactSidebar({
+export const ContactSidebar = memo(function ContactSidebar({
   contact,
   mode,
   isOpen,
@@ -62,12 +62,14 @@ export function ContactSidebar({
     onAvatarUpload,
   });
 
+  // Only depend on specific contact fields, not the entire contact object
+  const username = contact?.username;
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
-    if (!contact) return [];
+    if (!hasContact) return [];
 
     const items: CommonDropdownItem[] = [];
 
-    if (contact.username) {
+    if (username) {
       items.push({
         type: 'action',
         id: 'copy-url',
@@ -82,7 +84,7 @@ export function ContactSidebar({
         id: 'open-profile',
         label: 'Open profile',
         icon: <ExternalLink className='h-4 w-4' />,
-        onClick: () => window.open(`/${contact.username}`, '_blank'),
+        onClick: () => window.open(`/${username}`, '_blank'),
         className: CONTEXT_MENU_ITEM_CLASS,
       });
     }
@@ -115,7 +117,7 @@ export function ContactSidebar({
     });
 
     return items;
-  }, [contact, handleCopyProfileUrl, onRefresh]);
+  }, [hasContact, username, handleCopyProfileUrl, onRefresh]);
 
   return (
     <RightDrawer
@@ -191,4 +193,4 @@ export function ContactSidebar({
       </div>
     </RightDrawer>
   );
-}
+});

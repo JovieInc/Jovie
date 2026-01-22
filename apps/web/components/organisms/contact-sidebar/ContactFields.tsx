@@ -7,7 +7,7 @@
  */
 
 import { Input, Label } from '@jovie/ui';
-import React from 'react';
+import React, { memo } from 'react';
 
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
 
@@ -22,7 +22,7 @@ interface ContactFieldsProps {
   onUsernameChange: (value: string) => void;
 }
 
-export function ContactFields({
+export const ContactFields = memo(function ContactFields({
   firstName,
   lastName,
   username,
@@ -98,4 +98,4 @@ export function ContactFields({
       )}
     </div>
   );
-}
+});

@@ -167,6 +167,13 @@ export const queryKeys = {
     dspStatus: (releaseId: string) =>
       [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
   },
+
+  // Handle availability queries
+  handle: {
+    all: ['handle'] as const,
+    availability: (handle: string) =>
+      [...queryKeys.handle.all, 'availability', handle] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

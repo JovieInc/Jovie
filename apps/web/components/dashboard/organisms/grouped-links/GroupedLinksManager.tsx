@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
@@ -23,7 +23,7 @@ import type { GroupedLinksManagerProps } from './types';
 import { usePendingPreview } from './usePendingPreview';
 import { useSuggestionHandlers } from './useSuggestionHandlers';
 
-export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
+function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
   onLinksChange,
@@ -114,6 +114,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     [links]
   );
 
+  // Memoize platform IDs for UniversalLinkInput to prevent unnecessary re-renders
+  const existingPlatformIds = useMemo(
+    () =>
+      links.filter(l => l.platform.id !== 'youtube').map(l => l.platform.id),
+    [links]
+  );
+
   const hasAnyLinks = links.length > 0;
 
   // Hint state for drag-and-drop validation messages
@@ -167,9 +174,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           <UniversalLinkInput
             ref={linkInputRef}
             onAdd={handleAdd}
-            existingPlatforms={links
-              .filter(l => l.platform.id !== 'youtube')
-              .map(l => l.platform.id)}
+            existingPlatforms={existingPlatformIds}
             creatorName={creatorName}
             prefillUrl={prefillUrl}
             onPrefillConsumed={clearPrefillUrl}
@@ -238,3 +243,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     </section>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders when parent state changes
+export const GroupedLinksManager = memo(
+  GroupedLinksManagerInner
+) as typeof GroupedLinksManagerInner;
