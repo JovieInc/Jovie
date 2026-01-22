@@ -1,4 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -76,11 +77,23 @@ vi.mock('@/components/organisms/UserButton', () => ({
   UserButton: () => <div data-testid='user-button' />,
 }));
 
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
 const renderWithProviders = (ui: ReactNode) => {
+  const queryClient = createTestQueryClient();
   return render(
-    <ToastProvider>
-      <TooltipProvider>{ui}</TooltipProvider>
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <TooltipProvider>{ui}</TooltipProvider>
+      </ToastProvider>
+    </QueryClientProvider>
   );
 };
 

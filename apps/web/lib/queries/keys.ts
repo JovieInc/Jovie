@@ -65,6 +65,8 @@ export const queryKeys = {
       ] as const,
     detail: (id: string) => [...queryKeys.creators.all, 'detail', id] as const,
     featured: () => [...queryKeys.creators.all, 'featured'] as const,
+    socialLinks: (profileId: string) =>
+      [...queryKeys.creators.all, 'social-links', profileId] as const,
   },
 
   // Admin users

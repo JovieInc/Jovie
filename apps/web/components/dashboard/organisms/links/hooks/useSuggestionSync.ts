@@ -61,6 +61,8 @@ export interface UseSuggestionSyncOptions {
   setLinks: React.Dispatch<React.SetStateAction<LinkItem[]>>;
   /** Set suggested links array */
   setSuggestedLinks: React.Dispatch<React.SetStateAction<SuggestedLink[]>>;
+  /** Whether the preview sidebar is open. Pauses polling when true. */
+  sidebarOpen?: boolean;
 }
 
 /**
@@ -114,14 +116,17 @@ export function useSuggestionSync({
   setLinksVersion,
   setLinks,
   setSuggestedLinks,
+  sidebarOpen = false,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
-  // Polling interval depends on whether we're in auto-refresh mode
+  // Polling interval depends on auto-refresh mode and sidebar state
+  // Pause polling when sidebar is open to reduce unnecessary requests
   const refetchInterval = useMemo(
-    () => (autoRefreshUntilMs ? 2000 : 4500),
-    [autoRefreshUntilMs]
+    () => (sidebarOpen ? false : autoRefreshUntilMs ? 2000 : 4500),
+    [autoRefreshUntilMs, sidebarOpen]
   );
 
   // Use TanStack Query for fetching and polling suggestions
+  // Query stays enabled but polling pauses when sidebar is open
   const { data, refetch } = useSuggestionsQuery({
     profileId,
     enabled: suggestionsEnabled && !!profileId,

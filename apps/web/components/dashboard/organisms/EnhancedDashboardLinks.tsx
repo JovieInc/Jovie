@@ -72,6 +72,9 @@ export function EnhancedDashboardLinks({
     handleInputBlur,
   } = useProfileEditor();
 
+  // Get sidebar state early to gate polling
+  const { setPreviewData, isOpen: sidebarOpen } = usePreviewPanel();
+
   // Links persistence hook
   const {
     links,
@@ -92,7 +95,7 @@ export function EnhancedDashboardLinks({
     onSyncSuggestions: undefined, // Will be set after useSuggestionSync
   });
 
-  // Suggestion sync hook
+  // Suggestion sync hook - polling pauses when sidebar is open
   const { handleAcceptSuggestion, handleDismissSuggestion } = useSuggestionSync(
     {
       profileId,
@@ -103,6 +106,7 @@ export function EnhancedDashboardLinks({
       setLinksVersion,
       setLinks,
       setSuggestedLinks,
+      sidebarOpen,
     }
   );
 
@@ -149,9 +153,7 @@ export function EnhancedDashboardLinks({
     [links]
   );
 
-  // Sync preview data and get sidebar state
-  const { setPreviewData, isOpen: sidebarOpen } = usePreviewPanel();
-
+  // Sync preview data
   useEffect(() => {
     setPreviewData({
       username,

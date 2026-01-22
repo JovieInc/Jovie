@@ -146,6 +146,7 @@ export function AdminCreatorProfilesWithSidebar({
   } = useContactHydration({
     profiles: filteredProfiles,
     selectedId,
+    sidebarOpen,
   });
 
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
@@ -170,10 +171,8 @@ export function AdminCreatorProfilesWithSidebar({
     [setDraftContact]
   );
 
-  React.useEffect(() => {
-    if (!sidebarOpen || !selectedId) return;
-    void hydrateContactSocialLinks(selectedId);
-  }, [hydrateContactSocialLinks, selectedId, sidebarOpen]);
+  // Note: Social links are now fetched automatically via TanStack Query
+  // in useContactHydration when sidebarOpen && selectedId are truthy
 
   const { handleKeyDown } = useAdminTableKeyboardNavigation({
     items: filteredProfiles,
