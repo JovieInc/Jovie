@@ -11,6 +11,7 @@ type AnalyticsWindow = Window & {
 };
 
 const pendingEvents: Array<() => void> = [];
+const MAX_PENDING_EVENTS = 100;
 const skipReasonsLogged = new Set<string>();
 
 function getAnalyticsWindow(): AnalyticsWindow | null {
@@ -78,7 +79,10 @@ function withAnalyticsGuard(
   }
 
   if (!state.ready && hasStatsigClientKey()) {
-    pendingEvents.push(callback);
+    // Limit pending events to prevent memory leaks if analytics never enables
+    if (pendingEvents.length < MAX_PENDING_EVENTS) {
+      pendingEvents.push(callback);
+    }
     return;
   }
 
