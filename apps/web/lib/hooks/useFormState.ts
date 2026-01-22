@@ -494,6 +494,69 @@ export function useFormState(
       }, ms);
     });
 
+  /**
+   * Checks if an error is an AbortError (user cancellation).
+   */
+  const isAbortError = (error: unknown): boolean => {
+    return (
+      error !== null &&
+      typeof error === 'object' &&
+      'name' in error &&
+      error.name === 'AbortError'
+    );
+  };
+
+  /**
+   * Handles retry logic for a failed attempt.
+   * Returns true if retry should be attempted, false otherwise.
+   */
+  const shouldRetryAfterError = useCallback(
+    async (
+      error: unknown,
+      attempt: number,
+      asyncFn: (signal: AbortSignal) => Promise<unknown>
+    ): Promise<boolean> => {
+      // Don't retry on AbortError
+      if (isAbortError(error)) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          isRetrying: false,
+          canRetry: false,
+        }));
+        return false;
+      }
+
+      const isLastAttempt = attempt >= maxRetries;
+
+      if (isLastAttempt) {
+        // Final attempt failed - store function for manual retry
+        lastAsyncFnRef.current = asyncFn;
+        const errorMessage =
+          error instanceof Error ? error.message : 'An error occurred';
+        setState(prev => ({
+          ...prev,
+          canRetry: true,
+          isRetrying: false,
+          loading: false,
+          error: errorMessage,
+        }));
+        return false;
+      }
+
+      // Not the last attempt - prepare for retry
+      if (onRetry && error instanceof Error) {
+        onRetry(attempt + 1, error);
+      }
+
+      // Calculate backoff delay and wait
+      const backoffDelay = calculateBackoffDelay(attempt, baseDelay, maxDelay);
+      await delay(backoffDelay);
+      return true;
+    },
+    [maxRetries, baseDelay, maxDelay, onRetry]
+  );
+
   const handleAsync = useCallback(
     <T>(asyncFn: (signal: AbortSignal) => Promise<T>): Promise<T> => {
       const promise = (async (): Promise<T> => {
@@ -507,8 +570,6 @@ export function useFormState(
         abortControllerRef.current = controller;
 
         // Initialize state for new async operation
-        // Use a single setState call to avoid race conditions where
-        // setError/setSuccess might reset loading to false
         setState(prev => ({
           ...prev,
           loading: true,
@@ -550,57 +611,16 @@ export function useFormState(
           } catch (error) {
             lastError = error;
 
-            // Don't retry on AbortError (DOMException is not instanceof Error)
-            const isAbortError =
-              error &&
-              typeof error === 'object' &&
-              'name' in error &&
-              error.name === 'AbortError';
-            if (isAbortError) {
-              // Clear retry state and don't set error for aborted requests
-              setState(prev => ({
-                ...prev,
-                loading: false,
-                isRetrying: false,
-                canRetry: false,
-              }));
-              throw error;
-            }
-
-            // Check if we can retry
-            const isLastAttempt = attempt >= maxRetries;
-
-            if (isLastAttempt) {
-              // Final attempt failed - store function for manual retry
-              lastAsyncFnRef.current = asyncFn as (
-                signal: AbortSignal
-              ) => Promise<unknown>;
-              const errorMessage =
-                error instanceof Error ? error.message : 'An error occurred';
-              // Set final error state
-              setState(prev => ({
-                ...prev,
-                canRetry: true,
-                isRetrying: false,
-                loading: false,
-                error: errorMessage,
-              }));
-              throw error;
-            }
-
-            // Not the last attempt - prepare for retry
-            // Call onRetry callback before waiting
-            if (onRetry && error instanceof Error) {
-              onRetry(attempt + 1, error);
-            }
-
-            // Calculate backoff delay and wait
-            const backoffDelay = calculateBackoffDelay(
+            // Handle retry logic
+            const shouldRetry = await shouldRetryAfterError(
+              error,
               attempt,
-              baseDelay,
-              maxDelay
+              asyncFn as (signal: AbortSignal) => Promise<unknown>
             );
-            await delay(backoffDelay);
+
+            if (!shouldRetry) {
+              throw error;
+            }
           }
         }
 
@@ -614,7 +634,7 @@ export function useFormState(
 
       return promise;
     },
-    [maxRetries, baseDelay, maxDelay, onRetry]
+    [maxRetries, baseDelay, maxDelay, onRetry, shouldRetryAfterError]
   );
 
   /**

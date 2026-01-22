@@ -262,6 +262,94 @@ export default function DashboardLayoutClient({
   );
 }
 
+/**
+ * Shared layout wrapper for all dashboard routes
+ */
+function DashboardLayoutWrapper({
+  crumbs,
+  useFullWidth,
+  showMobileTabs,
+  headerAction,
+  contentPadding,
+  showDivider,
+  showPreview,
+  children,
+}: {
+  crumbs: DashboardBreadcrumbItem[];
+  useFullWidth: boolean;
+  showMobileTabs: boolean;
+  headerAction: React.ReactNode;
+  contentPadding: string;
+  showDivider?: boolean;
+  showPreview: boolean;
+  children: React.ReactNode;
+}) {
+  const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
+
+  const MobileMenuButton = isMobile ? (
+    <Button
+      variant='ghost'
+      size='icon'
+      onClick={toggleSidebar}
+      aria-label={openMobile ? 'Close menu' : 'Open menu'}
+      aria-expanded={openMobile}
+      className='h-11 w-11'
+    >
+      {openMobile ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
+    </Button>
+  ) : null;
+
+  const SidebarExpandButton =
+    !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+
+  return (
+    <div className='flex h-svh w-full overflow-hidden bg-base'>
+      <SkipToContent />
+      <DashboardSidebar />
+      <SidebarInset className='flex flex-1 flex-col overflow-hidden bg-base'>
+        <main
+          id='main-content'
+          className='flex-1 min-h-0 overflow-hidden bg-base'
+        >
+          <div
+            className={cn(
+              'p-1',
+              useFullWidth
+                ? 'w-full h-full min-h-0'
+                : 'container mx-auto max-w-7xl h-full'
+            )}
+          >
+            <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
+              <DashboardHeader
+                breadcrumbs={crumbs}
+                leading={MobileMenuButton}
+                sidebarTrigger={SidebarExpandButton}
+                showDivider={showDivider}
+                action={headerAction}
+              />
+              <div className='flex-1 min-h-0 overflow-hidden flex relative'>
+                <div
+                  className={cn(
+                    'flex-1 min-h-0',
+                    contentPadding,
+                    showMobileTabs
+                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                      : undefined
+                  )}
+                >
+                  {children}
+                </div>
+                {showPreview && <PreviewPanel />}
+              </div>
+            </div>
+          </div>
+        </main>
+        {showMobileTabs ? <DashboardMobileTabs /> : null}
+      </SidebarInset>
+    </div>
+  );
+}
+
 /** Inner component that can access preview panel context */
 function DashboardLayoutInner({
   crumbs,
@@ -286,7 +374,6 @@ function DashboardLayoutInner({
   const previewOpen = previewContext?.isOpen ?? false;
   const closePreview = previewContext?.close;
   const { tableMeta } = useTableMeta();
-  const { toggleSidebar, openMobile, isMobile } = useSidebar();
 
   const showPreview =
     previewEnabled &&
@@ -301,112 +388,46 @@ function DashboardLayoutInner({
     }
   }, [isContactTableRoute, previewOpen, closePreview]);
 
-  const ContactToggleButton = isContactTableRoute ? (
-    <Button
-      variant='ghost'
-      size='icon'
-      onClick={() => tableMeta.toggle?.()}
-      aria-label='Toggle contact details'
-      className='h-9 w-9'
-      disabled={!tableMeta.toggle}
-    >
-      <Users className='h-5 w-5' />
-    </Button>
-  ) : null;
+  if (isContactTableRoute) {
+    const ContactToggleButton = (
+      <Button
+        variant='ghost'
+        size='icon'
+        onClick={() => tableMeta.toggle?.()}
+        aria-label='Toggle contact details'
+        className='h-9 w-9'
+        disabled={!tableMeta.toggle}
+      >
+        <Users className='h-5 w-5' />
+      </Button>
+    );
 
-  const MobileMenuButton = isMobile ? (
-    <Button
-      variant='ghost'
-      size='icon'
-      onClick={toggleSidebar}
-      aria-label={openMobile ? 'Close menu' : 'Open menu'}
-      aria-expanded={openMobile}
-      className='h-11 w-11'
-    >
-      {openMobile ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
-    </Button>
-  ) : null;
-
-  const { state } = useSidebar();
-
-  const SidebarExpandButton =
-    !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+    return (
+      <DashboardLayoutWrapper
+        crumbs={crumbs}
+        useFullWidth={useFullWidth}
+        showMobileTabs={showMobileTabs}
+        headerAction={ContactToggleButton}
+        contentPadding='overflow-hidden'
+        showDivider={true}
+        showPreview={false}
+      >
+        {children}
+      </DashboardLayoutWrapper>
+    );
+  }
 
   return (
-    <div className='flex h-svh w-full overflow-hidden bg-base'>
-      <SkipToContent />
-      <DashboardSidebar />
-      <SidebarInset className='flex flex-1 flex-col overflow-hidden bg-base'>
-        <main
-          id='main-content'
-          className='flex-1 min-h-0 overflow-hidden bg-base'
-        >
-          {isContactTableRoute ? (
-            <div
-              className={cn(
-                'p-1',
-                useFullWidth
-                  ? 'w-full h-full min-h-0'
-                  : 'container mx-auto max-w-7xl h-full'
-              )}
-            >
-              <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
-                <DashboardHeader
-                  breadcrumbs={crumbs}
-                  leading={MobileMenuButton}
-                  sidebarTrigger={SidebarExpandButton}
-                  showDivider={true}
-                  action={ContactToggleButton}
-                />
-                <div className='flex-1 min-h-0 overflow-hidden flex'>
-                  <div
-                    className={cn(
-                      'flex-1 min-h-0 overflow-hidden',
-                      showMobileTabs
-                        ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                        : undefined
-                    )}
-                  >
-                    {children}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div
-              className={cn(
-                'p-1',
-                useFullWidth
-                  ? 'w-full h-full min-h-0'
-                  : 'container mx-auto max-w-7xl h-full'
-              )}
-            >
-              <div className='rounded-lg bg-(--color-bg-surface-1) h-full overflow-hidden flex flex-col'>
-                <DashboardHeader
-                  breadcrumbs={crumbs}
-                  leading={MobileMenuButton}
-                  sidebarTrigger={SidebarExpandButton}
-                  action={previewEnabled ? <PreviewToggleButton /> : null}
-                />
-                <div className='flex-1 min-h-0 overflow-hidden flex relative'>
-                  <div
-                    className={cn(
-                      'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6',
-                      showMobileTabs
-                        ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
-                        : undefined
-                    )}
-                  >
-                    {children}
-                  </div>
-                  {showPreview && <PreviewPanel />}
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-        {showMobileTabs ? <DashboardMobileTabs /> : null}
-      </SidebarInset>
-    </div>
+    <DashboardLayoutWrapper
+      crumbs={crumbs}
+      useFullWidth={useFullWidth}
+      showMobileTabs={showMobileTabs}
+      headerAction={previewEnabled ? <PreviewToggleButton /> : null}
+      contentPadding='overflow-y-auto p-4 sm:p-6'
+      showDivider={false}
+      showPreview={showPreview}
+    >
+      {children}
+    </DashboardLayoutWrapper>
   );
 }
