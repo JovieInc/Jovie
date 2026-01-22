@@ -202,8 +202,10 @@ function extractFromDehydratedQueries(dehydrated: unknown): unknown[] {
     const data = (query as { state?: { data?: unknown } }).state?.data;
     if (!data || typeof data !== 'object') continue;
 
-    collections.push((data as { links?: unknown }).links);
-    collections.push((data as { page?: { links?: unknown } }).page?.links);
+    const links = (data as { links?: unknown }).links;
+    const pageLinks = (data as { page?: { links?: unknown } }).page?.links;
+    if (links) collections.push(links);
+    if (pageLinks) collections.push(pageLinks);
   }
   return collections;
 }
@@ -218,9 +220,9 @@ function buildCandidateCollections(
   const pageProps = nextData?.props?.pageProps;
   if (!pageProps) return collections;
 
-  collections.push(pageProps.links);
-  collections.push(pageProps.profile?.links);
-  collections.push(pageProps.data?.links);
+  if (pageProps.links) collections.push(pageProps.links);
+  if (pageProps.profile?.links) collections.push(pageProps.profile.links);
+  if (pageProps.data?.links) collections.push(pageProps.data.links);
   collections.push(
     ...extractFromDehydratedQueries(pageProps.dehydratedState?.queries)
   );
