@@ -132,6 +132,25 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
 
 /**
+ * Check if an error should not be retried.
+ */
+function isNonRetryableError(error: unknown): boolean {
+  if (error instanceof AppleMusicNotConfiguredError) return true;
+  if (error instanceof AppleMusicError) {
+    return error.statusCode === 401 || error.statusCode === 404;
+  }
+  return false;
+}
+
+/**
+ * Calculate exponential backoff delay with jitter.
+ */
+function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
+  const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15x
+  return baseDelayMs * Math.pow(2, attempt) * jitter;
+}
+
+/**
  * Retry wrapper with exponential backoff for transient failures.
  * Does not retry on auth errors (401) or not found (404).
  */
@@ -148,24 +167,10 @@ async function withRetry<T>(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      // Don't retry on auth errors, not found, or configuration errors
-      if (error instanceof AppleMusicError) {
-        if (error.statusCode === 401 || error.statusCode === 404) {
-          throw error;
-        }
-      }
-      if (error instanceof AppleMusicNotConfiguredError) {
-        throw error;
-      }
+      if (isNonRetryableError(error)) throw error;
+      if (attempt >= maxRetries) throw lastError;
 
-      // If this was the last attempt, throw
-      if (attempt >= maxRetries) {
-        throw lastError;
-      }
-
-      // Exponential backoff with jitter
-      const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15x
-      const delayMs = baseDelayMs * Math.pow(2, attempt) * jitter;
+      const delayMs = calculateBackoffDelay(attempt, baseDelayMs);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }

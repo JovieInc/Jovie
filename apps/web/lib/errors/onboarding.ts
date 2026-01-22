@@ -78,6 +78,98 @@ function tryParseJsonError(str: string): Record<string, unknown> | null {
   return null;
 }
 
+const EMPTY_DB_ERROR: UnwrappedDbError = {
+  code: null,
+  message: '',
+  constraint: null,
+  detail: null,
+};
+const MAX_UNWRAP_DEPTH = 10;
+
+/**
+ * Extract basic fields from an error record.
+ */
+function extractDbErrorFields(
+  record: Record<string, unknown>
+): UnwrappedDbError {
+  return {
+    message: typeof record?.message === 'string' ? record.message : '',
+    code: typeof record?.code === 'string' ? record.code : null,
+    constraint:
+      typeof record?.constraint === 'string' ? record.constraint : null,
+    detail: typeof record?.detail === 'string' ? record.detail : null,
+  };
+}
+
+/**
+ * Check if unwrapped result has useful PostgreSQL error info.
+ */
+function hasDbErrorInfo(result: UnwrappedDbError): boolean {
+  return Boolean(result.code || result.constraint);
+}
+
+/**
+ * Try to unwrap from nested error property (Neon/Drizzle pattern).
+ */
+function tryUnwrapNestedError(
+  record: Record<string, unknown>,
+  depth: number
+): UnwrappedDbError | null {
+  const nestedError = record?.error;
+  if (nestedError && typeof nestedError === 'object') {
+    const nested = unwrapDatabaseError(nestedError, depth + 1);
+    if (hasDbErrorInfo(nested)) return nested;
+  }
+  return null;
+}
+
+/**
+ * Try to unwrap from errors array (some drivers return arrays).
+ */
+function tryUnwrapErrorsArray(
+  record: Record<string, unknown>,
+  depth: number
+): UnwrappedDbError | null {
+  const errors = record?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const firstError = unwrapDatabaseError(errors[0], depth + 1);
+    if (hasDbErrorInfo(firstError)) return firstError;
+  }
+  return null;
+}
+
+/**
+ * Try to unwrap from JSON-encoded message.
+ */
+function tryUnwrapJsonMessage(
+  message: string,
+  code: string | null,
+  depth: number
+): UnwrappedDbError | null {
+  if (!message || code) return null;
+  const parsed = tryParseJsonError(message);
+  if (parsed) {
+    const fromJson = unwrapDatabaseError(parsed, depth + 1);
+    if (hasDbErrorInfo(fromJson)) return fromJson;
+  }
+  return null;
+}
+
+/**
+ * Try to unwrap from cause chain.
+ */
+function tryUnwrapCause(
+  record: Record<string, unknown>,
+  message: string,
+  depth: number
+): UnwrappedDbError {
+  const cause = record?.cause;
+  if (cause && typeof cause === 'object') {
+    return unwrapDatabaseError(cause, depth + 1);
+  }
+  return { code: null, message, constraint: null, detail: null };
+}
+
 /**
  * Recursively extract PostgreSQL error details from nested error structures.
  * Handles Neon/Drizzle error wrappers, cause chains, and JSON-encoded messages.
@@ -86,58 +178,23 @@ export function unwrapDatabaseError(
   error: unknown,
   depth = 0
 ): UnwrappedDbError {
-  if (depth > 10) {
-    return { code: null, message: '', constraint: null, detail: null };
-  }
+  if (depth > MAX_UNWRAP_DEPTH) return EMPTY_DB_ERROR;
 
   const record = error as Record<string, unknown>;
-  const message = typeof record?.message === 'string' ? record.message : '';
-  const code = typeof record?.code === 'string' ? record.code : null;
-  const constraint =
-    typeof record?.constraint === 'string' ? record.constraint : null;
-  const detail = typeof record?.detail === 'string' ? record.detail : null;
+  const fields = extractDbErrorFields(record);
 
-  // Check for Neon/Drizzle nested error structures
-  // Neon errors often have: error.cause.error with the actual PostgreSQL error
-  const nestedError = record?.error;
-  if (nestedError && typeof nestedError === 'object') {
-    const nested = unwrapDatabaseError(nestedError, depth + 1);
-    if (nested.code || nested.constraint) {
-      return nested;
-    }
-  }
+  const fromNested = tryUnwrapNestedError(record, depth);
+  if (fromNested) return fromNested;
 
-  // Check for errors array (some database drivers return arrays)
-  const errors = record?.errors;
-  if (Array.isArray(errors) && errors.length > 0) {
-    const firstError = unwrapDatabaseError(errors[0], depth + 1);
-    if (firstError.code || firstError.constraint) {
-      return firstError;
-    }
-  }
+  const fromArray = tryUnwrapErrorsArray(record, depth);
+  if (fromArray) return fromArray;
 
-  // Try parsing message as JSON (some wrappers JSON-stringify the error)
-  if (message && !code) {
-    const parsed = tryParseJsonError(message);
-    if (parsed) {
-      const fromJson = unwrapDatabaseError(parsed, depth + 1);
-      if (fromJson.code || fromJson.constraint) {
-        return fromJson;
-      }
-    }
-  }
+  const fromJson = tryUnwrapJsonMessage(fields.message, fields.code, depth);
+  if (fromJson) return fromJson;
 
-  if (code || constraint) {
-    return { code, message, constraint, detail };
-  }
+  if (hasDbErrorInfo(fields)) return fields;
 
-  // Recurse into cause
-  const cause = record?.cause;
-  if (cause && typeof cause === 'object') {
-    return unwrapDatabaseError(cause, depth + 1);
-  }
-
-  return { code: null, message, constraint: null, detail };
+  return tryUnwrapCause(record, fields.message, depth);
 }
 
 const TRANSACTION_ROLLBACK_CODES = new Set(['40001', '40P01', '25P02']);
