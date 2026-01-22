@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { useApproveWaitlistMutation } from '@/lib/queries/useWaitlistMutations';
 import type { ApproveStatus } from './types';
 
 interface UseApproveEntryProps {
@@ -11,30 +12,15 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
     Record<string, ApproveStatus>
   >({});
 
+  // TanStack Query mutation for cache invalidation
+  const approveWaitlistMutation = useApproveWaitlistMutation();
+
   const approveEntry = useCallback(
     async (entryId: string) => {
       setApproveStatuses(prev => ({ ...prev, [entryId]: 'loading' }));
 
       try {
-        const response = await fetch('/app/admin/waitlist/approve', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ entryId }),
-        });
-
-        const payload = (await response.json().catch(() => null)) as {
-          success?: boolean;
-          status?: string;
-          error?: string;
-        } | null;
-
-        if (!response.ok || !payload?.success) {
-          setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
-          return;
-        }
+        await approveWaitlistMutation.mutateAsync({ entryId });
 
         onRowUpdate(entryId, {
           status: 'invited',
@@ -46,7 +32,7 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
         setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
       }
     },
-    [onRowUpdate]
+    [onRowUpdate, approveWaitlistMutation]
   );
 
   return { approveStatuses, approveEntry };

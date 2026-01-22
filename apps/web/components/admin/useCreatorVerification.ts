@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { useToggleVerificationMutation } from '@/lib/queries/useCreatorVerificationMutation';
 
 export type CreatorVerificationStatus =
   | 'idle'
@@ -35,6 +36,9 @@ export function useCreatorVerification(
   const statusTimeoutsRef = useRef<
     Record<string, ReturnType<typeof setTimeout>>
   >({});
+
+  // TanStack Query mutation for cache invalidation
+  const toggleVerificationMutation = useToggleVerificationMutation();
 
   useEffect(() => {
     setProfiles(initialProfiles);
@@ -70,36 +74,12 @@ export function useCreatorVerification(
       }));
 
       try {
-        const response = await fetch('/app/admin/creators/toggle-verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ profileId, nextVerified }),
+        const result = await toggleVerificationMutation.mutateAsync({
+          profileId,
+          nextVerified,
         });
 
-        const payload = (await response.json()) as {
-          success?: boolean;
-          isVerified?: boolean;
-          error?: string;
-        };
-
-        if (!response.ok || !payload.success) {
-          const errorMessage =
-            payload.error ?? 'Failed to update verification status';
-          setStatuses(prev => ({
-            ...prev,
-            [profileId]: 'error',
-          }));
-          resetStatus(profileId);
-          return { success: false, error: errorMessage };
-        }
-
-        const updatedVerified =
-          typeof payload.isVerified === 'boolean'
-            ? payload.isVerified
-            : nextVerified;
+        const updatedVerified = result.isVerified ?? nextVerified;
 
         setProfiles(prev =>
           prev.map(profile =>
@@ -132,7 +112,7 @@ export function useCreatorVerification(
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus]
+    [resetStatus, toggleVerificationMutation]
   );
 
   return {
