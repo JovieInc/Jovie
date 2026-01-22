@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
@@ -27,6 +27,13 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   });
   // Debounce timers per field
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(timers.current).forEach(clearTimeout);
+    };
+  }, []);
 
   const scheduleNormalize = (key: keyof typeof formData, value: string) => {
     // clear previous timer

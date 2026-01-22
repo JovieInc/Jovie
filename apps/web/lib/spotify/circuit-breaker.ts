@@ -45,15 +45,54 @@ export interface CircuitBreakerStats {
 }
 
 // ============================================================================
+// Environment Configuration
+// ============================================================================
+
+/**
+ * Parse an environment variable as a number with a fallback.
+ */
+function parseEnvNumber(envVar: string | undefined, fallback: number): number {
+  if (!envVar) return fallback;
+  const parsed = parseInt(envVar, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+/**
+ * Create circuit breaker config from environment variables.
+ * Environment variables allow runtime tuning without code changes.
+ *
+ * Environment variables:
+ * - CIRCUIT_BREAKER_FAILURE_THRESHOLD: failures to open (default: 5)
+ * - CIRCUIT_BREAKER_RESET_TIMEOUT_MS: ms before recovery attempt (default: 30000)
+ * - CIRCUIT_BREAKER_SUCCESS_THRESHOLD: successes to close (default: 2)
+ * - CIRCUIT_BREAKER_FAILURE_WINDOW_MS: failure tracking window (default: 60000)
+ */
+function createDefaultConfig(): CircuitBreakerConfig {
+  return {
+    failureThreshold: parseEnvNumber(
+      process.env['CIRCUIT_BREAKER_FAILURE_THRESHOLD'],
+      5
+    ),
+    resetTimeout: parseEnvNumber(
+      process.env['CIRCUIT_BREAKER_RESET_TIMEOUT_MS'],
+      30_000
+    ),
+    successThreshold: parseEnvNumber(
+      process.env['CIRCUIT_BREAKER_SUCCESS_THRESHOLD'],
+      2
+    ),
+    failureWindow: parseEnvNumber(
+      process.env['CIRCUIT_BREAKER_FAILURE_WINDOW_MS'],
+      60_000
+    ),
+  };
+}
+
+// ============================================================================
 // Default Configuration
 // ============================================================================
 
-const DEFAULT_CONFIG: CircuitBreakerConfig = {
-  failureThreshold: 5,
-  resetTimeout: 30_000, // 30 seconds
-  successThreshold: 2,
-  failureWindow: 60_000, // 1 minute
-};
+const DEFAULT_CONFIG: CircuitBreakerConfig = createDefaultConfig();
 
 // ============================================================================
 // Circuit Breaker Implementation
@@ -168,32 +207,42 @@ export class CircuitBreaker {
   /**
    * Record a failed call.
    *
-   * Note: This method is not fully concurrency-safe for multiple simultaneous calls.
-   * While JavaScript is single-threaded, async operations can interleave. In practice,
-   * this is low-risk because:
-   * - Operations are fast and circuit breaker is conservative
-   * - Worst case is slightly inaccurate failure count, which self-corrects
-   * - Circuit breaker will still prevent cascading failures
+   * Concurrency note: JavaScript is single-threaded within an event loop tick,
+   * but async operations can interleave between await points. To ensure
+   * deterministic behavior:
+   * 1. We capture state at the start of the operation
+   * 2. All state mutations happen synchronously within this method
+   * 3. State checks and transitions are atomic relative to other callbacks
    */
   private onFailure(): void {
-    this.totalFailures++;
-    this.lastFailureTime = Date.now();
-    this.failureTimestamps.push(this.lastFailureTime);
+    // Capture current state for atomic decision making
+    const currentState = this.state;
+    const now = Date.now();
 
-    switch (this.state) {
+    // Synchronous state updates
+    this.totalFailures++;
+    this.lastFailureTime = now;
+    this.failureTimestamps.push(now);
+
+    switch (currentState) {
       case 'HALF_OPEN':
         // Any failure in half-open state re-opens the circuit
         this.transitionTo('OPEN');
         break;
 
-      case 'CLOSED':
-        this.clearOldFailures();
+      case 'CLOSED': {
+        // Clean old failures and recount atomically
+        const cutoff = now - this.config.failureWindow;
+        this.failureTimestamps = this.failureTimestamps.filter(
+          ts => ts > cutoff
+        );
         this.failures = this.failureTimestamps.length;
 
         if (this.failures >= this.config.failureThreshold) {
           this.transitionTo('OPEN');
         }
         break;
+      }
     }
   }
 

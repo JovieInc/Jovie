@@ -83,7 +83,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
           className: 'font-sans',
           style: {
             // Use CSS custom properties for theme integration
-            fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+            fontFamily: 'var(--font-sans), system-ui, sans-serif',
           },
           classNames: {
             toast:

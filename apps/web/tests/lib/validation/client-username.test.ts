@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { debounce } from '@/lib/utils';
 import {
-  debounce,
   generateUsernameSuggestions,
   validateUsernameFormat,
 } from '@/lib/validation/client-username';

@@ -102,6 +102,76 @@ function ChannelToggle({
   );
 }
 
+function useInputFocusRegistration(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  registerInputFocus: (fn: (() => void) | null) => void
+) {
+  useEffect(() => {
+    registerInputFocus(() => inputRef.current?.focus());
+    return () => registerInputFocus(null);
+  }, [registerInputFocus, inputRef]);
+}
+
+function usePhoneInputConstraint(
+  dialCode: string,
+  phoneInput: string,
+  handlePhoneChange: (value: string) => void
+) {
+  useEffect(() => {
+    const maxNationalDigits = getMaxNationalDigits(dialCode);
+    if (phoneInput.length > maxNationalDigits) {
+      handlePhoneChange(phoneInput.slice(0, maxNationalDigits));
+    }
+  }, [dialCode, handlePhoneChange, phoneInput]);
+}
+
+function useAutoFocusOnEdit(
+  notificationsState: string,
+  inputRef: React.RefObject<HTMLInputElement | null>
+) {
+  useEffect(() => {
+    if (notificationsState !== 'editing' || !inputRef.current) return;
+    const timeoutId = window.setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+    return () => window.clearTimeout(timeoutId);
+  }, [notificationsState, inputRef]);
+}
+
+function useAutoOpen(
+  autoOpen: boolean,
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  openSubscription: () => void
+) {
+  useEffect(() => {
+    if (autoOpen && notificationsEnabled && notificationsState === 'idle') {
+      openSubscription();
+    }
+  }, [autoOpen, notificationsEnabled, notificationsState, openSubscription]);
+}
+
+function useImpressionTracking(
+  showsSubscribeForm: boolean,
+  handle: string,
+  variant: string
+) {
+  const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
+  useEffect(() => {
+    setHasTrackedImpression(false);
+  }, [handle, variant]);
+  useEffect(() => {
+    if (!showsSubscribeForm || hasTrackedImpression) return;
+    track('subscribe_impression', {
+      handle,
+      placement: 'profile_inline',
+      variant,
+    });
+    setHasTrackedImpression(true);
+  }, [showsSubscribeForm, hasTrackedImpression, handle, variant]);
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -135,58 +205,21 @@ export function ArtistNotificationsCTA({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
 
-  // Register the input focus function so bell icon click can focus the input
-  useEffect(() => {
-    registerInputFocus(() => {
-      inputRef.current?.focus();
-    });
-    return () => {
-      registerInputFocus(null);
-    };
-  }, [registerInputFocus]);
+  useInputFocusRegistration(inputRef, registerInputFocus);
+  usePhoneInputConstraint(country.dialCode, phoneInput, handlePhoneChange);
+  useAutoFocusOnEdit(notificationsState, inputRef);
+  useAutoOpen(
+    autoOpen,
+    notificationsEnabled,
+    notificationsState,
+    openSubscription
+  );
 
-  useEffect(() => {
-    const maxNationalDigits = getMaxNationalDigits(country.dialCode);
-    if (phoneInput.length > maxNationalDigits) {
-      handlePhoneChange(phoneInput.slice(0, maxNationalDigits));
-    }
-  }, [country.dialCode, handlePhoneChange, phoneInput]);
-
-  useEffect(() => {
-    if (notificationsState === 'editing' && inputRef.current) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }, 100);
-    }
-  }, [notificationsState]);
-
-  useEffect(() => {
-    if (autoOpen && notificationsEnabled && notificationsState === 'idle') {
-      openSubscription();
-    }
-  }, [autoOpen, notificationsEnabled, notificationsState, openSubscription]);
-
-  // Track subscribe CTA impression when form is shown
-  const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
   const showsSubscribeForm =
     notificationsEnabled &&
     !(notificationsState === 'idle' && !autoOpen) &&
     notificationsState !== 'success';
-
-  useEffect(() => {
-    if (showsSubscribeForm && !hasTrackedImpression) {
-      track('subscribe_impression', {
-        handle: artist.handle,
-        placement: 'profile_inline',
-        variant: variant,
-      });
-      setHasTrackedImpression(true);
-    }
-  }, [showsSubscribeForm, hasTrackedImpression, artist.handle, variant]);
+  useImpressionTracking(showsSubscribeForm, artist.handle, variant);
 
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms

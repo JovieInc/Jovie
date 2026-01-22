@@ -126,28 +126,50 @@ export default function DashboardLayoutClient({
 }: DashboardLayoutClientProps) {
   const [, startTransition] = useTransition();
   const pathname = usePathname();
-  const isAppDashboardRoute = pathname?.startsWith('/app/dashboard') ?? false;
-  const isSettingsRoute = pathname?.startsWith('/app/settings') ?? false;
-  const isAdminRoute = pathname?.startsWith('/app/admin') ?? false;
   const [tableMeta, setTableMeta] = useState<TableMeta>({
     rowCount: null,
     toggle: null,
   });
 
-  // Routes that should use full width layout
-  const isFullWidthRoute =
-    pathname?.startsWith('/app/admin/creators') ||
-    pathname?.startsWith('/app/admin/users') ||
-    pathname?.startsWith('/app/admin/waitlist') ||
-    pathname?.startsWith('/app/dashboard/audience') ||
-    pathname?.startsWith('/app/dashboard/releases');
-  const isContactTableRoute =
-    pathname?.startsWith('/app/admin/creators') ||
-    pathname?.startsWith('/app/dashboard/audience');
-  const isProfileRoute =
-    pathname?.startsWith('/app/dashboard/profile') ?? false;
-  const isAudienceRoute =
-    pathname?.startsWith('/app/dashboard/audience') ?? false;
+  // Memoize route checks to avoid recalculating on every render
+  const routeFlags = useMemo(() => {
+    const isAppDashboardRoute = pathname?.startsWith('/app/dashboard') ?? false;
+    const isSettingsRoute = pathname?.startsWith('/app/settings') ?? false;
+    const isAdminRoute = pathname?.startsWith('/app/admin') ?? false;
+    const isProfileRoute =
+      pathname?.startsWith('/app/dashboard/profile') ?? false;
+    const isAudienceRoute =
+      pathname?.startsWith('/app/dashboard/audience') ?? false;
+    const isFullWidthRoute =
+      pathname?.startsWith('/app/admin/creators') ||
+      pathname?.startsWith('/app/admin/users') ||
+      pathname?.startsWith('/app/admin/waitlist') ||
+      isAudienceRoute ||
+      pathname?.startsWith('/app/dashboard/releases');
+    const isContactTableRoute =
+      pathname?.startsWith('/app/admin/creators') || isAudienceRoute;
+
+    return {
+      isAppDashboardRoute,
+      isSettingsRoute,
+      isAdminRoute,
+      isProfileRoute,
+      isAudienceRoute,
+      isFullWidthRoute,
+      isContactTableRoute,
+    };
+  }, [pathname]);
+
+  const {
+    isAppDashboardRoute,
+    isSettingsRoute,
+    isAdminRoute,
+    isProfileRoute,
+    isAudienceRoute,
+    isFullWidthRoute,
+    isContactTableRoute,
+  } = routeFlags;
+
   const useFullWidth = fullWidth || isFullWidthRoute;
   const resolvedPreviewEnabled =
     previewEnabled && isAppDashboardRoute && isProfileRoute;

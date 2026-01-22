@@ -8,7 +8,7 @@
   --color-input-border: #767676;
   --color-input-border-focus: #000000;
   --color-muted: #595959;
-  --font-family-sans: "Inter", system-ui, sans-serif;
+  --font-family-sans: var(--font-inter), "Inter", system-ui, sans-serif;
 }
 
 html {

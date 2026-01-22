@@ -1,11 +1,18 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { SeeItInAction } from '@/components/home/SeeItInAction';
+import { SeeItInActionSafe } from '@/components/home/SeeItInActionSafe';
+import { SeeItInActionSkeleton } from '@/components/home/SeeItInActionSkeleton';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
+
+// Force dynamic rendering to ensure fresh data and proper error handling
+export const dynamic = 'force-dynamic';
+// Revalidate every hour to balance freshness with performance
+export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
@@ -238,8 +245,10 @@ export default function HomePage() {
       {/* 1. Hero Section */}
       <RedesignedHero />
 
-      {/* 2. See It In Action Section */}
-      <SeeItInAction />
+      {/* 2. See It In Action Section with error boundary */}
+      <Suspense fallback={<SeeItInActionSkeleton />}>
+        <SeeItInActionSafe />
+      </Suspense>
 
       {/* 3. Problem Section */}
       <ProblemSection />

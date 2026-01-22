@@ -186,6 +186,65 @@ function extractUrlFromCandidate(
 }
 
 /**
+ * Extracts dehydrated query links from page props.
+ */
+function extractDehydratedLinks(queries: unknown): unknown[] {
+  if (!Array.isArray(queries)) return [];
+
+  const links: unknown[] = [];
+  for (const query of queries) {
+    if (!query || typeof query !== 'object') continue;
+    const data = (query as { state?: { data?: unknown } }).state?.data;
+    if (!data || typeof data !== 'object') continue;
+
+    links.push((data as { links?: unknown }).links);
+    links.push((data as { page?: { links?: unknown } }).page?.links);
+  }
+  return links;
+}
+
+/**
+ * Adds a link to the structured list if not already seen.
+ */
+function addUniqueLink(
+  link: StructuredLink | null,
+  seen: Set<string>,
+  structured: StructuredLink[]
+): void {
+  if (!link?.url) return;
+  const key = link.url.trim();
+  if (seen.has(key)) return;
+  seen.add(key);
+  structured.push(link);
+}
+
+/**
+ * Recursively collects links from a value.
+ */
+function collectLinks(
+  value: unknown,
+  seen: Set<string>,
+  structured: StructuredLink[]
+): void {
+  if (!value) return;
+
+  if (Array.isArray(value)) {
+    for (const entry of value) collectLinks(entry, seen, structured);
+    return;
+  }
+
+  if (typeof value !== 'object') return;
+
+  const candidate = value as Record<string, unknown>;
+  addUniqueLink(extractUrlFromCandidate(candidate), seen, structured);
+
+  // Recurse into nested collections
+  for (const key of ['links', 'items', 'children', 'buttons'] as const) {
+    if (candidate[key]) collectLinks(candidate[key], seen, structured);
+  }
+}
+
+/**
  * Extracts structured links from Beacons Next.js page data.
  */
 export function extractBeaconsStructuredLinks(html: string): StructuredLink[] {
@@ -193,69 +252,25 @@ export function extractBeaconsStructuredLinks(html: string): StructuredLink[] {
   const structured: StructuredLink[] = [];
   const seen = new Set<string>();
 
-  const candidateCollections: unknown[] = [];
-
   const pageProps = nextData?.props?.pageProps;
   if (pageProps) {
-    candidateCollections.push(pageProps.links);
-    candidateCollections.push(pageProps.profile?.links);
-    candidateCollections.push(pageProps.data?.links);
+    const candidateCollections = [
+      pageProps.links,
+      pageProps.profile?.links,
+      pageProps.data?.links,
+      ...extractDehydratedLinks(pageProps.dehydratedState?.queries),
+    ];
 
-    const dehydrated = pageProps.dehydratedState?.queries;
-    if (Array.isArray(dehydrated)) {
-      for (const query of dehydrated) {
-        if (!query || typeof query !== 'object') continue;
-        const data = (query as { state?: { data?: unknown } }).state?.data;
-        if (data && typeof data === 'object') {
-          candidateCollections.push((data as { links?: unknown }).links);
-          candidateCollections.push(
-            (data as { page?: { links?: unknown } }).page?.links
-          );
-        }
-      }
+    for (const collection of candidateCollections) {
+      collectLinks(collection, seen, structured);
     }
   }
 
-  const collect = (value: unknown) => {
-    if (!value) return;
-
-    if (Array.isArray(value)) {
-      for (const entry of value) collect(entry);
-      return;
-    }
-
-    if (typeof value !== 'object') return;
-
-    const candidate = value as Record<string, unknown>;
-    const link = extractUrlFromCandidate(candidate);
-
-    if (link?.url) {
-      const key = link.url.trim();
-      if (!seen.has(key)) {
-        seen.add(key);
-        structured.push(link);
-      }
-    }
-
-    // Recurse into nested collections
-    const nestedKeys = ['links', 'items', 'children', 'buttons'] as const;
-    for (const key of nestedKeys) {
-      if (candidate[key]) collect(candidate[key]);
-    }
-  };
-
-  for (const collection of candidateCollections) {
-    collect(collection);
-  }
-
+  // Extract from data attributes
   const dataHrefRegex = /data-(?:href|url)=["'](https?:[^"'#\s]+)["']/gi;
   let match: RegExpExecArray | null;
   while ((match = dataHrefRegex.exec(html)) !== null) {
-    const rawUrl = match[1];
-    if (!seen.has(rawUrl)) {
-      seen.add(rawUrl);
-      structured.push({ url: rawUrl, title: undefined });
-    }
+    addUniqueLink({ url: match[1], title: undefined }, seen, structured);
   }
 
   return structured;

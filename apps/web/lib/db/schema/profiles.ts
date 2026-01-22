@@ -173,6 +173,15 @@ export const creatorProfiles = pgTable(
     fitScoreUnclaimedIndex: index('idx_creator_profiles_fit_score_unclaimed')
       .on(table.fitScore, table.isClaimed, table.createdAt)
       .where(drizzleSql`is_claimed = false AND fit_score IS NOT NULL`),
+    // Performance index: session context lookups (user + claimed profile)
+    userIdClaimedIndex: index('idx_creator_profiles_user_id_claimed').on(
+      table.userId,
+      table.isClaimed
+    ),
+    // Performance index: DSP enrichment lookups by Spotify ID
+    spotifyIdIndex: index('idx_creator_profiles_spotify_id')
+      .on(table.spotifyId)
+      .where(drizzleSql`spotify_id IS NOT NULL`),
   })
 );
 
