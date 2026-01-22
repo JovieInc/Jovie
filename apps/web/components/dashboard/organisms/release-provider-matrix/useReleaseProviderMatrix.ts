@@ -1,14 +1,14 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  resetProviderOverride,
-  saveProviderOverride,
-  syncFromSpotify,
-} from '@/app/app/dashboard/releases/actions';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import {
+  useResetProviderOverrideMutation,
+  useSaveProviderOverrideMutation,
+  useSyncReleasesFromSpotifyMutation,
+} from '@/lib/queries';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
@@ -41,8 +41,18 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
-  const [isSaving, startSaving] = useTransition();
-  const [isSyncing, startSyncing] = useTransition();
+
+  // Get profileId from first release (all releases share same profileId)
+  const profileId = releases[0]?.profileId ?? '';
+
+  // TanStack Query mutations
+  const saveProviderMutation = useSaveProviderOverrideMutation();
+  const resetProviderMutation = useResetProviderOverrideMutation();
+  const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
+
+  const isSaving =
+    saveProviderMutation.isPending || resetProviderMutation.isPending;
+  const isSyncing = syncMutation.isPending;
 
   // These are no longer needed since UnifiedTable handles sorting internally,
   // but kept for backward compatibility with return interface
@@ -109,21 +119,24 @@ export function useReleaseProviderMatrix({
       return;
     }
 
-    startSaving(async () => {
-      try {
-        const updated = await saveProviderOverride({
-          profileId: editingRelease.profileId,
-          releaseId: editingRelease.id,
-          provider,
-          url,
-        });
-        updateRow(updated);
-        toast.success('Link updated');
-      } catch (error) {
-        console.error(error);
-        toast.error('Failed to save override');
+    saveProviderMutation.mutate(
+      {
+        profileId: editingRelease.profileId,
+        releaseId: editingRelease.id,
+        provider,
+        url,
+      },
+      {
+        onSuccess: updated => {
+          updateRow(updated);
+          toast.success('Link updated');
+        },
+        onError: error => {
+          console.error(error);
+          toast.error('Failed to save override');
+        },
       }
-    });
+    );
   };
 
   const handleAddUrl = async (
@@ -134,60 +147,66 @@ export function useReleaseProviderMatrix({
     const release = rawRows.find(r => r.id === releaseId);
     if (!release) return;
 
-    startSaving(async () => {
-      try {
-        const updated = await saveProviderOverride({
-          profileId: release.profileId,
-          releaseId,
-          provider,
-          url,
-        });
-        updateRow(updated);
-        toast.success(`${providerConfig[provider].label} link added`);
-      } catch (error) {
-        console.error(error);
-        toast.error('Failed to add link');
+    saveProviderMutation.mutate(
+      {
+        profileId: release.profileId,
+        releaseId,
+        provider,
+        url,
+      },
+      {
+        onSuccess: updated => {
+          updateRow(updated);
+          toast.success(`${providerConfig[provider].label} link added`);
+        },
+        onError: error => {
+          console.error(error);
+          toast.error('Failed to add link');
+        },
       }
-    });
+    );
   };
 
   const handleReset = (provider: ProviderKey) => {
     if (!editingRelease) return;
 
-    startSaving(async () => {
-      try {
-        const updated = await resetProviderOverride({
-          profileId: editingRelease.profileId,
-          releaseId: editingRelease.id,
-          provider,
-        });
-        updateRow(updated);
-        setDrafts(prev => ({
-          ...prev,
-          [provider]: getProviderUrl(updated, provider),
-        }));
-        toast.success('Reverted to detected link');
-      } catch (error) {
-        console.error(error);
-        toast.error('Failed to reset link');
+    resetProviderMutation.mutate(
+      {
+        profileId: editingRelease.profileId,
+        releaseId: editingRelease.id,
+        provider,
+      },
+      {
+        onSuccess: updated => {
+          updateRow(updated);
+          setDrafts(prev => ({
+            ...prev,
+            [provider]: getProviderUrl(updated, provider),
+          }));
+          toast.success('Reverted to detected link');
+        },
+        onError: error => {
+          console.error(error);
+          toast.error('Failed to reset link');
+        },
       }
-    });
+    );
   };
 
   const handleSync = () => {
-    startSyncing(async () => {
-      try {
-        const result = await syncFromSpotify();
+    syncMutation.mutate(undefined, {
+      onSuccess: result => {
         if (result.success) {
           toast.success(result.message);
-          window.location.reload();
+          // Query will auto-refetch via invalidation in mutation hook
         } else {
           toast.error(result.message);
         }
-      } catch (error) {
+      },
+      onError: error => {
         console.error(error);
         toast.error('Failed to sync from Spotify');
-      }
+      },
     });
   };
 
