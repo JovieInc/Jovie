@@ -131,10 +131,11 @@ function useAutoFocusOnEdit(
 ) {
   useEffect(() => {
     if (notificationsState !== 'editing' || !inputRef.current) return;
-    setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
+    return () => window.clearTimeout(timeoutId);
   }, [notificationsState, inputRef]);
 }
 
@@ -157,6 +158,9 @@ function useImpressionTracking(
   variant: string
 ) {
   const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
+  useEffect(() => {
+    setHasTrackedImpression(false);
+  }, [handle, variant]);
   useEffect(() => {
     if (!showsSubscribeForm || hasTrackedImpression) return;
     track('subscribe_impression', {

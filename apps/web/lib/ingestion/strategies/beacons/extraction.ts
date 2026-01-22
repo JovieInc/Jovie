@@ -81,7 +81,7 @@ function extractProfileMetadata(html: string): {
     null;
 
   if (displayName) {
-    displayName = cleanBeaconsDisplayName(displayName);
+    displayName = cleanBeaconsDisplayName(displayName).trim() || null;
   }
 
   let avatarUrl =
@@ -89,6 +89,9 @@ function extractProfileMetadata(html: string): {
     extractMetaContent(html, 'twitter:image') ??
     null;
 
+  if (avatarUrl) {
+    avatarUrl = avatarUrl.trim() || null;
+  }
   if (avatarUrl && isDefaultBeaconsImage(avatarUrl)) {
     avatarUrl = null;
   }
@@ -96,7 +99,8 @@ function extractProfileMetadata(html: string): {
   // Try JSON-LD fallback
   if (!displayName || !avatarUrl) {
     const jsonLdData = extractJsonLd(html);
-    displayName ??= jsonLdData?.name ?? null;
+    const jsonLdName = jsonLdData?.name?.trim() || null;
+    displayName ??= jsonLdName;
     if (
       !avatarUrl &&
       jsonLdData?.image &&
@@ -109,8 +113,10 @@ function extractProfileMetadata(html: string): {
   // Try Beacons-specific fallback
   if (!displayName || !avatarUrl) {
     const beaconsData = extractBeaconsSpecificData(html);
-    displayName ??= beaconsData.displayName ?? null;
-    avatarUrl ??= beaconsData.avatarUrl ?? null;
+    const beaconsDisplayName = beaconsData.displayName?.trim() || null;
+    const beaconsAvatarUrl = beaconsData.avatarUrl?.trim() || null;
+    displayName ??= beaconsDisplayName;
+    avatarUrl ??= beaconsAvatarUrl;
   }
 
   return { displayName, avatarUrl };

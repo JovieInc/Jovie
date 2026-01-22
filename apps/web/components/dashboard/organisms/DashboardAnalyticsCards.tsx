@@ -103,6 +103,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
   );
 
   const [displayProfileViews, setDisplayProfileViews] = useState(0);
+  const displayProfileViewsRef = useRef(0);
   const [copied, setCopied] = useState(false);
 
   const { data, error, isLoading, isFetching, refetch } =
@@ -119,13 +120,10 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
 
   const rangeLabel = useMemo(() => getRangeLabel(range), [range]);
 
-  // Track the current displayed value for animation start
-  const displayedValueRef = useRef(0);
-
   // Run count-up animation when profile_views changes
   useEffect(() => {
-    const duration = 800; // ms
-    const startValue = displayedValueRef.current;
+    const duration = 800;
+    const startValue = displayProfileViewsRef.current;
     const endValue = data?.profile_views ?? 0;
 
     // Skip animation if no change
@@ -140,7 +138,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
       const nextValue = Math.round(
         startValue + (endValue - startValue) * eased
       );
-      displayedValueRef.current = nextValue;
+      displayProfileViewsRef.current = nextValue;
       setDisplayProfileViews(nextValue);
       if (t < 1) raf = requestAnimationFrame(step);
     };
@@ -220,7 +218,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
               <p className='text-xs text-tertiary-token'>Unique users</p>
               <Link
                 href='/app/dashboard/audience'
-                className='text-xs font-medium text-accent-token hover:underline underline-offset-2'
+                className='text-xs font-medium text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
               >
                 View audience
               </Link>
