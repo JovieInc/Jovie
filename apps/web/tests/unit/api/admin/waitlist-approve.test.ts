@@ -4,11 +4,16 @@ const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockSendNotification = vi.hoisted(() => vi.fn());
 const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
+const mockInvalidateProxyUserStateCache = vi.hoisted(() => vi.fn());
 
 const mockWaitlistEntries = {};
 const mockWaitlistInvites = {};
 const mockCreatorProfiles = {};
 const mockUsers = {};
+
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
+}));
 
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
