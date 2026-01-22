@@ -17,6 +17,9 @@ interface UseIngestRefreshReturn {
   isPending: boolean;
 }
 
+/** Delay before resetting status to idle after success/error */
+const STATUS_RESET_DELAY_MS = 2200;
+
 /**
  * Hook to manage ingest refresh operations for creator profiles.
  * Uses TanStack Query mutation for proper state management and cache invalidation.
@@ -58,7 +61,7 @@ export function useIngestRefresh({
                 ...prev,
                 [profileId]: 'idle',
               }));
-            }, 2200);
+            }, STATUS_RESET_DELAY_MS);
           },
           onError: error => {
             setIngestRefreshStatuses(prev => ({
@@ -73,7 +76,7 @@ export function useIngestRefresh({
                 ...prev,
                 [profileId]: 'idle',
               }));
-            }, 2200);
+            }, STATUS_RESET_DELAY_MS);
           },
         }
       );

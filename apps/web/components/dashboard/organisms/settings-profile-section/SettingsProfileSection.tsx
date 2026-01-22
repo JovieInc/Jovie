@@ -29,9 +29,6 @@ export function SettingsProfileSection({
   onArtistUpdate,
   onRefresh,
 }: SettingsProfileSectionProps) {
-  const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
-  const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
-
   const profileDomain = PROFILE_URL.replace(/^https?:\/\//, '');
 
   const {
@@ -53,6 +50,19 @@ export function SettingsProfileSection({
     profileSaveStatus.saving,
     profileSaveStatus.success
   );
+
+  /** Handle field changes with debounced save */
+  const handleFieldChange = (
+    field: 'username' | 'displayName',
+    value: string
+  ) => {
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      setProfileSaveStatus(s => ({ ...s, success: null, error: null }));
+      saveProfile({ displayName: next.displayName, username: next.username });
+      return next;
+    });
+  };
 
   return (
     <DashboardCard variant='settings' className='relative'>
@@ -84,8 +94,8 @@ export function SettingsProfileSection({
                 onUpload={handleAvatarUpload}
                 onSuccess={handleAvatarUpdate}
                 onError={message => toast.error(message)}
-                maxFileSize={maxAvatarSize}
-                acceptedTypes={acceptedAvatarTypes}
+                maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+                acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
                 className='mx-auto animate-in fade-in duration-300'
               />
             </div>
@@ -117,22 +127,9 @@ export function SettingsProfileSection({
                     data-1p-ignore
                     autoComplete='off'
                     value={formData.username}
-                    onChange={e => {
-                      const nextValue = e.target.value;
-                      setFormData(prev => {
-                        const next = { ...prev, username: nextValue };
-                        setProfileSaveStatus(s => ({
-                          ...s,
-                          success: null,
-                          error: null,
-                        }));
-                        saveProfile({
-                          displayName: next.displayName,
-                          username: next.username,
-                        });
-                        return next;
-                      });
-                    }}
+                    onChange={e =>
+                      handleFieldChange('username', e.target.value)
+                    }
                     onBlur={() => flushSave()}
                     placeholder='yourname'
                     className='flex-1 min-w-0'
@@ -154,22 +151,7 @@ export function SettingsProfileSection({
                 name='displayName'
                 id='displayName'
                 value={formData.displayName}
-                onChange={e => {
-                  const nextValue = e.target.value;
-                  setFormData(prev => {
-                    const next = { ...prev, displayName: nextValue };
-                    setProfileSaveStatus(s => ({
-                      ...s,
-                      success: null,
-                      error: null,
-                    }));
-                    saveProfile({
-                      displayName: next.displayName,
-                      username: next.username,
-                    });
-                    return next;
-                  });
-                }}
+                onChange={e => handleFieldChange('displayName', e.target.value)}
                 onBlur={() => flushSave()}
                 placeholder='The name your fans will see'
                 inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
