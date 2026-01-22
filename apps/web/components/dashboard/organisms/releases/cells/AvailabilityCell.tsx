@@ -12,6 +12,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -88,6 +89,15 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const [validationError, setValidationError] = useState('');
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Create provider Map for O(1) lookups instead of O(n) .find() operations
+  const providerMap = useMemo(() => {
+    const map = new Map<ProviderKey, (typeof release.providers)[number]>();
+    for (const provider of release.providers) {
+      map.set(provider.key, provider);
+    }
+    return map;
+  }, [release.providers]);
 
   // Count available providers
   const availableCount = release.providers.filter(p => p.url).length;
@@ -166,11 +176,14 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   );
 
   // Get status for a provider
-  const getProviderStatus = (providerKey: ProviderKey) => {
-    const provider = release.providers.find(p => p.key === providerKey);
-    if (!provider?.url) return 'missing';
-    return provider.source === 'manual' ? 'manual' : 'available';
-  };
+  const getProviderStatus = useCallback(
+    (providerKey: ProviderKey) => {
+      const provider = providerMap.get(providerKey);
+      if (!provider?.url) return 'missing';
+      return provider.source === 'manual' ? 'manual' : 'available';
+    },
+    [providerMap]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -244,7 +257,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
         <div className='max-h-64 overflow-y-auto'>
           {allProviders.map(providerKey => {
-            const provider = release.providers.find(p => p.key === providerKey);
+            const provider = providerMap.get(providerKey);
             const config = providerConfig[providerKey];
             const dspId = PROVIDER_TO_DSP[providerKey];
             const status = getProviderStatus(providerKey);
