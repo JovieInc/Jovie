@@ -4,6 +4,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  getPost,
   mockConstructEvent,
   mockGetHandler,
   mockGetPlanFromPriceId,
@@ -13,11 +14,6 @@ import {
   mockWithTransaction,
   setSkipProcessing,
 } from './webhooks.test-utils';
-
-async function getPost() {
-  const mod = await import('@/app/api/stripe/webhooks/route');
-  return mod.POST;
-}
 
 describe('/api/stripe/webhooks - Event Recording', () => {
   beforeEach(() => {
