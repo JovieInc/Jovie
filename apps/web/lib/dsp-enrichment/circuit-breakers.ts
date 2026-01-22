@@ -13,6 +13,7 @@ import 'server-only';
 import {
   CircuitBreaker,
   type CircuitBreakerConfig,
+  spotifyCircuitBreaker,
 } from '@/lib/spotify/circuit-breaker';
 
 import type { DspProviderId } from './types';
@@ -111,9 +112,11 @@ export function getCircuitBreakerForProvider(
 
 /**
  * Get all circuit breaker stats for monitoring.
+ * Includes all DSP providers and Spotify for unified observability.
  */
 export function getAllCircuitBreakerStats() {
   return {
+    spotify: spotifyCircuitBreaker.getStats(),
     apple_music: appleMusicCircuitBreaker.getStats(),
     deezer: deezerCircuitBreaker.getStats(),
     musicbrainz: musicBrainzCircuitBreaker.getStats(),
@@ -122,8 +125,10 @@ export function getAllCircuitBreakerStats() {
 
 /**
  * Reset all circuit breakers (for testing or manual intervention).
+ * Includes all DSP providers and Spotify for unified management.
  */
 export function resetAllCircuitBreakers() {
+  spotifyCircuitBreaker.reset();
   appleMusicCircuitBreaker.reset();
   deezerCircuitBreaker.reset();
   musicBrainzCircuitBreaker.reset();

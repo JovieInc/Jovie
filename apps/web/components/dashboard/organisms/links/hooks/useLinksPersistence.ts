@@ -5,10 +5,10 @@
  * debounced saves, and conflict resolution.
  */
 
+import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
-import { debounce } from '@/lib/utils';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
   areLinkItemsEqual,
@@ -77,7 +77,8 @@ export interface UseLinksPersistenceReturn {
   /** Set auto-refresh deadline */
   setAutoRefreshUntilMs: React.Dispatch<React.SetStateAction<number | null>>;
   /** Debounced save function */
-  debouncedSave: ReturnType<typeof debounce> & {
+  debouncedSave: {
+    (input: LinkItem[]): void;
     flush: () => void;
     cancel: () => void;
   };
@@ -311,22 +312,48 @@ export function useLinksPersistence({
     [persistLinks]
   );
 
-  // Debounced save function
-  const debouncedSave = useMemo(
-    () =>
-      debounce((...args: unknown[]) => {
-        const [input] = args as [LinkItem[]];
-        enqueueSave(input);
-      }, debounceMs),
-    [enqueueSave, debounceMs]
+  // Ref to track the last input for flush functionality
+  const lastInputRef = useRef<LinkItem[] | null>(null);
+
+  // TanStack Pacer async debouncer for save operations
+  const asyncDebouncer = useAsyncDebouncer(
+    async (input: LinkItem[]) => {
+      lastInputRef.current = null;
+      enqueueSave(input);
+    },
+    { wait: debounceMs }
   );
+
+  // Debounced save function with cancel and flush methods
+  const debouncedSave = useMemo(() => {
+    const fn = (input: LinkItem[]) => {
+      lastInputRef.current = input;
+      void asyncDebouncer.maybeExecute(input);
+    };
+
+    fn.cancel = () => {
+      asyncDebouncer.cancel();
+      lastInputRef.current = null;
+    };
+
+    fn.flush = () => {
+      const pending = lastInputRef.current;
+      if (pending) {
+        asyncDebouncer.cancel();
+        lastInputRef.current = null;
+        enqueueSave(pending);
+      }
+    };
+
+    return fn;
+  }, [asyncDebouncer, enqueueSave]);
 
   // Cancel pending saves when profileId changes
   useEffect(() => {
     return () => {
-      debouncedSave.cancel();
+      asyncDebouncer.cancel();
     };
-  }, [debouncedSave]);
+  }, [asyncDebouncer]);
 
   // Flush pending saves on unmount
   useEffect(() => {
