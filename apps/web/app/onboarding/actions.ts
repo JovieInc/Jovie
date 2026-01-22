@@ -32,6 +32,73 @@ function getRequestBaseUrl(headersList: Headers): string {
 }
 
 /**
+ * Fetches the remote avatar image and validates content type.
+ */
+async function fetchAvatarImage(imageUrl: string): Promise<{
+  buffer: ArrayBuffer;
+  contentType: string;
+}> {
+  const source = await fetch(imageUrl, {
+    signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
+  });
+
+  if (!source.ok) {
+    throw new Error(`Failed to fetch avatar: ${source.status}`);
+  }
+
+  const contentType =
+    source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? null;
+
+  if (!contentType?.startsWith('image/')) {
+    throw new Error(`Invalid content type: ${contentType}`);
+  }
+
+  const buffer = await source.arrayBuffer();
+  return { buffer, contentType };
+}
+
+/**
+ * Uploads avatar file to the API endpoint.
+ */
+async function uploadAvatarFile(
+  baseUrl: string,
+  buffer: ArrayBuffer,
+  contentType: string,
+  cookieHeader: string | null
+): Promise<{ blobUrl: string; photoId: string }> {
+  const file = new File([buffer], 'oauth-avatar', { type: contentType });
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const upload = await fetch(`${baseUrl}/api/images/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+    signal: AbortSignal.timeout(30000), // 30s timeout for upload
+  });
+
+  if (!upload.ok) {
+    const errorBody = await upload.text().catch(() => 'Unknown error');
+    throw new Error(`Upload failed: ${upload.status} - ${errorBody}`);
+  }
+
+  const data = (await upload.json()) as {
+    blobUrl?: string;
+    photoId?: string;
+    jobId?: string;
+  };
+
+  const blobUrl = data.blobUrl ?? null;
+  const photoId = data.photoId ?? data.jobId ?? null;
+
+  if (!blobUrl || !photoId) {
+    throw new Error('Upload response missing required fields');
+  }
+
+  return { blobUrl, photoId };
+}
+
+/**
  * Upload a remote avatar with retry mechanism.
  *
  * Implements exponential backoff retry for reliability.
@@ -60,68 +127,13 @@ async function uploadRemoteAvatar(params: {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      const source = await fetch(params.imageUrl, {
-        signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
-      });
-
-      if (!source.ok) {
-        lastError = new Error(`Failed to fetch avatar: ${source.status}`);
-        console.warn(
-          `[AVATAR_UPLOAD] Fetch failed (attempt ${attempt + 1}/${maxRetries}):`,
-          lastError.message
-        );
-        continue;
-      }
-
-      const contentType =
-        source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ??
-        null;
-      if (!contentType?.startsWith('image/')) {
-        lastError = new Error(`Invalid content type: ${contentType}`);
-        console.warn('[AVATAR_UPLOAD] Invalid content type:', contentType);
-        // Don't retry for invalid content type - it won't change
-        break;
-      }
-
-      const buffer = await source.arrayBuffer();
-      const file = new File([buffer], 'oauth-avatar', { type: contentType });
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
-        method: 'POST',
-        body: formData,
-        headers: params.cookieHeader
-          ? { cookie: params.cookieHeader }
-          : undefined,
-        signal: AbortSignal.timeout(30000), // 30s timeout for upload
-      });
-
-      if (!upload.ok) {
-        const errorBody = await upload.text().catch(() => 'Unknown error');
-        lastError = new Error(`Upload failed: ${upload.status} - ${errorBody}`);
-        console.warn(
-          `[AVATAR_UPLOAD] Upload failed (attempt ${attempt + 1}/${maxRetries}):`,
-          lastError.message
-        );
-        continue;
-      }
-
-      const data = (await upload.json()) as {
-        blobUrl?: string;
-        photoId?: string;
-        jobId?: string;
-      };
-
-      const blobUrl = data.blobUrl ?? null;
-      const photoId = data.photoId ?? data.jobId ?? null;
-
-      if (!blobUrl || !photoId) {
-        lastError = new Error('Upload response missing required fields');
-        console.warn('[AVATAR_UPLOAD] Invalid response:', data);
-        continue;
-      }
+      const { buffer, contentType } = await fetchAvatarImage(params.imageUrl);
+      const { blobUrl, photoId } = await uploadAvatarFile(
+        params.baseUrl,
+        buffer,
+        contentType,
+        params.cookieHeader
+      );
 
       // Success - always log for monitoring
       console.info(
@@ -131,9 +143,18 @@ async function uploadRemoteAvatar(params: {
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
+
+      const errorMessage = lastError.message;
+
+      // Don't retry for invalid content type - it won't change
+      if (errorMessage.includes('Invalid content type')) {
+        console.warn('[AVATAR_UPLOAD] Invalid content type:', errorMessage);
+        break;
+      }
+
       console.warn(
-        `[AVATAR_UPLOAD] Exception (attempt ${attempt + 1}/${maxRetries}):`,
-        lastError.message
+        `[AVATAR_UPLOAD] Attempt ${attempt + 1}/${maxRetries} failed:`,
+        errorMessage
       );
     }
   }
@@ -157,6 +178,119 @@ function profileIsPublishable(
   const hasCompleted = Boolean(profile.onboardingCompletedAt);
 
   return hasHandle && hasName && isPublic && hasCompleted;
+}
+
+/**
+ * Creates a new user and profile using the stored database function.
+ */
+async function createUserAndProfile(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  clerkUserId: string,
+  userEmail: string | null,
+  normalizedUsername: string,
+  trimmedDisplayName: string
+): Promise<{ username: string; status: 'created'; profileId: string | null }> {
+  const result = await tx.execute(
+    drizzleSql<{ profile_id: string }>`
+      SELECT create_profile_with_user(
+        ${clerkUserId},
+        ${userEmail ?? null},
+        ${normalizedUsername},
+        ${trimmedDisplayName}
+      ) AS profile_id
+    `
+  );
+
+  const profileId = result.rows?.[0]?.profile_id
+    ? String(result.rows[0].profile_id)
+    : null;
+
+  return {
+    username: normalizedUsername,
+    status: 'created',
+    profileId,
+  };
+}
+
+/**
+ * Updates an existing profile with new onboarding data.
+ */
+async function updateExistingProfile(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  profile: typeof creatorProfiles.$inferSelect,
+  normalizedUsername: string,
+  trimmedDisplayName: string,
+  username: string
+): Promise<{ username: string; status: 'updated'; profileId: string }> {
+  const nextDisplayName = trimmedDisplayName || profile.displayName || username;
+
+  const [updated] = await tx
+    .update(creatorProfiles)
+    .set({
+      username: normalizedUsername,
+      usernameNormalized: normalizedUsername,
+      displayName: nextDisplayName,
+      onboardingCompletedAt: profile.onboardingCompletedAt ?? new Date(),
+      isPublic: true,
+      isClaimed: true,
+      claimedAt: profile.claimedAt ?? new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id))
+    .returning();
+
+  return {
+    username: updated?.usernameNormalized || normalizedUsername,
+    status: 'updated',
+    profileId: profile.id,
+  };
+}
+
+/**
+ * Validates that the provided email is not already in use by another user.
+ */
+async function ensureEmailAvailable(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  clerkUserId: string,
+  userEmail: string
+): Promise<void> {
+  const [emailOwner] = await tx
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(users.email, userEmail))
+    .limit(1);
+
+  if (emailOwner && emailOwner.clerkId !== clerkUserId) {
+    throw onboardingErrorToError(
+      createOnboardingError(
+        OnboardingErrorCode.EMAIL_IN_USE,
+        'Email is already in use'
+      )
+    );
+  }
+}
+
+/**
+ * Validates that the provided handle is not already in use by another profile.
+ */
+async function ensureHandleAvailable(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  normalizedUsername: string,
+  profileId?: string | null
+): Promise<void> {
+  const [conflict] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+    .limit(1);
+
+  if (conflict && (!profileId || conflict.id !== profileId)) {
+    const error = createOnboardingError(
+      OnboardingErrorCode.USERNAME_TAKEN,
+      'Handle already taken'
+    );
+    throw onboardingErrorToError(error);
+  }
 }
 
 export async function completeOnboarding({
@@ -248,41 +382,6 @@ export async function completeOnboarding({
           profileId: string | null;
         };
 
-        const ensureEmailAvailable = async () => {
-          if (!userEmail) return;
-
-          const [emailOwner] = await tx
-            .select({ clerkId: users.clerkId })
-            .from(users)
-            .where(eq(users.email, userEmail))
-            .limit(1);
-
-          if (emailOwner && emailOwner.clerkId !== clerkUserId) {
-            throw onboardingErrorToError(
-              createOnboardingError(
-                OnboardingErrorCode.EMAIL_IN_USE,
-                'Email is already in use'
-              )
-            );
-          }
-        };
-
-        const ensureHandleAvailable = async (profileId?: string | null) => {
-          const [conflict] = await tx
-            .select({ id: creatorProfiles.id })
-            .from(creatorProfiles)
-            .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
-            .limit(1);
-
-          if (conflict && (!profileId || conflict.id !== profileId)) {
-            const error = createOnboardingError(
-              OnboardingErrorCode.USERNAME_TAKEN,
-              'Handle already taken'
-            );
-            throw onboardingErrorToError(error);
-          }
-        };
-
         const [existingUser] = await tx
           .select({ id: users.id })
           .from(users)
@@ -291,30 +390,17 @@ export async function completeOnboarding({
 
         // If the user record does not exist, the stored function will create both user + profile
         if (!existingUser) {
-          await ensureEmailAvailable();
-          await ensureHandleAvailable(null);
-          const result = await tx.execute(
-            drizzleSql<{ profile_id: string }>`
-              SELECT create_profile_with_user(
-                ${clerkUserId},
-                ${userEmail ?? null},
-                ${normalizedUsername},
-                ${trimmedDisplayName}
-              ) AS profile_id
-            `
+          if (userEmail) {
+            await ensureEmailAvailable(tx, clerkUserId, userEmail);
+          }
+          await ensureHandleAvailable(tx, normalizedUsername, null);
+          return await createUserAndProfile(
+            tx,
+            clerkUserId,
+            userEmail,
+            normalizedUsername,
+            trimmedDisplayName
           );
-
-          const profileId = result.rows?.[0]?.profile_id
-            ? String(result.rows[0].profile_id)
-            : null;
-
-          const created: CompletionResult = {
-            username: normalizedUsername,
-            status: 'created',
-            profileId,
-          };
-
-          return created;
         }
 
         const [existingProfile] = await tx
@@ -328,7 +414,11 @@ export async function completeOnboarding({
           existingProfile?.usernameNormalized !== normalizedUsername;
 
         if (handleChanged) {
-          await ensureHandleAvailable(existingProfile?.id);
+          await ensureHandleAvailable(
+            tx,
+            normalizedUsername,
+            existingProfile?.id
+          );
         }
 
         const needsPublish = !profileIsPublishable(existingProfile);
@@ -338,32 +428,13 @@ export async function completeOnboarding({
         const needsClaim = existingProfile && !existingProfile.isClaimed;
 
         if (existingProfile && (needsPublish || handleChanged || needsClaim)) {
-          const nextDisplayName =
-            trimmedDisplayName || existingProfile.displayName || username;
-
-          const [updated] = await tx
-            .update(creatorProfiles)
-            .set({
-              username: normalizedUsername,
-              usernameNormalized: normalizedUsername,
-              displayName: nextDisplayName,
-              onboardingCompletedAt:
-                existingProfile.onboardingCompletedAt ?? new Date(),
-              isPublic: true,
-              isClaimed: true,
-              claimedAt: existingProfile.claimedAt ?? new Date(),
-              updatedAt: new Date(),
-            })
-            .where(eq(creatorProfiles.id, existingProfile.id))
-            .returning();
-
-          const updatedResult: CompletionResult = {
-            username: updated?.usernameNormalized || normalizedUsername,
-            status: 'updated',
-            profileId: existingProfile.id,
-          };
-
-          return updatedResult;
+          return await updateExistingProfile(
+            tx,
+            existingProfile,
+            normalizedUsername,
+            trimmedDisplayName,
+            username
+          );
         }
 
         if (existingProfile) {
@@ -377,30 +448,17 @@ export async function completeOnboarding({
         }
 
         // Fallback: user exists but no profile yet
-        await ensureEmailAvailable();
-        await ensureHandleAvailable(null);
-        const result = await tx.execute(
-          drizzleSql<{ profile_id: string }>`
-            SELECT create_profile_with_user(
-              ${clerkUserId},
-              ${userEmail ?? null},
-              ${normalizedUsername},
-              ${trimmedDisplayName}
-            ) AS profile_id
-          `
+        if (userEmail) {
+          await ensureEmailAvailable(tx, clerkUserId, userEmail);
+        }
+        await ensureHandleAvailable(tx, normalizedUsername, null);
+        return await createUserAndProfile(
+          tx,
+          clerkUserId,
+          userEmail,
+          normalizedUsername,
+          trimmedDisplayName
         );
-
-        const profileId = result.rows?.[0]?.profile_id
-          ? String(result.rows[0].profile_id)
-          : null;
-
-        const created: CompletionResult = {
-          username: normalizedUsername,
-          status: 'created',
-          profileId,
-        };
-
-        return created;
       },
       { isolationLevel: 'serializable' }
     );
