@@ -67,7 +67,10 @@ export {
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
 // Query key factories
-export { type QueryKeys, queryKeys } from './keys';
+export {
+  type QueryKeys,
+  queryKeys,
+} from './keys';
 // Mutation utilities
 export {
   createMutationCallbacks,
@@ -78,7 +81,6 @@ export {
 } from './mutation-utils';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
-
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
 // Admin social links query
@@ -155,6 +157,12 @@ export {
   type IngestRefreshResponse,
   useIngestRefreshMutation,
 } from './useIngestRefreshMutation';
+// Notification status/subscription
+export {
+  useNotificationStatusQuery,
+  useSubscribeNotificationsMutation,
+  useUnsubscribeNotificationsMutation,
+} from './useNotificationStatusQuery';
 export {
   type PricingOption,
   type PricingOptionsResponse,

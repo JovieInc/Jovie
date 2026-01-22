@@ -103,6 +103,25 @@ export const queryKeys = {
       [...queryKeys.profile.all, 'links', profileId] as const,
   },
 
+  // Notifications (fan-facing subscriptions)
+  notifications: {
+    all: ['notifications'] as const,
+    status: (params: {
+      artistId: string;
+      email?: string | null;
+      phone?: string | null;
+    }) =>
+      [
+        ...queryKeys.notifications.all,
+        'status',
+        {
+          artistId: params.artistId,
+          email: params.email ?? null,
+          phone: params.phone ?? null,
+        },
+      ] as const,
+  },
+
   // Spotify search queries
   spotify: {
     all: ['spotify'] as const,
