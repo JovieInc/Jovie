@@ -20,6 +20,14 @@ interface UseIngestRefreshReturn {
 /** Delay before resetting status to idle after success/error */
 const STATUS_RESET_DELAY_MS = 2200;
 
+/** Helper to create status updater for a specific profile */
+function createIdleStatusUpdater(profileId: string) {
+  return (prev: Record<string, IngestRefreshStatus>) => ({
+    ...prev,
+    [profileId]: 'idle' as const,
+  });
+}
+
 /**
  * Hook to manage ingest refresh operations for creator profiles.
  * Uses TanStack Query mutation for proper state management and cache invalidation.
@@ -35,6 +43,13 @@ export function useIngestRefresh({
   >({});
 
   const mutation = useIngestRefreshMutation();
+
+  // Extracted to reduce nesting depth (S2004)
+  const scheduleStatusReset = useCallback((profileId: string) => {
+    setTimeout(() => {
+      setIngestRefreshStatuses(createIdleStatusUpdater(profileId));
+    }, STATUS_RESET_DELAY_MS);
+  }, []);
 
   const refreshIngest = useCallback(
     (profileId: string) => {
@@ -55,13 +70,7 @@ export function useIngestRefresh({
               onRefreshComplete(profileId);
             }
 
-            // Reset to idle after success animation
-            setTimeout(() => {
-              setIngestRefreshStatuses(prev => ({
-                ...prev,
-                [profileId]: 'idle',
-              }));
-            }, STATUS_RESET_DELAY_MS);
+            scheduleStatusReset(profileId);
           },
           onError: error => {
             setIngestRefreshStatuses(prev => ({
@@ -70,18 +79,19 @@ export function useIngestRefresh({
             }));
             notifications.handleError(error);
 
-            // Reset to idle after error
-            setTimeout(() => {
-              setIngestRefreshStatuses(prev => ({
-                ...prev,
-                [profileId]: 'idle',
-              }));
-            }, STATUS_RESET_DELAY_MS);
+            scheduleStatusReset(profileId);
           },
         }
       );
     },
-    [mutation, notifications, onRefreshComplete, router, selectedId]
+    [
+      mutation,
+      notifications,
+      onRefreshComplete,
+      router,
+      scheduleStatusReset,
+      selectedId,
+    ]
   );
 
   return {
