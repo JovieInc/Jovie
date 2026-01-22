@@ -149,6 +149,12 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Ingest refresh mutation
+export {
+  type IngestRefreshInput,
+  type IngestRefreshResponse,
+  useIngestRefreshMutation,
+} from './useIngestRefreshMutation';
 export {
   type PricingOption,
   type PricingOptionsResponse,

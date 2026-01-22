@@ -10,7 +10,7 @@ import {
 } from '@jovie/ui';
 import { PencilLine, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -199,6 +199,55 @@ export function ReleaseTableRow({
       setTimeout(() => setCopiedId(null), 2000);
     },
     [onCopy]
+  );
+
+  const handleEdit = useCallback(() => onEdit(release), [onEdit, release]);
+
+  const handleCopySmartLink = useCallback(() => {
+    void handleCopyWithFeedback(
+      release.smartLinkPath,
+      `${release.title} smart link`,
+      `action-copy-${release.id}`
+    );
+  }, [
+    handleCopyWithFeedback,
+    release.smartLinkPath,
+    release.title,
+    release.id,
+  ]);
+
+  const menuItems = useMemo(
+    () => [
+      {
+        id: 'edit',
+        label: 'Edit links',
+        icon: PencilLine,
+        onClick: handleEdit,
+      },
+      {
+        id: 'copy-smart-link',
+        label: 'Copy smart link',
+        icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
+        onClick: handleCopySmartLink,
+      },
+      {
+        id: 'separator-1',
+        label: 'separator',
+        onClick: () => {},
+      },
+      {
+        id: 'delete',
+        label: 'Delete release',
+        icon: Trash2,
+        variant: 'destructive' as const,
+        onClick: () => {
+          // TODO: Implement delete confirmation dialog
+          console.log('Delete release:', release.id);
+        },
+        disabled: true,
+      },
+    ],
+    [handleEdit, handleCopySmartLink, release.id]
   );
 
   const manualOverrideCount = release.providers.filter(
@@ -444,44 +493,7 @@ export function ReleaseTableRow({
       {/* Actions cell */}
       <td className='px-4 py-4 align-middle text-right sm:px-6'>
         <div className='flex justify-end'>
-          <TableActionMenu
-            items={[
-              {
-                id: 'edit',
-                label: 'Edit links',
-                icon: PencilLine,
-                onClick: () => onEdit(release),
-              },
-              {
-                id: 'copy-smart-link',
-                label: 'Copy smart link',
-                icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
-                onClick: () => {
-                  void handleCopyWithFeedback(
-                    release.smartLinkPath,
-                    `${release.title} smart link`,
-                    `action-copy-${release.id}`
-                  );
-                },
-              },
-              {
-                id: 'separator-1',
-                label: 'separator',
-                onClick: () => {},
-              },
-              {
-                id: 'delete',
-                label: 'Delete release',
-                icon: Trash2,
-                variant: 'destructive' as const,
-                onClick: () => {
-                  // TODO: Implement delete confirmation dialog
-                  console.log('Delete release:', release.id);
-                },
-                disabled: true,
-              },
-            ]}
-          />
+          <TableActionMenu items={menuItems} />
         </div>
       </td>
     </tr>

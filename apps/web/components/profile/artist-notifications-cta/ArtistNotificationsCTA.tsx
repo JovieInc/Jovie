@@ -2,7 +2,12 @@
 
 import { Bell, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
+
+/** Prevents synthetic font weight rendering for better typography */
+const noFontSynthesisStyle: CSSProperties = { fontSynthesisWeight: 'none' };
+
 import { CountrySelector } from '@/components/profile/notifications';
 import { CTAButton } from '@/components/ui/CTAButton';
 import { track } from '@/lib/analytics';
@@ -215,7 +220,7 @@ export function ArtistNotificationsCTA({
               disabled={isSubmitting}
               autoComplete={channel === 'sms' ? 'tel-national' : 'email'}
               maxLength={channel === 'sms' ? 32 : 254}
-              style={{ fontSynthesisWeight: 'none' }}
+              style={noFontSynthesisStyle}
             />
           </div>
         </div>
@@ -226,7 +231,7 @@ export function ArtistNotificationsCTA({
         onClick={() => void handleSubscribe()}
         disabled={isSubmitting}
         className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
-        style={{ fontSynthesisWeight: 'none' }}
+        style={noFontSynthesisStyle}
       >
         {isSubmitting ? 'Subscribing…' : 'Subscribe'}
       </button>
@@ -236,7 +241,7 @@ export function ArtistNotificationsCTA({
         className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
           isInputFocused ? 'opacity-100' : 'opacity-0'
         }`}
-        style={{ fontSynthesisWeight: 'none' }}
+        style={noFontSynthesisStyle}
         aria-hidden={!isInputFocused}
       >
         No spam. Opt-out anytime.
