@@ -146,11 +146,13 @@ describe('clerk-sync module', () => {
     });
 
     it('syncs minimal state when DB user does not exist', async () => {
-      // Mock no DB user found
+      // Mock no DB user found (single JOIN query returns empty)
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
           }),
         }),
       });
@@ -178,26 +180,25 @@ describe('clerk-sync module', () => {
     });
 
     it('syncs admin role correctly', async () => {
-      // Mock DB user with admin role
-      mockDbSelect.mockReturnValueOnce({
+      // Mock DB user with admin role (single JOIN query)
+      mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'user-uuid-123',
-                status: 'active',
-                isAdmin: true,
-              },
-            ]),
-          }),
-        }),
-      });
-
-      // Mock no profile
-      mockDbSelect.mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  userId: 'user-uuid-123',
+                  userStatus: 'active',
+                  isAdmin: true,
+                  // No profile fields
+                  profileId: null,
+                  onboardingCompletedAt: null,
+                  username: null,
+                  displayName: null,
+                  isPublic: null,
+                },
+              ]),
+            }),
           }),
         }),
       });
@@ -221,26 +222,25 @@ describe('clerk-sync module', () => {
     });
 
     it('syncs banned status correctly', async () => {
-      // Mock banned DB user
-      mockDbSelect.mockReturnValueOnce({
+      // Mock banned DB user (single JOIN query)
+      mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'user-uuid-123',
-                userStatus: 'banned',
-                isAdmin: false,
-              },
-            ]),
-          }),
-        }),
-      });
-
-      // Mock no profile
-      mockDbSelect.mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  userId: 'user-uuid-123',
+                  userStatus: 'banned',
+                  isAdmin: false,
+                  // No profile fields
+                  profileId: null,
+                  onboardingCompletedAt: null,
+                  username: null,
+                  displayName: null,
+                  isPublic: null,
+                },
+              ]),
+            }),
           }),
         }),
       });
@@ -264,34 +264,25 @@ describe('clerk-sync module', () => {
     });
 
     it('syncs profile completion correctly', async () => {
-      // Mock DB user
-      mockDbSelect.mockReturnValueOnce({
+      // Mock DB user with complete profile (single JOIN query)
+      mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'user-uuid-123',
-                status: 'active',
-                isAdmin: false,
-              },
-            ]),
-          }),
-        }),
-      });
-
-      // Mock complete profile
-      mockDbSelect.mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'profile-uuid-123',
-                onboardingCompletedAt: new Date(),
-                username: 'testuser',
-                displayName: 'Test User',
-                isPublic: true,
-              },
-            ]),
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  userId: 'user-uuid-123',
+                  userStatus: 'active',
+                  isAdmin: false,
+                  // Profile fields
+                  profileId: 'profile-uuid-123',
+                  onboardingCompletedAt: new Date(),
+                  username: 'testuser',
+                  displayName: 'Test User',
+                  isPublic: true,
+                },
+              ]),
+            }),
           }),
         }),
       });

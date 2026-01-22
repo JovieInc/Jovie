@@ -107,18 +107,26 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
   }
 
   try {
-    // Query current database state
-    const [dbUser] = await db
+    // Query user and profile in a single JOIN query for better performance
+    const [result] = await db
       .select({
-        id: users.id,
+        // User fields
+        userId: users.id,
         userStatus: users.userStatus,
         isAdmin: users.isAdmin,
+        // Profile fields (nullable due to LEFT JOIN)
+        profileId: creatorProfiles.id,
+        onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        isPublic: creatorProfiles.isPublic,
       })
       .from(users)
+      .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
       .where(eq(users.clerkId, clerkUserId))
       .limit(1);
 
-    if (!dbUser) {
+    if (!result) {
       // User doesn't exist in DB yet - sync minimal state
       const metadata: JovieClerkMetadata = {
         jovie_role: 'user',
@@ -126,49 +134,37 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
         jovie_has_profile: false,
       };
 
-      const result = await syncClerkMetadata(clerkUserId, metadata);
-      return { ...result, metadata };
+      const syncResult = await syncClerkMetadata(clerkUserId, metadata);
+      return { ...syncResult, metadata };
     }
-
-    // Check for profile
-    const [profile] = await db
-      .select({
-        id: creatorProfiles.id,
-        onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-        username: creatorProfiles.username,
-        displayName: creatorProfiles.displayName,
-        isPublic: creatorProfiles.isPublic,
-      })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, dbUser.id))
-      .limit(1);
 
     // Determine if profile is complete
     const hasCompleteProfile = Boolean(
-      profile?.onboardingCompletedAt &&
-        profile?.username &&
-        profile?.displayName &&
-        profile?.isPublic !== false
+      result.profileId &&
+        result.onboardingCompletedAt &&
+        result.username &&
+        result.displayName &&
+        result.isPublic !== false
     );
 
     // Map userStatus lifecycle enum to Clerk's simpler status
     let clerkStatus: 'active' | 'pending' | 'banned';
-    if (dbUser.userStatus === 'banned' || dbUser.userStatus === 'suspended') {
+    if (result.userStatus === 'banned' || result.userStatus === 'suspended') {
       clerkStatus = 'banned';
-    } else if (dbUser.userStatus === 'waitlist_pending') {
+    } else if (result.userStatus === 'waitlist_pending') {
       clerkStatus = 'pending';
     } else {
       clerkStatus = 'active';
     }
 
     const metadata: JovieClerkMetadata = {
-      jovie_role: dbUser.isAdmin ? 'admin' : 'user',
+      jovie_role: result.isAdmin ? 'admin' : 'user',
       jovie_status: clerkStatus,
       jovie_has_profile: hasCompleteProfile,
     };
 
-    const result = await syncClerkMetadata(clerkUserId, metadata);
-    return { ...result, metadata };
+    const syncResult = await syncClerkMetadata(clerkUserId, metadata);
+    return { ...syncResult, metadata };
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';

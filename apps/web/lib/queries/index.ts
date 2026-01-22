@@ -151,6 +151,13 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Handle availability query
+export {
+  type HandleAvailabilityResponse,
+  type UseHandleAvailabilityQueryOptions,
+  useHandleAvailabilityQuery,
+  useInvalidateHandleAvailability,
+} from './useHandleAvailabilityQuery';
 // Ingest refresh mutation
 export {
   type IngestRefreshInput,
@@ -168,6 +175,12 @@ export {
   type PricingOptionsResponse,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
+// Public profile query
+export {
+  type PublicProfileData,
+  type UsePublicProfileQueryOptions,
+  usePublicProfileQuery,
+} from './usePublicProfileQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,
