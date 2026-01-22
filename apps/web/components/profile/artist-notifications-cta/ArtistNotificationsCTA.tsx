@@ -154,26 +154,26 @@ export function ArtistNotificationsCTA({
     <div className='space-y-3'>
       <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
         <div className='flex items-center'>
-          {channel === 'sms' ? (
-            shouldShowCountrySelector ? (
-              <CountrySelector
-                country={country}
-                isOpen={isCountryOpen}
-                onOpenChange={setIsCountryOpen}
-                onSelect={setCountry}
-              />
-            ) : (
-              <button
-                type='button'
-                className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
-                aria-label='Switch to email updates'
-                onClick={() => handleChannelChange('email')}
-                disabled={isSubmitting}
-              >
-                <Phone className='w-4 h-4' aria-hidden='true' />
-              </button>
-            )
-          ) : (
+          {channel === 'sms' && shouldShowCountrySelector && (
+            <CountrySelector
+              country={country}
+              isOpen={isCountryOpen}
+              onOpenChange={setIsCountryOpen}
+              onSelect={setCountry}
+            />
+          )}
+          {channel === 'sms' && !shouldShowCountrySelector && (
+            <button
+              type='button'
+              className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+              aria-label='Switch to email updates'
+              onClick={() => handleChannelChange('email')}
+              disabled={isSubmitting}
+            >
+              <Phone className='w-4 h-4' aria-hidden='true' />
+            </button>
+          )}
+          {channel !== 'sms' && (
             <button
               type='button'
               className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'

@@ -1,9 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
@@ -14,11 +13,8 @@ import {
   NOTIFICATION_COPY,
 } from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
-import {
-  fetchWithTimeout,
-  queryKeys,
-  useSubscribeNotificationsMutation,
-} from '@/lib/queries';
+import { useSubscribeNotificationsMutation } from '@/lib/queries';
+import { usePublicProfileQuery } from '@/lib/queries/usePublicProfileQuery';
 
 export default function NotificationsPage() {
   const params = useParams();
@@ -40,30 +36,23 @@ export default function NotificationsPage() {
   const subscribeMutation = useSubscribeNotificationsMutation();
   const notificationsEnabled = true;
 
-  const artistQuery = useQuery({
-    queryKey: queryKeys.profile.byUsername(username),
-    queryFn: () =>
-      fetchWithTimeout<{ id?: string }>(
-        `/api/creator?username=${encodeURIComponent(username)}`
-      ),
+  // Fetch artist data using TanStack Query - handles caching, retry, abort automatically
+  const {
+    data: artistData,
+    isLoading: isArtistLoading,
+    error: artistQueryError,
+  } = usePublicProfileQuery({
+    username,
     enabled: notificationsEnabled && Boolean(username),
-    staleTime: 5 * 60 * 1000,
   });
 
-  const artistId = useMemo(
-    () => artistQuery.data?.id ?? null,
-    [artistQuery.data]
-  );
-  const isArtistLoading = artistQuery.isLoading;
+  const artistId = artistData?.id ?? null;
 
-  // Derive error message with clear priority
-  const getArtistLookupError = (): string | null => {
-    if (!notificationsEnabled) return null;
-    if (artistQuery.isError) return NOTIFICATION_COPY.errors.artistUnavailable;
-    if (!username) return NOTIFICATION_COPY.errors.artistNotFound;
-    return null;
-  };
-  const artistLookupError = getArtistLookupError();
+  // Determine lookup error - either query failed or no username provided
+  const artistLookupError =
+    artistQueryError || !username
+      ? NOTIFICATION_COPY.errors.artistNotFound
+      : null;
 
   if (!notificationsEnabled) {
     return (
@@ -83,7 +72,7 @@ export default function NotificationsPage() {
     return (
       <div className='container mx-auto px-4 py-8 max-w-xl'>
         <StarterEmptyState
-          title='We couldn’t find that artist'
+          title="We couldn't find that artist"
           description={artistLookupError}
           primaryAction={{ label: 'Return home', href: '/' }}
           secondaryAction={{ label: 'View profile', href: `/${username}` }}
@@ -133,11 +122,6 @@ export default function NotificationsPage() {
     });
 
     try {
-      // In a real implementation, we would:
-      // 1. Fetch the artist_id from the username
-      // 2. Submit the subscription request
-
-      // Use the mutation hook to subscribe
       await subscribeMutation.mutateAsync({
         artistId,
         channel: 'email',
