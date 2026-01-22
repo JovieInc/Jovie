@@ -30,6 +30,19 @@ interface ReleaseEditDialogProps {
   onClose: () => void;
 }
 
+function getProviderHelperText(
+  source: string | undefined,
+  url: string | undefined
+): string {
+  if (source === 'manual') {
+    return 'Manual override active';
+  }
+  if (url) {
+    return 'Detected automatically';
+  }
+  return 'No link yet';
+}
+
 export function ReleaseEditDialog({
   release,
   providerList,
@@ -104,12 +117,10 @@ export function ReleaseEditDialog({
                 const existing = release.providers.find(
                   entry => entry.key === provider.key
                 );
-                const helperText =
-                  existing?.source === 'manual'
-                    ? 'Manual override active'
-                    : existing?.url
-                      ? 'Detected automatically'
-                      : 'No link yet';
+                const helperText = getProviderHelperText(
+                  existing?.source,
+                  existing?.url
+                );
 
                 return (
                   <div

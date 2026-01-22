@@ -13,6 +13,17 @@ import {
 import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
+type StatusPillState = 'saving' | 'saved' | null;
+
+function getStatusPillState(
+  saving: boolean,
+  success: boolean | null
+): StatusPillState {
+  if (saving) return 'saving';
+  if (success) return 'saved';
+  return null;
+}
+
 export function SettingsProfileSection({
   artist,
   onArtistUpdate,
@@ -38,13 +49,19 @@ export function SettingsProfileSection({
     onRefresh,
   });
 
+  const statusPillState = getStatusPillState(
+    profileSaveStatus.saving,
+    profileSaveStatus.success
+  );
+
   return (
     <DashboardCard variant='settings' className='relative'>
-      {profileSaveStatus.saving ? (
-        <SettingsStatusPill state='saving' className='absolute right-6 top-6' />
-      ) : profileSaveStatus.success ? (
-        <SettingsStatusPill state='saved' className='absolute right-6 top-6' />
-      ) : null}
+      {statusPillState && (
+        <SettingsStatusPill
+          state={statusPillState}
+          className='absolute right-6 top-6'
+        />
+      )}
       <div className='flex flex-col gap-6'>
         <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
           <div>
