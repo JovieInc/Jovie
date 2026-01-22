@@ -92,6 +92,7 @@ export const queryKeys = {
         ...(filters === undefined ? [] : [filters]),
       ] as const,
     entry: (id: string) => [...queryKeys.waitlist.all, 'entry', id] as const,
+    status: () => [...queryKeys.waitlist.all, 'status'] as const,
   },
 
   // Public profile queries

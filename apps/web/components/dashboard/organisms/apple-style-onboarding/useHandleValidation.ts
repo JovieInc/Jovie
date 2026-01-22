@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
+import { isAbortError } from '@/lib/pacer/errors';
+import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 import {
   generateUsernameSuggestions,
   validateUsernameFormat,
@@ -20,11 +22,22 @@ interface UseHandleValidationReturn {
   >;
   handle: string;
   setHandle: React.Dispatch<React.SetStateAction<string>>;
-  validateHandle: (input: string) => Promise<void>;
+  validateHandle: (input: string) => void;
+}
+
+interface ApiValidationResult {
+  available: boolean;
+  error?: string;
 }
 
 /**
  * Hook to manage handle validation state and API checks.
+ *
+ * Uses TanStack Pacer for:
+ * - Automatic debouncing (400ms)
+ * - Request deduplication via caching (30s TTL)
+ * - AbortController management
+ * - Race condition prevention
  */
 export function useHandleValidation({
   normalizedInitialHandle,
@@ -40,15 +53,83 @@ export function useHandleValidation({
       suggestions: [],
     });
 
-  const validationSequence = useRef(0);
-  const abortController = useRef<AbortController | null>(null);
+  // TanStack Pacer hook for API validation with debouncing and caching
+  const {
+    validate: validateApi,
+    isPending,
+    isValidating,
+  } = useAsyncValidation<string, ApiValidationResult>({
+    validatorFn: async (normalizedInput: string, signal: AbortSignal) => {
+      const response = await fetch(
+        `/api/handle/check?handle=${encodeURIComponent(normalizedInput)}`,
+        { signal }
+      );
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(data.error || 'Unable to check handle.');
+      }
+
+      return (await response.json()) as ApiValidationResult;
+    },
+    wait: 400, // Match existing debounce timing
+    timeout: PACER_TIMING.VALIDATION_TIMEOUT_MS,
+    onSuccess: (result: ApiValidationResult) => {
+      if (result.available) {
+        setHandleValidation({
+          available: true,
+          checking: false,
+          error: null,
+          clientValid: true,
+          suggestions: [],
+        });
+      } else {
+        // Generate suggestions for taken handles
+        const suggestions = generateUsernameSuggestions(handle, fullName).slice(
+          0,
+          3
+        );
+        setHandleValidation({
+          available: false,
+          checking: false,
+          error: result.error || 'Handle already taken',
+          clientValid: true,
+          suggestions,
+        });
+      }
+    },
+    onError: (error: Error) => {
+      if (isAbortError(error)) {
+        return;
+      }
+
+      // Capture warning to Sentry for monitoring API failures
+      void captureWarning('Handle validation API failed', error, {
+        handle,
+        route: '/onboarding',
+        component: 'useHandleValidation',
+      });
+
+      setHandleValidation({
+        available: false,
+        checking: false,
+        error: 'Unable to check handle right now.',
+        clientValid: true,
+        suggestions: [],
+      });
+    },
+  });
+
+  // Update checking state when Pacer is pending or validating
+  const isChecking = isPending || isValidating;
 
   const validateHandle = useCallback(
-    async (input: string) => {
+    (input: string) => {
       const normalizedInput = input.trim().toLowerCase();
-      validationSequence.current += 1;
-      const runId = validationSequence.current;
 
+      // Fast path: if input matches initial handle, mark as valid immediately
       if (
         normalizedInitialHandle &&
         normalizedInput === normalizedInitialHandle
@@ -64,6 +145,7 @@ export function useHandleValidation({
         return;
       }
 
+      // Client-side validation first (synchronous)
       const clientResult = validateUsernameFormat(normalizedInput);
       if (!clientResult.valid) {
         setHandleValidation({
@@ -76,10 +158,8 @@ export function useHandleValidation({
         return;
       }
 
-      abortController.current?.abort();
-      const controller = new AbortController();
-      abortController.current = controller;
-
+      // Show checking state and update handle
+      setHandle(normalizedInput);
       setHandleValidation({
         available: false,
         checking: true,
@@ -88,82 +168,18 @@ export function useHandleValidation({
         suggestions: [],
       });
 
-      try {
-        const response = await fetch(
-          `/api/handle/check?handle=${encodeURIComponent(normalizedInput)}`,
-          { signal: controller.signal }
-        );
-
-        if (validationSequence.current !== runId) return;
-
-        if (!response.ok) {
-          const data = (await response.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          throw new Error(data.error || 'Unable to check handle.');
-        }
-
-        const data = (await response.json()) as {
-          available: boolean;
-          error?: string;
-        };
-
-        if (validationSequence.current !== runId) return;
-
-        if (data.available) {
-          setHandle(normalizedInput);
-          setHandleValidation({
-            available: true,
-            checking: false,
-            error: null,
-            clientValid: true,
-            suggestions: [],
-          });
-        } else {
-          const suggestions = generateUsernameSuggestions(
-            normalizedInput,
-            fullName
-          ).slice(0, 3);
-          setHandleValidation({
-            available: false,
-            checking: false,
-            error: data.error || 'Handle already taken',
-            clientValid: true,
-            suggestions,
-          });
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
-
-        // Capture warning to Sentry for monitoring API failures
-        void captureWarning('Handle validation API failed', error, {
-          handle: normalizedInput,
-          route: '/onboarding',
-          component: 'useHandleValidation',
-        });
-
-        setHandleValidation({
-          available: false,
-          checking: false,
-          error: 'Unable to check handle right now.',
-          clientValid: true,
-          suggestions: [],
-        });
-      }
+      // Trigger API validation via Pacer (debounced, cached)
+      void validateApi(normalizedInput);
     },
-    [fullName, normalizedInitialHandle]
+    [normalizedInitialHandle, validateApi]
   );
 
-  useEffect(() => {
-    return () => {
-      abortController.current?.abort();
-    };
-  }, []);
-
   return {
-    handleValidation,
+    handleValidation: {
+      ...handleValidation,
+      // Ensure checking reflects Pacer's state
+      checking: handleValidation.checking || isChecking,
+    },
     setHandleValidation,
     handle,
     setHandle,
