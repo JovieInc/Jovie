@@ -11,12 +11,12 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
   NOTIFICATION_COPY,
-  subscribeToNotifications,
 } from '@/lib/notifications/client';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { useSubscribeNotificationsMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 import { buildPhoneE164, getMaxNationalDigits } from './utils';
@@ -77,6 +77,7 @@ export function useSubscriptionForm({
   const [isCountryOpen, setIsCountryOpen] = useState<boolean>(false);
 
   const { success: showSuccess, error: showError } = useNotifications();
+  const subscribeMutation = useSubscribeNotificationsMutation();
 
   const handleChannelChange = useCallback(
     (next: NotificationChannel) => {
@@ -193,7 +194,7 @@ export function useSubscriptionForm({
         throw new Error('Please enter a valid phone number');
       }
 
-      await subscribeToNotifications({
+      await subscribeMutation.mutateAsync({
         artistId: artist.id,
         channel,
         email: channel === 'email' ? trimmedEmail : undefined,
@@ -241,6 +242,7 @@ export function useSubscriptionForm({
     emailInput,
     isSubmitting,
     phoneInput,
+    subscribeMutation,
     setNotificationsState,
     setSubscribedChannels,
     setSubscriptionDetails,

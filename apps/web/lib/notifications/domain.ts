@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { db } from '@/lib/db';
@@ -469,43 +469,54 @@ export const getNotificationStatusDomain = async (
     };
     const details: NotificationContactValues = {};
 
-    const lookups: Array<{
-      channel: NotificationChannel;
-      value: string | null;
-    }> = [
-      { channel: 'email', value: normalizedEmail },
-      { channel: 'sms', value: normalizedPhone },
-    ];
+    const valueClauses: Array<ReturnType<typeof and>> = [];
 
-    for (const lookup of lookups) {
-      if (!lookup.value) continue;
-
-      const rows = await db
-        .select({
-          id: notificationSubscriptions.id,
-          value:
-            lookup.channel === 'email'
-              ? notificationSubscriptions.email
-              : notificationSubscriptions.phone,
-        })
-        .from(notificationSubscriptions)
-        .where(
-          and(
-            eq(notificationSubscriptions.creatorProfileId, artist_id),
-            eq(notificationSubscriptions.channel, lookup.channel),
-            eq(
-              lookup.channel === 'email'
-                ? notificationSubscriptions.email
-                : notificationSubscriptions.phone,
-              lookup.value
-            )
-          )
+    if (normalizedEmail) {
+      valueClauses.push(
+        and(
+          eq(notificationSubscriptions.channel, 'email'),
+          eq(notificationSubscriptions.email, normalizedEmail)
         )
-        .limit(1);
+      );
+    }
 
-      if (rows.length > 0) {
-        channels[lookup.channel] = true;
-        details[lookup.channel] = lookup.value;
+    if (normalizedPhone) {
+      valueClauses.push(
+        and(
+          eq(notificationSubscriptions.channel, 'sms'),
+          eq(notificationSubscriptions.phone, normalizedPhone)
+        )
+      );
+    }
+
+    if (valueClauses.length === 0) {
+      return buildValidationErrorResponse('Contact required to check status');
+    }
+
+    const rows = await db
+      .select({
+        channel: notificationSubscriptions.channel,
+        email: notificationSubscriptions.email,
+        phone: notificationSubscriptions.phone,
+      })
+      .from(notificationSubscriptions)
+      .where(
+        and(
+          eq(notificationSubscriptions.creatorProfileId, artist_id),
+          or(...valueClauses)
+        )
+      )
+      .limit(2);
+
+    for (const row of rows) {
+      if (row.channel === 'email' && row.email) {
+        channels.email = true;
+        details.email = row.email;
+      }
+
+      if (row.channel === 'sms' && row.phone) {
+        channels.sms = true;
+        details.sms = row.phone;
       }
     }
 

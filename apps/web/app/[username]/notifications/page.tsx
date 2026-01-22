@@ -1,8 +1,9 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
@@ -11,9 +12,13 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
   NOTIFICATION_COPY,
-  subscribeToNotifications,
 } from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  fetchWithTimeout,
+  queryKeys,
+  useSubscribeNotificationsMutation,
+} from '@/lib/queries';
 
 export default function NotificationsPage() {
   const params = useParams();
@@ -30,73 +35,35 @@ export default function NotificationsPage() {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [artistId, setArtistId] = useState<string | null>(null);
-  const [artistLookupError, setArtistLookupError] = useState<string | null>(
-    null
-  );
-  const [isArtistLoading, setIsArtistLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const { success: notifySuccess, error: notifyError } = useNotifications();
+  const subscribeMutation = useSubscribeNotificationsMutation();
   const notificationsEnabled = true;
 
-  useEffect(() => {
-    if (!notificationsEnabled) {
-      setIsArtistLoading(false);
-      return;
-    }
+  const artistQuery = useQuery({
+    queryKey: queryKeys.profile.byUsername(username),
+    queryFn: () =>
+      fetchWithTimeout<{ id?: string }>(
+        `/api/creator?username=${encodeURIComponent(username)}`
+      ),
+    enabled: notificationsEnabled && Boolean(username),
+    staleTime: 5 * 60 * 1000,
+  });
 
-    if (!username) {
-      setArtistLookupError(NOTIFICATION_COPY.errors.artistNotFound);
-      setIsArtistLoading(false);
-      return;
-    }
+  const artistId = useMemo(
+    () => artistQuery.data?.id ?? null,
+    [artistQuery.data]
+  );
+  const isArtistLoading = artistQuery.isLoading;
 
-    const controller = new AbortController();
-    let isMounted = true;
-
-    const loadArtist = async () => {
-      setIsArtistLoading(true);
-      try {
-        const response = await fetch(
-          `/api/creator?username=${encodeURIComponent(username)}`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error(NOTIFICATION_COPY.errors.artistNotFound);
-        }
-
-        const data = (await response.json()) as { id?: string };
-
-        if (!data?.id) {
-          throw new Error(NOTIFICATION_COPY.errors.artistUnavailable);
-        }
-
-        if (isMounted) {
-          setArtistId(data.id);
-          setArtistLookupError(null);
-        }
-      } catch (loadError) {
-        if (!isMounted || controller.signal.aborted) return;
-        const message =
-          loadError instanceof Error
-            ? loadError.message
-            : NOTIFICATION_COPY.errors.artistUnavailable;
-        setArtistLookupError(message);
-      } finally {
-        if (isMounted) {
-          setIsArtistLoading(false);
-        }
-      }
-    };
-
-    void loadArtist();
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [notificationsEnabled, username]);
+  // Derive error message with clear priority
+  const getArtistLookupError = (): string | null => {
+    if (!notificationsEnabled) return null;
+    if (artistQuery.isError) return NOTIFICATION_COPY.errors.artistUnavailable;
+    if (!username) return NOTIFICATION_COPY.errors.artistNotFound;
+    return null;
+  };
+  const artistLookupError = getArtistLookupError();
 
   if (!notificationsEnabled) {
     return (
@@ -170,8 +137,8 @@ export default function NotificationsPage() {
       // 1. Fetch the artist_id from the username
       // 2. Submit the subscription request
 
-      // For now, we'll just simulate the API call
-      await subscribeToNotifications({
+      // Use the mutation hook to subscribe
+      await subscribeMutation.mutateAsync({
         artistId,
         channel: 'email',
         email: normalizedEmail,
@@ -237,25 +204,24 @@ export default function NotificationsPage() {
               onChange={e => setEmail(e.target.value)}
               placeholder='your@email.com'
               required
-              inputClassName='w-full px-4 py-2 border rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500'
+              inputClassName='w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background'
             />
           </div>
 
           <button
             type='submit'
             disabled={isSubmitting}
-            className='w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50'
+            className='w-full rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
           >
             {isSubmitting ? 'Subscribing...' : 'Turn on notifications'}
           </button>
 
-          <p className='text-xs text-gray-500 mt-2'>
+          <p className='text-xs text-secondary-token mt-2'>
             By subscribing, you agree to receive automated updates. Reply STOP
             to unsubscribe.{' '}
             <Link href='/terms' className='underline'>
               Terms
             </Link>{' '}
-            •{' '}
             <Link href='/privacy' className='underline'>
               Privacy
             </Link>
