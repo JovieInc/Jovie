@@ -263,6 +263,214 @@ export async function importReleasesFromSpotify(
 }
 
 /**
+ * Determine release type, inferring EP from track count
+ */
+function determineReleaseType(
+  albumType: SpotifyAlbum['album_type'],
+  totalTracks: number
+): 'album' | 'single' | 'ep' | 'compilation' {
+  const releaseType = mapSpotifyAlbumType(albumType);
+  // Spotify doesn't distinguish EPs, so we infer from track count
+  if (releaseType === 'album' && totalTracks >= 4 && totalTracks <= 6) {
+    return 'ep';
+  }
+  return releaseType;
+}
+
+/**
+ * Sanitize album metadata fields
+ */
+function sanitizeAlbumMetadata(
+  album: SpotifyAlbum,
+  fullAlbum?: SpotifyAlbumFull
+) {
+  const sanitizedTitle = sanitizeName(album.name);
+  const rawArtworkUrl = getBestSpotifyImage(album.images);
+  const artworkUrl = rawArtworkUrl ? sanitizeImageUrl(rawArtworkUrl) : null;
+  const sanitizedLabel = fullAlbum?.label
+    ? sanitizeText(fullAlbum.label, 200)
+    : null;
+  const sanitizedUpc = fullAlbum?.external_ids?.upc
+    ? fullAlbum.external_ids.upc.replaceAll(/[^a-zA-Z0-9]/g, '').slice(0, 20)
+    : null;
+
+  // Get popularity from full album (more reliable) or basic album
+  const rawPopularity = fullAlbum?.popularity ?? album.popularity;
+  const popularity =
+    typeof rawPopularity === 'number' && Number.isFinite(rawPopularity)
+      ? Math.min(100, Math.max(0, Math.round(rawPopularity)))
+      : null;
+
+  return {
+    sanitizedTitle,
+    artworkUrl,
+    sanitizedLabel,
+    sanitizedUpc,
+    popularity,
+  };
+}
+
+/**
+ * Parse and sanitize artist credits from album
+ */
+function parseAlbumArtistInputs(
+  album: SpotifyAlbum,
+  fullAlbum?: SpotifyAlbumFull
+): SpotifyArtistInput[] {
+  return album.artists.map(a => ({
+    id: a.id,
+    name: sanitizeName(a.name),
+    images: fullAlbum?.images,
+  }));
+}
+
+/**
+ * Fetch existing track slugs to preserve them across re-imports
+ */
+async function fetchExistingTrackSlugs(
+  spotifyTrackIds: string[]
+): Promise<Map<string, { id: string; slug: string }>> {
+  const existingTracksBySpotifyId = new Map<
+    string,
+    { id: string; slug: string }
+  >();
+
+  if (spotifyTrackIds.length === 0) {
+    return existingTracksBySpotifyId;
+  }
+
+  const rows = await db
+    .select({
+      id: discogTracks.id,
+      slug: discogTracks.slug,
+      spotifyTrackId: providerLinks.externalId,
+    })
+    .from(providerLinks)
+    .innerJoin(discogTracks, eq(discogTracks.id, providerLinks.trackId))
+    .where(
+      and(
+        eq(providerLinks.ownerType, 'track'),
+        eq(providerLinks.providerId, 'spotify'),
+        inArray(providerLinks.externalId, spotifyTrackIds)
+      )
+    );
+
+  for (const row of rows) {
+    if (!row.spotifyTrackId) continue;
+    existingTracksBySpotifyId.set(row.spotifyTrackId, {
+      id: row.id,
+      slug: row.slug,
+    });
+  }
+
+  return existingTracksBySpotifyId;
+}
+
+/**
+ * Process tracks for a release
+ */
+async function processTracksForRelease(
+  release: { id: string },
+  creatorProfileId: string,
+  sanitizedTitle: string,
+  slug: string,
+  fullAlbum: SpotifyAlbumFull
+): Promise<boolean> {
+  const tracksToImport = fullAlbum.tracks.items.slice(
+    0,
+    MAX_TRACKS_PER_RELEASE
+  );
+  const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
+  const existingTracksBySpotifyId =
+    await fetchExistingTrackSlugs(spotifyTrackIds);
+
+  let hasExplicit = false;
+
+  for (const track of tracksToImport) {
+    if (track.explicit) {
+      hasExplicit = true;
+    }
+
+    const sanitizedTrackTitle = sanitizeName(track.name);
+    const existingTrack = track.id
+      ? existingTracksBySpotifyId.get(track.id)
+      : undefined;
+    const trackSlug =
+      existingTrack?.slug ??
+      (await generateUniqueSlug(
+        creatorProfileId,
+        sanitizedTrackTitle,
+        'track',
+        existingTrack?.id
+      ));
+
+    const sanitizedIsrc = track.external_ids?.isrc
+      ? track.external_ids.isrc
+          .replaceAll(/[^a-zA-Z0-9]/g, '')
+          .slice(0, 12)
+          .toUpperCase()
+      : null;
+
+    const sanitizedPreviewUrl = track.preview_url
+      ? sanitizeSpotifyPreviewUrl(track.preview_url)
+      : null;
+
+    const createdTrack = await upsertTrack({
+      releaseId: release.id,
+      creatorProfileId,
+      title: sanitizedTrackTitle,
+      slug: trackSlug,
+      trackNumber: Math.max(1, Math.min(track.track_number, 999)),
+      discNumber: Math.max(1, Math.min(track.disc_number, 99)),
+      durationMs: Math.max(0, Math.min(track.duration_ms, 60 * 60 * 1000)),
+      isExplicit: track.explicit,
+      isrc: sanitizedIsrc,
+      previewUrl: sanitizedPreviewUrl,
+      sourceType: 'ingested',
+      metadata: {
+        spotifyId: track.id,
+        spotifyUri: track.uri,
+      },
+    });
+
+    await upsertProviderLink({
+      trackId: createdTrack.id,
+      providerId: 'spotify',
+      url: buildSpotifyTrackUrl(track.id),
+      externalId: track.id,
+      sourceType: 'ingested',
+      isPrimary: true,
+    });
+
+    const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
+      id: a.id,
+      name: sanitizeName(a.name),
+    }));
+
+    const trackArtistCredits = parseArtistCredits(
+      track.name,
+      trackArtistInputs
+    );
+    await processTrackArtistCredits(createdTrack.id, trackArtistCredits, {
+      deleteExisting: true,
+      sourceType: 'ingested',
+    });
+  }
+
+  // Update release explicit flag if any track is explicit
+  if (hasExplicit) {
+    await upsertRelease({
+      creatorProfileId,
+      title: sanitizedTitle,
+      slug,
+      isExplicit: true,
+    });
+  }
+
+  return hasExplicit;
+}
+
+/**
  * Import a single release from Spotify data
  *
  * Security:
@@ -275,10 +483,9 @@ async function importSingleRelease(
   album: SpotifyAlbum,
   fullAlbum?: SpotifyAlbumFull
 ): Promise<void> {
-  // Sanitize album name before use
-  const sanitizedTitle = sanitizeName(album.name);
+  const metadata = sanitizeAlbumMetadata(album, fullAlbum);
 
-  // If this album was previously imported, preserve its slug for stability.
+  // If this album was previously imported, preserve its slug for stability
   const [existingRelease] = await db
     .select({
       id: discogReleases.id,
@@ -295,68 +502,37 @@ async function importSingleRelease(
     )
     .limit(1);
 
-  // Generate clean slug from title (no more Spotify ID suffix!)
   const slug =
     existingRelease?.slug ??
     (await generateUniqueSlug(
       creatorProfileId,
-      sanitizedTitle,
+      metadata.sanitizedTitle,
       'release',
       existingRelease?.id
     ));
 
-  // Determine release type
-  // Spotify doesn't distinguish EPs, so we infer from track count
-  let releaseType = mapSpotifyAlbumType(album.album_type);
-  if (
-    releaseType === 'album' &&
-    album.total_tracks >= 4 &&
-    album.total_tracks <= 6
-  ) {
-    releaseType = 'ep';
-  }
-
-  // Parse release date
+  const releaseType = determineReleaseType(
+    album.album_type,
+    album.total_tracks
+  );
   const releaseDate = parseSpotifyReleaseDate(
     album.release_date,
     album.release_date_precision
   );
 
-  // Get best artwork and sanitize URL
-  const rawArtworkUrl = getBestSpotifyImage(album.images);
-  const artworkUrl = rawArtworkUrl ? sanitizeImageUrl(rawArtworkUrl) : null;
-
-  // Sanitize label if present
-  const sanitizedLabel = fullAlbum?.label
-    ? sanitizeText(fullAlbum.label, 200)
-    : null;
-
-  // Sanitize UPC (alphanumeric only, max 20 chars)
-  const sanitizedUpc = fullAlbum?.external_ids?.upc
-    ? fullAlbum.external_ids.upc.replaceAll(/[^a-zA-Z0-9]/g, '').slice(0, 20)
-    : null;
-
-  // Get popularity from full album (more reliable) or basic album.
-  // Spotify's API returns 0-100, but guard against unexpected/invalid values.
-  const rawPopularity = fullAlbum?.popularity ?? album.popularity;
-  const popularity =
-    typeof rawPopularity === 'number' && Number.isFinite(rawPopularity)
-      ? Math.min(100, Math.max(0, Math.round(rawPopularity)))
-      : null;
-
   // Upsert the release with sanitized data
   const release = await upsertRelease({
     creatorProfileId,
-    title: sanitizedTitle,
+    title: metadata.sanitizedTitle,
     slug,
     releaseType,
     releaseDate,
-    label: sanitizedLabel,
-    upc: sanitizedUpc,
+    label: metadata.sanitizedLabel,
+    upc: metadata.sanitizedUpc,
     totalTracks: Math.min(album.total_tracks, MAX_TRACKS_PER_RELEASE),
-    isExplicit: false, // Will be updated from tracks if available
-    artworkUrl,
-    spotifyPopularity: popularity,
+    isExplicit: false,
+    artworkUrl: metadata.artworkUrl,
+    spotifyPopularity: metadata.popularity,
     sourceType: 'ingested',
     metadata: {
       spotifyId: album.id,
@@ -380,13 +556,7 @@ async function importSingleRelease(
   });
 
   // Process release-level artist credits
-  // Convert Spotify artists to the format expected by the parser
-  const releaseArtistInputs: SpotifyArtistInput[] = album.artists.map(a => ({
-    id: a.id,
-    name: sanitizeName(a.name),
-    images: fullAlbum?.images,
-  }));
-
+  const releaseArtistInputs = parseAlbumArtistInputs(album, fullAlbum);
   const releaseArtistCredits = parseMainArtists(releaseArtistInputs);
   await processReleaseArtistCredits(release.id, releaseArtistCredits, {
     deleteExisting: true,
@@ -395,136 +565,13 @@ async function importSingleRelease(
 
   // Import tracks if we have full album data
   if (fullAlbum?.tracks?.items) {
-    let hasExplicit = false;
-
-    // Limit tracks per release for safety
-    const tracksToImport = fullAlbum.tracks.items.slice(
-      0,
-      MAX_TRACKS_PER_RELEASE
+    await processTracksForRelease(
+      release,
+      creatorProfileId,
+      metadata.sanitizedTitle,
+      slug,
+      fullAlbum
     );
-
-    // Pre-fetch any existing track slugs by Spotify ID so re-imports don't churn slugs.
-    const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
-    const existingTracksBySpotifyId = new Map<
-      string,
-      { id: string; slug: string }
-    >();
-    if (spotifyTrackIds.length > 0) {
-      const rows = await db
-        .select({
-          id: discogTracks.id,
-          slug: discogTracks.slug,
-          spotifyTrackId: providerLinks.externalId,
-        })
-        .from(providerLinks)
-        .innerJoin(discogTracks, eq(discogTracks.id, providerLinks.trackId))
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'track'),
-            eq(providerLinks.providerId, 'spotify'),
-            inArray(providerLinks.externalId, spotifyTrackIds)
-          )
-        );
-
-      for (const row of rows) {
-        if (!row.spotifyTrackId) continue;
-        existingTracksBySpotifyId.set(row.spotifyTrackId, {
-          id: row.id,
-          slug: row.slug,
-        });
-      }
-    }
-
-    for (const track of tracksToImport) {
-      if (track.explicit) {
-        hasExplicit = true;
-      }
-
-      // Sanitize track title
-      const sanitizedTrackTitle = sanitizeName(track.name);
-      const existingTrack = track.id
-        ? existingTracksBySpotifyId.get(track.id)
-        : undefined;
-
-      // Generate clean slug for track (no more Spotify ID suffix!)
-      // Preserve existing slug for stable URLs across re-imports.
-      const trackSlug =
-        existingTrack?.slug ??
-        (await generateUniqueSlug(
-          creatorProfileId,
-          sanitizedTrackTitle,
-          'track',
-          existingTrack?.id
-        ));
-
-      // Sanitize ISRC (alphanumeric only, max 12 chars, uppercase for consistency)
-      const sanitizedIsrc = track.external_ids?.isrc
-        ? track.external_ids.isrc
-            .replaceAll(/[^a-zA-Z0-9]/g, '')
-            .slice(0, 12)
-            .toUpperCase()
-        : null;
-
-      // Sanitize preview URL
-      const sanitizedPreviewUrl = track.preview_url
-        ? sanitizeSpotifyPreviewUrl(track.preview_url)
-        : null;
-
-      const createdTrack = await upsertTrack({
-        releaseId: release.id,
-        creatorProfileId,
-        title: sanitizedTrackTitle,
-        slug: trackSlug,
-        trackNumber: Math.max(1, Math.min(track.track_number, 999)),
-        discNumber: Math.max(1, Math.min(track.disc_number, 99)),
-        durationMs: Math.max(0, Math.min(track.duration_ms, 60 * 60 * 1000)), // Max 1 hour
-        isExplicit: track.explicit,
-        isrc: sanitizedIsrc,
-        previewUrl: sanitizedPreviewUrl,
-        sourceType: 'ingested',
-        metadata: {
-          spotifyId: track.id,
-          spotifyUri: track.uri,
-        },
-      });
-
-      // Create Spotify provider link for the track
-      await upsertProviderLink({
-        trackId: createdTrack.id,
-        providerId: 'spotify',
-        url: buildSpotifyTrackUrl(track.id),
-        externalId: track.id,
-        sourceType: 'ingested',
-        isPrimary: true,
-      });
-
-      // Process track-level artist credits
-      // Parse from both the Spotify artists array and the track title (for feat., remix, etc.)
-      const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
-        id: a.id,
-        name: sanitizeName(a.name),
-      }));
-
-      const trackArtistCredits = parseArtistCredits(
-        track.name, // Original title (before sanitization) for feat/remix parsing
-        trackArtistInputs
-      );
-
-      await processTrackArtistCredits(createdTrack.id, trackArtistCredits, {
-        deleteExisting: true,
-        sourceType: 'ingested',
-      });
-    }
-
-    // Update release explicit flag if any track is explicit
-    if (hasExplicit) {
-      await upsertRelease({
-        creatorProfileId,
-        title: sanitizedTitle,
-        slug,
-        isExplicit: true,
-      });
-    }
   }
 }
 
