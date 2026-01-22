@@ -6,7 +6,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -124,21 +124,24 @@ export function ReleaseTable({
     rowIds.length,
   ]);
 
-  const toggleSelect = (id: string) => {
-    if (onSelectionChange) {
-      const newSet = new Set(selectedIds);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+  const toggleSelect = useCallback(
+    (id: string) => {
+      if (onSelectionChange) {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) {
+          newSet.delete(id);
+        } else {
+          newSet.add(id);
+        }
+        onSelectionChange(newSet);
       } else {
-        newSet.add(id);
+        internalSelection.toggleSelect(id);
       }
-      onSelectionChange(newSet);
-    } else {
-      internalSelection.toggleSelect(id);
-    }
-  };
+    },
+    [onSelectionChange, selectedIds, internalSelection]
+  );
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     if (onSelectionChange) {
       // Check if all visible rows are selected
       if (visibleSelectedCount === rowIds.length) {
@@ -159,7 +162,13 @@ export function ReleaseTable({
     } else {
       internalSelection.toggleSelectAll();
     }
-  };
+  }, [
+    onSelectionChange,
+    visibleSelectedCount,
+    rowIds,
+    selectedIds,
+    internalSelection,
+  ]);
 
   // Build dynamic column definitions
   const columns = useMemo(() => {
@@ -341,6 +350,8 @@ export function ReleaseTable({
     releases.length,
     isSyncing,
     onSync,
+    toggleSelect,
+    toggleSelectAll,
   ]);
 
   // Context menu items for right-click
