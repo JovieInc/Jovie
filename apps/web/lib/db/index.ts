@@ -285,10 +285,33 @@ function createDbInstance(pool: Pool, isProduction: boolean): DbType {
   });
 }
 
+function createTestDbStub(): DbType {
+  const fail = () => {
+    throw new Error(
+      'DATABASE_URL environment variable is not set for tests. ' +
+        'Set DATABASE_URL or mock `@/lib/db` in this test.'
+    );
+  };
+
+  // Minimal surface area so tests can spy/mock these methods without eagerly
+  // initializing a real database connection.
+  return {
+    select: fail as unknown as DbType['select'],
+    insert: fail as unknown as DbType['insert'],
+    update: fail as unknown as DbType['update'],
+    delete: fail as unknown as DbType['delete'],
+    execute: fail as unknown as DbType['execute'],
+    transaction: fail as unknown as DbType['transaction'],
+  } as DbType;
+}
+
 function initializeDb(): DbType {
   // Validate the database URL at runtime
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) {
+    if (process.env.NODE_ENV === 'test') {
+      return createTestDbStub();
+    }
     throw new Error(
       'DATABASE_URL environment variable is not set. ' +
         'This is required for database operations but can be omitted during build time.'

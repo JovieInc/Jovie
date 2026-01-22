@@ -5,7 +5,7 @@
  * version tracking, cache behavior, and error handling.
  */
 
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('sonner', () => ({
@@ -58,6 +58,33 @@ import type { LinkItem } from '@/components/dashboard/organisms/links/types';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+
+const EMPTY_INITIAL_LINKS: ProfileSocialLink[] = [];
+
+async function flushMicrotasks(iterations = 10) {
+  for (let i = 0; i < iterations; i++) {
+    await Promise.resolve();
+  }
+}
+
+async function waitForExpectation(
+  expectation: () => void,
+  maxTries = 50
+): Promise<void> {
+  let lastError: unknown;
+  for (let i = 0; i < maxTries; i++) {
+    try {
+      expectation();
+      return;
+    } catch (error) {
+      lastError = error;
+      await act(async () => {
+        await flushMicrotasks(5);
+      });
+    }
+  }
+  throw lastError;
+}
 
 function createMockProfileLink(
   overrides: Partial<ProfileSocialLink> = {}
@@ -163,7 +190,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -177,7 +204,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -194,7 +221,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave(linksToSave);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(mockFetch).toHaveBeenCalledWith(
           '/api/dashboard/social-links',
           expect.objectContaining({
@@ -226,7 +253,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave(result.current.links);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(mockFetch).toHaveBeenCalled();
       });
 
@@ -238,7 +265,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -247,7 +274,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(toast.success).toHaveBeenCalledWith(
           expect.stringContaining('Links saved successfully')
         );
@@ -264,7 +291,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -273,7 +300,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(result.current.linksVersion).toBe(10);
       });
     });
@@ -293,11 +320,12 @@ describe('useLinksPersistence', () => {
       });
 
       const onSyncSuggestions = vi.fn().mockResolvedValue(undefined);
+      const initialLinks = [createMockProfileLink({ version: 3 })];
 
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [createMockProfileLink({ version: 3 })],
+          initialLinks,
           suggestionsEnabled: false,
           onSyncSuggestions,
         })
@@ -307,7 +335,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave(result.current.links);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(toast.error).toHaveBeenCalledWith(
           expect.stringContaining('updated in another tab'),
           expect.any(Object)
@@ -330,7 +358,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -339,7 +367,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(toast.error).toHaveBeenCalledWith('Invalid platform');
       });
     });
@@ -350,7 +378,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -359,7 +387,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(toast.error).toHaveBeenCalledWith(
           expect.stringContaining('Network error')
         );
@@ -370,7 +398,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: undefined,
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -379,7 +407,7 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(toast.error).toHaveBeenCalledWith(
           expect.stringContaining('Unable to save')
         );
@@ -394,7 +422,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -409,7 +437,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );
@@ -425,7 +453,7 @@ describe('useLinksPersistence', () => {
         result.current.debouncedSave.flush();
       });
 
-      await waitFor(() => {
+      await waitForExpectation(() => {
         expect(mockFetch).toHaveBeenCalled();
       });
     });
@@ -450,7 +478,7 @@ describe('useLinksPersistence', () => {
       const { result } = renderHook(() =>
         useLinksPersistence({
           profileId: 'profile-123',
-          initialLinks: [],
+          initialLinks: EMPTY_INITIAL_LINKS,
           suggestionsEnabled: false,
         })
       );

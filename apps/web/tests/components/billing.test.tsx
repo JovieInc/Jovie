@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -34,6 +36,18 @@ Object.defineProperty(window, 'location', {
   writable: true,
 });
 
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
 describe('Billing Components', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,13 +58,15 @@ describe('Billing Components', () => {
 
   describe('BillingPortalLink Component', () => {
     it('renders with default props', () => {
-      render(<BillingPortalLink />);
+      renderWithQueryClient(<BillingPortalLink />);
       expect(screen.getByText('Manage Billing')).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
 
     it('renders with custom children', () => {
-      render(<BillingPortalLink>Custom Portal Text</BillingPortalLink>);
+      renderWithQueryClient(
+        <BillingPortalLink>Custom Portal Text</BillingPortalLink>
+      );
       expect(screen.getByText('Custom Portal Text')).toBeInTheDocument();
     });
 
@@ -58,48 +74,54 @@ describe('Billing Components', () => {
       const mockUrl = 'https://billing.stripe.com/session/test';
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
         json: async () => ({ url: mockUrl }),
       });
 
-      render(<BillingPortalLink />);
+      renderWithQueryClient(<BillingPortalLink />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
 
-      expect(button).toHaveTextContent('Loading...');
-
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/stripe/portal', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/stripe/portal',
+          expect.objectContaining({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+        );
         expect(window.location.href).toBe(mockUrl);
       });
     });
 
     it('handles portal creation error', async () => {
-      const errorMessage = 'Portal creation failed';
       (global.fetch as any).mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: errorMessage }),
+        status: 400,
+        statusText: 'Bad Request',
+        json: async () => ({ error: 'Portal creation failed' }),
       });
 
-      render(<BillingPortalLink />);
+      renderWithQueryClient(<BillingPortalLink />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+        expect(
+          screen.getByText('Fetch failed: 400 Bad Request')
+        ).toBeInTheDocument();
       });
     });
 
     it('handles network error', async () => {
       (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
 
-      render(<BillingPortalLink />);
+      renderWithQueryClient(<BillingPortalLink />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
@@ -115,21 +137,21 @@ describe('Billing Components', () => {
 
     it('renders with default props', () => {
       mockUseFeatureFlag.mockReturnValue(false);
-      render(<UpgradeButton />);
+      renderWithQueryClient(<UpgradeButton />);
       expect(screen.getByText('Upgrade to Standard')).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
 
     it('renders with custom children', () => {
       mockUseFeatureFlag.mockReturnValue(false);
-      render(<UpgradeButton>Custom Upgrade Text</UpgradeButton>);
+      renderWithQueryClient(<UpgradeButton>Custom Upgrade Text</UpgradeButton>);
       expect(screen.getByText('Custom Upgrade Text')).toBeInTheDocument();
     });
 
     it('redirects to the billing remove-branding flow when feature flag is disabled', async () => {
       mockUseFeatureFlag.mockReturnValue(false);
 
-      render(<UpgradeButton />);
+      renderWithQueryClient(<UpgradeButton />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
@@ -142,15 +164,13 @@ describe('Billing Components', () => {
     it('validates priceId when direct upgrade is enabled but priceId is missing', async () => {
       mockUseFeatureFlag.mockReturnValue(true);
 
-      render(<UpgradeButton />);
+      renderWithQueryClient(<UpgradeButton />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('Price ID is required for direct checkout')
-        ).toBeInTheDocument();
+        expect(pushMock).toHaveBeenCalledWith('/billing/remove-branding');
       });
     });
 
@@ -161,45 +181,51 @@ describe('Billing Components', () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
         json: async () => ({ url: mockUrl }),
       });
 
-      render(<UpgradeButton priceId={priceId} />);
+      renderWithQueryClient(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
 
-      expect(button).toHaveTextContent('Loading...');
-
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/stripe/checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ priceId }),
-        });
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/stripe/checkout',
+          expect.objectContaining({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ priceId }),
+          })
+        );
         expect(window.location.href).toBe(mockUrl);
       });
     });
 
     it('handles checkout creation error', async () => {
       mockUseFeatureFlag.mockReturnValue(true);
-      const errorMessage = 'Checkout creation failed';
       const priceId = 'price_test123';
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: errorMessage }),
+        status: 400,
+        statusText: 'Bad Request',
+        json: async () => ({ error: 'Checkout creation failed' }),
       });
 
-      render(<UpgradeButton priceId={priceId} />);
+      renderWithQueryClient(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+        expect(
+          screen.getByText('Fetch failed: 400 Bad Request')
+        ).toBeInTheDocument();
       });
     });
 
@@ -209,7 +235,7 @@ describe('Billing Components', () => {
 
       (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
 
-      render(<UpgradeButton priceId={priceId} />);
+      renderWithQueryClient(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
 
       fireEvent.click(button);

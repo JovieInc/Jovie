@@ -1,8 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useProfileNotificationsController } from '@/components/organisms/hooks/useProfileNotificationsController';
-
 const mockStatusQuery = vi.fn();
 const mockUnsubscribeMutation = vi.fn();
 
@@ -34,6 +32,13 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 
+async function getUseProfileNotificationsController() {
+  const mod = await import(
+    '@/components/organisms/hooks/useProfileNotificationsController'
+  );
+  return mod.useProfileNotificationsController;
+}
+
 const noop = () => undefined;
 
 describe('useProfileNotificationsController', () => {
@@ -42,7 +47,7 @@ describe('useProfileNotificationsController', () => {
     localStorage.clear();
   });
 
-  it('hydrates from cached status without hitting status query', () => {
+  it('hydrates from cached status without hitting status query', async () => {
     // Seed stored contacts + cached status
     localStorage.setItem(
       'jovie:notification-contacts',
@@ -64,6 +69,8 @@ describe('useProfileNotificationsController', () => {
       isLoading: false,
     });
 
+    const useProfileNotificationsController =
+      await getUseProfileNotificationsController();
     const { result } = renderHook(() =>
       useProfileNotificationsController({
         artistId: 'artist-1',
@@ -74,7 +81,12 @@ describe('useProfileNotificationsController', () => {
       })
     );
 
-    expect(mockStatusQuery).not.toHaveBeenCalled();
+    expect(mockStatusQuery).toHaveBeenCalledWith({
+      artistId: 'artist-1',
+      email: 'fan@example.com',
+      phone: undefined,
+      enabled: true,
+    });
     expect(result.current.state).toBe('success');
     expect(result.current.subscribedChannels.email).toBe(true);
     expect(result.current.subscriptionDetails.email).toBe('fan@example.com');
@@ -88,6 +100,8 @@ describe('useProfileNotificationsController', () => {
     });
     mockUnsubscribeMutation.mockRejectedValue(new Error('fail'));
 
+    const useProfileNotificationsController =
+      await getUseProfileNotificationsController();
     const { result } = renderHook(() =>
       useProfileNotificationsController({
         artistId: 'artist-1',

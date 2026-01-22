@@ -9,10 +9,6 @@ const mockClerkClient = {
   },
 };
 
-const syncMocks = vi.hoisted(() => ({
-  syncUsernameFromClerkEvent: vi.fn(),
-}));
-
 const clerkSyncMocks = vi.hoisted(() => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
   syncEmailFromClerkByClerkId: vi.fn().mockResolvedValue({ success: true }),
@@ -45,8 +41,6 @@ vi.mock('@/lib/env', () => ({
 }));
 
 vi.mock('@/lib/auth/clerk-sync', () => clerkSyncMocks);
-vi.mock('@/lib/username/sync', () => syncMocks);
-const { syncUsernameFromClerkEvent } = syncMocks;
 
 describe('/api/clerk/webhook', () => {
   const mockWebhook = {
@@ -118,12 +112,10 @@ describe('/api/clerk/webhook', () => {
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
       expect(result.fullName).toBe('John Doe');
-      expect(result.suggestedUsername).toBe('john');
 
       expect(mockUpdateUser).toHaveBeenCalledWith('user_123', {
         privateMetadata: {
           fullName: 'John Doe',
-          suggestedUsername: 'john',
         },
       });
     });
@@ -166,7 +158,11 @@ describe('/api/clerk/webhook', () => {
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
       expect(result.fullName).toBe('John');
-      expect(result.suggestedUsername).toBe('john');
+      expect(mockUpdateUser).toHaveBeenCalledWith('user_123', {
+        privateMetadata: {
+          fullName: 'John',
+        },
+      });
     });
 
     it('should process user with no name but email', async () => {
@@ -207,7 +203,7 @@ describe('/api/clerk/webhook', () => {
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
       expect(result.fullName).toBe('');
-      expect(result.suggestedUsername).toBe('johndoe');
+      expect(mockUpdateUser).not.toHaveBeenCalled();
     });
 
     it('should handle short names by adding random suffix', async () => {
@@ -248,8 +244,11 @@ describe('/api/clerk/webhook', () => {
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
       expect(result.fullName).toBe('Al');
-      expect(result.suggestedUsername).toMatch(/^al[a-z0-9]{3}$/); // 'al' + 3 random chars
-      // Short names get random suffix to ensure minimum length of 3 characters
+      expect(mockUpdateUser).toHaveBeenCalledWith('user_123', {
+        privateMetadata: {
+          fullName: 'Al',
+        },
+      });
     });
   });
 
@@ -342,13 +341,14 @@ describe('/api/clerk/webhook', () => {
     });
   });
 
-  describe('user.updated username sync', () => {
-    it('should call syncUsernameFromClerkEvent and return success', async () => {
+  describe('user.updated email sync', () => {
+    it('should do nothing when no verified primary email is present', async () => {
       const eventData = {
         data: {
           id: 'user_123',
           username: 'new-handle',
           email_addresses: [],
+          primary_email_address_id: null,
           first_name: null,
           last_name: null,
           private_metadata: {},
@@ -359,7 +359,6 @@ describe('/api/clerk/webhook', () => {
       };
 
       mockWebhook.verify.mockReturnValue(eventData);
-      syncUsernameFromClerkEvent.mockResolvedValue(undefined);
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -375,19 +374,22 @@ describe('/api/clerk/webhook', () => {
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
       expect(result.type).toBe('user.updated');
-      expect(syncUsernameFromClerkEvent).toHaveBeenCalledWith(
-        'user_123',
-        'new-handle',
-        {}
-      );
+      expect(clerkSyncMocks.syncEmailFromClerkByClerkId).not.toHaveBeenCalled();
     });
 
-    it('should handle sync errors gracefully', async () => {
+    it('should sync verified primary email when present', async () => {
       const eventData = {
         data: {
           id: 'user_123',
           username: 'new-handle',
-          email_addresses: [],
+          primary_email_address_id: 'email_123',
+          email_addresses: [
+            {
+              id: 'email_123',
+              email_address: 'new@example.com',
+              verification: { status: 'verified' },
+            },
+          ],
           first_name: null,
           last_name: null,
           private_metadata: {},
@@ -398,7 +400,56 @@ describe('/api/clerk/webhook', () => {
       };
 
       mockWebhook.verify.mockReturnValue(eventData);
-      syncUsernameFromClerkEvent.mockRejectedValue(new Error('sync-failed'));
+      clerkSyncMocks.syncEmailFromClerkByClerkId.mockResolvedValue({
+        success: true,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
+
+      const response = await (await getPost())(request);
+      const result = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(true);
+      expect(clerkSyncMocks.syncEmailFromClerkByClerkId).toHaveBeenCalledWith(
+        'user_123',
+        'new@example.com'
+      );
+    });
+
+    it('should handle email sync failures gracefully', async () => {
+      const eventData = {
+        data: {
+          id: 'user_123',
+          username: 'new-handle',
+          primary_email_address_id: 'email_123',
+          email_addresses: [
+            {
+              id: 'email_123',
+              email_address: 'new@example.com',
+              verification: { status: 'verified' },
+            },
+          ],
+          first_name: null,
+          last_name: null,
+          private_metadata: {},
+          public_metadata: {},
+        },
+        object: 'event' as const,
+        type: 'user.updated' as const,
+      };
+
+      mockWebhook.verify.mockReturnValue(eventData);
+      clerkSyncMocks.syncEmailFromClerkByClerkId.mockResolvedValue({
+        success: false,
+        error: 'sync-failed',
+      });
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -413,11 +464,10 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to sync from Clerk');
-      expect(syncUsernameFromClerkEvent).toHaveBeenCalledWith(
+      expect(result.error).toBe('Failed to sync email from Clerk');
+      expect(clerkSyncMocks.syncEmailFromClerkByClerkId).toHaveBeenCalledWith(
         'user_123',
-        'new-handle',
-        {}
+        'new@example.com'
       );
     });
   });

@@ -2,13 +2,13 @@
  * Customer Sync Tests - Edge Cases, Constants, & Type Exports
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import module once after mocks are set up
 import {
   BILLING_FIELDS_CUSTOMER,
   BILLING_FIELDS_FULL,
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,
 } from '@/lib/stripe/customer-sync';
+// IMPORTANT: Import mocks before importing module-under-test
 import { mockDbSelect } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Edge Cases', () => {
