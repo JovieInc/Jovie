@@ -9,6 +9,54 @@ import { Artist, LegacySocialLink } from '@/types/db';
 
 type PrimaryAction = 'subscribe' | 'listen';
 
+// Platform keyword to DSP key mappings
+const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
+  [
+    { keywords: ['spotify'], dspKey: 'spotify' },
+    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
+    { keywords: ['youtube'], dspKey: 'youtube' },
+    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
+    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
+    { keywords: ['tidal'], dspKey: 'tidal' },
+    { keywords: ['deezer'], dspKey: 'deezer' },
+    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
+    { keywords: ['pandora'], dspKey: 'pandora' },
+  ];
+
+const TIP_AMOUNTS = [3, 5, 7];
+const ALLOWED_VENMO_HOSTS = ['venmo.com', 'www.venmo.com'];
+
+function mapSocialPlatformToDSPKey(platform: string): string | null {
+  const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
+
+  for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {
+    if (
+      keywords.some(
+        keyword => normalized.includes(keyword) || normalized === keyword
+      )
+    ) {
+      return dspKey;
+    }
+  }
+
+  return null;
+}
+
+function extractVenmoUsername(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (ALLOWED_VENMO_HOSTS.includes(u.hostname)) {
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts[0] === 'u' && parts[1]) return parts[1];
+      if (parts[0]) return parts[0];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 interface StaticArtistPageProps {
   mode: string;
   artist: Artist;
@@ -31,35 +79,6 @@ function renderContent(
   primaryAction: PrimaryAction,
   enableDynamicEngagement: boolean
 ) {
-  const mapSocialPlatformToDSPKey = (platform: string): string | null => {
-    const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-
-    // Map of platform keywords to DSP keys
-    const platformMappings: Array<{ keywords: string[]; dspKey: string }> = [
-      { keywords: ['spotify'], dspKey: 'spotify' },
-      { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-      { keywords: ['youtube'], dspKey: 'youtube' },
-      { keywords: ['soundcloud'], dspKey: 'soundcloud' },
-      { keywords: ['bandcamp'], dspKey: 'bandcamp' },
-      { keywords: ['tidal'], dspKey: 'tidal' },
-      { keywords: ['deezer'], dspKey: 'deezer' },
-      { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
-      { keywords: ['pandora'], dspKey: 'pandora' },
-    ];
-
-    for (const { keywords, dspKey } of platformMappings) {
-      if (
-        keywords.some(
-          keyword => normalized.includes(keyword) || normalized === keyword
-        )
-      ) {
-        return dspKey;
-      }
-    }
-
-    return null;
-  };
-
   const socialDSPs: AvailableDSP[] = (() => {
     const mapped = socialLinks
       .filter(link => link.url)
@@ -113,27 +132,9 @@ function renderContent(
       );
 
     case 'tip': {
-      // Extract Venmo link from social links
       const venmoLink =
         socialLinks.find(l => l.platform === 'venmo')?.url || null;
-      const extractVenmoUsername = (url: string | null): string | null => {
-        if (!url) return null;
-        try {
-          const u = new URL(url);
-          const allowedVenmoHosts = ['venmo.com', 'www.venmo.com'];
-          if (allowedVenmoHosts.includes(u.hostname)) {
-            const parts = u.pathname.split('/').filter(Boolean);
-            if (parts[0] === 'u' && parts[1]) return parts[1];
-            if (parts[0]) return parts[0];
-          }
-          return null;
-        } catch {
-          return null;
-        }
-      };
-
       const venmoUsername = extractVenmoUsername(venmoLink);
-      const AMOUNTS = [3, 5, 7];
 
       return (
         <main className='space-y-4' aria-labelledby='tipping-title'>
@@ -145,7 +146,7 @@ function renderContent(
             <VenmoTipSelector
               venmoLink={venmoLink}
               venmoUsername={venmoUsername ?? undefined}
-              amounts={AMOUNTS}
+              amounts={TIP_AMOUNTS}
             />
           ) : (
             <div className='text-center'>

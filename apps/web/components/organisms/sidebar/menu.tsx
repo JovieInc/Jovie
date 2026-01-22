@@ -59,7 +59,7 @@ const sidebarMenuButtonVariants = cva(
 type SidebarMenuButtonVariant = 'default' | 'outline';
 type SidebarMenuButtonSize = 'default' | 'sm' | 'lg';
 
-export const SidebarMenuButton = React.forwardRef<
+const SidebarMenuButtonInner = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<'button'> & {
     asChild?: boolean;
@@ -115,7 +115,10 @@ export const SidebarMenuButton = React.forwardRef<
     );
   }
 );
-SidebarMenuButton.displayName = 'SidebarMenuButton';
+SidebarMenuButtonInner.displayName = 'SidebarMenuButton';
+
+// Wrap with React.memo to prevent unnecessary re-renders when props haven't changed
+export const SidebarMenuButton = React.memo(SidebarMenuButtonInner);
 
 export const SidebarMenuActions = React.forwardRef<
   HTMLDivElement,
