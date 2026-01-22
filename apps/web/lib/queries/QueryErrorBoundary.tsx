@@ -2,8 +2,12 @@
 
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
-import { type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
+
+type CustomFallbackFn = (
+  props: FallbackProps & { reset: () => void }
+) => ReactNode;
 
 interface QueryErrorBoundaryProps {
   children: ReactNode;
@@ -11,7 +15,7 @@ interface QueryErrorBoundaryProps {
    * Custom fallback component to render on error.
    * If not provided, uses DefaultErrorFallback.
    */
-  fallback?: (props: FallbackProps & { reset: () => void }) => ReactNode;
+  fallback?: CustomFallbackFn;
 }
 
 /**
@@ -39,6 +43,19 @@ function DefaultErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
       </button>
     </div>
   );
+}
+
+/**
+ * Creates a fallback render function for the error boundary.
+ * Extracted to avoid defining components inside render.
+ */
+function createFallbackRender(customFallback?: CustomFallbackFn) {
+  return function FallbackRender(props: FallbackProps) {
+    if (customFallback) {
+      return customFallback({ ...props, reset: props.resetErrorBoundary });
+    }
+    return <DefaultErrorFallback {...props} />;
+  };
 }
 
 /**
@@ -72,19 +89,12 @@ export function QueryErrorBoundary({
   children,
   fallback,
 }: QueryErrorBoundaryProps) {
+  const FallbackComponent = createFallbackRender(fallback);
+
   return (
     <QueryErrorResetBoundary>
       {({ reset }) => (
-        <ErrorBoundary
-          onReset={reset}
-          fallbackRender={props =>
-            fallback ? (
-              fallback({ ...props, reset: props.resetErrorBoundary })
-            ) : (
-              <DefaultErrorFallback {...props} />
-            )
-          }
-        >
+        <ErrorBoundary onReset={reset} FallbackComponent={FallbackComponent}>
           {children}
         </ErrorBoundary>
       )}

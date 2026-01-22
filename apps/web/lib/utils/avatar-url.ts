@@ -12,6 +12,32 @@
 const HIGH_RES_SIZE = 512;
 
 /**
+ * Shared helper for upgrading URLs that use 's' or 'size' query parameters.
+ * Used by GitHub and Gravatar avatar URL upgraders.
+ */
+function upgradeUrlWithSizeParam(url: string): string {
+  try {
+    const urlObj = new URL(url);
+
+    if (urlObj.searchParams.has('s')) {
+      urlObj.searchParams.set('s', String(HIGH_RES_SIZE));
+      return urlObj.toString();
+    }
+
+    if (urlObj.searchParams.has('size')) {
+      urlObj.searchParams.set('size', String(HIGH_RES_SIZE));
+      return urlObj.toString();
+    }
+
+    // Add size parameter if none exists
+    urlObj.searchParams.set('s', String(HIGH_RES_SIZE));
+    return urlObj.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Upgrade a Google profile photo URL to request a higher resolution.
  *
  * Google profile photos use googleusercontent.com and support size parameters:
@@ -121,26 +147,7 @@ function upgradeTwitterAvatarUrl(url: string): string {
  * // Output: https://avatars.githubusercontent.com/u/xxx?s=512
  */
 function upgradeGitHubAvatarUrl(url: string): string {
-  try {
-    const urlObj = new URL(url);
-
-    // GitHub uses 's' or 'size' parameter
-    if (urlObj.searchParams.has('s')) {
-      urlObj.searchParams.set('s', String(HIGH_RES_SIZE));
-      return urlObj.toString();
-    }
-
-    if (urlObj.searchParams.has('size')) {
-      urlObj.searchParams.set('size', String(HIGH_RES_SIZE));
-      return urlObj.toString();
-    }
-
-    // Add size parameter if none exists
-    urlObj.searchParams.set('s', String(HIGH_RES_SIZE));
-    return urlObj.toString();
-  } catch {
-    return url;
-  }
+  return upgradeUrlWithSizeParam(url);
 }
 
 /**
@@ -199,25 +206,7 @@ function upgradeClerkAvatarUrl(url: string): string {
  * // Output: https://www.gravatar.com/avatar/xxx?s=512
  */
 function upgradeGravatarUrl(url: string): string {
-  try {
-    const urlObj = new URL(url);
-
-    if (urlObj.searchParams.has('s')) {
-      urlObj.searchParams.set('s', String(HIGH_RES_SIZE));
-      return urlObj.toString();
-    }
-
-    if (urlObj.searchParams.has('size')) {
-      urlObj.searchParams.set('size', String(HIGH_RES_SIZE));
-      return urlObj.toString();
-    }
-
-    // Add size parameter
-    urlObj.searchParams.set('s', String(HIGH_RES_SIZE));
-    return urlObj.toString();
-  } catch {
-    return url;
-  }
+  return upgradeUrlWithSizeParam(url);
 }
 
 /**
