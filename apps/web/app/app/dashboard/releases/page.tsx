@@ -18,6 +18,7 @@ export default async function ReleasesPage() {
 
   return (
     <ReleaseProviderMatrix
+      profileId={spotifyStatus.profileId ?? releases[0]?.profileId ?? ''}
       releases={releases}
       providerConfig={providerConfig}
       primaryProviders={primaryProviderKeys}

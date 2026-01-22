@@ -369,18 +369,29 @@ export async function checkSpotifyConnection(): Promise<{
   connected: boolean;
   spotifyId: string | null;
   artistName: string | null;
+  profileId: string | null;
 }> {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    return { connected: false, spotifyId: null, artistName: null };
+    return {
+      connected: false,
+      spotifyId: null,
+      artistName: null,
+      profileId: null,
+    };
   }
 
   try {
     const data = await getDashboardData();
 
     if (data.needsOnboarding || !data.selectedProfile) {
-      return { connected: false, spotifyId: null, artistName: null };
+      return {
+        connected: false,
+        spotifyId: null,
+        artistName: null,
+        profileId: null,
+      };
     }
 
     const settings = data.selectedProfile.settings as Record<
@@ -393,9 +404,15 @@ export async function checkSpotifyConnection(): Promise<{
       connected: !!data.selectedProfile.spotifyId,
       spotifyId: data.selectedProfile.spotifyId ?? null,
       artistName,
+      profileId: data.selectedProfile.id,
     };
   } catch {
-    return { connected: false, spotifyId: null, artistName: null };
+    return {
+      connected: false,
+      spotifyId: null,
+      artistName: null,
+      profileId: null,
+    };
   }
 }
 

@@ -29,6 +29,7 @@ function getProviderUrl(
 }
 
 export function useReleaseProviderMatrix({
+  profileId,
   releases,
   providerConfig,
   primaryProviders,
@@ -41,9 +42,6 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
-
-  // Get profileId from first release (all releases share same profileId)
-  const profileId = releases[0]?.profileId ?? '';
 
   // TanStack Query mutations
   const saveProviderMutation = useSaveProviderOverrideMutation();
@@ -101,14 +99,19 @@ export function useReleaseProviderMatrix({
   };
 
   const handleCopy = async (path: string, label: string, testId: string) => {
-    const absoluteUrl = `${getBaseUrl()}${path}`;
-    const success = await copyToClipboard(absoluteUrl);
+    const textToCopy =
+      path.startsWith('http://') || path.startsWith('https://')
+        ? path
+        : path.startsWith('/')
+          ? `${getBaseUrl()}${path}`
+          : path;
+    const success = await copyToClipboard(textToCopy);
     if (success) {
       toast.success(`${label} copied`, { id: testId });
     } else {
       toast.error('Unable to copy link', { id: `${testId}-error` });
     }
-    return absoluteUrl;
+    return textToCopy;
   };
 
   const handleSave = (provider: ProviderKey) => {
@@ -194,6 +197,10 @@ export function useReleaseProviderMatrix({
   };
 
   const handleSync = () => {
+    if (!profileId) {
+      toast.error('Missing profile ID');
+      return;
+    }
     syncMutation.mutate(undefined, {
       onSuccess: result => {
         if (result.success) {

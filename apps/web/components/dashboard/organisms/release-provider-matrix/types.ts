@@ -1,6 +1,7 @@
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 export interface ReleaseProviderMatrixProps {
+  profileId: string;
   releases: ReleaseViewModel[];
   providerConfig: Record<ProviderKey, { label: string; accent: string }>;
   primaryProviders: ProviderKey[];

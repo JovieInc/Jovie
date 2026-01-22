@@ -384,7 +384,11 @@ export function ReleaseTable({
           label: 'Copy release ID',
           icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
           onClick: () => {
-            navigator.clipboard.writeText(release.id);
+            void onCopy(
+              release.id,
+              `${release.title} release ID`,
+              `release-id-copy-${release.id}`
+            );
           },
         },
       ];

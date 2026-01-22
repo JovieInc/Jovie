@@ -60,18 +60,23 @@ export function useAvailabilityPopover({
     };
   }, []);
 
+  // Clear stale validation error when switching providers
+  useEffect(() => {
+    setValidationError('');
+  }, [addingProvider]);
+
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
       try {
         await onCopy(path, label, testId);
         setCopiedTestId(testId);
       } catch {
-        // Still show brief feedback even on failure
-        setCopiedTestId(testId);
+        // Don't show success feedback on failure (parent handles error toast)
+        setCopiedTestId(null);
       } finally {
-        if (copyTimeoutRef.current) {
-          clearTimeout(copyTimeoutRef.current);
-        }
         copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
       }
     },

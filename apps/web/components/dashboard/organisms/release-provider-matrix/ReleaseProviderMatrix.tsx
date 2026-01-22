@@ -19,6 +19,7 @@ import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
 export function ReleaseProviderMatrix({
+  profileId,
   releases,
   providerConfig,
   primaryProviders,
@@ -42,7 +43,12 @@ export function ReleaseProviderMatrix({
     handleCopy,
     handleSync,
     handleAddUrl,
-  } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
+  } = useReleaseProviderMatrix({
+    profileId,
+    releases,
+    providerConfig,
+    primaryProviders,
+  });
 
   // Row selection
   const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
