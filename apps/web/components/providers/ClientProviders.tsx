@@ -5,6 +5,7 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
+import { useVersionMonitor } from '@/lib/hooks/useVersionMonitor';
 import { PacerProvider } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { logger } from '@/lib/utils/logger';
@@ -107,6 +108,9 @@ function ClientProvidersInnerBase({
   enableStatsig = true,
   userId,
 }: ClientProvidersInnerBaseProps) {
+  // Monitor for version mismatches (silent Sentry tracking)
+  useVersionMonitor();
+
   useEffect(() => {
     // Environment-gated startup log
     try {
