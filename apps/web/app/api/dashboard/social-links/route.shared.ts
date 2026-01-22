@@ -14,7 +14,10 @@ import {
 } from '@/lib/rate-limit';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
-import { updateSocialLinksSchema as baseUpdateSocialLinksSchema } from '@/lib/validation/schemas';
+import {
+  updateSocialLinksSchema as baseUpdateSocialLinksSchema,
+  updateLinkStateSchema,
+} from '@/lib/validation/schemas';
 import { isValidSocialPlatform } from '@/types';
 import type { IngestionSourceType, SocialLinkState } from '@/types/db';
 
@@ -338,12 +341,7 @@ export const validateLinkStatePayload = (
   rawBody: unknown,
   headers: HeadersInit
 ):
-  | {
-      ok: true;
-      data: z.infer<
-        typeof import('@/lib/validation/schemas').updateLinkStateSchema
-      >;
-    }
+  | { ok: true; data: z.infer<typeof updateLinkStateSchema> }
   | { ok: false; response: NextResponse } => {
   if (rawBody == null || typeof rawBody !== 'object') {
     return {
@@ -355,7 +353,6 @@ export const validateLinkStatePayload = (
     };
   }
 
-  const { updateLinkStateSchema } = require('@/lib/validation/schemas');
   const parsed = updateLinkStateSchema.safeParse(rawBody);
   if (!parsed.success) {
     return {
