@@ -1,6 +1,7 @@
 'use client';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { memo } from 'react';
 
 interface PopularityCellProps {
   popularity: number | null | undefined;
@@ -14,7 +15,9 @@ interface PopularityCellProps {
  * - Tooltip showing exact score
  * - Spotify green color for the filled portion
  */
-export function PopularityCell({ popularity }: PopularityCellProps) {
+export const PopularityCell = memo(function PopularityCell({
+  popularity,
+}: PopularityCellProps) {
   if (popularity === null || popularity === undefined) {
     return <span className='text-xs text-tertiary-token'>-</span>;
   }
@@ -48,4 +51,4 @@ export function PopularityCell({ popularity }: PopularityCellProps) {
       </TooltipContent>
     </Tooltip>
   );
-}
+});

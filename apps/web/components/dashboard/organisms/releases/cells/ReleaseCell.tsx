@@ -2,7 +2,7 @@
 
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -20,7 +20,10 @@ interface ReleaseCellProps {
  * - Optional "edited" badge if manual overrides exist
  * - Artist name if provided
  */
-export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
+export const ReleaseCell = memo(function ReleaseCell({
+  release,
+  artistName,
+}: ReleaseCellProps) {
   const titleRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -98,4 +101,4 @@ export function ReleaseCell({ release, artistName }: ReleaseCellProps) {
       </div>
     </div>
   );
-}
+});

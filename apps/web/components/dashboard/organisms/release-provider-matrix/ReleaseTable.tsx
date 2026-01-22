@@ -62,6 +62,14 @@ interface ReleaseTableProps {
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
 
+// Date format options (extracted to prevent inline object creation)
+const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
+const DATE_TOOLTIP_FORMAT_OPTIONS = {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+} as const;
+
 /**
  * ReleaseTable - Releases table using UnifiedTable
  *
@@ -105,7 +113,7 @@ export function ReleaseTable({
       if (rowIdSet.has(id)) count++;
     }
     return count;
-  }, [selectedIds, rowIdSet]);
+  }, [selectedIds.size, rowIds.length]);
 
   // Compute header checkbox state based on visible selection
   const headerCheckboxState = useMemo(() => {
@@ -138,7 +146,7 @@ export function ReleaseTable({
         internalSelection.toggleSelect(id);
       }
     },
-    [onSelectionChange, selectedIds, internalSelection]
+    [onSelectionChange, selectedIds.size, internalSelection.toggleSelect]
   );
 
   const toggleSelectAll = useCallback(() => {
@@ -165,9 +173,9 @@ export function ReleaseTable({
   }, [
     onSelectionChange,
     visibleSelectedCount,
-    rowIds,
-    selectedIds,
-    internalSelection,
+    rowIds.length,
+    selectedIds.size,
+    internalSelection.toggleSelectAll,
   ]);
 
   // Build dynamic column definitions
@@ -259,12 +267,8 @@ export function ReleaseTable({
           return date ? (
             <DateCell
               date={new Date(date)}
-              formatOptions={{ year: 'numeric' }}
-              tooltipFormatOptions={{
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              }}
+              formatOptions={DATE_FORMAT_OPTIONS}
+              tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
             />
           ) : (
             <span className='text-xs text-tertiary-token'>TBD</span>
@@ -343,50 +347,50 @@ export function ReleaseTable({
     onAddUrl,
     isAddingUrl,
     headerCheckboxState,
-    selectedIds,
-    rowIds,
+    selectedIds.size,
+    releases.length,
     bulkActions,
     onClearSelection,
-    releases.length,
     isSyncing,
     onSync,
     toggleSelect,
     toggleSelectAll,
   ]);
 
-  // Context menu items for right-click
-  const getContextMenuItems = (
-    release: ReleaseViewModel
-  ): ContextMenuItemType[] => {
-    return [
-      {
-        id: 'edit',
-        label: 'Edit links',
-        icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
-        onClick: () => onEdit(release),
-      },
-      {
-        id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void onCopy(
-            release.smartLinkPath,
-            `${release.title} smart link`,
-            `smart-link-copy-${release.id}`
-          );
+  // Context menu items for right-click - memoized to prevent recreation
+  const getContextMenuItems = useCallback(
+    (release: ReleaseViewModel): ContextMenuItemType[] => {
+      return [
+        {
+          id: 'edit',
+          label: 'Edit links',
+          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          onClick: () => onEdit(release),
         },
-      },
-      {
-        id: 'copy-release-id',
-        label: 'Copy release ID',
-        icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          navigator.clipboard.writeText(release.id);
+        {
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            );
+          },
         },
-      },
-    ];
-  };
+        {
+          id: 'copy-release-id',
+          label: 'Copy release ID',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.id);
+          },
+        },
+      ];
+    },
+    [onEdit, onCopy]
+  );
 
   // Fixed min width - availability column consolidates all providers
   const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
