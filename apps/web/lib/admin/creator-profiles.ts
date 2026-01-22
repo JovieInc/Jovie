@@ -122,6 +122,63 @@ function getOrderByExpressions(sort: AdminCreatorProfilesSort) {
   }
 }
 
+type RowWithClaimToken = {
+  id: string;
+  isClaimed: boolean | null;
+  claimToken: string | null;
+  claimTokenExpiresAt?: Date | null;
+};
+
+/**
+ * Backfill claim tokens for unclaimed profiles that don't have one.
+ * Updates the database and returns a map of generated tokens.
+ */
+async function backfillClaimTokens<T extends RowWithClaimToken>(
+  rows: T[]
+): Promise<Map<string, { token: string; expiresAt: Date }>> {
+  const needsToken = rows.filter(row => !row.isClaimed && !row.claimToken);
+  const tokensById = new Map<string, { token: string; expiresAt: Date }>();
+
+  if (needsToken.length === 0) return tokensById;
+
+  await Promise.all(
+    needsToken.map(async row => {
+      const token = randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
+      tokensById.set(row.id, { token, expiresAt });
+
+      await db
+        .update(creatorProfiles)
+        .set({
+          claimToken: token,
+          claimTokenExpiresAt: expiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, row.id));
+    })
+  );
+
+  return tokensById;
+}
+
+/**
+ * Apply generated tokens to in-memory rows.
+ */
+function applyTokensToRows<T extends RowWithClaimToken>(
+  rows: T[],
+  tokensById: Map<string, { token: string; expiresAt: Date }>
+): void {
+  for (const row of rows) {
+    const tokenData = tokensById.get(row.id);
+    if (tokenData) {
+      (row as { claimToken?: string | null }).claimToken = tokenData.token;
+      (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
+        tokenData.expiresAt;
+    }
+  }
+}
+
 // Map a row to the admin profile format
 function mapRowToProfile(
   row: {
@@ -238,42 +295,8 @@ export async function getAdminCreatorProfiles(
 
     // Legacy backfill: Ensure unclaimed profiles have a claim token.
     // NOTE: New profiles should have tokens generated at creation time.
-    // This backfill is temporary for legacy rows without tokens.
-    const needsToken = pageRows.filter(
-      row => !row.isClaimed && !row.claimToken
-    );
-
-    if (needsToken.length > 0) {
-      const tokensById = new Map<string, { token: string; expiresAt: Date }>();
-
-      await Promise.all(
-        needsToken.map(async row => {
-          const token = randomUUID();
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
-          tokensById.set(row.id, { token, expiresAt });
-
-          await db
-            .update(creatorProfiles)
-            .set({
-              claimToken: token,
-              claimTokenExpiresAt: expiresAt,
-              updatedAt: new Date(),
-            })
-            .where(eq(creatorProfiles.id, row.id));
-        })
-      );
-
-      // Update in-memory rows so callers immediately see the new tokens.
-      for (const row of pageRows) {
-        const tokenData = tokensById.get(row.id);
-        if (tokenData) {
-          (row as { claimToken?: string | null }).claimToken = tokenData.token;
-          (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
-            tokenData.expiresAt;
-        }
-      }
-    }
+    const tokensById = await backfillClaimTokens(pageRows);
+    applyTokensToRows(pageRows, tokensById);
 
     const profileIds = pageRows.map(row => row.id);
     const confidenceMap = new Map<string, number>();

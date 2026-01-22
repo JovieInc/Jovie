@@ -59,6 +59,113 @@ interface AddProviderUrlPopoverProps {
   isSaving?: boolean;
 }
 
+interface ProviderCopyButtonProps {
+  testId: string;
+  url: string | undefined;
+  path: string | undefined;
+  isCopied: boolean;
+  isManual: boolean;
+  releaseTitle: string;
+  providerLabel: string;
+  onCopy: (path: string, label: string, testId: string) => Promise<void>;
+}
+
+function ProviderCopyButton({
+  testId,
+  url,
+  path,
+  isCopied,
+  isManual,
+  releaseTitle,
+  providerLabel,
+  onCopy,
+}: Readonly<ProviderCopyButtonProps>) {
+  return (
+    <button
+      type='button'
+      data-testid={testId}
+      data-url={path ? `${getBaseUrl()}${path}` : undefined}
+      onClick={() => {
+        if (!path) return;
+        void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
+      }}
+      className={cn(
+        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+        isCopied
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+      )}
+    >
+      <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+        <Icon
+          name='Copy'
+          className={cn(
+            'absolute h-3.5 w-3.5 transition-all duration-150',
+            isCopied
+              ? 'scale-50 opacity-0'
+              : 'scale-100 opacity-0 group-hover/btn:opacity-100'
+          )}
+          aria-hidden='true'
+        />
+        <Icon
+          name='Check'
+          className={cn(
+            'absolute h-3.5 w-3.5 transition-all duration-150',
+            isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+          )}
+          aria-hidden='true'
+        />
+      </span>
+      <span className='line-clamp-1'>
+        {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
+      </span>
+    </button>
+  );
+}
+
+interface MissingProviderButtonProps {
+  testId: string;
+  isCopied: boolean;
+  smartLinkPath: string;
+  releaseTitle: string;
+  onCopy: (path: string, label: string, testId: string) => Promise<void>;
+}
+
+function MissingProviderButton({
+  testId,
+  isCopied,
+  smartLinkPath,
+  releaseTitle,
+  onCopy,
+}: Readonly<MissingProviderButtonProps>) {
+  return (
+    <button
+      type='button'
+      className={cn(
+        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+        isCopied
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+      )}
+      onClick={() =>
+        void onCopy(smartLinkPath, `${releaseTitle} smart link`, testId)
+      }
+    >
+      <Icon
+        name={isCopied ? 'Check' : 'Copy'}
+        className={cn(
+          'h-3.5 w-3.5 transition-opacity',
+          isCopied ? 'opacity-100' : 'opacity-0 group-hover/btn:opacity-100'
+        )}
+        aria-hidden='true'
+      />
+      <span className='line-clamp-1 text-tertiary-token/50'>
+        {isCopied ? 'Copied!' : '—'}
+      </span>
+    </button>
+  );
+}
+
 function AddProviderUrlPopover({
   providerLabel,
   accent,
@@ -383,108 +490,52 @@ export function ReleaseTableRow({
           : available
             ? 'available'
             : 'missing';
+        const config = providerConfig[providerKey];
+
+        const renderContent = () => {
+          if (available) {
+            return (
+              <ProviderCopyButton
+                testId={testId}
+                url={provider?.url}
+                path={provider?.path}
+                isCopied={isCopied}
+                isManual={isManual}
+                releaseTitle={release.title}
+                providerLabel={config.label}
+                onCopy={handleCopyWithFeedback}
+              />
+            );
+          }
+
+          if (onAddUrl) {
+            return (
+              <AddProviderUrlPopover
+                providerLabel={config.label}
+                accent={config.accent}
+                onSave={url => onAddUrl(release.id, providerKey, url)}
+                isSaving={isAddingUrl}
+              />
+            );
+          }
+
+          const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
+          return (
+            <MissingProviderButton
+              testId={notFoundTestId}
+              isCopied={copiedId === notFoundTestId}
+              smartLinkPath={release.smartLinkPath}
+              releaseTitle={release.title}
+              onCopy={handleCopyWithFeedback}
+            />
+          );
+        };
 
         return (
           <td key={providerKey} className='px-4 py-4 align-middle sm:px-6'>
             <div className='flex items-center gap-3'>
-              <ProviderStatusDot
-                status={status}
-                accent={providerConfig[providerKey].accent}
-              />
-              {available ? (
-                <button
-                  type='button'
-                  data-testid={testId}
-                  data-url={
-                    provider?.path
-                      ? `${getBaseUrl()}${provider.path}`
-                      : undefined
-                  }
-                  onClick={() => {
-                    if (!provider?.path) return;
-                    void handleCopyWithFeedback(
-                      provider.path,
-                      `${release.title} – ${providerConfig[providerKey].label}`,
-                      testId
-                    );
-                  }}
-                  className={cn(
-                    'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
-                    isCopied
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                  )}
-                >
-                  <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
-                    <Icon
-                      name='Copy'
-                      className={cn(
-                        'absolute h-3.5 w-3.5 transition-all duration-150',
-                        isCopied
-                          ? 'scale-50 opacity-0'
-                          : 'scale-100 opacity-0 group-hover/btn:opacity-100'
-                      )}
-                      aria-hidden='true'
-                    />
-                    <Icon
-                      name='Check'
-                      className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
-                        isCopied
-                          ? 'scale-100 opacity-100'
-                          : 'scale-50 opacity-0'
-                      }`}
-                      aria-hidden='true'
-                    />
-                  </span>
-                  <span className='line-clamp-1'>
-                    {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
-                  </span>
-                </button>
-              ) : onAddUrl ? (
-                <AddProviderUrlPopover
-                  providerLabel={providerConfig[providerKey].label}
-                  accent={providerConfig[providerKey].accent}
-                  onSave={url => onAddUrl(release.id, providerKey, url)}
-                  isSaving={isAddingUrl}
-                />
-              ) : (
-                (() => {
-                  const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
-                  const isNotFoundCopied = copiedId === notFoundTestId;
-                  return (
-                    <button
-                      type='button'
-                      className={cn(
-                        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
-                        isNotFoundCopied
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
-                      )}
-                      onClick={() =>
-                        void handleCopyWithFeedback(
-                          release.smartLinkPath,
-                          `${release.title} smart link`,
-                          notFoundTestId
-                        )
-                      }
-                    >
-                      <Icon
-                        name={isNotFoundCopied ? 'Check' : 'Copy'}
-                        className={cn(
-                          'h-3.5 w-3.5 transition-opacity',
-                          isNotFoundCopied
-                            ? 'opacity-100'
-                            : 'opacity-0 group-hover/btn:opacity-100'
-                        )}
-                        aria-hidden='true'
-                      />
-                      <span className='line-clamp-1 text-tertiary-token/50'>
-                        {isNotFoundCopied ? 'Copied!' : '—'}
-                      </span>
-                    </button>
-                  );
-                })()
-              )}
+              <ProviderStatusDot status={status} accent={config.accent} />
+              {renderContent()}
             </div>
           </td>
         );

@@ -26,6 +26,48 @@ import {
 import { detectBeaconsPaidTier } from './paid-tier';
 
 /**
+ * Extract display name from various sources in priority order.
+ */
+function extractDisplayName(html: string): string | null {
+  // 1. Try meta tags first
+  const metaName =
+    extractMetaContent(html, 'og:title') ??
+    extractMetaContent(html, 'twitter:title');
+
+  if (metaName) return cleanBeaconsDisplayName(metaName);
+
+  // 2. Try JSON-LD
+  const jsonLdData = extractJsonLd(html);
+  if (jsonLdData?.name) return jsonLdData.name;
+
+  // 3. Try Beacons-specific extraction
+  const beaconsData = extractBeaconsSpecificData(html);
+  return beaconsData.displayName ?? null;
+}
+
+/**
+ * Extract avatar URL from various sources in priority order.
+ */
+function extractAvatarUrl(html: string): string | null {
+  // 1. Try meta tags first
+  const metaAvatar =
+    extractMetaContent(html, 'og:image') ??
+    extractMetaContent(html, 'twitter:image');
+
+  if (metaAvatar && !isDefaultBeaconsImage(metaAvatar)) return metaAvatar;
+
+  // 2. Try JSON-LD
+  const jsonLdData = extractJsonLd(html);
+  if (jsonLdData?.image && !isDefaultBeaconsImage(jsonLdData.image)) {
+    return jsonLdData.image;
+  }
+
+  // 3. Try Beacons-specific extraction
+  const beaconsData = extractBeaconsSpecificData(html);
+  return beaconsData.avatarUrl ?? null;
+}
+
+/**
  * Extracts profile data and links from Beacons.ai HTML.
  *
  * Handles multiple extraction methods:
@@ -90,55 +132,9 @@ export function extractBeacons(html: string): ExtractionResult {
     addLink(link.url, link.title);
   }
 
-  // Extract display name from meta tags
-  let displayName =
-    extractMetaContent(html, 'og:title') ??
-    extractMetaContent(html, 'twitter:title') ??
-    null;
-
-  // Clean up display name (remove " | Beacons" or similar suffixes)
-  if (displayName) {
-    displayName = cleanBeaconsDisplayName(displayName);
-  }
-
-  // Extract avatar from meta tags
-  let avatarUrl =
-    extractMetaContent(html, 'og:image') ??
-    extractMetaContent(html, 'twitter:image') ??
-    null;
-
-  // Beacons sometimes uses a default OG image, try to detect and skip it
-  if (avatarUrl && isDefaultBeaconsImage(avatarUrl)) {
-    avatarUrl = null;
-  }
-
-  // Try to extract from JSON-LD if meta tags are missing
-  if (!displayName || !avatarUrl) {
-    const jsonLdData = extractJsonLd(html);
-    if (jsonLdData) {
-      if (!displayName && jsonLdData.name) {
-        displayName = jsonLdData.name;
-      }
-      if (
-        !avatarUrl &&
-        jsonLdData.image &&
-        !isDefaultBeaconsImage(jsonLdData.image)
-      ) {
-        avatarUrl = jsonLdData.image;
-      }
-    }
-  }
-
-  // Try Beacons-specific extraction methods
-  if (!displayName || !avatarUrl) {
-    const beaconsData = extractBeaconsSpecificData(html);
-    if (!displayName && beaconsData.displayName) {
-      displayName = beaconsData.displayName;
-    }
-    if (!avatarUrl && beaconsData.avatarUrl) {
-      avatarUrl = beaconsData.avatarUrl;
-    }
-  }
+  // Extract profile data using cascading extraction methods
+  const displayName = extractDisplayName(html);
+  const avatarUrl = extractAvatarUrl(html);
 
   // Detect paid tier by checking for branding
   const hasPaidTier = detectBeaconsPaidTier(html);

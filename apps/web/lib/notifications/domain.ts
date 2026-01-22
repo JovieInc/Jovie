@@ -89,6 +89,50 @@ const sanitizeCountryCode = (raw: string | null | undefined) => {
 
 export { buildInvalidRequestResponse };
 
+interface SubscribeValidationResult {
+  normalizedEmail: string | null;
+  normalizedPhone: string | null;
+}
+
+/**
+ * Validate and normalize the contact info for a subscribe request.
+ * Returns null if validation fails (and tracks the error).
+ */
+async function validateSubscribeContact(
+  channel: NotificationChannel,
+  email: string | undefined,
+  phone: string | undefined,
+  artist_id: string,
+  source: string | undefined
+): Promise<SubscribeValidationResult | null> {
+  const normalizedEmail =
+    channel === 'email' ? (normalizeSubscriptionEmail(email) ?? null) : null;
+  const normalizedPhone =
+    channel === 'sms' ? (normalizeSubscriptionPhone(phone) ?? null) : null;
+
+  if (channel === 'email' && !normalizedEmail) {
+    await trackSubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Invalid email address'],
+      source,
+    });
+    return null;
+  }
+
+  if (channel === 'sms' && !normalizedPhone) {
+    await trackSubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Invalid phone number'],
+      source,
+    });
+    return null;
+  }
+
+  return { normalizedEmail, normalizedPhone };
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -160,34 +204,23 @@ export const subscribeToNotificationsDomain = async (
     const countryCode = sanitizeCountryCode(geoCountry ?? country_code);
     const cityValue = sanitizeCity(city ?? geoCity);
 
-    const normalizedEmail =
-      channel === 'email' ? (normalizeSubscriptionEmail(email) ?? null) : null;
-    const normalizedPhone =
-      channel === 'sms' ? (normalizeSubscriptionPhone(phone) ?? null) : null;
+    const contactValidation = await validateSubscribeContact(
+      channel,
+      email,
+      phone,
+      artist_id,
+      source
+    );
 
-    if (channel === 'email' && !normalizedEmail) {
-      await trackSubscribeError({
-        artist_id,
-        error_type: 'validation_error',
-        validation_errors: ['Invalid email address'],
-        source,
-      });
-      return buildSubscribeValidationError(
-        'Please provide a valid email address'
-      );
+    if (!contactValidation) {
+      const errorMsg =
+        channel === 'email'
+          ? 'Please provide a valid email address'
+          : 'Please provide a valid phone number';
+      return buildSubscribeValidationError(errorMsg);
     }
 
-    if (channel === 'sms' && !normalizedPhone) {
-      await trackSubscribeError({
-        artist_id,
-        error_type: 'validation_error',
-        validation_errors: ['Invalid phone number'],
-        source,
-      });
-      return buildSubscribeValidationError(
-        'Please provide a valid phone number'
-      );
-    }
+    const { normalizedEmail, normalizedPhone } = contactValidation;
 
     const conflictTarget =
       channel === 'email'
