@@ -8,7 +8,7 @@
 
 import { Button, Input, Label } from '@jovie/ui';
 import { ExternalLink, Plus, X } from 'lucide-react';
-import React from 'react';
+import React, { memo } from 'react';
 
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { detectPlatform } from '@/lib/utils/platform-detection';
@@ -34,7 +34,7 @@ interface ContactSocialLinksProps {
   onNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-export function ContactSocialLinks({
+export const ContactSocialLinks = memo(function ContactSocialLinks({
   contact,
   fullName,
   isEditable,
@@ -174,4 +174,4 @@ export function ContactSocialLinks({
       )}
     </div>
   );
-}
+});
