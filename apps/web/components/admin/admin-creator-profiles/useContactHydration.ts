@@ -10,16 +10,16 @@ interface UseContactHydrationOptions {
   profiles: AdminCreatorProfileRow[];
   selectedId: string | null;
   /** Whether the sidebar is open. Query is disabled when false. */
-  sidebarOpen?: boolean;
+  enabled?: boolean;
 }
 
 interface UseContactHydrationReturn {
   draftContact: Contact | null;
   setDraftContact: (contact: Contact | null) => void;
   effectiveContact: Contact | null;
-  /** @deprecated Use TanStack Query caching instead. Kept for compatibility. */
-  hydrateContactSocialLinks: (profileId: string) => Promise<void>;
+  refetchSocialLinks: () => void;
   handleContactChange: (updated: Contact) => void;
+  isLoading: boolean;
 }
 
 /**
@@ -31,7 +31,7 @@ interface UseContactHydrationReturn {
 export function useContactHydration({
   profiles,
   selectedId,
-  sidebarOpen = false,
+  enabled = true,
 }: UseContactHydrationOptions): UseContactHydrationReturn {
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
 
@@ -40,23 +40,23 @@ export function useContactHydration({
     [profiles, selectedId]
   );
 
-  // Use TanStack Query for social links with caching
-  const { data: socialLinks, refetch } = useAdminSocialLinksQuery({
+  const {
+    data: socialLinks,
+    isLoading,
+    refetch,
+  } = useAdminSocialLinksQuery({
     profileId: selectedId ?? undefined,
-    enabled: sidebarOpen && !!selectedId,
+    enabled: enabled && !!selectedId,
   });
 
   // Update draft contact when social links data changes
   useEffect(() => {
-    if (!selectedId || !sidebarOpen) return;
+    if (!selectedId || !enabled) return;
 
-    const contactBase = mapProfileToContact(
-      profiles.find(p => p.id === selectedId) ?? null
-    );
+    const contactBase = mapProfileToContact(selectedProfile);
     if (!contactBase) return;
 
-    // Only update if we have fresh data from the query
-    if (socialLinks) {
+    if (socialLinks && socialLinks.length > 0) {
       setDraftContact({
         ...contactBase,
         socialLinks: socialLinks.map(link => ({
@@ -67,19 +67,13 @@ export function useContactHydration({
         })),
       });
     } else {
-      // Set base contact while loading
       setDraftContact(contactBase);
     }
-  }, [selectedId, sidebarOpen, socialLinks, profiles]);
+  }, [selectedId, enabled, socialLinks, selectedProfile]);
 
-  // Legacy function kept for compatibility - triggers refetch
-  const hydrateContactSocialLinks = useCallback(
-    async (profileId: string): Promise<void> => {
-      if (profileId !== selectedId) return;
-      await refetch();
-    },
-    [selectedId, refetch]
-  );
+  const refetchSocialLinks = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   const effectiveContact = useMemo(() => {
     if (draftContact?.id === selectedId) return draftContact;
@@ -94,7 +88,8 @@ export function useContactHydration({
     draftContact,
     setDraftContact,
     effectiveContact,
-    hydrateContactSocialLinks,
+    refetchSocialLinks,
     handleContactChange,
+    isLoading,
   };
 }

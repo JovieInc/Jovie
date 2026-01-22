@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useIngestRefreshMutation } from '@/lib/queries/useIngestRefreshMutation';
 import type { IngestRefreshStatus } from './types';
 
 interface UseIngestRefreshOptions {
@@ -12,11 +13,13 @@ interface UseIngestRefreshOptions {
 
 interface UseIngestRefreshReturn {
   ingestRefreshStatuses: Record<string, IngestRefreshStatus>;
-  refreshIngest: (profileId: string) => Promise<void>;
+  refreshIngest: (profileId: string) => void;
+  isPending: boolean;
 }
 
 /**
  * Hook to manage ingest refresh operations for creator profiles.
+ * Uses TanStack Query mutation for proper state management and cache invalidation.
  */
 export function useIngestRefresh({
   selectedId,
@@ -28,57 +31,59 @@ export function useIngestRefresh({
     Record<string, IngestRefreshStatus>
   >({});
 
+  const mutation = useIngestRefreshMutation();
+
   const refreshIngest = useCallback(
-    async (profileId: string): Promise<void> => {
+    (profileId: string) => {
       setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'loading' }));
-      try {
-        const response = await fetch('/app/admin/creators/bulk-refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+
+      mutation.mutate(
+        { profileId },
+        {
+          onSuccess: () => {
+            setIngestRefreshStatuses(prev => ({
+              ...prev,
+              [profileId]: 'success',
+            }));
+            notifications.success('Ingestion refresh queued');
+            router.refresh();
+
+            if (selectedId === profileId && onRefreshComplete) {
+              onRefreshComplete(profileId);
+            }
+
+            // Reset to idle after success animation
+            setTimeout(() => {
+              setIngestRefreshStatuses(prev => ({
+                ...prev,
+                [profileId]: 'idle',
+              }));
+            }, 2200);
           },
-          body: JSON.stringify({ profileIds: [profileId] }),
-        });
+          onError: error => {
+            setIngestRefreshStatuses(prev => ({
+              ...prev,
+              [profileId]: 'error',
+            }));
+            notifications.handleError(error);
 
-        const payload = (await response.json().catch(() => ({}))) as {
-          success?: boolean;
-          queuedCount?: number;
-          error?: string;
-        };
-
-        if (!response.ok || !payload.success) {
-          throw new Error(payload.error ?? 'Failed to queue ingestion');
+            // Reset to idle after error
+            setTimeout(() => {
+              setIngestRefreshStatuses(prev => ({
+                ...prev,
+                [profileId]: 'idle',
+              }));
+            }, 2200);
+          },
         }
-
-        setIngestRefreshStatuses(prev => ({
-          ...prev,
-          [profileId]: 'success',
-        }));
-        notifications.success('Ingestion refresh queued');
-        router.refresh();
-
-        if (selectedId === profileId && onRefreshComplete) {
-          // Fire-and-forget: callback may be async but we don't need to await
-          onRefreshComplete(profileId);
-        }
-      } catch (error) {
-        setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
-        notifications.handleError(error);
-      } finally {
-        setTimeout(() => {
-          setIngestRefreshStatuses(prev => ({
-            ...prev,
-            [profileId]: 'idle',
-          }));
-        }, 2200);
-      }
+      );
     },
-    [notifications, onRefreshComplete, router, selectedId]
+    [mutation, notifications, onRefreshComplete, router, selectedId]
   );
 
   return {
     ingestRefreshStatuses,
     refreshIngest,
+    isPending: mutation.isPending,
   };
 }
