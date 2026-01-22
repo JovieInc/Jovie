@@ -178,7 +178,12 @@ export function UniversalLinkInputArtistSearchMode({
                   role='option'
                   tabIndex={-1}
                   aria-selected={index === activeResultIndex}
-                  aria-label={`${artist.name}${artist.followers ? `, ${formatFollowers(artist.followers)}` : ''}`}
+                  aria-label={
+                    artist.name +
+                    (artist.followers
+                      ? ', ' + formatFollowers(artist.followers)
+                      : '')
+                  }
                   className={cn(
                     'flex items-center gap-3 p-3 cursor-pointer transition-colors',
                     index === activeResultIndex
