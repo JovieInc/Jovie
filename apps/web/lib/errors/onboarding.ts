@@ -59,12 +59,35 @@ export function createOnboardingError(
   };
 }
 
-function unwrapDatabaseError(
+export interface UnwrappedDbError {
+  code: string | null;
+  message: string;
+  constraint: string | null;
+  detail: string | null;
+}
+
+function tryParseJsonError(str: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(str);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Not JSON, that's fine
+  }
+  return null;
+}
+
+/**
+ * Recursively extract PostgreSQL error details from nested error structures.
+ * Handles Neon/Drizzle error wrappers, cause chains, and JSON-encoded messages.
+ */
+export function unwrapDatabaseError(
   error: unknown,
   depth = 0
-): { code: string | null; message: string; constraint: string | null } {
-  if (depth > 5) {
-    return { code: null, message: '', constraint: null };
+): UnwrappedDbError {
+  if (depth > 10) {
+    return { code: null, message: '', constraint: null, detail: null };
   }
 
   const record = error as Record<string, unknown>;
@@ -72,18 +95,60 @@ function unwrapDatabaseError(
   const code = typeof record?.code === 'string' ? record.code : null;
   const constraint =
     typeof record?.constraint === 'string' ? record.constraint : null;
+  const detail = typeof record?.detail === 'string' ? record.detail : null;
 
-  if (code || constraint) {
-    return { code, message, constraint };
+  // Check for Neon/Drizzle nested error structures
+  // Neon errors often have: error.cause.error with the actual PostgreSQL error
+  const nestedError = record?.error;
+  if (nestedError && typeof nestedError === 'object') {
+    const nested = unwrapDatabaseError(nestedError, depth + 1);
+    if (nested.code || nested.constraint) {
+      return nested;
+    }
   }
 
+  // Check for errors array (some database drivers return arrays)
+  const errors = record?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const firstError = unwrapDatabaseError(errors[0], depth + 1);
+    if (firstError.code || firstError.constraint) {
+      return firstError;
+    }
+  }
+
+  // Try parsing message as JSON (some wrappers JSON-stringify the error)
+  if (message && !code) {
+    const parsed = tryParseJsonError(message);
+    if (parsed) {
+      const fromJson = unwrapDatabaseError(parsed, depth + 1);
+      if (fromJson.code || fromJson.constraint) {
+        return fromJson;
+      }
+    }
+  }
+
+  if (code || constraint) {
+    return { code, message, constraint, detail };
+  }
+
+  // Recurse into cause
   const cause = record?.cause;
   if (cause && typeof cause === 'object') {
     return unwrapDatabaseError(cause, depth + 1);
   }
 
-  return { code: null, message, constraint: null };
+  return { code: null, message, constraint: null, detail };
 }
+
+const TRANSACTION_ROLLBACK_CODES = new Set(['40001', '40P01', '25P02']);
+const TRANSACTION_ROLLBACK_PATTERNS = [
+  'failed query: rollback',
+  'transaction rolled back',
+  'transaction was aborted',
+  'current transaction is aborted',
+  'serialization failure',
+  'deadlock detected',
+];
 
 /**
  * Map database errors to onboarding error codes
@@ -91,66 +156,73 @@ function unwrapDatabaseError(
 export function mapDatabaseError(error: unknown): OnboardingError {
   const errorRecord = error as Record<string, unknown>;
   const unwrapped = unwrapDatabaseError(error);
-  const errorMessage = (
-    unwrapped.message ||
-    (errorRecord?.message as string) ||
-    ''
-  ).toLowerCase();
+
+  const rawMessage = unwrapped.message || (errorRecord?.message as string);
+  const errorMessage = (rawMessage || '').toLowerCase();
   const errorCode =
     unwrapped.code ?? (errorRecord?.code as string | null) ?? null;
   const constraint = (
-    unwrapped.constraint ??
-    (errorRecord?.constraint as string | null) ??
-    null
+    unwrapped.constraint ?? (errorRecord?.constraint as string | null)
   )?.toLowerCase();
+  const detail = (
+    unwrapped.detail ??
+    (errorRecord?.detail as string | null) ??
+    ''
+  ).toLowerCase();
 
-  const transactionRollbackCodes = new Set(['40001', '40P01', '25P02']);
-  const transactionRollbackPatterns = [
-    'failed query: rollback',
-    'transaction rolled back',
-    'transaction was aborted',
-    'current transaction is aborted',
-    'serialization failure',
-    'deadlock detected',
-  ];
+  // Check for custom SQL function error message (EMAIL_IN_USE from create_profile_with_user)
+  if (errorMessage.includes('email_in_use')) {
+    return createOnboardingError(
+      OnboardingErrorCode.EMAIL_IN_USE,
+      'Email is already in use',
+      rawMessage
+    );
+  }
 
   // Unique constraint violations
   if (errorCode === '23505' || errorMessage.includes('duplicate')) {
-    // Handle various forms of username unique errors (normalized/index names)
-    if (
+    const isUsernameError =
       errorMessage.includes('username') ||
       errorMessage.includes('username_normalized') ||
-      errorMessage.includes('creator_profiles_username_normalized_unique_idx')
-    ) {
+      errorMessage.includes(
+        'creator_profiles_username_normalized_unique_idx'
+      ) ||
+      detail.includes('username');
+
+    if (isUsernameError) {
       return createOnboardingError(
         OnboardingErrorCode.USERNAME_TAKEN,
         'Username is already taken',
-        unwrapped.message || (errorRecord?.message as string)
+        rawMessage
       );
     }
 
-    if (
+    const isEmailError =
       constraint === 'users_email_unique' ||
-      errorMessage.includes('users_email_unique')
-    ) {
+      errorMessage.includes('users_email_unique') ||
+      errorMessage.includes('email') ||
+      detail.includes('email');
+
+    if (isEmailError) {
       return createOnboardingError(
         OnboardingErrorCode.EMAIL_IN_USE,
         'Email is already in use',
-        unwrapped.message || (errorRecord?.message as string)
+        rawMessage
       );
     }
 
-    if (errorMessage.includes('user_id')) {
+    if (errorMessage.includes('user_id') || detail.includes('user_id')) {
       return createOnboardingError(
         OnboardingErrorCode.PROFILE_EXISTS,
         'Profile already exists for this user',
-        unwrapped.message || (errorRecord?.message as string)
+        rawMessage
       );
     }
+
     return createOnboardingError(
       OnboardingErrorCode.CONSTRAINT_VIOLATION,
       'Data constraint violation',
-      unwrapped.message || (errorRecord?.message as string)
+      rawMessage
     );
   }
 
@@ -159,20 +231,23 @@ export function mapDatabaseError(error: unknown): OnboardingError {
     return createOnboardingError(
       OnboardingErrorCode.DATABASE_ERROR,
       'Invalid reference data',
-      unwrapped.message || (errorRecord?.message as string)
+      rawMessage
     );
   }
 
   // Transaction rollback errors (e.g., serialization failures, deadlocks)
-  if (
-    (errorCode && transactionRollbackCodes.has(errorCode)) ||
-    transactionRollbackPatterns.some(pattern => errorMessage.includes(pattern))
-  ) {
+  const isTransactionError =
+    (errorCode && TRANSACTION_ROLLBACK_CODES.has(errorCode)) ||
+    TRANSACTION_ROLLBACK_PATTERNS.some(pattern =>
+      errorMessage.includes(pattern)
+    );
+
+  if (isTransactionError) {
     return createOnboardingError(
       OnboardingErrorCode.TRANSACTION_FAILED,
       'Profile creation failed. Please try again',
-      unwrapped.message || (errorRecord?.message as string),
-      true // Retryable – caller can safely retry onboarding
+      rawMessage,
+      true
     );
   }
 
@@ -181,8 +256,8 @@ export function mapDatabaseError(error: unknown): OnboardingError {
     return createOnboardingError(
       OnboardingErrorCode.NETWORK_ERROR,
       'Network error occurred',
-      errorRecord?.message as string,
-      true // Retryable
+      rawMessage,
+      true
     );
   }
 
@@ -191,8 +266,8 @@ export function mapDatabaseError(error: unknown): OnboardingError {
     return createOnboardingError(
       OnboardingErrorCode.INVALID_SESSION,
       'Authentication session expired',
-      unwrapped.message || (errorRecord?.message as string),
-      true // Retryable
+      rawMessage,
+      true
     );
   }
 
@@ -200,8 +275,8 @@ export function mapDatabaseError(error: unknown): OnboardingError {
   return createOnboardingError(
     OnboardingErrorCode.DATABASE_ERROR,
     'Database operation failed',
-    errorRecord?.message as string,
-    true // Potentially retryable
+    rawMessage,
+    true
   );
 }
 

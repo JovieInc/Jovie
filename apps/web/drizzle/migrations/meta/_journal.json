@@ -57,6 +57,13 @@
       "when": 1769050000000,
       "tag": "0007_add_spotify_popularity_range_check",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1769060000000,
+      "tag": "0008_fix_email_conflict_in_create_profile",
+      "breakpoints": true
     }
   ]
 }

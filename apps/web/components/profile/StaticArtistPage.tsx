@@ -112,7 +112,7 @@ function renderContent(
         </div>
       );
 
-    case 'tip':
+    case 'tip': {
       // Extract Venmo link from social links
       const venmoLink =
         socialLinks.find(l => l.platform === 'venmo')?.url || null;
@@ -158,6 +158,7 @@ function renderContent(
           )}
         </main>
       );
+    }
 
     case 'subscribe':
       // Subscribe mode - show notification subscription form directly

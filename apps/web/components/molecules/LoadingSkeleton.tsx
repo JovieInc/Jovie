@@ -155,11 +155,14 @@ export function LoadingSkeleton({
 // Specific skeleton components for common use cases
 export function ProfileSkeleton() {
   return (
-    <div className='flex flex-col items-center space-y-4 text-center'>
-      <div
-        className='h-32 w-32 rounded-full skeleton motion-reduce:animate-none'
-        aria-label='Loading artist profile image'
-        role='img'
+    <output
+      className='flex flex-col items-center space-y-4 text-center'
+      aria-busy='true'
+      aria-label='Loading artist profile'
+    >
+      <span
+        className='block h-32 w-32 rounded-full skeleton motion-reduce:animate-none'
+        aria-hidden='true'
       />
       <div className='space-y-2'>
         {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA props needed for loading skeleton accessibility */}
@@ -177,19 +180,18 @@ export function ProfileSkeleton() {
           role='text'
         />
       </div>
-    </div>
+    </output>
   );
 }
 
 export function ButtonSkeleton() {
   return (
-    // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
-    // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
-    <div
-      className='h-12 w-full max-w-sm rounded-lg skeleton motion-reduce:animate-none'
-      aria-label='Loading action button'
-      role='button'
-    />
+    <output aria-label='Loading action button' aria-busy='true'>
+      <span
+        className='block h-12 w-full max-w-sm rounded-lg skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+    </output>
   );
 }
 
@@ -197,39 +199,46 @@ const SOCIAL_BAR_SKELETON_KEYS = generateSkeletonKeys('social-link', 4);
 
 export function SocialBarSkeleton() {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: Navigation skeleton placeholder
-    <div
+    <nav
       className='flex flex-wrap justify-center gap-4'
       aria-label='Loading social media links'
-      role='navigation'
+      aria-busy='true'
     >
-      {SOCIAL_BAR_SKELETON_KEYS.map((key, index) => (
-        // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
-        // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
-        <div
+      {SOCIAL_BAR_SKELETON_KEYS.map(key => (
+        <span
           key={key}
-          className='h-12 w-12 rounded-full skeleton motion-reduce:animate-none'
-          aria-label={`Loading social link ${index + 1}`}
-          role='button'
+          className='block h-12 w-12 rounded-full skeleton motion-reduce:animate-none'
+          aria-hidden='true'
         />
       ))}
-    </div>
+    </nav>
   );
 }
 
 export function AuthFormSkeleton() {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
-    <div
-      className='space-y-4'
+    <output
+      className='block space-y-4'
       aria-label='Loading authentication form'
-      role='status'
+      aria-busy='true'
     >
-      <div className='h-10 w-full rounded-md skeleton motion-reduce:animate-none' />
-      <div className='h-10 w-full rounded-md skeleton motion-reduce:animate-none' />
-      <div className='h-10 w-full rounded-md skeleton motion-reduce:animate-none' />
-      <div className='h-12 w-full rounded-md skeleton motion-reduce:animate-none' />
-    </div>
+      <span
+        className='block h-10 w-full rounded-md skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+      <span
+        className='block h-10 w-full rounded-md skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+      <span
+        className='block h-10 w-full rounded-md skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+      <span
+        className='block h-12 w-full rounded-md skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+    </output>
   );
 }
 
@@ -261,22 +270,26 @@ export function ListSkeleton({ items = 3 }: Readonly<{ items?: number }>) {
   );
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: skeleton placeholder for list, semantic list element not appropriate
-    <div className='space-y-4' aria-label='Loading list items' role='list'>
+    <ul
+      className='space-y-4 list-none'
+      aria-label='Loading list items'
+      aria-busy='true'
+    >
       {itemKeys.map(key => (
-        <div
+        <li
           key={key}
           className='flex items-center space-x-3 p-3 border border-subtle rounded-md'
+          aria-hidden='true'
         >
-          <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
-          <div className='space-y-1 flex-1'>
-            <div className='h-4 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
-            <div className='h-3 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
-          </div>
-          <div className='h-8 w-8 rounded-md skeleton motion-reduce:animate-none' />
-        </div>
+          <span className='block h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
+          <span className='block space-y-1 flex-1'>
+            <span className='block h-4 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
+            <span className='block h-3 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
+          </span>
+          <span className='block h-8 w-8 rounded-md skeleton motion-reduce:animate-none' />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
