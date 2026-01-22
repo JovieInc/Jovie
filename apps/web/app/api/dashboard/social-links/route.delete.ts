@@ -7,59 +7,50 @@ import { socialLinks } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { updateLinkStateSchema } from '@/lib/validation/schemas';
-import { applyRateLimiting, computeLinkVersioning } from './route.shared';
+import {
+  applyRateLimiting,
+  computeLinkVersioning,
+  validateLinkStatePayload,
+} from './route.shared';
 
 export async function DELETE(req: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const { allowed, headers: rateLimitHeaders } =
         await applyRateLimiting(clerkUserId);
+      const combinedHeaders = { ...NO_STORE_HEADERS, ...rateLimitHeaders };
+
       if (!allowed) {
         return NextResponse.json(
           { error: 'Rate limit exceeded. Please try again later.' },
-          { status: 429, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+          { status: 429, headers: combinedHeaders }
         );
       }
 
       const parsedBody = await parseJsonBody<unknown>(req, {
         route: 'DELETE /api/dashboard/social-links',
-        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+        headers: combinedHeaders,
       });
       if (!parsedBody.ok) {
         return parsedBody.response;
       }
 
-      const rawBody = parsedBody.data;
-      if (rawBody == null || typeof rawBody !== 'object') {
-        return NextResponse.json(
-          { error: 'Invalid request body' },
-          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
+      const validationResult = validateLinkStatePayload(
+        parsedBody.data,
+        combinedHeaders
+      );
+      if (!validationResult.ok) {
+        return validationResult.response;
       }
 
-      const parsed = updateLinkStateSchema.safeParse(rawBody);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: 'Invalid request body' },
-          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
-      }
-
-      const { profileId, linkId, action, expectedVersion } = parsed.data;
-
-      if (!profileId || !linkId || !action) {
-        return NextResponse.json(
-          { error: 'Profile ID, Link ID, and action are required' },
-          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
-        );
-      }
+      const { profileId, linkId, action, expectedVersion } =
+        validationResult.data;
 
       const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+          { status: 404, headers: combinedHeaders }
         );
       }
 
@@ -81,14 +72,14 @@ export async function DELETE(req: Request) {
       if (!link) {
         return NextResponse.json(
           { error: 'Link not found' },
-          { status: 404, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+          { status: 404, headers: combinedHeaders }
         );
       }
 
       const versioning = computeLinkVersioning({
         existingVersions: [link.version],
         expectedVersion,
-        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+        headers: combinedHeaders,
         conflictMessage: 'Conflict: Link has been modified by another request',
       });
       if (!versioning.ok) {
@@ -121,7 +112,7 @@ export async function DELETE(req: Request) {
 
       return NextResponse.json(
         { ok: true, version: versioning.nextVersion },
-        { status: 200, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        { status: 200, headers: combinedHeaders }
       );
     });
   } catch (error) {

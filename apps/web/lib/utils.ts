@@ -116,3 +116,15 @@ export function detectPlatformFromUA(userAgent?: string): string | null {
 
   return matched?.platform ?? 'web';
 }
+
+const EXTERNAL_URL_PATTERN = /^https?:\/\//;
+
+export function isExternalUrl(href: string): boolean {
+  return EXTERNAL_URL_PATTERN.test(href);
+}
+
+export function getExternalLinkProps(isExternal: boolean) {
+  return isExternal
+    ? { target: '_blank' as const, rel: 'noopener noreferrer' }
+    : {};
+}

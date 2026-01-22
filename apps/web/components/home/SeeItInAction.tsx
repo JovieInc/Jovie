@@ -4,69 +4,27 @@ import {
 } from '@/lib/featured-creators';
 import { SeeItInActionCarousel } from './SeeItInActionCarousel';
 
-// Fallback avatars when DB has fewer than minimum
-const FALLBACK_AVATARS: FeaturedCreator[] = [
-  {
-    id: 'fallback-1',
-    handle: 'billie-eilish',
+const FALLBACK_HANDLES = [
+  'billie-eilish',
+  'dua-lipa',
+  'taylor-swift',
+  'the-1975',
+  'ed-sheeran',
+  'lady-gaga',
+  'john-mayer',
+  'coldplay',
+  'maneskin',
+  'placeholder',
+] as const;
+
+const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_HANDLES.map(
+  (handle, i) => ({
+    id: `fallback-${i + 1}`,
+    handle,
     name: 'Artist',
-    src: '/images/avatars/billie-eilish.jpg',
-  },
-  {
-    id: 'fallback-2',
-    handle: 'dua-lipa',
-    name: 'Artist',
-    src: '/images/avatars/dua-lipa.jpg',
-  },
-  {
-    id: 'fallback-3',
-    handle: 'taylor-swift',
-    name: 'Artist',
-    src: '/images/avatars/taylor-swift.jpg',
-  },
-  {
-    id: 'fallback-4',
-    handle: 'the-1975',
-    name: 'Artist',
-    src: '/images/avatars/the-1975.jpg',
-  },
-  {
-    id: 'fallback-5',
-    handle: 'ed-sheeran',
-    name: 'Artist',
-    src: '/images/avatars/ed-sheeran.jpg',
-  },
-  {
-    id: 'fallback-6',
-    handle: 'lady-gaga',
-    name: 'Artist',
-    src: '/images/avatars/lady-gaga.jpg',
-  },
-  {
-    id: 'fallback-7',
-    handle: 'john-mayer',
-    name: 'Artist',
-    src: '/images/avatars/john-mayer.jpg',
-  },
-  {
-    id: 'fallback-8',
-    handle: 'coldplay',
-    name: 'Artist',
-    src: '/images/avatars/coldplay.jpg',
-  },
-  {
-    id: 'fallback-9',
-    handle: 'maneskin',
-    name: 'Artist',
-    src: '/images/avatars/maneskin.jpg',
-  },
-  {
-    id: 'fallback-10',
-    handle: 'placeholder',
-    name: 'Artist',
-    src: '/images/avatars/placeholder.jpg',
-  },
-];
+    src: `/images/avatars/${handle}.jpg`,
+  })
+);
 
 const MIN_CREATORS = 10;
 

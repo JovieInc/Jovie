@@ -333,3 +333,50 @@ export const enqueueProfileEnrichment = async (options: {
     });
   }
 };
+
+export const validateLinkStatePayload = (
+  rawBody: unknown,
+  headers: HeadersInit
+):
+  | {
+      ok: true;
+      data: z.infer<
+        typeof import('@/lib/validation/schemas').updateLinkStateSchema
+      >;
+    }
+  | { ok: false; response: NextResponse } => {
+  if (rawBody == null || typeof rawBody !== 'object') {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400, headers }
+      ),
+    };
+  }
+
+  const { updateLinkStateSchema } = require('@/lib/validation/schemas');
+  const parsed = updateLinkStateSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400, headers }
+      ),
+    };
+  }
+
+  const { profileId, linkId, action } = parsed.data;
+  if (!profileId || !linkId || !action) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Profile ID, Link ID, and action are required' },
+        { status: 400, headers }
+      ),
+    };
+  }
+
+  return { ok: true, data: parsed.data };
+};
