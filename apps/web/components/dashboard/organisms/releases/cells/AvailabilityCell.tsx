@@ -7,33 +7,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
-import {
-  type FormEvent,
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
-
-// Provider domain mapping for URL validation
-const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
-  apple_music: ['music.apple.com', 'itunes.apple.com'],
-  spotify: ['open.spotify.com', 'spotify.com'],
-  youtube: ['music.youtube.com', 'youtube.com'],
-  soundcloud: ['soundcloud.com'],
-  deezer: ['deezer.com'],
-  amazon_music: ['music.amazon.com', 'amazon.com'],
-  tidal: ['tidal.com'],
-  bandcamp: ['bandcamp.com'],
-  beatport: ['beatport.com'],
-};
+import { useAvailabilityPopover } from './useAvailabilityPopover';
 
 // Maps ProviderKey to DspProviderId for icons
 const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
@@ -80,15 +60,25 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   onAddUrl,
   isAddingUrl,
 }: AvailabilityCellProps) {
-  const [open, setOpen] = useState(false);
-  const [copiedTestId, setCopiedTestId] = useState<string | null>(null);
-  const [addingProvider, setAddingProvider] = useState<ProviderKey | null>(
-    null
-  );
-  const [urlInput, setUrlInput] = useState('');
-  const [validationError, setValidationError] = useState('');
-  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Use custom hook for state management
+  const {
+    open,
+    setOpen,
+    copiedTestId,
+    handleCopyWithFeedback,
+    addingProvider,
+    setAddingProvider,
+    urlInput,
+    setUrlInput,
+    validationError,
+    setValidationError,
+    handleAddUrl,
+    inputRef,
+  } = useAvailabilityPopover({
+    releaseId: release.id,
+    onAddUrl,
+    onCopy,
+  });
 
   // Create provider Map for O(1) lookups instead of O(n) .find() operations
   const providerMap = useMemo(() => {
@@ -102,78 +92,6 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   // Count available providers
   const availableCount = release.providers.filter(p => p.url).length;
   const totalCount = allProviders.length;
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleCopyWithFeedback = useCallback(
-    async (path: string, label: string, testId: string) => {
-      try {
-        await onCopy(path, label, testId);
-        setCopiedTestId(testId);
-      } catch {
-        // Still show brief feedback even on failure
-        setCopiedTestId(testId);
-      } finally {
-        if (copyTimeoutRef.current) {
-          clearTimeout(copyTimeoutRef.current);
-        }
-        copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
-      }
-    },
-    [onCopy]
-  );
-
-  const handleAddUrl = useCallback(
-    async (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (!addingProvider || !onAddUrl) return;
-
-      const trimmed = urlInput.trim();
-      if (!trimmed) return;
-
-      // Validate URL format
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(trimmed);
-      } catch {
-        setValidationError('Please enter a valid URL');
-        return;
-      }
-
-      // Validate provider domain
-      const allowedDomains = PROVIDER_DOMAINS[addingProvider];
-      const hostname = parsedUrl.hostname.toLowerCase();
-      const isValidDomain = allowedDomains.some(
-        domain => hostname === domain || hostname.endsWith(`.${domain}`)
-      );
-
-      if (!isValidDomain) {
-        const domainMsg =
-          allowedDomains.length === 1
-            ? allowedDomains[0]
-            : 'one of: ' + allowedDomains.join(', ');
-        setValidationError(`URL must be from ${domainMsg}`);
-        return;
-      }
-
-      setValidationError('');
-      try {
-        await onAddUrl(release.id, addingProvider, trimmed);
-        setUrlInput('');
-        setAddingProvider(null);
-      } catch {
-        // Error toast is shown by parent
-      }
-    },
-    [addingProvider, onAddUrl, release.id, urlInput]
-  );
 
   // Get status for a provider
   const getProviderStatus = useCallback(
