@@ -100,7 +100,7 @@ export function useAdminCreatorProfiles({
   const {
     setDraftContact,
     effectiveContact,
-    hydrateContactSocialLinks,
+    refetchSocialLinks,
     handleContactChange,
   } = useContactHydration({
     profiles: filteredProfiles,
@@ -110,7 +110,7 @@ export function useAdminCreatorProfiles({
 
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
     selectedId,
-    onRefreshComplete: hydrateContactSocialLinks,
+    onRefreshComplete: refetchSocialLinks,
   });
 
   const { handleAvatarUpload } = useAvatarUpload();
@@ -184,7 +184,7 @@ export function useAdminCreatorProfiles({
     toggleSelect,
     toggleSelectAll,
     effectiveContact,
-    hydrateContactSocialLinks,
+    refetchSocialLinks,
     handleContactChange,
     ingestRefreshStatuses,
     refreshIngest,

@@ -154,7 +154,7 @@ export function AdminCreatorProfilesUnified({
   const {
     setDraftContact,
     effectiveContact,
-    hydrateContactSocialLinks,
+    refetchSocialLinks,
     handleContactChange,
   } = useContactHydration({
     profiles: filteredProfiles,
@@ -164,7 +164,7 @@ export function AdminCreatorProfilesUnified({
 
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
     selectedId,
-    onRefreshComplete: hydrateContactSocialLinks,
+    onRefreshComplete: refetchSocialLinks,
   });
 
   const { handleAvatarUpload } = useAvatarUpload();
@@ -394,9 +394,7 @@ export function AdminCreatorProfilesUnified({
             onClose={handleSidebarClose}
             onRefresh={() => {
               router.refresh();
-              if (selectedId) {
-                void hydrateContactSocialLinks(selectedId);
-              }
+              refetchSocialLinks();
             }}
             onContactChange={handleContactChange}
             onSave={saveContact}

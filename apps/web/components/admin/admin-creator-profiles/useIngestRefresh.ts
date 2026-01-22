@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useIngestRefreshMutation } from '@/lib/queries/useIngestRefreshMutation';
 import type { IngestRefreshStatus } from './types';
@@ -33,18 +33,10 @@ export function useIngestRefresh({
 
   const mutation = useIngestRefreshMutation();
 
-  // Sync mutation state to local status tracking for UI updates
-  useEffect(() => {
-    if (mutation.isPending && mutation.variables) {
-      setIngestRefreshStatuses(prev => ({
-        ...prev,
-        [mutation.variables.profileId]: 'loading',
-      }));
-    }
-  }, [mutation.isPending, mutation.variables]);
-
   const refreshIngest = useCallback(
     (profileId: string) => {
+      setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'loading' }));
+
       mutation.mutate(
         { profileId },
         {

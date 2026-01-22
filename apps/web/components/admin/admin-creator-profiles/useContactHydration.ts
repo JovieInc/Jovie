@@ -40,7 +40,6 @@ export function useContactHydration({
     [profiles, selectedId]
   );
 
-  // Use TanStack Query for social links with caching
   const {
     data: socialLinks,
     isLoading,
@@ -57,7 +56,6 @@ export function useContactHydration({
     const contactBase = mapProfileToContact(selectedProfile);
     if (!contactBase) return;
 
-    // Only update if we have data from the query
     if (socialLinks && socialLinks.length > 0) {
       setDraftContact({
         ...contactBase,
