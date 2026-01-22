@@ -2,12 +2,13 @@
  * Handler for Clerk user.updated webhook events.
  *
  * Processes user updates by:
- * - Syncing username changes
  * - Syncing verified email changes
+ *
+ * NOTE: Username changes from Clerk are IGNORED.
+ * Usernames are stored only in the database - users must change via the app.
  */
 
 import { syncEmailFromClerkByClerkId } from '@/lib/auth/clerk-sync';
-import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 import { logger } from '@/lib/utils/logger';
 import type {
   ClerkEventType,
@@ -23,20 +24,9 @@ async function handleUserUpdated(
   const user = event.data;
 
   try {
-    const errors: Array<{ step: 'username' | 'email'; error: string }> = [];
-
-    // Sync username
-    try {
-      await syncUsernameFromClerkEvent(
-        user.id,
-        user.username ?? null,
-        user.private_metadata
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      errors.push({ step: 'username', error: errorMessage });
-    }
+    // NOTE: Username sync is intentionally removed.
+    // Usernames are stored only in the database to eliminate sync overhead.
+    // Users must change their username through the Jovie app, not Clerk.
 
     // Sync email if primary email changed (only verified emails)
     const primaryEmail = user.email_addresses?.find(
@@ -51,24 +41,15 @@ async function handleUserUpdated(
         primaryEmail
       );
       if (!emailResult.success) {
-        errors.push({
-          step: 'email',
-          error: emailResult.error ?? 'Unknown error',
-        });
+        const message = `Failed to sync email for user.updated (userId=${user.id}): ${emailResult.error ?? 'Unknown error'}`;
+        logger.warn(message);
+
+        return {
+          success: false,
+          error: 'Failed to sync email from Clerk',
+          message,
+        };
       }
-    }
-
-    if (errors.length > 0) {
-      const details = errors.map(e => `${e.step}=${e.error}`).join('; ');
-      const message = `Partial Clerk sync failure for user.updated (userId=${user.id}, username=${user.username ?? 'null'}): ${details}`;
-
-      logger.warn(message);
-
-      return {
-        success: false,
-        error: 'Failed to sync from Clerk',
-        message,
-      };
     }
 
     return {

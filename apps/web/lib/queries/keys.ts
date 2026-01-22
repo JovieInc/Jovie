@@ -168,11 +168,11 @@ export const queryKeys = {
       [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
   },
 
-  // Handle availability queries
+  // Handle/username availability queries
   handle: {
     all: ['handle'] as const,
     availability: (handle: string) =>
-      [...queryKeys.handle.all, 'availability', handle] as const,
+      [...queryKeys.handle.all, 'availability', handle.toLowerCase()] as const,
   },
 } as const;
 

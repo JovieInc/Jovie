@@ -94,13 +94,7 @@ export const ContactSidebar = memo(function ContactSidebar({
       id: 'refresh',
       label: 'Refresh',
       icon: <RefreshCw className='h-4 w-4' />,
-      onClick: () => {
-        if (onRefresh) {
-          onRefresh();
-        } else {
-          window.location.reload();
-        }
-      },
+      onClick: () => (onRefresh ?? (() => window.location.reload()))(),
       className: CONTEXT_MENU_ITEM_CLASS,
     });
 

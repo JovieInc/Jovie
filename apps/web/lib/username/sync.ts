@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
@@ -112,6 +111,16 @@ async function updateCanonicalUsernameInternal(
   );
 }
 
+/**
+ * Updates the canonical username in the database.
+ *
+ * NOTE: Usernames are stored ONLY in the database (creator_profiles table).
+ * Clerk username field is NOT used - this eliminates sync overhead.
+ *
+ * @param clerkUserId - The Clerk user ID
+ * @param rawUsername - The raw username input
+ * @throws UsernameValidationError if username is invalid or taken
+ */
 export async function syncCanonicalUsernameFromApp(
   clerkUserId: string,
   rawUsername: string
@@ -125,87 +134,30 @@ export async function syncCanonicalUsernameFromApp(
     throw new UsernameValidationError('USERNAME_TAKEN', 'Handle already taken');
   }
 
-  const client = await clerkClient();
-  const user = await client.users.getUser(clerkUserId);
-
-  const canonical = outcome.canonicalUsername;
-
-  // Get old username from metadata for cache invalidation
-  const oldUsername = (
-    user.privateMetadata as { jovie_username_normalized?: string }
-  )?.jovie_username_normalized;
-
-  await client.users.updateUser(clerkUserId, {
-    username: canonical,
-    privateMetadata: {
-      ...(user.privateMetadata as Record<string, unknown>),
-      jovie_username_normalized: canonical,
-    },
-  });
-
-  // Invalidate caches for both old and new usernames
+  // Invalidate caches if username changed
   if (outcome.changed) {
-    await invalidateUsernameChange(canonical, oldUsername);
+    // Note: We don't have the old username without a Clerk lookup,
+    // but invalidateUsernameChange handles undefined oldUsername gracefully
+    await invalidateUsernameChange(outcome.canonicalUsername, undefined);
   }
 }
 
+/**
+ * Handle username change events from Clerk webhook.
+ *
+ * NOTE: Usernames are now stored ONLY in the database.
+ * Clerk username changes are IGNORED - users must change username via the app.
+ * This function is kept for backwards compatibility but is a no-op.
+ *
+ * @deprecated Clerk username is no longer synced. Use app UI to change username.
+ */
 export async function syncUsernameFromClerkEvent(
-  clerkUserId: string,
-  rawUsername: string | null | undefined,
-  privateMetadata: Record<string, unknown> | null | undefined
+  _clerkUserId: string,
+  _rawUsername: string | null | undefined,
+  _privateMetadata: Record<string, unknown> | null | undefined
 ): Promise<void> {
-  if (!rawUsername) {
-    return;
-  }
-
-  const normalizedFromEvent = normalizeUsername(rawUsername);
-
-  const metadata = (privateMetadata ?? {}) as {
-    jovie_username_normalized?: string;
-  };
-  const metaNormalized = metadata.jovie_username_normalized;
-
-  if (metaNormalized && metaNormalized === normalizedFromEvent) {
-    return;
-  }
-
-  let outcome: UsernameUpdateOutcome;
-
-  try {
-    outcome = await updateCanonicalUsernameInternal(clerkUserId, rawUsername);
-  } catch (error) {
-    if (
-      error instanceof UsernameValidationError &&
-      error.code === 'INVALID_USERNAME'
-    ) {
-      if (metaNormalized) {
-        const client = await clerkClient();
-        await client.users.updateUser(clerkUserId, {
-          username: metaNormalized,
-        });
-      }
-      return;
-    }
-    throw error;
-  }
-
-  const client = await clerkClient();
-
-  if (outcome.conflict) {
-    await client.users.updateUser(clerkUserId, {
-      username: outcome.canonicalUsername,
-    });
-    return;
-  }
-
-  const user = await client.users.getUser(clerkUserId);
-  const canonical = outcome.canonicalUsername;
-
-  await client.users.updateUser(clerkUserId, {
-    username: canonical,
-    privateMetadata: {
-      ...(user.privateMetadata as Record<string, unknown>),
-      jovie_username_normalized: canonical,
-    },
-  });
+  // No-op: Usernames are stored only in the database.
+  // Clerk username changes are ignored to eliminate sync overhead.
+  // Users must change their username through the Jovie app.
+  return;
 }

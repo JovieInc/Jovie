@@ -165,13 +165,13 @@ export function useSuggestionsQuery({
     enabled: enabled && !!profileId,
     initialData,
     select: data => ({ links: data.links, maxVersion: data.maxVersion }),
-    refetchInterval:
-      refetchInterval === 'adaptive'
-        ? query =>
-            isDocumentVisible() ? getAdaptiveInterval(query.state.data) : false
-        : isDocumentVisible() && typeof refetchInterval === 'number'
-          ? refetchInterval
-          : false,
+    refetchInterval: query => {
+      if (!isDocumentVisible()) return false;
+      if (refetchInterval === 'adaptive') {
+        return getAdaptiveInterval(query.state.data);
+      }
+      return typeof refetchInterval === 'number' ? refetchInterval : false;
+    },
     // Don't refetch on window focus since we're already polling
     refetchOnWindowFocus: false,
     staleTime: 1 * 60 * 1000, // 1 min
