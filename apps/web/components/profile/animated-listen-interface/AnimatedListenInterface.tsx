@@ -16,6 +16,41 @@ const SHIMMER_OPACITY = 0.2;
 const BUTTON_SCALE_SELECTED = 1.05;
 const ICON_ROTATION_FULL = 360;
 
+// Pre-computed motion props to reduce cognitive complexity in render
+const hoverProps: MotionProps['whileHover'] = {
+  scale: HOVER_SCALE,
+  y: HOVER_Y_OFFSET,
+  transition: { duration: HOVER_DURATION, ease: [0.16, 1, 0.3, 1] },
+};
+
+const tapProps: MotionProps['whileTap'] = {
+  scale: TAP_SCALE,
+  transition: { duration: TAP_DURATION },
+};
+
+const shimmerTransition = {
+  duration: SHIMMER_DURATION,
+  ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+};
+
+function getShimmerAnimate(isSelected: boolean, prefersReducedMotion: boolean) {
+  if (prefersReducedMotion) {
+    return { opacity: isSelected ? SHIMMER_OPACITY : 0 };
+  }
+  return { x: isSelected ? '200%' : '-100%' };
+}
+
+function getIconAnimate(isSelected: boolean, prefersReducedMotion: boolean) {
+  if (prefersReducedMotion) return undefined;
+  return { rotate: isSelected ? [0, ICON_ROTATION_FULL] : 0 };
+}
+
+function getSpinnerInitial(prefersReducedMotion: boolean) {
+  return prefersReducedMotion
+    ? { opacity: 1, scale: 1 }
+    : { opacity: 0, scale: 0 };
+}
+
 export function AnimatedListenInterface({
   artist,
   handle,
@@ -51,112 +86,68 @@ export function AnimatedListenInterface({
               </p>
             </div>
           ) : (
-            availableDSPs.map(dsp => (
-              <motion.button
-                key={dsp.key}
-                onClick={() => handleDSPClick(dsp)}
-                disabled={selectedDSP === dsp.key}
-                variants={prefersReducedMotion ? undefined : itemVariants}
-                whileHover={
-                  (prefersReducedMotion
-                    ? undefined
-                    : {
-                        scale: HOVER_SCALE,
-                        y: HOVER_Y_OFFSET,
-                        transition: {
-                          duration: HOVER_DURATION,
-                          ease: [0.16, 1, 0.3, 1],
-                        },
-                      }) satisfies MotionProps['whileHover']
-                }
-                whileTap={
-                  (prefersReducedMotion
-                    ? undefined
-                    : {
-                        scale: TAP_SCALE,
-                        transition: { duration: TAP_DURATION },
-                      }) satisfies MotionProps['whileTap']
-                }
-                className='w-full group relative overflow-hidden rounded-xl p-4 font-semibold text-base transition-all duration-300 ease-out shadow-lg hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/50 disabled:cursor-not-allowed'
-                style={{
-                  backgroundColor: dsp.config.color,
-                  color: dsp.config.textColor,
-                }}
-                aria-label={`Open in ${dsp.name} app if installed, otherwise opens in web browser`}
-              >
-                {/* Shimmer effect overlay */}
-                <motion.div
-                  className='absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent dark:via-white/10'
-                  animate={
-                    prefersReducedMotion
-                      ? {
-                          opacity:
-                            selectedDSP === dsp.key ? SHIMMER_OPACITY : 0,
-                        }
-                      : { x: selectedDSP === dsp.key ? '200%' : '-100%' }
-                  }
-                  transition={
-                    prefersReducedMotion
-                      ? { duration: 0 }
-                      : {
-                          duration: SHIMMER_DURATION,
-                          ease: [0.16, 1, 0.3, 1],
-                        }
-                  }
-                />
-
-                {/* Button content */}
-                <motion.span
-                  className='relative flex items-center justify-center gap-3'
-                  animate={{
-                    scale: selectedDSP === dsp.key ? BUTTON_SCALE_SELECTED : 1,
+            availableDSPs.map(dsp => {
+              const isSelected = selectedDSP === dsp.key;
+              return (
+                <motion.button
+                  key={dsp.key}
+                  onClick={() => handleDSPClick(dsp)}
+                  disabled={isSelected}
+                  variants={prefersReducedMotion ? undefined : itemVariants}
+                  whileHover={prefersReducedMotion ? undefined : hoverProps}
+                  whileTap={prefersReducedMotion ? undefined : tapProps}
+                  className='w-full group relative overflow-hidden rounded-xl p-4 font-semibold text-base transition-all duration-300 ease-out shadow-lg hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/50 disabled:cursor-not-allowed'
+                  style={{
+                    backgroundColor: dsp.config.color,
+                    color: dsp.config.textColor,
                   }}
-                  transition={{ duration: HOVER_DURATION }}
+                  aria-label={`Open in ${dsp.name} app if installed, otherwise opens in web browser`}
                 >
-                  <motion.span
-                    className='flex items-center'
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG sanitized with DOMPurify
-                    dangerouslySetInnerHTML={{
-                      __html: sanitizedLogos[dsp.key],
-                    }}
-                    animate={
+                  {/* Shimmer effect overlay */}
+                  <motion.div
+                    className='absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent dark:via-white/10'
+                    animate={getShimmerAnimate(
+                      isSelected,
                       prefersReducedMotion
-                        ? undefined
-                        : {
-                            rotate:
-                              selectedDSP === dsp.key
-                                ? [0, ICON_ROTATION_FULL]
-                                : 0,
-                          }
-                    }
+                    )}
                     transition={
-                      prefersReducedMotion
-                        ? { duration: 0 }
-                        : {
-                            duration: SHIMMER_DURATION,
-                            ease: [0.16, 1, 0.3, 1],
-                          }
+                      prefersReducedMotion ? { duration: 0 } : shimmerTransition
                     }
                   />
-                  <span>
-                    {selectedDSP === dsp.key
-                      ? 'Opening...'
-                      : `Open in ${dsp.name}`}
-                  </span>
-                  {selectedDSP === dsp.key && (
-                    <motion.div
-                      initial={
+
+                  {/* Button content */}
+                  <motion.span
+                    className='relative flex items-center justify-center gap-3'
+                    animate={{ scale: isSelected ? BUTTON_SCALE_SELECTED : 1 }}
+                    transition={{ duration: HOVER_DURATION }}
+                  >
+                    <motion.span
+                      className='flex items-center'
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG sanitized with DOMPurify
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizedLogos[dsp.key],
+                      }}
+                      animate={getIconAnimate(isSelected, prefersReducedMotion)}
+                      transition={
                         prefersReducedMotion
-                          ? { opacity: 1, scale: 1 }
-                          : { opacity: 0, scale: 0 }
+                          ? { duration: 0 }
+                          : shimmerTransition
                       }
-                      animate={{ opacity: 1, scale: 1 }}
-                      className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none'
                     />
-                  )}
-                </motion.span>
-              </motion.button>
-            ))
+                    <span>
+                      {isSelected ? 'Opening...' : `Open in ${dsp.name}`}
+                    </span>
+                    {isSelected && (
+                      <motion.div
+                        initial={getSpinnerInitial(prefersReducedMotion)}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none'
+                      />
+                    )}
+                  </motion.span>
+                </motion.button>
+              );
+            })
           )}
         </motion.div>
 

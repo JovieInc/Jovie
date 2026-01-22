@@ -18,6 +18,47 @@ import {
   validateUpdateSocialLinksPayload,
 } from './route.shared';
 
+/**
+ * Helper to create error response with idempotency storage
+ */
+async function createErrorResponse(
+  error: { error: string },
+  status: number,
+  headers: HeadersInit,
+  idempotencyKey: string | undefined,
+  clerkUserId: string
+) {
+  await storeIdempotencyKey(
+    idempotencyKey ?? '',
+    clerkUserId,
+    'PUT:/api/dashboard/social-links',
+    status,
+    error
+  );
+  return NextResponse.json(error, { status, headers });
+}
+
+/**
+ * Helper to update ingested links version
+ */
+async function updateIngestedLinksVersion(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  existingLinks: { id: string; sourceType: string | null }[],
+  removableIds: string[],
+  nextVersion: number
+) {
+  if (existingLinks.length <= removableIds.length) return;
+  const ingestedIds = existingLinks
+    .filter(link => link.sourceType === 'ingested')
+    .map(link => link.id);
+  if (ingestedIds.length > 0) {
+    await tx
+      .update(socialLinks)
+      .set({ version: nextVersion, updatedAt: new Date() })
+      .where(inArray(socialLinks.id, ingestedIds));
+  }
+}
+
 export async function PUT(req: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -68,33 +109,23 @@ export async function PUT(req: Request) {
       }
       const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
       if (!profile) {
-        const response = { error: 'Profile not found' };
-        await storeIdempotencyKey(
-          idempotencyKey ?? '',
-          clerkUserId,
-          'PUT:/api/dashboard/social-links',
+        return createErrorResponse(
+          { error: 'Profile not found' },
           404,
-          response
+          { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          idempotencyKey,
+          clerkUserId
         );
-        return NextResponse.json(response, {
-          status: 404,
-          headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
-        });
       }
       const validation = processLinkValidation(links);
       if (!validation.ok) {
-        const response = { error: validation.error };
-        await storeIdempotencyKey(
-          idempotencyKey ?? '',
-          clerkUserId,
-          'PUT:/api/dashboard/social-links',
+        return createErrorResponse(
+          { error: validation.error },
           400,
-          response
+          { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          idempotencyKey,
+          clerkUserId
         );
-        return NextResponse.json(response, {
-          status: 400,
-          headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
-        });
       }
       const existingLinks = await tx
         .select({
@@ -135,17 +166,12 @@ export async function PUT(req: Request) {
       if (insertPayloadResult.payload.length > 0) {
         await tx.insert(socialLinks).values(insertPayloadResult.payload);
       }
-      if (existingLinks.length > removableIds.length) {
-        const ingestedIds = existingLinks
-          .filter(link => link.sourceType === 'ingested')
-          .map(link => link.id);
-        if (ingestedIds.length > 0) {
-          await tx
-            .update(socialLinks)
-            .set({ version: versioning.nextVersion, updatedAt: new Date() })
-            .where(inArray(socialLinks.id, ingestedIds));
-        }
-      }
+      await updateIngestedLinksVersion(
+        tx,
+        existingLinks,
+        removableIds,
+        versioning.nextVersion
+      );
       const successResponse = { ok: true, version: versioning.nextVersion };
       await storeIdempotencyKey(
         idempotencyKey ?? '',
