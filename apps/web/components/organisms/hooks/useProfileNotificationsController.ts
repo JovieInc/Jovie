@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import {
-  getNotificationStatus,
   getNotificationUnsubscribeSuccessMessage,
   NOTIFICATION_COPY,
-  unsubscribeFromNotifications,
 } from '@/lib/notifications/client';
+import {
+  useNotificationStatusQuery,
+  useUnsubscribeNotificationsMutation,
+} from '@/lib/queries';
 import type {
   NotificationChannel,
   NotificationContactValues,
@@ -147,6 +149,15 @@ export function useProfileNotificationsController({
     Partial<Record<NotificationChannel, boolean>>
   >({});
 
+  const statusQuery = useNotificationStatusQuery({
+    artistId,
+    email: storedContacts?.email,
+    phone: storedContacts?.sms,
+    enabled: notificationsEnabled && hasStoredContacts,
+  });
+
+  const unsubscribeMutation = useUnsubscribeNotificationsMutation();
+
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasMenuOpenRef = useRef(false);
   const inputFocusFnRef = useRef<(() => void) | null>(null);
@@ -223,7 +234,6 @@ export function useProfileNotificationsController({
 
       setSubscriptionDetails(prev => ({ ...prev, ...parsed }));
 
-      // Check if we have a valid cached status (avoids API call on every page load)
       const cachedStatus = readCachedStatus(artistId);
       if (cachedStatus) {
         setSubscribedChannels(cachedStatus.channels);
@@ -236,42 +246,41 @@ export function useProfileNotificationsController({
         return;
       }
 
-      // No cache - fetch from API
       setHydrationStatus('checking');
-
-      void (async () => {
-        try {
-          const data = await getNotificationStatus({
-            artistId,
-            email: parsed.email,
-            phone: parsed.sms,
-          });
-
-          setSubscribedChannels(data.channels);
-          const hasAny = Object.values(data.channels).some(Boolean);
-
-          if (hasAny) {
-            setSubscriptionDetails(data.details ?? {});
-            setState('success');
-          }
-
-          // Cache the result to avoid future API calls
-          writeCachedStatus(artistId, data.channels, data.details ?? {});
-        } catch (error) {
-          console.error(
-            'Unable to hydrate notification subscription state',
-            error
-          );
-        } finally {
-          setHydrationStatus('done');
-        }
-      })();
     } catch {
-      // Ignore parse failures
       setHasStoredContacts(false);
       setHydrationStatus('done');
     }
   }, [artistId, notificationsEnabled]);
+
+  useEffect(() => {
+    if (hydrationStatus !== 'checking') return;
+    if (!statusQuery.data && !statusQuery.isError && statusQuery.isLoading) {
+      return;
+    }
+
+    if (statusQuery.data?.channels) {
+      setSubscribedChannels(statusQuery.data.channels);
+      const hasAny = Object.values(statusQuery.data.channels).some(Boolean);
+      if (hasAny) {
+        setSubscriptionDetails(statusQuery.data.details ?? {});
+        setState('success');
+      }
+      writeCachedStatus(
+        artistId,
+        statusQuery.data.channels,
+        statusQuery.data.details ?? {}
+      );
+    }
+
+    setHydrationStatus('done');
+  }, [
+    artistId,
+    hydrationStatus,
+    statusQuery.data,
+    statusQuery.isError,
+    statusQuery.isLoading,
+  ]);
 
   const handleNotificationsClick = useCallback(() => {
     if (!notificationsEnabled) return;
@@ -359,7 +368,7 @@ export function useProfileNotificationsController({
           source: 'profile_inline',
         });
 
-        await unsubscribeFromNotifications({
+        await unsubscribeMutation.mutateAsync({
           artistId,
           channel: targetChannel,
           email: targetChannel === 'email' ? contactValue : undefined,
