@@ -10,8 +10,8 @@ export function useSaveProviderOverrideMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: saveProviderOverride,
-    onSuccess: (updated, variables) => {
-      void queryClient.invalidateQueries({
+    onSuccess: async (updated, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
     },
@@ -22,8 +22,8 @@ export function useResetProviderOverrideMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: resetProviderOverride,
-    onSuccess: (updated, variables) => {
-      void queryClient.invalidateQueries({
+    onSuccess: async (updated, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
     },
@@ -34,9 +34,9 @@ export function useSyncReleasesFromSpotifyMutation(profileId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: syncFromSpotify,
-    onSuccess: result => {
+    onSuccess: async result => {
       if (result.success) {
-        void queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
           queryKey: queryKeys.releases.matrix(profileId),
         });
       }
