@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileShell } from '@/components/organisms/profile-shell';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import { renderWithQueryClient } from '../../utils/test-utils';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
@@ -82,7 +83,7 @@ describe('ProfilePrimaryCTA', () => {
       JSON.stringify({ email: 'fan@example.com' })
     );
 
-    render(
+    renderWithQueryClient(
       <ProfileShell
         artist={makeArtist()}
         socialLinks={[] as LegacySocialLink[]}

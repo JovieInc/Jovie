@@ -2,7 +2,8 @@
  * Customer Sync Tests - User Not Found & Database Error Handling
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Import module once after mocks are set up
+// Ensure mocks are registered before importing the module under test
+import './customer-sync.test-utils';
 import {
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,

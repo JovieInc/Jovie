@@ -3,8 +3,8 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/stripe/webhooks/route';
 import {
+  getPost,
   mockCaptureCriticalError,
   mockConstructEvent,
   mockGetHandler,
@@ -54,7 +54,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe('Webhook processing failed');
@@ -97,7 +97,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe('Webhook processing failed');
@@ -149,7 +149,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
       }
     );
 
-    const response = await POST(request);
+    const response = await (await getPost())(request);
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.received).toBe(true);
