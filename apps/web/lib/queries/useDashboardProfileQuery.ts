@@ -24,6 +24,10 @@ interface UpdateProfileInput {
   avatarUrl?: string;
 }
 
+interface UpdateVenmoInput {
+  venmo_handle: string;
+}
+
 // Use shared mutation helper for consistent error handling
 const updateDashboardProfile = createMutationFn<
   UpdateProfileInput,
@@ -113,6 +117,46 @@ export function useUpdateDashboardProfileMutation() {
     },
 
     // Always refetch after error or success to ensure server state
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
+    },
+  });
+}
+
+/**
+ * Mutation hook for updating the user's Venmo handle.
+ *
+ * Invalidates the dashboard profile query after successful mutation.
+ *
+ * @example
+ * function VenmoForm() {
+ *   const { mutateAsync, isPending } = useUpdateVenmoMutation();
+ *
+ *   const handleSave = async (handle: string) => {
+ *     await mutateAsync({ venmo_handle: handle });
+ *   };
+ *
+ *   return <input disabled={isPending} />;
+ * }
+ */
+export function useUpdateVenmoMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateVenmoInput) => {
+      const response = await fetch('/api/dashboard/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: input }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update Venmo handle');
+      }
+
+      return response.json();
+    },
+
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
     },
