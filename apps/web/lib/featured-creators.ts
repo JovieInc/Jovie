@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
+import { revalidateTag, unstable_cache } from 'next/cache';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { transformImageUrl } from '@/lib/images/versioning';
@@ -43,53 +43,103 @@ function shuffle<T>(arr: T[], seed: number): T[] {
 }
 
 async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
-  if (!(await doesTableExist(TABLE_NAMES.creatorProfiles))) {
+  try {
+    // Add timeout to table existence check (5s) to prevent hanging during cold starts
+    const tableExists = await Promise.race([
+      doesTableExist(TABLE_NAMES.creatorProfiles),
+      new Promise<boolean>(resolve =>
+        setTimeout(() => {
+          console.warn(
+            '[FeaturedCreators] Table check timed out after 5s, assuming table does not exist'
+          );
+          resolve(false);
+        }, 5000)
+      ),
+    ]);
+
+    if (!tableExists) {
+      console.warn(
+        '[FeaturedCreators] Table check failed or timed out, using fallbacks'
+      );
+      return [];
+    }
+
+    // Add timeout to database query (10s) to prevent hanging
+    const data = await Promise.race([
+      db
+        .select({
+          id: creatorProfiles.id,
+          username: creatorProfiles.username,
+          displayName: creatorProfiles.displayName,
+          avatarUrl: creatorProfiles.avatarUrl,
+          creatorType: creatorProfiles.creatorType,
+        })
+        .from(creatorProfiles)
+        .where(
+          and(
+            eq(creatorProfiles.isPublic, true),
+            eq(creatorProfiles.isFeatured, true),
+            eq(creatorProfiles.marketingOptOut, false)
+          )
+        )
+        .orderBy(creatorProfiles.displayName)
+        .limit(12),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Featured creators query timeout after 10s')),
+          10000
+        )
+      ),
+    ]);
+
+    const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+    return shuffle(
+      data.map(a => ({
+        id: a.id,
+        handle: a.username,
+        name: a.displayName || a.username,
+        src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
+          width: 256,
+          height: 256,
+          quality: 70,
+          format: 'webp',
+          crop: 'fill',
+          gravity: 'face',
+        }),
+      })),
+      seed
+    );
+  } catch (error) {
+    // Log error but don't throw - use fallbacks in component
+    console.error('[FeaturedCreators] Query failed:', error);
+
+    // Server-side only: Log to Sentry for monitoring
+    if (typeof window === 'undefined') {
+      try {
+        const Sentry = await import('@sentry/nextjs');
+        Sentry.captureException(error, {
+          tags: { context: 'featured_creators_query' },
+          extra: {
+            message:
+              'Failed to fetch featured creators, component will use fallback avatars',
+          },
+        });
+      } catch (sentryError) {
+        // Sentry logging failed, just continue with console error above
+        console.error('[FeaturedCreators] Sentry logging failed:', sentryError);
+      }
+    }
+
+    // Return empty array - component already has fallback avatars
     return [];
   }
-
-  const data = await db
-    .select({
-      id: creatorProfiles.id,
-      username: creatorProfiles.username,
-      displayName: creatorProfiles.displayName,
-      avatarUrl: creatorProfiles.avatarUrl,
-      creatorType: creatorProfiles.creatorType,
-    })
-    .from(creatorProfiles)
-    .where(
-      and(
-        eq(creatorProfiles.isPublic, true),
-        eq(creatorProfiles.isFeatured, true),
-        eq(creatorProfiles.marketingOptOut, false)
-      )
-    )
-    .orderBy(creatorProfiles.displayName)
-    .limit(12);
-
-  const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
-  return shuffle(
-    data.map(a => ({
-      id: a.id,
-      handle: a.username,
-      name: a.displayName || a.username,
-      src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
-        width: 256,
-        height: 256,
-        quality: 70,
-        format: 'webp',
-        crop: 'fill',
-        gravity: 'face',
-      }),
-    })),
-    seed
-  );
 }
 
 export const getFeaturedCreators = unstable_cache(
   queryFeaturedCreators,
   ['featured-creators'],
   {
-    revalidate: 60 * 60 * 24 * 7,
+    revalidate: 60 * 60 * 24, // Reduced from 7 days to 1 day to prevent long cache poisoning
     tags: ['featured-creators'],
   }
 );
@@ -156,3 +206,17 @@ export const getFeaturedCreatorsForSearch = unstable_cache(
     tags: ['featured-creators'],
   }
 );
+
+/**
+ * Invalidates the featured creators cache.
+ * Useful for forcing a refresh after database errors or updates.
+ * Safe to call - fails silently if revalidation fails.
+ */
+export function invalidateFeaturedCreatorsCache(): void {
+  try {
+    revalidateTag('featured-creators', 'max');
+  } catch (error) {
+    console.error('[FeaturedCreators] Failed to invalidate cache:', error);
+    // Fail silently - cache will eventually expire on its own
+  }
+}

@@ -9,15 +9,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import {
-  and,
-  asc,
-  count,
-  sql as drizzleSql,
-  eq,
-  inArray,
-  or,
-} from 'drizzle-orm';
+import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { cache } from 'react';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -147,7 +139,9 @@ async function fetchDashboardDataWithSession(
 
     const selected = selectDashboardProfile(creatorData);
 
-    const [settings, hasLinks, hasMusicLinks] = await Promise.all([
+    // Performance optimization: Single query for both link counts using conditional aggregation
+    // This reduces database round trips from 3 to 2 (33% reduction)
+    const [settings, linkCounts] = await Promise.all([
       dbClient
         .select()
         .from(userSettings)
@@ -172,8 +166,12 @@ async function fetchDashboardDataWithSession(
           });
           throw error;
         }),
+      // Consolidated link count query - counts all active links and music links in one query
       dbClient
-        .select({ c: count() })
+        .select({
+          totalActive: count(),
+          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ANY(${DSP_PLATFORMS}))`,
+        })
         .from(socialLinks)
         .where(
           and(
@@ -181,7 +179,10 @@ async function fetchDashboardDataWithSession(
             eq(socialLinks.state, 'active')
           )
         )
-        .then(result => Number(result?.[0]?.c ?? 0) > 0)
+        .then(result => ({
+          hasLinks: Number(result?.[0]?.totalActive ?? 0) > 0,
+          hasMusicLinks: Number(result?.[0]?.musicActive ?? 0) > 0,
+        }))
         .catch((error: unknown) => {
           const migrationResult = handleMigrationErrors(error, {
             userId: userData.id,
@@ -189,45 +190,17 @@ async function fetchDashboardDataWithSession(
           });
 
           if (!migrationResult.shouldRetry) {
-            return migrationResult.fallbackData as boolean;
+            return { hasLinks: false, hasMusicLinks: false };
           }
           Sentry.captureException(error, {
             tags: { query: 'social_links_count', context: 'dashboard_data' },
           });
           throw error;
         }),
-      dbClient
-        .select({ c: count() })
-        .from(socialLinks)
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, selected.id),
-            eq(socialLinks.state, 'active'),
-            or(
-              eq(socialLinks.platformType, 'dsp'),
-              inArray(
-                socialLinks.platform,
-                DSP_PLATFORMS as unknown as string[]
-              )
-            )
-          )
-        )
-        .then(result => Number(result?.[0]?.c ?? 0) > 0)
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'music_links_count',
-          });
-
-          if (!migrationResult.shouldRetry) {
-            return migrationResult.fallbackData as boolean;
-          }
-          Sentry.captureException(error, {
-            tags: { query: 'music_links_count', context: 'dashboard_data' },
-          });
-          throw error;
-        }),
     ]);
+
+    const hasLinks = linkCounts.hasLinks;
+    const hasMusicLinks = linkCounts.hasMusicLinks;
 
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);

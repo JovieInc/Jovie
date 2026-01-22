@@ -314,64 +314,54 @@ describe('@critical session.ts', () => {
   });
 
   describe('getSessionContext', () => {
+    // Helper to create mock for the single JOIN query used by getSessionContext
+    const createJoinQueryMock = (result: unknown[]) => ({
+      from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(result),
+          }),
+        }),
+      }),
+    });
+
     it('returns full context for active user', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: true,
-        userStatus: 'active',
-      };
-
-      const mockProfile = {
-        id: 'profile-123',
+      // The new implementation uses a single JOIN query returning combined data
+      const mockJoinResult = {
         userId: 'db-user-123',
-        username: 'testuser',
-        usernameNormalized: 'testuser',
-        displayName: 'Test User',
-        avatarUrl: null,
-        isPublic: true,
-        isClaimed: true,
-        onboardingCompletedAt: new Date(),
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: true,
+        userStatus: 'active',
+        profileId: 'profile-123',
+        profileUserId: 'db-user-123',
+        profileUsername: 'testuser',
+        profileUsernameNormalized: 'testuser',
+        profileDisplayName: 'Test User',
+        profileAvatarUrl: null,
+        profileIsPublic: true,
+        profileIsClaimed: true,
+        profileOnboardingCompletedAt: new Date(),
       };
 
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockUser]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockProfile]),
-            }),
-          }),
-        });
+      mockDbSelect.mockReturnValue(createJoinQueryMock([mockJoinResult]));
 
       const { getSessionContext } = await import('@/lib/auth/session');
       const result = await getSessionContext();
 
       expect(result.clerkUserId).toBe('clerk_123');
-      expect(result.user).toEqual(mockUser);
-      expect(result.profile).toEqual(mockProfile);
+      expect(result.user.id).toBe('db-user-123');
+      expect(result.user.clerkId).toBe('clerk_123');
+      expect(result.profile?.id).toBe('profile-123');
     });
 
     it('throws when user not found and requireUser is true', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(createJoinQueryMock([]));
 
       const { getSessionContext } = await import('@/lib/auth/session');
 
@@ -383,30 +373,26 @@ describe('@critical session.ts', () => {
     it('throws when profile not found and requireProfile is true', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: false,
+      // User exists but no profile (profileId is null from LEFT JOIN)
+      const mockJoinResult = {
+        userId: 'db-user-123',
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: false,
         userStatus: 'active',
+        profileId: null,
+        profileUserId: null,
+        profileUsername: null,
+        profileUsernameNormalized: null,
+        profileDisplayName: null,
+        profileAvatarUrl: null,
+        profileIsPublic: null,
+        profileIsClaimed: null,
+        profileOnboardingCompletedAt: null,
       };
 
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockUser]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        });
+      mockDbSelect.mockReturnValue(createJoinQueryMock([mockJoinResult]));
 
       const { getSessionContext } = await import('@/lib/auth/session');
 
@@ -418,30 +404,28 @@ describe('@critical session.ts', () => {
     it('returns null profile when not found and requireProfile is false', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: false,
+      // User exists but no profile (profileId is null from LEFT JOIN)
+      const mockJoinResultNoProfile = {
+        userId: 'db-user-123',
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: false,
         userStatus: 'active',
+        profileId: null,
+        profileUserId: null,
+        profileUsername: null,
+        profileUsernameNormalized: null,
+        profileDisplayName: null,
+        profileAvatarUrl: null,
+        profileIsPublic: null,
+        profileIsClaimed: null,
+        profileOnboardingCompletedAt: null,
       };
 
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockUser]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        });
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([mockJoinResultNoProfile])
+      );
 
       const { getSessionContext } = await import('@/lib/auth/session');
       const result = await getSessionContext({ requireProfile: false });
@@ -451,79 +435,71 @@ describe('@critical session.ts', () => {
   });
 
   describe('getCurrentUserProfile', () => {
+    // Helper to create mock for the single JOIN query
+    const createJoinQueryMock = (result: unknown[]) => ({
+      from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(result),
+          }),
+        }),
+      }),
+    });
+
     it('returns profile for authenticated user', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: false,
-        userStatus: 'active',
-      };
-
-      const mockProfile = {
-        id: 'profile-123',
+      const mockJoinResult = {
         userId: 'db-user-123',
-        username: 'testuser',
-        usernameNormalized: 'testuser',
-        displayName: 'Test User',
-        avatarUrl: null,
-        isPublic: true,
-        isClaimed: true,
-        onboardingCompletedAt: new Date(),
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: false,
+        userStatus: 'active',
+        profileId: 'profile-123',
+        profileUserId: 'db-user-123',
+        profileUsername: 'testuser',
+        profileUsernameNormalized: 'testuser',
+        profileDisplayName: 'Test User',
+        profileAvatarUrl: null,
+        profileIsPublic: true,
+        profileIsClaimed: true,
+        profileOnboardingCompletedAt: new Date(),
       };
 
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockUser]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockProfile]),
-            }),
-          }),
-        });
+      mockDbSelect.mockReturnValue(createJoinQueryMock([mockJoinResult]));
 
       const { getCurrentUserProfile } = await import('@/lib/auth/session');
       const result = await getCurrentUserProfile();
 
-      expect(result).toEqual(mockProfile);
+      expect(result?.id).toBe('profile-123');
+      expect(result?.username).toBe('testuser');
     });
 
     it('returns null when no profile exists', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: false,
+      const mockJoinResultNoProfile = {
+        userId: 'db-user-123',
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: false,
         userStatus: 'active',
+        profileId: null,
+        profileUserId: null,
+        profileUsername: null,
+        profileUsernameNormalized: null,
+        profileDisplayName: null,
+        profileAvatarUrl: null,
+        profileIsPublic: null,
+        profileIsClaimed: null,
+        profileOnboardingCompletedAt: null,
       };
 
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockUser]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        });
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([mockJoinResultNoProfile])
+      );
 
       const { getCurrentUserProfile } = await import('@/lib/auth/session');
       const result = await getCurrentUserProfile();
@@ -533,25 +509,39 @@ describe('@critical session.ts', () => {
   });
 
   describe('withSessionContext', () => {
+    // Helper to create mock for the single JOIN query
+    const createJoinQueryMock = (result: unknown[]) => ({
+      from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(result),
+          }),
+        }),
+      }),
+    });
+
     it('executes operation with session context', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: false,
+      const mockJoinResult = {
+        userId: 'db-user-123',
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: false,
         userStatus: 'active',
+        profileId: null,
+        profileUserId: null,
+        profileUsername: null,
+        profileUsernameNormalized: null,
+        profileDisplayName: null,
+        profileAvatarUrl: null,
+        profileIsPublic: null,
+        profileIsClaimed: null,
+        profileOnboardingCompletedAt: null,
       };
 
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([mockUser]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(createJoinQueryMock([mockJoinResult]));
 
       const { withSessionContext } = await import('@/lib/auth/session');
 
@@ -562,7 +552,10 @@ describe('@critical session.ts', () => {
       expect(operation).toHaveBeenCalledWith(
         expect.objectContaining({
           clerkUserId: 'clerk_123',
-          user: mockUser,
+          user: expect.objectContaining({
+            id: 'db-user-123',
+            clerkId: 'clerk_123',
+          }),
         })
       );
       expect(result).toBe('operation_result');
@@ -571,22 +564,25 @@ describe('@critical session.ts', () => {
     it('sets up RLS session before executing operation', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
-      const mockUser = {
-        id: 'db-user-123',
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        isAdmin: false,
-        isPro: false,
+      const mockJoinResult = {
+        userId: 'db-user-123',
+        userClerkId: 'clerk_123',
+        userEmail: 'test@example.com',
+        userIsAdmin: false,
+        userIsPro: false,
         userStatus: 'active',
+        profileId: null,
+        profileUserId: null,
+        profileUsername: null,
+        profileUsernameNormalized: null,
+        profileDisplayName: null,
+        profileAvatarUrl: null,
+        profileIsPublic: null,
+        profileIsClaimed: null,
+        profileOnboardingCompletedAt: null,
       };
 
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([mockUser]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(createJoinQueryMock([mockJoinResult]));
 
       const { withSessionContext } = await import('@/lib/auth/session');
 

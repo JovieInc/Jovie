@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   pgTable,
   text,
@@ -11,23 +12,30 @@ import { waitlistInviteStatusEnum, waitlistStatusEnum } from './enums';
 import { creatorProfiles } from './profiles';
 
 // Waitlist entries for invite-only access
-export const waitlistEntries = pgTable('waitlist_entries', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  fullName: text('full_name').notNull(),
-  email: text('email').notNull(),
-  primarySocialUrl: text('primary_social_url').notNull(),
-  primarySocialPlatform: text('primary_social_platform').notNull(),
-  primarySocialUrlNormalized: text('primary_social_url_normalized').notNull(),
-  spotifyUrl: text('spotify_url'),
-  spotifyUrlNormalized: text('spotify_url_normalized'),
-  heardAbout: text('heard_about'),
-  primaryGoal: text('primary_goal'),
-  selectedPlan: text('selected_plan'),
-  status: waitlistStatusEnum('status').default('new').notNull(),
-  primarySocialFollowerCount: integer('primary_social_follower_count'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const waitlistEntries = pgTable(
+  'waitlist_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    fullName: text('full_name').notNull(),
+    email: text('email').notNull(),
+    primarySocialUrl: text('primary_social_url').notNull(),
+    primarySocialPlatform: text('primary_social_platform').notNull(),
+    primarySocialUrlNormalized: text('primary_social_url_normalized').notNull(),
+    spotifyUrl: text('spotify_url'),
+    spotifyUrlNormalized: text('spotify_url_normalized'),
+    heardAbout: text('heard_about'),
+    primaryGoal: text('primary_goal'),
+    selectedPlan: text('selected_plan'),
+    status: waitlistStatusEnum('status').default('new').notNull(),
+    primarySocialFollowerCount: integer('primary_social_follower_count'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Performance index: email lookups for waitlist access checks
+    emailIndex: index('idx_waitlist_entries_email').on(table.email),
+  })
+);
 
 // Waitlist invites table
 export const waitlistInvites = pgTable(

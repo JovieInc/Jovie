@@ -279,13 +279,77 @@ export async function getSessionContext(options?: {
   const { requireUser = true, requireProfile = false } = options ?? {};
 
   const clerkUserId = await resolveClerkUserId(options?.clerkUserId);
-  const user = await getDbUser(clerkUserId);
 
-  if (!user && requireUser) {
+  // Performance optimization: Single JOIN query instead of two sequential queries
+  // This reduces database round trips from 2 to 1 (50% reduction)
+  const [result] = await db
+    .select({
+      // User fields
+      userId: users.id,
+      userClerkId: users.clerkId,
+      userEmail: users.email,
+      userIsAdmin: users.isAdmin,
+      userIsPro: users.isPro,
+      userStatus: users.userStatus,
+      // Profile fields (nullable from LEFT JOIN)
+      profileId: creatorProfiles.id,
+      profileUserId: creatorProfiles.userId,
+      profileUsername: creatorProfiles.username,
+      profileUsernameNormalized: creatorProfiles.usernameNormalized,
+      profileDisplayName: creatorProfiles.displayName,
+      profileAvatarUrl: creatorProfiles.avatarUrl,
+      profileIsPublic: creatorProfiles.isPublic,
+      profileIsClaimed: creatorProfiles.isClaimed,
+      profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+    })
+    .from(users)
+    .leftJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  // User not found
+  if (!result && requireUser) {
     throw new Error('User not found');
   }
 
-  const profile = user ? await getProfileByDbUserId(user.id) : null;
+  if (!result) {
+    return {
+      clerkUserId,
+      user: null as unknown as DbUserContext,
+      profile: null,
+    };
+  }
+
+  // Build user context from result
+  const user: DbUserContext = {
+    id: result.userId,
+    clerkId: result.userClerkId,
+    email: result.userEmail,
+    isAdmin: result.userIsAdmin,
+    isPro: result.userIsPro,
+    userStatus: result.userStatus,
+  };
+
+  // Build profile context from result (if exists)
+  const profile: ProfileContext | null = result.profileId
+    ? {
+        id: result.profileId,
+        userId: result.profileUserId,
+        username: result.profileUsername,
+        usernameNormalized: result.profileUsernameNormalized,
+        displayName: result.profileDisplayName,
+        avatarUrl: result.profileAvatarUrl,
+        isPublic: result.profileIsPublic,
+        isClaimed: result.profileIsClaimed,
+        onboardingCompletedAt: result.profileOnboardingCompletedAt,
+      }
+    : null;
 
   if (!profile && requireProfile) {
     throw new Error('Profile not found');
@@ -293,7 +357,7 @@ export async function getSessionContext(options?: {
 
   return {
     clerkUserId,
-    user: user!,
+    user,
     profile,
   };
 }
