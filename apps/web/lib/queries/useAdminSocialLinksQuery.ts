@@ -80,10 +80,11 @@ export function useAdminSocialLinksQuery({
     queryKey: queryKeys.creators.socialLinks(profileId ?? ''),
     queryFn: ({ signal }) => fetchAdminSocialLinks(profileId!, signal),
     enabled: enabled && !!profileId,
-    // STANDARD_CACHE settings
+    // STANDARD_CACHE settings (with refetchOnMount disabled to prevent
+    // unnecessary fetches when switching between profiles in admin table)
     staleTime: 5 * MINUTE,
     gcTime: 30 * MINUTE,
-    refetchOnMount: true,
+    refetchOnMount: false,
     refetchOnWindowFocus: process.env.NODE_ENV === 'production',
   });
 }
