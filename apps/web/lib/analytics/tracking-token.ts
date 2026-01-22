@@ -36,6 +36,53 @@ export interface TrackingTokenValidation {
 }
 
 /**
+ * Parse and validate a dev token (format: {profileId}:{timestamp}:dev)
+ */
+/**
+ * Parse and validate a dev token (format: {profileId}:{timestamp}:dev)
+ */
+function parseDevToken(
+  token: string,
+  expectedProfileId?: string
+): TrackingTokenValidation {
+  const parts = token.split(':');
+  if (parts.length !== 3 || parts[2] !== 'dev') {
+    return { valid: false, error: 'Token validation not configured' };
+  }
+
+  const profileId = parts[0];
+  if (expectedProfileId && profileId !== expectedProfileId) {
+    return { valid: false, error: 'Profile ID mismatch' };
+  }
+
+  return {
+    valid: true,
+    payload: {
+      profileId,
+      timestamp: Number.parseInt(parts[1], 10),
+    },
+  };
+}
+
+/**
+ * Verify signature using timing-safe comparison
+ */
+function verifySignature(
+  signature: string,
+  profileId: string,
+  timestamp: number
+): boolean {
+  const expectedSignature = generateSignature(profileId, timestamp);
+  const signatureBuffer = Buffer.from(signature, 'hex');
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+
+  return (
+    signatureBuffer.length === expectedBuffer.length &&
+    crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+  );
+}
+
+/**
  * Check if tracking token validation is enabled
  */
 export function isTrackingTokenEnabled(): boolean {
@@ -97,20 +144,7 @@ export function validateTrackingToken(
   // In development without secret, allow dev tokens
   if (!isTrackingTokenEnabled()) {
     if (process.env.NODE_ENV === 'development') {
-      const parts = token.split(':');
-      if (parts.length === 3 && parts[2] === 'dev') {
-        const profileId = parts[0];
-        if (expectedProfileId && profileId !== expectedProfileId) {
-          return { valid: false, error: 'Profile ID mismatch' };
-        }
-        return {
-          valid: true,
-          payload: {
-            profileId,
-            timestamp: Number.parseInt(parts[1], 10),
-          },
-        };
-      }
+      return parseDevToken(token, expectedProfileId);
     }
     return { valid: false, error: 'Token validation not configured' };
   }
@@ -147,17 +181,8 @@ export function validateTrackingToken(
     return { valid: false, error: 'Token expired' };
   }
 
-  // Verify signature
-  const expectedSignature = generateSignature(profileId, timestamp);
-
-  // Use timing-safe comparison to prevent timing attacks
-  const signatureBuffer = Buffer.from(signature, 'hex');
-  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-
-  if (
-    signatureBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
-  ) {
+  // Verify signature using timing-safe comparison
+  if (!verifySignature(signature, profileId, timestamp)) {
     return { valid: false, error: 'Invalid signature' };
   }
 
