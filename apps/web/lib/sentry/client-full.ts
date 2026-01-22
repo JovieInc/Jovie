@@ -100,7 +100,7 @@ export function getFullClientConfig(
     replaysOnErrorSampleRate = REPLAY_ERROR_SAMPLE_RATE,
     additionalIntegrations = [],
     enableBreadcrumbs = true,
-    enableReplay = true,
+    enableReplay = process.env.NODE_ENV === 'development',
   } = options;
 
   // Build integrations array - full set including Replay
