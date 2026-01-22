@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo } from 'react';
 import { GradientText } from '@/components/atoms/GradientText';
 import { Container } from '@/components/site/Container';
+import { cn } from '@/lib/utils';
 
 export interface HeroSectionProps {
   /** Main headline text (will be large and prominent) */
@@ -41,7 +42,7 @@ export function HeroSection({
   children,
   supportingText,
   trustIndicators,
-  className = '',
+  className,
   showBackgroundEffects = true,
 }: HeroSectionProps) {
   // Process headline to add gradient to highlighted text
@@ -71,7 +72,10 @@ export function HeroSection({
   return (
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-labelledby needed for hero section accessibility
     <header
-      className={`relative flex flex-col items-center justify-center px-6 py-16 md:py-20 ${className}`}
+      className={cn(
+        'relative flex flex-col items-center justify-center px-6 py-16 md:py-20',
+        className
+      )}
       aria-labelledby='hero-headline'
     >
       <Container className='relative flex max-w-4xl flex-col items-center text-center'>

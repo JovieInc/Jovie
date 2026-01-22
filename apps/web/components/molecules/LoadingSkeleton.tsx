@@ -1,5 +1,5 @@
-import { clsx } from 'clsx';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 // Generate stable keys for skeleton items to avoid array index key warnings
 function generateSkeletonKeys(prefix: string, count: number): string[] {
@@ -122,7 +122,7 @@ export function LoadingSkeleton({
   if (lines === 1) {
     return (
       <div
-        className={clsx(
+        className={cn(
           'skeleton motion-reduce:animate-none',
           roundedClasses[rounded],
           validatedHeight,
@@ -139,7 +139,7 @@ export function LoadingSkeleton({
       {lineKeys.map((key, index) => (
         <div
           key={key}
-          className={clsx(
+          className={cn(
             'skeleton motion-reduce:animate-none',
             roundedClasses[rounded],
             validatedHeight,
@@ -341,7 +341,7 @@ export function TableSkeleton({
             return (
               <div key={cellKey} className='flex-1 p-3'>
                 <div
-                  className={clsx(
+                  className={cn(
                     'h-4 rounded-sm skeleton motion-reduce:animate-none',
                     colIndex === 0 ? 'w-3/4' : 'w-full'
                   )}

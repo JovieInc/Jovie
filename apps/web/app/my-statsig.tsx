@@ -17,6 +17,9 @@ export interface MyStatsigProps {
   userId?: string | null;
 }
 
+// Stable empty array reference to avoid unnecessary state updates
+const EMPTY_PLUGINS: StatsigPlugin<StatsigClient>[] = [];
+
 interface MyStatsigEnabledProps {
   children: React.ReactNode;
   sdkKey: string;
@@ -106,7 +109,8 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
       process.env.NODE_ENV !== 'development' ||
       !pathname.startsWith('/app/dashboard')
     ) {
-      setPlugins([]);
+      // Use stable reference and functional update to avoid unnecessary re-renders
+      setPlugins(prev => (prev.length === 0 ? prev : EMPTY_PLUGINS));
       return;
     }
 
