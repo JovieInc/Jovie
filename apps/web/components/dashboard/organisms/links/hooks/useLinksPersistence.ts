@@ -18,6 +18,29 @@ import {
 import { isIngestableUrl } from '../utils/platform-category';
 
 /**
+ * Parse error message from a failed response
+ */
+async function parseErrorMessage(response: Response): Promise<string> {
+  const data = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  if (data?.error && typeof data.error === 'string') {
+    return data.error;
+  }
+  return 'Failed to save links';
+}
+
+/**
+ * Parse version from a response body
+ */
+function parseVersionFromBody(
+  body: { version?: number; currentVersion?: number } | null
+): number | null {
+  const version = body?.version ?? body?.currentVersion;
+  return typeof version === 'number' ? version : null;
+}
+
+/**
  * Options for the useLinksPersistence hook
  */
 export interface UseLinksPersistenceOptions {
@@ -210,52 +233,32 @@ export function useLinksPersistence({
         // Handle 409 Conflict - links were modified elsewhere
         if (response.status === 409) {
           const conflictData = (await response.json().catch(() => null)) as {
-            error?: string;
-            code?: string;
             currentVersion?: number;
           } | null;
-
-          // Update version from conflict response
-          if (
-            conflictData?.currentVersion &&
-            typeof conflictData.currentVersion === 'number'
-          ) {
-            setLinksVersion(conflictData.currentVersion);
+          const conflictVersion = parseVersionFromBody(conflictData);
+          if (conflictVersion !== null) {
+            setLinksVersion(conflictVersion);
           }
-
-          // Show conflict message and trigger refresh
           toast.error(
             'Your links were updated in another tab. Refreshing to show the latest version.',
             { duration: 5000 }
           );
-
-          // Sync from server to get the latest state
           await onSyncSuggestions?.();
           return;
         }
 
         if (!response.ok) {
-          let message = 'Failed to save links';
-          try {
-            const data = (await response.json().catch(() => null)) as {
-              error?: string;
-            } | null;
-            if (data?.error && typeof data.error === 'string') {
-              message = data.error;
-            }
-          } catch {
-            // swallow JSON parse errors and fall back to default message
-          }
+          const message = await parseErrorMessage(response);
           throw new Error(message);
         }
 
         // Parse success response and update version
         const successData = (await response.json().catch(() => null)) as {
-          ok?: boolean;
           version?: number;
         } | null;
-        if (successData?.version && typeof successData.version === 'number') {
-          setLinksVersion(successData.version);
+        const newVersion = parseVersionFromBody(successData);
+        if (newVersion !== null) {
+          setLinksVersion(newVersion);
         }
 
         // Keep normalized links locally; server IDs will be applied on next load
@@ -264,15 +267,12 @@ export function useLinksPersistence({
         );
 
         // Check for ingestable URLs and trigger suggestion sync
-        if (suggestionsEnabled) {
-          const hasIngestableLink = normalized.some(item =>
-            isIngestableUrl(item.normalizedUrl)
-          );
-
-          if (hasIngestableLink) {
-            setAutoRefreshUntilMs(Date.now() + 20000);
-            void onSyncSuggestions?.();
-          }
+        const hasIngestableLink =
+          suggestionsEnabled &&
+          normalized.some(item => isIngestableUrl(item.normalizedUrl));
+        if (hasIngestableLink) {
+          setAutoRefreshUntilMs(Date.now() + 20000);
+          void onSyncSuggestions?.();
         }
 
         const now = new Date();
@@ -282,8 +282,10 @@ export function useLinksPersistence({
       } catch (error) {
         console.error('Error saving links:', error);
         const message =
-          error instanceof Error ? error.message : 'Failed to save links';
-        toast.error(message || 'Failed to save links. Please try again.');
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to save links. Please try again.';
+        toast.error(message);
       }
     },
     [profileId, suggestionsEnabled, onSyncSuggestions, linksVersion]

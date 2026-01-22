@@ -21,6 +21,37 @@ import {
 } from '../services/youtube-handler';
 import { sectionOf } from '../utils';
 
+type DuplicateResolution<T> = {
+  next: T[];
+  emittedLink: T | null;
+};
+
+/**
+ * Resolve duplicate found after delay - determines merge vs add behavior
+ */
+function resolveDuplicateAfterDelay<T extends DetectedLink>(
+  link: T,
+  prev: T[],
+  dupIndex: number,
+  dupLink: T | undefined,
+  section: string
+): DuplicateResolution<T> {
+  // No duplicate found - will add new link later
+  if (dupIndex === -1 || !dupLink) {
+    return { next: prev, emittedLink: null };
+  }
+
+  // Cross-section duplicates: skip merge, will add new link
+  if (sectionOf(dupLink) !== section) {
+    return { next: prev, emittedLink: null };
+  }
+
+  // Same section: merge the duplicate
+  const merged = mergeDuplicate(dupLink, link as DetectedLink);
+  const next = prev.map((l, i) => (i === dupIndex ? merged : l));
+  return { next, emittedLink: merged };
+}
+
 /**
  * YouTube prompt state for cross-category placement
  */
@@ -237,15 +268,13 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
         otherSection
       );
 
+      if (ytCrossCategory.shouldSkip) return;
+
       if (ytCrossCategory.shouldPrompt && ytCrossCategory.targetSection) {
         setYtPrompt({
           candidate: visibilityApplied,
           target: ytCrossCategory.targetSection,
         });
-        return;
-      }
-
-      if (ytCrossCategory.shouldSkip) {
         return;
       }
 
@@ -295,37 +324,16 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       const { duplicateIndex: dupAfterDelay, duplicate: duplicateAfterDelay } =
         findDuplicate(visibilityApplied as DetectedLink, prev, section);
 
-      let next = prev;
-      let emittedLink: T | null = null;
-
       // Step 10: Handle duplicate found after delay
-      if (dupAfterDelay !== -1 && duplicateAfterDelay) {
-        const dupSection = sectionOf(duplicateAfterDelay);
+      const resolution = resolveDuplicateAfterDelay(
+        visibilityApplied,
+        prev,
+        dupAfterDelay,
+        duplicateAfterDelay as T | undefined,
+        section
+      );
 
-        // Non-YouTube cross-section duplicates not allowed
-        if (
-          visibilityApplied.platform.id !== 'youtube' &&
-          dupSection !== section
-        ) {
-          emittedLink = null;
-        }
-        // YouTube cross-section: allow as add (skip merge)
-        else if (
-          visibilityApplied.platform.id === 'youtube' &&
-          dupSection !== section
-        ) {
-          emittedLink = null; // Will add below
-        }
-        // Same section: merge
-        else {
-          const merged = mergeDuplicate(
-            duplicateAfterDelay,
-            visibilityApplied as DetectedLink
-          );
-          next = prev.map((l, i) => (i === dupAfterDelay ? merged : l));
-          emittedLink = merged;
-        }
-      }
+      let { next, emittedLink } = resolution;
 
       // Step 11: Add new link if no merge happened
       if (!emittedLink) {
@@ -338,11 +346,9 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       }
 
       // Step 12: Update state and notify
-      if (emittedLink) {
-        setLinks(next);
-        setLastAddedId(idFor(emittedLink));
-        onLinkAdded?.([emittedLink]);
-      }
+      setLinks(next);
+      setLastAddedId(idFor(emittedLink));
+      onLinkAdded?.([emittedLink]);
       setAddingLink(null);
 
       // Step 13: Enable tipping if Venmo (non-blocking)
