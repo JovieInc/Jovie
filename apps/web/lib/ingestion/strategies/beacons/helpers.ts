@@ -161,6 +161,11 @@ interface BeaconsPageProps {
   };
 }
 
+type LinkCollectorState = {
+  structured: StructuredLink[];
+  seen: Set<string>;
+};
+
 /**
  * Try to extract a URL from a candidate object.
  * Returns the URL and optional title if found, null otherwise.
@@ -186,77 +191,105 @@ function extractUrlFromCandidate(
 }
 
 /**
+ * Extract links from dehydrated React Query state.
+ */
+function extractFromDehydratedQueries(dehydrated: unknown): unknown[] {
+  const collections: unknown[] = [];
+  if (!Array.isArray(dehydrated)) return collections;
+
+  for (const query of dehydrated) {
+    if (!query || typeof query !== 'object') continue;
+    const data = (query as { state?: { data?: unknown } }).state?.data;
+    if (!data || typeof data !== 'object') continue;
+
+    collections.push((data as { links?: unknown }).links);
+    collections.push((data as { page?: { links?: unknown } }).page?.links);
+  }
+  return collections;
+}
+
+/**
+ * Build candidate collections from Next.js page props.
+ */
+function buildCandidateCollections(
+  nextData: BeaconsPageProps | null
+): unknown[] {
+  const collections: unknown[] = [];
+  const pageProps = nextData?.props?.pageProps;
+  if (!pageProps) return collections;
+
+  collections.push(pageProps.links);
+  collections.push(pageProps.profile?.links);
+  collections.push(pageProps.data?.links);
+  collections.push(
+    ...extractFromDehydratedQueries(pageProps.dehydratedState?.queries)
+  );
+
+  return collections;
+}
+
+/**
+ * Add a link to the collector if not already seen.
+ */
+function addToCollector(state: LinkCollectorState, link: StructuredLink): void {
+  if (!link.url) return;
+  const key = link.url.trim();
+  if (state.seen.has(key)) return;
+  state.seen.add(key);
+  state.structured.push(link);
+}
+
+/**
+ * Recursively collect links from a value and its nested collections.
+ */
+function collectLinks(state: LinkCollectorState, value: unknown): void {
+  if (!value) return;
+
+  if (Array.isArray(value)) {
+    for (const entry of value) collectLinks(state, entry);
+    return;
+  }
+
+  if (typeof value !== 'object') return;
+
+  const candidate = value as Record<string, unknown>;
+  const link = extractUrlFromCandidate(candidate);
+  if (link) addToCollector(state, link);
+
+  // Recurse into nested collections
+  const nestedKeys = ['links', 'items', 'children', 'buttons'] as const;
+  for (const key of nestedKeys) {
+    if (candidate[key]) collectLinks(state, candidate[key]);
+  }
+}
+
+/**
+ * Extract links from data-href and data-url attributes in HTML.
+ */
+function extractDataAttributeLinks(
+  html: string,
+  state: LinkCollectorState
+): void {
+  const dataHrefRegex = /data-(?:href|url)=["'](https?:[^"'#\s]+)["']/gi;
+  let match: RegExpExecArray | null;
+  while ((match = dataHrefRegex.exec(html)) !== null) {
+    addToCollector(state, { url: match[1], title: undefined });
+  }
+}
+
+/**
  * Extracts structured links from Beacons Next.js page data.
  */
 export function extractBeaconsStructuredLinks(html: string): StructuredLink[] {
   const nextData = extractScriptJson<BeaconsPageProps>(html, '__NEXT_DATA__');
-  const structured: StructuredLink[] = [];
-  const seen = new Set<string>();
+  const state: LinkCollectorState = { structured: [], seen: new Set<string>() };
 
-  const candidateCollections: unknown[] = [];
-
-  const pageProps = nextData?.props?.pageProps;
-  if (pageProps) {
-    candidateCollections.push(pageProps.links);
-    candidateCollections.push(pageProps.profile?.links);
-    candidateCollections.push(pageProps.data?.links);
-
-    const dehydrated = pageProps.dehydratedState?.queries;
-    if (Array.isArray(dehydrated)) {
-      for (const query of dehydrated) {
-        if (!query || typeof query !== 'object') continue;
-        const data = (query as { state?: { data?: unknown } }).state?.data;
-        if (data && typeof data === 'object') {
-          candidateCollections.push((data as { links?: unknown }).links);
-          candidateCollections.push(
-            (data as { page?: { links?: unknown } }).page?.links
-          );
-        }
-      }
-    }
-  }
-
-  const collect = (value: unknown) => {
-    if (!value) return;
-
-    if (Array.isArray(value)) {
-      for (const entry of value) collect(entry);
-      return;
-    }
-
-    if (typeof value !== 'object') return;
-
-    const candidate = value as Record<string, unknown>;
-    const link = extractUrlFromCandidate(candidate);
-
-    if (link?.url) {
-      const key = link.url.trim();
-      if (!seen.has(key)) {
-        seen.add(key);
-        structured.push(link);
-      }
-    }
-
-    // Recurse into nested collections
-    const nestedKeys = ['links', 'items', 'children', 'buttons'] as const;
-    for (const key of nestedKeys) {
-      if (candidate[key]) collect(candidate[key]);
-    }
-  };
-
+  const candidateCollections = buildCandidateCollections(nextData);
   for (const collection of candidateCollections) {
-    collect(collection);
+    collectLinks(state, collection);
   }
 
-  const dataHrefRegex = /data-(?:href|url)=["'](https?:[^"'#\s]+)["']/gi;
-  let match: RegExpExecArray | null;
-  while ((match = dataHrefRegex.exec(html)) !== null) {
-    const rawUrl = match[1];
-    if (!seen.has(rawUrl)) {
-      seen.add(rawUrl);
-      structured.push({ url: rawUrl, title: undefined });
-    }
-  }
+  extractDataAttributeLinks(html, state);
 
-  return structured;
+  return state.structured;
 }
