@@ -34,6 +34,76 @@ const buildSkippedResult = (
   detail,
 });
 
+/**
+ * Handle sending a notification via email channel
+ */
+async function handleEmailChannel(
+  message: NotificationMessage,
+  target: NotificationTarget,
+  preferences: Awaited<ReturnType<typeof getNotificationPreferences>>
+): Promise<NotificationChannelResult> {
+  const to = target.email ?? preferences.email ?? null;
+
+  if (!to) {
+    return buildSkippedResult('email', 'No email available');
+  }
+
+  // Check global suppression list (bounces, complaints, etc.)
+  const suppressionCheck = await isEmailSuppressed(to);
+  if (suppressionCheck.suppressed) {
+    const detail = `Email suppressed: ${suppressionCheck.reason}`;
+    await logDelivery({
+      channel: 'email',
+      recipientEmail: to,
+      status: 'suppressed',
+      metadata: {
+        suppressionReason: suppressionCheck.reason,
+        notificationId: message.id,
+      },
+    });
+    return buildSkippedResult('email', detail);
+  }
+
+  const respectPreferences =
+    message.respectUserPreferences !== false &&
+    message.category !== 'transactional';
+
+  if (respectPreferences && !preferences.marketingEmails) {
+    return buildSkippedResult('email', 'Marketing emails are disabled');
+  }
+
+  const emailResult = await emailProvider.sendEmail({
+    to,
+    subject: message.subject,
+    text: message.text,
+    html: message.html,
+    replyTo: message.replyTo ?? EMAIL_REPLY_TO,
+    headers: message.headers,
+    from: message.from,
+  });
+
+  // Log delivery for tracking
+  if (emailResult.status === 'sent') {
+    await logDelivery({
+      channel: 'email',
+      recipientEmail: to,
+      status: 'sent',
+      providerMessageId: emailResult.detail,
+      metadata: { notificationId: message.id },
+    });
+  } else if (emailResult.status === 'error') {
+    await logDelivery({
+      channel: 'email',
+      recipientEmail: to,
+      status: 'failed',
+      errorMessage: emailResult.error,
+      metadata: { notificationId: message.id },
+    });
+  }
+
+  return emailResult;
+}
+
 export const sendNotification = async (
   message: NotificationMessage,
   target: NotificationTarget
@@ -76,76 +146,11 @@ export const sendNotification = async (
     }
 
     if (channel === 'email') {
-      const to = target.email ?? preferences.email ?? null;
-
-      if (!to) {
-        results.push(buildSkippedResult(channel, 'No email available'));
-        continue;
-      }
-
-      // Check global suppression list (bounces, complaints, etc.)
-      const suppressionCheck = await isEmailSuppressed(to);
-      if (suppressionCheck.suppressed) {
-        const detail = `Email suppressed: ${suppressionCheck.reason}`;
-        results.push(buildSkippedResult(channel, detail));
-
-        // Log the suppressed delivery for tracking
-        await logDelivery({
-          channel: 'email',
-          recipientEmail: to,
-          status: 'suppressed',
-          metadata: {
-            suppressionReason: suppressionCheck.reason,
-            notificationId: message.id,
-          },
-        });
-        continue;
-      }
-
-      const respectPreferences =
-        message.respectUserPreferences !== false &&
-        message.category !== 'transactional';
-
-      if (respectPreferences && !preferences.marketingEmails) {
-        results.push(
-          buildSkippedResult(channel, 'Marketing emails are disabled')
-        );
-        continue;
-      }
-
-      const emailResult = await emailProvider.sendEmail({
-        to,
-        subject: message.subject,
-        text: message.text,
-        html: message.html,
-        replyTo: message.replyTo ?? EMAIL_REPLY_TO,
-        headers: message.headers,
-        from: message.from,
-      });
-
-      // Log successful sends for delivery tracking
-      if (emailResult.status === 'sent') {
-        await logDelivery({
-          channel: 'email',
-          recipientEmail: to,
-          status: 'sent',
-          providerMessageId: emailResult.detail,
-          metadata: {
-            notificationId: message.id,
-          },
-        });
-      } else if (emailResult.status === 'error') {
-        await logDelivery({
-          channel: 'email',
-          recipientEmail: to,
-          status: 'failed',
-          errorMessage: emailResult.error,
-          metadata: {
-            notificationId: message.id,
-          },
-        });
-      }
-
+      const emailResult = await handleEmailChannel(
+        message,
+        target,
+        preferences
+      );
       results.push(emailResult);
       continue;
     }

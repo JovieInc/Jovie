@@ -70,6 +70,65 @@ export interface SpotifyImportOptions {
 }
 
 /**
+ * Discover cross-platform links for imported releases
+ */
+async function discoverLinksForReleases(
+  creatorProfileId: string,
+  market: string
+): Promise<void> {
+  const importedReleases = await getReleasesForProfile(creatorProfileId);
+
+  for (const release of importedReleases) {
+    try {
+      const existingProviders = release.providerLinks.map(l => l.providerId);
+      await discoverLinksForRelease(release.id, existingProviders, {
+        skipExisting: true,
+        storefront: market.toLowerCase(),
+      });
+    } catch (error) {
+      // Don't fail the whole import if discovery fails
+      console.debug(`Discovery failed for ${release.title}:`, error);
+    }
+  }
+}
+
+/**
+ * Import a batch of albums and track results
+ */
+async function importAlbumBatch(
+  creatorProfileId: string,
+  albumsToImport: SpotifyAlbum[],
+  fullAlbumMap: Map<string, SpotifyAlbumFull>,
+  result: SpotifyImportResult
+): Promise<void> {
+  for (const album of albumsToImport) {
+    try {
+      const fullAlbum = fullAlbumMap.get(album.id);
+      await importSingleRelease(creatorProfileId, album, fullAlbum);
+      result.imported++;
+    } catch (error) {
+      result.failed++;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const sanitizedAlbumName = sanitizeName(album.name);
+      result.errors.push(
+        `Failed to import "${sanitizedAlbumName}": ${message}`
+      );
+
+      Sentry.captureException(error, {
+        tags: { source: 'spotify_import' },
+        extra: {
+          albumId: album.id,
+          albumName: sanitizedAlbumName,
+          creatorProfileId,
+        },
+      });
+
+      console.error(`Failed to import album ${album.id}:`, error);
+    }
+  }
+}
+
+/**
  * Import all releases from a Spotify artist profile into the database
  *
  * Security:
@@ -166,55 +225,16 @@ export async function importReleasesFromSpotify(
         }
 
         // 3. Import each album
-        for (const album of albumsToImport) {
-          try {
-            const fullAlbum = fullAlbumMap.get(album.id);
-            await importSingleRelease(creatorProfileId, album, fullAlbum);
-            result.imported++;
-          } catch (error) {
-            result.failed++;
-            const message =
-              error instanceof Error ? error.message : 'Unknown error';
-            const sanitizedAlbumName = sanitizeName(album.name);
-            result.errors.push(
-              `Failed to import "${sanitizedAlbumName}": ${message}`
-            );
-
-            Sentry.captureException(error, {
-              tags: { source: 'spotify_import' },
-              extra: {
-                albumId: album.id,
-                albumName: sanitizedAlbumName,
-                creatorProfileId,
-              },
-            });
-
-            console.error(`Failed to import album ${album.id}:`, error);
-          }
-        }
+        await importAlbumBatch(
+          creatorProfileId,
+          albumsToImport,
+          fullAlbumMap,
+          result
+        );
 
         // 4. Discover cross-platform links
         if (discoverLinks && includeTracks) {
-          // Get the imported releases to discover links
-          const importedReleases =
-            await getReleasesForProfile(creatorProfileId);
-
-          for (const release of importedReleases) {
-            try {
-              // Get existing provider IDs to skip
-              const existingProviders = release.providerLinks.map(
-                l => l.providerId
-              );
-
-              await discoverLinksForRelease(release.id, existingProviders, {
-                skipExisting: true,
-                storefront: market.toLowerCase(),
-              });
-            } catch (error) {
-              // Don't fail the whole import if discovery fails
-              console.debug(`Discovery failed for ${release.title}:`, error);
-            }
-          }
+          await discoverLinksForReleases(creatorProfileId, market);
         }
 
         // 5. Fetch the final state
