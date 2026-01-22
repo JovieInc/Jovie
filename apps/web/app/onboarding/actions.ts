@@ -16,6 +16,7 @@ import {
   mapDatabaseError,
   OnboardingErrorCode,
   onboardingErrorToError,
+  unwrapDatabaseError,
 } from '@/lib/errors/onboarding';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
@@ -532,26 +533,16 @@ export async function completeOnboarding({
       error instanceof Error ? error.stack : 'No stack available'
     );
 
-    // Log database-specific error details
-    // Define shape for PostgreSQL database errors
-    interface DatabaseErrorShape {
-      code?: string;
-      constraint?: string;
-      detail?: string;
-      hint?: string;
-      table?: string;
-      column?: string;
-      cause?: unknown;
-    }
-    const dbError = error as DatabaseErrorShape;
+    // Extract nested PostgreSQL error details using shared utility
+    const unwrapped = unwrapDatabaseError(error);
+    const effectiveCode = unwrapped.code || 'UNKNOWN_DB_ERROR';
+    const effectiveConstraint = unwrapped.constraint;
+
     console.error('🔴 DATABASE ERROR DETAILS:', {
-      code: dbError?.code,
-      constraint: dbError?.constraint,
-      detail: dbError?.detail,
-      hint: dbError?.hint,
-      table: dbError?.table,
-      column: dbError?.column,
-      cause: dbError?.cause,
+      code: effectiveCode,
+      constraint: effectiveConstraint,
+      detail: unwrapped.detail,
+      message: unwrapped.message,
     });
 
     console.error('🔴 REQUEST CONTEXT:', {
@@ -563,19 +554,25 @@ export async function completeOnboarding({
       errorMessage: error instanceof Error ? error.message : String(error),
     });
 
-    // Capture to Sentry with full context
+    // Capture to Sentry with full context and fingerprinting
     Sentry.captureException(error, {
       tags: {
         context: 'onboarding_submission',
         username: username ?? 'unknown',
+        db_error_code: effectiveCode,
       },
       extra: {
         displayName,
         email,
-        dbErrorCode: dbError?.code,
-        dbConstraint: dbError?.constraint,
-        dbDetail: dbError?.detail,
+        dbErrorCode: effectiveCode,
+        dbConstraint: effectiveConstraint,
+        dbDetail: unwrapped.detail,
+        rawErrorKeys:
+          error && typeof error === 'object' ? Object.keys(error) : [],
       },
+      fingerprint: effectiveConstraint
+        ? ['onboarding', effectiveCode, effectiveConstraint]
+        : ['onboarding', effectiveCode],
     });
 
     // Normalize unknown errors into onboarding-shaped errors for consistent handling

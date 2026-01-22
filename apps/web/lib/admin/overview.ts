@@ -269,12 +269,14 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
       const row = rows[0];
       incidentCount = Number(row?.count ?? 0);
       const rawLastAt = row?.lastAt;
-      lastIncidentAt =
-        rawLastAt instanceof Date
-          ? rawLastAt
-          : rawLastAt != null
-            ? new Date(String(rawLastAt))
-            : null;
+      // Extract nested ternary for clarity (S3358)
+      if (rawLastAt instanceof Date) {
+        lastIncidentAt = rawLastAt;
+      } else if (rawLastAt != null) {
+        lastIncidentAt = new Date(String(rawLastAt));
+      } else {
+        lastIncidentAt = null;
+      }
     } catch {
       DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
       console.warn(
@@ -329,8 +331,9 @@ function mapStripeEventToActivity(event: {
   type: string;
   createdAt: Date;
 }): AdminActivityItem {
-  let action = event.type;
-  let status: AdminActivityStatus = 'success';
+  // Declare without initial values to avoid dead stores (S1854)
+  let action: string;
+  let status: AdminActivityStatus;
 
   switch (event.type) {
     case 'invoice.payment_failed':

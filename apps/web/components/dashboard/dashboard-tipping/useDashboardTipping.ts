@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useUpdateVenmoMutation } from '@/lib/queries/useDashboardProfileQuery';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { UseDashboardTippingReturn } from './types';
 
@@ -10,6 +11,7 @@ import type { UseDashboardTippingReturn } from './types';
  */
 export function useDashboardTipping(): UseDashboardTippingReturn {
   const dashboardData = useDashboardData();
+  const updateVenmoMutation = useUpdateVenmoMutation();
   const [artist, setArtist] = useState<Artist | null>(
     dashboardData.selectedProfile
       ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
@@ -19,7 +21,6 @@ export function useDashboardTipping(): UseDashboardTippingReturn {
     artist?.venmo_handle?.replace(/^@/, '') || ''
   );
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   const hasVenmoHandle = Boolean(artist?.venmo_handle);
@@ -27,25 +28,12 @@ export function useDashboardTipping(): UseDashboardTippingReturn {
   const handleSaveVenmo = useCallback(async () => {
     if (!artist) return;
 
-    setIsSaving(true);
     try {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            venmo_handle: venmoHandle ? `@${venmoHandle}` : '',
-          },
-        }),
+      const normalizedHandle = venmoHandle ? `@${venmoHandle}` : '';
+      await updateVenmoMutation.mutateAsync({
+        venmo_handle: normalizedHandle,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update Venmo handle');
-      }
-
-      const normalizedHandle = venmoHandle ? `@${venmoHandle}` : '';
       const updatedArtist = { ...artist, venmo_handle: normalizedHandle };
       setArtist(updatedArtist);
       setIsEditing(false);
@@ -53,10 +41,8 @@ export function useDashboardTipping(): UseDashboardTippingReturn {
       setTimeout(() => setSaveSuccess(null), 2500);
     } catch (error) {
       console.error('Failed to update Venmo handle:', error);
-    } finally {
-      setIsSaving(false);
     }
-  }, [venmoHandle, artist]);
+  }, [venmoHandle, artist, updateVenmoMutation]);
 
   const handleCancel = useCallback(() => {
     if (!artist) return;
@@ -70,7 +56,7 @@ export function useDashboardTipping(): UseDashboardTippingReturn {
     setVenmoHandle,
     isEditing,
     setIsEditing,
-    isSaving,
+    isSaving: updateVenmoMutation.isPending,
     saveSuccess,
     hasVenmoHandle,
     handleSaveVenmo,
