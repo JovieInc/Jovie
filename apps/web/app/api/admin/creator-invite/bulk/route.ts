@@ -150,31 +150,39 @@ export async function POST(request: Request) {
     const result = await withSystemIngestionSession(async tx => {
       const invitePayloads: { inviteId: string; creatorProfileId: string }[] =
         [];
-      let skippedDuplicates = 0;
 
-      for (const profile of profilesWithEmails) {
-        const [invite] = await tx
-          .insert(creatorClaimInvites)
-          .values({
-            creatorProfileId: profile.id,
-            email: profile.contactEmail!.toLowerCase().trim(),
-            status: 'pending',
-            meta: { source: 'bulk' },
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .onConflictDoNothing()
-          .returning({ id: creatorClaimInvites.id });
+      // Batch all values at once for N->1 database roundtrip
+      const now = new Date();
+      const inviteValues = profilesWithEmails.map(profile => ({
+        creatorProfileId: profile.id,
+        email: profile.contactEmail!.toLowerCase().trim(),
+        status: 'pending' as const,
+        meta: { source: 'bulk' as const },
+        createdAt: now,
+        updatedAt: now,
+      }));
 
-        if (invite) {
-          invitePayloads.push({
-            inviteId: invite.id,
-            creatorProfileId: profile.id,
-          });
-        } else {
-          skippedDuplicates++;
-        }
+      const insertedInvites = await tx
+        .insert(creatorClaimInvites)
+        .values(inviteValues)
+        .onConflictDoNothing()
+        .returning({
+          id: creatorClaimInvites.id,
+          creatorProfileId: creatorClaimInvites.creatorProfileId,
+        });
+
+      // Track which profiles were inserted vs skipped
+      const insertedProfileIds = new Set(
+        insertedInvites.map(inv => inv.creatorProfileId)
+      );
+      for (const invite of insertedInvites) {
+        invitePayloads.push({
+          inviteId: invite.id,
+          creatorProfileId: invite.creatorProfileId,
+        });
       }
+      const skippedDuplicates =
+        profilesWithEmails.length - insertedProfileIds.size;
 
       const { enqueued, skipped } = await enqueueBulkClaimInviteJobs(
         tx,
