@@ -58,6 +58,39 @@ export function ProfileShell({
     subscriptionDetails,
   } = notificationsController;
 
+  // Render notification button/menu based on state
+  const renderNotificationControls = () => {
+    if (!showNotificationButton || !notificationsEnabled) {
+      return null;
+    }
+
+    if (hasActiveSubscriptions) {
+      return (
+        <ProfileNotificationsMenu
+          channelBusy={channelBusy}
+          hasActiveSubscriptions={hasActiveSubscriptions}
+          notificationsState={notificationsState}
+          onAddChannel={openSubscription}
+          onOpenChange={handleMenuOpenChange}
+          onUnsubscribe={handleUnsubscribe}
+          open={isNotificationMenuOpen}
+          subscribedChannels={subscribedChannels}
+          subscriptionDetails={subscriptionDetails}
+          triggerRef={menuTriggerRef}
+        />
+      );
+    }
+
+    return (
+      <ProfileNotificationsButton
+        buttonRef={menuTriggerRef}
+        hasActiveSubscriptions={false}
+        notificationsState={notificationsState}
+        onClick={handleNotificationsClick}
+      />
+    );
+  };
+
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
@@ -85,29 +118,7 @@ export function ProfileShell({
           </div>
 
           <div className='absolute right-4 top-4 z-10 flex items-center gap-2'>
-            {showNotificationButton && notificationsEnabled ? (
-              hasActiveSubscriptions ? (
-                <ProfileNotificationsMenu
-                  channelBusy={channelBusy}
-                  hasActiveSubscriptions={hasActiveSubscriptions}
-                  notificationsState={notificationsState}
-                  onAddChannel={openSubscription}
-                  onOpenChange={handleMenuOpenChange}
-                  onUnsubscribe={handleUnsubscribe}
-                  open={isNotificationMenuOpen}
-                  subscribedChannels={subscribedChannels}
-                  subscriptionDetails={subscriptionDetails}
-                  triggerRef={menuTriggerRef}
-                />
-              ) : (
-                <ProfileNotificationsButton
-                  buttonRef={menuTriggerRef}
-                  hasActiveSubscriptions={false}
-                  notificationsState={notificationsState}
-                  onClick={handleNotificationsClick}
-                />
-              )
-            ) : null}
+            {renderNotificationControls()}
           </div>
 
           <div className='relative z-10 flex min-h-screen flex-col py-12'>

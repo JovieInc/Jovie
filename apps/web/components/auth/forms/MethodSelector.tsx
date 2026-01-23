@@ -106,11 +106,11 @@ export function MethodSelector({
     }
 
     if (method === 'google') {
-      const className = isPrimary
-        ? isGooglePrimary
-          ? authButtonVariants({ variant: 'oauthPrimary' })
-          : authButtonVariants({ variant: 'primaryLight' })
-        : authButtonVariants({ variant: 'secondary' });
+      const getGoogleVariant = () => {
+        if (!isPrimary) return 'secondary';
+        return isGooglePrimary ? 'oauthPrimary' : 'primaryLight';
+      };
+      const className = authButtonVariants({ variant: getGoogleVariant() });
 
       return (
         <button
