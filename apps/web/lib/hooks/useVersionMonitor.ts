@@ -1,6 +1,5 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface BuildInfo {
@@ -70,22 +69,6 @@ export function useVersionMonitor(
 
       setHasMismatch(true);
       setMismatchInfo(info);
-
-      Sentry.captureMessage('Build version mismatch detected', {
-        level: 'info',
-        tags: {
-          context: 'version_monitor',
-          initialBuildId: initialBuildId.current,
-          currentBuildId: data.buildId,
-          environment: data.environment,
-        },
-        extra: {
-          commitSha: data.commitSha,
-          deployedAt: data.deployedAt,
-          userAgent: navigator.userAgent,
-          pageLoadTime: Date.now(),
-        },
-      });
 
       console.info(
         '[version-monitor] New version detected:',
