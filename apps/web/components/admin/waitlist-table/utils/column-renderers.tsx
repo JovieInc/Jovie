@@ -1,8 +1,15 @@
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
-import { DateCell } from '@/components/organisms/table';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+  DateCell,
+  TableCheckboxCell,
+} from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS } from '../constants';
 
@@ -156,4 +163,68 @@ export function renderStatusCell(status: WaitlistEntryRow['status']) {
       {statusLabels[status]}
     </StatusBadge>
   );
+}
+
+/**
+ * Creates a header renderer for the checkbox column
+ */
+export function createSelectHeaderRenderer(
+  headerCheckboxState: boolean | 'indeterminate',
+  onToggleSelectAll: () => void
+) {
+  return function SelectHeader({
+    table,
+  }: HeaderContext<WaitlistEntryRow, unknown>) {
+    return (
+      <TableCheckboxCell
+        table={table as Table<WaitlistEntryRow>}
+        headerCheckboxState={headerCheckboxState}
+        onToggleSelectAll={onToggleSelectAll}
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the checkbox column
+ */
+export function createSelectCellRenderer(
+  selectedIds: Set<string>,
+  page: number,
+  pageSize: number,
+  onToggleSelect: (id: string) => void
+) {
+  return function SelectCell({ row }: CellContext<WaitlistEntryRow, unknown>) {
+    const entry = row.original;
+    const isChecked = selectedIds.has(entry.id);
+    const rowNumber = (page - 1) * pageSize + row.index + 1;
+
+    return (
+      <TableCheckboxCell
+        row={row}
+        rowNumber={rowNumber}
+        isChecked={isChecked}
+        onToggleSelect={() => onToggleSelect(entry.id)}
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the actions column
+ */
+export function createActionsCellRenderer(
+  getContextMenuItems: (entry: WaitlistEntryRow) => ContextMenuItemType[]
+) {
+  return function ActionsCell({ row }: CellContext<WaitlistEntryRow, unknown>) {
+    const entry = row.original;
+    const contextMenuItems = getContextMenuItems(entry);
+    const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+    return (
+      <div className='flex items-center justify-end'>
+        <TableActionMenu items={actionMenuItems} align='end' />
+      </div>
+    );
+  };
 }

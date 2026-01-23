@@ -1,12 +1,19 @@
 import type { CellContext } from '@tanstack/react-table';
+import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
+  AudienceLastSeenCell,
   AudienceLocationCell,
+  AudienceRowSelectionCell,
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
 } from '@/components/dashboard/audience/table/atoms';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+} from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 
 /**
@@ -85,4 +92,67 @@ export function renderEmailCell({
   getValue,
 }: CellContext<AudienceMember, string | null>) {
   return <span className='text-secondary-token'>{getValue() ?? '—'}</span>;
+}
+
+/**
+ * Creates a cell renderer for the selection column
+ */
+export function createSelectCellRenderer(
+  page: number,
+  pageSize: number,
+  selectedIds: Set<string>,
+  onToggleSelect: (id: string) => void
+) {
+  return function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
+    const rowNumber = (page - 1) * pageSize + row.index + 1;
+    return (
+      <AudienceRowSelectionCell
+        rowNumber={rowNumber}
+        isChecked={selectedIds.has(row.original.id)}
+        displayName={row.original.displayName}
+        onToggle={() => onToggleSelect(row.original.id)}
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the lastSeen/subscribedAt column
+ */
+export function createLastSeenCellRenderer(
+  openMenuRowId: string | null,
+  setOpenMenuRowId: (id: string | null) => void
+) {
+  return function LastSeenCell({
+    row,
+  }: CellContext<AudienceMember, Date | null>) {
+    return (
+      <AudienceLastSeenCell
+        row={row.original}
+        lastSeenAt={row.original.lastSeenAt}
+        isMenuOpen={openMenuRowId === row.original.id}
+        onMenuOpenChange={open =>
+          setOpenMenuRowId(open ? row.original.id : null)
+        }
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the menu/actions column
+ */
+export function createMenuCellRenderer(
+  getContextMenuItems: (member: AudienceMember) => ContextMenuItemType[]
+) {
+  return function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
+    const contextMenuItems = getContextMenuItems(row.original);
+    const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+    return (
+      <div className='flex items-center justify-end'>
+        <TableActionMenu items={actionMenuItems} align='end' />
+      </div>
+    );
+  };
 }

@@ -6,17 +6,11 @@ import { BellRing, Copy, Download, Eye, Phone, Users } from 'lucide-react';
 import * as React from 'react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { TableActionMenu } from '@/components/atoms/table-action-menu';
-import {
-  AudienceLastSeenCell,
-  AudienceRowSelectionCell,
-} from '@/components/dashboard/audience/table/atoms';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
   AdminPageSizeSelect,
   type ContextMenuItemType,
-  convertContextMenuItems,
   convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
@@ -26,6 +20,9 @@ import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { downloadVCard } from './utils';
 import {
+  createLastSeenCellRenderer,
+  createMenuCellRenderer,
+  createSelectCellRenderer,
   renderActionsCell,
   renderDeviceCell,
   renderEmailCell,
@@ -143,17 +140,12 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.display({
         id: 'select',
         header: () => null,
-        cell: ({ row }) => {
-          const rowNumber = (page - 1) * pageSize + row.index + 1;
-          return (
-            <AudienceRowSelectionCell
-              rowNumber={rowNumber}
-              isChecked={selectedIds.has(row.original.id)}
-              displayName={row.original.displayName}
-              onToggle={() => toggleSelect(row.original.id)}
-            />
-          );
-        },
+        cell: createSelectCellRenderer(
+          page,
+          pageSize,
+          selectedIds,
+          toggleSelect
+        ),
         size: 100,
       }),
 
@@ -209,16 +201,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('lastSeenAt', {
         id: 'lastSeen',
         header: 'Last Seen',
-        cell: ({ row }) => (
-          <AudienceLastSeenCell
-            row={row.original}
-            lastSeenAt={row.original.lastSeenAt}
-            isMenuOpen={openMenuRowId === row.original.id}
-            onMenuOpenChange={open =>
-              setOpenMenuRowId(open ? row.original.id : null)
-            }
-          />
-        ),
+        cell: createLastSeenCellRenderer(openMenuRowId, setOpenMenuRowId),
         size: 160,
       }),
 
@@ -226,16 +209,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.display({
         id: 'menu',
         header: '',
-        cell: ({ row }) => {
-          const contextMenuItems = getContextMenuItems(row.original);
-          const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
-        },
+        cell: createMenuCellRenderer(getContextMenuItems),
         size: 48,
       }),
     ],
@@ -257,17 +231,12 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.display({
         id: 'select',
         header: () => null,
-        cell: ({ row }) => {
-          const rowNumber = (page - 1) * pageSize + row.index + 1;
-          return (
-            <AudienceRowSelectionCell
-              rowNumber={rowNumber}
-              isChecked={selectedIds.has(row.original.id)}
-              displayName={row.original.displayName}
-              onToggle={() => toggleSelect(row.original.id)}
-            />
-          );
-        },
+        cell: createSelectCellRenderer(
+          page,
+          pageSize,
+          selectedIds,
+          toggleSelect
+        ),
         size: 100,
       }),
 
@@ -291,16 +260,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.accessor('lastSeenAt', {
         id: 'subscribedAt',
         header: 'Subscribed',
-        cell: ({ row }) => (
-          <AudienceLastSeenCell
-            row={row.original}
-            lastSeenAt={row.original.lastSeenAt}
-            isMenuOpen={openMenuRowId === row.original.id}
-            onMenuOpenChange={open =>
-              setOpenMenuRowId(open ? row.original.id : null)
-            }
-          />
-        ),
+        cell: createLastSeenCellRenderer(openMenuRowId, setOpenMenuRowId),
         size: 180,
       }),
 
@@ -308,16 +268,7 @@ export function DashboardAudienceTableUnified({
       memberColumnHelper.display({
         id: 'menu',
         header: '',
-        cell: ({ row }) => {
-          const contextMenuItems = getContextMenuItems(row.original);
-          const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
-        },
+        cell: createMenuCellRenderer(getContextMenuItems),
         size: 48,
       }),
     ],
