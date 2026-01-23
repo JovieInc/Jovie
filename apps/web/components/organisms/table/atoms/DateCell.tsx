@@ -2,7 +2,7 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import React from 'react';
-import { typography } from '../table.styles';
+import { cn, typography } from '../table.styles';
 
 interface DateCellProps {
   /**
@@ -66,30 +66,35 @@ export const DateCell = React.memo(function DateCell({
   locale = 'en-US',
   className,
 }: DateCellProps) {
-  if (!date) {
-    return <span className={typography.cellTertiary}>—</span>;
-  }
-
   // Format user-friendly date
-  const formatted = new Intl.DateTimeFormat(locale, formatOptions).format(date);
+  const formatted = date
+    ? new Intl.DateTimeFormat(locale, formatOptions).format(date)
+    : '—';
 
   // Format full date for tooltip
-  const fullDate = new Intl.DateTimeFormat(locale, tooltipFormatOptions).format(
-    date
-  );
+  const fullDate = date
+    ? new Intl.DateTimeFormat(locale, tooltipFormatOptions).format(date)
+    : null;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          className={`${typography.cellTertiary} whitespace-nowrap cursor-help ${className || ''}`}
+          className={cn(
+            typography.cellTertiary,
+            'whitespace-nowrap',
+            date && 'cursor-help',
+            className
+          )}
         >
           {formatted}
         </span>
       </TooltipTrigger>
-      <TooltipContent side='top' className='text-xs'>
-        {fullDate}
-      </TooltipContent>
+      {fullDate && (
+        <TooltipContent side='top' className='text-xs'>
+          {fullDate}
+        </TooltipContent>
+      )}
     </Tooltip>
   );
 });
