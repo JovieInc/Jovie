@@ -47,7 +47,7 @@ function HighlightedName({
   const matchSet = new Set(matchIndices);
 
   // For character-by-character rendering, using index as key is acceptable
-  // since the string content is static and reordering never occurs
+  // since the string content is static and reordering never occurs (NOSONAR S6479)
   return (
     <span className='font-medium'>
       {name.split('').map((char, i) => (

@@ -36,30 +36,44 @@
  */
 
 /**
+ * Validate if a string is a valid IPv4 address.
+ * Uses simple regex pattern + programmatic octet validation to reduce regex complexity.
+ */
+function isValidIPv4(ip: string): boolean {
+  // Simple pattern match, then validate octet ranges programmatically
+  const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const match = ip.match(ipv4Pattern);
+  if (!match) return false;
+
+  // Validate each octet is 0-255
+  for (let i = 1; i <= 4; i++) {
+    const octet = Number.parseInt(match[i], 10);
+    if (octet < 0 || octet > 255) return false;
+  }
+  return true;
+}
+
+/**
+ * Validate if a string is a valid IPv6 address.
+ */
+function isValidIPv6(ip: string): boolean {
+  // Full IPv6 format
+  const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+  if (ipv6Regex.test(ip)) return true;
+
+  // Compressed format (with ::)
+  const ipv6CompressedRegex =
+    /^(?:[0-9a-fA-F]{1,4}:)*::(?:[0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{0,4}$/;
+  if (ipv6CompressedRegex.test(ip)) return true;
+
+  return false;
+}
+
+/**
  * Validate if a string is a valid IPv4 or IPv6 address
  */
 export function isValidIP(ip: string): boolean {
-  // IPv4 validation - complexity required to properly validate octet ranges (0-255)
-  const ipv4Regex =
-    /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  if (ipv4Regex.test(ip)) {
-    return true;
-  }
-
-  // IPv6 validation (simplified - covers most common formats)
-  const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  if (ipv6Regex.test(ip)) {
-    return true;
-  }
-
-  // IPv6 compressed format (with ::)
-  const ipv6CompressedRegex =
-    /^((?:[0-9a-fA-F]{1,4}:)*)::((?:[0-9a-fA-F]{1,4}:)*)([0-9a-fA-F]{1,4})?$/;
-  if (ipv6CompressedRegex.test(ip)) {
-    return true;
-  }
-
-  return false;
+  return isValidIPv4(ip) || isValidIPv6(ip);
 }
 
 /**
