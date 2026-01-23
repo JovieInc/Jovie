@@ -6,6 +6,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
   useTransition,
 } from 'react';
@@ -116,8 +117,14 @@ function AuthShellWrapperInner({
     [persistSidebarCollapsed, startTransition]
   );
 
+  // Memoize context value to prevent unnecessary re-renders
+  const tableMetaContextValue = useMemo(
+    () => ({ tableMeta, setTableMeta }),
+    [tableMeta, setTableMeta]
+  );
+
   return (
-    <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
+    <TableMetaContext.Provider value={tableMetaContextValue}>
       <PreviewPanelProvider enabled={previewEnabled} defaultOpen>
         <AuthShell
           section={config.section}
