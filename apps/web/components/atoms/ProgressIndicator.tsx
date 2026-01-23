@@ -69,7 +69,6 @@ export function ProgressIndicator({
         {steps.map((step, index) => {
           const isCompleted = index < currentStep;
           const isCurrent = index === currentStep;
-          // const isUpcoming = index > currentStep; // Reserved for future use
 
           return (
             <div
