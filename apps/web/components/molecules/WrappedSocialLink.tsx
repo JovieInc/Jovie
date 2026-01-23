@@ -5,6 +5,7 @@
 
 'use client';
 
+import { captureException } from '@sentry/nextjs';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -98,7 +99,9 @@ export function WrappedSocialLink({
         if (err instanceof DOMException && err.name === 'AbortError') {
           return;
         }
-        console.error('Link wrapping failed:', err);
+        captureException(err, {
+          extra: { context: 'link-wrapping', href, platform },
+        });
         // Fallback to original URL
         setWrappedData({
           wrappedUrl: href,

@@ -4,8 +4,8 @@
  * Database operations for release-artist junction table.
  */
 
-import { eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { and, eq } from 'drizzle-orm';
+import { db, type TransactionType } from '@/lib/db';
 import {
   type ArtistRole,
   artists,
@@ -16,18 +16,28 @@ import type { ArtistWithRole } from './types';
 
 /**
  * Upsert a release-artist relationship
+ *
+ * On conflict, only updates fields that were explicitly provided to avoid
+ * clobbering existing values with defaults.
+ *
+ * @param input - The release-artist relationship data
+ * @param tx - Optional transaction to use for atomicity
  */
-export async function upsertReleaseArtist(input: {
-  releaseId: string;
-  artistId: string;
-  role: ArtistRole;
-  creditName?: string | null;
-  joinPhrase?: string | null;
-  position?: number;
-  isPrimary?: boolean;
-  sourceType?: 'manual' | 'admin' | 'ingested';
-  metadata?: Record<string, unknown>;
-}): Promise<typeof releaseArtists.$inferSelect> {
+export async function upsertReleaseArtist(
+  input: {
+    releaseId: string;
+    artistId: string;
+    role: ArtistRole;
+    creditName?: string | null;
+    joinPhrase?: string | null;
+    position?: number;
+    isPrimary?: boolean;
+    sourceType?: 'manual' | 'admin' | 'ingested';
+    metadata?: Record<string, unknown>;
+  },
+  tx?: TransactionType
+): Promise<typeof releaseArtists.$inferSelect> {
+  const database = tx ?? db;
   const now = new Date();
 
   const insertData: NewReleaseArtist = {
@@ -43,7 +53,16 @@ export async function upsertReleaseArtist(input: {
     createdAt: now,
   };
 
-  const [result] = await db
+  // Build update set with only explicitly provided fields to avoid clobbering
+  const updateSet: Partial<NewReleaseArtist> = {};
+  if (input.creditName !== undefined) updateSet.creditName = input.creditName;
+  if (input.joinPhrase !== undefined) updateSet.joinPhrase = input.joinPhrase;
+  if (input.position !== undefined) updateSet.position = input.position;
+  if (input.isPrimary !== undefined) updateSet.isPrimary = input.isPrimary;
+  if (input.sourceType !== undefined) updateSet.sourceType = input.sourceType;
+  if (input.metadata !== undefined) updateSet.metadata = input.metadata;
+
+  const [result] = await database
     .insert(releaseArtists)
     .values(insertData)
     .onConflictDoUpdate({
@@ -52,14 +71,10 @@ export async function upsertReleaseArtist(input: {
         releaseArtists.artistId,
         releaseArtists.role,
       ],
-      set: {
-        creditName: input.creditName ?? null,
-        joinPhrase: input.joinPhrase ?? null,
-        position: input.position ?? 0,
-        isPrimary: input.isPrimary ?? false,
-        sourceType: input.sourceType ?? 'ingested',
-        metadata: input.metadata ?? {},
-      },
+      set:
+        Object.keys(updateSet).length > 0
+          ? updateSet
+          : { creditName: insertData.creditName },
     })
     .returning();
 
@@ -98,9 +113,16 @@ export async function getArtistsForRelease(
 
 /**
  * Delete all artist relationships for a release
+ *
+ * @param releaseId - The release ID to delete relationships for
+ * @param tx - Optional transaction to use for atomicity
  */
-export async function deleteReleaseArtists(releaseId: string): Promise<void> {
-  await db
+export async function deleteReleaseArtists(
+  releaseId: string,
+  tx?: TransactionType
+): Promise<void> {
+  const database = tx ?? db;
+  await database
     .delete(releaseArtists)
     .where(eq(releaseArtists.releaseId, releaseId));
 }
@@ -116,7 +138,12 @@ export async function getReleasesByArtist(
     offset?: number;
   }
 ): Promise<Array<{ releaseId: string; role: ArtistRole; isPrimary: boolean }>> {
-  const { limit = 100, offset = 0 } = options ?? {};
+  const { role, limit = 100, offset = 0 } = options ?? {};
+
+  const conditions = [eq(releaseArtists.artistId, artistId)];
+  if (role) {
+    conditions.push(eq(releaseArtists.role, role));
+  }
 
   return db
     .select({
@@ -125,7 +152,7 @@ export async function getReleasesByArtist(
       isPrimary: releaseArtists.isPrimary,
     })
     .from(releaseArtists)
-    .where(eq(releaseArtists.artistId, artistId))
+    .where(and(...conditions))
     .limit(limit)
     .offset(offset);
 }
