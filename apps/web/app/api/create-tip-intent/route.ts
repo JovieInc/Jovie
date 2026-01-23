@@ -1,11 +1,11 @@
 import crypto from 'node:crypto';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { env } from '@/lib/env-server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
+import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 import {
   type TipIntentPayload,
@@ -73,13 +73,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!env.STRIPE_SECRET_KEY) {
-      return NextResponse.json(
-        { error: 'Stripe not configured' },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
-    }
-
     const parsedBody = await parseJsonBody<unknown>(req, {
       route: 'POST /api/create-tip-intent',
       headers: NO_STORE_HEADERS,
@@ -107,7 +100,6 @@ export async function POST(req: NextRequest) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
     // Convert to cents with overflow protection
     const amountInCents = amountToCents(amount);
