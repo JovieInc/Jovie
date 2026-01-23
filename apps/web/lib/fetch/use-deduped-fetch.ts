@@ -352,13 +352,11 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
         const data = results.map(r =>
           r.status === 'fulfilled' ? r.value : null
         );
-        const errors = results.map(r =>
-          r.status === 'rejected'
-            ? r.reason instanceof Error
-              ? r.reason.message
-              : 'Unknown error'
-            : null
-        );
+        const errors = results.map(r => {
+          if (r.status !== 'rejected') return null;
+          if (r.reason instanceof Error) return r.reason.message;
+          return 'Unknown error';
+        });
 
         setState({
           data,

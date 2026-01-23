@@ -217,7 +217,9 @@ function ProviderCopyButton({
         />
       </span>
       <span className='line-clamp-1'>
-        {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
+        {isCopied && 'Copied!'}
+        {!isCopied && isManual && 'Custom'}
+        {!isCopied && !isManual && 'Detected'}
       </span>
     </button>
   );
