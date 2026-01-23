@@ -162,6 +162,131 @@ export interface UnifiedTableProps<TData> {
 }
 
 /**
+ * Props for the memoized TableRow component
+ */
+interface TableRowProps<TData> {
+  row: Row<TData>;
+  rowIndex: number;
+  focusedIndex: number;
+  shouldEnableKeyboardNav: boolean;
+  hasRowClick: boolean;
+  getRowClassName?: (row: TData, index: number) => string;
+  onRowClick: (rowData: TData, rowIndex: number) => void;
+  onKeyDown: (
+    event: React.KeyboardEvent,
+    rowIndex: number,
+    rowData: TData
+  ) => void;
+  onFocus: (rowIndex: number) => void;
+  onContextMenu: (rowData: TData, event: React.MouseEvent) => void;
+  setRowRef: (index: number, el: HTMLTableRowElement | null) => void;
+  // Virtualization props (optional)
+  shouldVirtualize?: boolean;
+  virtualItem?: VirtualItem;
+  measureElement?: (el: HTMLTableRowElement) => void;
+}
+
+/**
+ * Memoized table row component to prevent unnecessary re-renders
+ * Handles click, keyboard, focus, and context menu events efficiently
+ */
+const TableRowComponent = React.memo(function TableRowComponent<TData>({
+  row,
+  rowIndex,
+  focusedIndex,
+  shouldEnableKeyboardNav,
+  hasRowClick,
+  getRowClassName,
+  onRowClick,
+  onKeyDown,
+  onFocus,
+  onContextMenu,
+  setRowRef,
+  shouldVirtualize,
+  virtualItem,
+  measureElement,
+}: TableRowProps<TData>) {
+  const rowData = row.original as TData;
+
+  const handleClick = useCallback(() => {
+    onRowClick(rowData, rowIndex);
+  }, [onRowClick, rowData, rowIndex]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      onKeyDown(e, rowIndex, rowData);
+    },
+    [onKeyDown, rowIndex, rowData]
+  );
+
+  const handleFocus = useCallback(() => {
+    onFocus(rowIndex);
+  }, [onFocus, rowIndex]);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      onContextMenu(rowData, e);
+    },
+    [onContextMenu, rowData]
+  );
+
+  const handleRef = useCallback(
+    (el: HTMLTableRowElement | null) => {
+      setRowRef(rowIndex, el);
+      if (shouldVirtualize && el && measureElement) {
+        measureElement(el);
+      }
+    },
+    [setRowRef, rowIndex, shouldVirtualize, measureElement]
+  );
+
+  return (
+    <tr
+      ref={handleRef}
+      data-index={rowIndex}
+      tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
+      className={cn(
+        presets.tableRow,
+        hasRowClick && 'cursor-pointer',
+        shouldEnableKeyboardNav &&
+          'focus-visible:outline-none focus-visible:bg-surface-2',
+        focusedIndex === rowIndex && 'bg-surface-2',
+        getRowClassName?.(rowData, rowIndex)
+      )}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
+      onMouseEnter={handleFocus}
+      onContextMenu={handleContextMenu}
+      style={
+        shouldVirtualize && virtualItem
+          ? {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualItem.start}px)`,
+            }
+          : undefined
+      }
+    >
+      {row.getVisibleCells().map(cell => (
+        <td
+          key={cell.id}
+          className={presets.tableCell}
+          style={{
+            width:
+              cell.column.getSize() !== 150 ? cell.column.getSize() : undefined,
+          }}
+        >
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </td>
+      ))}
+    </tr>
+  );
+}) as <TData>(props: TableRowProps<TData>) => React.ReactElement;
+
+/**
  * UnifiedTable - TanStack Table wrapper with virtualization and atomic design
  *
  * Features:
@@ -347,6 +472,43 @@ export function UnifiedTable<TData>({
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
 
+  // Memoized row event handlers - stable references that don't change per-row
+  const handleRowClick = useCallback(
+    (rowData: TData, rowIndex: number) => {
+      onRowClick?.(rowData);
+      setFocusedIndex(rowIndex);
+    },
+    [onRowClick, setFocusedIndex]
+  );
+
+  const handleRowFocus = useCallback(
+    (rowIndex: number) => {
+      if (shouldEnableKeyboardNav) {
+        setFocusedIndex(rowIndex);
+      }
+    },
+    [shouldEnableKeyboardNav, setFocusedIndex]
+  );
+
+  const handleRowContextMenu = useCallback(
+    (rowData: TData, event: React.MouseEvent) => {
+      onRowContextMenu?.(rowData, event);
+    },
+    [onRowContextMenu]
+  );
+
+  // Stable ref setter for row elements
+  const setRowRef = useCallback(
+    (index: number, el: HTMLTableRowElement | null) => {
+      if (el) {
+        rowRefs.current.set(index, el);
+      } else {
+        rowRefs.current.delete(index);
+      }
+    },
+    []
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -487,57 +649,22 @@ export function UnifiedTable<TData>({
 
                   const rowData = row.original as TData;
 
-                  // Build row element
+                  // Build row element using memoized component
                   const rowElement = (
-                    <tr
+                    <TableRowComponent
                       key={row.id}
-                      ref={el => {
-                        if (el) {
-                          rowRefs.current.set(index, el);
-                        } else {
-                          rowRefs.current.delete(index);
-                        }
-                      }}
-                      tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
-                      className={cn(
-                        presets.tableRow,
-                        onRowClick && 'cursor-pointer',
-                        shouldEnableKeyboardNav &&
-                          'focus-visible:outline-none focus-visible:bg-surface-2',
-                        focusedIndex === index && 'bg-surface-2',
-                        getRowClassName?.(rowData, index)
-                      )}
-                      onClick={() => {
-                        onRowClick?.(rowData);
-                        setFocusedIndex(index);
-                      }}
-                      onKeyDown={e => handleKeyDown(e, index, rowData)}
-                      onFocus={() =>
-                        shouldEnableKeyboardNav && setFocusedIndex(index)
-                      }
-                      onMouseEnter={() =>
-                        shouldEnableKeyboardNav && setFocusedIndex(index)
-                      }
-                      onContextMenu={e => onRowContextMenu?.(rowData, e)}
-                    >
-                      {row.getVisibleCells().map(cell => (
-                        <td
-                          key={cell.id}
-                          className={presets.tableCell}
-                          style={{
-                            width:
-                              cell.column.getSize() !== 150
-                                ? cell.column.getSize()
-                                : undefined,
-                          }}
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </td>
-                      ))}
-                    </tr>
+                      row={row}
+                      rowIndex={index}
+                      focusedIndex={focusedIndex}
+                      shouldEnableKeyboardNav={shouldEnableKeyboardNav}
+                      hasRowClick={Boolean(onRowClick)}
+                      getRowClassName={getRowClassName}
+                      onRowClick={handleRowClick}
+                      onKeyDown={handleKeyDown}
+                      onFocus={handleRowFocus}
+                      onContextMenu={handleRowContextMenu}
+                      setRowRef={setRowRef}
+                    />
                   );
 
                   // Wrap with context menu if provided
@@ -629,71 +756,25 @@ export function UnifiedTable<TData>({
               return renderRow(rowData, rowIndex);
             }
 
-            // Default row renderer
+            // Default row renderer using memoized component
             const rowElement = (
-              <tr
+              <TableRowComponent
                 key={row.id}
-                ref={el => {
-                  // Store ref for keyboard navigation
-                  if (el) {
-                    rowRefs.current.set(rowIndex, el);
-                  } else {
-                    rowRefs.current.delete(rowIndex);
-                  }
-                  // Also handle virtualization measurement
-                  if (shouldVirtualize && el) {
-                    rowVirtualizer.measureElement(el);
-                  }
-                }}
-                data-index={rowIndex}
-                tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
-                className={cn(
-                  presets.tableRow,
-                  onRowClick && 'cursor-pointer',
-                  shouldEnableKeyboardNav &&
-                    'focus-visible:outline-none focus-visible:bg-surface-2',
-                  focusedIndex === rowIndex && 'bg-surface-2',
-                  getRowClassName?.(rowData, rowIndex)
-                )}
-                onClick={() => {
-                  onRowClick?.(rowData);
-                  setFocusedIndex(rowIndex);
-                }}
-                onKeyDown={e => handleKeyDown(e, rowIndex, rowData)}
-                onFocus={() =>
-                  shouldEnableKeyboardNav && setFocusedIndex(rowIndex)
-                }
-                onMouseEnter={() =>
-                  shouldEnableKeyboardNav && setFocusedIndex(rowIndex)
-                }
-                onContextMenu={e => onRowContextMenu?.(rowData, e)}
-                style={
-                  shouldVirtualize && virtualItem
-                    ? {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }
-                    : undefined
-                }
-              >
-                {row.getVisibleCells().map(cell => (
-                  <td
-                    key={cell.id}
-                    className={presets.tableCell}
-                    style={{
-                      width:
-                        cell.column.getSize() !== 150
-                          ? cell.column.getSize()
-                          : undefined,
-                    }}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
+                row={row}
+                rowIndex={rowIndex}
+                focusedIndex={focusedIndex}
+                shouldEnableKeyboardNav={shouldEnableKeyboardNav}
+                hasRowClick={Boolean(onRowClick)}
+                getRowClassName={getRowClassName}
+                onRowClick={handleRowClick}
+                onKeyDown={handleKeyDown}
+                onFocus={handleRowFocus}
+                onContextMenu={handleRowContextMenu}
+                setRowRef={setRowRef}
+                shouldVirtualize={shouldVirtualize}
+                virtualItem={virtualItem}
+                measureElement={rowVirtualizer.measureElement}
+              />
             );
 
             // Wrap with context menu if provided
