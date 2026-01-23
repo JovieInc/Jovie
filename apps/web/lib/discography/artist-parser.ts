@@ -59,6 +59,7 @@ export interface SpotifyArtistInput {
 /**
  * Pattern to match remix credits in track titles
  * Matches: "(X Remix)", "[X Remix]", "(Remixed by X)", "(X Mix)"
+ * Note: Complex pattern is intentional to parse multiple remix credit formats per music industry standards
  */
 const REMIX_PATTERN =
   /[([]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[)\]]/gi;
@@ -66,6 +67,7 @@ const REMIX_PATTERN =
 /**
  * Pattern to match featured artists in track titles
  * Matches: "(feat. X)", "(ft. X)", "(featuring X)", "feat. X", "ft. X"
+ * Note: Complex pattern is intentional to parse multiple featuring credit formats per music industry standards
  */
 const FEATURED_PATTERN =
   /(?:[([]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+))/gi;

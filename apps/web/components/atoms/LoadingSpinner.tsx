@@ -33,7 +33,7 @@ export function LoadingSpinner({
   const toneClass = toneClasses[tone];
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
+    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading spinner status
     <span
       role='status'
       aria-label={label}

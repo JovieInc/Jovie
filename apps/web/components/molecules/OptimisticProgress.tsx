@@ -112,7 +112,7 @@ export function OptimisticProgress({
   };
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for progress display
+    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for progress container
     <div className='space-y-3' aria-live='polite' role='status'>
       {/* Progress bar */}
       <div className='space-y-2'>

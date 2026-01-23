@@ -22,7 +22,7 @@ export function DashboardOverviewToolbar({
 
   return (
     <div className='flex items-center justify-end gap-2'>
-      {/* biome-ignore lint/a11y/useSemanticElements: fieldset not appropriate for segmented control */}
+      {/* biome-ignore lint/a11y/useSemanticElements: fieldset not appropriate for segmented button group */}
       <div
         role='group'
         aria-label='Dashboard window'

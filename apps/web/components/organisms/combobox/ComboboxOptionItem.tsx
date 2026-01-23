@@ -25,7 +25,7 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
       id={`option-${option.id}`}
     >
       {({ active, selected }) => (
-        // biome-ignore lint/a11y/useFocusableInteractive: Headless UI Combobox.Option handles interactivity
+        // biome-ignore lint/a11y/useFocusableInteractive: Headless UI Combobox.Option handles focus and interaction
         <div
           className='flex items-center space-x-3'
           role='option'

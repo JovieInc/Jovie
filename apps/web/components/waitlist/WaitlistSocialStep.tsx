@@ -73,7 +73,7 @@ export function WaitlistSocialStep({
         onKeyDown={onPlatformKeyDown}
       >
         {SOCIAL_PLATFORM_OPTIONS.map((option, index) => (
-          // biome-ignore lint/a11y/useSemanticElements: button element used with ARIA radio pattern for custom radio group
+          // biome-ignore lint/a11y/useSemanticElements: input[type=radio] not appropriate for custom styled button group
           <button
             key={option.value}
             ref={el => {

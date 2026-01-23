@@ -20,6 +20,7 @@ export function cleanBeaconsDisplayName(name: string): string {
       // Handle "on Beacons.ai" and variations
       .replace(/\s+on\s+Beacons(?:\.ai)?$/i, '')
       // Handle "'s Beacons.ai" and variations
+      // Note: [''] intentionally matches both U+0027 (') and U+2019 (') apostrophe variants
       .replace(/['']s\s+Beacons(?:\.ai)?$/i, '')
       // Handle just "Beacons" at the end
       .replace(/\s+Beacons(?:\.ai)?$/i, '')

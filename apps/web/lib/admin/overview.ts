@@ -274,9 +274,8 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
         lastIncidentAt = rawLastAt;
       } else if (rawLastAt != null) {
         lastIncidentAt = new Date(String(rawLastAt));
-      } else {
-        lastIncidentAt = null;
       }
+      // Note: else case is not needed since lastIncidentAt is already initialized to null
     } catch {
       DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
       console.warn(
