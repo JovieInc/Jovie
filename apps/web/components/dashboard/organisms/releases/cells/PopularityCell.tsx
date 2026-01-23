@@ -18,37 +18,41 @@ interface PopularityCellProps {
 export const PopularityCell = memo(function PopularityCell({
   popularity,
 }: PopularityCellProps) {
-  if (popularity === null || popularity === undefined) {
-    return <span className='text-xs text-tertiary-token'>-</span>;
-  }
-
-  if (!Number.isFinite(popularity)) {
-    return <span className='text-xs text-tertiary-token'>-</span>;
-  }
-
-  const clampedPopularity = Math.min(100, Math.max(0, popularity));
-  const displayPopularity = Math.round(clampedPopularity);
+  const isValid =
+    popularity !== null &&
+    popularity !== undefined &&
+    Number.isFinite(popularity);
+  const clampedPopularity = isValid
+    ? Math.min(100, Math.max(0, popularity!))
+    : 0;
+  const displayPopularity = isValid ? Math.round(clampedPopularity) : null;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type='button'
-          className='inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-spotify/50'
-          aria-label={`Spotify popularity ${displayPopularity} out of 100`}
-        >
-          <div className='h-2 w-12 overflow-hidden rounded-full bg-surface-3'>
-            <div
-              className='h-full rounded-full bg-brand-spotify transition-all'
-              style={{ width: `${clampedPopularity}%` }}
-            />
-          </div>
-        </button>
+        {isValid ? (
+          <button
+            type='button'
+            className='inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-spotify/50'
+            aria-label={`Spotify popularity ${displayPopularity} out of 100`}
+          >
+            <div className='h-2 w-12 overflow-hidden rounded-full bg-surface-3'>
+              <div
+                className='h-full rounded-full bg-brand-spotify transition-all'
+                style={{ width: `${clampedPopularity}%` }}
+              />
+            </div>
+          </button>
+        ) : (
+          <span className='text-xs text-tertiary-token'>-</span>
+        )}
       </TooltipTrigger>
-      <TooltipContent side='top' className='text-xs'>
-        <span className='font-medium'>{displayPopularity}</span>
-        <span className='text-secondary-token'>/100 popularity</span>
-      </TooltipContent>
+      {isValid && (
+        <TooltipContent side='top' className='text-xs'>
+          <span className='font-medium'>{displayPopularity}</span>
+          <span className='text-secondary-token'>/100 popularity</span>
+        </TooltipContent>
+      )}
     </Tooltip>
   );
 });
