@@ -11,6 +11,10 @@ const LEGAL_DOCS = {
     title: 'Terms of Service',
     file: path.join('content', 'legal', 'terms.md'),
   },
+  cookies: {
+    title: 'Cookie Policy',
+    file: path.join('content', 'legal', 'cookies.md'),
+  },
 } as const;
 
 export type LegalDocumentSlug = keyof typeof LEGAL_DOCS;
