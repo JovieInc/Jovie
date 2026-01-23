@@ -170,6 +170,78 @@ async function upsertAudienceMember(
   });
 }
 
+interface ArtistProfileResult {
+  profile: {
+    id: string;
+    displayName: string | null;
+    username: string | null;
+    creatorIsPro: boolean;
+    creatorClerkId: string | null;
+  };
+  dynamicEnabled: boolean;
+}
+
+/**
+ * Fetches artist profile and computes dynamic engagement status.
+ */
+async function fetchArtistProfile(
+  artist_id: string,
+  source: string | undefined
+): Promise<ArtistProfileResult | NotificationSubscribeDomainResponse> {
+  const [artistProfile] = await db
+    .select({
+      id: creatorProfiles.id,
+      displayName: creatorProfiles.displayName,
+      username: creatorProfiles.username,
+      creatorIsPro: users.isPro,
+      creatorClerkId: users.clerkId,
+    })
+    .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.id, artist_id))
+    .limit(1);
+
+  if (!artistProfile) {
+    await trackSubscribeError({
+      artist_id,
+      error_type: 'artist_not_found',
+      source,
+    });
+    return buildSubscribeNotFoundError();
+  }
+
+  const creatorIsPro = !!artistProfile.creatorIsPro;
+  const creatorClerkId =
+    typeof artistProfile.creatorClerkId === 'string'
+      ? artistProfile.creatorClerkId
+      : null;
+
+  const dynamicOverrideEnabled = creatorClerkId
+    ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+        userID: creatorClerkId,
+      })
+    : false;
+
+  const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
+
+  return {
+    profile: {
+      id: artistProfile.id,
+      displayName: artistProfile.displayName,
+      username: artistProfile.username,
+      creatorIsPro,
+      creatorClerkId,
+    },
+    dynamicEnabled,
+  };
+}
+
+function isArtistProfileResult(
+  result: ArtistProfileResult | NotificationSubscribeDomainResponse
+): result is ArtistProfileResult {
+  return 'profile' in result && 'dynamicEnabled' in result;
+}
+
 /**
  * Sends subscription confirmation email.
  */
@@ -235,41 +307,12 @@ export const subscribeToNotificationsDomain = async (
     const { artist_id, email, phone, channel, source, country_code, city } =
       result.data;
 
-    const [artistProfile] = await db
-      .select({
-        id: creatorProfiles.id,
-        displayName: creatorProfiles.displayName,
-        username: creatorProfiles.username,
-        creatorIsPro: users.isPro,
-        creatorClerkId: users.clerkId,
-      })
-      .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, artist_id))
-      .limit(1);
-
-    if (!artistProfile) {
-      await trackSubscribeError({
-        artist_id,
-        error_type: 'artist_not_found',
-        source,
-      });
-      return buildSubscribeNotFoundError();
+    const artistResult = await fetchArtistProfile(artist_id, source);
+    if (!isArtistProfileResult(artistResult)) {
+      return artistResult;
     }
-
-    const creatorIsPro = !!artistProfile.creatorIsPro;
-    const creatorClerkId =
-      typeof artistProfile.creatorClerkId === 'string'
-        ? artistProfile.creatorClerkId
-        : null;
-
-    const dynamicOverrideEnabled = creatorClerkId
-      ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
-          userID: creatorClerkId,
-        })
-      : false;
-
-    const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
+    const { profile: artistProfile, dynamicEnabled } = artistResult;
+    const creatorIsPro = artistProfile.creatorIsPro;
 
     const ipAddress = getForwardedIp(context.headers);
     const geoCountry =

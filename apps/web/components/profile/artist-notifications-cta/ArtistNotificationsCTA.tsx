@@ -172,6 +172,43 @@ function useImpressionTracking(
   }, [showsSubscribeForm, hasTrackedImpression, handle, variant]);
 }
 
+/**
+ * Get input configuration based on channel type.
+ */
+function getInputConfig(channel: 'email' | 'sms') {
+  return channel === 'sms'
+    ? {
+        type: 'tel' as const,
+        inputMode: 'numeric' as const,
+        placeholder: '(555) 123-4567',
+        autoComplete: 'tel-national',
+        maxLength: 32,
+        label: 'Phone number',
+      }
+    : {
+        type: 'email' as const,
+        inputMode: 'email' as const,
+        placeholder: 'your@email.com',
+        autoComplete: 'email',
+        maxLength: 254,
+        label: 'Email address',
+      };
+}
+
+/**
+ * Get display value for input based on channel.
+ */
+function getInputDisplayValue(
+  channel: 'email' | 'sms',
+  phoneInput: string,
+  emailInput: string,
+  dialCode: string
+): string {
+  return channel === 'sms'
+    ? formatPhoneDigitsForDisplay(phoneInput, dialCode)
+    : emailInput;
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -235,11 +272,32 @@ export function ArtistNotificationsCTA({
     return <SubscriptionSuccess />;
   }
 
+  const inputConfig = getInputConfig(channel);
+  const inputValue = getInputDisplayValue(
+    channel,
+    phoneInput,
+    emailInput,
+    country.dialCode
+  );
+
+  const handleInputChange = (value: string) => {
+    if (channel === 'sms') {
+      handlePhoneChange(value);
+    } else {
+      handleEmailChange(value);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsInputFocused(false);
+    handleFieldBlur();
+  };
+
   return (
     <div className='space-y-3'>
       <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
         <div className='flex items-center'>
-          {channel === 'sms' && shouldShowCountrySelector ? (
+          {shouldShowCountrySelector ? (
             <CountrySelector
               country={country}
               isOpen={isCountryOpen}
@@ -256,39 +314,24 @@ export function ArtistNotificationsCTA({
 
           <div className='flex-1 min-w-0'>
             <label htmlFor={inputId} className='sr-only'>
-              {channel === 'sms' ? 'Phone number' : 'Email address'}
+              {inputConfig.label}
             </label>
             <input
               ref={inputRef}
               id={inputId}
               aria-describedby={disclaimerId}
-              type={channel === 'sms' ? 'tel' : 'email'}
-              inputMode={channel === 'sms' ? 'numeric' : 'email'}
+              type={inputConfig.type}
+              inputMode={inputConfig.inputMode}
               className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
-              placeholder={
-                channel === 'sms' ? '(555) 123-4567' : 'your@email.com'
-              }
-              value={
-                channel === 'sms'
-                  ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
-                  : emailInput
-              }
-              onChange={event => {
-                if (channel === 'sms') {
-                  handlePhoneChange(event.target.value);
-                } else {
-                  handleEmailChange(event.target.value);
-                }
-              }}
+              placeholder={inputConfig.placeholder}
+              value={inputValue}
+              onChange={event => handleInputChange(event.target.value)}
               onFocus={() => setIsInputFocused(true)}
-              onBlur={() => {
-                setIsInputFocused(false);
-                handleFieldBlur();
-              }}
+              onBlur={handleInputBlur}
               onKeyDown={handleKeyDown}
               disabled={isSubmitting}
-              autoComplete={channel === 'sms' ? 'tel-national' : 'email'}
-              maxLength={channel === 'sms' ? 32 : 254}
+              autoComplete={inputConfig.autoComplete}
+              maxLength={inputConfig.maxLength}
               style={noFontSynthesisStyle}
             />
           </div>

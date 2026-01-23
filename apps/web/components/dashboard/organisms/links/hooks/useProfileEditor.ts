@@ -326,22 +326,11 @@ export function useProfileEditor(
   // Handle avatar upload using TanStack Query mutation
   const handleAvatarUpload = useCallback(
     async (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        avatarMutation.mutate(file, {
-          onSuccess: avatarUrl => {
-            setArtist(prev => {
-              if (!prev) return prev;
-              return { ...prev, image_url: avatarUrl };
-            });
-            toast.success('Profile photo updated');
-            router.refresh();
-            resolve(avatarUrl);
-          },
-          onError: error => {
-            reject(error);
-          },
-        });
-      });
+      const avatarUrl = await avatarMutation.mutateAsync(file);
+      setArtist(prev => (prev ? { ...prev, image_url: avatarUrl } : prev));
+      toast.success('Profile photo updated');
+      router.refresh();
+      return avatarUrl;
     },
     [avatarMutation, router]
   );

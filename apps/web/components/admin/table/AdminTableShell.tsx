@@ -47,6 +47,14 @@ export function AdminTableShell({
     const container = tableContainerRef.current;
     if (!container) return;
 
+    // Helper to update header elevation state
+    const updateHeaderElevation = () => {
+      rafIdRef.current = null;
+      const isScrolled = container.scrollTop > 0;
+      setHeaderElevated(prev => (prev !== isScrolled ? isScrolled : prev));
+      lastScrollTimeRef.current = Date.now();
+    };
+
     // Throttled scroll handler using requestAnimationFrame + time check
     const handleScroll = () => {
       const now = Date.now();
@@ -55,14 +63,7 @@ export function AdminTableShell({
       if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
         // Schedule one final update after throttle period ends
         if (rafIdRef.current === null) {
-          rafIdRef.current = requestAnimationFrame(() => {
-            rafIdRef.current = null;
-            const isScrolled = container.scrollTop > 0;
-            setHeaderElevated(prev =>
-              prev !== isScrolled ? isScrolled : prev
-            );
-            lastScrollTimeRef.current = Date.now();
-          });
+          rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
         }
         return;
       }
