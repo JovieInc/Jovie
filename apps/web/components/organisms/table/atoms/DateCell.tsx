@@ -2,7 +2,7 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import React from 'react';
-import { typography } from '../table.styles';
+import { cn, typography } from '../table.styles';
 
 interface DateCellProps {
   /**
@@ -80,7 +80,12 @@ export const DateCell = React.memo(function DateCell({
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          className={`${typography.cellTertiary} whitespace-nowrap ${date ? 'cursor-help' : ''} ${className || ''}`}
+          className={cn(
+            typography.cellTertiary,
+            'whitespace-nowrap',
+            date && 'cursor-help',
+            className
+          )}
         >
           {formatted}
         </span>

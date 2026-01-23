@@ -18,10 +18,7 @@ interface PopularityCellProps {
 export const PopularityCell = memo(function PopularityCell({
   popularity,
 }: PopularityCellProps) {
-  const isValidPopularity =
-    popularity !== null &&
-    popularity !== undefined &&
-    Number.isFinite(popularity);
+  const isValidPopularity = popularity != null && Number.isFinite(popularity);
 
   const clampedPopularity = isValidPopularity
     ? Math.min(100, Math.max(0, popularity))
