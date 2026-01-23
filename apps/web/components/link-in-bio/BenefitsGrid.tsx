@@ -77,6 +77,7 @@ export function BenefitsGrid() {
                 <div className='relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300 h-full'>
                   {/* Emoji and title */}
                   <div className='flex items-start gap-4 mb-6'>
+                    {/* NOSONAR S6819: Emoji needs role="img" for screen reader accessibility */}
                     <div
                       className='text-3xl'
                       role='img'

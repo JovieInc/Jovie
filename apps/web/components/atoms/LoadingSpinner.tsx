@@ -34,6 +34,7 @@ export function LoadingSpinner({
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading spinner status
+    // NOSONAR S6819: role="status" is correct for live announcements; <output> is for form calculation results
     <span
       role='status'
       aria-label={label}

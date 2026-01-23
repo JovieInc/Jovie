@@ -54,6 +54,7 @@ export function QRCode({
 
   if (hasError) {
     return (
+      // NOSONAR S6819: Fallback state container needs role="img" for accessibility
       <div
         role='img'
         aria-label={`${label} unavailable`}

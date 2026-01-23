@@ -39,6 +39,7 @@ export function JovieLogo({
 
   const logoContent = (
     <>
+      {/* NOSONAR S6819: SVG requires role="img" for accessibility; native <img> cannot render inline SVGs */}
       <svg
         xmlns='http://www.w3.org/2000/svg'
         xmlnsXlink='http://www.w3.org/1999/xlink'
@@ -81,6 +82,7 @@ export function JovieLogo({
   }
 
   return (
+    // NOSONAR S6819: Wrapper div with role="img" groups multiple SVG elements; native <img> can't group SVGs
     <div
       className={wrapperClasses}
       role='img'

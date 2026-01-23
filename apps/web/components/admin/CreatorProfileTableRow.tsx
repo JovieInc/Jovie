@@ -221,6 +221,7 @@ function CreatorProfileTableRowComponent({
     >
       <td className='w-14 px-4 py-3 align-middle'>
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox */}
+        {/* NOSONAR S6819: role="presentation" correctly hides wrapper; checkbox inside is the interactive element */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}

@@ -56,7 +56,7 @@ export function ContextMenuSubmenu({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: Submenu requires mouse events for hover behavior
+    // NOSONAR S6819: role="presentation" correctly hides wrapper; button inside is the interactive element
     <div
       className='relative'
       onMouseEnter={() => setIsOpen(true)}

@@ -98,6 +98,7 @@ export function SocialIcon({
 
   if (icon) {
     return (
+      // NOSONAR S6819: SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
       <svg
         className={iconClass}
         style={sizeStyle}

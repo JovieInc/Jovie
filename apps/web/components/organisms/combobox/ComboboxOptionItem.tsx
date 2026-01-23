@@ -25,7 +25,7 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
       id={`option-${option.id}`}
     >
       {({ active, selected }) => (
-        // biome-ignore lint/a11y/useFocusableInteractive: Headless UI Combobox.Option handles focus and interaction
+        // NOSONAR S6819: Custom option with rich content; native <option> can't render images
         <div
           className='flex items-center space-x-3'
           role='option'

@@ -119,6 +119,7 @@ export const YouTubeCrossCategoryPrompt = React.memo(
     const platformName = candidate.platform.name || candidate.platform.id;
 
     const content = (
+      // NOSONAR S6819: Inline prompt, not modal; <dialog> has modal behavior (backdrop, focus trap) not appropriate here
       <div
         className={`rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3 ${className ?? ''}`}
         role='dialog'

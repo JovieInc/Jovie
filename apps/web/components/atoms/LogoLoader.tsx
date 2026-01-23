@@ -22,7 +22,7 @@ export function LogoLoader({
   'aria-label': ariaLabel = 'Loading',
 }: LogoLoaderProps) {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading spinner status
+    // NOSONAR S6819: role="status" is correct for live announcements; <output> is for form calculation results
     <div
       role='status'
       aria-live='polite'

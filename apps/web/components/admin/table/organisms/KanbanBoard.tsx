@@ -194,6 +194,7 @@ function KanbanColumn<TData>({
       {/* Column Content */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drop zone requires drag event handlers */}
       {/* biome-ignore lint/a11y/useSemanticElements: fieldset not appropriate for kanban column layout */}
+      {/* NOSONAR S6819: role="group" is appropriate for kanban columns; <fieldset> has styling constraints */}
       <div
         ref={containerRef}
         className='flex-1 overflow-y-auto p-3'

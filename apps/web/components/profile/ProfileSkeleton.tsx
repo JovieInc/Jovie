@@ -8,7 +8,7 @@ import { Container } from '@/components/site/Container';
 
 export function ProfileSkeleton() {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading skeleton container
+    // NOSONAR S6819: role="status" is correct for loading states; <output> is for form calculation results
     <div
       className='min-h-screen bg-base text-primary-token transition-colors duration-200 relative overflow-hidden'
       role='status'

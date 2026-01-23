@@ -36,6 +36,7 @@ export function ProgressIndicator({
   };
 
   return (
+    // NOSONAR S6819: Multi-step progress with custom styling; native <progress> doesn't support step indicators
     <div
       className={`space-y-4 ${className}`}
       role='progressbar'

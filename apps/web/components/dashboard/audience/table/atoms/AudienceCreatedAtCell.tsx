@@ -29,7 +29,7 @@ export function AudienceCreatedAtCell({
       )}
     >
       <span className='line-clamp-1'>{formatLongDate(lastSeenAt)}</span>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for menu */}
+      {/* NOSONAR S6819: role="presentation" correctly hides wrapper; menu inside is the interactive element */}
       <div
         className={cn(
           'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',

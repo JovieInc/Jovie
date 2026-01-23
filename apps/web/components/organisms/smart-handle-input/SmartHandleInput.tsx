@@ -128,7 +128,7 @@ export function SmartHandleInput({
       </div>
 
       {/* Status message */}
-      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
+      {/* NOSONAR S6819: role="status" is correct for validation feedback; <output> is for form results */}
       <div
         className={`text-xs min-h-5 transition-all duration-300 ${getStatusClass()}`}
         id={statusId}

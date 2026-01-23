@@ -73,7 +73,7 @@ export function WaitlistSocialStep({
         onKeyDown={onPlatformKeyDown}
       >
         {SOCIAL_PLATFORM_OPTIONS.map((option, index) => (
-          // biome-ignore lint/a11y/useSemanticElements: input[type=radio] not appropriate for custom styled button group
+          // NOSONAR S6819: Custom pill-style radio buttons; native input[type=radio] can't be styled this way
           <button
             key={option.value}
             ref={el => {

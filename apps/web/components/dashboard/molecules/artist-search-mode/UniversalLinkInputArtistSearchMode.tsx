@@ -164,6 +164,7 @@ export function UniversalLinkInputArtistSearchMode({
             </div>
           )}
 
+          {/* NOSONAR S6819: Custom autocomplete requires ARIA listbox pattern; native <select> can't support search or custom styling */}
           {results.length > 0 && (
             <div
               ref={resultsListRef}
@@ -171,6 +172,7 @@ export function UniversalLinkInputArtistSearchMode({
               role='listbox'
               className='max-h-64 overflow-y-auto'
             >
+              {/* NOSONAR S6819: Custom option with rich content; native <option> can't render images */}
               {results.map((artist, index) => (
                 <div
                   key={artist.id}
