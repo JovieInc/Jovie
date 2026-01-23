@@ -10,7 +10,14 @@ import {
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
 import Link from 'next/link';
-import { memo, type ReactNode, useCallback, useState } from 'react';
+import {
+  memo,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorProfileSocialLinks } from '@/components/admin/CreatorProfileSocialLinks';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
@@ -180,6 +187,13 @@ function CreatorProfileTableRowComponent({
     'displayName' in profile ? (profile.displayName ?? null) : null;
 
   const [copySuccess, setCopySuccess] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const handleCopyClaimLink = useCallback(async () => {
     if (!profile.claimToken) return;
@@ -190,7 +204,8 @@ function CreatorProfileTableRowComponent({
 
     if (success) {
       setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
     }
   }, [profile.claimToken]);
 

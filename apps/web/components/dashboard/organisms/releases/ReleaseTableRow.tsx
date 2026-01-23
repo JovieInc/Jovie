@@ -10,7 +10,7 @@ import {
 } from '@jovie/ui';
 import { PencilLine, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -299,12 +299,20 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
   artistName,
 }: Readonly<ReleaseTableRowProps>) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
       await onCopy(path, label, testId);
       setCopiedId(testId);
-      setTimeout(() => setCopiedId(null), 2000);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
     },
     [onCopy]
   );

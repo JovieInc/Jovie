@@ -7,7 +7,7 @@
  */
 
 import { Check, Copy, ExternalLink, IdCard, RefreshCw, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -33,11 +33,21 @@ export function ContactSidebarHeader({
   const showActions = hasContact && contact?.username;
   const [isCopied, setIsCopied] = useState(false);
   const [isClerkIdCopied, setIsClerkIdCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clerkIdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (clerkIdTimeoutRef.current) clearTimeout(clerkIdTimeoutRef.current);
+    };
+  }, []);
 
   const handleCopyProfileUrl = useCallback(() => {
     onCopyProfileUrl();
     setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [onCopyProfileUrl]);
 
   const handleCopyClerkId = async () => {
@@ -46,7 +56,11 @@ export function ContactSidebarHeader({
       await navigator.clipboard.writeText(contact.clerkId);
       notifications.success('Clerk ID copied');
       setIsClerkIdCopied(true);
-      setTimeout(() => setIsClerkIdCopied(false), 2000);
+      if (clerkIdTimeoutRef.current) clearTimeout(clerkIdTimeoutRef.current);
+      clerkIdTimeoutRef.current = setTimeout(
+        () => setIsClerkIdCopied(false),
+        2000
+      );
     } catch {
       notifications.error('Failed to copy');
     }
