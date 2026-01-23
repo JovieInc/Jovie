@@ -1,5 +1,5 @@
 /**
- * Content smart link loading skeleton
+ * Release smart link loading skeleton
  * Matches the landing page layout with artwork and provider buttons
  */
 
@@ -8,7 +8,7 @@ const PROVIDER_SKELETON_KEYS = Array.from(
   (_, i) => `provider-skeleton-${i + 1}`
 );
 
-export default function ContentLoading() {
+export default function ReleaseLoading() {
   return (
     <div className='min-h-screen bg-[#0D0E12] flex items-center justify-center p-4'>
       <div className='w-full max-w-md text-center space-y-8'>

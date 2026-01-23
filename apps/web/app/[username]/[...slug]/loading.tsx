@@ -1,6 +1,6 @@
 /**
- * Content smart link loading skeleton
- * Matches the landing page layout with artwork and provider buttons
+ * Catch-all content loading skeleton
+ * Used for any nested paths under username
  */
 
 const PROVIDER_SKELETON_KEYS = Array.from(
@@ -8,7 +8,7 @@ const PROVIDER_SKELETON_KEYS = Array.from(
   (_, i) => `provider-skeleton-${i + 1}`
 );
 
-export default function ContentLoading() {
+export default function CatchAllLoading() {
   return (
     <div className='min-h-screen bg-[#0D0E12] flex items-center justify-center p-4'>
       <div className='w-full max-w-md text-center space-y-8'>
