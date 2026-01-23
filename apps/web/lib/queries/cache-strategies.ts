@@ -20,26 +20,23 @@ const HOUR = 60 * MINUTE;
  * Real-time data that should always be fresh.
  * Use for: notifications, live activity feeds, real-time analytics
  *
- * **IMPORTANT: Polling control**
- * This preset enables 30s polling via `refetchInterval`. To avoid unnecessary
- * CPU/memory usage, callers MUST control polling in their useQuery calls:
+ * **Polling is opt-in:** Add `refetchInterval` explicitly if needed.
  *
  * @example
- * // Option 1: Disable query when not needed (stops all fetching including polling)
+ * // Without polling (default) - refetches on mount and focus only
  * useQuery({
  *   ...REALTIME_CACHE,
  *   queryKey: [...],
  *   queryFn: ...,
- *   enabled: isTabVisible && isComponentMounted,
  * });
  *
  * @example
- * // Option 2: Dynamically disable polling while keeping query active
+ * // With polling - add refetchInterval explicitly
  * useQuery({
  *   ...REALTIME_CACHE,
  *   queryKey: [...],
  *   queryFn: ...,
- *   refetchInterval: isPaused ? false : 30 * 1000,
+ *   refetchInterval: 30 * 1000, // Poll every 30s
  * });
  */
 export const REALTIME_CACHE: Partial<UseQueryOptions> = {
@@ -47,8 +44,8 @@ export const REALTIME_CACHE: Partial<UseQueryOptions> = {
   gcTime: 5 * MINUTE,
   refetchOnMount: 'always',
   refetchOnWindowFocus: true,
-  refetchInterval: 30 * SECOND, // Poll every 30s - see JSDoc for control guidance
-  refetchIntervalInBackground: false, // Stop polling when tab is not visible
+  // Note: refetchInterval is opt-in - add explicitly if polling is needed
+  refetchIntervalInBackground: false,
 };
 
 /**

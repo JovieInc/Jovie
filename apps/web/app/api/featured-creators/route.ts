@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const revalidate = 3600; // Cache results for 1 hour
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;

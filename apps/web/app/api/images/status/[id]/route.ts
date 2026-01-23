@@ -4,7 +4,7 @@ import { and, db, eq, profilePhotos } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { logger } from '@/lib/utils/logger';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 

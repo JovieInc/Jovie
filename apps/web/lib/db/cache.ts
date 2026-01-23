@@ -101,6 +101,34 @@ export interface CacheOptions {
 }
 
 /**
+ * Try to read a value from Redis cache.
+ * Returns null if Redis is unavailable or read fails.
+ */
+async function tryReadFromRedis<T>(cacheKey: string): Promise<T | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    return await redis.get<T>(cacheKey);
+  } catch (error) {
+    console.warn('[db-cache] Redis read failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Write a value to Redis cache (fire-and-forget).
+ */
+function writeToRedis<T>(cacheKey: string, value: T, ttlSeconds: number): void {
+  const redis = getRedis();
+  if (!redis) return;
+
+  redis.set(cacheKey, value, { ex: ttlSeconds }).catch(err => {
+    console.warn('[db-cache] Redis write failed:', err);
+  });
+}
+
+/**
  * Cache a query result with automatic multi-layer caching.
  *
  * Cache layers (checked in order):
@@ -124,6 +152,7 @@ export async function cacheQuery<T>(
     skipMemoryCache = false,
   } = options;
   const cacheKey = `${CACHE_PREFIX}${key}`;
+  const ttlMs = ttlSeconds * 1000;
 
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
@@ -135,21 +164,13 @@ export async function cacheQuery<T>(
 
   // Layer 2: Try Redis if enabled
   if (useRedis) {
-    const redis = getRedis();
-    if (redis) {
-      try {
-        const redisResult = await redis.get<T>(cacheKey);
-        if (redisResult !== null) {
-          // Populate memory cache from Redis hit
-          if (!skipMemoryCache) {
-            memoryCache.set(cacheKey, redisResult, ttlSeconds * 1000);
-          }
-          return redisResult;
-        }
-      } catch (error) {
-        console.warn('[db-cache] Redis read failed:', error);
-        // Fall through to query execution
+    const redisResult = await tryReadFromRedis<T>(cacheKey);
+    if (redisResult !== null) {
+      // Populate memory cache from Redis hit
+      if (!skipMemoryCache) {
+        memoryCache.set(cacheKey, redisResult, ttlMs);
       }
+      return redisResult;
     }
   }
 
@@ -158,16 +179,11 @@ export async function cacheQuery<T>(
 
   // Populate caches (fire-and-forget for non-blocking)
   if (!skipMemoryCache) {
-    memoryCache.set(cacheKey, result, ttlSeconds * 1000);
+    memoryCache.set(cacheKey, result, ttlMs);
   }
 
   if (useRedis) {
-    const redis = getRedis();
-    if (redis) {
-      redis.set(cacheKey, result, { ex: ttlSeconds }).catch(err => {
-        console.warn('[db-cache] Redis write failed:', err);
-      });
-    }
+    writeToRedis(cacheKey, result, ttlSeconds);
   }
 
   return result;

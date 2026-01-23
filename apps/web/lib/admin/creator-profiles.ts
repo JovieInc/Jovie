@@ -174,6 +174,121 @@ function mapRowToProfile(
   };
 }
 
+/**
+ * Backfill claim tokens for unclaimed profiles that don't have one.
+ * Updates the database and returns a map of profile IDs to their new tokens.
+ */
+async function backfillMissingClaimTokens(
+  profiles: Array<{
+    id: string;
+    isClaimed: boolean | null;
+    claimToken: string | null;
+  }>
+): Promise<Map<string, { token: string; expiresAt: Date }>> {
+  const needsToken = profiles.filter(row => !row.isClaimed && !row.claimToken);
+  const tokensById = new Map<string, { token: string; expiresAt: Date }>();
+
+  if (needsToken.length === 0) {
+    return tokensById;
+  }
+
+  await Promise.all(
+    needsToken.map(async row => {
+      const token = randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
+      tokensById.set(row.id, { token, expiresAt });
+
+      await db
+        .update(creatorProfiles)
+        .set({
+          claimToken: token,
+          claimTokenExpiresAt: expiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, row.id));
+    })
+  );
+
+  return tokensById;
+}
+
+/**
+ * Fetches confidence scores and social links for a list of profile IDs.
+ */
+async function fetchRelatedProfileData(profileIds: string[]): Promise<{
+  confidenceMap: Map<string, number>;
+  socialLinksMap: Map<
+    string,
+    Array<{
+      id: string;
+      platform: string;
+      platformType: string;
+      url: string;
+      displayText: string | null;
+    }>
+  >;
+}> {
+  const confidenceMap = new Map<string, number>();
+  const socialLinksMap = new Map<
+    string,
+    Array<{
+      id: string;
+      platform: string;
+      platformType: string;
+      url: string;
+      displayText: string | null;
+    }>
+  >();
+
+  if (profileIds.length === 0) {
+    return { confidenceMap, socialLinksMap };
+  }
+
+  const [confidenceRows, socialLinksRows] = await Promise.all([
+    db
+      .select({
+        creatorProfileId: socialLinks.creatorProfileId,
+        averageConfidence: drizzleSql`AVG(${socialLinks.confidence})`,
+      })
+      .from(socialLinks)
+      .where(inArray(socialLinks.creatorProfileId, profileIds))
+      .groupBy(socialLinks.creatorProfileId),
+    db
+      .select({
+        id: socialLinks.id,
+        creatorProfileId: socialLinks.creatorProfileId,
+        platform: socialLinks.platform,
+        platformType: socialLinks.platformType,
+        url: socialLinks.url,
+        displayText: socialLinks.displayText,
+      })
+      .from(socialLinks)
+      .where(inArray(socialLinks.creatorProfileId, profileIds)),
+  ]);
+
+  for (const row of confidenceRows) {
+    const confidence = parseConfidenceValue(row.averageConfidence);
+    if (confidence !== null) {
+      confidenceMap.set(row.creatorProfileId, confidence);
+    }
+  }
+
+  for (const link of socialLinksRows) {
+    const existing = socialLinksMap.get(link.creatorProfileId) ?? [];
+    existing.push({
+      id: link.id,
+      platform: link.platform,
+      platformType: link.platformType,
+      url: link.url,
+      displayText: link.displayText,
+    });
+    socialLinksMap.set(link.creatorProfileId, existing);
+  }
+
+  return { confidenceMap, socialLinksMap };
+}
+
 export async function getAdminCreatorProfiles(
   params: AdminCreatorProfilesParams = {}
 ): Promise<AdminCreatorProfilesResult> {
@@ -239,100 +354,21 @@ export async function getAdminCreatorProfiles(
     // Legacy backfill: Ensure unclaimed profiles have a claim token.
     // NOTE: New profiles should have tokens generated at creation time.
     // This backfill is temporary for legacy rows without tokens.
-    const needsToken = pageRows.filter(
-      row => !row.isClaimed && !row.claimToken
-    );
+    const tokensById = await backfillMissingClaimTokens(pageRows);
 
-    if (needsToken.length > 0) {
-      const tokensById = new Map<string, { token: string; expiresAt: Date }>();
-
-      await Promise.all(
-        needsToken.map(async row => {
-          const token = randomUUID();
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
-          tokensById.set(row.id, { token, expiresAt });
-
-          await db
-            .update(creatorProfiles)
-            .set({
-              claimToken: token,
-              claimTokenExpiresAt: expiresAt,
-              updatedAt: new Date(),
-            })
-            .where(eq(creatorProfiles.id, row.id));
-        })
-      );
-
-      // Update in-memory rows so callers immediately see the new tokens.
-      for (const row of pageRows) {
-        const tokenData = tokensById.get(row.id);
-        if (tokenData) {
-          (row as { claimToken?: string | null }).claimToken = tokenData.token;
-          (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
-            tokenData.expiresAt;
-        }
+    // Update in-memory rows so callers immediately see the new tokens.
+    for (const row of pageRows) {
+      const tokenData = tokensById.get(row.id);
+      if (tokenData) {
+        (row as { claimToken?: string | null }).claimToken = tokenData.token;
+        (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
+          tokenData.expiresAt;
       }
     }
 
     const profileIds = pageRows.map(row => row.id);
-    const confidenceMap = new Map<string, number>();
-    const socialLinksMap = new Map<
-      string,
-      Array<{
-        id: string;
-        platform: string;
-        platformType: string;
-        url: string;
-        displayText: string | null;
-      }>
-    >();
-
-    if (profileIds.length > 0) {
-      const [confidenceRows, socialLinksRows] = await Promise.all([
-        // Fetch confidence scores
-        db
-          .select({
-            creatorProfileId: socialLinks.creatorProfileId,
-            averageConfidence: drizzleSql`AVG(${socialLinks.confidence})`,
-          })
-          .from(socialLinks)
-          .where(inArray(socialLinks.creatorProfileId, profileIds))
-          .groupBy(socialLinks.creatorProfileId),
-        // Fetch social links
-        db
-          .select({
-            id: socialLinks.id,
-            creatorProfileId: socialLinks.creatorProfileId,
-            platform: socialLinks.platform,
-            platformType: socialLinks.platformType,
-            url: socialLinks.url,
-            displayText: socialLinks.displayText,
-          })
-          .from(socialLinks)
-          .where(inArray(socialLinks.creatorProfileId, profileIds)),
-      ]);
-
-      for (const row of confidenceRows) {
-        const confidence = parseConfidenceValue(row.averageConfidence);
-        if (confidence !== null) {
-          confidenceMap.set(row.creatorProfileId, confidence);
-        }
-      }
-
-      // Group social links by creator profile ID
-      for (const link of socialLinksRows) {
-        const existing = socialLinksMap.get(link.creatorProfileId) ?? [];
-        existing.push({
-          id: link.id,
-          platform: link.platform,
-          platformType: link.platformType,
-          url: link.url,
-          displayText: link.displayText,
-        });
-        socialLinksMap.set(link.creatorProfileId, existing);
-      }
-    }
+    const { confidenceMap, socialLinksMap } =
+      await fetchRelatedProfileData(profileIds);
 
     return {
       profiles: pageRows.map(row =>
