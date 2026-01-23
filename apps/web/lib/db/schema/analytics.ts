@@ -64,6 +64,15 @@ export const audienceMembers = pgTable(
     creatorProfileFingerprintUnique: uniqueIndex(
       'audience_members_creator_profile_id_fingerprint_unique'
     ).on(table.creatorProfileId, table.fingerprint),
+    creatorProfileLastSeenIdx: index(
+      'audience_members_creator_profile_id_last_seen_at_idx'
+    ).on(table.creatorProfileId, table.lastSeenAt),
+    creatorProfileUpdatedIdx: index(
+      'audience_members_creator_profile_id_updated_at_idx'
+    ).on(table.creatorProfileId, table.updatedAt),
+    retentionIdx: index('audience_members_retention_idx')
+      .on(table.lastSeenAt)
+      .where(sql`type = 'anonymous' AND email IS NULL AND phone IS NULL`),
   })
 );
 
@@ -104,6 +113,7 @@ export const clickEvents = pgTable(
     creatorProfileIsBotCreatedAtIdx: index(
       'click_events_creator_profile_id_is_bot_created_at_idx'
     ).on(table.creatorProfileId, table.isBot, table.createdAt),
+    createdAtIdx: index('click_events_created_at_idx').on(table.createdAt),
     // Performance index: analytics aggregation by link type
     linkTypeAnalyticsIndex: index('idx_click_events_link_type').on(
       table.creatorProfileId,
@@ -156,6 +166,12 @@ export const notificationSubscriptions = pgTable(
     contactRequired: check(
       'notification_subscriptions_contact_required',
       sql`${table.email} IS NOT NULL OR ${table.phone} IS NOT NULL`
+    ),
+    creatorProfileCreatedAtIdx: index(
+      'notification_subscriptions_creator_profile_id_created_at_idx'
+    ).on(table.creatorProfileId, table.createdAt),
+    createdAtIdx: index('notification_subscriptions_created_at_idx').on(
+      table.createdAt
     ),
   })
 );
