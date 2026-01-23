@@ -163,7 +163,8 @@ export default async function RootLayout({
   try {
     var ls = localStorage.getItem('jovie-theme');
     var mql = window.matchMedia('(prefers-color-scheme: dark)');
-    var pref = ls && ls !== 'system' ? ls : (mql.matches ? 'dark' : 'light');
+    var systemPref = mql.matches ? 'dark' : 'light';
+    var pref = (ls && ls !== 'system') ? ls : systemPref;
     var root = document.documentElement;
     if (pref === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
   } catch (e) { /* Theme detection failed - defaults will apply */ }
