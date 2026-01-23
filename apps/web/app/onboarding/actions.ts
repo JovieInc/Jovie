@@ -8,6 +8,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
 import { publicEnv } from '@/lib/env-public';
@@ -462,6 +463,10 @@ export async function completeOnboarding({
       },
       { isolationLevel: 'serializable' }
     );
+
+    // Immediately invalidate user state cache so middleware sees fresh state
+    // This prevents stale cache from causing redirect loops
+    await invalidateProxyUserStateCache(userId);
 
     // Step 7: Avatar upload (fire-and-forget, background processing)
     // Avatar upload runs in background - don't block onboarding completion

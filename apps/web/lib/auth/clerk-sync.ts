@@ -4,6 +4,7 @@ import { clerkClient } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { db } from '@/lib/db';
 import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
@@ -231,6 +232,9 @@ export async function handleClerkUserDeleted(
         updatedAt: now,
       })
       .where(eq(users.id, dbUser.id));
+
+    // Invalidate user state cache so middleware reflects deletion immediately
+    await invalidateProxyUserStateCache(clerkUserId);
 
     // Log the action if we have an admin context
     if (adminUserId) {
