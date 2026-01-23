@@ -244,7 +244,7 @@ export function OnboardingHandleStep({
           </AuthButton>
         </form>
 
-        {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for error message */}
+        {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for error hint */}
         <div
           className={FORM_LAYOUT.footerHint}
           role='status'

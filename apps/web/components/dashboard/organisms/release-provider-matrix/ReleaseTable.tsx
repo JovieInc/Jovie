@@ -7,12 +7,7 @@ import {
 } from '@tanstack/react-table';
 import { useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import {
-  AvailabilityCell,
-  PopularityCell,
-  ReleaseCell,
-  SmartLinkCell,
-} from '@/components/dashboard/organisms/releases/cells';
+// Cell components are now used via factory functions in ./utils/column-renderers
 import {
   type ContextMenuItemType,
   type HeaderBulkAction,
@@ -27,9 +22,13 @@ import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import {
   createActionsCellRenderer,
   createActionsHeaderRenderer,
+  createAvailabilityCellRenderer,
+  createReleaseCellRenderer,
   createReleaseHeaderRenderer,
   createSelectCellRenderer,
   createSelectHeaderRenderer,
+  createSmartLinkCellRenderer,
+  renderPopularityCell,
   renderReleaseDateCell,
 } from './utils/column-renderers';
 
@@ -229,9 +228,7 @@ export function ReleaseTable({
           bulkActions,
           onClearSelection
         ),
-        cell: ({ row }) => (
-          <ReleaseCell release={row.original} artistName={artistName} />
-        ),
+        cell: createReleaseCellRenderer(artistName),
         size: 280,
         enableSorting: true,
       }),
@@ -240,15 +237,12 @@ export function ReleaseTable({
       columnHelper.display({
         id: 'availability',
         header: 'Availability',
-        cell: ({ row }) => (
-          <AvailabilityCell
-            release={row.original}
-            allProviders={allProviders}
-            providerConfig={providerConfig}
-            onCopy={onCopy}
-            onAddUrl={onAddUrl}
-            isAddingUrl={isAddingUrl}
-          />
+        cell: createAvailabilityCellRenderer(
+          allProviders,
+          providerConfig,
+          onCopy,
+          onAddUrl,
+          isAddingUrl
         ),
         size: 120,
       }),
@@ -257,9 +251,7 @@ export function ReleaseTable({
       columnHelper.display({
         id: 'smartLink',
         header: 'Smart link',
-        cell: ({ row }) => (
-          <SmartLinkCell release={row.original} onCopy={onCopy} />
-        ),
+        cell: createSmartLinkCellRenderer(onCopy),
         size: 180,
       }),
 
@@ -276,7 +268,7 @@ export function ReleaseTable({
       columnHelper.accessor('spotifyPopularity', {
         id: 'popularity',
         header: 'Popularity',
-        cell: ({ getValue }) => <PopularityCell popularity={getValue()} />,
+        cell: renderPopularityCell,
         size: 80,
         enableSorting: true,
       }),

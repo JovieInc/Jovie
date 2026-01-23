@@ -3,6 +3,12 @@ import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
+  AvailabilityCell,
+  PopularityCell,
+  ReleaseCell,
+  SmartLinkCell,
+} from '@/components/dashboard/organisms/releases/cells';
+import {
   type ContextMenuItemType,
   convertContextMenuItems,
   DateCell,
@@ -10,7 +16,7 @@ import {
   HeaderBulkActions,
   TableCheckboxCell,
 } from '@/components/organisms/table';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 // Date format options (extracted to prevent inline object creation)
 export const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
@@ -165,4 +171,73 @@ export function createActionsCellRenderer(
       </div>
     );
   };
+}
+
+// Provider config type for availability cell
+interface ProviderConfig {
+  label: string;
+  accent: string;
+}
+
+/**
+ * Creates a cell renderer for the release column
+ */
+export function createReleaseCellRenderer(artistName?: string | null) {
+  return function ReleaseCellRenderer({
+    row,
+  }: CellContext<ReleaseViewModel, unknown>) {
+    return <ReleaseCell release={row.original} artistName={artistName} />;
+  };
+}
+
+/**
+ * Creates a cell renderer for the availability column
+ */
+export function createAvailabilityCellRenderer(
+  allProviders: ProviderKey[],
+  providerConfig: Record<ProviderKey, ProviderConfig>,
+  onCopy: (path: string, label: string, testId: string) => Promise<string>,
+  onAddUrl?: (
+    releaseId: string,
+    provider: ProviderKey,
+    url: string
+  ) => Promise<void>,
+  isAddingUrl?: boolean
+) {
+  return function AvailabilityCellRenderer({
+    row,
+  }: CellContext<ReleaseViewModel, unknown>) {
+    return (
+      <AvailabilityCell
+        release={row.original}
+        allProviders={allProviders}
+        providerConfig={providerConfig}
+        onCopy={onCopy}
+        onAddUrl={onAddUrl}
+        isAddingUrl={isAddingUrl}
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the smart link column
+ */
+export function createSmartLinkCellRenderer(
+  onCopy: (path: string, label: string, testId: string) => Promise<string>
+) {
+  return function SmartLinkCellRenderer({
+    row,
+  }: CellContext<ReleaseViewModel, unknown>) {
+    return <SmartLinkCell release={row.original} onCopy={onCopy} />;
+  };
+}
+
+/**
+ * Renders the popularity cell
+ */
+export function renderPopularityCell({
+  getValue,
+}: CellContext<ReleaseViewModel, number | null | undefined>) {
+  return <PopularityCell popularity={getValue()} />;
 }

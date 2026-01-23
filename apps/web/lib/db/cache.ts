@@ -21,7 +21,7 @@ const MAX_MEMORY_CACHE_SIZE = 5000;
  * Provides sub-millisecond access for hot data.
  */
 class InMemoryCache<T> {
-  private cache = new Map<string, { value: T; expiresAt: number }>();
+  private readonly cache = new Map<string, { value: T; expiresAt: number }>();
   private readonly maxSize: number;
 
   constructor(maxSize = MAX_MEMORY_CACHE_SIZE) {

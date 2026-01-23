@@ -435,6 +435,7 @@ export function WaitlistSpotifySearch({
           )}
 
           {/* Always-visible "Manually add URL" option */}
+
           <div
             role='option'
             id={`spotify-result-${manualAddIndex}`}

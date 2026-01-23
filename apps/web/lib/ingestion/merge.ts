@@ -72,19 +72,32 @@ async function processExistingLink(
 }
 
 // Insert a new link
-async function insertNewLink(
-  tx: DbType,
-  profileId: string,
-  link: { url: string; title?: string | null; sourcePlatform?: string },
+interface InsertNewLinkOptions {
+  tx: DbType;
+  profileId: string;
+  link: { url: string; title?: string | null; sourcePlatform?: string };
   detected: {
     normalizedUrl: string;
     platform: { id: string; category: string };
-  },
-  sortOrder: number,
-  evidence: SocialLinkRow['evidence'],
-  confidence: number,
-  state: 'active' | 'suggested' | 'rejected'
-): Promise<void> {
+  };
+  sortOrder: number;
+  evidence: SocialLinkRow['evidence'];
+  confidence: number;
+  state: 'active' | 'suggested' | 'rejected';
+}
+
+async function insertNewLink(options: InsertNewLinkOptions): Promise<void> {
+  const {
+    tx,
+    profileId,
+    link,
+    detected,
+    sortOrder,
+    evidence,
+    confidence,
+    state,
+  } = options;
+
   const insertPayload: typeof socialLinks.$inferInsert = {
     creatorProfileId: profileId,
     platform: detected.platform.id,
@@ -216,16 +229,16 @@ export async function normalizeAndMergeExtraction(
         continue;
       }
 
-      await insertNewLink(
+      await insertNewLink({
         tx,
-        profile.id,
+        profileId: profile.id,
         link,
         detected,
-        sortStart + inserted,
+        sortOrder: sortStart + inserted,
         evidence,
         confidence,
-        state
-      );
+        state,
+      });
       existingByCanonical.set(
         canonical,
         createInMemorySocialLinkRow({

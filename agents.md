@@ -107,6 +107,17 @@ docs(readme): update setup instructions
 
 ---
 
+## Pre-PR Checklist (required before opening any PR)
+
+1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
+2. **Run `/simplify`** - Simplify recently modified code for clarity
+3. **Enable automerge** with squash:
+   ```bash
+   gh pr merge --auto --squash
+   ```
+
+---
+
 ## Architecture Overview
 
 ```

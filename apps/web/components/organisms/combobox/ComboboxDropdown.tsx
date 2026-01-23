@@ -36,7 +36,7 @@ export const ComboboxDropdown = forwardRef<
       {(() => {
         if (isLoading && query.length > 0) {
           return (
-            // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
+            // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading state
             <div className='px-4 py-3 text-sm text-gray-500' role='status'>
               <div className='flex items-center space-x-2'>
                 <LoadingSpinner size='sm' className='text-gray-500' />
@@ -47,7 +47,7 @@ export const ComboboxDropdown = forwardRef<
         }
         if (showNoResults) {
           return (
-            // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible search results announcement
+            // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for empty results
             <div className='px-4 py-4 text-sm text-gray-500' role='status'>
               <p className='mb-2'>No artists found for &quot;{query}&quot;</p>
               <p className='text-xs text-gray-400'>

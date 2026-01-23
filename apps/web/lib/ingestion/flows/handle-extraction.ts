@@ -134,13 +134,12 @@ export function extractHandleFromSocialUrl(url: string): string | null {
       return null;
     }
 
-    if (isSpotifyArtist) {
-      // Allow base62 artist IDs with the `artist-` prefix.
-      if (!/^artist-[A-Za-z0-9]+$/.test(handle)) return null;
-    } else {
-      // Only allow alphanumeric, underscores, hyphens, and periods
-      if (!/^[a-z0-9._-]+$/.test(handle)) return null;
-    }
+    // Validate handle format based on type
+    const validPattern = isSpotifyArtist
+      ? /^artist-[A-Za-z0-9]+$/ // Spotify: base62 artist IDs with `artist-` prefix
+      : /^[a-z0-9._-]+$/; // Standard: alphanumeric, underscores, hyphens, periods
+
+    if (!validPattern.test(handle)) return null;
 
     return handle;
   } catch {

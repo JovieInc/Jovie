@@ -7,7 +7,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false,
+    "ignoreUnknown": true,
     "maxSize": 3000000,
     "includes": ["**/*", "!!.claude", "!!storybook-static"]
   },

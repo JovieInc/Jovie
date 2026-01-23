@@ -94,7 +94,8 @@ export function CopyToClipboardButton({
           currentLabel
         )}
       </Button>
-      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for screen reader announcement */}
+
+      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for live announcement */}
       <span className='sr-only' aria-live='polite' role='status'>
         {getStatusMessage(status)}
       </span>
