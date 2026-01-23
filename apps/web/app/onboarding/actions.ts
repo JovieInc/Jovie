@@ -182,6 +182,154 @@ function profileIsPublishable(
 }
 
 /**
+ * Handles avatar upload in the background after onboarding completes.
+ * Fetches the OAuth avatar and applies it to the profile.
+ */
+async function handleBackgroundAvatarUpload(
+  profileId: string,
+  oauthAvatarUrl: string,
+  baseUrl: string,
+  cookieHeader: string | null
+): Promise<void> {
+  try {
+    const uploaded = await uploadRemoteAvatar({
+      imageUrl: oauthAvatarUrl,
+      baseUrl,
+      cookieHeader,
+      maxRetries: 3,
+    });
+
+    if (!uploaded) {
+      console.warn('[ONBOARDING] Avatar upload failed for profile:', profileId);
+      return;
+    }
+
+    await withDbSessionTx(async tx => {
+      const [profile] = await tx
+        .select({
+          avatarUrl: creatorProfiles.avatarUrl,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profileId))
+        .limit(1);
+
+      await applyProfileEnrichment(tx, {
+        profileId,
+        avatarLockedByUser: profile?.avatarLockedByUser ?? null,
+        currentAvatarUrl: profile?.avatarUrl ?? null,
+        extractedAvatarUrl: uploaded.blobUrl,
+      });
+
+      await tx
+        .update(profilePhotos)
+        .set({
+          creatorProfileId: profileId,
+          sourcePlatform: 'clerk',
+          updatedAt: new Date(),
+        })
+        .where(eq(profilePhotos.id, uploaded.photoId));
+    });
+  } catch (avatarError) {
+    console.error(
+      '[ONBOARDING] Avatar upload exception for profile:',
+      profileId,
+      avatarError
+    );
+    Sentry.captureException(avatarError, {
+      tags: { context: 'onboarding_avatar_upload', profileId },
+      level: 'warning',
+    });
+  }
+}
+
+/**
+ * Runs post-onboarding sync operations in the background.
+ * Syncs username and Clerk metadata without blocking.
+ */
+function runBackgroundSyncOperations(userId: string, username: string): void {
+  void Promise.allSettled([
+    syncCanonicalUsernameFromApp(userId, username),
+    syncAllClerkMetadata(userId),
+  ]).then(results => {
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const context =
+          index === 0 ? 'onboarding_username_sync' : 'onboarding_metadata_sync';
+        console.error(`[ONBOARDING] ${context} failed:`, result.reason);
+        Sentry.captureException(result.reason, {
+          tags: { context, username },
+          level: 'warning',
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Logs and captures onboarding errors with full context.
+ */
+function logOnboardingError(
+  error: unknown,
+  context: { username: string; displayName?: string; email?: string | null }
+): Error {
+  console.error('🔴 ONBOARDING ERROR:', error);
+  console.error(
+    '🔴 ERROR STACK:',
+    error instanceof Error ? error.stack : 'No stack available'
+  );
+
+  const unwrapped = unwrapDatabaseError(error);
+  const effectiveCode = unwrapped.code || 'UNKNOWN_DB_ERROR';
+  const effectiveConstraint = unwrapped.constraint;
+
+  console.error('🔴 DATABASE ERROR DETAILS:', {
+    code: effectiveCode,
+    constraint: effectiveConstraint,
+    detail: unwrapped.detail,
+    message: unwrapped.message,
+  });
+
+  console.error('🔴 REQUEST CONTEXT:', {
+    username: context.username,
+    displayName: context.displayName,
+    email: context.email,
+    timestamp: new Date().toISOString(),
+    errorName: error instanceof Error ? error.name : 'Unknown',
+    errorMessage: error instanceof Error ? error.message : String(error),
+  });
+
+  Sentry.captureException(error, {
+    tags: {
+      context: 'onboarding_submission',
+      username: context.username ?? 'unknown',
+      db_error_code: effectiveCode,
+    },
+    extra: {
+      displayName: context.displayName,
+      email: context.email,
+      dbErrorCode: effectiveCode,
+      dbConstraint: effectiveConstraint,
+      dbDetail: unwrapped.detail,
+      rawErrorKeys:
+        error && typeof error === 'object' ? Object.keys(error) : [],
+    },
+    fingerprint: effectiveConstraint
+      ? ['onboarding', effectiveCode, effectiveConstraint]
+      : ['onboarding', effectiveCode],
+  });
+
+  const resolvedError =
+    error instanceof Error && /^\[([A-Z_]+)\]/.test(error.message)
+      ? error
+      : onboardingErrorToError(mapDatabaseError(error));
+
+  console.error('🔴 RESOLVED ERROR TYPE:', resolvedError.message);
+
+  return resolvedError;
+}
+
+/**
  * Creates a new user and profile using the stored database function.
  */
 async function createUserAndProfile(
@@ -469,89 +617,18 @@ export async function completeOnboarding({
     await invalidateProxyUserStateCache(userId);
 
     // Step 7: Avatar upload (fire-and-forget, background processing)
-    // Avatar upload runs in background - don't block onboarding completion
     const profileId = completion.profileId;
-
     if (profileId && oauthAvatarUrl) {
-      void (async () => {
-        try {
-          const uploaded = await uploadRemoteAvatar({
-            imageUrl: oauthAvatarUrl,
-            baseUrl,
-            cookieHeader,
-            maxRetries: 3,
-          });
-
-          if (uploaded) {
-            await withDbSessionTx(async tx => {
-              const [profile] = await tx
-                .select({
-                  avatarUrl: creatorProfiles.avatarUrl,
-                  avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-                })
-                .from(creatorProfiles)
-                .where(eq(creatorProfiles.id, profileId))
-                .limit(1);
-
-              await applyProfileEnrichment(tx, {
-                profileId,
-                avatarLockedByUser: profile?.avatarLockedByUser ?? null,
-                currentAvatarUrl: profile?.avatarUrl ?? null,
-                extractedAvatarUrl: uploaded.blobUrl,
-              });
-
-              await tx
-                .update(profilePhotos)
-                .set({
-                  creatorProfileId: profileId,
-                  sourcePlatform: 'clerk',
-                  updatedAt: new Date(),
-                })
-                .where(eq(profilePhotos.id, uploaded.photoId));
-            });
-          } else {
-            console.warn(
-              '[ONBOARDING] Avatar upload failed for profile:',
-              profileId
-            );
-          }
-        } catch (avatarError) {
-          console.error(
-            '[ONBOARDING] Avatar upload exception for profile:',
-            profileId,
-            avatarError
-          );
-          Sentry.captureException(avatarError, {
-            tags: { context: 'onboarding_avatar_upload', profileId },
-            level: 'warning',
-          });
-        }
-      })();
+      void handleBackgroundAvatarUpload(
+        profileId,
+        oauthAvatarUrl,
+        baseUrl,
+        cookieHeader
+      );
     }
 
     // Step 8: Sync operations (parallel, fire-and-forget)
-    // Run username sync and Clerk metadata sync in parallel without blocking
-    void Promise.allSettled([
-      // Sync username to database (no longer syncs to Clerk)
-      syncCanonicalUsernameFromApp(userId, completion.username),
-      // Sync Jovie metadata to Clerk (profile completion, status, etc.)
-      syncAllClerkMetadata(userId),
-    ]).then(results => {
-      // Log any failures for monitoring
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          const context =
-            index === 0
-              ? 'onboarding_username_sync'
-              : 'onboarding_metadata_sync';
-          console.error(`[ONBOARDING] ${context} failed:`, result.reason);
-          Sentry.captureException(result.reason, {
-            tags: { context, username: completion.username },
-            level: 'warning',
-          });
-        }
-      });
-    });
+    runBackgroundSyncOperations(userId, completion.username);
 
     // ENG-002: Set completion cookie to prevent redirect loop race condition
     // The proxy checks this cookie and bypasses needsOnboarding check for 30s
@@ -577,64 +654,6 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
-    // Enhanced logging with database-specific fields
-    console.error('🔴 ONBOARDING ERROR:', error);
-    console.error(
-      '🔴 ERROR STACK:',
-      error instanceof Error ? error.stack : 'No stack available'
-    );
-
-    // Extract nested PostgreSQL error details using shared utility
-    const unwrapped = unwrapDatabaseError(error);
-    const effectiveCode = unwrapped.code || 'UNKNOWN_DB_ERROR';
-    const effectiveConstraint = unwrapped.constraint;
-
-    console.error('🔴 DATABASE ERROR DETAILS:', {
-      code: effectiveCode,
-      constraint: effectiveConstraint,
-      detail: unwrapped.detail,
-      message: unwrapped.message,
-    });
-
-    console.error('🔴 REQUEST CONTEXT:', {
-      username,
-      displayName,
-      email,
-      timestamp: new Date().toISOString(),
-      errorName: error instanceof Error ? error.name : 'Unknown',
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-
-    // Capture to Sentry with full context and fingerprinting
-    Sentry.captureException(error, {
-      tags: {
-        context: 'onboarding_submission',
-        username: username ?? 'unknown',
-        db_error_code: effectiveCode,
-      },
-      extra: {
-        displayName,
-        email,
-        dbErrorCode: effectiveCode,
-        dbConstraint: effectiveConstraint,
-        dbDetail: unwrapped.detail,
-        rawErrorKeys:
-          error && typeof error === 'object' ? Object.keys(error) : [],
-      },
-      fingerprint: effectiveConstraint
-        ? ['onboarding', effectiveCode, effectiveConstraint]
-        : ['onboarding', effectiveCode],
-    });
-
-    // Normalize unknown errors into onboarding-shaped errors for consistent handling
-    const resolvedError =
-      error instanceof Error && /^\[([A-Z_]+)\]/.test(error.message)
-        ? error
-        : onboardingErrorToError(mapDatabaseError(error));
-
-    // Log the resolved error type for monitoring
-    console.error('🔴 RESOLVED ERROR TYPE:', resolvedError.message);
-
-    throw resolvedError;
+    throw logOnboardingError(error, { username, displayName, email });
   }
 }
