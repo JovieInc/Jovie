@@ -1,6 +1,12 @@
 import { Badge } from '@jovie/ui';
-import type { CellContext } from '@tanstack/react-table';
-import { DateCell } from '@/components/organisms/table';
+import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+  DateCell,
+  TableCheckboxCell,
+} from '@/components/organisms/table';
 import type { AdminUserRow } from '@/lib/admin/users';
 
 /**
@@ -61,4 +67,68 @@ export function renderStatusCell({ row }: CellContext<AdminUserRow, unknown>) {
       </span>
     </Badge>
   );
+}
+
+/**
+ * Creates a header renderer for the checkbox column
+ */
+export function createSelectHeaderRenderer(
+  headerCheckboxState: boolean | 'indeterminate',
+  onToggleSelectAll: () => void
+) {
+  return function SelectHeader({
+    table,
+  }: HeaderContext<AdminUserRow, unknown>) {
+    return (
+      <TableCheckboxCell
+        table={table as Table<AdminUserRow>}
+        headerCheckboxState={headerCheckboxState}
+        onToggleSelectAll={onToggleSelectAll}
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the checkbox column
+ */
+export function createSelectCellRenderer(
+  selectedIds: Set<string>,
+  page: number,
+  pageSize: number,
+  onToggleSelect: (id: string) => void
+) {
+  return function SelectCell({ row }: CellContext<AdminUserRow, unknown>) {
+    const user = row.original;
+    const isChecked = selectedIds.has(user.id);
+    const rowNumber = (page - 1) * pageSize + row.index + 1;
+
+    return (
+      <TableCheckboxCell
+        row={row}
+        rowNumber={rowNumber}
+        isChecked={isChecked}
+        onToggleSelect={() => onToggleSelect(user.id)}
+      />
+    );
+  };
+}
+
+/**
+ * Creates a cell renderer for the actions column
+ */
+export function createActionsCellRenderer(
+  getContextMenuItems: (user: AdminUserRow) => ContextMenuItemType[]
+) {
+  return function ActionsCell({ row }: CellContext<AdminUserRow, unknown>) {
+    const user = row.original;
+    const contextMenuItems = getContextMenuItems(user);
+    const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+    return (
+      <div className='flex items-center justify-end'>
+        <TableActionMenu items={actionMenuItems} align='end' />
+      </div>
+    );
+  };
 }

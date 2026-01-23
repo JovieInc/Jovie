@@ -8,14 +8,11 @@ import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   AdminPageSizeSelect,
   type ContextMenuItemType,
-  convertContextMenuItems,
   ExportCSVButton,
   TableBulkActionsToolbar,
-  TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
@@ -29,6 +26,9 @@ import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminUsersTableProps } from './types';
 import { useAdminUsersTable } from './useAdminUsersTable';
 import {
+  createActionsCellRenderer,
+  createSelectCellRenderer,
+  createSelectHeaderRenderer,
   renderCreatedDateCell,
   renderNameCell,
   renderPlanCell,
@@ -161,33 +161,30 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     ];
   }, [users, selectedIds, clearSelection]);
 
+  // Create memoized cell renderers to avoid component-in-component warnings
+  const SelectHeader = useMemo(
+    () => createSelectHeaderRenderer(headerCheckboxState, toggleSelectAll),
+    [headerCheckboxState, toggleSelectAll]
+  );
+
+  const SelectCell = useMemo(
+    () => createSelectCellRenderer(selectedIds, page, pageSize, toggleSelect),
+    [selectedIds, page, pageSize, toggleSelect]
+  );
+
+  const ActionsCell = useMemo(
+    () => createActionsCellRenderer(getContextMenuItems),
+    [getContextMenuItems]
+  );
+
   // Define columns using TanStack Table
   const columns = useMemo<ColumnDef<AdminUserRow, any>[]>(
     () => [
       // Checkbox column with row numbers
       columnHelper.display({
         id: 'select',
-        header: ({ table }) => (
-          <TableCheckboxCell
-            table={table}
-            headerCheckboxState={headerCheckboxState}
-            onToggleSelectAll={toggleSelectAll}
-          />
-        ),
-        cell: ({ row }) => {
-          const user = row.original;
-          const isChecked = selectedIds.has(user.id);
-          const rowNumber = (page - 1) * pageSize + row.index + 1;
-
-          return (
-            <TableCheckboxCell
-              row={row}
-              rowNumber={rowNumber}
-              isChecked={isChecked}
-              onToggleSelect={() => toggleSelect(user.id)}
-            />
-          );
-        },
+        header: SelectHeader,
+        cell: SelectCell,
         size: 56,
       }),
 
@@ -227,29 +224,11 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       columnHelper.display({
         id: 'actions',
         header: '',
-        cell: ({ row }) => {
-          const user = row.original;
-          const contextMenuItems = getContextMenuItems(user);
-          const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
-        },
+        cell: ActionsCell,
         size: 48,
       }),
     ],
-    [
-      getContextMenuItems,
-      headerCheckboxState,
-      toggleSelectAll,
-      selectedIds,
-      page,
-      pageSize,
-      toggleSelect,
-    ]
+    [SelectHeader, SelectCell, ActionsCell]
   );
 
   // Get row className - uses unified hover token
