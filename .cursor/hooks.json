@@ -6,19 +6,9 @@
         "command": "sh .cursor/hooks/after-file-edit.sh"
       }
     ],
-    "beforeStop": [
+    "stop": [
       {
         "command": "sh .cursor/hooks/before-stop.sh"
-      }
-    ],
-    "onTaskComplete": [
-      {
-        "command": "sh .cursor/hooks/on-task-complete.sh"
-      }
-    ],
-    "onError": [
-      {
-        "command": "sh .cursor/hooks/on-error.sh"
       }
     ]
   }
