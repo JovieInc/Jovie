@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -8,7 +7,6 @@ import {
 } from '@tanstack/react-table';
 import { useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AvailabilityCell,
   PopularityCell,
@@ -17,11 +15,7 @@ import {
 } from '@/components/dashboard/organisms/releases/cells';
 import {
   type ContextMenuItemType,
-  convertContextMenuItems,
-  DateCell,
   type HeaderBulkAction,
-  HeaderBulkActions,
-  TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
@@ -30,6 +24,14 @@ import {
   TABLE_ROW_HEIGHTS,
 } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import {
+  createActionsCellRenderer,
+  createActionsHeaderRenderer,
+  createReleaseHeaderRenderer,
+  createSelectCellRenderer,
+  createSelectHeaderRenderer,
+  renderReleaseDateCell,
+} from './utils/column-renderers';
 
 interface ProviderConfig {
   label: string;
@@ -61,14 +63,6 @@ interface ReleaseTableProps {
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
-
-// Date format options (extracted to prevent inline object creation)
-const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
-const DATE_TOOLTIP_FORMAT_OPTIONS = {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-} as const;
 
 /**
  * ReleaseTable - Releases table using UnifiedTable
@@ -178,31 +172,47 @@ export function ReleaseTable({
     internalSelection.toggleSelectAll,
   ]);
 
+  // Context menu items for right-click - memoized to prevent recreation
+  const getContextMenuItems = useCallback(
+    (release: ReleaseViewModel): ContextMenuItemType[] => {
+      return [
+        {
+          id: 'edit',
+          label: 'Edit links',
+          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          onClick: () => onEdit(release),
+        },
+        {
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            );
+          },
+        },
+        {
+          id: 'copy-release-id',
+          label: 'Copy release ID',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.id);
+          },
+        },
+      ];
+    },
+    [onEdit, onCopy]
+  );
+
   // Build dynamic column definitions
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
       id: 'select',
-      header: ({ table }) => (
-        <TableCheckboxCell
-          table={table}
-          headerCheckboxState={headerCheckboxState}
-          onToggleSelectAll={toggleSelectAll}
-        />
-      ),
-      cell: ({ row }) => {
-        const release = row.original;
-        const isChecked = selectedIds.has(release.id);
-        const rowNumber = row.index + 1;
-
-        return (
-          <TableCheckboxCell
-            row={row}
-            rowNumber={rowNumber}
-            isChecked={isChecked}
-            onToggleSelect={() => toggleSelect(release.id)}
-          />
-        );
-      },
+      header: createSelectHeaderRenderer(headerCheckboxState, toggleSelectAll),
+      cell: createSelectCellRenderer(selectedIds, toggleSelect),
       size: 56,
     });
 
@@ -214,15 +224,10 @@ export function ReleaseTable({
       // Release column (artwork + title + artist) with inline bulk actions
       columnHelper.accessor('title', {
         id: 'release',
-        header: () => (
-          <div className='flex items-center gap-2'>
-            {selectedIds.size === 0 && <span>Release</span>}
-            <HeaderBulkActions
-              selectedCount={selectedIds.size}
-              bulkActions={bulkActions}
-              onClearSelection={onClearSelection}
-            />
-          </div>
+        header: createReleaseHeaderRenderer(
+          selectedIds.size,
+          bulkActions,
+          onClearSelection
         ),
         cell: ({ row }) => (
           <ReleaseCell release={row.original} artistName={artistName} />
@@ -262,18 +267,7 @@ export function ReleaseTable({
       columnHelper.accessor('releaseDate', {
         id: 'releaseDate',
         header: 'Released',
-        cell: ({ getValue }) => {
-          const date = getValue();
-          return date ? (
-            <DateCell
-              date={new Date(date)}
-              formatOptions={DATE_FORMAT_OPTIONS}
-              tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
-            />
-          ) : (
-            <span className='text-xs text-tertiary-token'>TBD</span>
-          );
-        },
+        cell: renderReleaseDateCell,
         size: 70,
         enableSorting: true,
       }),
@@ -290,51 +284,13 @@ export function ReleaseTable({
       // Actions column - header shows toolbar buttons, cells show row menu
       columnHelper.display({
         id: 'actions',
-        header: () => (
-          <div className='flex items-center justify-end gap-1'>
-            {selectedIds.size > 0 ? (
-              // Clear button when items selected
-              onClearSelection && (
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={onClearSelection}
-                  className='h-7 gap-1 text-xs'
-                >
-                  <Icon name='X' className='h-3.5 w-3.5' />
-                  Clear
-                </Button>
-              )
-            ) : (
-              // Sync button when nothing selected
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={onSync}
-                disabled={isSyncing}
-                className='h-7 gap-1 text-xs'
-              >
-                <Icon
-                  name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                  className={
-                    isSyncing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'
-                  }
-                />
-                Sync
-              </Button>
-            )}
-          </div>
+        header: createActionsHeaderRenderer(
+          selectedIds.size,
+          onClearSelection,
+          onSync,
+          isSyncing
         ),
-        cell: ({ row }) => {
-          const contextMenuItems = getContextMenuItems(row.original);
-          const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
-        },
+        cell: createActionsCellRenderer(getContextMenuItems),
         size: 80,
       }),
     ];
@@ -355,42 +311,8 @@ export function ReleaseTable({
     onSync,
     toggleSelect,
     toggleSelectAll,
+    getContextMenuItems,
   ]);
-
-  // Context menu items for right-click - memoized to prevent recreation
-  const getContextMenuItems = useCallback(
-    (release: ReleaseViewModel): ContextMenuItemType[] => {
-      return [
-        {
-          id: 'edit',
-          label: 'Edit links',
-          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
-          onClick: () => onEdit(release),
-        },
-        {
-          id: 'copy-smart-link',
-          label: 'Copy smart link',
-          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
-          onClick: () => {
-            void onCopy(
-              release.smartLinkPath,
-              `${release.title} smart link`,
-              `smart-link-copy-${release.id}`
-            );
-          },
-        },
-        {
-          id: 'copy-release-id',
-          label: 'Copy release ID',
-          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(release.id);
-          },
-        },
-      ];
-    },
-    [onEdit, onCopy]
-  );
 
   // Fixed min width - availability column consolidates all providers
   const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
