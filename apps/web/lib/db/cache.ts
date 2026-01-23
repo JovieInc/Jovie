@@ -22,7 +22,7 @@ const MAX_MEMORY_CACHE_SIZE = 5000;
  */
 class InMemoryCache<T> {
   private cache = new Map<string, { value: T; expiresAt: number }>();
-  private maxSize: number;
+  private readonly maxSize: number;
 
   constructor(maxSize = MAX_MEMORY_CACHE_SIZE) {
     this.maxSize = maxSize;

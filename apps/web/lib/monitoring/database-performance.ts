@@ -34,7 +34,7 @@ export interface DatabaseHealthMetrics {
 
 class DatabasePerformanceMonitor {
   private queryMetrics: QueryPerformanceMetrics[] = [];
-  private maxMetricsHistory = 1000;
+  private readonly maxMetricsHistory = 1000;
 
   /**
    * Track query performance
