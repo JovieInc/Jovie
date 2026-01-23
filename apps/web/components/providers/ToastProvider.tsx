@@ -96,16 +96,12 @@ export function ToastProvider({ children }: ToastProviderProps) {
               'bg-surface-1 text-secondary-token font-medium hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             closeButton:
               'bg-surface-1 border-subtle text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-            // Type-specific styles
-            success:
-              'border-emerald-500/30 dark:border-emerald-400/30 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-400',
-            error:
-              'border-red-500/30 dark:border-red-400/30 [&>svg]:text-red-600 dark:[&>svg]:text-red-400',
-            warning:
-              'border-amber-500/30 dark:border-amber-400/30 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400',
-            info: 'border-sky-500/30 dark:border-sky-400/30 [&>svg]:text-sky-600 dark:[&>svg]:text-sky-400',
-            loading:
-              'border-violet-500/30 dark:border-violet-400/30 [&>svg]:text-violet-600 dark:[&>svg]:text-violet-400',
+            // Type-specific styles using design tokens
+            success: 'border-success [&>svg]:text-success',
+            error: 'border-error [&>svg]:text-error',
+            warning: 'border-warning [&>svg]:text-warning',
+            info: 'border-info [&>svg]:text-info',
+            loading: 'border-accent [&>svg]:text-accent',
           },
           // Type-specific durations
           // Success: short (users just need confirmation)
