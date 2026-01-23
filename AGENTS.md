@@ -26,6 +26,13 @@ first and treat this one as a quick index.
 
 - **Migrations are immutable:** never edit files in `drizzle/migrations/`.
 - **No new middleware.ts** without explicit review.
-- **No biome-ignore** comments; fix the root issue.
+- **No biome-ignore comments; fix the root issue.** Documented exceptions are
+  allowed only for: tests, a11y overrides, sanitized HTML injection, security
+  exemptions, and test utilities. When an exception is used, the comment must
+  include the standardized justification template so maintainers can review and
+  audit existing usages: `biome-ignore: <reason>; owner: <team>; ticket: <link>`.
+  Examples:
+  - `// biome-ignore lint/a11y/noAutofocus: required in test; owner: web; ticket: https://example.com/ABC-123`
+  - `/* biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized HTML via DOMPurify; owner: platform; ticket: https://example.com/SEC-456 */`
 - **Conventional commits** required (see `agents.md` for examples).
 
