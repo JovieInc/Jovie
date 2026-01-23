@@ -1,39 +1,143 @@
-'use client';
-
 import { Check } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { APP_NAME, APP_URL } from '@/constants/app';
+
+// Static feature lists - no need for client-side state
+const FREE_FEATURES = [
+  'Blazing-fast profiles, SEO-optimized',
+  'AI-driven personalization',
+  'Smart deep links (/listen, /tip, etc.)',
+  'Clean dark/light mode',
+  'App deep links (no browser friction)',
+  'Conversion-focused analytics',
+  'Unique Jovie handle (yourname)',
+] as const;
+
+const PRO_FEATURES = [
+  'Everything in Free',
+  'No Jovie branding - Your profile, your brand',
+  'Capture any identifier - Email, phone, or Spotify',
+  "Remember your fans across visits - See who's new, who's back",
+  'Segment new vs. returning listeners - Understand your audience',
+  "See what's working - Simple reports, clear insights",
+] as const;
+
+const GROWTH_FEATURES = [
+  'Everything in Pro',
+  'Automated follow-ups - Playlist adds, drop reminders',
+  'Test what converts - A/B headlines and offers',
+  'Retarget your fans on Meta - Stay top of mind',
+  "Smart suggestions - We'll tell you what to do next",
+] as const;
+
+// SEO Metadata
+export const metadata: Metadata = {
+  title: `Pricing - ${APP_NAME}`,
+  description:
+    'Find a plan to grow your audience. Jovie supports artists of all sizes with pricing that scales - Free, Pro ($39/mo), and Growth ($99/mo) tiers.',
+  keywords: [
+    'Jovie pricing',
+    'link in bio pricing',
+    'artist marketing tools',
+    'music promotion pricing',
+    'fan engagement platform',
+    'artist link tree alternative',
+  ],
+  openGraph: {
+    title: `Pricing - ${APP_NAME}`,
+    description:
+      'Find a plan to grow your audience. Free, Pro, and Growth tiers available.',
+    url: `${APP_URL}/pricing`,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Pricing - ${APP_NAME}`,
+    description:
+      'Find a plan to grow your audience. Free, Pro, and Growth tiers available.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+// Product/Offer JSON-LD Structured Data for rich search results
+const PRICING_SCHEMA = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: `Pricing - ${APP_NAME}`,
+  description:
+    'Find a plan to grow your audience. Jovie supports artists of all sizes with pricing that scales.',
+  url: `${APP_URL}/pricing`,
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        item: {
+          '@type': 'Product',
+          name: `${APP_NAME} Free`,
+          description: 'Everything you need to start. Free forever.',
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD',
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        item: {
+          '@type': 'Product',
+          name: `${APP_NAME} Pro`,
+          description: 'Your identity. Your data.',
+          offers: {
+            '@type': 'Offer',
+            price: '39',
+            priceCurrency: 'USD',
+            priceValidUntil: '2026-12-31',
+            availability: 'https://schema.org/InStock',
+            billingIncrement: 'P1M',
+          },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        item: {
+          '@type': 'Product',
+          name: `${APP_NAME} Growth`,
+          description: 'Automate. Retarget. Scale.',
+          offers: {
+            '@type': 'Offer',
+            price: '99',
+            priceCurrency: 'USD',
+            priceValidUntil: '2026-12-31',
+            availability: 'https://schema.org/InStock',
+            billingIncrement: 'P1M',
+          },
+        },
+      },
+    ],
+  },
+});
 
 export default function PricingPage() {
-  const freeFeatures = [
-    'Blazing-fast profiles, SEO-optimized',
-    'AI-driven personalization',
-    'Smart deep links (/listen, /tip, etc.)',
-    'Clean dark/light mode',
-    'App deep links (no browser friction)',
-    'Conversion-focused analytics',
-    'Unique Jovie handle (yourname)',
-  ];
-
-  const proFeatures = [
-    'Everything in Free',
-    'No Jovie branding - Your profile, your brand',
-    'Capture any identifier - Email, phone, or Spotify',
-    "Remember your fans across visits - See who's new, who's back",
-    'Segment new vs. returning listeners - Understand your audience',
-    "See what's working - Simple reports, clear insights",
-  ];
-
-  const growthFeatures = [
-    'Everything in Pro',
-    'Automated follow-ups - Playlist adds, drop reminders',
-    'Test what converts - A/B headlines and offers',
-    'Retarget your fans on Meta - Stay top of mind',
-    "Smart suggestions - We'll tell you what to do next",
-  ];
-
   return (
     <div className='min-h-screen bg-white dark:bg-[#0a0a0b]'>
+      {/* Structured Data for SEO */}
+      <script
+        type='application/ld+json'
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
+        dangerouslySetInnerHTML={{ __html: PRICING_SCHEMA }}
+      />
+
       <Container size='lg'>
         <div className='py-20 sm:py-28'>
           {/* Header */}
@@ -81,7 +185,7 @@ export default function PricingPage() {
                   Join waitlist →
                 </Link>
                 <ul className='space-y-3 grow'>
-                  {freeFeatures.map(feature => (
+                  {FREE_FEATURES.map(feature => (
                     <li key={feature} className='flex items-start gap-3'>
                       <Check className='w-4 h-4 text-neutral-400 dark:text-neutral-500 mt-0.5 shrink-0' />
                       <span className='text-sm text-neutral-600 dark:text-neutral-400'>
@@ -121,7 +225,7 @@ export default function PricingPage() {
                   Join waitlist →
                 </Link>
                 <ul className='space-y-3 grow'>
-                  {proFeatures.map(feature => (
+                  {PRO_FEATURES.map(feature => (
                     <li key={feature} className='flex items-start gap-3'>
                       <Check className='w-4 h-4 text-neutral-900 dark:text-white mt-0.5 shrink-0' />
                       <span className='text-sm text-neutral-700 dark:text-neutral-300'>
@@ -161,7 +265,7 @@ export default function PricingPage() {
                   Join waitlist →
                 </Link>
                 <ul className='space-y-3 grow'>
-                  {growthFeatures.map(feature => (
+                  {GROWTH_FEATURES.map(feature => (
                     <li key={feature} className='flex items-start gap-3'>
                       <Check className='w-4 h-4 text-neutral-400 dark:text-neutral-500 mt-0.5 shrink-0' />
                       <span className='text-sm text-neutral-600 dark:text-neutral-400'>
