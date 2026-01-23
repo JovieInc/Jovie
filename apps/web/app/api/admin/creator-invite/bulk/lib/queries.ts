@@ -54,7 +54,8 @@ export async function fetchProfilesById(
 }
 
 /**
- * Auto-select profiles based on fit score threshold.
+ * Fetch eligible profiles by fit score threshold.
+ * Used for both auto-selection and preview endpoints.
  */
 export async function fetchProfilesByFitScore(
   fitScoreThreshold: number,
@@ -94,42 +95,9 @@ export async function fetchProfilesByFitScore(
 
 /**
  * Fetch eligible profiles for preview (GET endpoint).
+ * @deprecated Use fetchProfilesByFitScore instead - identical implementation.
  */
-export async function fetchEligibleProfilesForPreview(
-  fitScoreThreshold: number,
-  limit: number
-): Promise<EligibleProfile[]> {
-  return db
-    .select({
-      id: creatorProfiles.id,
-      username: creatorProfiles.username,
-      displayName: creatorProfiles.displayName,
-      fitScore: creatorProfiles.fitScore,
-      contactEmail: creatorContacts.email,
-    })
-    .from(creatorProfiles)
-    .leftJoin(
-      creatorContacts,
-      and(
-        eq(creatorContacts.creatorProfileId, creatorProfiles.id),
-        eq(creatorContacts.isActive, true)
-      )
-    )
-    .leftJoin(
-      creatorClaimInvites,
-      eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
-    )
-    .where(
-      and(
-        eq(creatorProfiles.isClaimed, false),
-        isNotNull(creatorProfiles.claimToken),
-        gte(creatorProfiles.fitScore, fitScoreThreshold),
-        isNull(creatorClaimInvites.id)
-      )
-    )
-    .orderBy(sql`${creatorProfiles.fitScore} DESC`)
-    .limit(limit);
-}
+export const fetchEligibleProfilesForPreview = fetchProfilesByFitScore;
 
 /**
  * Get total count of eligible profiles for a given threshold.
