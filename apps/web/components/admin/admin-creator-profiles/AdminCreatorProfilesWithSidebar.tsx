@@ -171,6 +171,79 @@ export function AdminCreatorProfilesWithSidebar({
     [setDraftContact]
   );
 
+  // Extracted handlers to prevent creating new function instances on every render
+  // These are used by CreatorProfileTableRow which is now memoized
+
+  const handleMenuOpenChange = useCallback(
+    (profileId: string, open: boolean) => {
+      setOpenMenuProfileId(open ? profileId : null);
+    },
+    []
+  );
+
+  const handleRefreshIngest = useCallback(
+    (profileId: string) => {
+      refreshIngest(profileId);
+    },
+    [refreshIngest]
+  );
+
+  const handleToggleVerification = useCallback(
+    async (profileId: string, currentIsVerified: boolean) => {
+      const result = await toggleVerification(profileId, !currentIsVerified);
+      if (!result.success) {
+        console.error('Failed to toggle verification', result.error);
+        const errorSuffix = result.error ? `: ${result.error}` : '';
+        notifications.error(
+          `Failed to update verification status${errorSuffix}`
+        );
+      }
+    },
+    [toggleVerification, notifications]
+  );
+
+  const handleToggleFeatured = useCallback(
+    async (profileId: string, currentIsFeatured: boolean) => {
+      const result = await toggleFeatured(profileId, !currentIsFeatured);
+      if (!result.success) {
+        console.error('Failed to toggle featured', result.error);
+        const errorSuffix = result.error ? `: ${result.error}` : '';
+        notifications.error(`Failed to update featured status${errorSuffix}`);
+      }
+    },
+    [toggleFeatured, notifications]
+  );
+
+  const handleToggleMarketing = useCallback(
+    async (profileId: string, currentMarketingOptOut: boolean) => {
+      const result = await toggleMarketing(profileId, !currentMarketingOptOut);
+      if (!result.success) {
+        console.error('Failed to toggle marketing', result.error);
+        const errorSuffix = result.error ? `: ${result.error}` : '';
+        notifications.error(
+          `Failed to update marketing preferences${errorSuffix}`
+        );
+      }
+    },
+    [toggleMarketing, notifications]
+  );
+
+  const handleSendInvite = useCallback(
+    (profile: (typeof profilesWithActions)[number]) => {
+      setProfileToInvite(profile);
+      setInviteDialogOpen(true);
+    },
+    []
+  );
+
+  const handleDelete = useCallback(
+    (profile: (typeof profilesWithActions)[number]) => {
+      setProfileToDelete(profile);
+      setDeleteDialogOpen(true);
+    },
+    []
+  );
+
   // Social links are fetched automatically via TanStack Query
   // in useContactHydration when enabled && selectedId are truthy
 
@@ -279,75 +352,30 @@ export function AdminCreatorProfilesWithSidebar({
                         onContextMenu={setOpenMenuProfileId}
                         onToggleSelect={toggleSelect}
                         onMenuOpenChange={open =>
-                          setOpenMenuProfileId(open ? profile.id : null)
+                          handleMenuOpenChange(profile.id, open)
                         }
-                        onRefreshIngest={() => refreshIngest(profile.id)}
-                        onToggleVerification={async () => {
-                          const result = await toggleVerification(
+                        onRefreshIngest={() => handleRefreshIngest(profile.id)}
+                        onToggleVerification={() =>
+                          handleToggleVerification(
                             profile.id,
-                            !profile.isVerified
-                          );
-                          if (!result.success) {
-                            console.error(
-                              'Failed to toggle verification',
-                              result.error
-                            );
-                            const errorSuffix = result.error
-                              ? `: ${result.error}`
-                              : '';
-                            notifications.error(
-                              `Failed to update verification status${errorSuffix}`
-                            );
-                          }
-                        }}
-                        onToggleFeatured={async () => {
-                          const result = await toggleFeatured(
+                            profile.isVerified
+                          )
+                        }
+                        onToggleFeatured={() =>
+                          handleToggleFeatured(profile.id, profile.isFeatured)
+                        }
+                        onToggleMarketing={() =>
+                          handleToggleMarketing(
                             profile.id,
-                            !profile.isFeatured
-                          );
-                          if (!result.success) {
-                            console.error(
-                              'Failed to toggle featured',
-                              result.error
-                            );
-                            const errorSuffix = result.error
-                              ? `: ${result.error}`
-                              : '';
-                            notifications.error(
-                              `Failed to update featured status${errorSuffix}`
-                            );
-                          }
-                        }}
-                        onToggleMarketing={async () => {
-                          const result = await toggleMarketing(
-                            profile.id,
-                            !profile.marketingOptOut
-                          );
-                          if (!result.success) {
-                            console.error(
-                              'Failed to toggle marketing',
-                              result.error
-                            );
-                            const errorSuffix = result.error
-                              ? `: ${result.error}`
-                              : '';
-                            notifications.error(
-                              `Failed to update marketing preferences${errorSuffix}`
-                            );
-                          }
-                        }}
+                            profile.marketingOptOut
+                          )
+                        }
                         onSendInvite={
                           !profile.isClaimed && profile.claimToken
-                            ? () => {
-                                setProfileToInvite(profile);
-                                setInviteDialogOpen(true);
-                              }
+                            ? () => handleSendInvite(profile)
                             : undefined
                         }
-                        onDelete={() => {
-                          setProfileToDelete(profile);
-                          setDeleteDialogOpen(true);
-                        }}
+                        onDelete={() => handleDelete(profile)}
                       />
                     ))
                   )}

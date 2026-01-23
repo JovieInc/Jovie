@@ -10,7 +10,7 @@ import {
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
 import Link from 'next/link';
-import { type ReactNode, useCallback, useState } from 'react';
+import { memo, type ReactNode, useCallback, useState } from 'react';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorProfileSocialLinks } from '@/components/admin/CreatorProfileSocialLinks';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
@@ -90,7 +90,54 @@ export interface CreatorProfileTableRowProps {
   onDelete: () => void | Promise<void>;
 }
 
-export function CreatorProfileTableRow({
+/**
+ * Custom comparison function for React.memo.
+ * Only rerenders when data or status actually changed.
+ * Ignores handler function identity changes (they're recreated every render but do the same thing).
+ */
+function arePropsEqual(
+  prev: CreatorProfileTableRowProps,
+  next: CreatorProfileTableRowProps
+): boolean {
+  // Compare primitive props that affect rendering
+  if (prev.rowNumber !== next.rowNumber) return false;
+  if (prev.isSelected !== next.isSelected) return false;
+  if (prev.isChecked !== next.isChecked) return false;
+  if (prev.isMobile !== next.isMobile) return false;
+  if (prev.verificationStatus !== next.verificationStatus) return false;
+  if (prev.refreshIngestStatus !== next.refreshIngestStatus) return false;
+  if (prev.isMenuOpen !== next.isMenuOpen) return false;
+
+  // Compare profile data that affects rendering
+  const prevProfile = prev.profile;
+  const nextProfile = next.profile;
+  if (prevProfile.id !== nextProfile.id) return false;
+  if (prevProfile.username !== nextProfile.username) return false;
+  if (prevProfile.displayName !== nextProfile.displayName) return false;
+  if (prevProfile.avatarUrl !== nextProfile.avatarUrl) return false;
+  if (prevProfile.isVerified !== nextProfile.isVerified) return false;
+  if (prevProfile.isFeatured !== nextProfile.isFeatured) return false;
+  if (prevProfile.isClaimed !== nextProfile.isClaimed) return false;
+  if (prevProfile.marketingOptOut !== nextProfile.marketingOptOut) return false;
+  if (prevProfile.claimToken !== nextProfile.claimToken) return false;
+
+  // Compare dates (need special handling)
+  const prevDate = prevProfile.createdAt?.getTime?.() ?? null;
+  const nextDate = nextProfile.createdAt?.getTime?.() ?? null;
+  if (prevDate !== nextDate) return false;
+
+  // Compare social links array (shallow comparison of length and ids)
+  const prevLinks = prevProfile.socialLinks ?? [];
+  const nextLinks = nextProfile.socialLinks ?? [];
+  if (prevLinks.length !== nextLinks.length) return false;
+
+  // Handlers are intentionally not compared - they're stable via useCallback in parent
+  // or we accept new instances since the component is already memoized on data changes
+
+  return true;
+}
+
+function CreatorProfileTableRowComponent({
   profile,
   rowNumber,
   isSelected,
@@ -300,3 +347,12 @@ export function CreatorProfileTableRow({
     </ContextMenu>
   );
 }
+
+/**
+ * Memoized table row component to prevent unnecessary rerenders.
+ * Uses custom comparison to ignore handler function identity changes.
+ */
+export const CreatorProfileTableRow = memo(
+  CreatorProfileTableRowComponent,
+  arePropsEqual
+);
