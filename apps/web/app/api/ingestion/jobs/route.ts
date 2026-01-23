@@ -39,6 +39,9 @@ function isAuthorized(request: NextRequest): boolean {
   return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
+// Maximum concurrent job processing to balance parallelism with resource usage
+const MAX_CONCURRENT_JOBS = 3;
+
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json(
@@ -58,7 +61,10 @@ export async function POST(request: NextRequest) {
 
     attempted = claimed.length;
 
-    for (const job of claimed) {
+    // Process a single job within its own transaction
+    const processJobTransaction = async (
+      job: (typeof claimed)[number]
+    ): Promise<boolean> => {
       const result = await withSystemIngestionSession(async tx => {
         try {
           await processJob(tx, job);
@@ -80,7 +86,14 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      if (result.ok) processed += 1;
+      return result.ok;
+    };
+
+    // Process jobs in batches with controlled concurrency
+    for (let i = 0; i < claimed.length; i += MAX_CONCURRENT_JOBS) {
+      const batch = claimed.slice(i, i + MAX_CONCURRENT_JOBS);
+      const results = await Promise.all(batch.map(processJobTransaction));
+      processed += results.filter(Boolean).length;
     }
 
     return NextResponse.json(

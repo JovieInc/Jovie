@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Copy } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
@@ -18,7 +18,7 @@ import { ReleaseTable } from './ReleaseTable';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
-export function ReleaseProviderMatrix({
+export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   releases,
   providerConfig,
   primaryProviders,
@@ -134,18 +134,20 @@ export function ReleaseProviderMatrix({
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useHeaderActions();
 
+  // Memoize the badge to avoid creating new JSX object on every render
+  const spotifyBadge = useMemo(
+    () => (
+      <span className='inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954]'>
+        <SocialIcon platform='spotify' className='h-3 w-3' />
+        {artistName}
+      </span>
+    ),
+    [artistName]
+  );
+
   useEffect(() => {
     // Spotify pill on left side of header
-    if (isConnected && artistName) {
-      setHeaderBadge(
-        <span className='inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954]'>
-          <SocialIcon platform='spotify' className='h-3 w-3' />
-          {artistName}
-        </span>
-      );
-    } else {
-      setHeaderBadge(null);
-    }
+    setHeaderBadge(isConnected && artistName ? spotifyBadge : null);
 
     // Drawer toggle on right side
     setHeaderActions(<DrawerToggleButton />);
@@ -154,7 +156,7 @@ export function ReleaseProviderMatrix({
       setHeaderBadge(null);
       setHeaderActions(null);
     };
-  }, [isConnected, artistName, setHeaderBadge, setHeaderActions]);
+  }, [isConnected, artistName, spotifyBadge, setHeaderBadge, setHeaderActions]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
@@ -285,4 +287,4 @@ export function ReleaseProviderMatrix({
       />
     </div>
   );
-}
+});
