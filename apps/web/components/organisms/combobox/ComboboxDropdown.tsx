@@ -33,35 +33,41 @@ export const ComboboxDropdown = forwardRef<
       )}
       static={isOpen}
     >
-      {isLoading && query.length > 0 ? (
-        // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
-        <div className='px-4 py-3 text-sm text-gray-500' role='status'>
-          <div className='flex items-center space-x-2'>
-            <LoadingSpinner size='sm' className='text-gray-500' />
-            <span>Searching artists...</span>
-          </div>
-        </div>
-      ) : showNoResults ? (
-        // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible search results announcement
-        <div className='px-4 py-4 text-sm text-gray-500' role='status'>
-          <p className='mb-2'>No artists found for &quot;{query}&quot;</p>
-          <p className='text-xs text-gray-400'>
-            Can&apos;t find your artist?{' '}
-            <a
-              href='https://artists.spotify.com'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-indigo-600 hover:text-indigo-500 underline'
-            >
-              Verify your Spotify artist profile
-            </a>
-          </p>
-        </div>
-      ) : (
-        filteredOptions.map((option, index) => (
+      {(() => {
+        if (isLoading && query.length > 0) {
+          return (
+            // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
+            <div className='px-4 py-3 text-sm text-gray-500' role='status'>
+              <div className='flex items-center space-x-2'>
+                <LoadingSpinner size='sm' className='text-gray-500' />
+                <span>Searching artists...</span>
+              </div>
+            </div>
+          );
+        }
+        if (showNoResults) {
+          return (
+            // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible search results announcement
+            <div className='px-4 py-4 text-sm text-gray-500' role='status'>
+              <p className='mb-2'>No artists found for &quot;{query}&quot;</p>
+              <p className='text-xs text-gray-400'>
+                Can&apos;t find your artist?{' '}
+                <a
+                  href='https://artists.spotify.com'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='text-indigo-600 hover:text-indigo-500 underline'
+                >
+                  Verify your Spotify artist profile
+                </a>
+              </p>
+            </div>
+          );
+        }
+        return filteredOptions.map((option, index) => (
           <ComboboxOptionItem key={option.id} option={option} index={index} />
-        ))
-      )}
+        ));
+      })()}
     </Headless.Combobox.Options>
   );
 });
