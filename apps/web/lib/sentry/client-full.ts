@@ -188,15 +188,29 @@ export function initFullSentry(options: FullSentryConfig = {}): boolean {
  * This is useful when upgrading from a lite SDK to full SDK during navigation,
  * without re-initializing the entire SDK.
  *
- * @returns Promise<boolean> - true if Replay was added, false if already loaded or client not initialized
+ * **Note:** This function is only available in development due to CSP restrictions.
+ * Sentry Replay uses eval() internally, which is blocked by Content Security Policy
+ * in production where 'unsafe-eval' is not allowed. In production, this function
+ * returns false immediately without loading replay.
+ *
+ * @returns Promise<boolean> - true if Replay was added, false if:
+ *   - Running in production (CSP restriction)
+ *   - Replay already loaded
+ *   - Sentry client not initialized
  *
  * @example
- * // Upgrade lite SDK with Replay when user navigates to dashboard
+ * // Upgrade lite SDK with Replay when user navigates to dashboard (dev only)
  * if (isNavigatingToDashboard) {
  *   await addReplayIntegration();
  * }
  */
 export async function addReplayIntegration(): Promise<boolean> {
+  // Skip in production - Sentry Replay uses eval() which violates CSP
+  // when 'unsafe-eval' is not allowed (only permitted in development)
+  if (process.env.NODE_ENV !== 'development') {
+    return false;
+  }
+
   // Skip if Replay is already loaded
   if (isReplayLoaded) {
     return false;
@@ -250,7 +264,12 @@ export async function initFullSentryAsync(
     return false;
   }
 
-  const { enableReplay = true, ...restOptions } = options;
+  // Default enableReplay to development-only to avoid CSP violations in production.
+  // Sentry Replay uses eval() internally, which violates CSP when 'unsafe-eval' is not allowed.
+  const {
+    enableReplay = process.env.NODE_ENV === 'development',
+    ...restOptions
+  } = options;
 
   // First, initialize with base configuration (no Replay yet)
   const configWithoutReplay = getFullClientConfig({
