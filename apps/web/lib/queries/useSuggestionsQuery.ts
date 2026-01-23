@@ -73,7 +73,7 @@ export interface UseSuggestionsQueryOptions {
   /** Force fast polling mode (resets backoff). Useful after user actions. */
   fastPolling?: boolean;
   /** Optional initial data to seed the cache and skip the first fetch. */
-  initialData?: SuggestionsQueryResult | undefined;
+  initialData?: SuggestionsQueryResult;
 }
 
 /**

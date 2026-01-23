@@ -552,7 +552,6 @@ export async function getAdminActivityFeed(
           if (shouldDisableStripeEventsTable(error)) {
             DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
           }
-          DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
           console.warn('Stripe webhook activity unavailable; skipping.');
           return [] as StripeActivityRow[];
         }

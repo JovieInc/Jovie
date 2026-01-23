@@ -35,7 +35,7 @@ export function profileIsPublishable(profile: CreatorProfile | null): boolean {
   // be public, and have completed onboarding at least once.
   const hasHandle =
     Boolean(profile.usernameNormalized) && Boolean(profile.username);
-  const hasName = Boolean(profile.displayName && profile.displayName.trim());
+  const hasName = Boolean(profile.displayName?.trim());
   const isPublic = profile.isPublic !== false;
   const hasCompleted = Boolean(profile.onboardingCompletedAt);
 
