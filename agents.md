@@ -184,6 +184,33 @@ Required variables are defined in `lib/env.ts` with Zod validation.
 
 ---
 
+## Doppler Secrets (Local/CI)
+
+This repo uses Doppler for secrets instead of committed `.env` files.
+
+- **Tokens are not auto-injected** in cloud agent sessions. If a user says a
+  Doppler token was added, verify it exists in the shell (e.g.,
+  `echo $DOPPLER_TOKEN_DEV`).
+- **Configure Doppler** for this repo:
+  ```bash
+  doppler setup --project jovie-web --config dev --no-interactive --scope /workspace --token "$DOPPLER_TOKEN_DEV"
+  ```
+  Use `stg` or `prd` configs with their matching tokens when needed.
+- **Run commands with secrets**:
+  ```bash
+  doppler run --config dev -- <command>
+  ```
+- **Production public-profile audits** require `VERCEL_AUTOMATION_BYPASS_SECRET`,
+  which is available in the `prd` config (CI uses it for bot bypass).
+
+If Doppler CLI is missing and you lack sudo, install to a user-writable path:
+```bash
+curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh -o /tmp/doppler-install.sh
+sh /tmp/doppler-install.sh --install-path "$HOME/.local/bin"
+```
+
+---
+
 ## Branch Strategy
 
 ```
