@@ -110,12 +110,11 @@ export function computeLinkConfidence(input: ConfidenceInput): {
 
   const clamped = Math.min(1, Math.max(0, Number(score.toFixed(2))));
 
-  const state: SocialLinkState =
-    clamped >= ACTIVE_THRESHOLD
-      ? 'active'
-      : clamped >= SUGGESTED_THRESHOLD
-        ? 'suggested'
-        : 'rejected';
+  const state: SocialLinkState = (() => {
+    if (clamped >= ACTIVE_THRESHOLD) return 'active';
+    if (clamped >= SUGGESTED_THRESHOLD) return 'suggested';
+    return 'rejected';
+  })();
 
   return { confidence: clamped, state };
 }

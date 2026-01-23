@@ -140,13 +140,18 @@ const fetchStoredPreferences = async (target: NotificationTarget) => {
       .from(creatorProfiles)
       .leftJoin(users, eq(users.id, creatorProfiles.userId));
 
-    const whereCondition = target.creatorProfileId
-      ? eq(creatorProfiles.id, target.creatorProfileId)
-      : target.userId
-        ? eq(creatorProfiles.userId, target.userId)
-        : target.clerkUserId
-          ? eq(users.clerkId, target.clerkUserId)
-          : undefined;
+    const whereCondition = (() => {
+      if (target.creatorProfileId) {
+        return eq(creatorProfiles.id, target.creatorProfileId);
+      }
+      if (target.userId) {
+        return eq(creatorProfiles.userId, target.userId);
+      }
+      if (target.clerkUserId) {
+        return eq(users.clerkId, target.clerkUserId);
+      }
+      return undefined;
+    })();
 
     const query = whereCondition ? baseQuery.where(whereCondition) : baseQuery;
 

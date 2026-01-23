@@ -123,12 +123,11 @@ export const unsubscribeSchema = z
 
     if (hasToken || hasEmail || hasPhone) return;
 
-    const path =
-      data.channel === 'sms'
-        ? ['phone']
-        : data.channel === 'email'
-          ? ['email']
-          : ['channel'];
+    const path = (() => {
+      if (data.channel === 'sms') return ['phone'];
+      if (data.channel === 'email') return ['email'];
+      return ['channel'];
+    })();
 
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

@@ -287,12 +287,15 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     checkedAtIso: generatedAt.toISOString(),
   };
 
-  const lastIncidentAtIso =
-    reliabilitySummary.lastIncidentAt instanceof Date
-      ? reliabilitySummary.lastIncidentAt.toISOString()
-      : reliabilitySummary.lastIncidentAt != null
-        ? normalizeIso(reliabilitySummary.lastIncidentAt)
-        : null;
+  const lastIncidentAtIso = (() => {
+    if (reliabilitySummary.lastIncidentAt instanceof Date) {
+      return reliabilitySummary.lastIncidentAt.toISOString();
+    }
+    if (reliabilitySummary.lastIncidentAt != null) {
+      return normalizeIso(reliabilitySummary.lastIncidentAt);
+    }
+    return null;
+  })();
 
   return {
     accessMode: mode,
