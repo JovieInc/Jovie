@@ -206,6 +206,21 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     if (!isDevOrPreview(hostname)) {
       // app.jov.ie: Only allow app paths (no /app prefix)
       if (isAppSubdomain(hostname)) {
+        // Redirect /dashboard to / (dashboard is at root on app.jov.ie)
+        // This handles SSO callbacks that redirect to /app/dashboard → app.jov.ie/dashboard
+        if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+          const targetPath =
+            pathname === '/dashboard'
+              ? '/'
+              : pathname.replace('/dashboard', '');
+          // Normalize path to prevent open redirect (e.g., //evil.com being treated as protocol-relative)
+          const normalizedPath = '/' + targetPath.replace(/^\/+/, '');
+          const targetUrl = new URL('https://app.jov.ie');
+          targetUrl.pathname = normalizedPath;
+          targetUrl.search = req.nextUrl.search;
+          return NextResponse.redirect(targetUrl, 301);
+        }
+
         const appPaths = [
           '/', // Dashboard at root
           '/analytics',
