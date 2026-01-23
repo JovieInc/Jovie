@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   deleteContact,
@@ -13,6 +13,15 @@ import type {
   DashboardContact,
   DashboardContactInput,
 } from '@/types/contacts';
+
+/** UI state for a contact (separate from domain data) */
+interface ContactUIState {
+  isExpanded: boolean;
+  isSaving: boolean;
+  error: string | null;
+  customTerritory: string;
+  isNew: boolean;
+}
 
 export interface EditableContact extends DashboardContact {
   isExpanded?: boolean;
@@ -78,14 +87,29 @@ export function useContactsManager({
   artistHandle,
   initialContacts,
 }: UseContactsManagerProps): UseContactsManagerReturn {
-  const [contacts, setContacts] = useState<EditableContact[]>(() =>
-    initialContacts.map(contact => ({
-      ...contact,
-      isExpanded: initialContacts.length === 1,
-      customTerritory: '',
-      error: null,
-    }))
+  // Domain state - the actual contact data
+  const [contacts, setContacts] = useState<DashboardContact[]>(
+    () => initialContacts
   );
+
+  // UI state - keyed by contact ID
+  const [uiState, setUiState] = useState<Record<string, ContactUIState>>(() =>
+    initialContacts.reduce(
+      (acc, contact) => ({
+        ...acc,
+        [contact.id]: {
+          isExpanded: initialContacts.length === 1,
+          isSaving: false,
+          error: null,
+          customTerritory: '',
+          isNew: false,
+        },
+      }),
+      {}
+    )
+  );
+
+  // Baseline for cancel/revert (domain data only)
   const [baseline, setBaseline] = useState<Record<string, DashboardContact>>(
     () =>
       initialContacts.reduce(
@@ -96,158 +120,286 @@ export function useContactsManager({
 
   const hasContacts = contacts.length > 0;
 
-  const updateContact = (
-    id: string,
-    updates: Partial<EditableContact>
-  ): void => {
-    setContacts(prev =>
-      prev.map(contact =>
-        contact.id === id ? { ...contact, ...updates, error: null } : contact
-      )
-    );
-  };
-
-  const handleToggleTerritory = (contactId: string, territory: string) => {
-    setContacts(prev =>
-      prev.map(contact =>
-        contact.id === contactId
-          ? toggleTerritoryForContact(contact, territory, profileId)
-          : contact
-      )
-    );
-  };
-
-  const addCustomTerritory = (contactId: string) => {
-    const target = contacts.find(contact => contact.id === contactId);
-    if (!target) return;
-    const value = target.customTerritory?.trim();
-    if (!value) return;
-    handleToggleTerritory(contactId, value);
-    updateContact(contactId, { customTerritory: '' });
-  };
-
-  const handleSave = async (contact: EditableContact) => {
-    updateContact(contact.id, { isSaving: true, error: null });
-    try {
-      const payload: DashboardContactInput = {
+  // Merge domain and UI state for consumers
+  const editableContacts = useMemo<EditableContact[]>(
+    () =>
+      contacts.map(contact => ({
         ...contact,
-        id: contact.id.startsWith('temp-') ? undefined : contact.id,
-        profileId,
-      };
-      const validated = sanitizeContactInput(payload);
-      const saved = await saveContact(validated);
+        ...uiState[contact.id],
+      })),
+    [contacts, uiState]
+  );
 
+  const updateContact = useCallback(
+    (id: string, updates: Partial<EditableContact>): void => {
+      // Separate domain updates from UI updates
+      const {
+        isExpanded,
+        isSaving,
+        error,
+        customTerritory,
+        isNew,
+        ...domainUpdates
+      } = updates;
+      const uiUpdates = { isExpanded, isSaving, error, customTerritory, isNew };
+
+      // Update domain state if there are domain updates
+      if (Object.keys(domainUpdates).length > 0) {
+        setContacts(prev =>
+          prev.map(contact =>
+            contact.id === id ? { ...contact, ...domainUpdates } : contact
+          )
+        );
+      }
+
+      // Update UI state
+      const hasUiUpdates = Object.values(uiUpdates).some(v => v !== undefined);
+      if (hasUiUpdates) {
+        setUiState(prev => ({
+          ...prev,
+          [id]: {
+            ...prev[id],
+            ...(isExpanded !== undefined && { isExpanded }),
+            ...(isSaving !== undefined && { isSaving }),
+            ...(error !== undefined && { error }),
+            ...(customTerritory !== undefined && { customTerritory }),
+            ...(isNew !== undefined && { isNew }),
+          },
+        }));
+      }
+    },
+    []
+  );
+
+  const handleToggleTerritory = useCallback(
+    (contactId: string, territory: string) => {
       setContacts(prev =>
-        prev.map(item =>
-          item.id === contact.id
-            ? {
-                ...saved,
-                isExpanded: false,
-                customTerritory: '',
-                error: null,
-                isNew: false,
-              }
-            : item
+        prev.map(contact =>
+          contact.id === contactId
+            ? toggleTerritoryForContact(contact, territory, profileId)
+            : contact
         )
       );
-      setBaseline(prev => ({ ...prev, [saved.id]: saved }));
-      toast.success('Contact saved');
-      track(
-        contact.id && !contact.id.startsWith('temp-')
-          ? 'contacts_contact_updated'
-          : 'contacts_contact_created',
-        {
-          handle: artistHandle,
-          role: saved.role,
-          territory_count: saved.territories.length,
-        }
+    },
+    [profileId]
+  );
+
+  const addCustomTerritory = useCallback(
+    (contactId: string) => {
+      const customTerritoryValue = uiState[contactId]?.customTerritory?.trim();
+      if (!customTerritoryValue) return;
+      handleToggleTerritory(contactId, customTerritoryValue);
+      setUiState(prev => ({
+        ...prev,
+        [contactId]: { ...prev[contactId], customTerritory: '' },
+      }));
+    },
+    [uiState, handleToggleTerritory]
+  );
+
+  const handleSave = useCallback(
+    async (contact: EditableContact) => {
+      const contactId = contact.id;
+      const isNewContact = contactId.startsWith('temp-');
+
+      // Single UI state update for starting save
+      setUiState(prev => ({
+        ...prev,
+        [contactId]: { ...prev[contactId], isSaving: true, error: null },
+      }));
+
+      try {
+        const payload: DashboardContactInput = {
+          ...contact,
+          id: isNewContact ? undefined : contactId,
+          profileId,
+        };
+        const validated = sanitizeContactInput(payload);
+        const saved = await saveContact(validated);
+
+        // Batch all success updates together
+        setContacts(prev =>
+          prev.map(item => (item.id === contactId ? saved : item))
+        );
+        setBaseline(prev => ({ ...prev, [saved.id]: saved }));
+        setUiState(prev => {
+          const next = { ...prev };
+          // Remove old temp ID entry if it was a new contact
+          if (isNewContact && saved.id !== contactId) {
+            delete next[contactId];
+          }
+          next[saved.id] = {
+            isExpanded: false,
+            isSaving: false,
+            error: null,
+            customTerritory: '',
+            isNew: false,
+          };
+          return next;
+        });
+
+        toast.success('Contact saved');
+        track(
+          isNewContact
+            ? 'contacts_contact_created'
+            : 'contacts_contact_updated',
+          {
+            handle: artistHandle,
+            role: saved.role,
+            territory_count: saved.territories.length,
+          }
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unable to save contact';
+        setUiState(prev => ({
+          ...prev,
+          [contactId]: { ...prev[contactId], isSaving: false, error: message },
+        }));
+        toast.error(message);
+      }
+    },
+    [profileId, artistHandle]
+  );
+
+  const handleDelete = useCallback(
+    async (contact: EditableContact) => {
+      const contactId = contact.id;
+
+      // Handle temp contacts (not persisted yet)
+      if (!contactId || contactId.startsWith('temp-')) {
+        setContacts(prev => prev.filter(item => item.id !== contactId));
+        setUiState(prev => {
+          const next = { ...prev };
+          delete next[contactId];
+          return next;
+        });
+        return;
+      }
+
+      const confirmed = window.confirm(
+        'Remove this contact from your profile?'
       );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to save contact';
-      updateContact(contact.id, { error: message });
-      toast.error(message);
-    } finally {
-      updateContact(contact.id, { isSaving: false });
-    }
-  };
+      if (!confirmed) return;
 
-  const handleDelete = async (contact: EditableContact) => {
-    if (!contact.id || contact.id.startsWith('temp-')) {
-      setContacts(prev => prev.filter(item => item.id !== contact.id));
-      return;
-    }
+      // Store backup for rollback
+      const backup = contacts.find(c => c.id === contactId);
+      const backupUiState = uiState[contactId];
 
-    const confirmed = window.confirm('Remove this contact from your profile?');
-    if (!confirmed) return;
-
-    updateContact(contact.id, { isSaving: true });
-    try {
-      await deleteContact(contact.id, profileId);
-      setContacts(prev => prev.filter(item => item.id !== contact.id));
-      setBaseline(prev => {
+      // Optimistic delete - remove immediately
+      setContacts(prev => prev.filter(c => c.id !== contactId));
+      setUiState(prev => {
         const next = { ...prev };
-        delete next[contact.id];
+        delete next[contactId];
         return next;
       });
-      toast.success('Contact removed');
-      track('contacts_contact_deleted', {
-        handle: artistHandle,
-        role: contact.role,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to delete contact';
-      toast.error(message);
-      updateContact(contact.id, { isSaving: false, error: message });
-    }
-  };
 
-  const handleCancel = (contact: EditableContact) => {
-    if (!contact.id || contact.id.startsWith('temp-')) {
-      setContacts(prev => prev.filter(item => item.id !== contact.id));
-      return;
-    }
-    const baselineContact = baseline[contact.id];
-    if (!baselineContact) return;
-    setContacts(prev =>
-      prev.map(item =>
-        item.id === contact.id
-          ? {
-              ...baselineContact,
+      try {
+        await deleteContact(contactId, profileId);
+        setBaseline(prev => {
+          const next = { ...prev };
+          delete next[contactId];
+          return next;
+        });
+        toast.success('Contact removed');
+        track('contacts_contact_deleted', {
+          handle: artistHandle,
+          role: contact.role,
+        });
+      } catch (error) {
+        // Rollback on error
+        if (backup) {
+          setContacts(prev => [...prev, backup]);
+          setUiState(prev => ({
+            ...prev,
+            [contactId]: backupUiState ?? {
               isExpanded: false,
+              isSaving: false,
+              error: null,
               customTerritory: '',
-            }
-          : item
-      )
-    );
-  };
+              isNew: false,
+            },
+          }));
+        }
+        const message =
+          error instanceof Error ? error.message : 'Unable to delete contact';
+        toast.error(message);
+      }
+    },
+    [contacts, uiState, profileId, artistHandle]
+  );
 
-  const addContact = (role: ContactRole = 'bookings') => {
-    const newContact: EditableContact = {
-      id: `temp-${makeTempId()}`,
-      creatorProfileId: profileId,
-      role,
-      customLabel: role === 'other' ? '' : null,
-      personName: '',
-      companyName: '',
-      territories: [],
-      email: '',
-      phone: '',
-      preferredChannel: null,
-      isActive: true,
-      sortOrder: contacts.length,
-      isExpanded: true,
-      isNew: true,
-      customTerritory: '',
-      error: null,
-    };
-    setContacts(prev => [...prev, newContact]);
-  };
+  const handleCancel = useCallback(
+    (contact: EditableContact) => {
+      const contactId = contact.id;
+
+      if (!contactId || contactId.startsWith('temp-')) {
+        setContacts(prev => prev.filter(item => item.id !== contactId));
+        setUiState(prev => {
+          const next = { ...prev };
+          delete next[contactId];
+          return next;
+        });
+        return;
+      }
+
+      const baselineContact = baseline[contactId];
+      if (!baselineContact) return;
+
+      // Revert domain state to baseline
+      setContacts(prev =>
+        prev.map(item => (item.id === contactId ? baselineContact : item))
+      );
+      // Reset UI state
+      setUiState(prev => ({
+        ...prev,
+        [contactId]: {
+          isExpanded: false,
+          isSaving: false,
+          error: null,
+          customTerritory: '',
+          isNew: false,
+        },
+      }));
+    },
+    [baseline]
+  );
+
+  const addContact = useCallback(
+    (role: ContactRole = 'bookings') => {
+      const newId = `temp-${makeTempId()}`;
+      const newContact: DashboardContact = {
+        id: newId,
+        creatorProfileId: profileId,
+        role,
+        customLabel: role === 'other' ? '' : null,
+        personName: '',
+        companyName: '',
+        territories: [],
+        email: '',
+        phone: '',
+        preferredChannel: null,
+        isActive: true,
+        sortOrder: contacts.length,
+      };
+      setContacts(prev => [...prev, newContact]);
+      setUiState(prev => ({
+        ...prev,
+        [newId]: {
+          isExpanded: true,
+          isSaving: false,
+          error: null,
+          customTerritory: '',
+          isNew: true,
+        },
+      }));
+    },
+    [profileId, contacts.length]
+  );
 
   return useMemo(
     () => ({
-      contacts,
+      contacts: editableContacts,
       hasContacts,
       updateContact,
       handleToggleTerritory,
@@ -257,6 +409,16 @@ export function useContactsManager({
       handleCancel,
       addContact,
     }),
-    [contacts, hasContacts]
+    [
+      editableContacts,
+      hasContacts,
+      updateContact,
+      handleToggleTerritory,
+      addCustomTerritory,
+      handleSave,
+      handleDelete,
+      handleCancel,
+      addContact,
+    ]
   );
 }

@@ -10,7 +10,7 @@ import {
 } from '@jovie/ui';
 import { PencilLine, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -286,7 +286,7 @@ interface ReleaseTableRowProps {
   artistName?: string | null;
 }
 
-export function ReleaseTableRow({
+export const ReleaseTableRow = memo(function ReleaseTableRow({
   release,
   index,
   totalRows,
@@ -542,4 +542,4 @@ export function ReleaseTableRow({
       </td>
     </tr>
   );
-}
+});
