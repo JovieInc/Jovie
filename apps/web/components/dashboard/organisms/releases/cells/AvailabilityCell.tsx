@@ -191,6 +191,24 @@ export const AvailabilityCell = memo(function AvailabilityCell({
     [providerMap]
   );
 
+  // Create copy handler for a specific provider (extracted to reduce nesting depth)
+  const createCopyHandler = useCallback(
+    (providerKey: ProviderKey, testId: string) => {
+      return () => {
+        const provider = providerMap.get(providerKey);
+        if (provider?.path) {
+          const config = providerConfig[providerKey];
+          void handleCopyWithFeedback(
+            provider.path,
+            `${release.title} – ${config.label}`,
+            testId
+          );
+        }
+      };
+    },
+    [providerMap, providerConfig, release.title, handleCopyWithFeedback]
+  );
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -340,15 +358,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               ? `Copied ${config.label} link`
                               : `Copy ${config.label} link`
                           }
-                          onClick={() => {
-                            if (provider.path) {
-                              handleCopyWithFeedback(
-                                provider.path,
-                                `${release.title} – ${config.label}`,
-                                testId
-                              ).catch(() => {});
-                            }
-                          }}
+                          onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
                             'rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                             isCopied && 'text-green-600 dark:text-green-400'
