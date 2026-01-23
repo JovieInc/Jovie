@@ -13,6 +13,7 @@ import {
 import { MatchStatusBadge } from '@/components/dashboard/atoms/MatchStatusBadge';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
+import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 import { MatchConfidenceBreakdown } from './MatchConfidenceBreakdown';
 
@@ -103,7 +104,7 @@ export function DspMatchCard({
               width={40}
               height={40}
               className='rounded-full object-cover'
-              unoptimized={externalArtistImageUrl.includes('i.scdn.co')}
+              unoptimized={isExternalDspImage(externalArtistImageUrl)}
             />
           ) : (
             <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-2'>

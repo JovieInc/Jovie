@@ -47,6 +47,17 @@ export function IngestProfileDialog({
     }
   }, [open]);
 
+  // Handle delayed close after successful ingest
+  useEffect(() => {
+    if (success) {
+      const timeoutId = window.setTimeout(() => {
+        onOpenChange(false);
+        onSuccess();
+      }, 1500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [success, onOpenChange, onSuccess]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -67,14 +78,6 @@ export function IngestProfileDialog({
       {
         onSuccess: () => {
           setSuccess(true);
-          setUrl('');
-
-          // Close dialog after a brief delay and refresh table
-          setTimeout(() => {
-            onOpenChange(false);
-            onSuccess();
-            setSuccess(false);
-          }, 1500);
         },
         onError: err => {
           const errorMessage =
@@ -87,9 +90,6 @@ export function IngestProfileDialog({
 
   const handleClose = () => {
     if (!isLoading) {
-      setUrl('');
-      setError(null);
-      setSuccess(false);
       onOpenChange(false);
     }
   };
