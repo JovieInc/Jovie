@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 
+// Extracted static style to avoid creating new object on each render
+const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
+
 export function PricingPreview() {
   return (
     <section className='py-20 bg-neutral-50 dark:bg-neutral-900'>
@@ -8,7 +11,7 @@ export function PricingPreview() {
         <div className='text-center mb-12'>
           <h2
             className='text-3xl sm:text-4xl font-medium tracking-tight text-neutral-900 dark:text-white'
-            style={{ fontSynthesisWeight: 'none' }}
+            style={FONT_SYNTHESIS_STYLE}
           >
             Simple, transparent pricing
           </h2>
@@ -22,13 +25,13 @@ export function PricingPreview() {
           <div className='text-center'>
             <h3
               className='text-sm font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-3'
-              style={{ fontSynthesisWeight: 'none' }}
+              style={FONT_SYNTHESIS_STYLE}
             >
               Free
             </h3>
             <p
               className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
-              style={{ fontSynthesisWeight: 'none' }}
+              style={FONT_SYNTHESIS_STYLE}
             >
               $0
             </p>
@@ -41,13 +44,13 @@ export function PricingPreview() {
           <div className='text-center'>
             <h3
               className='text-sm font-medium uppercase tracking-wide text-neutral-900 dark:text-white mb-3'
-              style={{ fontSynthesisWeight: 'none' }}
+              style={FONT_SYNTHESIS_STYLE}
             >
               Pro
             </h3>
             <p
               className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
-              style={{ fontSynthesisWeight: 'none' }}
+              style={FONT_SYNTHESIS_STYLE}
             >
               $39
             </p>
@@ -60,13 +63,13 @@ export function PricingPreview() {
           <div className='text-center'>
             <h3
               className='text-sm font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-3'
-              style={{ fontSynthesisWeight: 'none' }}
+              style={FONT_SYNTHESIS_STYLE}
             >
               Growth
             </h3>
             <p
               className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
-              style={{ fontSynthesisWeight: 'none' }}
+              style={FONT_SYNTHESIS_STYLE}
             >
               $99
             </p>
@@ -80,7 +83,7 @@ export function PricingPreview() {
           <Link
             href='/pricing'
             className='inline-block px-6 py-3 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors'
-            style={{ fontSynthesisWeight: 'none' }}
+            style={FONT_SYNTHESIS_STYLE}
           >
             View pricing →
           </Link>

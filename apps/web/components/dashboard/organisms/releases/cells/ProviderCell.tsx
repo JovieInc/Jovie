@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import {
   type FormEvent,
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -326,7 +327,7 @@ interface ProviderCellProps {
  * - Manual: Shows status dot with warning + copy link button
  * - Missing: Shows status dot + "Add URL" popover trigger
  */
-export function ProviderCell({
+export const ProviderCell = memo(function ProviderCell({
   release,
   provider: providerKey,
   config,
@@ -430,4 +431,4 @@ export function ProviderCell({
       {renderProviderContent()}
     </div>
   );
-}
+});

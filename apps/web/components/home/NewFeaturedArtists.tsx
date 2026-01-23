@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/nextjs';
 import { type FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 import { Container } from '@/components/site/Container';
 import { getFeaturedCreators } from '@/lib/featured-creators';
@@ -16,7 +17,7 @@ export async function NewFeaturedArtists({
   try {
     artists = await getFeaturedCreators();
   } catch (err) {
-    console.error('Error fetching artists:', err);
+    captureException(err, { extra: { context: 'featured-artists' } });
     error = "We're having trouble loading creators right now. Please refresh.";
   }
 

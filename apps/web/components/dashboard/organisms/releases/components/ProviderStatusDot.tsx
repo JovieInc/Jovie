@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ProviderStatusDotProps {
@@ -5,7 +6,7 @@ interface ProviderStatusDotProps {
   accent: string;
 }
 
-export function ProviderStatusDot({
+export const ProviderStatusDot = memo(function ProviderStatusDot({
   status,
   accent,
 }: Readonly<ProviderStatusDotProps>) {
@@ -30,4 +31,4 @@ export function ProviderStatusDot({
       )}
     </span>
   );
-}
+});

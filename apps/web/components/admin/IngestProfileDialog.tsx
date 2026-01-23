@@ -1,9 +1,10 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
+import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
 
 interface IngestProfileDialogProps {
   open: boolean;
@@ -17,9 +18,11 @@ export function IngestProfileDialog({
   onSuccess,
 }: IngestProfileDialogProps) {
   const [url, setUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const { mutate: ingestProfile, isPending: isLoading } =
+    useIngestProfileMutation();
 
   const isValidLinktreeUrl = (input: string): boolean => {
     try {
@@ -35,7 +38,27 @@ export function IngestProfileDialog({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setUrl('');
+      setError(null);
+      setSuccess(false);
+    }
+  }, [open]);
+
+  // Handle delayed close after successful ingest
+  useEffect(() => {
+    if (success) {
+      const timeoutId = window.setTimeout(() => {
+        onOpenChange(false);
+        onSuccess();
+      }, 1500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [success, onOpenChange, onSuccess]);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(false);
@@ -50,54 +73,23 @@ export function IngestProfileDialog({
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/admin/creator-ingest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+    ingestProfile(
+      { url: url.trim() },
+      {
+        onSuccess: () => {
+          setSuccess(true);
         },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        profile?: { id: string; username: string };
-        links?: number;
-      };
-
-      if (!response.ok || !data.ok) {
-        const errorMessage = data.error || 'Failed to ingest profile';
-        setError(errorMessage);
-        setIsLoading(false);
-        return;
+        onError: err => {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to ingest profile';
+          setError(errorMessage);
+        },
       }
-
-      setSuccess(true);
-      setUrl('');
-
-      // Close dialog after a brief delay and refresh table
-      setTimeout(() => {
-        onOpenChange(false);
-        onSuccess();
-        setSuccess(false);
-      }, 1500);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to ingest profile';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   const handleClose = () => {
     if (!isLoading) {
-      setUrl('');
-      setError(null);
-      setSuccess(false);
       onOpenChange(false);
     }
   };
