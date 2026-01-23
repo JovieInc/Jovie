@@ -2,39 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { type AdminSocialLink, useAdminSocialLinksQuery } from '@/lib/queries';
+import { useAdminSocialLinksQuery } from '@/lib/queries';
 import type { Contact } from '@/types';
 import { mapProfileToContact } from './utils';
 
-/** Simple social link shape for comparison */
-interface SimpleSocialLink {
+/** Common social link shape for comparison */
+interface ComparableSocialLink {
   id?: string;
   url: string;
   label?: string;
   platformType?: string;
 }
 
-/** Check if two admin social link arrays are equal by comparing key fields */
-function areAdminSocialLinksEqual(
-  a: AdminSocialLink[] | undefined,
-  b: AdminSocialLink[] | undefined
-): boolean {
-  if (!a && !b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  return a.every(
-    (link, i) =>
-      link.id === b[i].id &&
-      link.url === b[i].url &&
-      link.label === b[i].label &&
-      link.platformType === b[i].platformType
-  );
-}
-
-/** Check if two simple social link arrays are equal */
-function areSimpleSocialLinksEqual(
-  a: SimpleSocialLink[] | undefined,
-  b: SimpleSocialLink[] | undefined
+/** Check if two social link arrays are equal by comparing key fields */
+function areSocialLinksEqual<T extends ComparableSocialLink>(
+  a: T[] | undefined,
+  b: T[] | undefined
 ): boolean {
   if (!a && !b) return true;
   if (!a || !b) return false;
@@ -113,7 +96,7 @@ export function useContactHydration({
         : undefined;
 
     // Skip update if social links haven't actually changed
-    if (areAdminSocialLinksEqual(prevSocialLinksRef.current, socialLinks)) {
+    if (areSocialLinksEqual(prevSocialLinksRef.current, socialLinks)) {
       return;
     }
     prevSocialLinksRef.current = socialLinks;
@@ -122,7 +105,7 @@ export function useContactHydration({
       // Skip update if the contact ID matches and social links are the same
       if (
         prev?.id === contactBase.id &&
-        areSimpleSocialLinksEqual(prev.socialLinks, newSocialLinks)
+        areSocialLinksEqual(prev.socialLinks, newSocialLinks)
       ) {
         return prev;
       }

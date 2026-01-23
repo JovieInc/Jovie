@@ -22,8 +22,8 @@ interface CacheEntry<T> {
  */
 class LRUCache<T> {
   private cache = new Map<string, CacheEntry<T>>();
-  private maxSize: number;
-  private defaultTtlMs: number;
+  private readonly maxSize: number;
+  private readonly defaultTtlMs: number;
 
   constructor(maxSize: number, defaultTtlMs = CACHE_TTL_MS) {
     this.maxSize = maxSize;

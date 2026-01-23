@@ -13,8 +13,8 @@ declare global {
  * User Journey Tracker class for monitoring user flows
  */
 export class UserJourneyTracker {
-  private journeyName: string;
-  private steps: string[];
+  private readonly journeyName: string;
+  private readonly steps: string[];
   private currentStep: number = -1;
   private startTime: number = 0;
   private stepTimes: Record<string, number> = {};

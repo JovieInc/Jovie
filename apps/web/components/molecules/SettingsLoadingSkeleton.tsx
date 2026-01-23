@@ -123,16 +123,8 @@ export function NotificationsSettingsLoading() {
   );
 }
 
-/** Appearance settings loading skeleton */
-export function AppearanceSettingsLoading() {
-  return (
-    <SettingsLoadingSkeleton titleWidth='w-48' descriptionWidth='w-80'>
-      <InputSkeleton />
-      <InputSkeleton />
-      <ButtonSkeleton width='w-40' />
-    </SettingsLoadingSkeleton>
-  );
-}
+/** Appearance settings loading skeleton - reuses ProfileSettingsLoading */
+export const AppearanceSettingsLoading = ProfileSettingsLoading;
 
 /** Generic form settings loading skeleton */
 export function FormSettingsLoading({
