@@ -91,26 +91,31 @@ export interface CreatorProfileTableRowProps {
 }
 
 /**
- * Custom comparison function for React.memo.
- * Only rerenders when data or status actually changed.
- * Ignores handler function identity changes (they're recreated every render but do the same thing).
+ * Compares primitive props that affect rendering.
  */
-function arePropsEqual(
+function arePrimitivePropsEqual(
   prev: CreatorProfileTableRowProps,
   next: CreatorProfileTableRowProps
 ): boolean {
-  // Compare primitive props that affect rendering
-  if (prev.rowNumber !== next.rowNumber) return false;
-  if (prev.isSelected !== next.isSelected) return false;
-  if (prev.isChecked !== next.isChecked) return false;
-  if (prev.isMobile !== next.isMobile) return false;
-  if (prev.verificationStatus !== next.verificationStatus) return false;
-  if (prev.refreshIngestStatus !== next.refreshIngestStatus) return false;
-  if (prev.isMenuOpen !== next.isMenuOpen) return false;
+  return (
+    prev.rowNumber === next.rowNumber &&
+    prev.isSelected === next.isSelected &&
+    prev.isChecked === next.isChecked &&
+    prev.isMobile === next.isMobile &&
+    prev.verificationStatus === next.verificationStatus &&
+    prev.refreshIngestStatus === next.refreshIngestStatus &&
+    prev.isMenuOpen === next.isMenuOpen
+  );
+}
 
-  // Compare profile data that affects rendering
-  const prevProfile = prev.profile;
-  const nextProfile = next.profile;
+/**
+ * Compares profile data that affects rendering.
+ */
+function areProfilesEqual(
+  prevProfile: AdminCreatorProfileRow,
+  nextProfile: AdminCreatorProfileRow
+): boolean {
+  // Compare basic profile fields
   if (prevProfile.id !== nextProfile.id) return false;
   if (prevProfile.username !== nextProfile.username) return false;
   if (prevProfile.displayName !== nextProfile.displayName) return false;
@@ -126,15 +131,29 @@ function arePropsEqual(
   const nextDate = nextProfile.createdAt?.getTime?.() ?? null;
   if (prevDate !== nextDate) return false;
 
-  // Compare social links array (shallow comparison of length and ids)
+  // Compare social links array (shallow comparison of length)
   const prevLinks = prevProfile.socialLinks ?? [];
   const nextLinks = nextProfile.socialLinks ?? [];
   if (prevLinks.length !== nextLinks.length) return false;
 
+  return true;
+}
+
+/**
+ * Custom comparison function for React.memo.
+ * Only rerenders when data or status actually changed.
+ * Ignores handler function identity changes (they're recreated every render but do the same thing).
+ */
+function arePropsEqual(
+  prev: CreatorProfileTableRowProps,
+  next: CreatorProfileTableRowProps
+): boolean {
   // Handlers are intentionally not compared - they're stable via useCallback in parent
   // or we accept new instances since the component is already memoized on data changes
-
-  return true;
+  return (
+    arePrimitivePropsEqual(prev, next) &&
+    areProfilesEqual(prev.profile, next.profile)
+  );
 }
 
 function CreatorProfileTableRowComponent({
