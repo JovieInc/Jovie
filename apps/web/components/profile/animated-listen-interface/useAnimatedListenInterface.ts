@@ -2,7 +2,7 @@
 
 import DOMPurify from 'isomorphic-dompurify';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   LISTEN_COOKIE,
@@ -25,12 +25,13 @@ export function useAnimatedListenInterface(
   handle: string,
   enableDynamicEngagement: boolean
 ): UseAnimatedListenInterfaceReturn {
-  const [dsps] = useState<AvailableDSP[]>(() => getAvailableDSPs(artist));
+  const [availableDSPs] = useState<AvailableDSP[]>(() =>
+    getAvailableDSPs(artist)
+  );
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
-
-  const availableDSPs = dsps;
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sanitize SVG logos to prevent XSS
   const sanitizedLogos = useMemo(() => {
@@ -64,6 +65,13 @@ export function useAnimatedListenInterface(
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handle, router]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const handleDSPClick = async (dsp: AvailableDSP) => {
     setSelectedDSP(dsp.key);
@@ -116,7 +124,8 @@ export function useAnimatedListenInterface(
       console.error('Failed to handle DSP click:', error);
     } finally {
       // Reset selection after a delay
-      setTimeout(() => setSelectedDSP(null), 1000);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setSelectedDSP(null), 1000);
     }
   };
 
