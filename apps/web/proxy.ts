@@ -209,11 +209,15 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         // Redirect /dashboard to / (dashboard is at root on app.jov.ie)
         // This handles SSO callbacks that redirect to /app/dashboard → app.jov.ie/dashboard
         if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
-          const targetPath = pathname === '/dashboard' ? '/' : pathname.replace('/dashboard', '');
-          return NextResponse.redirect(
-            new URL(targetPath, 'https://app.jov.ie'),
-            301
-          );
+          const targetPath =
+            pathname === '/dashboard'
+              ? '/'
+              : pathname.replace('/dashboard', '');
+          // Normalize path to prevent open redirect (e.g., //evil.com being treated as protocol-relative)
+          const normalizedPath = '/' + targetPath.replace(/^\/+/, '');
+          const targetUrl = new URL('https://app.jov.ie');
+          targetUrl.pathname = normalizedPath;
+          return NextResponse.redirect(targetUrl, 301);
         }
 
         const appPaths = [
