@@ -41,9 +41,16 @@ export const Sidebar = React.forwardRef<
       );
     }
 
-    if (isMobile) {
-      return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+    // Always render Sheet to maintain consistent hook count (Radix UI uses internal hooks)
+    // Control visibility via open prop instead of conditional rendering
+    return (
+      <>
+        {/* Mobile Sheet - always in tree, visibility controlled by open prop */}
+        <Sheet
+          open={isMobile && openMobile}
+          onOpenChange={setOpenMobile}
+          {...props}
+        >
           <SheetContent
             data-sidebar='sidebar'
             data-mobile='true'
@@ -60,41 +67,42 @@ export const Sidebar = React.forwardRef<
             </div>
           </SheetContent>
         </Sheet>
-      );
-    }
 
-    return (
-      <div
-        ref={ref}
-        className='group peer hidden shrink-0 overflow-hidden text-sidebar-foreground lg:sticky lg:top-0 lg:block'
-        data-state={state}
-        data-collapsible={state === 'closed' ? collapsible : ''}
-        data-variant={variant}
-        data-side={side}
-      >
-        <div
-          className={cn(
-            'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-out',
-            'group-data-[collapsible=offcanvas]:w-0',
-            'group-data-[side=right]:rotate-180',
-            variant === 'floating' &&
-              'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
-            variant === 'inset' &&
-              'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
-            variant === 'sidebar' &&
-              'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
-            className
-          )}
-          {...props}
-        >
+        {/* Desktop Sidebar - hidden on mobile via CSS class */}
+        {!isMobile && (
           <div
-            data-sidebar='sidebar'
-            className='flex h-full w-full flex-col overflow-hidden bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+            ref={ref}
+            className='group peer hidden shrink-0 overflow-hidden text-sidebar-foreground lg:sticky lg:top-0 lg:block'
+            data-state={state}
+            data-collapsible={state === 'closed' ? collapsible : ''}
+            data-variant={variant}
+            data-side={side}
           >
-            {children}
+            <div
+              className={cn(
+                'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-out',
+                'group-data-[collapsible=offcanvas]:w-0',
+                'group-data-[side=right]:rotate-180',
+                variant === 'floating' &&
+                  'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
+                variant === 'inset' &&
+                  'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
+                variant === 'sidebar' &&
+                  'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
+                className
+              )}
+              {...props}
+            >
+              <div
+                data-sidebar='sidebar'
+                className='flex h-full w-full flex-col overflow-hidden bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+              >
+                {children}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        )}
+      </>
     );
   }
 );
