@@ -3,6 +3,9 @@ import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/Laz
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardDataCached, getProfileSocialLinks } from '../actions';
 
+// Revalidate every minute for settings data
+export const revalidate = 60;
+
 export default async function ProfilePage() {
   const { userId } = await getCachedAuth();
 

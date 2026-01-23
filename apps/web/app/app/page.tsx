@@ -4,6 +4,9 @@ import { DashboardOverviewSkeleton } from '@/components/dashboard/organisms/Dash
 import { getCachedAuth } from '@/lib/auth/cached';
 import { DashboardOverviewSection } from './dashboard/DashboardOverviewSection';
 
+// User-specific page - always render fresh
+export const dynamic = 'force-dynamic';
+
 export default async function AppRootPage() {
   const { userId } = await getCachedAuth();
 

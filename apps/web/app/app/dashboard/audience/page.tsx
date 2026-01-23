@@ -12,6 +12,9 @@ import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
 import { getAudienceServerData } from './audience-data';
 
+// User-specific page - always render fresh
+export const dynamic = 'force-dynamic';
+
 export default async function AudiencePage({
   searchParams,
 }: {

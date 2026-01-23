@@ -3,6 +3,9 @@ import { DashboardTippingGate } from '@/components/dashboard/DashboardTippingGat
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../actions';
 
+// User-specific page - always render fresh
+export const dynamic = 'force-dynamic';
+
 export default async function EarningsPage() {
   const { userId } = await getCachedAuth();
 
