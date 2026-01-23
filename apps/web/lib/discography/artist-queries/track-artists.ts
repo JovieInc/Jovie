@@ -105,14 +105,13 @@ export async function deleteTrackArtists(trackId: string): Promise<void> {
 export async function getTracksByArtist(
   artistId: string,
   options?: {
-    role?: ArtistRole;
     limit?: number;
     offset?: number;
   }
 ): Promise<Array<{ trackId: string; role: ArtistRole; isPrimary: boolean }>> {
-  const { role, limit = 100, offset = 0 } = options ?? {};
+  const { limit = 100, offset = 0 } = options ?? {};
 
-  let query = db
+  return db
     .select({
       trackId: trackArtists.trackId,
       role: trackArtists.role,
@@ -122,19 +121,4 @@ export async function getTracksByArtist(
     .where(eq(trackArtists.artistId, artistId))
     .limit(limit)
     .offset(offset);
-
-  if (role) {
-    query = db
-      .select({
-        trackId: trackArtists.trackId,
-        role: trackArtists.role,
-        isPrimary: trackArtists.isPrimary,
-      })
-      .from(trackArtists)
-      .where(eq(trackArtists.artistId, artistId))
-      .limit(limit)
-      .offset(offset);
-  }
-
-  return query;
 }
