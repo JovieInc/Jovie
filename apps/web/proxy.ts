@@ -217,6 +217,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           const normalizedPath = '/' + targetPath.replace(/^\/+/, '');
           const targetUrl = new URL('https://app.jov.ie');
           targetUrl.pathname = normalizedPath;
+          targetUrl.search = req.nextUrl.search;
           return NextResponse.redirect(targetUrl, 301);
         }
 
