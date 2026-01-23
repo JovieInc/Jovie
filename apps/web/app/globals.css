@@ -568,9 +568,11 @@ body {
   }
 }
 
-/* Success color utilities - mapped to design tokens */
+/* Semantic status color utilities - mapped to design tokens */
+
+/* Success */
 @utility border-success {
-  border-color: var(--color-success);
+  border-color: color-mix(in oklch, var(--color-success) 30%, transparent);
 }
 
 @utility bg-success {
@@ -583,6 +585,57 @@ body {
 
 @utility text-success {
   color: var(--color-success);
+}
+
+/* Error */
+@utility border-error {
+  border-color: color-mix(in oklch, var(--color-error) 30%, transparent);
+}
+
+@utility bg-error {
+  background-color: var(--color-error);
+}
+
+@utility bg-error-subtle {
+  background-color: var(--color-error-subtle);
+}
+
+@utility text-error {
+  color: var(--color-error);
+}
+
+/* Warning */
+@utility border-warning {
+  border-color: color-mix(in oklch, var(--color-warning) 30%, transparent);
+}
+
+@utility bg-warning {
+  background-color: var(--color-warning);
+}
+
+@utility bg-warning-subtle {
+  background-color: var(--color-warning-subtle);
+}
+
+@utility text-warning {
+  color: var(--color-warning);
+}
+
+/* Info */
+@utility border-info {
+  border-color: color-mix(in oklch, var(--color-info) 30%, transparent);
+}
+
+@utility bg-info {
+  background-color: var(--color-info);
+}
+
+@utility bg-info-subtle {
+  background-color: var(--color-info-subtle);
+}
+
+@utility text-info {
+  color: var(--color-info);
 }
 
 /* Interactive state utilities */
@@ -705,6 +758,10 @@ body {
 
 @utility text-accent-token {
   color: var(--color-accent);
+}
+
+@utility border-accent {
+  border-color: color-mix(in oklch, var(--color-accent) 30%, transparent);
 }
 
 @utility ring-accent {
