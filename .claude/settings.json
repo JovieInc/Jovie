@@ -65,6 +65,7 @@
   "permissions": {
     "allow": [
       "mcp__linear__*",
+      "mcp__claude_ai_Linear__*",
       "Skill(pr)",
       "Skill(pr:*)",
       "Skill(ship)",
@@ -83,6 +84,8 @@
       "Skill(neon-backup:*)",
       "Skill(session-start-hook)",
       "Skill(session-start-hook:*)",
+      "Skill(sync-permissions)",
+      "Skill(sync-permissions:*)",
       "SlashCommand(/pr)",
       "SlashCommand(/verify)",
       "SlashCommand(/ship)",
