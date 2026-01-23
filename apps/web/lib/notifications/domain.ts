@@ -89,6 +89,126 @@ const sanitizeCountryCode = (raw: string | null | undefined) => {
 
 export { buildInvalidRequestResponse };
 
+/**
+ * Validates and normalizes the contact value based on channel type.
+ * Returns error response if validation fails.
+ */
+async function validateContactForChannel(
+  channel: NotificationChannel,
+  normalizedEmail: string | null,
+  normalizedPhone: string | null,
+  artist_id: string,
+  source: string | undefined
+): Promise<NotificationSubscribeDomainResponse | null> {
+  if (channel === 'email' && !normalizedEmail) {
+    await trackSubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Invalid email address'],
+      source,
+    });
+    return buildSubscribeValidationError(
+      'Please provide a valid email address'
+    );
+  }
+
+  if (channel === 'sms' && !normalizedPhone) {
+    await trackSubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Invalid phone number'],
+      source,
+    });
+    return buildSubscribeValidationError('Please provide a valid phone number');
+  }
+
+  return null;
+}
+
+/**
+ * Creates or updates an audience member for dynamic engagement tracking.
+ */
+async function upsertAudienceMember(
+  artist_id: string,
+  normalizedEmail: string,
+  ipAddress: string | null,
+  userAgent: string | null
+): Promise<void> {
+  const fingerprint = createFingerprint(ipAddress, userAgent);
+  const now = new Date();
+
+  await withSystemIngestionSession(async tx => {
+    await tx
+      .insert(audienceMembers)
+      .values({
+        creatorProfileId: artist_id,
+        fingerprint,
+        type: 'email',
+        displayName: 'Subscriber',
+        email: normalizedEmail,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        visits: 0,
+        engagementScore: 0,
+        intentLevel: 'low',
+        deviceType: 'unknown',
+        referrerHistory: [],
+        latestActions: [],
+        tags: [],
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [audienceMembers.creatorProfileId, audienceMembers.fingerprint],
+        set: {
+          type: 'email',
+          email: normalizedEmail,
+          lastSeenAt: now,
+          updatedAt: now,
+        },
+      });
+  });
+}
+
+/**
+ * Sends subscription confirmation email.
+ */
+async function sendSubscriptionConfirmationEmail(
+  artist_id: string,
+  normalizedEmail: string,
+  artistProfile: { displayName: string | null; username: string | null }
+): Promise<Awaited<ReturnType<typeof sendNotification>>> {
+  const profileUrl = `${APP_URL.replace(/\/$/, '')}/${artistProfile.username}`;
+  const artistName =
+    artistProfile.displayName || artistProfile.username || 'this artist';
+  const dedupKey = `notification_subscribe:${artist_id}:${normalizedEmail}`;
+
+  return sendNotification(
+    {
+      id: dedupKey,
+      dedupKey,
+      category: 'transactional',
+      subject: `You're subscribed to ${artistName} on Jovie`,
+      text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
+      html: `
+        <p>Thanks for turning on notifications for <strong>${artistName}</strong>.</p>
+        <p>We'll email you when ${artistName} drops new music or updates their profile.</p>
+        <p style="margin:16px 0;">
+          <a href="${profileUrl}/notifications" style="padding:10px 16px;background:#000;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Manage notifications</a>
+        </p>
+        <p style="font-size:14px;color:#555;">If you didn't request this, you can ignore this email or unsubscribe from the artist page.</p>
+      `,
+      channels: ['email'],
+      respectUserPreferences: false,
+      dismissible: true,
+    },
+    {
+      email: normalizedEmail,
+      creatorProfileId: artist_id,
+    }
+  );
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -165,28 +285,15 @@ export const subscribeToNotificationsDomain = async (
     const normalizedPhone =
       channel === 'sms' ? (normalizeSubscriptionPhone(phone) ?? null) : null;
 
-    if (channel === 'email' && !normalizedEmail) {
-      await trackSubscribeError({
-        artist_id,
-        error_type: 'validation_error',
-        validation_errors: ['Invalid email address'],
-        source,
-      });
-      return buildSubscribeValidationError(
-        'Please provide a valid email address'
-      );
-    }
-
-    if (channel === 'sms' && !normalizedPhone) {
-      await trackSubscribeError({
-        artist_id,
-        error_type: 'validation_error',
-        validation_errors: ['Invalid phone number'],
-        source,
-      });
-      return buildSubscribeValidationError(
-        'Please provide a valid phone number'
-      );
+    const validationError = await validateContactForChannel(
+      channel,
+      normalizedEmail,
+      normalizedPhone,
+      artist_id,
+      source
+    );
+    if (validationError) {
+      return validationError;
     }
 
     const conflictTarget =
@@ -230,77 +337,17 @@ export const subscribeToNotificationsDomain = async (
 
     if (dynamicEnabled && normalizedEmail) {
       const ua = getHeader(context.headers, 'user-agent') || null;
-      const fingerprint = createFingerprint(ipAddress, ua);
-      const now = new Date();
-
-      await withSystemIngestionSession(async tx => {
-        await tx
-          .insert(audienceMembers)
-          .values({
-            creatorProfileId: artist_id,
-            fingerprint,
-            type: 'email',
-            displayName: 'Subscriber',
-            email: normalizedEmail,
-            firstSeenAt: now,
-            lastSeenAt: now,
-            visits: 0,
-            engagementScore: 0,
-            intentLevel: 'low',
-            deviceType: 'unknown',
-            referrerHistory: [],
-            latestActions: [],
-            tags: [],
-            createdAt: now,
-            updatedAt: now,
-          })
-          .onConflictDoUpdate({
-            target: [
-              audienceMembers.creatorProfileId,
-              audienceMembers.fingerprint,
-            ],
-            set: {
-              type: 'email',
-              email: normalizedEmail,
-              lastSeenAt: now,
-              updatedAt: now,
-            },
-          });
-      });
+      await upsertAudienceMember(artist_id, normalizedEmail, ipAddress, ua);
     }
 
     let dispatchResult: Awaited<ReturnType<typeof sendNotification>> | null =
       null;
 
     if (channel === 'email' && normalizedEmail && insertedSubscription?.id) {
-      const profileUrl = `${APP_URL.replace(/\/$/, '')}/${artistProfile.username}`;
-      const artistName =
-        artistProfile.displayName || artistProfile.username || 'this artist';
-      const dedupKey = `notification_subscribe:${artist_id}:${normalizedEmail}`;
-
-      dispatchResult = await sendNotification(
-        {
-          id: dedupKey,
-          dedupKey,
-          category: 'transactional',
-          subject: `You're subscribed to ${artistName} on Jovie`,
-          text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
-          html: `
-            <p>Thanks for turning on notifications for <strong>${artistName}</strong>.</p>
-            <p>We'll email you when ${artistName} drops new music or updates their profile.</p>
-            <p style="margin:16px 0;">
-              <a href="${profileUrl}/notifications" style="padding:10px 16px;background:#000;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Manage notifications</a>
-            </p>
-            <p style="font-size:14px;color:#555;">If you didn't request this, you can ignore this email or unsubscribe from the artist page.</p>
-          `,
-          channels: ['email'],
-          respectUserPreferences: false,
-          dismissible: true,
-        },
-        {
-          email: normalizedEmail,
-          creatorProfileId: artist_id,
-        }
+      dispatchResult = await sendSubscriptionConfirmationEmail(
+        artist_id,
+        normalizedEmail,
+        artistProfile
       );
     }
 
