@@ -195,11 +195,10 @@ function extractAvatar(data: unknown): string | null {
       'thumbnail',
       'thumbnails',
     ]);
-    const thumbnails = Array.isArray(headerThumbnails)
-      ? headerThumbnails
-      : Array.isArray(microThumbnails)
-        ? microThumbnails
-        : [];
+    const thumbnails =
+      (Array.isArray(headerThumbnails) && headerThumbnails) ||
+      (Array.isArray(microThumbnails) && microThumbnails) ||
+      [];
 
     const best =
       thumbnails.length > 0 ? thumbnails[thumbnails.length - 1] : null;
@@ -222,11 +221,10 @@ function isOfficialArtist(data: unknown): boolean {
       'channelMetadataRenderer',
       'ownerBadges',
     ]);
-    const badges = Array.isArray(badgesHeader)
-      ? badgesHeader
-      : Array.isArray(badgesMeta)
-        ? badgesMeta
-        : [];
+    const badges =
+      (Array.isArray(badgesHeader) && badgesHeader) ||
+      (Array.isArray(badgesMeta) && badgesMeta) ||
+      [];
 
     return badges.some(badge =>
       JSON.stringify(badge).includes('OFFICIAL_ARTIST_BADGE')
