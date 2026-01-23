@@ -23,6 +23,12 @@ export interface AdminTableShellProps {
 
 const TOOLBAR_HEIGHT_PX = 56;
 
+/**
+ * Throttle interval for scroll handler (ms).
+ * 100ms provides smooth visual updates while reducing state updates from 60+/sec to 10/sec.
+ */
+const SCROLL_THROTTLE_MS = 100;
+
 export function AdminTableShell({
   toolbar,
   footer,
@@ -34,18 +40,48 @@ export function AdminTableShell({
   const internalRef = React.useRef<HTMLDivElement | null>(null);
   const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);
+  const lastScrollTimeRef = React.useRef(0);
+  const rafIdRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) return;
 
+    // Throttled scroll handler using requestAnimationFrame + time check
     const handleScroll = () => {
-      setHeaderElevated(container.scrollTop > 0);
+      const now = Date.now();
+
+      // Skip if we're within the throttle window
+      if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
+        // Schedule one final update after throttle period ends
+        if (rafIdRef.current === null) {
+          rafIdRef.current = requestAnimationFrame(() => {
+            rafIdRef.current = null;
+            const isScrolled = container.scrollTop > 0;
+            setHeaderElevated(prev =>
+              prev !== isScrolled ? isScrolled : prev
+            );
+            lastScrollTimeRef.current = Date.now();
+          });
+        }
+        return;
+      }
+
+      lastScrollTimeRef.current = now;
+      const isScrolled = container.scrollTop > 0;
+      setHeaderElevated(prev => (prev !== isScrolled ? isScrolled : prev));
     };
 
+    // Initial check
     handleScroll();
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
   }, [tableContainerRef]);
 
   const stickyTopPx = toolbar ? TOOLBAR_HEIGHT_PX : 0;

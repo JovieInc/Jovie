@@ -1,5 +1,6 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
@@ -90,9 +91,9 @@ export async function POST(request: Request) {
           );
         }
 
-        // Get user by email
+        // Get user by email (include clerkId for cache invalidation)
         const [user] = await tx
-          .select({ id: users.id })
+          .select({ id: users.id, clerkId: users.clerkId })
           .from(users)
           .where(drizzleSql`lower(${users.email}) = lower(${entry.email})`)
           .limit(1);
@@ -138,6 +139,7 @@ export async function POST(request: Request) {
           profileId: profile.id,
           email: entry.email,
           fullName: entry.fullName,
+          clerkId: user.clerkId,
         };
       },
       { isolationLevel: 'serializable' }
@@ -158,6 +160,11 @@ export async function POST(request: Request) {
         },
         { status: 409, headers: NO_STORE_HEADERS }
       );
+    }
+
+    // Invalidate user state cache so middleware sees fresh state immediately
+    if (result.clerkId) {
+      await invalidateProxyUserStateCache(result.clerkId);
     }
 
     // Send welcome email after successful approval
