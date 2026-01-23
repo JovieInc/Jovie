@@ -7,11 +7,8 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
-  convertContextMenuItems,
-  TableCheckboxCell,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
@@ -20,6 +17,9 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import {
+  createActionsCellRenderer,
+  createSelectCellRenderer,
+  createSelectHeaderRenderer,
   renderDateCellWrapper,
   renderEmailCell,
   renderHeardAboutCell,
@@ -125,27 +125,16 @@ export function AdminWaitlistTableUnified({
       // Checkbox column
       columnHelper.display({
         id: 'select',
-        header: ({ table }) => (
-          <TableCheckboxCell
-            table={table}
-            headerCheckboxState={headerCheckboxState}
-            onToggleSelectAll={toggleSelectAll}
-          />
+        header: createSelectHeaderRenderer(
+          headerCheckboxState,
+          toggleSelectAll
         ),
-        cell: ({ row }) => {
-          const entry = row.original;
-          const isChecked = selectedIds.has(entry.id);
-          const rowNumber = (page - 1) * pageSize + row.index + 1;
-
-          return (
-            <TableCheckboxCell
-              row={row}
-              rowNumber={rowNumber}
-              isChecked={isChecked}
-              onToggleSelect={() => toggleSelect(entry.id)}
-            />
-          );
-        },
+        cell: createSelectCellRenderer(
+          selectedIds,
+          page,
+          pageSize,
+          toggleSelect
+        ),
         size: 56, // 14 * 4 = 56px (w-14)
       }),
 
@@ -217,17 +206,7 @@ export function AdminWaitlistTableUnified({
       columnHelper.display({
         id: 'actions',
         header: '',
-        cell: ({ row }) => {
-          const entry = row.original;
-          const contextMenuItems = createContextMenuItems(entry);
-          const actionMenuItems = convertContextMenuItems(contextMenuItems);
-
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={actionMenuItems} align='end' />
-            </div>
-          );
-        },
+        cell: createActionsCellRenderer(createContextMenuItems),
         size: 48,
       }),
     ],
