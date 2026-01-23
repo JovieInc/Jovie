@@ -57,7 +57,7 @@ export function HeaderActionsProvider({
 
   const value = useMemo(
     () => ({ headerActions, setHeaderActions, headerBadge, setHeaderBadge }),
-    [headerActions, setHeaderActions, headerBadge, setHeaderBadge]
+    [headerActions, headerBadge]
   );
 
   return (
