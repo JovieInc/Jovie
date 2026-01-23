@@ -163,6 +163,76 @@ export const SENSITIVE_HEADERS = [
 ] as const;
 
 /**
+ * ReferenceError patterns that occur during deployment transitions.
+ *
+ * When a new deployment changes chunk hashes, users with stale JavaScript
+ * may encounter ReferenceErrors for modules that haven't loaded properly.
+ * These are not application bugs but deployment transition artifacts.
+ *
+ * These errors are filtered from Sentry to reduce noise while still being
+ * handled gracefully by useChunkErrorHandler (which shows a refresh toast).
+ */
+const DEPLOYMENT_TRANSITION_ERRORS = [
+  'dynamic is not defined',
+  'usestate is not defined',
+  'useversionmonitor is not defined',
+  'mystatsigenabled is not defined',
+  'checkversionmismatch is not defined',
+  'frequent_cache is not defined',
+] as const;
+
+/**
+ * React/Next.js internal error patterns that are framework noise.
+ *
+ * These errors originate from React's concurrent rendering scheduler or
+ * Next.js's internal caching mechanisms. They are not actionable application
+ * bugs and should be filtered to reduce Sentry noise.
+ */
+const FRAMEWORK_INTERNAL_ERRORS = [
+  'headcachenode',
+  'should not already be working',
+] as const;
+
+/**
+ * Checks if an error is a deployment transition error that should be filtered.
+ *
+ * These are ReferenceErrors that occur when users have stale JavaScript
+ * after a new deployment. They are handled by useChunkErrorHandler which
+ * shows a user-friendly refresh prompt.
+ *
+ * @param event - The Sentry event to check
+ * @returns true if this is a deployment transition error that should be dropped
+ */
+function isDeploymentTransitionError(event: SentryEvent): boolean {
+  const message = event.exception?.values?.[0]?.value?.toLowerCase() ?? '';
+  const type = event.exception?.values?.[0]?.type?.toLowerCase() ?? '';
+
+  // Only filter ReferenceErrors matching known deployment transition patterns
+  if (type !== 'referenceerror') {
+    return false;
+  }
+
+  return DEPLOYMENT_TRANSITION_ERRORS.some(pattern =>
+    message.includes(pattern)
+  );
+}
+
+/**
+ * Checks if an error is a React/Next.js framework internal error.
+ *
+ * These errors originate from framework internals (React scheduler,
+ * Next.js cache) and are not actionable application bugs.
+ *
+ * @param event - The Sentry event to check
+ * @returns true if this is a framework internal error that should be dropped
+ */
+function isFrameworkInternalError(event: SentryEvent): boolean {
+  const message = event.exception?.values?.[0]?.value?.toLowerCase() ?? '';
+
+  return FRAMEWORK_INTERNAL_ERRORS.some(pattern => message.includes(pattern));
+}
+
+/**
  * PII Collection Notice (for documentation purposes):
  *
  * When sendDefaultPii is enabled, Sentry may collect:
@@ -175,10 +245,12 @@ export const SENSITIVE_HEADERS = [
  */
 
 /**
- * Scrubs PII from Sentry events before they are sent.
+ * Scrubs PII from Sentry events and filters deployment noise.
  * This is used as the `beforeSend` hook in all Sentry configurations.
  *
  * Actions performed:
+ * - Filters deployment transition errors (chunk loading ReferenceErrors)
+ * - Filters React/Next.js framework internal errors
  * - Anonymizes IP addresses using Sentry's auto-masking
  * - Removes email addresses from user context
  * - Scrubs sensitive headers from request data
@@ -187,6 +259,16 @@ export const SENSITIVE_HEADERS = [
  * @returns The scrubbed event, or null to drop the event
  */
 export function scrubPii(event: SentryEvent): SentryEvent | null {
+  // Filter deployment transition errors (handled by useChunkErrorHandler)
+  if (isDeploymentTransitionError(event)) {
+    return null;
+  }
+
+  // Filter React/Next.js framework internal errors (not actionable)
+  if (isFrameworkInternalError(event)) {
+    return null;
+  }
+
   // Anonymize IP addresses if present
   if (event.user?.ip_address) {
     event.user.ip_address = '{{auto}}';
