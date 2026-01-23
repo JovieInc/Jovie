@@ -8,7 +8,7 @@
     ],
     "stop": [
       {
-        "command": "sh .cursor/hooks/before-stop.sh"
+        "command": "sh .cursor/hooks/stop.sh"
       }
     ]
   }
