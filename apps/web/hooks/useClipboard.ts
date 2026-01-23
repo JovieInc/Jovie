@@ -5,7 +5,7 @@
  * Reduces duplicated clipboard logic across components.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type ClipboardStatus = 'idle' | 'success' | 'error';
 
@@ -78,6 +78,16 @@ export function useClipboard(
   const { resetDelay = 2000, onSuccess, onError } = options;
 
   const [status, setStatus] = useState<ClipboardStatus>('idle');
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const reset = useCallback(() => {
     setStatus('idle');
@@ -122,7 +132,10 @@ export function useClipboard(
 
       // Reset status after delay
       if (resetDelay > 0) {
-        setTimeout(() => setStatus('idle'), resetDelay);
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        timeoutRef.current = setTimeout(() => setStatus('idle'), resetDelay);
       }
 
       return success;
