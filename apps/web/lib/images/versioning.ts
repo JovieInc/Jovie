@@ -2,6 +2,8 @@
  * Image versioning utilities for cache busting and optimization
  */
 
+import { isDevelopment } from '@/lib/utils/platform-detection/environment';
+
 // Cache for generated hashes with LRU eviction to prevent memory leaks
 const hashCache = new Map<string, string>();
 const MAX_HASH_CACHE_SIZE = 500;
@@ -283,7 +285,7 @@ export function preloadImage(
 
   // Limit total preloaded URLs to prevent memory issues
   if (preloadedUrls.size >= MAX_PRELOADED_URLS) {
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment()) {
       console.warn(
         `[preloadImage] Max preloaded URLs (${MAX_PRELOADED_URLS}) reached, skipping: ${url}`
       );
