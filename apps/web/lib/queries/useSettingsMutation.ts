@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Settings mutation hook for updating user settings.
  *

@@ -12,6 +12,7 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "lint:eslint": "eslint --max-warnings=0 --cache --cache-location .cache/eslint --cache-strategy content .",
+    "lint:server-boundaries": "eslint --config eslint-server-boundaries.config.js --no-inline-config .",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
     "next:proxy-guard": "node scripts/next-proxy-guard.mjs",
     "pre-push": "pnpm run next:proxy-guard && pnpm run tailwind:check && pnpm run typecheck && pnpm run lint",
