@@ -197,7 +197,6 @@ const nextConfig = {
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-radio-group',
-      'date-fns',
       'clsx',
       'class-variance-authority',
       '@dnd-kit/core',

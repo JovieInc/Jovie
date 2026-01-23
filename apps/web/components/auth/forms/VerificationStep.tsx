@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import { AuthBackButton, AuthButton, FormError, OtpInput } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
@@ -72,6 +72,7 @@ export function VerificationStep({
 }: VerificationStepProps) {
   const [resendSuccess, setResendSuccess] = useState(false);
   const errorId = useId();
+  const resendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -101,9 +102,20 @@ export function VerificationStep({
     if (result !== false) {
       setResendSuccess(true);
       // Clear success message after 3 seconds
-      setTimeout(() => setResendSuccess(false), 3000);
+      if (resendTimeoutRef.current) clearTimeout(resendTimeoutRef.current);
+      resendTimeoutRef.current = setTimeout(
+        () => setResendSuccess(false),
+        3000
+      );
     }
   }, [onResend]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (resendTimeoutRef.current) clearTimeout(resendTimeoutRef.current);
+    };
+  }, []);
 
   const isLoading = isVerifying || isResending;
 
