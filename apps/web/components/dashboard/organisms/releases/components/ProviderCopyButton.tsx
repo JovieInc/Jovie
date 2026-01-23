@@ -1,0 +1,68 @@
+import { Icon } from '@/components/atoms/Icon';
+import { cn } from '@/lib/utils';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
+
+export interface ProviderCopyButtonProps {
+  testId: string;
+  path: string | undefined;
+  releaseTitle: string;
+  providerLabel: string;
+  isCopied: boolean;
+  isManual: boolean;
+  onCopy: (path: string, label: string, testId: string) => Promise<void>;
+}
+
+/**
+ * Copy button for available provider links
+ */
+export function ProviderCopyButton({
+  testId,
+  path,
+  releaseTitle,
+  providerLabel,
+  isCopied,
+  isManual,
+  onCopy,
+}: Readonly<ProviderCopyButtonProps>) {
+  return (
+    <button
+      type='button'
+      data-testid={testId}
+      data-url={path ? `${getBaseUrl()}${path}` : undefined}
+      onClick={() => {
+        if (!path) return;
+        void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
+      }}
+      className={cn(
+        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+        isCopied
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+      )}
+    >
+      <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+        <Icon
+          name='Copy'
+          className={cn(
+            'absolute h-3.5 w-3.5 transition-all duration-150',
+            isCopied
+              ? 'scale-50 opacity-0'
+              : 'scale-100 opacity-0 group-hover/btn:opacity-100'
+          )}
+          aria-hidden='true'
+        />
+        <Icon
+          name='Check'
+          className={cn(
+            'absolute h-3.5 w-3.5 transition-all duration-150',
+            isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+          )}
+          aria-hidden='true'
+        />
+      </span>
+      <span className='line-clamp-1'>
+        {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
+      </span>
+    </button>
+  );
+}
