@@ -220,7 +220,6 @@ function CreatorProfileTableRowComponent({
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox */}
         {/* NOSONAR S6819: role="presentation" correctly hides wrapper; checkbox inside is the interactive element */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
@@ -303,7 +302,6 @@ function CreatorProfileTableRowComponent({
             }).format(profile.createdAt)
           : '—'}
       </td>
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
       <td
         className='px-4 py-3 align-middle text-right'
         onClick={e => e.stopPropagation()}

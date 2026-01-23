@@ -192,8 +192,6 @@ function KanbanColumn<TData>({
       </div>
 
       {/* Column Content */}
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drop zone requires drag event handlers */}
-      {/* biome-ignore lint/a11y/useSemanticElements: fieldset not appropriate for kanban column layout */}
       {/* NOSONAR S6819: role="group" is appropriate for kanban columns; <fieldset> has styling constraints */}
       <div
         ref={containerRef}
@@ -230,7 +228,6 @@ function KanbanColumn<TData>({
                   const itemId = getItemId(item);
 
                   return (
-                    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
                     <li
                       key={itemId}
                       data-index={virtualRow.index}
@@ -265,7 +262,6 @@ function KanbanColumn<TData>({
           return (
             <ul className='m-0 list-none space-y-3 p-0'>
               {column.items.map((item, index) => (
-                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag and drop card
                 <li
                   key={getItemId(item)}
                   draggable={Boolean(onItemMove)}

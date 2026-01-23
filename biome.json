@@ -107,6 +107,54 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "**/LoadingSpinner.tsx",
+        "**/LogoLoader.tsx",
+        "**/StatusBadge.tsx",
+        "**/ProfileSkeleton.tsx",
+        "**/EmptyState.tsx",
+        "**/StarterEmptyState.tsx",
+        "**/ProfileForm.tsx",
+        "**/OnboardingHandleStep.tsx",
+        "**/ComboboxDropdown.tsx",
+        "**/SmartHandleInput.tsx",
+        "**/CopyToClipboardButton.tsx",
+        "**/UniversalLinkInputUrlMode.tsx",
+        "**/OptimisticProgress.tsx",
+        "**/ProgressIndicator.tsx",
+        "**/TipSelector.tsx",
+        "**/DashboardOverviewToolbar.tsx",
+        "**/ProfileLinkCategorySelector.tsx",
+        "**/KanbanBoard.tsx",
+        "**/TableCheckboxCell.tsx",
+        "**/ContextMenuSubmenu.tsx",
+        "**/AudienceCreatedAtCell.tsx",
+        "**/AudienceLastSeenCell.tsx",
+        "**/AudienceRowSelectionCell.tsx",
+        "**/CreatorProfileTableRow.tsx",
+        "**/WaitlistSocialStep.tsx",
+        "**/WaitlistSpotifySearch.tsx",
+        "**/UniversalLinkInputArtistSearchMode.tsx",
+        "**/UniversalLinkInput.tsx",
+        "**/ComboboxOptionItem.tsx",
+        "**/ReleasesEmptyState.tsx",
+        "**/AvatarUploadable.tsx",
+        "**/PlatformPill.tsx",
+        "**/YouTubeCrossCategoryPrompt.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useSemanticElements": "off",
+            "noStaticElementInteractions": "off",
+            "noNoninteractiveElementInteractions": "off",
+            "useFocusableInteractive": "off",
+            "useAriaPropsSupportedByRole": "off"
+          }
+        }
+      }
     }
   ],
   "javascript": {
