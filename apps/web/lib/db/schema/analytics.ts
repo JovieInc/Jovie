@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -123,6 +124,57 @@ export const clickEvents = pgTable(
   })
 );
 
+// Click event daily rollups (non-bot only)
+export const clickEventDailyRollups = pgTable(
+  'click_event_daily_rollups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    day: date('day').notNull(),
+    linkType: linkTypeEnum('link_type').notNull(),
+    totalCount: integer('total_count').notNull().default(0),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorDayIdx: index('click_event_daily_rollups_creator_day_idx').on(
+      table.creatorProfileId,
+      table.day
+    ),
+    creatorDayLinkTypeIdx: index(
+      'click_event_daily_rollups_creator_day_link_type_idx'
+    ).on(table.creatorProfileId, table.day, table.linkType),
+  })
+);
+
+// Click event daily rollups for top links (non-bot, link_id not null)
+export const clickEventDailyLinkRollups = pgTable(
+  'click_event_daily_link_rollups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    day: date('day').notNull(),
+    linkType: linkTypeEnum('link_type').notNull(),
+    linkId: uuid('link_id').notNull(),
+    totalCount: integer('total_count').notNull().default(0),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorDayIdx: index('click_event_daily_link_rollups_creator_day_idx').on(
+      table.creatorProfileId,
+      table.day
+    ),
+    creatorDayLinkIdx: index(
+      'click_event_daily_link_rollups_creator_day_link_idx'
+    ).on(table.creatorProfileId, table.day, table.linkId),
+  })
+);
+
 /**
  * Fan notification preferences for release alerts
  */
@@ -209,6 +261,18 @@ export const tips = pgTable(
 // Schema validations
 export const insertClickEventSchema = createInsertSchema(clickEvents);
 export const selectClickEventSchema = createSelectSchema(clickEvents);
+export const insertClickEventDailyRollupSchema = createInsertSchema(
+  clickEventDailyRollups
+);
+export const selectClickEventDailyRollupSchema = createSelectSchema(
+  clickEventDailyRollups
+);
+export const insertClickEventDailyLinkRollupSchema = createInsertSchema(
+  clickEventDailyLinkRollups
+);
+export const selectClickEventDailyLinkRollupSchema = createSelectSchema(
+  clickEventDailyLinkRollups
+);
 
 export const insertNotificationSubscriptionSchema = createInsertSchema(
   notificationSubscriptions
@@ -226,6 +290,13 @@ export type NewAudienceMember = typeof audienceMembers.$inferInsert;
 
 export type ClickEvent = typeof clickEvents.$inferSelect;
 export type NewClickEvent = typeof clickEvents.$inferInsert;
+export type ClickEventDailyRollup = typeof clickEventDailyRollups.$inferSelect;
+export type NewClickEventDailyRollup =
+  typeof clickEventDailyRollups.$inferInsert;
+export type ClickEventDailyLinkRollup =
+  typeof clickEventDailyLinkRollups.$inferSelect;
+export type NewClickEventDailyLinkRollup =
+  typeof clickEventDailyLinkRollups.$inferInsert;
 
 export type NotificationSubscription =
   typeof notificationSubscriptions.$inferSelect;

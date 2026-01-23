@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
+  clickEventDailyLinkRollups,
+  clickEventDailyRollups,
   clickEvents,
   creatorProfiles,
   notificationSubscriptions,
@@ -47,6 +49,37 @@ interface AnalyticsData {
   topReferrers: { referrer: string; count: number }[];
 }
 
+type AnalyticsAggregateRow = {
+  total_clicks: string | number | null;
+  spotify_clicks: string | number | null;
+  social_clicks: string | number | null;
+  recent_clicks: string | number | null;
+  profile_views_in_range: string | number | null;
+  clicks_by_day: JsonArray<{ date: string; count: number }>;
+  top_links: JsonArray<{
+    id: string | null;
+    url: string | null;
+    clicks: number;
+  }>;
+  top_cities: JsonArray<{ city: string | null; count: number }>;
+  top_countries: JsonArray<{ country: string | null; count: number }>;
+  top_referrers: JsonArray<{ referrer: string | null; count: number }>;
+};
+
+type DashboardAggregateRow = {
+  top_cities: JsonArray<{ city: string | null; count: number }>;
+  top_countries: JsonArray<{ country: string | null; count: number }>;
+  top_referrers: JsonArray<{ referrer: string | null; count: number }>;
+  unique_users: string | number | null;
+  total_clicks: string | number | null;
+  spotify_clicks: string | number | null;
+  social_clicks: string | number | null;
+  recent_clicks: string | number | null;
+  listen_clicks: string | number | null;
+  subscribers: string | number | null;
+  identified_users: string | number | null;
+};
+
 export async function getAnalyticsData(
   creatorProfileId: string,
   range: TimeRange = '30d'
@@ -78,99 +111,201 @@ export async function getAnalyticsData(
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Consolidated analytics into one SQL round trip (previously nine queries).
-  // Local dev timing (5-run avg, seeded DB): ~120ms ➝ ~48ms.
-  // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
-  const analyticsAggregates = await apiQuery(
+  const rollupAvailable = await apiQuery(
     () =>
       db
-        .execute<{
-          total_clicks: string | number | null;
-          spotify_clicks: string | number | null;
-          social_clicks: string | number | null;
-          recent_clicks: string | number | null;
-          profile_views_in_range: string | number | null;
-          clicks_by_day: JsonArray<{ date: string; count: number }>;
-          top_links: JsonArray<{
-            id: string | null;
-            url: string | null;
-            clicks: number;
-          }>;
-          top_cities: JsonArray<{ city: string | null; count: number }>;
-          top_countries: JsonArray<{ country: string | null; count: number }>;
-          top_referrers: JsonArray<{ referrer: string | null; count: number }>;
-        }>(
-          drizzleSql`
-            with base_events as (
-              select *
-              from ${clickEvents}
-              where ${clickEvents.creatorProfileId} = ${creatorProfileId}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
-            ),
-            ranged_events as (
-              select *
-              from base_events
-              where created_at >= ${startDate}
-            ),
-            recent_events as (
-              select *
-              from base_events
-              where created_at >= ${recentThreshold}
-            ),
-            clicks_last_30 as (
-              select date(created_at) as date, count(*) as count
-              from base_events
-              where created_at >= ${thirtyDaysAgo}
-              group by date(created_at)
-              order by date(created_at)
-            ),
-            top_links as (
-              select link_id as id, link_type as url, count(*) as clicks
-              from base_events
-              group by link_id, link_type
-              order by clicks desc
-              limit 5
-            ),
-            top_cities as (
-              select city, count(*) as count
-              from ranged_events
-              where city is not null
-              group by city
-              order by count desc
-              limit 5
-            ),
-            top_countries as (
-              select country, count(*) as count
-              from ranged_events
-              where country is not null
-              group by country
-              order by count desc
-              limit 5
-            ),
-            top_referrers as (
-              select referrer, count(*) as count
-              from ranged_events
-              group by referrer
-              order by count desc
-              limit 5
-            )
-            select
-              (select count(*) from base_events) as total_clicks,
-              (select count(*) from base_events where link_type = 'listen') as spotify_clicks,
-              (select count(*) from base_events where link_type = 'social') as social_clicks,
-              (select count(*) from recent_events) as recent_clicks,
-              (select count(*) from ranged_events) as profile_views_in_range,
-              coalesce((select json_agg(row_to_json(c)) from clicks_last_30 c), '[]'::json) as clicks_by_day,
-              coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links,
-              coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
-              coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
-              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
-            ;
-          `
-        )
-        .then(res => res.rows?.[0]),
-    'getAnalyticsData'
+        .select({ count: drizzleSql<number>`count(*)` })
+        .from(clickEventDailyRollups)
+        .where(eq(clickEventDailyRollups.creatorProfileId, creatorProfileId))
+        .limit(1)
+        .then(result => Number(result?.[0]?.count ?? 0) > 0),
+    'getAnalyticsDataRollupCheck'
   );
+
+  const analyticsAggregates = rollupAvailable
+    ? await Promise.all([
+        apiQuery(
+          () =>
+            db
+              .execute<AnalyticsAggregateRow>(drizzleSql`
+                with rollups as (
+                  select *
+                  from ${clickEventDailyRollups}
+                  where ${clickEventDailyRollups.creatorProfileId} = ${creatorProfileId}
+                ),
+                rollups_range as (
+                  select *
+                  from rollups
+                  where day >= ${startDate}::date
+                ),
+                rollups_recent as (
+                  select *
+                  from rollups
+                  where day >= ${recentThreshold}::date
+                ),
+                clicks_last_30 as (
+                  select day as date, sum(total_count) as count
+                  from rollups
+                  where day >= ${thirtyDaysAgo}::date
+                  group by day
+                  order by day
+                ),
+                top_links as (
+                  select link_id as id, link_type as url, sum(total_count) as clicks
+                  from ${clickEventDailyLinkRollups}
+                  where ${clickEventDailyLinkRollups.creatorProfileId} = ${creatorProfileId}
+                  group by link_id, link_type
+                  order by clicks desc
+                  limit 5
+                )
+                select
+                  coalesce((select sum(total_count) from rollups), 0) as total_clicks,
+                  coalesce(
+                    (select sum(total_count) from rollups where link_type = 'listen'),
+                    0
+                  ) as spotify_clicks,
+                  coalesce(
+                    (select sum(total_count) from rollups where link_type = 'social'),
+                    0
+                  ) as social_clicks,
+                  coalesce((select sum(total_count) from rollups_recent), 0) as recent_clicks,
+                  coalesce((select sum(total_count) from rollups_range), 0) as profile_views_in_range,
+                  coalesce((select json_agg(row_to_json(c)) from clicks_last_30 c), '[]'::json) as clicks_by_day,
+                  coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
+                ;
+              `)
+              .then(res => res.rows?.[0]),
+          'getAnalyticsDataRollups'
+        ),
+        apiQuery(
+          () =>
+            db
+              .execute<
+                Pick<
+                  AnalyticsAggregateRow,
+                  'top_cities' | 'top_countries' | 'top_referrers'
+                >
+              >(drizzleSql`
+                with base_events as (
+                  select *
+                  from ${clickEvents}
+                  where ${clickEvents.creatorProfileId} = ${creatorProfileId}
+                    and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                ),
+                ranged_events as (
+                  select *
+                  from base_events
+                  where created_at >= ${startDate}
+                ),
+                top_cities as (
+                  select city, count(*) as count
+                  from ranged_events
+                  where city is not null
+                  group by city
+                  order by count desc
+                  limit 5
+                ),
+                top_countries as (
+                  select country, count(*) as count
+                  from ranged_events
+                  where country is not null
+                  group by country
+                  order by count desc
+                  limit 5
+                ),
+                top_referrers as (
+                  select referrer, count(*) as count
+                  from ranged_events
+                  group by referrer
+                  order by count desc
+                  limit 5
+                )
+                select
+                  coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
+                  coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
+                  coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+                ;
+              `)
+              .then(res => res.rows?.[0]),
+          'getAnalyticsDataGeo'
+        ),
+      ]).then(([rollupAggregates, geoAggregates]) => ({
+        ...(rollupAggregates ?? {}),
+        ...(geoAggregates ?? {}),
+      }))
+    : await apiQuery(
+        () =>
+          db
+            .execute<AnalyticsAggregateRow>(drizzleSql`
+              with base_events as (
+                select *
+                from ${clickEvents}
+                where ${clickEvents.creatorProfileId} = ${creatorProfileId}
+                  and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+              ),
+              ranged_events as (
+                select *
+                from base_events
+                where created_at >= ${startDate}
+              ),
+              recent_events as (
+                select *
+                from base_events
+                where created_at >= ${recentThreshold}
+              ),
+              clicks_last_30 as (
+                select date(created_at) as date, count(*) as count
+                from base_events
+                where created_at >= ${thirtyDaysAgo}
+                group by date(created_at)
+                order by date(created_at)
+              ),
+              top_links as (
+                select link_id as id, link_type as url, count(*) as clicks
+                from base_events
+                group by link_id, link_type
+                order by clicks desc
+                limit 5
+              ),
+              top_cities as (
+                select city, count(*) as count
+                from ranged_events
+                where city is not null
+                group by city
+                order by count desc
+                limit 5
+              ),
+              top_countries as (
+                select country, count(*) as count
+                from ranged_events
+                where country is not null
+                group by country
+                order by count desc
+                limit 5
+              ),
+              top_referrers as (
+                select referrer, count(*) as count
+                from ranged_events
+                group by referrer
+                order by count desc
+                limit 5
+              )
+              select
+                (select count(*) from base_events) as total_clicks,
+                (select count(*) from base_events where link_type = 'listen') as spotify_clicks,
+                (select count(*) from base_events where link_type = 'social') as social_clicks,
+                (select count(*) from recent_events) as recent_clicks,
+                (select count(*) from ranged_events) as profile_views_in_range,
+                coalesce((select json_agg(row_to_json(c)) from clicks_last_30 c), '[]'::json) as clicks_by_day,
+                coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links,
+                coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
+                coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
+                coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+              ;
+            `)
+            .then(res => res.rows?.[0]),
+        'getAnalyticsData'
+      );
 
   return {
     totalClicks: Number(analyticsAggregates?.total_clicks ?? 0),
@@ -327,100 +462,228 @@ export async function getUserDashboardAnalytics(
   // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
   // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
   // Dashboard queries have a 10s timeout.
-  const aggregates = await dashboardQuery(
+  const rollupAvailable = await dashboardQuery(
     () =>
       db
-        .execute<{
-          top_cities: JsonArray<{ city: string | null; count: number }>;
-          top_countries: JsonArray<{ country: string | null; count: number }>;
-          top_referrers: JsonArray<{ referrer: string | null; count: number }>;
-          unique_users: string | number | null;
-          total_clicks: string | number | null;
-          spotify_clicks: string | number | null;
-          social_clicks: string | number | null;
-          recent_clicks: string | number | null;
-          listen_clicks: string | number | null;
-          subscribers: string | number | null;
-          identified_users: string | number | null;
-        }>(
-          drizzleSql`
-            with base_events as (
-              select *
-              from ${clickEvents}
-              where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
-            ),
-            ranged_events as (
-              select *
-              from base_events
-              where created_at >= ${startDate}
-            ),
-            recent_events as (
-              select *
-              from base_events
-              where created_at >= ${recentThreshold}
-            ),
-            top_cities as (
-              select city, count(*) as count
-              from ranged_events
-              where city is not null
-              group by city
-              order by count desc
-              limit 5
-            ),
-            top_countries as (
-              select country, count(*) as count
-              from ranged_events
-              where country is not null
-              group by country
-              order by count desc
-              limit 5
-            ),
-            top_referrers as (
-              select referrer, count(*) as count
-              from ranged_events
-              group by referrer
-              order by count desc
-              limit 5
-            ),
-            notification_recent as (
-              select 1
-              from ${notificationSubscriptions}
-              where ${notificationSubscriptions.creatorProfileId} = ${creatorProfile.id}
-                and ${notificationSubscriptions.createdAt} >= ${startDate}
-            ),
-            audience_recent as (
-              select 1
-              from ${audienceMembers}
-              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
-                and ${audienceMembers.lastSeenAt} >= ${startDate}
-                and ${audienceMembers.fingerprint} is not null
-            ),
-            audience_identified as (
-              select 1
-              from ${audienceMembers}
-              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
-                and ${audienceMembers.updatedAt} >= ${startDate}
-                and ${audienceMembers.email} is not null
-            )
-            select
-              (select count(*) from audience_recent) as unique_users,
-              (select count(*) from ranged_events) as total_clicks,
-              (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
-              (select count(*) from ranged_events where link_type = 'social') as social_clicks,
-              (select count(*) from recent_events) as recent_clicks,
-              (select count(*) from ranged_events where link_type = 'listen') as listen_clicks,
-              (select count(*) from notification_recent) as subscribers,
-              (select count(*) from audience_identified) as identified_users,
-              coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
-              coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
-              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
-            ;
-          `
-        )
-        .then(res => res.rows?.[0]),
-    'getUserDashboardAnalytics'
+        .select({ count: drizzleSql<number>`count(*)` })
+        .from(clickEventDailyRollups)
+        .where(eq(clickEventDailyRollups.creatorProfileId, creatorProfile.id))
+        .limit(1)
+        .then(result => Number(result?.[0]?.count ?? 0) > 0),
+    'getUserDashboardAnalyticsRollupCheck'
   );
+
+  const aggregates = rollupAvailable
+    ? await Promise.all([
+        dashboardQuery(
+          () =>
+            db
+              .execute<
+                Pick<
+                  DashboardAggregateRow,
+                  | 'total_clicks'
+                  | 'spotify_clicks'
+                  | 'social_clicks'
+                  | 'recent_clicks'
+                  | 'listen_clicks'
+                >
+              >(drizzleSql`
+                with rollups_range as (
+                  select *
+                  from ${clickEventDailyRollups}
+                  where ${clickEventDailyRollups.creatorProfileId} = ${creatorProfile.id}
+                    and day >= ${startDate}::date
+                ),
+                rollups_recent as (
+                  select *
+                  from ${clickEventDailyRollups}
+                  where ${clickEventDailyRollups.creatorProfileId} = ${creatorProfile.id}
+                    and day >= ${recentThreshold}::date
+                )
+                select
+                  coalesce((select sum(total_count) from rollups_range), 0) as total_clicks,
+                  coalesce(
+                    (select sum(total_count) from rollups_range where link_type = 'listen'),
+                    0
+                  ) as spotify_clicks,
+                  coalesce(
+                    (select sum(total_count) from rollups_range where link_type = 'social'),
+                    0
+                  ) as social_clicks,
+                  coalesce((select sum(total_count) from rollups_recent), 0) as recent_clicks,
+                  coalesce(
+                    (select sum(total_count) from rollups_range where link_type = 'listen'),
+                    0
+                  ) as listen_clicks
+                ;
+              `)
+              .then(res => res.rows?.[0]),
+          'getUserDashboardAnalyticsRollups'
+        ),
+        dashboardQuery(
+          () =>
+            db
+              .execute<
+                Pick<
+                  DashboardAggregateRow,
+                  | 'top_cities'
+                  | 'top_countries'
+                  | 'top_referrers'
+                  | 'unique_users'
+                  | 'subscribers'
+                  | 'identified_users'
+                >
+              >(drizzleSql`
+                with base_events as (
+                  select *
+                  from ${clickEvents}
+                  where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
+                    and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                ),
+                ranged_events as (
+                  select *
+                  from base_events
+                  where created_at >= ${startDate}
+                ),
+                top_cities as (
+                  select city, count(*) as count
+                  from ranged_events
+                  where city is not null
+                  group by city
+                  order by count desc
+                  limit 5
+                ),
+                top_countries as (
+                  select country, count(*) as count
+                  from ranged_events
+                  where country is not null
+                  group by country
+                  order by count desc
+                  limit 5
+                ),
+                top_referrers as (
+                  select referrer, count(*) as count
+                  from ranged_events
+                  group by referrer
+                  order by count desc
+                  limit 5
+                ),
+                notification_recent as (
+                  select 1
+                  from ${notificationSubscriptions}
+                  where ${notificationSubscriptions.creatorProfileId} = ${creatorProfile.id}
+                    and ${notificationSubscriptions.createdAt} >= ${startDate}
+                ),
+                audience_recent as (
+                  select 1
+                  from ${audienceMembers}
+                  where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                    and ${audienceMembers.lastSeenAt} >= ${startDate}
+                    and ${audienceMembers.fingerprint} is not null
+                ),
+                audience_identified as (
+                  select 1
+                  from ${audienceMembers}
+                  where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                    and ${audienceMembers.updatedAt} >= ${startDate}
+                    and ${audienceMembers.email} is not null
+                )
+                select
+                  (select count(*) from audience_recent) as unique_users,
+                  (select count(*) from notification_recent) as subscribers,
+                  (select count(*) from audience_identified) as identified_users,
+                  coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
+                  coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
+                  coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+                ;
+              `)
+              .then(res => res.rows?.[0]),
+          'getUserDashboardAnalyticsGeo'
+        ),
+      ]).then(([rollupAggregates, geoAggregates]) => ({
+        ...(rollupAggregates ?? {}),
+        ...(geoAggregates ?? {}),
+      }))
+    : await dashboardQuery(
+        () =>
+          db
+            .execute<DashboardAggregateRow>(drizzleSql`
+              with base_events as (
+                select *
+                from ${clickEvents}
+                where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
+                  and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+              ),
+              ranged_events as (
+                select *
+                from base_events
+                where created_at >= ${startDate}
+              ),
+              recent_events as (
+                select *
+                from base_events
+                where created_at >= ${recentThreshold}
+              ),
+              top_cities as (
+                select city, count(*) as count
+                from ranged_events
+                where city is not null
+                group by city
+                order by count desc
+                limit 5
+              ),
+              top_countries as (
+                select country, count(*) as count
+                from ranged_events
+                where country is not null
+                group by country
+                order by count desc
+                limit 5
+              ),
+              top_referrers as (
+                select referrer, count(*) as count
+                from ranged_events
+                group by referrer
+                order by count desc
+                limit 5
+              ),
+              notification_recent as (
+                select 1
+                from ${notificationSubscriptions}
+                where ${notificationSubscriptions.creatorProfileId} = ${creatorProfile.id}
+                  and ${notificationSubscriptions.createdAt} >= ${startDate}
+              ),
+              audience_recent as (
+                select 1
+                from ${audienceMembers}
+                where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                  and ${audienceMembers.lastSeenAt} >= ${startDate}
+                  and ${audienceMembers.fingerprint} is not null
+              ),
+              audience_identified as (
+                select 1
+                from ${audienceMembers}
+                where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                  and ${audienceMembers.updatedAt} >= ${startDate}
+                  and ${audienceMembers.email} is not null
+              )
+              select
+                (select count(*) from audience_recent) as unique_users,
+                (select count(*) from ranged_events) as total_clicks,
+                (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
+                (select count(*) from ranged_events where link_type = 'social') as social_clicks,
+                (select count(*) from recent_events) as recent_clicks,
+                (select count(*) from ranged_events where link_type = 'listen') as listen_clicks,
+                (select count(*) from notification_recent) as subscribers,
+                (select count(*) from audience_identified) as identified_users,
+                coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
+                coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
+                coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+              ;
+            `)
+            .then(res => res.rows?.[0]),
+        'getUserDashboardAnalytics'
+      );
 
   const base: DashboardAnalyticsResponse = {
     view,
