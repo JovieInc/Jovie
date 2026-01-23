@@ -58,7 +58,7 @@ export function validatePathTraversal(
  */
 export function isValidFilename(filename: string): boolean {
   // Disallow path separators and parent directory references
-  const dangerousPatterns = /[\/\\]|\.\.|\0/;
+  const dangerousPatterns = /[/\\]|\.\.|\0/;
   return !dangerousPatterns.test(filename);
 }
 
@@ -77,7 +77,7 @@ export function sanitizeFilename(filename: string): string {
   return (
     filename
       // Remove path separators
-      .replaceAll(/[\/\\]/g, '')
+      .replaceAll(/[/\\]/g, '')
       // Remove parent directory references
       .replaceAll('..', '')
       // Remove null bytes
