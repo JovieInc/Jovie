@@ -1,0 +1,6 @@
+CREATE INDEX IF NOT EXISTS "audience_members_creator_profile_id_last_seen_at_idx" ON "audience_members" USING btree ("creator_profile_id","last_seen_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "audience_members_creator_profile_id_updated_at_idx" ON "audience_members" USING btree ("creator_profile_id","updated_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "audience_members_retention_idx" ON "audience_members" USING btree ("last_seen_at") WHERE type = 'anonymous' AND email IS NULL AND phone IS NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "click_events_created_at_idx" ON "click_events" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "notification_subscriptions_creator_profile_id_created_at_idx" ON "notification_subscriptions" USING btree ("creator_profile_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "notification_subscriptions_created_at_idx" ON "notification_subscriptions" USING btree ("created_at");
