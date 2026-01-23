@@ -2,19 +2,36 @@ import fs from 'node:fs';
 import path from 'node:path';
 import DOMPurify from 'isomorphic-dompurify';
 import type { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import { remark } from 'remark';
 import html from 'remark-html';
 import { Container } from '@/components/site/Container';
 import { APP_NAME } from '@/constants/app';
 
 const CHANGELOG_PATH = path.join(process.cwd(), 'CHANGELOG.md');
+const CACHE_REVALIDATE_SECONDS = 60 * 60 * 24; // 24 hours
 
-async function getChangelogHtml(): Promise<string> {
+/**
+ * Process markdown to HTML. This is CPU-intensive so we cache the result.
+ */
+async function processChangelogMarkdown(): Promise<string> {
   const fileContents = fs.readFileSync(CHANGELOG_PATH, 'utf8');
   const processedContent = await remark().use(html).process(fileContents);
-  // Sanitize HTML to prevent XSS from markdown content
   return DOMPurify.sanitize(processedContent.toString());
 }
+
+/**
+ * Cached version of changelog processing.
+ * Revalidates every 24 hours or when 'changelog' tag is invalidated.
+ */
+const getChangelogHtml = unstable_cache(
+  processChangelogMarkdown,
+  ['changelog-html'],
+  {
+    revalidate: CACHE_REVALIDATE_SECONDS,
+    tags: ['changelog'],
+  }
+);
 
 export const metadata: Metadata = {
   title: `Changelog | ${APP_NAME}`,
