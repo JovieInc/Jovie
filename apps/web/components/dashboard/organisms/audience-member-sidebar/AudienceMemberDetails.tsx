@@ -7,7 +7,7 @@
  */
 
 import { Check, Copy } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
@@ -23,13 +23,21 @@ interface CopyableValueProps {
 
 function CopyableValue({ value, label }: CopyableValueProps) {
   const [isCopied, setIsCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(value);
       toast.success(`${label} copied to clipboard`);
       setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
     }

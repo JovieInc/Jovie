@@ -7,7 +7,7 @@
  */
 
 import { Check, Copy, ExternalLink, Hash, RefreshCw, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -30,11 +30,19 @@ export function ReleaseSidebarHeader({
 }: ReleaseSidebarHeaderProps) {
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const handleCopySmartLink = useCallback(() => {
     onCopySmartLink();
     setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [onCopySmartLink]);
 
   // Define actions based on pattern from ContactSidebarHeader:
