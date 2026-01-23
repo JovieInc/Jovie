@@ -24,7 +24,7 @@ const MIN_URLS_FOR_DIALOG = 2;
  * URL extraction regex - matches most URL formats.
  * Excludes common trailing punctuation that's often not part of URLs.
  */
-const URL_REGEX = /https?:\/\/[^\s<>"'{}|\\^`\[\]]+/gi;
+const URL_REGEX = /https?:\/\/[^\s<>"'{}|\\^`[\]]+/gi;
 
 /**
  * Clean up extracted URLs by removing trailing punctuation.
