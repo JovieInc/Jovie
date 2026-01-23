@@ -221,7 +221,7 @@ export function OnboardingHandleStep({
               </div>
             </div>
 
-            {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
+            {/* NOSONAR S6819: role="status" is correct for validation feedback; <output> is for form calculation results */}
             <div
               className={FORM_LAYOUT.errorContainer}
               role='status'
@@ -244,7 +244,7 @@ export function OnboardingHandleStep({
           </AuthButton>
         </form>
 
-        {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for error hint */}
+        {/* NOSONAR S6819: role="status" is correct for error feedback; <output> is for form calculation results */}
         <div
           className={FORM_LAYOUT.footerHint}
           role='status'

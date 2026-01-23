@@ -156,9 +156,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     const ariaLabel = getAriaLabel();
 
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: Div with conditional role='button', tabIndex, and keyboard support when interactive
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Role is dynamically 'button' when interactive
-      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label only present when role='button'
+      // NOSONAR S6819: Dynamic role for conditional interactivity; native <button> can't contain complex pill layout
       <div
         ref={ref}
         onClick={isInteractive ? onClick : undefined}

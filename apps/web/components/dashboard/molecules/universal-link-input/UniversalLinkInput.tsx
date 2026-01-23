@@ -81,6 +81,7 @@ function PlatformSuggestionItem({
   const isDark = isBrandDark(iconHex);
 
   return (
+    // NOSONAR S6819: Custom option with icon and rich content; native <option> can't render this
     <button
       id={optionId}
       role='option'
@@ -262,6 +263,7 @@ export const UniversalLinkInput = forwardRef<
         />
 
         {shouldShowAutosuggest ? (
+          // NOSONAR S6819: Custom autocomplete requires ARIA listbox pattern; native <select> can't support search or custom styling
           <div
             id={autosuggestListId}
             role='listbox'

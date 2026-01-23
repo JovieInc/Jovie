@@ -112,7 +112,7 @@ export function OptimisticProgress({
   };
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for progress container
+    // NOSONAR S6819: role="status" is correct for progress announcements; <output> is for form results
     <div className='space-y-3' aria-live='polite' role='status'>
       {/* Progress bar */}
       <div className='space-y-2'>
@@ -121,6 +121,7 @@ export function OptimisticProgress({
           <span>{Math.round(state.progress)}%</span>
         </div>
         <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden'>
+          {/* NOSONAR S6819: Custom progress bar with gradient styling; native <progress> can't be styled this way */}
           <div
             className='bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-100 ease-out'
             style={{ width: `${state.progress}%` }}

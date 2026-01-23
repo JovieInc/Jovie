@@ -62,7 +62,7 @@ function TanStackHeaderCheckbox({
   const normalizedState = normalizeHeaderState(headerCheckboxState);
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
+    // NOSONAR S6819: role="presentation" correctly hides wrapper from screen readers; Checkbox inside is the interactive element
     <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
@@ -93,7 +93,7 @@ function TanStackRowCheckbox({
   onToggleSelect: () => void;
 }) {
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: Wrapper stops propagation for checkbox
+    // NOSONAR S6819: role="presentation" correctly hides wrapper from screen readers; Checkbox inside is the interactive element
     <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}

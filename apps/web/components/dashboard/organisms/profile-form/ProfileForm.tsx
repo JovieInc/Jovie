@@ -159,7 +159,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       </Button>
 
       {success && (
-        // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for success message
+        // NOSONAR S6819: role="status" is correct for success announcements; <output> is for form calculation results
         <div
           className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'
           role='status'

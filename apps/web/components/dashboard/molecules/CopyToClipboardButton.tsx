@@ -95,7 +95,7 @@ export function CopyToClipboardButton({
         )}
       </Button>
 
-      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for live announcement */}
+      {/* NOSONAR S6819: role="status" is correct for live announcements; <output> is for form results */}
       <span className='sr-only' aria-live='polite' role='status'>
         {getStatusMessage(status)}
       </span>

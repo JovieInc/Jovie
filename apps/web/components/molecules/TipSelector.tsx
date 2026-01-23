@@ -41,7 +41,7 @@ export function TipSelector({
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-      {/* biome-ignore lint/a11y/useSemanticElements: fieldset not appropriate for button group layout */}
+      {/* NOSONAR S6819: role="group" is appropriate for button groups; <fieldset> has styling constraints */}
       <div
         className='grid grid-cols-3 gap-3'
         role='group'

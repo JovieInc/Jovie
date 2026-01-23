@@ -38,7 +38,7 @@ export function ProfileLinkCategorySelector({
   }
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: fieldset not appropriate for segmented control
+    // NOSONAR S6819: role="group" is appropriate for segmented controls; <fieldset> has styling constraints
     <div
       role='group'
       aria-label='Link categories'

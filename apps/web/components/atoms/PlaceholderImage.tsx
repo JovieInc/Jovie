@@ -37,6 +37,7 @@ export const PlaceholderImage = forwardRef<
       )}
     >
       {children || (
+        // NOSONAR S6819: SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
         <svg
           className='h-1/2 w-1/2 text-gray-400 dark:text-gray-500'
           fill='currentColor'
