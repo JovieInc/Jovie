@@ -2,7 +2,7 @@ import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import React from 'react';
-import { ClientProviders } from '@/components/providers/ClientProviders';
+import { CoreProviders } from '@/components/providers/CoreProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
@@ -257,7 +257,7 @@ export default async function RootLayout({
   }
 
   // publishableKey may be undefined in test/dev mode
-  // ClientProviders handles bypassing Clerk authentication when key is missing
+  // CoreProviders handle base client providers; Clerk is mounted per route.
   return (
     <html lang='en' suppressHydrationWarning>
       {headContent}
@@ -269,9 +269,7 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        <ClientProviders publishableKey={publishableKey}>
-          {children}
-        </ClientProviders>
+        <CoreProviders>{children}</CoreProviders>
 
         <CookieBannerSection showBanner={showCookieBanner} />
         {shouldInjectToolbar && <VercelToolbar />}
