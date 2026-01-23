@@ -220,7 +220,8 @@ export async function getLinkStats(userId?: string): Promise<LinkStats> {
       return await db
         .select()
         .from(wrappedLinks)
-        .where(userId ? eq(wrappedLinks.createdBy, userId) : undefined);
+        .where(userId ? eq(wrappedLinks.createdBy, userId) : undefined)
+        .limit(1000);
     };
 
     const data = userId
