@@ -4,7 +4,16 @@
  * Search and analytics queries for artists.
  */
 
-import { and, count, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  eq,
+  ilike,
+  inArray,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type Artist,
@@ -34,7 +43,7 @@ export async function searchArtists(
 
   const whereClause =
     excludeIds.length > 0
-      ? and(nameMatch, sql`${artists.id} NOT IN ${excludeIds}`)
+      ? and(nameMatch, notInArray(artists.id, excludeIds))
       : nameMatch;
 
   return db

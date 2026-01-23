@@ -133,6 +133,10 @@ export function useAsyncSearch<TResult>({
 
       const trimmed = searchQuery.trim();
       if (trimmed.length < minQueryLength) {
+        // Cancel any pending debounced work and in-flight requests
+        asyncDebouncer.cancel();
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
         setResults([]);
         setSearchState('idle');
         setError(null);
