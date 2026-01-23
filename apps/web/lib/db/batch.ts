@@ -10,6 +10,11 @@ import type { PgTable } from 'drizzle-orm/pg-core';
 
 import { type DbType, db, type TransactionType } from './index';
 
+/** Escape single quotes for SQL string literals */
+function escapeSql(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
 // Maximum batch size to prevent memory issues and timeout
 export const DEFAULT_BATCH_SIZE = 100;
 export const MAX_BATCH_SIZE = 1000;
@@ -144,4 +149,68 @@ export async function batchUpdateInTransaction<T>(
     }
     return updates.length;
   });
+}
+
+/**
+ * Social link update data for batch operations.
+ */
+export interface SocialLinkUpdate {
+  id: string;
+  url: string;
+  platform: string;
+  platformType: string;
+  displayText: string | null;
+  sortOrder: number;
+}
+
+/**
+ * Optimized batch update for social links.
+ * Uses PostgreSQL VALUES clause with JOIN for single-statement update.
+ *
+ * Updates url, platform, platform_type, display_text, sort_order, and updated_at
+ * in a single database round trip.
+ *
+ * @param updates - Array of social link updates
+ */
+export async function batchUpdateSocialLinks(
+  updates: SocialLinkUpdate[]
+): Promise<void> {
+  if (updates.length === 0) return;
+
+  // Validate IDs to prevent SQL injection
+  for (const update of updates) {
+    if (typeof update.id !== 'string' || !/^[\w-]+$/.test(update.id)) {
+      throw new Error('Invalid ID format in batch update');
+    }
+    if (
+      typeof update.sortOrder !== 'number' ||
+      !Number.isInteger(update.sortOrder)
+    ) {
+      throw new Error('Invalid sortOrder in batch update');
+    }
+  }
+
+  // Generate VALUES list with proper escaping for SQL string literals
+  const valuesList = updates
+    .map(u => {
+      const displayText =
+        u.displayText === null ? 'NULL' : `'${escapeSql(u.displayText)}'`;
+      return `('${u.id}'::uuid, '${escapeSql(u.url)}', '${escapeSql(u.platform)}', '${escapeSql(u.platformType)}', ${displayText}, ${u.sortOrder})`;
+    })
+    .join(', ');
+
+  await db.execute(
+    drizzleSql.raw(`
+    UPDATE social_links AS t
+    SET
+      url = v.url,
+      platform = v.platform,
+      platform_type = v.platform_type,
+      display_text = v.display_text,
+      sort_order = v.sort_order,
+      updated_at = NOW()
+    FROM (VALUES ${valuesList}) AS v(id, url, platform, platform_type, display_text, sort_order)
+    WHERE t.id = v.id
+  `)
+  );
 }

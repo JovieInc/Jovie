@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, profilePhotos } from '@/lib/db';
 import { logger } from '@/lib/utils/logger';
@@ -70,10 +70,12 @@ export async function GET(request: Request) {
     const blobUrlsToDelete = collectBlobUrls(orphanedRecords);
     const blobsDeleted = await deleteBlobsIfConfigured(blobUrlsToDelete);
 
-    // Delete database records
+    // Delete database records in a single batch operation
     const recordIds = orphanedRecords.map(r => r.id);
-    for (const id of recordIds) {
-      await db.delete(profilePhotos).where(eq(profilePhotos.id, id));
+    if (recordIds.length > 0) {
+      await db
+        .delete(profilePhotos)
+        .where(inArray(profilePhotos.id, recordIds));
     }
 
     logger.info(
