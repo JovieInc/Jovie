@@ -5,21 +5,28 @@
  */
 
 import { eq, or } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, type TransactionType } from '@/lib/db';
 import { type Artist, artists, type NewArtist } from '@/lib/db/schema';
 import { normalizeArtistName } from '../artist-parser';
 import type { FindOrCreateArtistInput } from './types';
 
 /**
  * Find an artist by any external ID or normalized name
+ *
+ * @param input - Search criteria (external IDs or name)
+ * @param tx - Optional transaction to use for atomicity
  */
-export async function findArtist(input: {
-  spotifyId?: string | null;
-  appleMusicId?: string | null;
-  musicbrainzId?: string | null;
-  deezerId?: string | null;
-  name?: string;
-}): Promise<Artist | null> {
+export async function findArtist(
+  input: {
+    spotifyId?: string | null;
+    appleMusicId?: string | null;
+    musicbrainzId?: string | null;
+    deezerId?: string | null;
+    name?: string;
+  },
+  tx?: TransactionType
+): Promise<Artist | null> {
+  const database = tx ?? db;
   const conditions = [];
 
   // Prefer external IDs for matching (most reliable)
@@ -38,7 +45,7 @@ export async function findArtist(input: {
 
   // Try external IDs first
   if (conditions.length > 0) {
-    const [found] = await db
+    const [found] = await database
       .select()
       .from(artists)
       .where(or(...conditions))
@@ -50,7 +57,7 @@ export async function findArtist(input: {
   // Fallback to normalized name match
   if (input.name) {
     const normalized = normalizeArtistName(input.name);
-    const [found] = await db
+    const [found] = await database
       .select()
       .from(artists)
       .where(eq(artists.nameNormalized, normalized))
@@ -67,18 +74,27 @@ export async function findArtist(input: {
  *
  * First tries to find by external IDs, then by normalized name.
  * If not found, creates a new artist record.
+ *
+ * @param input - Artist data for find/create
+ * @param tx - Optional transaction to use for atomicity
  */
 export async function findOrCreateArtist(
-  input: FindOrCreateArtistInput
+  input: FindOrCreateArtistInput,
+  tx?: TransactionType
 ): Promise<Artist> {
+  const database = tx ?? db;
+
   // Try to find existing artist
-  const existing = await findArtist({
-    spotifyId: input.spotifyId,
-    appleMusicId: input.appleMusicId,
-    musicbrainzId: input.musicbrainzId,
-    deezerId: input.deezerId,
-    name: input.name,
-  });
+  const existing = await findArtist(
+    {
+      spotifyId: input.spotifyId,
+      appleMusicId: input.appleMusicId,
+      musicbrainzId: input.musicbrainzId,
+      deezerId: input.deezerId,
+      name: input.name,
+    },
+    tx
+  );
 
   if (existing) {
     // Update with any new external IDs we have (only fill in missing fields)
@@ -100,7 +116,7 @@ export async function findOrCreateArtist(
 
     if (Object.keys(updates).length > 0) {
       updates.updatedAt = new Date();
-      const [updated] = await db
+      const [updated] = await database
         .update(artists)
         .set(updates)
         .where(eq(artists.id, existing.id))
@@ -132,7 +148,10 @@ export async function findOrCreateArtist(
     updatedAt: now,
   };
 
-  const [created] = await db.insert(artists).values(insertData).returning();
+  const [created] = await database
+    .insert(artists)
+    .values(insertData)
+    .returning();
 
   return created;
 }

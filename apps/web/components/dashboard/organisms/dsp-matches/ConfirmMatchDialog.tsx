@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import Image from 'next/image';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfidenceBadge } from '@/components/dashboard/atoms/ConfidenceBadge';
 import {
@@ -19,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 export interface ConfirmMatchDialogProps {
   open: boolean;
@@ -104,10 +106,13 @@ export function ConfirmMatchDialog({
           <div className='flex items-center gap-4'>
             {/* Artist Image */}
             {externalArtistImageUrl ? (
-              <img
+              <Image
                 src={externalArtistImageUrl}
                 alt={externalArtistName}
-                className='h-16 w-16 rounded-full object-cover ring-2 ring-surface-3'
+                width={64}
+                height={64}
+                className='rounded-full object-cover ring-2 ring-surface-3'
+                unoptimized={isExternalDspImage(externalArtistImageUrl)}
               />
             ) : (
               <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-3'>

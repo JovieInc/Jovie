@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo } from 'react';
+
 interface ProgressStep {
   id: string;
   title: string;
@@ -25,9 +27,13 @@ export function ProgressIndicator({
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
   // Calculate remaining time estimate
-  const remainingTime = steps
-    .slice(currentStep + 1)
-    .reduce((total, step) => total + (step.estimatedTimeSeconds || 30), 0);
+  const remainingTime = useMemo(
+    () =>
+      steps
+        .slice(currentStep + 1)
+        .reduce((total, step) => total + (step.estimatedTimeSeconds || 30), 0),
+    [steps, currentStep]
+  );
 
   const formatTime = (seconds: number): string => {
     if (seconds < 60) return `${seconds}s`;

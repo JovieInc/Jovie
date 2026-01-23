@@ -175,6 +175,12 @@ export const queryKeys = {
     availability: (handle: string) =>
       [...queryKeys.handle.all, 'availability', handle.toLowerCase()] as const,
   },
+
+  // Link wrapping queries
+  links: {
+    all: ['links'] as const,
+    wrapped: () => [...queryKeys.links.all, 'wrapped'] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

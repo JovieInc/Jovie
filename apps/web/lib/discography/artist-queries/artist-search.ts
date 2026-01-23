@@ -4,7 +4,16 @@
  * Search and analytics queries for artists.
  */
 
-import { and, count, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  eq,
+  ilike,
+  inArray,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type Artist,
@@ -34,7 +43,7 @@ export async function searchArtists(
 
   const whereClause =
     excludeIds.length > 0
-      ? and(nameMatch, sql`${artists.id} NOT IN ${excludeIds}`)
+      ? and(nameMatch, notInArray(artists.id, excludeIds))
       : nameMatch;
 
   return db
@@ -111,19 +120,30 @@ export async function getFrequentCollaborators(
           .groupBy(releaseArtists.artistId)
       : [];
 
-  // Merge track and release collaborator data
+  // Build count maps for both track and release collaborators
+  const trackCountMap = new Map(
+    trackCollaborators.map(c => [c.artistId, Number(c.trackCount)])
+  );
   const releaseCountMap = new Map(
     releaseCollaborators.map(c => [c.artistId, Number(c.releaseCount)])
   );
 
-  // Sort by track count and limit
-  const collaborators = trackCollaborators
-    .map(c => ({
-      artistId: c.artistId,
-      trackCount: c.trackCount,
-      releaseCount: releaseCountMap.get(c.artistId) ?? 0,
+  // Combine all unique artist IDs from both track and release collaborators
+  const allCollaboratorIds = new Set([
+    ...trackCollaborators.map(c => c.artistId),
+    ...releaseCollaborators.map(c => c.artistId),
+  ]);
+
+  // Create collaborator objects with counts from both sources
+  const collaborators = Array.from(allCollaboratorIds)
+    .map(artistId => ({
+      artistId,
+      trackCount: trackCountMap.get(artistId) ?? 0,
+      releaseCount: releaseCountMap.get(artistId) ?? 0,
     }))
-    .sort((a, b) => Number(b.trackCount) - Number(a.trackCount))
+    .sort(
+      (a, b) => b.trackCount - a.trackCount || b.releaseCount - a.releaseCount
+    )
     .slice(0, limit);
 
   // Fetch artist details
