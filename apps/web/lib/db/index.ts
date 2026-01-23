@@ -200,6 +200,36 @@ function isRetryableError(error: unknown): boolean {
   );
 }
 
+/**
+ * Wraps a database operation with a timeout to prevent indefinite hanging.
+ * Returns a Promise that rejects if the operation takes longer than timeoutMs.
+ *
+ * @param operation - The async operation to execute
+ * @param timeoutMs - Maximum time to wait in milliseconds
+ * @param context - Description of the operation for error messages
+ * @returns Promise that resolves with operation result or rejects on timeout
+ */
+async function withTimeout<T>(
+  operation: () => Promise<T>,
+  timeoutMs: number,
+  context: string
+): Promise<T> {
+  return Promise.race([
+    operation(),
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Database operation timeout after ${timeoutMs}ms: ${context}`
+            )
+          ),
+        timeoutMs
+      )
+    ),
+  ]);
+}
+
 // Lazy initialization of database connection
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
@@ -220,11 +250,18 @@ function initializePoolIfNeeded(
     if (!_pool) {
       _pool = new Pool({
         connectionString: databaseUrl,
-        // Neon serverless connections can be terminated unexpectedly;
-        // keep pool small and allow quick reconnection
-        max: isProduction ? 10 : 3,
-        idleTimeoutMillis: 30000, // 30s idle timeout
-        connectionTimeoutMillis: 15000, // 15s connection timeout (allows Neon wake-up)
+        // Performance-optimized pool settings for Neon serverless:
+        // - Increased max for higher concurrency under load
+        // - Added min to keep connections warm (reduces cold start latency)
+        // - Reduced idle timeout since Neon connections are cheap to recreate
+        // - Reduced connection timeout for faster failure detection (retry logic handles recovery)
+        max: isProduction ? 15 : 3, // Increased from 10 for higher concurrency
+        min: isProduction ? 2 : 1, // Keep minimum connections warm
+        idleTimeoutMillis: 20000, // 20s idle timeout (reduced from 30s - Neon connections are cheap)
+        connectionTimeoutMillis: 8000, // 8s connection timeout (reduced from 10s - fail faster, retry handles it)
+        statement_timeout: 15000, // 15s max query execution time
+        query_timeout: 15000, // 15s max query time (includes network latency)
+        allowExitOnIdle: !isProduction, // Allow clean shutdown in dev
       });
 
       // Handle pool errors to prevent unhandled rejections
@@ -482,15 +519,21 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
       _db = initializeDb();
     }
 
-    const result = await _db.execute(
-      drizzleSql<TableExistsRow>`
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.tables
-          WHERE table_schema = 'public'
-            AND table_name = ${tableName}
-        ) AS table_exists
-      `
+    // Wrap table existence check with 10s timeout to prevent hanging
+    const result = await withTimeout(
+      () =>
+        _db!.execute(
+          drizzleSql<TableExistsRow>`
+            SELECT EXISTS (
+              SELECT 1
+              FROM information_schema.tables
+              WHERE table_schema = 'public'
+                AND table_name = ${tableName}
+            ) AS table_exists
+          `
+        ),
+      10000, // 10 second timeout
+      `table_exists_${tableName}`
     );
 
     // result.rows is TableExistsRow[] - rows is always defined, first element may be undefined
@@ -697,6 +740,31 @@ export async function checkDbPerformance(): Promise<{
 }
 
 /**
+ * Get connection pool metrics for monitoring.
+ * Returns null if pool is not initialized.
+ */
+export function getPoolMetrics(): {
+  total: number;
+  idle: number;
+  waiting: number;
+  utilization: number;
+} | null {
+  if (!_pool) return null;
+
+  const total = _pool.totalCount;
+  const idle = _pool.idleCount;
+  const waiting = _pool.waitingCount;
+
+  return {
+    total,
+    idle,
+    waiting,
+    // Utilization percentage: (active connections / total connections) * 100
+    utilization: total > 0 ? Math.round(((total - idle) / total) * 100) : 0,
+  };
+}
+
+/**
  * Get database configuration and status
  */
 export function getDbConfig() {
@@ -707,5 +775,6 @@ export function getDbConfig() {
       environment: process.env.NODE_ENV,
       hasUrl: !!env.DATABASE_URL,
     },
+    pool: getPoolMetrics(),
   };
 }

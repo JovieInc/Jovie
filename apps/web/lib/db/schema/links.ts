@@ -54,6 +54,12 @@ export const socialLinks = pgTable(
       table.state,
       table.createdAt
     ),
+    // Performance index: dashboard link count queries
+    activeLinksIndex: index('idx_social_links_active').on(
+      table.creatorProfileId,
+      table.isActive,
+      table.state
+    ),
   })
 );
 

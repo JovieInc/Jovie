@@ -64,6 +64,13 @@
       "when": 1769060000000,
       "tag": "0008_fix_email_conflict_in_create_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1769124583369,
+      "tag": "0009_add_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

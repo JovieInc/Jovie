@@ -6,6 +6,7 @@
 
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { batchUpdateSortOrder } from '@/lib/db/batch';
 import { socialLinks } from '@/lib/db/schema';
 import type {
   CreateLinkData,
@@ -107,19 +108,14 @@ export async function deleteLink(linkId: string): Promise<boolean> {
 
 /**
  * Bulk update link sort orders.
+ * Performance optimized: Uses single SQL statement instead of N individual updates.
  */
 export async function reorderLinks(
   linkOrders: Array<{ id: string; sortOrder: number }>
 ): Promise<void> {
-  // Update each link's sort order
-  await Promise.all(
-    linkOrders.map(({ id, sortOrder }) =>
-      db
-        .update(socialLinks)
-        .set({ sortOrder, updatedAt: new Date() })
-        .where(eq(socialLinks.id, id))
-    )
-  );
+  // Performance optimization: Single batch update instead of N individual queries
+  // This reduces database round trips from N to 1
+  await batchUpdateSortOrder(socialLinks, linkOrders);
 }
 
 /**
