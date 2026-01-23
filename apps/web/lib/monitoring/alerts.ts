@@ -59,7 +59,7 @@ export interface AlertData {
 export class PerformanceAlerts {
   private rules: AlertRule[] = [];
   private alertHistory: Record<string, number> = {}; // Track when alerts were last sent
-  private cooldownPeriod: number = 3600000; // 1 hour cooldown by default
+  private readonly cooldownPeriod: number; // 1 hour cooldown by default
 
   /**
    * Create a new performance alerts instance
