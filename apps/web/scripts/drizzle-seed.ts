@@ -1,22 +1,17 @@
 #!/usr/bin/env -S tsx
 
-import { neon } from '@neondatabase/serverless';
 /**
  * Drizzle Database Seed Script
  * Seeds the database with comprehensive demo data using Drizzle ORM and Neon
  */
 
+import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
   type NeonHttpDatabase,
   drizzle as neonDrizzle,
 } from 'drizzle-orm/neon-http';
-import {
-  type PostgresJsDatabase,
-  drizzle as pgDrizzle,
-} from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
 import * as schema from '@/lib/db/schema';
 import {
   audienceMembers,
@@ -47,42 +42,24 @@ if (process.env.ALLOW_DB_SEED !== '1') {
   process.exit(1);
 }
 
-// URL patterns for special cases
+// URL pattern for Neon special URL format
 const NEON_PLUS_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
-const TCP_PLUS_PATTERN = /(postgres)(|ql)(\+tcp)(.*)/;
 
 const DATABASE_URL: string = process.env.DATABASE_URL ?? '';
 if (!DATABASE_URL) {
   console.error('❌ DATABASE_URL not configured');
   process.exit(1);
 }
-type SeedDB =
-  | NeonHttpDatabase<typeof schema>
-  | PostgresJsDatabase<typeof schema>;
-let db: SeedDB;
-let closeDb: () => Promise<void> = async () => {};
 
-function isTcpUrl(url: string): boolean {
-  // Explicit +tcp suffix or an explicit port suggests TCP client usage
-  if (TCP_PLUS_PATTERN.test(url)) return true;
-  try {
-    const u = new URL(url);
-    return Boolean(u.port); // heuristically treat URLs with ports as TCP
-  } catch {
-    return false;
-  }
-}
+type SeedDB = NeonHttpDatabase<typeof schema>;
+let db: SeedDB;
+const closeDb = async (): Promise<void> => {
+  // Neon HTTP driver has no persistent connection to close
+};
 
 function normalizeForNeon(url: string): string {
   // strip "+neon" suffix if present
   return url.replace(NEON_PLUS_PATTERN, 'postgres$2$4');
-}
-
-function normalizeForTcp(url: string): string {
-  // Convert +tcp -> normal protocol; also strip +neon if present
-  let u = url.replace(TCP_PLUS_PATTERN, 'postgres$2$4');
-  u = u.replace(NEON_PLUS_PATTERN, 'postgres$2$4');
-  return u;
 }
 
 function logConnInfo(url: string) {
@@ -96,44 +73,14 @@ function logConnInfo(url: string) {
 }
 
 async function initDb(): Promise<void> {
-  // Prefer Neon HTTP unless URL explicitly demands TCP
-  if (!isTcpUrl(DATABASE_URL)) {
-    const neonUrl = normalizeForNeon(DATABASE_URL);
-    logConnInfo(neonUrl);
-    try {
-      const sqlClient = neon(neonUrl);
-      const neonDb = neonDrizzle(sqlClient, { schema });
-      // quick ping
-      await neonDb.execute(drizzleSql`SELECT 1`);
-      db = neonDb;
-      closeDb = async () => {
-        /* neon-http doesn't require explicit close */
-      };
-      return;
-    } catch (err) {
-      console.warn(
-        '⚠️  Neon HTTP init failed, falling back to TCP:',
-        (err as Error).message
-      );
-      // fall through to TCP
-    }
-  }
+  const neonUrl = normalizeForNeon(DATABASE_URL);
+  logConnInfo(neonUrl);
 
-  // Fallback to TCP
-  const tcpUrl = normalizeForTcp(DATABASE_URL);
-  logConnInfo(tcpUrl);
-  const sqlClient = postgres(tcpUrl, { ssl: true, max: 1, onnotice: () => {} });
-  const pgDb = pgDrizzle(sqlClient, { schema });
-  // quick ping
-  await pgDb.execute(drizzleSql`SELECT 1`);
-  db = pgDb;
-  closeDb = async () => {
-    try {
-      await sqlClient.end();
-    } catch {
-      /* ignore */
-    }
-  };
+  const sqlClient = neon(neonUrl);
+  db = neonDrizzle(sqlClient, { schema });
+
+  // Verify connection
+  await db.execute(drizzleSql`SELECT 1`);
 }
 
 // =============================================================================

@@ -7,6 +7,20 @@ import { env } from '@/lib/env';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
+// Module-level singleton - initialized once per cold start
+let webhookVerifier: Webhook | null = null;
+let webhookVerifierSecret: string | null = null;
+
+function getWebhookVerifier(secret: string): Webhook {
+  // Re-initialize if secret changed (shouldn't happen, but be safe)
+  if (webhookVerifier && webhookVerifierSecret === secret) {
+    return webhookVerifier;
+  }
+  webhookVerifier = new Webhook(secret);
+  webhookVerifierSecret = secret;
+  return webhookVerifier;
+}
+
 /**
  * Verify the webhook signature and extract the event.
  */
@@ -45,7 +59,7 @@ async function verifyWebhook(
   }
 
   try {
-    const wh = new Webhook(webhook_secret);
+    const wh = getWebhookVerifier(webhook_secret);
     const event = wh.verify(body, {
       'svix-id': svix_id,
       'svix-timestamp': svix_timestamp,
