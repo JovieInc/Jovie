@@ -56,6 +56,33 @@ export interface InputProps
  * Input component with comprehensive validation, loading states, and accessibility.
  * Built on native HTML input with enhanced features for forms.
  */
+// Helper function to get padding class based on inputSize
+function getPaddingRight(
+  inputSize: InputProps['inputSize']
+): 'pr-8' | 'pr-12' | 'pr-10' {
+  if (inputSize === 'sm') return 'pr-8';
+  if (inputSize === 'lg') return 'pr-12';
+  return 'pr-10';
+}
+
+// Helper function to get position class based on inputSize
+function getRightPosition(
+  inputSize: InputProps['inputSize']
+): 'right-2' | 'right-3' | 'right-2.5' {
+  if (inputSize === 'sm') return 'right-2';
+  if (inputSize === 'lg') return 'right-3';
+  return 'right-2.5';
+}
+
+// Helper function to get spinner size class based on inputSize
+function getSpinnerSize(
+  inputSize: InputProps['inputSize']
+): 'h-3 w-3' | 'h-5 w-5' | 'h-4 w-4' {
+  if (inputSize === 'sm') return 'h-3 w-3';
+  if (inputSize === 'lg') return 'h-5 w-5';
+  return 'h-4 w-4';
+}
+
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
     {
@@ -81,12 +108,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           className={cn(
             inputVariants({ variant, inputSize }),
-            hasRightContent &&
-              (inputSize === 'sm'
-                ? 'pr-8'
-                : inputSize === 'lg'
-                  ? 'pr-12'
-                  : 'pr-10'),
+            hasRightContent && getPaddingRight(inputSize),
             className
           )}
           ref={ref}
@@ -101,11 +123,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <div
             className={cn(
               'absolute top-1/2 -translate-y-1/2 flex items-center gap-1',
-              inputSize === 'sm'
-                ? 'right-2'
-                : inputSize === 'lg'
-                  ? 'right-3'
-                  : 'right-2.5'
+              getRightPosition(inputSize)
             )}
           >
             {/* Loading spinner */}
@@ -115,11 +133,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 className={cn(
                   'animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent',
                   'text-muted-foreground',
-                  inputSize === 'sm'
-                    ? 'h-3 w-3'
-                    : inputSize === 'lg'
-                      ? 'h-5 w-5'
-                      : 'h-4 w-4'
+                  getSpinnerSize(inputSize)
                 )}
                 aria-label='Loading'
               />

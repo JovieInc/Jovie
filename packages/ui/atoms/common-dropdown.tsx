@@ -242,17 +242,23 @@ export function CommonDropdown(props: CommonDropdownProps) {
             />
           </div>
         )}
-        {isLoading ? (
-          <div className='flex items-center justify-center py-6'>
-            <Loader2 className='h-6 w-6 animate-spin text-tertiary-token' />
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className='py-6 text-center text-sm text-tertiary-token'>
-            {emptyMessage}
-          </div>
-        ) : (
-          renderItems(filteredItems, false)
-        )}
+        {(() => {
+          if (isLoading) {
+            return (
+              <div className='flex items-center justify-center py-6'>
+                <Loader2 className='h-6 w-6 animate-spin text-tertiary-token' />
+              </div>
+            );
+          }
+          if (filteredItems.length === 0) {
+            return (
+              <div className='py-6 text-center text-sm text-tertiary-token'>
+                {emptyMessage}
+              </div>
+            );
+          }
+          return renderItems(filteredItems, false);
+        })()}
       </DropdownMenuPrimitive.Content>
     );
 
@@ -273,17 +279,23 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <ContextMenuPrimitive.Content
         className={cn(contextMenuContentClasses, contentClassName)}
       >
-        {isLoading ? (
-          <div className='flex items-center justify-center py-6'>
-            <Loader2 className='h-6 w-6 animate-spin text-tertiary-token' />
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className='py-6 text-center text-sm text-tertiary-token'>
-            {emptyMessage}
-          </div>
-        ) : (
-          renderItems(filteredItems, true)
-        )}
+        {(() => {
+          if (isLoading) {
+            return (
+              <div className='flex items-center justify-center py-6'>
+                <Loader2 className='h-6 w-6 animate-spin text-tertiary-token' />
+              </div>
+            );
+          }
+          if (filteredItems.length === 0) {
+            return (
+              <div className='py-6 text-center text-sm text-tertiary-token'>
+                {emptyMessage}
+              </div>
+            );
+          }
+          return renderItems(filteredItems, true);
+        })()}
       </ContextMenuPrimitive.Content>
     );
 

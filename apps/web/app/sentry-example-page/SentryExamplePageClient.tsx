@@ -94,21 +94,27 @@ export function SentryExamplePageClient() {
           <span>Throw Sample Error</span>
         </button>
 
-        {hasSentError ? (
-          <p className='m-0 rounded-lg border border-[#00bf4d] bg-[#00f261] px-4 py-3 text-[20px] leading-none text-[#181423]'>
-            Error sent to Sentry.
-          </p>
-        ) : !isConnected ? (
-          <div className='w-[500px] rounded-lg border border-[#a80033] bg-[#e50045] p-4 text-center text-white'>
-            <p className='m-0 text-[20px]'>
-              It looks like network requests to Sentry are being blocked, which
-              will prevent errors from being captured. Try disabling your
-              ad-blocker to complete the test.
-            </p>
-          </div>
-        ) : (
-          <div className='h-[46px]' />
-        )}
+        {(() => {
+          if (hasSentError) {
+            return (
+              <p className='m-0 rounded-lg border border-[#00bf4d] bg-[#00f261] px-4 py-3 text-[20px] leading-none text-[#181423]'>
+                Error sent to Sentry.
+              </p>
+            );
+          }
+          if (!isConnected) {
+            return (
+              <div className='w-[500px] rounded-lg border border-[#a80033] bg-[#e50045] p-4 text-center text-white'>
+                <p className='m-0 text-[20px]'>
+                  It looks like network requests to Sentry are being blocked,
+                  which will prevent errors from being captured. Try disabling
+                  your ad-blocker to complete the test.
+                </p>
+              </div>
+            );
+          }
+          return <div className='h-[46px]' />;
+        })()}
 
         <div className='flex-1' />
       </main>

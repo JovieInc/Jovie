@@ -297,14 +297,13 @@ export function AdminCreatorProfilesUnified({
       const isChecked = selectedIds.has(profile.id);
       const isSelected = profile.id === selectedId;
 
-      return cn(
-        'group',
-        isChecked
-          ? 'bg-surface-2/70 hover:bg-surface-2'
-          : isSelected
-            ? 'bg-surface-2'
-            : 'hover:bg-surface-2/50'
-      );
+      const getSelectionClass = () => {
+        if (isChecked) return 'bg-surface-2/70 hover:bg-surface-2';
+        if (isSelected) return 'bg-surface-2';
+        return 'hover:bg-surface-2/50';
+      };
+
+      return cn('group', getSelectionClass());
     },
     [selectedIds, selectedId]
   );

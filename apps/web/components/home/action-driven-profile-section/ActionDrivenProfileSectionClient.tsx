@@ -135,12 +135,12 @@ export function ActionDrivenProfileSectionClient({
                   const tabId = getTabId(pillar.id);
                   const panelId = getPanelId(pillar.id);
 
-                  const ctaLabel =
-                    pillar.promotedModuleId === 'listen'
-                      ? 'Listen'
-                      : pillar.promotedModuleId === 'merch'
-                        ? 'Shop'
-                        : 'Jul 14';
+                  const getCtaLabel = () => {
+                    if (pillar.promotedModuleId === 'listen') return 'Listen';
+                    if (pillar.promotedModuleId === 'merch') return 'Shop';
+                    return 'Jul 14';
+                  };
+                  const ctaLabel = getCtaLabel();
 
                   return (
                     <div

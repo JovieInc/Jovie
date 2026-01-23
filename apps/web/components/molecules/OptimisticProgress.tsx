@@ -89,6 +89,28 @@ export function OptimisticProgress({
 
   const currentStep = steps[state.currentStep];
 
+  // Get step text color class based on completion state
+  const getStepTextColor = (index: number) => {
+    if (index < state.currentStep) {
+      return 'text-green-600 dark:text-green-400';
+    }
+    if (index === state.currentStep) {
+      return 'text-blue-600 dark:text-blue-400';
+    }
+    return 'text-gray-400 dark:text-gray-600';
+  };
+
+  // Get step dot color class based on completion state
+  const getStepDotColor = (index: number) => {
+    if (index < state.currentStep) {
+      return 'bg-green-500';
+    }
+    if (index === state.currentStep) {
+      return 'bg-blue-500';
+    }
+    return 'bg-gray-300 dark:bg-gray-600';
+  };
+
   return (
     // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for progress display
     <div className='space-y-3' aria-live='polite' role='status'>
@@ -116,22 +138,10 @@ export function OptimisticProgress({
         {steps.map((step, index) => (
           <div
             key={step.key}
-            className={`flex items-center space-x-1 text-xs transition-colors duration-200 ${
-              index < state.currentStep
-                ? 'text-green-600 dark:text-green-400'
-                : index === state.currentStep
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-gray-400 dark:text-gray-600'
-            }`}
+            className={`flex items-center space-x-1 text-xs transition-colors duration-200 ${getStepTextColor(index)}`}
           >
             <div
-              className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-                index < state.currentStep
-                  ? 'bg-green-500'
-                  : index === state.currentStep
-                    ? 'bg-blue-500'
-                    : 'bg-gray-300 dark:bg-gray-600'
-              }`}
+              className={`w-2 h-2 rounded-full transition-colors duration-200 ${getStepDotColor(index)}`}
             />
             <span className='hidden sm:inline'>{step.label}</span>
           </div>
