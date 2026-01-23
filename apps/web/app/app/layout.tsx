@@ -83,6 +83,8 @@ export default async function AppShellLayout({
 
     console.error('Error loading app shell:', error);
 
+    // SAFETY: Error UI is self-contained - DO NOT render {children} here
+    // as it would break context provider expectations (DashboardDataProvider, MyStatsig, etc.)
     return (
       <ClientProviders publishableKey={publishableKey} skipCoreProviders>
         <div className='min-h-screen bg-base flex items-center justify-center px-6'>

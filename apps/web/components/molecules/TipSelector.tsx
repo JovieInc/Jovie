@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
