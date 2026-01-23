@@ -4,6 +4,9 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { checkSpotifyConnection, loadReleaseMatrix } from './actions';
 import { primaryProviderKeys, providerConfig } from './config';
 
+// Revalidate every 5 minutes for release data
+export const revalidate = 300;
+
 export default async function ReleasesPage() {
   const { userId } = await getCachedAuth();
 

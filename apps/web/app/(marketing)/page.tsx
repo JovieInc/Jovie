@@ -9,9 +9,7 @@ import { SeeItInActionSkeleton } from '@/components/home/SeeItInActionSkeleton';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
-// Force dynamic rendering to ensure fresh data and proper error handling
-export const dynamic = 'force-dynamic';
-// Revalidate every hour to balance freshness with performance
+// Revalidate every hour to balance freshness with performance using ISR
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {

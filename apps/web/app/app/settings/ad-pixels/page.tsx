@@ -4,6 +4,9 @@ import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardDataCached } from '../../dashboard/actions';
 
+// Revalidate every minute for settings data
+export const revalidate = 60;
+
 export default async function SettingsAdPixelsPage() {
   const { userId } = await getCachedAuth();
 

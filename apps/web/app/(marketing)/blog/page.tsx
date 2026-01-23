@@ -3,6 +3,9 @@ import { Container } from '@/components/site/Container';
 import { APP_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 
+// Revalidate hourly for ISR
+export const revalidate = 3600;
+
 export const metadata = {
   title: 'Jovie Blog',
   description:

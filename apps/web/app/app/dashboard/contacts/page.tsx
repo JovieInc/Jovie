@@ -5,6 +5,9 @@ import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardDataCached } from '../actions';
 import { getProfileContactsForOwner } from './actions';
 
+// Revalidate every minute for settings data
+export const revalidate = 60;
+
 export default async function ContactsPage() {
   const { userId } = await getCachedAuth();
 
