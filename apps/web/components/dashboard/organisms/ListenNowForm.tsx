@@ -111,7 +111,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
           value={formData.spotify_url}
           onChange={e => {
             const v = e.target.value;
-            setFormData({ ...formData, spotify_url: v });
+            setFormData(prev => ({ ...prev, spotify_url: v }));
             scheduleNormalize('spotify_url', v);
           }}
           onBlur={() => handleBlur('spotify_url')}
@@ -129,7 +129,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
           value={formData.apple_music_url}
           onChange={e => {
             const v = e.target.value;
-            setFormData({ ...formData, apple_music_url: v });
+            setFormData(prev => ({ ...prev, apple_music_url: v }));
             scheduleNormalize('apple_music_url', v);
           }}
           onBlur={() => handleBlur('apple_music_url')}
@@ -147,7 +147,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
           value={formData.youtube_url}
           onChange={e => {
             const v = e.target.value;
-            setFormData({ ...formData, youtube_url: v });
+            setFormData(prev => ({ ...prev, youtube_url: v }));
             scheduleNormalize('youtube_url', v);
           }}
           onBlur={() => handleBlur('youtube_url')}

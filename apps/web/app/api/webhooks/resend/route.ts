@@ -196,18 +196,23 @@ async function processBounceOrComplaint(
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       : undefined;
 
-  // Add each recipient to suppression list
-  for (const email of emails) {
-    const result = await addSuppression(email, reason, 'webhook', {
-      sourceEventId: eventId,
-      metadata: {
-        bounceCode: data.bounce?.diagnostic_code,
-        bounceMessage,
-        complaintType,
-      },
-      expiresAt,
-    });
+  // Add all recipients to suppression list in parallel
+  const suppressionResults = await Promise.all(
+    emails.map(email =>
+      addSuppression(email, reason, 'webhook', {
+        sourceEventId: eventId,
+        metadata: {
+          bounceCode: data.bounce?.diagnostic_code,
+          bounceMessage,
+          complaintType,
+        },
+        expiresAt,
+      }).then(result => ({ email, result }))
+    )
+  );
 
+  // Log suppression results
+  for (const { email, result } of suppressionResults) {
     if (!result.success) {
       const emailMasked = `${email.slice(0, 3)}***@***`;
       logger.error(`[Resend Webhook] Failed to add suppression`, {
@@ -223,21 +228,25 @@ async function processBounceOrComplaint(
         emailMasked: `${email.slice(0, 3)}***@***`,
       });
     }
-
-    // Log the delivery outcome
-    await logDelivery({
-      channel: 'email',
-      recipientEmail: email,
-      status: type === 'email.bounced' ? 'bounced' : 'complained',
-      providerMessageId: data.email_id,
-      errorMessage: bounceMessage || complaintType,
-      metadata: {
-        eventType: type,
-        bounceCode: data.bounce?.diagnostic_code,
-        complaintType,
-      },
-    });
   }
+
+  // Log all delivery outcomes in parallel
+  await Promise.all(
+    emails.map(email =>
+      logDelivery({
+        channel: 'email',
+        recipientEmail: email,
+        status: type === 'email.bounced' ? 'bounced' : 'complained',
+        providerMessageId: data.email_id,
+        errorMessage: bounceMessage || complaintType,
+        metadata: {
+          eventType: type,
+          bounceCode: data.bounce?.diagnostic_code,
+          complaintType,
+        },
+      })
+    )
+  );
 }
 
 /**
@@ -246,14 +255,17 @@ async function processBounceOrComplaint(
 async function processDelivered(event: ResendWebhookPayload): Promise<void> {
   const { data } = event;
 
-  for (const email of data.to) {
-    await logDelivery({
-      channel: 'email',
-      recipientEmail: email,
-      status: 'delivered',
-      providerMessageId: data.email_id,
-    });
-  }
+  // Log all deliveries in parallel
+  await Promise.all(
+    data.to.map(email =>
+      logDelivery({
+        channel: 'email',
+        recipientEmail: email,
+        status: 'delivered',
+        providerMessageId: data.email_id,
+      })
+    )
+  );
 }
 
 export async function POST(request: NextRequest) {

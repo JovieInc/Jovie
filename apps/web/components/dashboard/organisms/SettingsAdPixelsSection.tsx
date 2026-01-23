@@ -27,16 +27,18 @@ export function SettingsAdPixelsSection() {
       setIsPixelSaving(true);
 
       try {
+        // Read form data from the form element to avoid dependency on state
+        const formData = new FormData(e.currentTarget);
         const response = await fetch('/api/dashboard/pixels', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            facebookPixel: pixelData.facebookPixel,
-            googleAdsConversion: pixelData.googleAdsConversion,
-            tiktokPixel: pixelData.tiktokPixel,
-            customPixel: pixelData.customPixel,
+            facebookPixel: formData.get('facebookPixel') ?? '',
+            googleAdsConversion: formData.get('googleAdsConversion') ?? '',
+            tiktokPixel: formData.get('tiktokPixel') ?? '',
+            customPixel: formData.get('customPixel') ?? '',
           }),
         });
 
@@ -51,7 +53,7 @@ export function SettingsAdPixelsSection() {
         setIsPixelSaving(false);
       }
     },
-    [pixelData]
+    []
   );
 
   return (
@@ -70,6 +72,7 @@ export function SettingsAdPixelsSection() {
             <Input
               type='text'
               id='facebookPixel'
+              name='facebookPixel'
               value={pixelData.facebookPixel}
               onChange={e =>
                 handlePixelInputChange('facebookPixel', e.target.value)
@@ -89,6 +92,7 @@ export function SettingsAdPixelsSection() {
             <Input
               type='text'
               id='googleAdsConversion'
+              name='googleAdsConversion'
               value={pixelData.googleAdsConversion}
               onChange={e =>
                 handlePixelInputChange('googleAdsConversion', e.target.value)
@@ -108,6 +112,7 @@ export function SettingsAdPixelsSection() {
             <Input
               type='text'
               id='tiktokPixel'
+              name='tiktokPixel'
               value={pixelData.tiktokPixel}
               onChange={e =>
                 handlePixelInputChange('tiktokPixel', e.target.value)
@@ -126,6 +131,7 @@ export function SettingsAdPixelsSection() {
             </label>
             <Textarea
               id='customPixel'
+              name='customPixel'
               rows={4}
               value={pixelData.customPixel}
               onChange={e =>
