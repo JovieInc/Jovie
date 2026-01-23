@@ -18,6 +18,8 @@ export * from './auth';
 export * from './billing';
 // Content (Providers, Releases, Tracks)
 export * from './content';
+// Contracts & Agreements (Split Sheets, Producer Agreements, etc.)
+export * from './contracts';
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export * from './dsp-enrichment';
 // Enums

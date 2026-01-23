@@ -30,6 +30,10 @@ Cross-platform notification system for artist updates and fan engagement.
 
 Mobile-optimized artist profile views and enhanced mobile experience.
 
+### 📝 Contracts & Documents (`contracts-documents.md`)
+
+Split sheets, producer agreements, session contracts, and licensing deals. Enables artists to document ownership, get e-signatures from collaborators, and maintain chain-of-title documentation for sync opportunities.
+
 ## Contributing to Future Features
 
 ### Adding New Features

@@ -273,3 +273,35 @@ export const contentSlugTypeEnum = pgEnum('content_slug_type', [
   'release',
   'track',
 ]);
+
+// Contracts & Agreements Enums
+export const agreementTypeEnum = pgEnum('agreement_type', [
+  'split_sheet', // Master + publishing ownership
+  'producer_agreement', // Beat/production deal
+  'session_agreement', // Work-for-hire
+  'licensing_agreement', // Sync, sample, remix
+  'collaboration_agreement', // General collab terms
+]);
+
+export const agreementStatusEnum = pgEnum('agreement_status', [
+  'draft', // Being edited
+  'pending', // Sent, awaiting signatures
+  'active', // All parties signed
+  'expired', // Past validity date
+  'terminated', // Cancelled by party
+  'disputed', // Under dispute
+]);
+
+export const splitTypeEnum = pgEnum('split_type', [
+  'master', // Sound recording ownership
+  'publishing', // Composition/songwriting
+  'sync', // Sync licensing share
+  'performance', // Performance royalties
+]);
+
+export const signatureStatusEnum = pgEnum('signature_status', [
+  'pending',
+  'signed',
+  'declined',
+  'expired',
+]);
