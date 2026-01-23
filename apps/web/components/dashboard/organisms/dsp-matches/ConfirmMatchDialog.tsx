@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import Image from 'next/image';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfidenceBadge } from '@/components/dashboard/atoms/ConfidenceBadge';
 import {
@@ -104,10 +105,13 @@ export function ConfirmMatchDialog({
           <div className='flex items-center gap-4'>
             {/* Artist Image */}
             {externalArtistImageUrl ? (
-              <img
+              <Image
                 src={externalArtistImageUrl}
                 alt={externalArtistName}
-                className='h-16 w-16 rounded-full object-cover ring-2 ring-surface-3'
+                width={64}
+                height={64}
+                className='rounded-full object-cover ring-2 ring-surface-3'
+                unoptimized={externalArtistImageUrl.includes('i.scdn.co')}
               />
             ) : (
               <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-3'>

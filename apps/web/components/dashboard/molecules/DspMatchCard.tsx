@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import Image from 'next/image';
 import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
@@ -96,10 +97,13 @@ export function DspMatchCard({
         <div className='flex items-center gap-3'>
           {/* Provider Icon or Artist Image */}
           {externalArtistImageUrl ? (
-            <img
+            <Image
               src={externalArtistImageUrl}
               alt={externalArtistName}
-              className='h-10 w-10 rounded-full object-cover'
+              width={40}
+              height={40}
+              className='rounded-full object-cover'
+              unoptimized={externalArtistImageUrl.includes('i.scdn.co')}
             />
           ) : (
             <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-2'>

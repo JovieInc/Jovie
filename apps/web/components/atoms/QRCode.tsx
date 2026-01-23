@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // Cache with size limit to prevent memory leaks
@@ -46,6 +46,12 @@ export function QRCode({
   const [isLoading, setIsLoading] = useState(true);
   const qrUrl = useMemo(() => getQrCodeUrl(data, size), [data, size]);
 
+  // Memoize size style to avoid creating new object on each render
+  const sizeStyle = useMemo<CSSProperties>(
+    () => ({ width: size, height: size }),
+    [size]
+  );
+
   // Reset error and loading state when props change
   useEffect(() => {
     setIsLoading(true);
@@ -62,7 +68,7 @@ export function QRCode({
           'flex items-center justify-center rounded bg-gray-100 text-gray-500',
           className
         )}
-        style={{ width: size, height: size }}
+        style={sizeStyle}
       >
         <span className='text-xs'>QR code unavailable</span>
       </div>
@@ -70,7 +76,7 @@ export function QRCode({
   }
 
   return (
-    <div className='relative' style={{ width: size, height: size }}>
+    <div className='relative' style={sizeStyle}>
       {/* Loading skeleton */}
       {isLoading && (
         <div
@@ -86,7 +92,7 @@ export function QRCode({
         width={size}
         height={size}
         className={cn(className)}
-        style={{ width: size, height: size }}
+        style={sizeStyle}
         unoptimized // QR codes are dynamically generated
         onLoad={() => setIsLoading(false)}
         onError={() => {

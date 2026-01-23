@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +13,7 @@ export interface NotFoundCopyButtonProps {
 /**
  * Fallback copy button for missing provider links
  */
-export function NotFoundCopyButton({
+export const NotFoundCopyButton = memo(function NotFoundCopyButton({
   testId,
   releaseTitle,
   smartLinkPath,
@@ -45,4 +46,4 @@ export function NotFoundCopyButton({
       </span>
     </button>
   );
-}
+});

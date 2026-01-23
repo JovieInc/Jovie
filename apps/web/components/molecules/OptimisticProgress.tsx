@@ -40,6 +40,7 @@ export function OptimisticProgress({
     let elapsedTime = 0;
 
     const totalDuration = steps.reduce((sum, step) => sum + step.duration, 0);
+    // Note: totalDuration is computed inside useEffect to avoid closure issues with memoized values
 
     const updateProgress = () => {
       if (currentStepIndex >= steps.length) {
