@@ -273,7 +273,7 @@ export function useLinksPersistence({
           normalized.some(item => isIngestableUrl(item.normalizedUrl));
         if (hasIngestableLink) {
           setAutoRefreshUntilMs(Date.now() + 20000);
-          void onSyncSuggestions?.();
+          onSyncSuggestions?.();
         }
 
         const now = new Date();
@@ -328,7 +328,7 @@ export function useLinksPersistence({
   const debouncedSave = useMemo(() => {
     const fn = (input: LinkItem[]) => {
       lastInputRef.current = input;
-      void asyncDebouncer.maybeExecute(input);
+      asyncDebouncer.maybeExecute(input);
     };
 
     fn.cancel = () => {
