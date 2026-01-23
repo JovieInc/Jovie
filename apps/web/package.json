@@ -133,7 +133,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.0",
     "critters": "^0.0.25",
-    "date-fns": "^3.2.0",
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.45.0",
     "flags": "^4.0.1",
