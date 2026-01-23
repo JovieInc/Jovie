@@ -162,7 +162,7 @@ export function UniversalLinkInputUrlMode({
       </div>
 
       {url && !detectedLink?.isValid && (
-        // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible hint announcement
+        // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for hint text
         <div className='hidden text-xs text-secondary-token' role='status'>
           💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more for
           automatic detection

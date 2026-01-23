@@ -21,7 +21,7 @@ interface CacheEntry<T> {
  * Simple LRU cache with TTL support.
  */
 class LRUCache<T> {
-  private cache = new Map<string, CacheEntry<T>>();
+  private readonly cache = new Map<string, CacheEntry<T>>();
   private readonly maxSize: number;
   private readonly defaultTtlMs: number;
 

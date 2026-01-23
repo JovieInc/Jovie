@@ -16,6 +16,15 @@ first and treat this one as a quick index.
 - `pnpm typecheck`
 - `pnpm lint`
 
+## Pre-PR Checklist (required before opening any PR)
+
+1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
+2. **Run `/simplify`** - Simplify recently modified code for clarity
+3. **Enable automerge** with squash:
+   ```bash
+   gh pr merge --auto --squash
+   ```
+
 ## CI/CD references
 
 - `.github/CI_CD_FLOW.md` - end-to-end pipeline overview
@@ -35,4 +44,3 @@ first and treat this one as a quick index.
   - `// biome-ignore lint/a11y/noAutofocus: required in test; owner: web; ticket: https://example.com/ABC-123`
   - `/* biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized HTML via DOMPurify; owner: platform; ticket: https://example.com/SEC-456 */`
 - **Conventional commits** required (see `agents.md` for examples).
-

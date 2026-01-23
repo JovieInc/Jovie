@@ -159,7 +159,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       </Button>
 
       {success && (
-        // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible success message announcement
+        // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for success message
         <div
           className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'
           role='status'
