@@ -194,11 +194,11 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   // Create copy handler for a specific provider (extracted to reduce nesting depth)
   const createCopyHandler = useCallback(
     (providerKey: ProviderKey, testId: string) => {
-      return () => {
+      return async () => {
         const provider = providerMap.get(providerKey);
         if (provider?.path) {
           const config = providerConfig[providerKey];
-          void handleCopyWithFeedback(
+          await handleCopyWithFeedback(
             provider.path,
             `${release.title} – ${config.label}`,
             testId
