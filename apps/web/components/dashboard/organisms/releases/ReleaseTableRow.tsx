@@ -488,11 +488,11 @@ export function ReleaseTableRow({
         const isCopied = copiedId === testId;
         const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
         const isNotFoundCopied = copiedId === notFoundTestId;
-        const status = isManual
-          ? 'manual'
-          : available
-            ? 'available'
-            : 'missing';
+        const getStatus = () => {
+          if (isManual) return 'manual';
+          return available ? 'available' : 'missing';
+        };
+        const status = getStatus();
 
         return (
           <td key={providerKey} className='px-4 py-4 align-middle sm:px-6'>

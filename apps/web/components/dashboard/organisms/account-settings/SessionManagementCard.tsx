@@ -93,68 +93,84 @@ export function SessionManagementCard({
         </div>
       </div>
 
-      {sessionsLoading ? (
-        <div className='mt-6 space-y-3'>
-          <LoadingSkeleton height='h-12' />
-          <LoadingSkeleton height='h-12' />
-        </div>
-      ) : sessionsError ? (
-        <div className='mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600'>
-          {sessionsError}
-        </div>
-      ) : sessions.length === 0 ? (
-        <div className='mt-6 rounded-lg border border-subtle bg-surface-0 px-4 py-6 text-center text-sm text-secondary'>
-          You have no other active sessions.
-        </div>
-      ) : (
-        <div className='mt-6 space-y-3'>
-          {sessions.map(session => {
-            const isCurrent = session.id === activeSessionId;
-            const activity = session.latestActivity;
+      {(() => {
+        if (sessionsLoading) {
+          return (
+            <div className='mt-6 space-y-3'>
+              <LoadingSkeleton height='h-12' />
+              <LoadingSkeleton height='h-12' />
+            </div>
+          );
+        }
 
-            return (
-              <div
-                key={session.id}
-                className={cn(
-                  'flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl border border-subtle px-4 py-3 bg-surface-1',
-                  isCurrent && 'border-accent'
-                )}
-              >
-                <div>
-                  <p className='text-sm font-semibold text-primary flex items-center gap-2'>
-                    {isCurrent
-                      ? 'This device'
-                      : activity?.browserName || 'Unknown device'}
-                    {isCurrent && (
-                      <span className='inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent'>
-                        Current session
-                      </span>
-                    )}
-                  </p>
-                  <p className='text-xs text-secondary mt-1'>
-                    Last active {formatRelativeDate(session.lastActiveAt)}
-                    {activity?.city && activity?.country
-                      ? ` · ${activity.city}, ${activity.country}`
-                      : ''}
-                  </p>
+        if (sessionsError) {
+          return (
+            <div className='mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600'>
+              {sessionsError}
+            </div>
+          );
+        }
+
+        if (sessions.length === 0) {
+          return (
+            <div className='mt-6 rounded-lg border border-subtle bg-surface-0 px-4 py-6 text-center text-sm text-secondary'>
+              You have no other active sessions.
+            </div>
+          );
+        }
+
+        return (
+          <div className='mt-6 space-y-3'>
+            {sessions.map(session => {
+              const isCurrent = session.id === activeSessionId;
+              const activity = session.latestActivity;
+
+              return (
+                <div
+                  key={session.id}
+                  className={cn(
+                    'flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl border border-subtle px-4 py-3 bg-surface-1',
+                    isCurrent && 'border-accent'
+                  )}
+                >
+                  <div>
+                    <p className='text-sm font-semibold text-primary flex items-center gap-2'>
+                      {isCurrent
+                        ? 'This device'
+                        : activity?.browserName || 'Unknown device'}
+                      {isCurrent && (
+                        <span className='inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent'>
+                          Current session
+                        </span>
+                      )}
+                    </p>
+                    <p className='text-xs text-secondary mt-1'>
+                      Last active {formatRelativeDate(session.lastActiveAt)}
+                      {activity?.city && activity?.country
+                        ? ` · ${activity.city}, ${activity.country}`
+                        : ''}
+                    </p>
+                  </div>
+
+                  {!isCurrent && (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                      disabled={endingSessionId === session.id}
+                      onClick={() => handleEndSession(session)}
+                    >
+                      {endingSessionId === session.id
+                        ? 'Ending…'
+                        : 'End session'}
+                    </Button>
+                  )}
                 </div>
-
-                {!isCurrent && (
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='text-red-500 hover:text-red-600 hover:bg-red-50'
-                    disabled={endingSessionId === session.id}
-                    onClick={() => handleEndSession(session)}
-                  >
-                    {endingSessionId === session.id ? 'Ending…' : 'End session'}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        );
+      })()}
     </DashboardCard>
   );
 }

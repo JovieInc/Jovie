@@ -131,17 +131,27 @@ export function DashboardActivityFeed({
       </div>
 
       <div className='min-h-[180px]'>
-        {error ? (
-          <p className='text-sm text-error-token'>
-            {error.message || 'Failed to load activity'}
-          </p>
-        ) : isLoading ? (
-          <ActivityLoadingSkeleton />
-        ) : activities.length === 0 ? (
-          <ActivityEmptyState isRefreshing={isRefreshing} />
-        ) : (
-          <ActivityList activities={activities} isRefreshing={isRefreshing} />
-        )}
+        {(() => {
+          if (error) {
+            return (
+              <p className='text-sm text-error-token'>
+                {error.message || 'Failed to load activity'}
+              </p>
+            );
+          }
+
+          if (isLoading) {
+            return <ActivityLoadingSkeleton />;
+          }
+
+          if (activities.length === 0) {
+            return <ActivityEmptyState isRefreshing={isRefreshing} />;
+          }
+
+          return (
+            <ActivityList activities={activities} isRefreshing={isRefreshing} />
+          );
+        })()}
       </div>
       <div className='sr-only' aria-live='polite' aria-atomic='true'>
         {activities.length > 0 &&

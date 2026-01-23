@@ -55,11 +55,10 @@ export function AnalyticsCard({
         </dd>
 
         <div className='mt-2'>
-          {children ? (
-            children
-          ) : metadata ? (
-            <dd className='text-xs text-tertiary-token'>{metadata}</dd>
-          ) : null}
+          {children ??
+            (metadata ? (
+              <dd className='text-xs text-tertiary-token'>{metadata}</dd>
+            ) : null)}
         </div>
       </dl>
     </section>

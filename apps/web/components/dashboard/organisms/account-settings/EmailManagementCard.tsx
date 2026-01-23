@@ -168,13 +168,16 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   emailStatus === 'sending' || emailStatus === 'verifying'
                 }
               >
-                {pendingEmail
-                  ? emailStatus === 'verifying'
-                    ? 'Verifying…'
-                    : 'Confirm email'
-                  : emailStatus === 'sending'
+                {(() => {
+                  if (pendingEmail) {
+                    return emailStatus === 'verifying'
+                      ? 'Verifying…'
+                      : 'Confirm email';
+                  }
+                  return emailStatus === 'sending'
                     ? 'Sending…'
-                    : 'Send verification'}
+                    : 'Send verification';
+                })()}
               </Button>
               {pendingEmail && (
                 <Button type='button' variant='ghost' onClick={resetEmailForm}>
