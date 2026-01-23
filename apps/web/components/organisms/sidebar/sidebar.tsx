@@ -77,11 +77,12 @@ export const Sidebar = React.forwardRef<
             'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-out',
             'group-data-[collapsible=offcanvas]:w-0',
             'group-data-[side=right]:rotate-180',
-            variant === 'floating'
-              ? 'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
-              : variant === 'inset'
-                ? 'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
-                : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
+            variant === 'floating' &&
+              'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
+            variant === 'inset' &&
+              'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
+            variant === 'sidebar' &&
+              'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
             className
           )}
           {...props}

@@ -150,11 +150,7 @@ export function AnimatedAccordion({
           exit='collapsed'
           variants={shouldReduceMotion ? undefined : containerVariants}
           className={cn('overflow-hidden', className)}
-          style={
-            shouldReduceMotion
-              ? { display: isOpen ? 'block' : 'none' }
-              : undefined
-          }
+          style={shouldReduceMotion ? { display: 'block' } : undefined}
         >
           <motion.div
             variants={shouldReduceMotion ? undefined : contentVariants}
