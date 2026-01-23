@@ -5,6 +5,7 @@
  * Handles duplicate detection, YouTube cross-category logic, and MAX_SOCIAL_LINKS visibility.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { popularityIndex } from '@/constants/app';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -353,9 +354,13 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
 
       // Step 13: Enable tipping if Venmo (non-blocking)
       if (visibilityApplied.platform.id === 'venmo') {
-        fetch('/api/dashboard/tipping/enable', { method: 'POST' }).catch(() => {
-          // Non-blocking: ignore errors
-        });
+        fetch('/api/dashboard/tipping/enable', { method: 'POST' }).catch(
+          error => {
+            Sentry.captureException(error, {
+              tags: { feature: 'tipping', action: 'enable' },
+            });
+          }
+        );
       }
     },
     [links, linkIsVisible, idFor, onLinkAdded]
