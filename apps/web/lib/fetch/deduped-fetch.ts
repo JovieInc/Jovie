@@ -67,11 +67,40 @@ export interface DedupedFetchResult<T> {
 // Default TTL for cached responses (5 seconds)
 const DEFAULT_TTL_MS = 5_000;
 
+// Maximum cache size to prevent memory leaks
+const MAX_CACHE_SIZE = 200;
+
 // Response cache: stores successful responses with TTL
 const responseCache = new Map<string, CacheEntry>();
 
 // In-flight requests: tracks ongoing fetches to deduplicate concurrent calls
 const inflightRequests = new Map<string, Promise<unknown>>();
+
+/**
+ * Prune expired entries and enforce max cache size using LRU eviction.
+ * Called before adding new entries to prevent unbounded memory growth.
+ */
+function pruneCache(): void {
+  const now = Date.now();
+
+  // First pass: remove expired entries
+  for (const [key, entry] of responseCache) {
+    if (entry.expiresAt <= now) {
+      responseCache.delete(key);
+    }
+  }
+
+  // Second pass: if still over limit, remove oldest entries (LRU approximation)
+  if (responseCache.size >= MAX_CACHE_SIZE) {
+    const entriesToRemove = responseCache.size - MAX_CACHE_SIZE + 1;
+    const keys = responseCache.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const { value: key, done } = keys.next();
+      if (done) break;
+      responseCache.delete(key);
+    }
+  }
+}
 
 /**
  * Generate a cache key from URL and request options
@@ -148,6 +177,9 @@ export async function dedupedFetchWithMeta<T = unknown>(
   if (!forceRefresh) {
     const cached = responseCache.get(key);
     if (cached && cached.expiresAt > now) {
+      // Refresh access order for true LRU semantics
+      responseCache.delete(key);
+      responseCache.set(key, cached);
       return {
         data: cached.data as T,
         fromCache: true,
@@ -192,6 +224,9 @@ export async function dedupedFetchWithMeta<T = unknown>(
 
       const data = (await response.json()) as T;
       const fetchedAt = Date.now();
+
+      // Prune cache before adding new entry to prevent memory leaks
+      pruneCache();
 
       // Cache successful response
       responseCache.set(key, {

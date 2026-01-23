@@ -2,8 +2,11 @@
  * Image versioning utilities for cache busting and optimization
  */
 
-// Cache for generated hashes to avoid recomputation
+import { isDevelopment } from '@/lib/utils/platform-detection/environment';
+
+// Cache for generated hashes with LRU eviction to prevent memory leaks
 const hashCache = new Map<string, string>();
+const MAX_HASH_CACHE_SIZE = 500;
 
 /**
  * Generate a stable hash for cache busting from image URL
@@ -13,7 +16,11 @@ export function generateImageHash(url: string, timestamp?: number): string {
   const cacheKey = `${url}_${timestamp || ''}`;
 
   if (hashCache.has(cacheKey)) {
-    return hashCache.get(cacheKey)!;
+    const cached = hashCache.get(cacheKey)!;
+    // Refresh access order for true LRU semantics
+    hashCache.delete(cacheKey);
+    hashCache.set(cacheKey, cached);
+    return cached;
   }
 
   // Simple hash function that works in edge runtime
@@ -26,6 +33,15 @@ export function generateImageHash(url: string, timestamp?: number): string {
   }
 
   const hashString = Math.abs(hash).toString(16).substring(0, 8);
+
+  // LRU eviction: remove oldest entry if at capacity
+  if (hashCache.size >= MAX_HASH_CACHE_SIZE) {
+    const firstKey = hashCache.keys().next().value as string | undefined;
+    if (firstKey !== undefined) {
+      hashCache.delete(firstKey);
+    }
+  }
+
   hashCache.set(cacheKey, hashString);
   return hashString;
 }
@@ -245,8 +261,13 @@ export function getOptimalImageFormat(): 'avif' | 'webp' | 'auto' {
   return 'auto';
 }
 
+// Track preloaded URLs to prevent duplicate DOM elements
+const preloadedUrls = new Set<string>();
+const MAX_PRELOADED_URLS = 100;
+
 /**
- * Preload critical images with optimizations
+ * Preload critical images with optimizations.
+ * Prevents duplicate preload links and limits total preloads.
  */
 export function preloadImage(
   url: string,
@@ -258,6 +279,19 @@ export function preloadImage(
   } = {}
 ): void {
   if (typeof window === 'undefined') return;
+
+  // Prevent duplicate preloads
+  if (preloadedUrls.has(url)) return;
+
+  // Limit total preloaded URLs to prevent memory issues
+  if (preloadedUrls.size >= MAX_PRELOADED_URLS) {
+    if (isDevelopment()) {
+      console.warn(
+        `[preloadImage] Max preloaded URLs (${MAX_PRELOADED_URLS}) reached, skipping: ${url}`
+      );
+    }
+    return;
+  }
 
   const link = document.createElement('link');
   link.rel = 'preload';
@@ -277,6 +311,7 @@ export function preloadImage(
   }
 
   document.head.appendChild(link);
+  preloadedUrls.add(url);
 }
 
 /**

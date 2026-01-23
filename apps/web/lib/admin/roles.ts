@@ -17,12 +17,37 @@ import { redis } from '@/lib/redis';
 const REDIS_CACHE_TTL_SECONDS = 60; // 1 minute (reduced from 5 for faster revocation)
 const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute fallback
 const REDIS_KEY_PREFIX = 'admin:role:';
+const MAX_FALLBACK_CACHE_SIZE = 100; // Max users to cache in memory
 
 // Keep in-memory cache as fallback when Redis unavailable
 const fallbackCache = new Map<
   string,
   { isAdmin: boolean; expiresAt: number }
 >();
+
+/**
+ * Prune expired entries and enforce max cache size.
+ * Called before adding new entries to prevent unbounded memory growth.
+ */
+function pruneFallbackCache(now: number): void {
+  // First pass: remove expired entries
+  for (const [key, entry] of fallbackCache) {
+    if (entry.expiresAt <= now) {
+      fallbackCache.delete(key);
+    }
+  }
+
+  // Second pass: if still over limit, remove oldest entries
+  if (fallbackCache.size >= MAX_FALLBACK_CACHE_SIZE) {
+    const entriesToRemove = fallbackCache.size - MAX_FALLBACK_CACHE_SIZE + 1;
+    const keys = fallbackCache.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const { value: key, done } = keys.next();
+      if (done) break;
+      fallbackCache.delete(key);
+    }
+  }
+}
 
 /**
  * Query the database for admin role status.
@@ -99,6 +124,9 @@ export const isAdmin = cache(async function isAdmin(
 
   // Query database
   const isUserAdmin = await queryAdminRoleFromDB(userId);
+
+  // Prune cache before adding new entry to prevent memory leaks
+  pruneFallbackCache(now);
 
   // Store in memory cache
   fallbackCache.set(userId, {
