@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { invalidateSocialLinksCache } from '@/lib/cache';
 import { db } from '@/lib/db';
+import { batchUpdateSocialLinks, type SocialLinkUpdate } from '@/lib/db/batch';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
@@ -172,8 +173,11 @@ export async function PUT(request: NextRequest) {
       await db.delete(socialLinks).where(inArray(socialLinks.id, idsToDelete));
     }
 
-    // Upsert links
+    // Batch upsert links - separate into inserts and updates
     const now = new Date();
+    const linksToInsert: (typeof socialLinks.$inferInsert)[] = [];
+    const linksToUpdate: SocialLinkUpdate[] = [];
+
     for (let i = 0; i < links.length; i++) {
       const link = links[i];
       if (!link) continue;
@@ -184,21 +188,18 @@ export async function PUT(request: NextRequest) {
       const normalizedUrl = detected.normalizedUrl || link.url;
 
       if (link.id && existingIds.has(link.id)) {
-        // Update existing link
-        await db
-          .update(socialLinks)
-          .set({
-            url: normalizedUrl,
-            platform,
-            platformType,
-            displayText: link.label || null,
-            sortOrder: i,
-            updatedAt: now,
-          })
-          .where(eq(socialLinks.id, link.id));
+        // Collect for batch update
+        linksToUpdate.push({
+          id: link.id,
+          url: normalizedUrl,
+          platform,
+          platformType,
+          displayText: link.label || null,
+          sortOrder: i,
+        });
       } else {
-        // Insert new link
-        await db.insert(socialLinks).values({
+        // Collect for batch insert
+        linksToInsert.push({
           creatorProfileId: profileId,
           url: normalizedUrl,
           platform,
@@ -214,6 +215,14 @@ export async function PUT(request: NextRequest) {
           updatedAt: now,
         });
       }
+    }
+
+    // Execute batch operations
+    if (linksToInsert.length > 0) {
+      await db.insert(socialLinks).values(linksToInsert);
+    }
+    if (linksToUpdate.length > 0) {
+      await batchUpdateSocialLinks(linksToUpdate);
     }
 
     // Invalidate cache to ensure public profile reflects changes
