@@ -24,22 +24,27 @@ export default meta;
 
 type Story = StoryObj<typeof DashboardThemeToggleButton>;
 
-export const Controlled: Story = {
-  render: args => {
-    const [theme, setTheme] = React.useState<'light' | 'dark'>(
-      args.theme ?? 'light'
-    );
+function ControlledStory(
+  args: React.ComponentProps<typeof DashboardThemeToggleButton>
+) {
+  const [theme, setTheme] = React.useState<'light' | 'dark'>(
+    args.theme ?? 'light'
+  );
 
-    return (
-      <DashboardThemeToggleButton
-        theme={theme}
-        onThemeChange={next => {
-          setTheme(next);
-          args.onThemeChange?.(next);
-        }}
-      />
-    );
-  },
+  return (
+    <DashboardThemeToggleButton
+      {...args}
+      theme={theme}
+      onThemeChange={next => {
+        setTheme(next);
+        args.onThemeChange?.(next);
+      }}
+    />
+  );
+}
+
+export const Controlled: Story = {
+  render: args => <ControlledStory {...args} />,
 };
 
 export const Light: Story = {

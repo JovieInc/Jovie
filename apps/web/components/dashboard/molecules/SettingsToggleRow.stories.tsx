@@ -30,45 +30,34 @@ export default meta;
 
 type Story = StoryObj<typeof SettingsToggleRow>;
 
-export const Default: Story = {
-  render: args => {
-    const [checked, setChecked] = React.useState<boolean>(args.checked);
+function ControlledSettingsToggleRow(
+  args: React.ComponentProps<typeof SettingsToggleRow>
+) {
+  const [checked, setChecked] = React.useState<boolean>(args.checked ?? false);
 
-    return (
-      <div className='max-w-xl'>
-        <SettingsToggleRow
-          {...args}
-          checked={checked}
-          onCheckedChange={next => {
-            setChecked(next);
-            args.onCheckedChange(next);
-          }}
-        />
-      </div>
-    );
-  },
+  return (
+    <div className='max-w-xl'>
+      <SettingsToggleRow
+        {...args}
+        checked={checked}
+        onCheckedChange={next => {
+          setChecked(next);
+          args.onCheckedChange?.(next);
+        }}
+      />
+    </div>
+  );
+}
+
+export const Default: Story = {
+  render: args => <ControlledSettingsToggleRow {...args} />,
 };
 
 export const WithoutDescription: Story = {
   args: {
     description: undefined,
   },
-  render: args => {
-    const [checked, setChecked] = React.useState<boolean>(args.checked);
-
-    return (
-      <div className='max-w-xl'>
-        <SettingsToggleRow
-          {...args}
-          checked={checked}
-          onCheckedChange={next => {
-            setChecked(next);
-            args.onCheckedChange(next);
-          }}
-        />
-      </div>
-    );
-  },
+  render: args => <ControlledSettingsToggleRow {...args} />,
 };
 
 export const Disabled: Story = {
