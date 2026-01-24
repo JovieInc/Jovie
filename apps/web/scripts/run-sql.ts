@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 
+import { neon } from '@neondatabase/serverless';
 import { config } from 'dotenv';
 import { readFileSync } from 'fs';
 import path from 'path';
-import postgres from 'postgres';
 
 config({ path: '.env.local', override: true });
 config();
@@ -31,18 +31,19 @@ async function main() {
   const rawUrl = process.env.DATABASE_URL;
   const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
 
-  const sql = postgres(databaseUrl, { ssl: true, max: 1, onnotice: () => {} });
+  const sql = neon(databaseUrl);
 
   try {
     console.log(`[SQL] Applying file: ${absPath}`);
-    await sql.unsafe(sqlText);
+    // Execute raw SQL using tagged template literal syntax
+    // Cast to TemplateStringsArray for raw SQL text execution
+    await sql([sqlText] as unknown as TemplateStringsArray);
     console.log('[SQL] Success');
   } catch (err) {
     console.error('[SQL] Error applying file:', err);
     process.exit(1);
-  } finally {
-    await sql.end();
   }
+  // Neon HTTP driver has no persistent connection - no cleanup needed
 }
 
 main();

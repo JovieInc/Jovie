@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Pricing options query hook for fetching available Stripe pricing.
  *

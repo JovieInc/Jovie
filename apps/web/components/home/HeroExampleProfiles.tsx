@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/nextjs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getFeaturedCreators } from '@/lib/featured-creators';
@@ -67,7 +68,7 @@ export async function HeroExampleProfiles() {
       </div>
     );
   } catch (error: unknown) {
-    console.error('Error loading hero example profiles:', error);
+    captureException(error, { extra: { context: 'hero-example-profiles' } });
     return null;
   }
 }

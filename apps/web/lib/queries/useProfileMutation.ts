@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Profile mutation hooks using TanStack Query.
  *

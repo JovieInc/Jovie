@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Billing mutation hooks for checkout and portal operations.
  *

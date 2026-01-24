@@ -1,5 +1,6 @@
 'use client';
 
+import { captureException } from '@sentry/nextjs';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
@@ -25,7 +26,7 @@ export function ArtistSearch() {
       // Redirect to waitlist (invite-only)
       router.push('/waitlist');
     } catch (error) {
-      console.error('Search error:', error);
+      captureException(error, { extra: { context: 'artist-search' } });
     } finally {
       setIsSearching(false);
     }
