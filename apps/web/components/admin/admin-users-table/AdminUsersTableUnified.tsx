@@ -348,7 +348,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
                 </div>
               </div>
             }
-            getRowId={row => row.id}
+            getRowId={(row: AdminUserRow) => row.id}
             getRowClassName={getRowClassName}
             getContextMenuItems={getContextMenuItems}
             enableVirtualization={true}

@@ -317,8 +317,8 @@ export function ReleaseTable({
       onSortingChange={setSorting}
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
-      getRowId={row => row.id}
-      getRowClassName={row =>
+      getRowId={(row: ReleaseViewModel) => row.id}
+      getRowClassName={(row: ReleaseViewModel) =>
         selectedIds.has(row.id)
           ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
           : 'group hover:bg-surface-2/50'

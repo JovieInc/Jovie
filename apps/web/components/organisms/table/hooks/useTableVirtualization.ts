@@ -26,7 +26,7 @@ export interface UseTableVirtualizationReturn {
   /** Whether virtualization is active */
   isVirtualized: boolean;
   /** Function to measure a row element for dynamic sizing */
-  measureElement: (el: HTMLTableRowElement | null) => void;
+  measureElement: (el: HTMLElement | null) => void;
 }
 
 /**

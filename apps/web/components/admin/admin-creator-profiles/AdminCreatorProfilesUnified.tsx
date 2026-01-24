@@ -368,7 +368,7 @@ export function AdminCreatorProfilesUnified({
               }
               rowSelection={rowSelection}
               onRowSelectionChange={handleRowSelectionChange}
-              getRowId={row => row.id}
+              getRowId={(row: AdminCreatorProfileRow) => row.id}
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}

@@ -135,7 +135,7 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
                 </div>
               </div>
             }
-            getRowId={row => row.id}
+            getRowId={(row: AdminActivityItem) => row.id}
             enableVirtualization={true}
             minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
             className='text-[13px]'

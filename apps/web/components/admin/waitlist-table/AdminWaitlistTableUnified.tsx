@@ -244,7 +244,7 @@ export function AdminWaitlistTableUnified({
           </div>
         </div>
       }
-      getRowId={row => row.id}
+      getRowId={(row: WaitlistEntryRow) => row.id}
       getRowClassName={getRowClassName}
       enableVirtualization={true}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
@@ -254,8 +254,8 @@ export function AdminWaitlistTableUnified({
       groupingConfig={
         groupingEnabled
           ? {
-              getGroupKey: entry => entry.status,
-              getGroupLabel: key => STATUS_LABELS[key] || key,
+              getGroupKey: (entry: WaitlistEntryRow) => entry.status,
+              getGroupLabel: (key: string) => STATUS_LABELS[key] || key,
             }
           : undefined
       }

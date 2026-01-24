@@ -11,7 +11,7 @@
  * - Ref management for scrolling
  */
 
-import { flexRender } from '@tanstack/react-table';
+import { type Cell, flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback } from 'react';
 import { cn, presets } from '../table.styles';
 import type { UnifiedTableRowProps } from '../types/unified-table.types';
@@ -109,7 +109,7 @@ export const UnifiedTableRow = memo(function UnifiedTableRow<TData>({
           : undefined
       }
     >
-      {row.getVisibleCells().map(cell => (
+      {row.getVisibleCells().map((cell: Cell<TData, unknown>) => (
         <td
           key={cell.id}
           className={presets.tableCell}
