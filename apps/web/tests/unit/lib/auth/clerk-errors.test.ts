@@ -396,4 +396,39 @@ describe('clerk-errors.ts', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('isSessionExists', () => {
+    it('returns true for session_exists', async () => {
+      const clerkError = {
+        errors: [{ code: 'session_exists' }],
+      };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+
+      const { isSessionExists } = await import('@/lib/auth/clerk-errors');
+      const result = isSessionExists(clerkError);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false for other error codes', async () => {
+      const clerkError = {
+        errors: [{ code: 'form_identifier_not_found' }],
+      };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+
+      const { isSessionExists } = await import('@/lib/auth/clerk-errors');
+      const result = isSessionExists(clerkError);
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false for non-Clerk errors', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+
+      const { isSessionExists } = await import('@/lib/auth/clerk-errors');
+      const result = isSessionExists(new Error('test'));
+
+      expect(result).toBe(false);
+    });
+  });
 });

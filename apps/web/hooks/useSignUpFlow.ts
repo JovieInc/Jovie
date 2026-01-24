@@ -7,7 +7,11 @@
 
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
-import { isSignInSuggested, parseClerkError } from '@/lib/auth/clerk-errors';
+import {
+  isSessionExists,
+  isSignInSuggested,
+  parseClerkError,
+} from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
@@ -131,6 +135,12 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         base.setLoadingState({ type: 'idle' });
         return true;
       } catch (err) {
+        // If user already has a session, redirect to dashboard
+        if (isSessionExists(err)) {
+          base.router.push('/app/dashboard');
+          return false;
+        }
+
         const message = parseClerkError(err);
         base.setError(message);
         setShouldSuggestSignIn(isSignInSuggested(err));
@@ -254,6 +264,12 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           redirectUrlComplete: base.getRedirectUrl(),
         });
       } catch (err) {
+        // If user already has a session, redirect to dashboard
+        if (isSessionExists(err)) {
+          base.router.push('/app/dashboard');
+          return;
+        }
+
         const message = parseClerkError(err);
         base.setError(message);
         base.setLoadingState({ type: 'idle' });
