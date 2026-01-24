@@ -37,6 +37,16 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
 
+// Import after mocks are set up
+import {
+  handleClerkUserDeleted,
+  syncAdminRoleChange,
+  syncAllClerkMetadata,
+  syncClerkMetadata,
+  syncProfileStatus,
+  syncUserStatus,
+} from '@/lib/auth/clerk-sync';
+
 describe('clerk-sync module', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,8 +54,6 @@ describe('clerk-sync module', () => {
 
   describe('JovieClerkMetadata interface', () => {
     it('defines the expected metadata shape', async () => {
-      const { syncClerkMetadata } = await import('@/lib/auth/clerk-sync');
-
       // The interface should accept these fields
       const metadata = {
         jovie_role: 'admin' as const,
@@ -73,8 +81,6 @@ describe('clerk-sync module', () => {
 
   describe('syncClerkMetadata', () => {
     it('returns error when clerkUserId is missing', async () => {
-      const { syncClerkMetadata } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncClerkMetadata('', { jovie_role: 'user' });
 
       expect(result.success).toBe(false);
@@ -97,8 +103,6 @@ describe('clerk-sync module', () => {
           updateUserMetadata: mockUpdateUserMetadata,
         },
       });
-
-      const { syncClerkMetadata } = await import('@/lib/auth/clerk-sync');
 
       await syncClerkMetadata('clerk_123', {
         jovie_role: 'admin',
@@ -126,8 +130,6 @@ describe('clerk-sync module', () => {
         },
       });
 
-      const { syncClerkMetadata } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncClerkMetadata('clerk_123', {
         jovie_role: 'user',
       });
@@ -140,8 +142,6 @@ describe('clerk-sync module', () => {
 
   describe('syncAllClerkMetadata', () => {
     it('returns error when clerkUserId is missing', async () => {
-      const { syncAllClerkMetadata } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncAllClerkMetadata('');
 
       expect(result.success).toBe(false);
@@ -169,8 +169,6 @@ describe('clerk-sync module', () => {
           updateUserMetadata: mockUpdateUserMetadata,
         },
       });
-
-      const { syncAllClerkMetadata } = await import('@/lib/auth/clerk-sync');
 
       const result = await syncAllClerkMetadata('clerk_123');
 
@@ -216,8 +214,6 @@ describe('clerk-sync module', () => {
         },
       });
 
-      const { syncAllClerkMetadata } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncAllClerkMetadata('clerk_123');
 
       expect(result.success).toBe(true);
@@ -257,8 +253,6 @@ describe('clerk-sync module', () => {
           updateUserMetadata: mockUpdateUserMetadata,
         },
       });
-
-      const { syncAllClerkMetadata } = await import('@/lib/auth/clerk-sync');
 
       const result = await syncAllClerkMetadata('clerk_123');
 
@@ -300,8 +294,6 @@ describe('clerk-sync module', () => {
         },
       });
 
-      const { syncAllClerkMetadata } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncAllClerkMetadata('clerk_123');
 
       expect(result.success).toBe(true);
@@ -311,8 +303,6 @@ describe('clerk-sync module', () => {
 
   describe('handleClerkUserDeleted', () => {
     it('returns error when clerkUserId is missing', async () => {
-      const { handleClerkUserDeleted } = await import('@/lib/auth/clerk-sync');
-
       const result = await handleClerkUserDeleted('');
 
       expect(result.success).toBe(false);
@@ -327,8 +317,6 @@ describe('clerk-sync module', () => {
           }),
         }),
       });
-
-      const { handleClerkUserDeleted } = await import('@/lib/auth/clerk-sync');
 
       const result = await handleClerkUserDeleted('clerk_123');
 
@@ -348,8 +336,6 @@ describe('clerk-sync module', () => {
           }),
         }),
       });
-
-      const { handleClerkUserDeleted } = await import('@/lib/auth/clerk-sync');
 
       const result = await handleClerkUserDeleted('clerk_123');
 
@@ -378,8 +364,6 @@ describe('clerk-sync module', () => {
         }),
       });
 
-      const { handleClerkUserDeleted } = await import('@/lib/auth/clerk-sync');
-
       const result = await handleClerkUserDeleted('clerk_123');
 
       expect(result.success).toBe(true);
@@ -389,8 +373,6 @@ describe('clerk-sync module', () => {
 
   describe('syncAdminRoleChange', () => {
     it('returns error when targetClerkUserId is missing', async () => {
-      const { syncAdminRoleChange } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncAdminRoleChange('', true);
 
       expect(result.success).toBe(false);
@@ -407,8 +389,6 @@ describe('clerk-sync module', () => {
           updateUserMetadata: mockUpdateUserMetadata,
         },
       });
-
-      const { syncAdminRoleChange } = await import('@/lib/auth/clerk-sync');
 
       const result = await syncAdminRoleChange('clerk_target', true);
 
@@ -433,8 +413,6 @@ describe('clerk-sync module', () => {
         },
       });
 
-      const { syncAdminRoleChange } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncAdminRoleChange('clerk_target', false);
 
       expect(result.success).toBe(true);
@@ -458,8 +436,6 @@ describe('clerk-sync module', () => {
         },
       });
 
-      const { syncProfileStatus } = await import('@/lib/auth/clerk-sync');
-
       const result = await syncProfileStatus('clerk_123', true);
 
       expect(result.success).toBe(true);
@@ -482,8 +458,6 @@ describe('clerk-sync module', () => {
           updateUserMetadata: mockUpdateUserMetadata,
         },
       });
-
-      const { syncUserStatus } = await import('@/lib/auth/clerk-sync');
 
       const result = await syncUserStatus('clerk_123', 'banned');
 

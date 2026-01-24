@@ -80,6 +80,13 @@ vi.mock('@/app/api/audience/lib/audience-utils', () => ({
   createFingerprint: vi.fn().mockReturnValue('fingerprint-123'),
 }));
 
+// Import once after all mocks are set up
+import {
+  getNotificationStatusDomain,
+  subscribeToNotificationsDomain,
+  unsubscribeFromNotificationsDomain,
+} from '@/lib/notifications/domain';
+
 describe('notifications/domain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,10 +94,6 @@ describe('notifications/domain', () => {
 
   describe('subscribeToNotificationsDomain', () => {
     it('should return validation error for invalid payload', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({});
 
       expect(result.status).toBe(400);
@@ -98,10 +101,6 @@ describe('notifications/domain', () => {
     });
 
     it('should return validation error for invalid email format', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({
         artist_id: 'artist-123',
         email: 'invalid-email',
@@ -112,10 +111,6 @@ describe('notifications/domain', () => {
     });
 
     it('should return validation error for invalid phone format', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({
         artist_id: 'artist-123',
         phone: '123456',
@@ -128,10 +123,6 @@ describe('notifications/domain', () => {
 
   describe('unsubscribeFromNotificationsDomain', () => {
     it('should return error when no identifier provided', async () => {
-      const { unsubscribeFromNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await unsubscribeFromNotificationsDomain({
         artist_id: 'artist-123',
       });
@@ -142,20 +133,12 @@ describe('notifications/domain', () => {
 
   describe('getNotificationStatusDomain', () => {
     it('should return validation error for invalid payload', async () => {
-      const { getNotificationStatusDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await getNotificationStatusDomain({});
 
       expect(result.body.success).toBe(false);
     });
 
     it('should return error when no contact provided', async () => {
-      const { getNotificationStatusDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await getNotificationStatusDomain({
         artist_id: 'artist-123',
       });
@@ -166,10 +149,6 @@ describe('notifications/domain', () => {
 
   describe('input sanitization', () => {
     it('should handle null values gracefully', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({
         artist_id: null as unknown as string,
         email: null as unknown as string,
@@ -179,10 +158,6 @@ describe('notifications/domain', () => {
     });
 
     it('should handle undefined values gracefully', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({
         artist_id: undefined as unknown as string,
       });
@@ -193,10 +168,6 @@ describe('notifications/domain', () => {
 
   describe('response structure', () => {
     it('should return proper NotificationDomainResponse structure', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({
         artist_id: 'artist-123',
         email: 'invalid',
@@ -209,10 +180,6 @@ describe('notifications/domain', () => {
     });
 
     it('should include success field in body', async () => {
-      const { getNotificationStatusDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await getNotificationStatusDomain({
         artist_id: 'artist-123',
       });
@@ -224,10 +191,6 @@ describe('notifications/domain', () => {
 
   describe('channel inference', () => {
     it('should accept email channel with valid email', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       // This will fail validation but shows the channel is accepted
       const result = await subscribeToNotificationsDomain({
         artist_id: 'artist-123',
@@ -240,10 +203,6 @@ describe('notifications/domain', () => {
     });
 
     it('should accept sms channel with phone', async () => {
-      const { subscribeToNotificationsDomain } = await import(
-        '@/lib/notifications/domain'
-      );
-
       const result = await subscribeToNotificationsDomain({
         artist_id: 'artist-123',
         phone: '+15551234567',
