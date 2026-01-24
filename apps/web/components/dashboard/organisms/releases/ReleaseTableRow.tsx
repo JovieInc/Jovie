@@ -109,7 +109,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         icon: Trash2,
         variant: 'destructive' as const,
         onClick: () => {
-          // TODO: Implement delete confirmation dialog
+          // See JOV-478: Implement delete confirmation dialog
           console.log('Delete release:', release.id);
         },
         disabled: true,
