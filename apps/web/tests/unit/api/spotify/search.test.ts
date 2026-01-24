@@ -20,10 +20,8 @@ vi.mock('@/lib/spotify/circuit-breaker', () => ({
 
 vi.mock('@/app/api/spotify/search/helpers', () => ({
   applyVipBoost: vi.fn((results: unknown[]) => Promise.resolve(results)),
-  parseLimit: vi.fn((param: string | null, defaultVal: number, max: number) =>
-    param
-      ? Math.min(Math.max(1, parseInt(param, 10) || defaultVal), max)
-      : defaultVal
+  parseLimit: vi.fn(
+    (_param: string | null, defaultVal: number, _max: number) => defaultVal
   ),
 }));
 

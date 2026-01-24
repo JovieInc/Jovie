@@ -1,13 +1,18 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies
-const mockUpdateUser = vi.fn();
-const mockClerkClient = {
-  users: {
-    updateUser: mockUpdateUser,
-  },
-};
+// Mock dependencies - hoisted to ensure availability in vi.mock callbacks
+const { mockUpdateUser, mockClerkClient } = vi.hoisted(() => {
+  const mockUpdateUser = vi.fn();
+  return {
+    mockUpdateUser,
+    mockClerkClient: {
+      users: {
+        updateUser: mockUpdateUser,
+      },
+    },
+  };
+});
 
 const clerkSyncMocks = vi.hoisted(() => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
