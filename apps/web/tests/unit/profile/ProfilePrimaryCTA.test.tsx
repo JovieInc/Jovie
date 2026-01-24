@@ -18,9 +18,13 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-}));
+vi.mock('@statsig/react-bindings', () => {
+  const React = require('react');
+  return {
+    useFeatureGate: () => ({ value: true }),
+    StatsigContext: React.createContext({ client: {} }),
+  };
+});
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
