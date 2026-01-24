@@ -1,0 +1,282 @@
+{
+  "generated_at": "2026-01-23T23:30:00.000Z",
+  "scope": "apps/web",
+  "linear_issues_checked": 100,
+  "ideas": [
+    {
+      "id": "qual-001",
+      "title": "Replace 228+ console.* calls in lib/ with Sentry logging",
+      "description": "The lib/ directory contains 228 console.log/warn/error calls across 79 files, violating the Jovie standard of using Sentry for logging.",
+      "rationale": "Console statements don't aggregate in production, lack context/stack traces, and can't be filtered or alerted on. Sentry provides structured logging with error grouping and alerting.",
+      "category": "code_smells",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/lib/env-server.ts (14 occurrences)",
+        "apps/web/lib/startup/environment-validator.ts (13 occurrences)",
+        "apps/web/lib/admin/overview.ts (8 occurrences)",
+        "apps/web/lib/error-tracking.ts (8 occurrences)",
+        "apps/web/lib/services/link-wrapping.ts (8 occurrences)"
+      ],
+      "current_state": "228 console.* calls in lib/, 130 in components/",
+      "proposed_change": "Replace console.error with Sentry.captureException(), console.warn with Sentry.captureMessage(level: 'warning'), and console.log with Sentry breadcrumbs or remove entirely. Keep console.* only in scripts/ and development-only code paths.",
+      "best_practice": "Centralized observability via Sentry",
+      "metrics": {
+        "occurrences_lib": 228,
+        "occurrences_components": 130,
+        "files_affected": 142
+      },
+      "effort": "medium",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-002",
+      "title": "Split lib/db/index.ts (780 lines) into focused modules",
+      "description": "lib/db/index.ts is 780 lines containing connection pooling, session management, health checks, retry logic, and performance monitoring - violating Single Responsibility Principle.",
+      "rationale": "Monolithic database files are hard to test, understand, and maintain. Separating concerns enables independent testing and clearer ownership.",
+      "category": "large_files",
+      "severity": "major",
+      "affected_files": ["apps/web/lib/db/index.ts"],
+      "current_state": "780 lines with 13+ exported functions: getWebSocketConstructor, logDbError, createDbInstance, getDb, setSessionUser, doesTableExist, validateDbConnection, checkDbPerformance, getPoolMetrics, getDbConfig, and more",
+      "proposed_change": "Split into: db/connection.ts (pool, WebSocket config ~100 lines), db/session.ts (setSessionUser, session management ~80 lines), db/health.ts (validateDbConnection, checkDbPerformance ~150 lines), db/retry.ts (retry logic, error classification ~100 lines). Keep index.ts as barrel re-export.",
+      "code_example": "// db/index.ts after refactor\nexport { db, getDb, type DbType, type TransactionType } from './connection';\nexport { setSessionUser, clearSessionUser } from './session';\nexport { validateDbConnection, checkDbHealth, doesTableExist } from './health';\nexport { withRetry, isRetryableError } from './retry';",
+      "best_practice": "Single Responsibility Principle (SRP)",
+      "metrics": {
+        "line_count": 780,
+        "exports_count": 13,
+        "concerns_mixed": 5
+      },
+      "effort": "medium",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-003",
+      "title": "Split UnifiedTable.tsx (769 lines) into composable table components",
+      "description": "UnifiedTable.tsx is 769 lines handling virtualization, context menus, grouping, sorting, row selection, and rendering in one component.",
+      "rationale": "Monolithic components are hard to test in isolation, slow to render (no React.memo boundaries), and difficult to modify without risk of regression.",
+      "category": "large_files",
+      "severity": "major",
+      "affected_files": ["apps/web/components/organisms/table/organisms/UnifiedTable.tsx"],
+      "current_state": "769 lines with TanStack Table + TanStack Virtual + context menus + grouping all in one component. Props interface has 25+ properties.",
+      "proposed_change": "Extract: hooks/useTableVirtualization.ts, hooks/useTableContextMenu.ts, molecules/VirtualizedTableBody.tsx, molecules/TableHeaderRow.tsx, molecules/TableEmptyState.tsx. UnifiedTable becomes a thin composition layer under 200 lines.",
+      "best_practice": "Component composition pattern",
+      "metrics": {
+        "line_count": 769,
+        "props_count": 25
+      },
+      "effort": "large",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-004",
+      "title": "Add unit tests for lib/discography/spotify-import.ts (646 lines)",
+      "description": "spotify-import.ts handles critical Spotify album import with complex batch processing, track importing, and cross-platform discovery but has no dedicated unit tests.",
+      "rationale": "Import logic is business-critical and handles external API responses. Without tests, refactoring is risky and bugs can silently break the import flow.",
+      "category": "types",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/lib/discography/spotify-import.ts",
+        "apps/web/tests/unit/lib/discography/ (missing)"
+      ],
+      "current_state": "646 lines with importSpotifyDiscography, importAlbumBatch, discoverLinksForReleases. No tests/unit/lib/discography/spotify-import.test.ts exists.",
+      "proposed_change": "Create comprehensive test suite covering: successful album import, batch processing limits, track import with ISRC matching, cross-platform link discovery, error handling for API failures, rate limiting scenarios. Mock Spotify API responses.",
+      "best_practice": "Unit test coverage for critical business logic",
+      "metrics": {
+        "line_count": 646,
+        "test_coverage": "0%"
+      },
+      "effort": "medium",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-005",
+      "title": "Split app/onboarding/actions.ts (659 lines) into action modules",
+      "description": "onboarding/actions.ts is 659 lines mixing avatar handling, profile creation, username validation, and enrichment logic in one server actions file.",
+      "rationale": "Large action files are harder to test, have longer cold starts, and mix unrelated concerns. Modular actions can be imported individually.",
+      "category": "large_files",
+      "severity": "major",
+      "affected_files": ["apps/web/app/onboarding/actions.ts"],
+      "current_state": "659 lines with: fetchAvatarImage, uploadAvatarFile, uploadAvatarFromUrl, createProfile, validateUsername, enrichProfileWithSpotify",
+      "proposed_change": "Split into: onboarding/actions/avatar.ts (~150 lines), onboarding/actions/profile.ts (~200 lines), onboarding/actions/validation.ts (~100 lines), onboarding/actions/enrichment.ts (~150 lines), onboarding/actions/index.ts (re-exports). Already partially started - complete the refactor.",
+      "best_practice": "Server actions organized by domain",
+      "metrics": {
+        "line_count": 659,
+        "action_count": 6
+      },
+      "effort": "medium",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-006",
+      "title": "Clean up 54 @deprecated exports and migrate consumers",
+      "description": "Found 54 @deprecated annotations across 35 files marking code that should be migrated but consumers haven't been updated.",
+      "rationale": "Deprecated code accumulates tech debt, confuses new developers, and often has subtle differences from the replacement. Cleaning it up simplifies the codebase.",
+      "category": "dead_code",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/lib/rate-limit/index.ts (6 deprecated exports)",
+        "apps/web/lib/utils/rate-limit.ts (7 deprecated exports)",
+        "apps/web/lib/db/queries.ts (6 deprecated exports)",
+        "apps/web/lib/discography/utils.ts (3 deprecated exports)"
+      ],
+      "current_state": "54 @deprecated annotations with migration instructions not followed",
+      "proposed_change": "For each deprecated export: 1) Find all usages with grep, 2) Migrate to new API, 3) Remove deprecated export. Start with most-used deprecated exports.",
+      "best_practice": "Don't Repeat Yourself (DRY), clean code",
+      "metrics": {
+        "deprecated_exports": 54,
+        "files_with_deprecated": 35
+      },
+      "effort": "large",
+      "priority": "medium",
+      "breaking_change": true,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-007",
+      "title": "Add unit tests for lib/notifications/domain.ts (627 lines)",
+      "description": "notifications/domain.ts contains core subscription logic but only has API route-level tests, not direct unit tests of domain functions.",
+      "rationale": "Domain logic tests run faster, can test edge cases without HTTP overhead, and verify business rules in isolation.",
+      "category": "types",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/lib/notifications/domain.ts",
+        "apps/web/tests/unit/lib/notifications/ (partially exists)"
+      ],
+      "current_state": "627 lines with subscribe, unsubscribe, getSubscriptionStatus functions. Tests exist at route level but not for domain functions directly.",
+      "proposed_change": "Create tests/unit/lib/notifications/domain.test.ts with direct unit tests: subscription validation, duplicate handling, unsubscribe flows, status queries, preference updates.",
+      "best_practice": "Test pyramid - more unit tests than integration tests",
+      "metrics": {
+        "line_count": 627,
+        "direct_test_coverage": "0%"
+      },
+      "effort": "medium",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-008",
+      "title": "Address 16 TODO/FIXME comments with Linear issues",
+      "description": "Found 16 TODO/FIXME comments indicating incomplete features that should be tracked properly.",
+      "rationale": "TODOs in code are often forgotten. Converting to tracked issues ensures visibility and prioritization.",
+      "category": "code_smells",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/lib/dsp-enrichment/jobs/dsp-artist-discovery.ts - TODO: Add deezer and musicbrainz support",
+        "apps/web/lib/audit/ingest.ts - TODO: When database table is available",
+        "apps/web/components/dashboard/organisms/releases/ReleaseTableRow.tsx - TODO: Implement delete confirmation",
+        "apps/web/app/api/monitoring/performance/route.ts - TODO: Integrate with analytics service"
+      ],
+      "current_state": "16 TODO/FIXME comments scattered across production code",
+      "proposed_change": "For each TODO: 1) Create Linear issue with full context, 2) Replace TODO comment with Linear issue reference (e.g., // See JOV-123), 3) Prioritize in backlog.",
+      "best_practice": "Track technical debt in issue tracker",
+      "metrics": {
+        "todo_count": 16
+      },
+      "effort": "small",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-009",
+      "title": "Reduce type casting with 'as any' (102 occurrences)",
+      "description": "Found 102 'as any' type assertions across 24 files, mostly in test code but some in production.",
+      "rationale": "Type assertions bypass TypeScript's safety checks. While acceptable in tests, production code should use proper types or unknown with type guards.",
+      "category": "types",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/tests/lib/monitoring/web-vitals.test.ts (14 occurrences)",
+        "apps/web/tests/unit/api/stripe/capture-tip.test.ts (9 occurrences)",
+        "apps/web/tests/unit/api/clerk/webhook.test.ts (9 occurrences)"
+      ],
+      "current_state": "102 'as any' casts - 90% in test files, 10% in production",
+      "proposed_change": "For production code: Replace 'as any' with proper typing or 'unknown' with type guards. For test code: Create properly typed mock factories instead of casting.",
+      "best_practice": "TypeScript strict mode best practices",
+      "metrics": {
+        "as_any_count": 102,
+        "files_affected": 24
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-010",
+      "title": "Split WaitlistSpotifySearch.tsx (499 lines) component",
+      "description": "WaitlistSpotifySearch.tsx is 499 lines handling search input, results display, keyboard navigation, and artist selection in one component.",
+      "rationale": "Large components are harder to test, have more re-renders, and mix presentation with interaction logic.",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": ["apps/web/components/waitlist/WaitlistSpotifySearch.tsx"],
+      "current_state": "499 lines with input handling, search results rendering, keyboard navigation, and selection logic",
+      "proposed_change": "Extract: hooks/useSpotifyArtistSearch.ts (search logic + keyboard nav), molecules/SpotifySearchResults.tsx (results list), molecules/SpotifySearchInput.tsx (input with debounce). Main component under 150 lines.",
+      "best_practice": "Component composition, custom hooks for logic",
+      "metrics": {
+        "line_count": 499
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    }
+  ],
+  "metadata": {
+    "files_analyzed": 1589,
+    "large_files_found": {
+      "lib_over_600_lines": 5,
+      "components_over_400_lines": 8
+    },
+    "any_usages_found": 149,
+    "console_usages_found": 358,
+    "deprecated_exports": 54,
+    "todo_comments": 16,
+    "potential_duplications": 0
+  },
+  "summary": {
+    "total_ideas": 10,
+    "by_category": {
+      "large_files": 4,
+      "code_smells": 2,
+      "types": 3,
+      "dead_code": 1
+    },
+    "by_severity": {
+      "critical": 0,
+      "major": 5,
+      "minor": 5,
+      "suggestion": 0
+    },
+    "by_effort": {
+      "trivial": 0,
+      "small": 1,
+      "medium": 7,
+      "large": 2
+    },
+    "by_priority": {
+      "high": 3,
+      "medium": 4,
+      "low": 3
+    }
+  }
+}

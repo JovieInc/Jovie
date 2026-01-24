@@ -14,6 +14,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@statsig/react-bindings', () => ({
   useFeatureGate: () => ({ value: true }),
+  StatsigContext: React.createContext({ client: {} }),
 }));
 
 // Mock @jovie/ui Tooltip components

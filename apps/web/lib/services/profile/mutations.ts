@@ -8,6 +8,7 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { redis } from '@/lib/redis';
 import type { ProfileData, ProfileUpdateData } from './types';
 
@@ -123,10 +124,10 @@ export async function incrementProfileViews(username: string): Promise<void> {
 
           // Flush accumulated views to database (fire-and-forget)
           flushViewsToDatabase(normalizedUsername, flushCount).catch(error => {
-            console.error(
-              '[profile-service] Failed to flush views to database:',
-              error
-            );
+            captureError('Failed to flush views to database', error, {
+              username: normalizedUsername,
+              flushCount,
+            });
             // Put the count back in Redis if DB flush failed
             redis?.incrby(redisKey, flushCount).catch(() => {});
           });
@@ -135,9 +136,12 @@ export async function incrementProfileViews(username: string): Promise<void> {
 
       return;
     } catch (error) {
-      console.warn(
-        '[profile-service] Redis view increment failed, falling back to direct DB:',
-        error
+      captureWarning(
+        'Redis view increment failed, falling back to direct DB',
+        error,
+        {
+          username: normalizedUsername,
+        }
       );
       // Fall through to direct DB write
     }
@@ -187,10 +191,8 @@ async function incrementViewsDirectly(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      console.warn(
-        `[profile-service] View increment retry ${attempt}/${maxRetries}:`,
-        lastError.message
-      );
+      // Retry logging - only capture on final failure
+      void lastError;
 
       if (attempt < maxRetries) {
         await new Promise(resolve =>
@@ -200,20 +202,10 @@ async function incrementViewsDirectly(
     }
   }
 
-  console.error(
-    `[profile-service] View increment failed after ${maxRetries} attempts:`,
-    lastError
-  );
-
-  // Report to Sentry (fire-and-forget)
-  import('@/lib/error-tracking')
-    .then(({ captureError }) => {
-      captureError('Profile view increment failed', lastError, {
-        username: normalizedUsername,
-        maxRetries,
-      });
-    })
-    .catch(() => {});
+  captureError('Profile view increment failed', lastError, {
+    username: normalizedUsername,
+    maxRetries,
+  });
 }
 
 /**
@@ -222,7 +214,7 @@ async function incrementViewsDirectly(
  */
 export async function flushAllPendingViews(): Promise<number> {
   if (!redis) {
-    console.warn('[profile-service] Redis not available for view flush');
+    captureWarning('Redis not available for view flush');
     return 0;
   }
 
@@ -252,9 +244,9 @@ export async function flushAllPendingViews(): Promise<number> {
       }
     }
 
-    console.log(`[profile-service] Flushed views for ${flushedCount} profiles`);
+    // Successfully flushed views - no logging needed
   } catch (error) {
-    console.error('[profile-service] Failed to flush pending views:', error);
+    captureError('Failed to flush pending views', error, { flushedCount });
   }
 
   return flushedCount;

@@ -9,6 +9,7 @@ import {
   waitlistEntries,
 } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminMercuryMetrics } from './mercury-metrics';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
@@ -36,7 +37,7 @@ async function getWaitlistCount(): Promise<number> {
       .from(waitlistEntries);
     return Number(row?.count ?? 0);
   } catch (error) {
-    console.error('Error fetching waitlist count:', error);
+    captureError('Error fetching waitlist count', error);
     return 0;
   }
 }
@@ -176,7 +177,7 @@ export async function getAdminUsageSeries(
       activeUsers: row.active_users != null ? Number(row.active_users) : null,
     }));
   } catch (error) {
-    console.error('Error loading admin usage series', error);
+    captureError('Error loading admin usage series', error, { days });
     // Fall through with empty rows, which will produce a zeroed series
   }
 
@@ -236,7 +237,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
       totalEvents = Number(rows[0]?.count ?? 0);
     } catch {
       DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
+      captureWarning(
         'Stripe webhook events unavailable; skipping reliability summary.'
       );
 
@@ -278,7 +279,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
       // Note: else case is not needed since lastIncidentAt is already initialized to null
     } catch {
       DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
+      captureWarning(
         'Stripe webhook incidents unavailable; skipping reliability summary.'
       );
 
@@ -300,7 +301,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
       lastIncidentAt,
     };
   } catch (error) {
-    console.error('Error loading admin reliability summary', error);
+    captureError('Error loading admin reliability summary', error);
 
     try {
       const dbHealth = await checkDbHealth();
@@ -494,7 +495,7 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
       mercuryAvailability,
     };
   } catch (error) {
-    console.error('Error computing admin overview metrics:', error);
+    captureError('Error computing admin overview metrics', error);
     return {
       ...defaultUnavailableMetrics,
       defaultStatusDetail:
@@ -551,7 +552,7 @@ export async function getAdminActivityFeed(
           if (shouldDisableStripeEventsTable(error)) {
             DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
           }
-          console.warn('Stripe webhook activity unavailable; skipping.');
+          captureWarning('Stripe webhook activity unavailable; skipping.');
           return [] as StripeActivityRow[];
         }
       })(),
@@ -583,7 +584,7 @@ export async function getAdminActivityFeed(
 
     return allItems.slice(0, limit);
   } catch (error) {
-    console.error('Error loading admin activity feed', error);
+    captureError('Error loading admin activity feed', error, { limit });
     return [];
   }
 }

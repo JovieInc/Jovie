@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases, discogTracks, providerLinks } from '@/lib/db/schema';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,
   buildSpotifyTrackUrl,
@@ -87,7 +88,12 @@ async function discoverLinksForReleases(
       });
     } catch (error) {
       // Don't fail the whole import if discovery fails
-      console.debug(`Discovery failed for ${release.title}:`, error);
+      Sentry.addBreadcrumb({
+        category: 'spotify-import',
+        message: `Discovery failed for ${release.title}`,
+        level: 'debug',
+        data: { releaseId: release.id, error },
+      });
     }
   }
 }
@@ -114,16 +120,12 @@ async function importAlbumBatch(
         `Failed to import "${sanitizedAlbumName}": ${message}`
       );
 
-      Sentry.captureException(error, {
-        tags: { source: 'spotify_import' },
-        extra: {
-          albumId: album.id,
-          albumName: sanitizedAlbumName,
-          creatorProfileId,
-        },
+      captureError(`Failed to import album ${album.id}`, error, {
+        source: 'spotify_import',
+        albumId: album.id,
+        albumName: sanitizedAlbumName,
+        creatorProfileId,
       });
-
-      console.error(`Failed to import album ${album.id}:`, error);
     }
   }
 }
@@ -197,16 +199,10 @@ export async function importReleasesFromSpotify(
         // Safety limit: cap number of releases
         const albumsToImport = spotifyAlbums.slice(0, MAX_RELEASES_PER_IMPORT);
         if (spotifyAlbums.length > MAX_RELEASES_PER_IMPORT) {
-          console.warn(
-            `[Spotify Import] Truncating ${spotifyAlbums.length} releases to ${MAX_RELEASES_PER_IMPORT}`
-          );
-          Sentry.captureMessage('Spotify import truncated due to limit', {
-            level: 'info',
-            extra: {
-              totalReleases: spotifyAlbums.length,
-              limit: MAX_RELEASES_PER_IMPORT,
-              spotifyArtistId,
-            },
+          captureWarning('Spotify import truncated due to limit', {
+            totalReleases: spotifyAlbums.length,
+            limit: MAX_RELEASES_PER_IMPORT,
+            spotifyArtistId,
           });
         }
 
@@ -250,12 +246,12 @@ export async function importReleasesFromSpotify(
           error instanceof Error ? error.message : 'Unknown error';
         result.errors.push(`Import failed: ${message}`);
 
-        Sentry.captureException(error, {
-          tags: { source: 'spotify_import' },
-          extra: { spotifyArtistId, creatorProfileId },
+        captureError('Spotify import failed', error, {
+          source: 'spotify_import',
+          spotifyArtistId,
+          creatorProfileId,
         });
 
-        console.error('Spotify import failed:', error);
         return result;
       }
     }
