@@ -81,26 +81,29 @@ function mapReleaseToViewModel(
     slug,
     smartLinkPath: buildSmartLinkPath(profileHandle, slug),
     spotifyPopularity: release.spotifyPopularity,
-    providers: Object.entries(providerLabels).map(([key, label]) => {
-      const providerKey = key as ProviderKey;
-      const match = release.providerLinks.find(
-        link => link.providerId === providerKey
-      );
-      const url = match?.url ?? '';
-      const source = match?.sourceType === 'manual' ? 'manual' : 'ingested';
-      const updatedAt =
-        match?.updatedAt?.toISOString() ?? new Date().toISOString();
+    providers: Object.entries(providerLabels)
+      .map(([key, label]) => {
+        const providerKey = key as ProviderKey;
+        const match = release.providerLinks.find(
+          link => link.providerId === providerKey
+        );
+        const url = match?.url ?? '';
+        const source: 'manual' | 'ingested' =
+          match?.sourceType === 'manual' ? 'manual' : 'ingested';
+        const updatedAt =
+          match?.updatedAt?.toISOString() ?? new Date().toISOString();
 
-      return {
-        key: providerKey,
-        label,
-        url,
-        source,
-        updatedAt,
-        path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
-        isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
-      };
-    }),
+        return {
+          key: providerKey,
+          label,
+          url,
+          source,
+          updatedAt,
+          path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
+          isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
+        };
+      })
+      .filter(provider => provider.url !== ''),
   };
 }
 

@@ -131,12 +131,28 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Memoize the badge to avoid creating new JSX object on every render
   const spotifyBadge = useMemo(
     () => (
-      <span className='inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954]'>
+      <button
+        type='button'
+        onClick={handleSync}
+        disabled={isSyncing}
+        className='group inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
+        aria-label={
+          isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
+        }
+      >
         <SocialIcon platform='spotify' className='h-3 w-3' />
-        {artistName}
-      </span>
+        <span>{artistName}</span>
+        <Icon
+          name={isSyncing ? 'Loader2' : 'RefreshCw'}
+          className={cn(
+            'h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+            isSyncing && 'animate-spin opacity-100'
+          )}
+          aria-hidden='true'
+        />
+      </button>
     ),
-    [artistName]
+    [artistName, handleSync, isSyncing]
   );
 
   useEffect(() => {

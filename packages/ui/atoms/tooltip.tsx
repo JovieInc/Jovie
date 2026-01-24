@@ -85,12 +85,9 @@ const TooltipContent = React.forwardRef<
         className={cn(
           // Base layout + spacing
           'z-50 inline-flex select-none items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium leading-tight',
-          // Theme-aware surface with subtle border
+          // Theme-aware surface with subtle border using design tokens
           'max-w-xs border shadow-lg',
-          // Light mode: light bg, dark text
-          'border-black/10 bg-white text-neutral-900',
-          // Dark mode: dark bg, light text
-          'dark:border-white/10 dark:bg-neutral-900 dark:text-white',
+          'border-default bg-surface-2 text-primary-token',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
@@ -116,7 +113,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-white dark:fill-neutral-900'
+            className='fill-surface-2'
             data-testid='tooltip-arrow'
           />
         )}

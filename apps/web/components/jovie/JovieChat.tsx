@@ -358,23 +358,25 @@ export function JovieChat({ artistContext }: JovieChatProps) {
 
           {/* Error display in chat view */}
           {chatError && (
-            <div className='border-t border-subtle bg-error-subtle px-4 py-3'>
-              <div className='mx-auto flex max-w-2xl items-center gap-3'>
-                <AlertCircle className='h-4 w-4 shrink-0 text-error' />
-                <p className='flex-1 text-sm text-primary-token'>
-                  {chatError.message}
+            <div className='px-4 pb-3'>
+              <div className='mx-auto flex max-w-2xl items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
+                <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                <div className='flex-1'>
+                  <p className='text-sm font-medium text-primary-token'>
+                    {chatError.message}
+                  </p>
                   {chatError.retryAfter && (
-                    <span className='ml-2 text-secondary-token'>
-                      (retry in {chatError.retryAfter}s)
-                    </span>
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      Try again in {chatError.retryAfter} seconds
+                    </p>
                   )}
-                </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* Input at bottom */}
-          <div className='border-t border-subtle bg-base px-4 py-4'>
+          <div className='border-t border-subtle px-4 py-4'>
             <form onSubmit={handleSubmit} className='mx-auto max-w-2xl'>
               <div className='relative'>
                 <textarea
