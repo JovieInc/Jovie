@@ -54,3 +54,6 @@ export { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 
 // Re-export schema
 export * from './schema';
+
+// Re-export SQL helpers
+export * from './sql-helpers';

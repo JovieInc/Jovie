@@ -120,7 +120,7 @@ export function AdminWaitlistTableUnified({
   );
 
   // Define columns using TanStack Table
-  const columns = useMemo<ColumnDef<WaitlistEntryRow, any>[]>(
+  const columns = useMemo<ColumnDef<WaitlistEntryRow, unknown>[]>(
     () => [
       // Checkbox column
       columnHelper.display({

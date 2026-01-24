@@ -16,6 +16,9 @@ import React, { memo, useCallback } from 'react';
 import { cn, presets } from '../table.styles';
 import type { UnifiedTableRowProps } from '../types/unified-table.types';
 
+/** Default column size used by TanStack Table when no size is specified */
+const DEFAULT_COLUMN_SIZE = 150;
+
 /**
  * Internal memoized row component to prevent inline handler recreation.
  * This is a generic component that works with TanStack Table's Row type.
@@ -80,7 +83,6 @@ export const UnifiedTableRow = memo(function UnifiedTableRow<TData>({
 
   return (
     <tr
-      key={row.id}
       ref={handleRef}
       data-index={rowIndex}
       tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
@@ -115,7 +117,9 @@ export const UnifiedTableRow = memo(function UnifiedTableRow<TData>({
           className={presets.tableCell}
           style={{
             width:
-              cell.column.getSize() !== 150 ? cell.column.getSize() : undefined,
+              cell.column.getSize() !== DEFAULT_COLUMN_SIZE
+                ? cell.column.getSize()
+                : undefined,
           }}
         >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
