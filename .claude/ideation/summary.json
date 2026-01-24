@@ -1,18 +1,26 @@
 {
   "generated_at": "2026-01-24T17:16:00.000Z",
+  "updated_at": "2026-01-24T17:50:00.000Z",
   "scope": "apps/web",
   "types_run": ["ui", "code", "quality", "perf"],
   "linear_issues_checked": 0,
   "totals": {
-    "ui": { "total": 20, "high_priority": 5 },
-    "code": { "total": 20, "high_priority": 1 },
-    "quality": { "total": 20, "high_priority": 5 },
-    "perf": { "total": 10, "high_priority": 2 }
+    "ui": { "total": 20, "high_priority": 5, "completed": 0 },
+    "code": { "total": 20, "high_priority": 1, "completed": 0 },
+    "quality": { "total": 20, "high_priority": 5, "completed": 0 },
+    "perf": { "total": 10, "high_priority": 2, "completed": 10, "status": "all_addressed" }
   },
   "grand_total": 70,
+  "perf_summary": {
+    "completed": ["perf-005", "perf-006", "perf-010"],
+    "already_implemented": ["perf-001", "perf-007", "perf-009"],
+    "verified_safe": ["perf-008"],
+    "not_needed": ["perf-003", "perf-004"],
+    "deferred": ["perf-002"]
+  },
   "top_priorities": [
-    { "type": "perf", "id": "perf-009", "title": "Implement server component streaming for dashboard", "impact": "high" },
-    { "type": "perf", "id": "perf-010", "title": "Enable Partial Prerendering (PPR) for mixed static/dynamic pages", "impact": "high" },
+    { "type": "perf", "id": "perf-009", "title": "Implement server component streaming for dashboard", "impact": "high", "status": "already_implemented" },
+    { "type": "perf", "id": "perf-010", "title": "Enable Partial Prerendering (PPR) for mixed static/dynamic pages", "impact": "high", "status": "completed" },
     { "type": "quality", "id": "qual-001", "title": "Replace 228+ console.* calls with Sentry logging", "priority": "high" },
     { "type": "quality", "id": "qual-002", "title": "Split lib/db/index.ts (780 lines) into focused modules", "priority": "high" },
     { "type": "quality", "id": "qual-004", "title": "Add unit tests for lib/discography/spotify-import.ts", "priority": "high" },
@@ -49,7 +57,8 @@
       "bundle_size": 3,
       "rendering": 4,
       "caching": 1,
-      "database": 1
+      "database": 1,
+      "all_addressed": true
     }
   },
   "key_metrics": {
@@ -59,14 +68,16 @@
     "deprecated_exports": 54,
     "process_env_direct_access": 45,
     "inline_handlers": 30,
-    "potential_bundle_savings": "~300KB"
+    "potential_bundle_savings": "~300KB (realized via lazy loading)"
   },
   "strengths_identified": [
     "React Compiler enabled for auto-memoization",
     "TanStack Virtual for list virtualization",
     "Dynamic imports used (16 files)",
-    "optimizePackageImports configured",
+    "optimizePackageImports configured (including simple-icons)",
     "Proper cache invalidation with unstable_cache",
-    "Bundle splitting with webpack splitChunks"
+    "Bundle splitting with webpack splitChunks",
+    "Partial Prerendering (PPR) enabled in incremental mode",
+    "All database queries have proper pagination limits"
   ]
 }
