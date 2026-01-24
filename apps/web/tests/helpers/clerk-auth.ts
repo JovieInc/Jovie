@@ -84,6 +84,14 @@ export async function signInUser(
     );
   }
 
+  // Verify that clerkSetup() succeeded in global setup
+  if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+    throw new ClerkTestError(
+      'Clerk testing setup was not successful. Tests requiring authentication will be skipped.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
   // Set up Clerk testing token to bypass bot protection
   await setupClerkTestingToken({ page });
 
