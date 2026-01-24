@@ -1,7 +1,9 @@
 import 'server-only';
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import crypto from 'crypto';
 import { NextResponse } from 'next/server';
+import { captureWarning } from '@/lib/error-tracking';
 import { isAdmin } from './roles';
 
 /**
@@ -42,7 +44,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   // User not authenticated
   if (!userId) {
-    console.warn(
+    captureWarning(
       '[admin/middleware] Unauthorized admin access attempt - no user ID'
     );
     return NextResponse.json(
@@ -59,7 +61,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   if (!userIsAdmin) {
     // Log unauthorized access attempt with masked ID
-    console.warn(
+    captureWarning(
       `[admin/middleware] Forbidden admin access attempt by user: ${maskedUserId}`
     );
 
@@ -70,9 +72,11 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   }
 
   // Log successful admin access with masked ID (for audit trail)
-  console.log(
-    `[admin/middleware] Admin access granted to user: ${maskedUserId}`
-  );
+  Sentry.addBreadcrumb({
+    category: 'admin',
+    message: `Admin access granted to user: ${maskedUserId}`,
+    level: 'info',
+  });
 
   // Authorization successful
   return null;

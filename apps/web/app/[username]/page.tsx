@@ -16,6 +16,7 @@ import {
   isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
+import { captureWarning } from '@/lib/error-tracking';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
 import { getTopProfilesForStaticGeneration } from '@/lib/services/profile';
@@ -216,15 +217,25 @@ const fetchProfileAndLinks = async (
 
 // Cache public profile reads across requests; tags keep updates fast and precise.
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
+// Wrapped in try-catch to handle cache layer failures gracefully
 const getCachedProfileAndLinks = async (username: string) => {
-  return unstable_cache(
-    async () => fetchProfileAndLinks(username),
-    [`public-profile-${username}`],
-    {
-      tags: ['public-profile', `public-profile:${username}`],
-      revalidate: 3600, // 1 hour
-    }
-  )();
+  try {
+    return await unstable_cache(
+      async () => fetchProfileAndLinks(username),
+      [`public-profile-${username}`],
+      {
+        tags: ['public-profile', `public-profile:${username}`],
+        revalidate: 3600, // 1 hour
+      }
+    )();
+  } catch (error) {
+    // Cache layer failure - fall back to direct fetch
+    captureWarning('[profile] Cache layer failed, using direct fetch', {
+      error,
+      username,
+    });
+    return fetchProfileAndLinks(username);
+  }
 };
 
 // Memoize per-request to avoid duplicate DB work between generateMetadata and page render.

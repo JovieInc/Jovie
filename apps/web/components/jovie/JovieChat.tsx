@@ -1,0 +1,435 @@
+'use client';
+
+import { useChat } from '@ai-sdk/react';
+import { Button } from '@jovie/ui';
+import { DefaultChatTransport } from 'ai';
+import { AlertCircle, ArrowUp, Loader2, User } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { useThrottledCallback } from '@/lib/pacer';
+import { cn } from '@/lib/utils';
+
+interface ArtistContext {
+  displayName: string;
+  username: string;
+  bio: string | null;
+  genres: string[];
+  spotifyFollowers: number | null;
+  spotifyPopularity: number | null;
+  profileViews: number;
+  hasSocialLinks: boolean;
+  hasMusicLinks: boolean;
+  tippingStats: {
+    tipClicks: number;
+    tipsSubmitted: number;
+    totalReceivedCents: number;
+    monthReceivedCents: number;
+  };
+}
+
+interface JovieChatProps {
+  artistContext: ArtistContext;
+}
+
+/** Maximum allowed message length */
+const MAX_MESSAGE_LENGTH = 4000;
+
+/** Minimum time between message submissions (ms) */
+const SUBMIT_THROTTLE_MS = 1000;
+
+const SUGGESTED_PROMPTS = [
+  'What should I focus on this week?',
+  'How can I grow my audience?',
+  'What are my strengths based on my profile?',
+  "Help me understand what's working",
+];
+
+// Helper to extract text content from message parts
+function getMessageText(parts: Array<{ type: string; text?: string }>): string {
+  return parts
+    .filter(
+      (part): part is { type: 'text'; text: string } =>
+        part.type === 'text' && typeof part.text === 'string'
+    )
+    .map(part => part.text)
+    .join('');
+}
+
+interface ChatError {
+  message: string;
+  retryAfter?: number;
+}
+
+export function JovieChat({ artistContext }: JovieChatProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [input, setInput] = useState('');
+  const [chatError, setChatError] = useState<ChatError | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Create transport with artist context in body
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        body: { artistContext },
+      }),
+    [artistContext]
+  );
+
+  const { messages, sendMessage, status } = useChat({
+    transport,
+    onError: error => {
+      // Parse error response for rate limiting info
+      try {
+        const errorData = JSON.parse(error.message);
+        setChatError({
+          message: errorData.message || 'An error occurred. Please try again.',
+          retryAfter: errorData.retryAfter,
+        });
+      } catch {
+        setChatError({
+          message: error.message || 'An error occurred. Please try again.',
+        });
+      }
+      setIsSubmitting(false);
+    },
+  });
+
+  const isLoading = status === 'streaming' || status === 'submitted';
+  const hasMessages = messages.length > 0;
+
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (input && chatError) {
+      setChatError(null);
+    }
+  }, [input, chatError]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  // Reset submitting state when streaming completes
+  useEffect(() => {
+    if (status === 'ready') {
+      setIsSubmitting(false);
+    }
+  }, [status]);
+
+  // Core submit logic
+  const doSubmit = useCallback(
+    (text: string) => {
+      if (!text.trim() || isLoading || isSubmitting) return;
+
+      // Validate message length
+      if (text.length > MAX_MESSAGE_LENGTH) {
+        setChatError({
+          message: `Message is too long. Maximum is ${MAX_MESSAGE_LENGTH} characters.`,
+        });
+        return;
+      }
+
+      setChatError(null);
+      setIsSubmitting(true);
+      sendMessage({ text: text.trim() });
+      setInput('');
+
+      // Reset textarea height
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto';
+      }
+    },
+    [isLoading, isSubmitting, sendMessage]
+  );
+
+  // Throttled submit to prevent rapid submissions
+  const throttledSubmit = useThrottledCallback(doSubmit, {
+    wait: SUBMIT_THROTTLE_MS,
+    leading: true,
+    trailing: false,
+  });
+
+  const handleSubmit = useCallback(
+    (e?: React.FormEvent) => {
+      e?.preventDefault();
+      throttledSubmit(input);
+    },
+    [input, throttledSubmit]
+  );
+
+  const handleSuggestedPrompt = useCallback((prompt: string) => {
+    setInput(prompt);
+    // Focus the input after setting the prompt
+    inputRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit]
+  );
+
+  const handleInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    target.style.height = 'auto';
+    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+  }, []);
+
+  // Character count display
+  const characterCount = input.length;
+  const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
+  const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
+
+  return (
+    <div className='flex h-full flex-col'>
+      {!hasMessages ? (
+        // Empty state - centered content
+        <div className='flex flex-1 flex-col items-center justify-center px-4'>
+          <div className='w-full max-w-2xl space-y-8'>
+            {/* Header */}
+            <div className='text-center'>
+              <div className='mb-4 flex justify-center'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2'>
+                  <BrandLogo size={32} tone='auto' />
+                </div>
+              </div>
+              <h1 className='text-2xl font-semibold text-primary-token'>
+                Ask Jovie
+              </h1>
+              <p className='mt-2 text-secondary-token'>
+                Get personalized insights about your music career based on your
+                profile and analytics.
+              </p>
+            </div>
+
+            {/* Error display */}
+            {chatError && (
+              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
+                <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                <div className='flex-1'>
+                  <p className='text-sm font-medium text-primary-token'>
+                    {chatError.message}
+                  </p>
+                  {chatError.retryAfter && (
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      Try again in {chatError.retryAfter} seconds
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Input */}
+            <form onSubmit={handleSubmit} className='relative'>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder='What do you want to know about your career?'
+                className={cn(
+                  'w-full resize-none rounded-xl border bg-surface-1 px-4 py-4 pr-14',
+                  'text-primary-token placeholder:text-tertiary-token',
+                  'focus:outline-none focus:ring-2 focus:ring-offset-2',
+                  'transition-colors duration-fast',
+                  'min-h-[120px]',
+                  isOverLimit
+                    ? 'border-error focus:border-error focus:ring-error/20'
+                    : 'border-subtle focus:border-accent focus:ring-accent/20'
+                )}
+                onKeyDown={handleKeyDown}
+                maxLength={MAX_MESSAGE_LENGTH + 100} // Allow slight overflow for UX
+                aria-label='Chat message input'
+                aria-describedby={isOverLimit ? 'char-limit-error' : undefined}
+              />
+              <Button
+                type='submit'
+                size='icon'
+                disabled={
+                  !input.trim() || isLoading || isSubmitting || isOverLimit
+                }
+                className='absolute bottom-3 right-3 h-10 w-10 rounded-lg'
+                aria-label='Send message'
+              >
+                {isLoading || isSubmitting ? (
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                ) : (
+                  <ArrowUp className='h-4 w-4' />
+                )}
+              </Button>
+
+              {/* Character count */}
+              {isNearLimit && (
+                <div
+                  id='char-limit-error'
+                  className={cn(
+                    'absolute bottom-3 left-3 text-xs',
+                    isOverLimit ? 'text-error' : 'text-tertiary-token'
+                  )}
+                >
+                  {characterCount}/{MAX_MESSAGE_LENGTH}
+                </div>
+              )}
+            </form>
+
+            {/* Suggested prompts */}
+            <div className='space-y-3'>
+              <p className='text-center text-sm text-tertiary-token'>
+                Try asking about:
+              </p>
+              <div className='flex flex-wrap justify-center gap-2'>
+                {SUGGESTED_PROMPTS.map(prompt => (
+                  <button
+                    key={prompt}
+                    type='button'
+                    onClick={() => handleSuggestedPrompt(prompt)}
+                    className={cn(
+                      'rounded-full border border-subtle bg-surface-1 px-4 py-2 text-sm',
+                      'text-secondary-token transition-colors duration-fast',
+                      'hover:border-default hover:bg-surface-2 hover:text-primary-token',
+                      'focus:outline-none focus:ring-2 focus:ring-accent/20 focus:ring-offset-2'
+                    )}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Chat view - messages + input at bottom
+        <>
+          {/* Messages area */}
+          <div className='flex-1 overflow-y-auto px-4 py-6'>
+            <div className='mx-auto max-w-2xl space-y-6'>
+              {messages.map(message => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    'flex gap-3',
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  )}
+                >
+                  {message.role === 'assistant' && (
+                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                      <BrandLogo size={16} tone='auto' />
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      'max-w-[80%] rounded-2xl px-4 py-3',
+                      message.role === 'user'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-surface-2 text-primary-token'
+                    )}
+                  >
+                    <div className='whitespace-pre-wrap text-sm leading-relaxed'>
+                      {getMessageText(message.parts)}
+                    </div>
+                  </div>
+                  {message.role === 'user' && (
+                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                      <User className='h-4 w-4 text-secondary-token' />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                <div className='flex gap-3'>
+                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                    <BrandLogo size={16} tone='auto' />
+                  </div>
+                  <div className='rounded-2xl bg-surface-2 px-4 py-3'>
+                    <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Error display in chat view */}
+          {chatError && (
+            <div className='border-t border-subtle bg-error-subtle px-4 py-3'>
+              <div className='mx-auto flex max-w-2xl items-center gap-3'>
+                <AlertCircle className='h-4 w-4 shrink-0 text-error' />
+                <p className='flex-1 text-sm text-primary-token'>
+                  {chatError.message}
+                  {chatError.retryAfter && (
+                    <span className='ml-2 text-secondary-token'>
+                      (retry in {chatError.retryAfter}s)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Input at bottom */}
+          <div className='border-t border-subtle bg-base px-4 py-4'>
+            <form onSubmit={handleSubmit} className='mx-auto max-w-2xl'>
+              <div className='relative'>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  placeholder='Ask a follow-up...'
+                  rows={1}
+                  className={cn(
+                    'w-full resize-none rounded-xl border bg-surface-1 px-4 py-3 pr-14',
+                    'text-primary-token placeholder:text-tertiary-token',
+                    'focus:outline-none focus:ring-2 focus:ring-offset-2',
+                    'transition-colors duration-fast',
+                    'max-h-32',
+                    isOverLimit
+                      ? 'border-error focus:border-error focus:ring-error/20'
+                      : 'border-subtle focus:border-accent focus:ring-accent/20'
+                  )}
+                  onKeyDown={handleKeyDown}
+                  onInput={handleInput}
+                  maxLength={MAX_MESSAGE_LENGTH + 100}
+                  aria-label='Chat message input'
+                />
+                <Button
+                  type='submit'
+                  size='icon'
+                  disabled={
+                    !input.trim() || isLoading || isSubmitting || isOverLimit
+                  }
+                  className='absolute bottom-2 right-2 h-8 w-8 rounded-lg'
+                  aria-label='Send message'
+                >
+                  {isLoading || isSubmitting ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <ArrowUp className='h-4 w-4' />
+                  )}
+                </Button>
+
+                {/* Character count in chat view */}
+                {isNearLimit && (
+                  <div
+                    className={cn(
+                      'absolute bottom-2 left-3 text-xs',
+                      isOverLimit ? 'text-error' : 'text-tertiary-token'
+                    )}
+                  >
+                    {characterCount}/{MAX_MESSAGE_LENGTH}
+                  </div>
+                )}
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

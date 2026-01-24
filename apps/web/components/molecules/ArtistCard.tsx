@@ -1,6 +1,6 @@
 'use client';
 
-import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
+import { type MotionProps, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { Avatar } from '@/components/atoms/Avatar';
 

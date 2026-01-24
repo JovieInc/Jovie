@@ -7,12 +7,14 @@ const {
   mockDbUpdate,
   mockDbInsert,
   mockCaptureError,
+  mockCaptureWarning,
 } = vi.hoisted(() => ({
   mockClerkClient: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbInsert: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockCaptureWarning: vi.fn(),
 }));
 
 // Mock Clerk client
@@ -32,6 +34,7 @@ vi.mock('@/lib/db', () => ({
 // Mock error tracking
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
+  captureWarning: mockCaptureWarning,
 }));
 
 describe('clerk-sync module', () => {

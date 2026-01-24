@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export interface UsernameAvailabilityResult {
@@ -57,7 +58,7 @@ export async function checkUsernameAvailability(
       error: available ? undefined : 'Username is already taken',
     };
   } catch (error) {
-    console.error('Database error checking username:', error);
+    captureError('Database error checking username', error);
     return {
       available: false,
       error: 'Unable to check username availability. Please try again.',
@@ -102,7 +103,7 @@ export async function checkUserHasProfile(
       { clerkUserId }
     );
   } catch (error) {
-    console.error('Error checking user profile:', error);
+    captureError('Error checking user profile', error);
     return false; // Assume no profile on error to allow creation attempt
   }
 }

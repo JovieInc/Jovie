@@ -14,7 +14,7 @@ export function DashboardOverviewMetricsClient({
   profileId,
   profileUrl,
   showActivity = false,
-}: DashboardOverviewMetricsClientProps): JSX.Element {
+}: DashboardOverviewMetricsClientProps): React.ReactElement {
   const { range, refreshSignal } = useDashboardOverviewControls();
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, type MotionProps, motion } from 'framer-motion';
+import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import { containerVariants, itemVariants } from './animation-variants';
 import type { AnimatedListenInterfaceProps } from './types';
 import { useAnimatedListenInterface } from './useAnimatedListenInterface';

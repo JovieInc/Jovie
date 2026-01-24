@@ -10,6 +10,12 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+// Mock Sentry
+vi.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: vi.fn(),
+}));
+
+import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 import { UserJourneyTracker } from '@/lib/monitoring/user-journey';
 
@@ -153,17 +159,16 @@ describe('UserJourneyTracker', () => {
 
     it('should warn when no more steps', () => {
       const tracker = new UserJourneyTracker('checkout', ['step1']);
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       tracker.start();
       tracker.nextStep(); // step1
       tracker.nextStep(); // no more steps
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Journey checkout has no more steps defined'
-      );
-
-      consoleSpy.mockRestore();
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+        category: 'user-journey',
+        message: 'Journey checkout has no more steps defined',
+        level: 'warning',
+      });
     });
 
     it('should return self for chaining', () => {
@@ -221,16 +226,15 @@ describe('UserJourneyTracker', () => {
 
     it('should warn if step not found', () => {
       const tracker = new UserJourneyTracker('checkout', ['step1']);
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       tracker.start();
       tracker.goToStep('nonexistent');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Step nonexistent not found in journey checkout'
-      );
-
-      consoleSpy.mockRestore();
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+        category: 'user-journey',
+        message: 'Step nonexistent not found in journey checkout',
+        level: 'warning',
+      });
     });
 
     it('should include custom data', () => {

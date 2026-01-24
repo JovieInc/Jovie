@@ -30,7 +30,7 @@ interface UseArtistSearchModeReturn {
   error: string | null;
 
   // Refs
-  resultsListRef: React.RefObject<HTMLDivElement>;
+  resultsListRef: React.RefObject<HTMLDivElement | null>;
 
   // Platform styling
   searchPlatform: (typeof ARTIST_SEARCH_PLATFORMS)[number] | undefined;

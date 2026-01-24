@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import type { PhoneMockupPreviewProps } from './types';

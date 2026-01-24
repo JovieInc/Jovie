@@ -5,7 +5,7 @@ import {
   motion,
   useReducedMotion,
   type Variants,
-} from 'framer-motion';
+} from 'motion/react';
 import { cn } from '@/lib/utils';
 
 // Animation constants

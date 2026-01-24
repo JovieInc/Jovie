@@ -3,7 +3,7 @@
  * Reduces cognitive complexity by extracting repeated conditional motion logic.
  */
 
-import type { Variants } from 'framer-motion';
+import type { Variants } from 'motion/react';
 
 /**
  * Motion animation values for fade-up transitions.

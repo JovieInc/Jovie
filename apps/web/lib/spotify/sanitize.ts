@@ -12,6 +12,7 @@
  */
 
 import DOMPurify from 'isomorphic-dompurify';
+import { captureWarning } from '@/lib/error-tracking';
 
 // ============================================================================
 // Types
@@ -152,7 +153,7 @@ export function sanitizeImageUrl(
 
     // Only allow Spotify CDN domains
     if (!ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) {
-      console.warn('[Spotify Sanitize] Blocked non-Spotify image URL', {
+      captureWarning('[Spotify Sanitize] Blocked non-Spotify image URL', {
         url,
         hostname: parsed.hostname,
       });
@@ -164,7 +165,7 @@ export function sanitizeImageUrl(
 
     return parsed.toString();
   } catch {
-    console.warn('[Spotify Sanitize] Invalid image URL format', { url });
+    captureWarning('[Spotify Sanitize] Invalid image URL format', { url });
     return null;
   }
 }
@@ -198,7 +199,7 @@ export function sanitizeExternalUrls(
 
       // Verify domain is in allowed list for this URL type
       if (!allowedDomains.includes(parsed.hostname)) {
-        console.warn(
+        captureWarning(
           '[Spotify Sanitize] Blocked external URL with invalid domain',
           {
             key,
@@ -215,7 +216,7 @@ export function sanitizeExternalUrls(
 
       sanitized[key] = parsed.toString();
     } catch {
-      console.warn('[Spotify Sanitize] Invalid external URL format', {
+      captureWarning('[Spotify Sanitize] Invalid external URL format', {
         key,
         url,
       });
@@ -241,7 +242,7 @@ export function sanitizeSpotifyUrl(
 
     // Must be open.spotify.com
     if (parsed.hostname !== 'open.spotify.com') {
-      console.warn('[Spotify Sanitize] Blocked non-Spotify URL', {
+      captureWarning('[Spotify Sanitize] Blocked non-Spotify URL', {
         url,
         hostname: parsed.hostname,
       });
@@ -253,7 +254,7 @@ export function sanitizeSpotifyUrl(
 
     return parsed.toString();
   } catch {
-    console.warn('[Spotify Sanitize] Invalid Spotify URL format', { url });
+    captureWarning('[Spotify Sanitize] Invalid Spotify URL format', { url });
     return null;
   }
 }

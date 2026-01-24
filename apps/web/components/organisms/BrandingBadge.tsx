@@ -1,13 +1,13 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { useUserSafe } from '@/hooks/useClerkSafe';
 
 /**
  * Branding badge that shows "Made with Jovie" for free plan users
  * Hidden for Pro plan users
  */
 export function BrandingBadge() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useUserSafe();
 
   // Show a placeholder while loading to avoid layout shift
   if (!isLoaded) {

@@ -10,7 +10,9 @@ export const PERFORMANCE_THRESHOLDS = {
   warningMultiplier: 0.5, // 50% of max = warning
 
   // Connection and retry settings
-  maxRetries: 3,
+  // 4 retries with exponential backoff: 1s + 2s + 4s + 8s = 15s total retry window
+  // This allows recovery from Neon cold starts (can take 10-15s)
+  maxRetries: 4,
   retryDelay: 1000, // 1 second base delay
   retryBackoffMultiplier: 2,
 } as const;

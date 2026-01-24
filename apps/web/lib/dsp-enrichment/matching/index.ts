@@ -8,6 +8,7 @@
 
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import type {
   AppleMusicTrack,
   DspProviderId,
@@ -130,9 +131,12 @@ export function convertAppleMusicToIsrcMatches(
 
       // Skip tracks without a valid artist ID - we can't aggregate without it
       if (!artistId) {
-        console.warn(
-          `[convertAppleMusicToIsrcMatches] Skipping ISRC ${normalizedIsrc}: missing artist ID`
-        );
+        Sentry.addBreadcrumb({
+          category: 'dsp-matching',
+          message: `Skipping ISRC: missing artist ID`,
+          level: 'warning',
+          data: { isrc: normalizedIsrc },
+        });
         continue;
       }
 

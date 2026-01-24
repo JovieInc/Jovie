@@ -13,7 +13,7 @@ import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { cache } from 'react';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { type DbType } from '@/lib/db';
+import { type DbType, sqlAny } from '@/lib/db';
 import {
   type CreatorProfile,
   clickEvents,
@@ -170,7 +170,7 @@ async function fetchDashboardDataWithSession(
       dbClient
         .select({
           totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ANY(${DSP_PLATFORMS}))`,
+          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
         })
         .from(socialLinks)
         .where(
@@ -205,6 +205,8 @@ async function fetchDashboardDataWithSession(
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
+    // Convert to ISO string for proper SQL parameter formatting
+    const startOfMonthISO = startOfMonth.toISOString();
 
     const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
       dbClient
@@ -216,7 +218,7 @@ async function fetchDashboardDataWithSession(
             COALESCE(
               SUM(
                 CASE
-                  WHEN ${tips.createdAt} >= ${startOfMonth}
+                  WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp
                   THEN ${tips.amountCents}
                   ELSE 0
                 END

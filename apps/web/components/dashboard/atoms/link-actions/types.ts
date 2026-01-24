@@ -21,8 +21,8 @@ export interface UseLinkActionsMenuReturn {
   menuId: string;
   focusedIndex: number | null;
   menuItems: MenuItem[];
-  triggerRef: React.RefObject<HTMLButtonElement>;
-  menuRef: React.RefObject<HTMLDivElement>;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   itemRefs: React.MutableRefObject<(HTMLButtonElement | null)[]>;
   setOpen: (next: boolean) => void;
   handleKeyDown: (e: React.KeyboardEvent) => void;

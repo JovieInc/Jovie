@@ -9,6 +9,39 @@ type BuildCspOptions = {
 };
 
 /**
+ * SHA-256 hashes for inline scripts injected by third-party libraries.
+ * These scripts run before nonces are available (e.g., preventing FOUC).
+ *
+ * To regenerate hashes when libraries update:
+ * 1. Run the app locally: `pnpm --filter=@jovie/web dev`
+ * 2. View page source and find the inline <script> tags
+ * 3. Copy the script content (without <script> tags)
+ * 4. Generate hash: `echo -n 'script content here' | openssl sha256 -binary | base64`
+ * 5. Format as: 'sha256-<hash>'
+ *
+ * Common causes of CSP violations (JOVIE-WEB-52):
+ * - Library version updates changing inline script content
+ * - Configuration changes affecting script generation
+ */
+const INLINE_SCRIPT_HASHES = {
+  /**
+   * Clerk inline script hash (@clerk/nextjs)
+   * This script handles Clerk initialization before hydration.
+   * Hash may need updating when @clerk/nextjs version changes.
+   */
+  clerk: "'sha256-U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8='",
+
+  /**
+   * next-themes inline script hash (v0.4.6)
+   * This script prevents flash of unstyled content (FOUC) by applying
+   * the theme class before React hydration.
+   * Hash may need updating when next-themes version or ThemeProvider config changes.
+   * Config: attribute='class', storageKey='jovie-theme', enableSystem=true
+   */
+  nextThemes: "'sha256-iK+F03M7k3TWfO9vSjPo8wTaJ5NWMGiY6ghQMBSGTkU='",
+};
+
+/**
  * Builds the array of CSP directives (without report directives).
  * This is the core policy shared by both enforcing and report-only modes.
  */
@@ -25,8 +58,8 @@ const buildCspDirectives = ({
     [
       "script-src 'self'",
       `'nonce-${nonce}'`,
-      "'sha256-U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8='", // Clerk inline script hash
-      "'sha256-iK+F03M7k3TWfO9vSjPo8wTaJ5NWMGiY6ghQMBSGTkU='", // Theme script hash (next-themes)
+      INLINE_SCRIPT_HASHES.clerk,
+      INLINE_SCRIPT_HASHES.nextThemes,
       isDev ? "'unsafe-eval'" : null,
       'https://va.vercel-scripts.com',
       'https://vitals.vercel-insights.com',

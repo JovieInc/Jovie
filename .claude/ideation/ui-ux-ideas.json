@@ -1,0 +1,348 @@
+{
+  "generated_at": "2026-01-24T17:00:00Z",
+  "scope": "apps/web",
+  "linear_issues_checked": 0,
+  "ideas": [
+    {
+      "id": "uiux-001",
+      "title": "Replace hardcoded hex colors with design tokens in WaitlistSpotifySearch",
+      "description": "Replace numerous hardcoded hex colors (e.g., #d7d9de, #2c2e33, #0f1011, #1DB954, #6c78e6) with Tailwind design tokens",
+      "rationale": "Hardcoded colors break theme consistency and make dark mode maintenance difficult. The design token system in packages/ui/theme/tokens.ts provides proper semantic tokens",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx",
+        "apps/web/components/waitlist/WaitlistSocialStep.tsx"
+      ],
+      "current_state": "Uses hardcoded hex colors like border-[#d7d9de], bg-[#0f1011], text-[#1DB954], focus-within:ring-[#6c78e6]/40",
+      "proposed_change": "Replace with design tokens: border-subtle, bg-surface-0, text-brand-spotify, focus-within:ring-accent/40. Use cn() for conditional classes",
+      "user_benefit": "Consistent appearance across themes, better dark mode support, easier maintenance",
+      "effort": "low",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-002",
+      "title": "Add aria-label to DSPButton for screen reader accessibility",
+      "description": "DSPButton component lacks an aria-label, relying only on visible text 'Open in {name}'",
+      "rationale": "Screen reader users need clear context. The button opens external links and should indicate this behavior accessibly",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/atoms/DSPButton.tsx"
+      ],
+      "current_state": "Button has no aria-label, uses dangerouslySetInnerHTML for logo SVG without accessible alternative",
+      "proposed_change": "Add aria-label={`Open in ${name} (opens in new window)`} and ensure SVG logo has aria-hidden='true'",
+      "user_benefit": "Screen reader users understand button purpose and behavior",
+      "effort": "low",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-003",
+      "title": "Replace hardcoded disabled colors in DSPButton with design tokens",
+      "description": "DSPButton uses inline styles with hardcoded colors #9CA3AF and #FFFFFF for disabled state",
+      "rationale": "Inline hardcoded colors bypass theme system and create inconsistency",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/atoms/DSPButton.tsx"
+      ],
+      "current_state": "Uses style={{ backgroundColor: disabled ? '#9CA3AF' : backgroundColor, color: disabled ? '#FFFFFF' : textColor }}",
+      "proposed_change": "Use Tailwind disabled: variants with design tokens: disabled:bg-surface-2 disabled:text-tertiary-token",
+      "user_benefit": "Consistent disabled state appearance matching design system",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-004",
+      "title": "Add focus-visible ring to BillingDashboard loading skeleton",
+      "description": "BillingDashboard loading skeleton does not have visible focus indicators for accessibility",
+      "rationale": "Loading skeletons should have proper focus management for screen reader users navigating with keyboard",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/organisms/BillingDashboard.tsx"
+      ],
+      "current_state": "Loading skeleton uses aria-busy but no focus management. Skeleton divs have no sr-only description",
+      "proposed_change": "Add aria-live='polite' and sr-only descriptive text: 'Loading billing information'",
+      "user_benefit": "Screen reader users are informed that content is loading",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-005",
+      "title": "Add consistent empty state illustration to admin creator profiles table",
+      "description": "AdminCreatorProfilesUnified empty state shows text only without visual illustration",
+      "rationale": "Visual empty states improve UX by clearly communicating the lack of content and possible actions",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx"
+      ],
+      "current_state": "Shows minimal text: 'No creator profiles found' in a div",
+      "proposed_change": "Use EmptyState component pattern like in TippingEmptyState with illustration, heading, and description",
+      "user_benefit": "Clearer visual feedback when no data exists, with actionable guidance",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-006",
+      "title": "Add motion-reduce support to WaitlistSpotifySearch loading spinner",
+      "description": "Loading spinner in dropdown uses animate-spin without motion-reduce alternative",
+      "rationale": "Users with vestibular disorders may experience discomfort from spinning animations",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx",
+        "apps/web/components/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx"
+      ],
+      "current_state": "Uses animate-spin class without motion-reduce:animate-none modifier",
+      "proposed_change": "Add motion-reduce:animate-none to all animate-spin instances. Reference LoadingSpinner pattern which correctly uses motion-reduce:animate-[spin_1.2s_linear_infinite]",
+      "user_benefit": "Respects user preference for reduced motion, improves accessibility",
+      "effort": "low",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-007",
+      "title": "Add keyboard shortcut hints to theme toggle",
+      "description": "ThemeToggleSegmented has keyboard shortcut functionality but hints are only in sr-only span",
+      "rationale": "Keyboard shortcuts should be discoverable by all users, not just screen reader users",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx"
+      ],
+      "current_state": "Uses tooltips with TooltipShortcut component. Shortcut hints exist but may not be visible on hover",
+      "proposed_change": "Ensure TooltipShortcut is visible on hover/focus and displays 'L' and 'D' keyboard shortcuts visually",
+      "user_benefit": "Users discover keyboard shortcuts faster, improving efficiency",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-008",
+      "title": "Add error recovery action to WaitlistSpotifySearch search error state",
+      "description": "Search error state shows 'Search failed. Try again.' but no retry button",
+      "rationale": "Error states should provide clear recovery actions, not just describe the problem",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx"
+      ],
+      "current_state": "Shows text: 'Search failed. Try again.' with no actionable button",
+      "proposed_change": "Add a 'Retry' button that clears the error and allows re-search. Follow ErrorBanner pattern with action buttons",
+      "user_benefit": "Users can easily recover from errors without manually clearing and retyping",
+      "effort": "low",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-009",
+      "title": "Standardize border radius values across waitlist components",
+      "description": "WaitlistSpotifySearch uses hardcoded rounded-[6px] while design system uses rounded-lg (8px)",
+      "rationale": "Inconsistent border radius creates visual discord with rest of app",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx",
+        "apps/web/components/waitlist/WaitlistSocialStep.tsx"
+      ],
+      "current_state": "Uses rounded-[6px] for inputs and dropdowns",
+      "proposed_change": "Replace rounded-[6px] with rounded-lg from design tokens (packages/ui/theme/tokens.ts radii.lg)",
+      "user_benefit": "Consistent visual language across the application",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-010",
+      "title": "Add loading state to Change button in WaitlistSpotifySearch URL mode",
+      "description": "Change button in URL mode has no loading state when artist is selected",
+      "rationale": "Buttons that trigger state changes should indicate processing to prevent double-clicks",
+      "category": "interaction",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx"
+      ],
+      "current_state": "Change button only has disabled={isSubmitting} but no visual loading indicator",
+      "proposed_change": "Use Button component with loading prop from @jovie/ui instead of plain button element",
+      "user_benefit": "Clear feedback during state transitions, prevents confusion",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-011",
+      "title": "Add focus trap to dropdown results in WaitlistSpotifySearch",
+      "description": "Dropdown results list allows focus to escape while navigating with keyboard",
+      "rationale": "Combobox/listbox patterns should trap focus within results for proper keyboard navigation",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx",
+        "apps/web/components/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx"
+      ],
+      "current_state": "Uses tabIndex={-1} on options but Tab key closes dropdown instead of cycling through options",
+      "proposed_change": "Implement proper focus trap when dropdown is open, only Tab+Escape should close dropdown",
+      "user_benefit": "Keyboard users can navigate all options without accidentally closing dropdown",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-012",
+      "title": "Replace gray-* color classes with design token equivalents in TippingEmptyState",
+      "description": "TippingEmptyState uses Tailwind gray-800, gray-100, gray-600, gray-400 instead of design tokens",
+      "rationale": "Hardcoded gray scale bypasses theme system and creates inconsistency with rest of app",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/tipping/EmptyStates.tsx"
+      ],
+      "current_state": "Uses text-gray-800 dark:text-gray-100, text-gray-600 dark:text-gray-400",
+      "proposed_change": "Replace with text-primary-token, text-secondary-token from design system",
+      "user_benefit": "Consistent text colors across the application",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-013",
+      "title": "Add skeleton loading to ReleasesEmptyState search results",
+      "description": "ReleasesEmptyState loading skeleton uses inline bg-surface-3 which is correct but could use LoadingSkeleton component for consistency",
+      "rationale": "Using shared LoadingSkeleton component ensures consistent loading patterns",
+      "category": "performance",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx"
+      ],
+      "current_state": "Uses inline divs with animate-pulse and bg-surface-3",
+      "proposed_change": "Use LoadingSkeleton component from @/components/molecules/LoadingSkeleton for consistency",
+      "user_benefit": "Consistent loading skeleton appearance with proper accessibility attributes",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-014",
+      "title": "Add aria-describedby to BillingDashboard error state buttons",
+      "description": "ErrorBanner action buttons don't have aria-describedby linking to error description",
+      "rationale": "Screen reader users should understand what error the retry button addresses",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/organisms/BillingDashboard.tsx",
+        "apps/web/components/feedback/ErrorBanner.tsx"
+      ],
+      "current_state": "Buttons in ErrorBanner have no aria-describedby linking them to error message",
+      "proposed_change": "Add id to error description and aria-describedby to action buttons referencing it",
+      "user_benefit": "Screen reader users understand context of action buttons",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-015",
+      "title": "Add confirmation feedback after CopyToClipboardButton success",
+      "description": "CopyToClipboardButton shows success icon but no persistent confirmation message",
+      "rationale": "Users may miss the brief icon change, especially if they look away after clicking",
+      "category": "interaction",
+      "affected_files": [
+        "apps/web/components/dashboard/molecules/CopyToClipboardButton.tsx"
+      ],
+      "current_state": "Changes icon to Check and uses sr-only aria-live announcement",
+      "proposed_change": "Add a brief toast notification or visible 'Copied!' text that persists for 2 seconds",
+      "user_benefit": "Clear visual confirmation of successful copy action",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-016",
+      "title": "Add touch target size check to social link icons",
+      "description": "SocialLink component uses h-10 w-10 (40px) which is below recommended 44px minimum",
+      "rationale": "WCAG recommends minimum 44x44px touch targets for mobile accessibility",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/molecules/SocialLink.tsx"
+      ],
+      "current_state": "Uses h-10 w-10 (40px x 40px) for touch target",
+      "proposed_change": "Increase to h-11 w-11 (44px x 44px) or add padding to meet minimum touch target",
+      "user_benefit": "Easier to tap on mobile devices, especially for users with motor impairments",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-017",
+      "title": "Add visible focus ring to waitlist platform selection chips",
+      "description": "WaitlistSocialStep platform chips have focus-visible ring but using hardcoded color",
+      "rationale": "Focus indicators should use design system colors for consistency",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/waitlist/WaitlistSocialStep.tsx"
+      ],
+      "current_state": "Uses focus-visible:ring-[#6c78e6]/40 with hardcoded color",
+      "proposed_change": "Replace with focus-visible:ring-accent/40 from design tokens",
+      "user_benefit": "Consistent focus ring colors matching theme",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-018",
+      "title": "Add optimistic UI feedback to SocialLink click handler",
+      "description": "SocialLink click handler has async tracking but no immediate visual feedback",
+      "rationale": "Users should see immediate feedback when clicking links, even before tracking completes",
+      "category": "interaction",
+      "affected_files": [
+        "apps/web/components/molecules/SocialLink.tsx"
+      ],
+      "current_state": "handleClick is async but provides no visual loading state. Deep link may take time to resolve",
+      "proposed_change": "Add brief loading indicator or scale animation while deep link is being processed",
+      "user_benefit": "Users know their click was registered, reducing confusion and double-clicks",
+      "effort": "medium",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-019",
+      "title": "Add announcement for DashboardOverviewSkeleton completion",
+      "description": "DashboardOverviewSkeleton has aria-busy but no announcement when loading completes",
+      "rationale": "Screen reader users should be notified when content finishes loading",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx"
+      ],
+      "current_state": "Uses aria-busy='true' and aria-live='polite' but parent component may not announce completion",
+      "proposed_change": "Ensure parent component updates aria-busy='false' and optionally announces 'Dashboard loaded'",
+      "user_benefit": "Screen reader users know when they can interact with loaded content",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-020",
+      "title": "Consolidate duplicate LoadingSkeleton imports",
+      "description": "Multiple components import LoadingSkeleton from different relative paths",
+      "rationale": "Consistent import paths improve maintainability and prevent import confusion",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/tipping/EmptyStates.tsx",
+        "apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx"
+      ],
+      "current_state": "Some components import from @/components/molecules/LoadingSkeleton, others may use relative paths",
+      "proposed_change": "Ensure all LoadingSkeleton imports use @/components/molecules/LoadingSkeleton alias",
+      "user_benefit": "Easier code maintenance and consistent component usage",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
+    }
+  ],
+  "summary": {
+    "total_ideas": 20,
+    "by_category": {
+      "usability": 4,
+      "accessibility": 9,
+      "performance": 1,
+      "visual": 4,
+      "interaction": 3
+    },
+    "by_priority": {
+      "high": 5,
+      "medium": 9,
+      "low": 6
+    }
+  }
+}

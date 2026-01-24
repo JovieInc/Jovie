@@ -14,7 +14,7 @@ import type {
 import { copyTextToClipboard } from './utils';
 
 export interface UseDashboardAudienceTableReturn {
-  tableContainerRef: React.RefObject<HTMLDivElement>;
+  tableContainerRef: React.RefObject<HTMLDivElement | null>;
   headerElevated: boolean;
   openMenuRowId: string | null;
   setOpenMenuRowId: (id: string | null) => void;

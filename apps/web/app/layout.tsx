@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
@@ -236,7 +237,22 @@ export default async function RootLayout({
       logger.debug('Bypassing Clerk authentication (no keys provided)');
       // In test/dev mode, continue rendering without Clerk
     } else {
-      // In production, show configuration error
+      // In production, report to Sentry and show configuration error
+      // This helps track intermittent cold start issues where env vars may be unavailable
+      Sentry.captureMessage('Clerk publishableKey missing in production', {
+        level: 'error',
+        tags: {
+          context: 'root_layout_clerk_key_missing',
+          vercel_env: process.env.VERCEL_ENV || 'unknown',
+          node_env: process.env.NODE_ENV,
+        },
+        extra: {
+          has_clerk_key_in_process_env:
+            !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+          vercel_region: process.env.VERCEL_REGION,
+        },
+      });
+
       return (
         <html lang='en' suppressHydrationWarning>
           {headContent}

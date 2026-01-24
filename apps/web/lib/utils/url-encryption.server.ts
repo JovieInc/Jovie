@@ -2,6 +2,7 @@ import 'server-only';
 
 import crypto from 'crypto';
 import { env } from '@/lib/env-server';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import type { EncryptionResult } from './url-encryption';
 
 const ALGORITHM = 'aes-256-gcm';
@@ -33,7 +34,7 @@ if (!isBuildTime && !ENCRYPTION_KEY) {
   }
 
   if (vercelEnv === 'development') {
-    console.warn(
+    captureWarning(
       '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set. ' +
         'URL encryption will fail in this environment. Generate a secure key with: openssl rand -base64 32'
     );
@@ -70,7 +71,7 @@ export function encryptUrl(url: string): EncryptionResult {
       salt: salt.toString('hex'),
     };
   } catch (error) {
-    console.error('[url-encryption] Encryption failed:', error);
+    captureError('[url-encryption] Encryption failed', error);
     throw new Error('Failed to encrypt URL');
   }
 }
@@ -83,7 +84,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
       !encryptionResult.salt
     ) {
       // Log warning for legacy unencrypted data and throw error
-      console.warn(
+      captureWarning(
         '[url-encryption] Attempted to decrypt legacy unencrypted URL data. ' +
           'This data should be re-encrypted with proper encryption.'
       );
@@ -116,7 +117,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
 
     return decryptedBuffer.toString('utf8');
   } catch (error) {
-    console.error('[url-encryption] Decryption failed:', error);
+    captureError('[url-encryption] Decryption failed', error);
     throw new Error('Failed to decrypt URL');
   }
 }

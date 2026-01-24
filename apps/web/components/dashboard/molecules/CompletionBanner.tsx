@@ -3,12 +3,13 @@
 import { CheckCircle, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { captureWarning } from '@/lib/error-tracking';
 
 const COMPLETION_BANNER_STORAGE_KEY =
   'jovie_dashboard_completion_banner_dismissed_v1';
 
 export const CompletionBanner = memo(
-  function CompletionBanner(): JSX.Element | null {
+  function CompletionBanner(): React.ReactElement | null {
     const [dismissed, setDismissed] = useState(false);
 
     useEffect(() => {
@@ -17,8 +18,8 @@ export const CompletionBanner = memo(
         if (stored === '1') {
           setDismissed(true);
         }
-      } catch (error) {
-        console.error('[CompletionBanner] Failed to read localStorage:', error);
+      } catch {
+        captureWarning('[CompletionBanner] Failed to read localStorage');
       }
     }, []);
 
@@ -26,8 +27,8 @@ export const CompletionBanner = memo(
       setDismissed(true);
       try {
         localStorage.setItem(COMPLETION_BANNER_STORAGE_KEY, '1');
-      } catch (error) {
-        console.error('[CompletionBanner] Failed to set localStorage:', error);
+      } catch {
+        captureWarning('[CompletionBanner] Failed to set localStorage');
       }
     }, []);
 

@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 
 // Define alert severity levels
@@ -250,12 +251,17 @@ export class PerformanceAlerts {
     // - Send a Slack notification
     // - Log to a monitoring service
 
-    // For now, we'll just log to console in development
+    // Log alerts as breadcrumbs for debugging
     if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        `[ALERT] ${alertData.severity.toUpperCase()}: ${alertData.metric} = ${alertData.value.toFixed(2)} (threshold: ${alertData.threshold})`,
-        alertData
-      );
+      Sentry.addBreadcrumb({
+        category: 'performance-alert',
+        message: `${alertData.severity.toUpperCase()}: ${alertData.metric} = ${alertData.value.toFixed(2)} (threshold: ${alertData.threshold})`,
+        level:
+          alertData.severity === 'critical' || alertData.severity === 'error'
+            ? 'error'
+            : 'warning',
+        data: alertData,
+      });
     }
 
     return alertData;

@@ -41,7 +41,7 @@ export function StepCard({
   titleLevel = 3,
   ...props
 }: StepCardProps) {
-  const TitleTag = `h${titleLevel}` as keyof JSX.IntrinsicElements;
+  const TitleTag = `h${titleLevel}` as ElementType;
 
   return (
     <Wrapper

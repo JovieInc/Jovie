@@ -1,7 +1,7 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
 import { TrendingUp } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useMemo } from 'react';
 import { Container } from '@/components/site/Container';
 import { JovieProfileUI } from './JovieProfileUI';

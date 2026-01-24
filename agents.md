@@ -190,6 +190,45 @@ Server-only import "@/lib/db" cannot be used in client components.
 Remove the import or remove "use client" if this should be a server component.
 ```
 
+### Database Access (Single Driver Policy)
+
+**ALWAYS use `import { db } from '@/lib/db'`** - this is the canonical database client.
+
+| Correct | Wrong |
+|---------|-------|
+| `import { db } from '@/lib/db'` | `import { db } from '@/lib/db/client'` |
+| `import { withTransaction } from '@/lib/db'` | `import { neon } from '@neondatabase/serverless'` |
+| Use `db.query.*` or `db.select()` | Direct SQL strings outside lib/db |
+
+The project uses `@neondatabase/serverless` with connection pooling (WebSocket-based). The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
+
+### React Hook Guidelines
+
+**Prevent render loops and memory leaks:**
+
+```typescript
+// CORRECT: Stable dependencies
+const callback = useCallback(() => doThing(id), [id]);
+useEffect(() => { ... }, [callback]);
+
+// WRONG: Object/function in deps = infinite loop
+useEffect(() => { ... }, [{ foo }]);           // Object recreated each render
+useEffect(() => { ... }, [() => doThing()]);   // Function recreated each render
+
+// CORRECT: Cleanup subscriptions
+useEffect(() => {
+  const sub = subscribe();
+  return () => sub.unsubscribe();  // Always cleanup!
+}, []);
+
+// WRONG: State update during render
+if (condition) setState(x);  // Causes infinite loop!
+// CORRECT: Use useEffect for conditional state updates
+useEffect(() => {
+  if (condition) setState(x);
+}, [condition]);
+```
+
 ### Styling
 
 - Tailwind utility classes only (no custom CSS unless necessary)

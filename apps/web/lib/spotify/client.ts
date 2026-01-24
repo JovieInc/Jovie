@@ -18,6 +18,7 @@
 
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { type IngestErrorCode, spotifyApiError } from '@/lib/errors/ingest';
 import { spotifyCircuitBreaker } from './circuit-breaker';
 import {
@@ -169,10 +170,9 @@ class SpotifyClientManager {
       });
 
       if (!response.ok) {
-        console.error(
-          '[Spotify Client] Token refresh failed:',
-          response.status
-        );
+        captureError('[Spotify Client] Token refresh failed', null, {
+          status: response.status,
+        });
         this.accessToken = null;
         this.tokenExpiresAt = 0;
         return null;
@@ -185,7 +185,7 @@ class SpotifyClientManager {
 
       return this.accessToken;
     } catch (error) {
-      console.error('[Spotify Client] Token refresh error:', error);
+      captureError('[Spotify Client] Token refresh error', error);
       this.accessToken = null;
       this.tokenExpiresAt = 0;
       return null;
@@ -452,14 +452,14 @@ export async function searchSpotifyArtists(
   limit: number = 5
 ): Promise<SearchArtistResult[]> {
   if (!spotifyClient.isAvailable()) {
-    console.warn('[Spotify] Not available - returning empty results');
+    captureWarning('[Spotify] Not available - returning empty results');
     return [];
   }
 
   try {
     return await spotifyClient.searchArtists(query, limit);
   } catch (error) {
-    console.error('[Spotify] Search failed:', error);
+    captureError('[Spotify] Search failed', error);
     return [];
   }
 }
@@ -474,14 +474,14 @@ export async function getSpotifyArtist(
   artistId: string
 ): Promise<SanitizedArtist | null> {
   if (!spotifyClient.isAvailable()) {
-    console.warn('[Spotify] Not available - returning null');
+    captureWarning('[Spotify] Not available - returning null');
     return null;
   }
 
   try {
     return await spotifyClient.getArtist(artistId);
   } catch (error) {
-    console.error('[Spotify] Get artist failed:', error);
+    captureError('[Spotify] Get artist failed', error);
     return null;
   }
 }

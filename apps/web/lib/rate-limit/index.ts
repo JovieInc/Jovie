@@ -38,9 +38,13 @@ export { parseWindowToMs, RATE_LIMITERS } from './config';
 export {
   // Admin
   adminImpersonateLimiter,
+  // AI Chat
+  aiChatLimiter,
   apiLimiter,
   // Auth & User
   avatarUploadLimiter,
+  // AI Chat convenience function
+  checkAiChatRateLimit,
   checkOnboardingRateLimit,
   // Spotify convenience functions
   checkSpotifyClaimRateLimit,

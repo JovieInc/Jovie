@@ -8,6 +8,8 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 
 const nextConfig = {
   turbopack: {},
+  // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
+  reactCompiler: true,
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -176,11 +178,17 @@ const nextConfig = {
     ];
   },
   experimental: {
+    // Partial Prerendering: Combines static shell with streaming dynamic content
+    // Enables near-instant initial paint while streaming dynamic sections
+    ppr: 'incremental',
+    // Turbopack filesystem cache for faster dev server startup
+    turbopackFileSystemCacheForDev: true,
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
     optimizePackageImports: [
       '@headlessui/react',
       'lucide-react',
+      'simple-icons',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
       '@radix-ui/react-popover',
