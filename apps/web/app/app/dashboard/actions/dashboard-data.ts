@@ -167,10 +167,14 @@ async function fetchDashboardDataWithSession(
           throw error;
         }),
       // Consolidated link count query - counts all active links and music links in one query
+      // Note: DSP_PLATFORMS must be passed as a PostgreSQL array, not individual params
       dbClient
         .select({
           totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ANY(${DSP_PLATFORMS}))`,
+          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ANY(ARRAY[${drizzleSql.join(
+            DSP_PLATFORMS.map(p => drizzleSql`${p}`),
+            drizzleSql`, `
+          )}]))`,
         })
         .from(socialLinks)
         .where(
@@ -205,6 +209,8 @@ async function fetchDashboardDataWithSession(
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
+    // Convert to ISO string for proper SQL parameter formatting
+    const startOfMonthISO = startOfMonth.toISOString();
 
     const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
       dbClient
@@ -216,7 +222,7 @@ async function fetchDashboardDataWithSession(
             COALESCE(
               SUM(
                 CASE
-                  WHEN ${tips.createdAt} >= ${startOfMonth}
+                  WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp
                   THEN ${tips.amountCents}
                   ELSE 0
                 END
