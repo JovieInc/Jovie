@@ -7,6 +7,7 @@ import 'server-only';
 import Stripe from 'stripe';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 
 let stripeSingleton: Stripe | undefined;
 
@@ -109,7 +110,10 @@ export async function getOrCreateCustomer(
 
     return customer;
   } catch (error) {
-    console.error('Error creating/retrieving Stripe customer:', error);
+    captureError('Error creating/retrieving Stripe customer', error, {
+      userId,
+      email,
+    });
     throw new Error('Failed to create or retrieve customer');
   }
 }
@@ -189,18 +193,25 @@ export async function createCheckoutSession({
     };
 
     if (stripeError && typeof stripeError === 'object' && stripeError.message) {
-      console.error('Error creating checkout session:', {
+      captureError('Error creating checkout session', error, {
         type: stripeError.type,
         message: stripeError.message,
         code: stripeError.code,
         param: stripeError.param,
         requestId: stripeError.requestId,
         statusCode: stripeError.statusCode,
+        customerId,
+        priceId,
+        userId,
       });
       throw new Error(stripeError.message);
     }
 
-    console.error('Error creating checkout session:', error);
+    captureError('Error creating checkout session', error, {
+      customerId,
+      priceId,
+      userId,
+    });
     throw new Error('Failed to create checkout session');
   }
 }
@@ -223,7 +234,9 @@ export async function createBillingPortalSession({
 
     return session;
   } catch (error) {
-    console.error('Error creating billing portal session:', error);
+    captureError('Error creating billing portal session', error, {
+      customerId,
+    });
     throw new Error('Failed to create billing portal session');
   }
 }
@@ -243,7 +256,9 @@ export async function getCustomerSubscription(
 
     return subscriptions.data[0] || null;
   } catch (error) {
-    console.error('Error retrieving customer subscription:', error);
+    captureError('Error retrieving customer subscription', error, {
+      customerId,
+    });
     return null;
   }
 }
@@ -258,7 +273,7 @@ export async function cancelSubscription(
     const subscription = await getStripe().subscriptions.cancel(subscriptionId);
     return subscription;
   } catch (error) {
-    console.error('Error canceling subscription:', error);
+    captureError('Error canceling subscription', error, { subscriptionId });
     throw new Error('Failed to cancel subscription');
   }
 }
@@ -276,7 +291,7 @@ export async function getUpcomingInvoice(
     });
     return resp;
   } catch (error) {
-    console.error('Error retrieving upcoming invoice:', error);
+    captureError('Error retrieving upcoming invoice', error, { customerId });
     return null;
   }
 }

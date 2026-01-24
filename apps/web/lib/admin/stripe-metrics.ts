@@ -2,6 +2,7 @@ import 'server-only';
 
 import type Stripe from 'stripe';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 
@@ -185,7 +186,7 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
     return buildSuccessResponse(accumulator);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error loading Stripe metrics:', error);
+    captureError('Error loading Stripe metrics', error);
     return buildErrorResponse(message);
   }
 }
