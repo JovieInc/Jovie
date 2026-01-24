@@ -260,11 +260,11 @@ function initializePoolIfNeeded(
         // - Increased max for higher concurrency under load
         // - Added min to keep connections warm (reduces cold start latency)
         // - Reduced idle timeout since Neon connections are cheap to recreate
-        // - Reduced connection timeout for faster failure detection (retry logic handles recovery)
+        // - Connection timeout allows for Neon cold start (can take 10-15s)
         max: isProduction ? 15 : 3, // Increased from 10 for higher concurrency
         min: isProduction ? 2 : 1, // Keep minimum connections warm
         idleTimeoutMillis: 20000, // 20s idle timeout (reduced from 30s - Neon connections are cheap)
-        connectionTimeoutMillis: 8000, // 8s connection timeout (reduced from 10s - fail faster, retry handles it)
+        connectionTimeoutMillis: 15000, // 15s connection timeout (allows for Neon cold start)
         statement_timeout: 15000, // 15s max query execution time
         query_timeout: 15000, // 15s max query time (includes network latency)
         allowExitOnIdle: !isProduction, // Allow clean shutdown in dev
@@ -277,6 +277,21 @@ function initializePoolIfNeeded(
           message: 'Pool encountered an error, will attempt to recover',
         });
         // Don't throw - let the pool attempt to recover
+      });
+
+      // Monitor pool pressure to detect exhaustion issues
+      _pool.on('acquire', () => {
+        if (_pool && _pool.waitingCount > 2) {
+          Sentry.captureMessage('[db] Pool under pressure', {
+            level: 'warning',
+            extra: {
+              waiting: _pool.waitingCount,
+              total: _pool.totalCount,
+              idle: _pool.idleCount,
+            },
+            tags: { context: 'db_pool_pressure' },
+          });
+        }
       });
 
       // In development, register pool cleanup so hot reloads and Ctrl+C don't leak pools.
