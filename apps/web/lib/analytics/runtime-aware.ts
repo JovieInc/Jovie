@@ -51,7 +51,12 @@ export async function trackEvent(
 
     // Log in development for debugging
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Analytics ${runtime}] ${event}`, eventProperties);
+      Sentry.addBreadcrumb({
+        category: 'analytics',
+        message: `[${runtime}] ${event}`,
+        level: 'info',
+        data: eventProperties,
+      });
     }
 
     // In production, send critical events to Sentry for observability
@@ -68,7 +73,10 @@ export async function trackEvent(
     }
   } catch (error) {
     // Log error but don't throw - analytics should never break the application
-    console.error('[Analytics] Error tracking event:', error);
+    Sentry.captureException(error, {
+      tags: { context: 'analytics_tracking' },
+      extra: { event, properties },
+    });
   }
 }
 
@@ -89,10 +97,18 @@ export async function identifyUser(
     };
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Analytics identify]', distinctId, userProperties);
+      Sentry.addBreadcrumb({
+        category: 'analytics',
+        message: `identify: ${distinctId}`,
+        level: 'info',
+        data: userProperties,
+      });
     }
   } catch (error) {
-    console.error('[Analytics] Error identifying user:', error);
+    Sentry.captureException(error, {
+      tags: { context: 'analytics_identify' },
+      extra: { distinctId, properties },
+    });
   }
 }
 

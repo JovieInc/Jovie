@@ -5,6 +5,8 @@
  * Includes slow query detection and performance monitoring.
  */
 
+import * as Sentry from '@sentry/nextjs';
+
 // Slow query threshold in milliseconds
 const SLOW_QUERY_THRESHOLD_MS = 100;
 // Very slow query threshold (always log, even in production)
@@ -34,7 +36,13 @@ export function logDbError(
     nodeEnv: process.env.NODE_ENV,
   };
 
-  console.error('[DB_ERROR]', JSON.stringify(errorInfo, null, 2));
+  Sentry.captureException(
+    error instanceof Error ? error : new Error(String(error)),
+    {
+      extra: errorInfo,
+      tags: { context: 'db_error', dbContext: context },
+    }
+  );
 }
 
 /**
@@ -46,13 +54,12 @@ export function logDbInfo(
   metadata?: Record<string, unknown>
 ): void {
   if (process.env.NODE_ENV === 'development') {
-    const info = {
-      context,
-      message,
-      timestamp: new Date().toISOString(),
-      metadata,
-    };
-    console.info('[DB_INFO]', JSON.stringify(info, null, 2));
+    Sentry.addBreadcrumb({
+      category: 'database',
+      message: `[${context}] ${message}`,
+      level: 'info',
+      data: metadata,
+    });
   }
 }
 
@@ -90,11 +97,12 @@ export function logSlowQuery(
     ...metadata,
   };
 
-  if (isVerySlow) {
-    console.warn('[DB_SLOW_QUERY]', JSON.stringify(logData));
-  } else {
-    console.info('[DB_SLOW_QUERY]', JSON.stringify(logData));
-  }
+  Sentry.addBreadcrumb({
+    category: 'database',
+    message: `${isVerySlow ? 'Very slow' : 'Slow'} query: ${truncatedQuery.slice(0, 100)}...`,
+    level: isVerySlow ? 'warning' : 'info',
+    data: logData,
+  });
 }
 
 /**

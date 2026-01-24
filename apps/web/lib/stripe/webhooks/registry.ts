@@ -12,6 +12,7 @@
  * - Unhandled event types return null (caller should skip processing)
  */
 
+import { captureWarning } from '@/lib/error-tracking';
 import { checkoutSessionHandler } from './handlers/checkout-handler';
 import { paymentHandler } from './handlers/payment-handler';
 import { subscriptionHandler } from './handlers/subscription-handler';
@@ -46,8 +47,7 @@ function buildRegistry(): HandlerRegistry {
     for (const eventType of handler.eventTypes) {
       // Warn if event type is already registered (indicates a bug)
       if (registry.has(eventType)) {
-        // In production this would be logged; in dev it helps catch bugs
-        console.warn(
+        captureWarning(
           `[Webhook Registry] Event type "${eventType}" is registered by multiple handlers. ` +
             `Only the first handler will be used.`
         );

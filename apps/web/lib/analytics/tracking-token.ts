@@ -9,6 +9,7 @@
  * Validity: 5 minutes (configurable)
  */
 
+import * as Sentry from '@sentry/nextjs';
 import crypto from 'crypto';
 
 // Token validity in milliseconds (5 minutes default)
@@ -112,9 +113,12 @@ export function generateTrackingToken(profileId: string): string {
   if (!isTrackingTokenEnabled()) {
     // Return a placeholder token in development
     if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        '[Tracking Token] TRACKING_TOKEN_SECRET not set - using dev token'
-      );
+      Sentry.addBreadcrumb({
+        category: 'tracking-token',
+        message: 'TRACKING_TOKEN_SECRET not set - using dev token',
+        level: 'warning',
+        data: { profileId },
+      });
       return `${profileId}:${Date.now()}:dev`;
     }
     throw new Error('Tracking token signing not configured');

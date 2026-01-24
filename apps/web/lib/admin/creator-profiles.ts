@@ -14,6 +14,7 @@ import {
 
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
 
 // Default claim token expiration: 30 days
@@ -388,7 +389,11 @@ export async function getAdminCreatorProfiles(
       total,
     };
   } catch (error) {
-    console.error('Error loading admin creator profiles', error);
+    captureError('Error loading admin creator profiles', error, {
+      page,
+      pageSize,
+      search: params.search,
+    });
 
     return {
       profiles: [],

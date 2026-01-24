@@ -5,6 +5,7 @@
  * Provides a consistent interface regardless of the underlying storage mechanism.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
 import { MemoryRateLimiter } from './memory-limiter';
 import { createRedisRateLimiter, isRedisAvailable } from './redis-limiter';
@@ -45,7 +46,14 @@ export class RateLimiter {
       preferRedis: options.preferRedis ?? true,
       warnOnFallback:
         options.warnOnFallback ?? process.env.NODE_ENV === 'production',
-      logger: options.logger ?? console.warn,
+      logger:
+        options.logger ??
+        ((msg: string) =>
+          Sentry.addBreadcrumb({
+            category: 'rate-limiter',
+            message: msg,
+            level: 'warning',
+          })),
     };
 
     // Initialize both backends

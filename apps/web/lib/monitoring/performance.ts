@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 
 declare global {
@@ -55,7 +56,9 @@ export class PerformanceTracker {
     try {
       observer.observe({ entryTypes: ['navigation'] });
     } catch (error) {
-      console.error('Failed to observe navigation timing:', error);
+      Sentry.captureException(error, {
+        extra: { context: 'navigation_timing_observer' },
+      });
     }
 
     if (!globalThis.joviePerformanceObservers) {
@@ -109,7 +112,9 @@ export class PerformanceTracker {
     try {
       observer.observe({ entryTypes: ['resource'] });
     } catch (error) {
-      console.error('Failed to observe resource timing:', error);
+      Sentry.captureException(error, {
+        extra: { context: 'resource_timing_observer' },
+      });
     }
 
     if (!globalThis.joviePerformanceObservers) {

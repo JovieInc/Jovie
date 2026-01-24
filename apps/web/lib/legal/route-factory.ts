@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import path from 'path';
 import { remark } from 'remark';
 import html from 'remark-html';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Creates a legal document route handler that converts markdown to HTML
@@ -35,7 +36,7 @@ export function createLegalDocumentRoute(
         },
       });
     } catch (error) {
-      console.error(`Error loading ${docFilename}:`, error);
+      captureError(`Error loading legal document: ${docFilename}`, error);
       return new NextResponse(`<p>${errorMessage}</p>`, {
         status: 500,
         headers: {

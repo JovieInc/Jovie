@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import {
   EMAIL_FROM_ADDRESS,
   EMAIL_REPLY_TO,
@@ -63,7 +64,10 @@ export class ResendEmailProvider implements EmailProvider {
       const messageText =
         error instanceof Error ? error.message : 'Unknown Resend error';
 
-      console.error('[notifications] Resend sendEmail error', error);
+      captureError('[notifications] Resend sendEmail error', error, {
+        to: message.to,
+        subject: message.subject,
+      });
 
       return {
         channel: 'email' as NotificationDeliveryChannel,

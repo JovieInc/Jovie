@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { transformImageUrl } from '@/lib/images/versioning';
 
 export type FeaturedCreator = {
@@ -49,7 +50,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
       doesTableExist(TABLE_NAMES.creatorProfiles),
       new Promise<boolean>(resolve =>
         setTimeout(() => {
-          console.warn(
+          captureWarning(
             '[FeaturedCreators] Table check timed out after 5s, assuming table does not exist'
           );
           resolve(false);
@@ -58,7 +59,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     ]);
 
     if (!tableExists) {
-      console.warn(
+      captureWarning(
         '[FeaturedCreators] Table check failed or timed out, using fallbacks'
       );
       return [];
@@ -111,24 +112,11 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     );
   } catch (error) {
     // Log error but don't throw - use fallbacks in component
-    console.error('[FeaturedCreators] Query failed:', error);
-
-    // Server-side only: Log to Sentry for monitoring
-    if (typeof window === 'undefined') {
-      try {
-        const Sentry = await import('@sentry/nextjs');
-        Sentry.captureException(error, {
-          tags: { context: 'featured_creators_query' },
-          extra: {
-            message:
-              'Failed to fetch featured creators, component will use fallback avatars',
-          },
-        });
-      } catch (sentryError) {
-        // Sentry logging failed, just continue with console error above
-        console.error('[FeaturedCreators] Sentry logging failed:', sentryError);
-      }
-    }
+    captureError('[FeaturedCreators] Query failed', error, {
+      context: 'featured_creators_query',
+      message:
+        'Failed to fetch featured creators, component will use fallback avatars',
+    });
 
     // Return empty array - component already has fallback avatars
     return [];
@@ -216,7 +204,7 @@ export function invalidateFeaturedCreatorsCache(): void {
   try {
     revalidateTag('featured-creators', 'max');
   } catch (error) {
-    console.error('[FeaturedCreators] Failed to invalidate cache:', error);
+    captureError('[FeaturedCreators] Failed to invalidate cache', error);
     // Fail silently - cache will eventually expire on its own
   }
 }

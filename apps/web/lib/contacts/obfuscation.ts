@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/nextjs';
+
 export interface EncodedContactPayload {
   type: 'email' | 'phone';
   value: string;
@@ -51,7 +53,12 @@ export function decodeContactPayload(
     if (!parsed.value) return null;
     return parsed;
   } catch (error) {
-    console.warn('Failed to decode contact payload', error);
+    Sentry.addBreadcrumb({
+      category: 'contacts',
+      message: 'Failed to decode contact payload',
+      level: 'warning',
+      data: { error: error instanceof Error ? error.message : String(error) },
+    });
     return null;
   }
 }
