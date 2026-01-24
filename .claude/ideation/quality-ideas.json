@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-23T23:30:00.000Z",
+  "generated_at": "2026-01-24T12:00:00.000Z",
   "scope": "apps/web",
   "linear_issues_checked": 100,
   "ideas": [
@@ -239,44 +239,309 @@
       "breaking_change": false,
       "prerequisites": [],
       "related_linear_issues": []
+    },
+    {
+      "id": "qual-011",
+      "title": "Split lib/hooks/useFormState.ts (705 lines) into focused hook modules",
+      "description": "useFormState.ts is 705 lines combining form state management, retry logic with exponential backoff, error handling, and extensive JSDoc documentation in one hook file.",
+      "rationale": "Hooks should be focused and composable. This file mixes retry orchestration, backoff calculation, and form state concerns that could be separate utilities.",
+      "category": "large_files",
+      "severity": "major",
+      "affected_files": ["apps/web/lib/hooks/useFormState.ts"],
+      "current_state": "705 lines with UseFormStateOptions, calculateBackoffDelay, FormState interface, and extensive JSDoc. Contains retry logic that could be a shared utility.",
+      "proposed_change": "Split into: lib/utils/retry-backoff.ts (calculateBackoffDelay, exponential backoff utilities ~80 lines), lib/hooks/useRetry.ts (generic retry hook ~100 lines), lib/hooks/useFormState.ts (form-specific state ~200 lines). Move JSDoc examples to separate documentation or tests.",
+      "code_example": "// lib/utils/retry-backoff.ts\nexport function calculateBackoffDelay(attempt: number, base: number, max: number): number;\nexport function withJitter(delay: number, range?: number): number;\n\n// lib/hooks/useRetry.ts\nexport function useRetry<T>(options: RetryOptions): RetryState<T>;",
+      "best_practice": "Single Responsibility Principle (SRP), composable hooks",
+      "metrics": {
+        "line_count": 705,
+        "concerns_mixed": 3
+      },
+      "effort": "medium",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-012",
+      "title": "Reorganize lib/dsp-enrichment/types.ts (633 lines) into domain-specific type modules",
+      "description": "dsp-enrichment/types.ts is 633 lines containing provider types, match types, notification types, sync types, and re-exports all in one file.",
+      "rationale": "Large type files become hard to navigate and create circular dependency risks. Domain-specific type modules improve discoverability and co-location with implementation.",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": ["apps/web/lib/dsp-enrichment/types.ts"],
+      "current_state": "633 lines with DspProviderId, DspMatchStatus, ReleaseNotificationType, AppleMusicArtist, AppleMusicTrack, provider response types, and re-exports from schema files",
+      "proposed_change": "Split into: types/providers.ts (DspProviderId, provider configs ~80 lines), types/matching.ts (DspMatchStatus, confidence types ~100 lines), types/notifications.ts (release notification types ~80 lines), types/apple-music.ts (Apple Music API response types ~150 lines). Keep types/index.ts for re-exports.",
+      "best_practice": "Co-location of types with domain, smaller focused modules",
+      "metrics": {
+        "line_count": 633,
+        "type_categories": 5
+      },
+      "effort": "small",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-013",
+      "title": "Replace direct process.env access with validated env module in 45 lib/ files",
+      "description": "Found 45 files in lib/ directly accessing process.env instead of using the validated env module from lib/env.ts or lib/env-server.ts.",
+      "rationale": "Direct process.env access bypasses Zod validation, can return undefined at runtime, and makes it harder to track which env vars are required. The validated env module provides type safety and runtime validation.",
+      "category": "types",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/lib/redis.ts",
+        "apps/web/lib/db/client.ts",
+        "apps/web/lib/db/index.ts",
+        "apps/web/lib/analytics.ts",
+        "apps/web/lib/cookies/consent.ts",
+        "apps/web/lib/rate-limit/redis-limiter.ts",
+        "apps/web/lib/monitoring/regression.ts",
+        "apps/web/lib/security/headers.ts"
+      ],
+      "current_state": "45 files using process.env.* directly in lib/, bypassing Zod validation",
+      "proposed_change": "Replace process.env.VAR with env.VAR from lib/env.ts (client) or lib/env-server.ts (server). Add any missing vars to the env schema. For optional vars, use env.VAR ?? defaultValue pattern.",
+      "code_example": "// Before\nconst redisUrl = process.env.REDIS_URL;\n\n// After\nimport { env } from '@/lib/env-server';\nconst redisUrl = env.REDIS_URL;",
+      "best_practice": "Validated environment configuration, fail-fast on missing vars",
+      "metrics": {
+        "files_with_direct_access": 45,
+        "unvalidated_env_vars": "unknown"
+      },
+      "effort": "medium",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-014",
+      "title": "Extract magic number timeouts into named constants",
+      "description": "Found 30+ hardcoded setTimeout values (1000, 1500, 2000, 2500, 3000, 5000, 6000ms) scattered across components without meaningful names.",
+      "rationale": "Magic numbers obscure intent, make timing changes error-prone, and prevent consistent behavior across similar UI interactions. Named constants document purpose and enable coordinated changes.",
+      "category": "code_smells",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/components/admin/CreatorProfileTableRow.tsx (2000ms copy feedback)",
+        "apps/web/components/admin/UserActionsMenu.tsx (1500ms copy feedback)",
+        "apps/web/components/dashboard/AudienceRowActionsMenu.tsx (1500ms copy feedback)",
+        "apps/web/components/dashboard/organisms/socials-form/useSocialsForm.ts (3000ms success)",
+        "apps/web/components/dashboard/organisms/ListenNowForm.tsx (3000ms success)",
+        "apps/web/app/api/featured-creators/route.ts (3000ms db timeout)",
+        "apps/web/app/api/handle/check/route.ts (3000ms db timeout)"
+      ],
+      "current_state": "30+ hardcoded setTimeout delays with values like 1000, 1500, 2000, 2500, 3000, 5000ms",
+      "proposed_change": "Create lib/constants/timing.ts with named constants: COPY_FEEDBACK_DURATION_MS = 2000, SUCCESS_MESSAGE_DURATION_MS = 3000, DATABASE_TIMEOUT_MS = 5000, ANIMATION_DELAY_MS = 1000. Import and use these constants in all affected files.",
+      "code_example": "// lib/constants/timing.ts\nexport const TIMING = {\n  COPY_FEEDBACK_MS: 2000,\n  SUCCESS_TOAST_MS: 3000,\n  DB_TIMEOUT_MS: 5000,\n  DEBOUNCE_MS: 300,\n} as const;\n\n// Usage\nsetTimeout(() => setCopied(false), TIMING.COPY_FEEDBACK_MS);",
+      "best_practice": "Named constants over magic numbers",
+      "metrics": {
+        "magic_timeout_count": 30
+      },
+      "effort": "small",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-015",
+      "title": "Split large page components ([username]/page.tsx 570 lines, waitlist/page.tsx 550 lines)",
+      "description": "Dynamic route pages [username]/page.tsx (570 lines) and [username]/[slug]/page.tsx (539 lines) contain metadata generation, data fetching, JSON-LD structured data, and rendering logic all in one file.",
+      "rationale": "Page files should primarily orchestrate data fetching and composition. Embedding structured data generation, helper functions, and complex rendering makes pages hard to test and maintain.",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/app/[username]/page.tsx (570 lines)",
+        "apps/web/app/[username]/[slug]/page.tsx (539 lines)",
+        "apps/web/app/waitlist/page.tsx (550 lines)"
+      ],
+      "current_state": "[username]/page.tsx has generateProfileStructuredData (50+ lines), data fetching helpers, metadata generation, and component rendering. Similar patterns in other page files.",
+      "proposed_change": "Extract: lib/seo/structured-data/profile.ts (JSON-LD generation), lib/seo/structured-data/release.ts (release JSON-LD), components/profile/ProfilePageContent.tsx (main rendering). Page files become thin orchestration layers under 150 lines.",
+      "code_example": "// app/[username]/page.tsx after refactor\nimport { generateProfileMetadata } from '@/lib/seo/metadata/profile';\nimport { ProfilePageContent } from '@/components/profile/ProfilePageContent';\nimport { getProfilePageData } from '@/lib/services/profile';\n\nexport const generateMetadata = generateProfileMetadata;\n\nexport default async function ProfilePage({ params }) {\n  const data = await getProfilePageData(params.username);\n  return <ProfilePageContent data={data} />;\n}",
+      "best_practice": "Page components as thin orchestration layers",
+      "metrics": {
+        "username_page_lines": 570,
+        "slug_page_lines": 539,
+        "waitlist_page_lines": 550
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-016",
+      "title": "Reduce deep nesting in 30+ files (16+ indentation levels)",
+      "description": "Found 30+ files with code indented 16+ spaces (4+ nesting levels), indicating complex control flow that's hard to follow and test.",
+      "rationale": "Deep nesting increases cognitive load, makes code paths hard to trace, and often indicates missing abstractions. Flat code is easier to read and test.",
+      "category": "complexity",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/lib/db/index.ts",
+        "apps/web/components/dashboard/organisms/releases/cells/ProviderCell.tsx",
+        "apps/web/components/dashboard/organisms/releases/ReleaseTableRow.tsx",
+        "apps/web/components/dashboard/organisms/grouped-links/GroupedLinksManager.tsx",
+        "apps/web/components/dashboard/organisms/DashboardOverviewToolbar.tsx",
+        "apps/web/components/profile/animated-listen-interface/AnimatedListenInterface.tsx"
+      ],
+      "current_state": "30+ files with deeply nested code (16+ spaces indentation). Common patterns: nested conditionals, nested callbacks, nested JSX with conditionals.",
+      "proposed_change": "Apply early return pattern to reduce nesting. Extract nested logic into helper functions. Use guard clauses. For JSX, extract conditional blocks into separate components.",
+      "code_example": "// Before (nested)\nif (user) {\n  if (user.isActive) {\n    if (user.hasPermission) {\n      doThing();\n    }\n  }\n}\n\n// After (flat with early returns)\nif (!user) return;\nif (!user.isActive) return;\nif (!user.hasPermission) return;\ndoThing();",
+      "best_practice": "Early return pattern, flat code",
+      "metrics": {
+        "deeply_nested_files": 30
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-017",
+      "title": "Audit and reduce @ts-ignore/@ts-expect-error comments (19 occurrences in production)",
+      "description": "Found 19 @ts-ignore and @ts-expect-error comments in production code (excluding tests), bypassing TypeScript's type checking.",
+      "rationale": "Type suppression comments often hide real type issues that can cause runtime errors. They should be audited - either fix the underlying type issue or document why suppression is necessary.",
+      "category": "types",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/hooks/useTouchDevice.ts (@ts-expect-error for msMaxTouchPoints)",
+        "apps/web/components/providers/ErrorBoundary.tsx (@ts-expect-error for gtag)",
+        "apps/web/tests/helpers/clerk-auth.ts (@ts-expect-error for Clerk window)",
+        "apps/web/tests/e2e/dashboard.access-control.spec.ts (5 @ts-ignore)"
+      ],
+      "current_state": "19 type suppression comments - some justified (browser API quirks), some hiding real issues",
+      "proposed_change": "For each suppression: 1) Determine if underlying type can be fixed, 2) If suppression is necessary, add detailed comment explaining why, 3) Consider creating proper type declarations for external APIs (gtag, msMaxTouchPoints).",
+      "code_example": "// Before\n// @ts-expect-error\nwindow.gtag('event', ...);\n\n// After - create declaration\ndeclare global {\n  interface Window {\n    gtag?: (command: string, ...args: unknown[]) => void;\n  }\n}\nwindow.gtag?.('event', ...);",
+      "best_practice": "TypeScript strict mode, proper type declarations",
+      "metrics": {
+        "ts_ignore_count": 19,
+        "production_code": 8,
+        "test_code": 11
+      },
+      "effort": "small",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-018",
+      "title": "Replace useEffect+fetch anti-pattern with TanStack Query",
+      "description": "Found 3 components using useEffect with fetch for data loading instead of TanStack Query, violating Jovie's data fetching standards.",
+      "rationale": "useEffect+fetch lacks caching, deduplication, loading states, error handling, and refetch logic that TanStack Query provides. It's also prone to race conditions and memory leaks.",
+      "category": "code_smells",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/components/admin/ImpersonationBanner.tsx",
+        "apps/web/components/dashboard/organisms/DashboardAnalyticsCards.tsx",
+        "apps/web/components/dashboard/organisms/DashboardPreview.tsx"
+      ],
+      "current_state": "3 components using useEffect(() => { fetch(...) }, []) pattern for client-side data loading",
+      "proposed_change": "Migrate to TanStack Query using useQuery hook. Create query functions in lib/queries/ following existing patterns. Leverage query caching, automatic refetch, and proper loading/error states.",
+      "code_example": "// Before\nuseEffect(() => {\n  fetch('/api/data').then(r => r.json()).then(setData);\n}, []);\n\n// After\nconst { data, isLoading, error } = useQuery({\n  queryKey: ['data'],\n  queryFn: () => fetch('/api/data').then(r => r.json()),\n});",
+      "best_practice": "TanStack Query for data fetching (Jovie standard)",
+      "metrics": {
+        "files_with_anti_pattern": 3
+      },
+      "effort": "small",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-019",
+      "title": "Split large table cell components (AvailabilityCell 460 lines, ProviderCell 434 lines)",
+      "description": "Table cell components AvailabilityCell.tsx (460 lines) and ProviderCell.tsx (434 lines) contain complex rendering logic, copy handlers, and state management for what should be presentational cells.",
+      "rationale": "Cell components should be simple renderers. Complex logic in cells makes tables slow to render and cells hard to test. Business logic should be in hooks or parent components.",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/releases/cells/AvailabilityCell.tsx (460 lines)",
+        "apps/web/components/dashboard/organisms/releases/cells/ProviderCell.tsx (434 lines)"
+      ],
+      "current_state": "AvailabilityCell: 460 lines with copy handling, tooltip logic, status rendering. ProviderCell: 434 lines with provider icons, copy handlers, link generation, status badges.",
+      "proposed_change": "Extract: hooks/useCopyToClipboard.ts (shared copy logic), atoms/ProviderIcon.tsx, atoms/StatusBadge.tsx, molecules/CopyableLink.tsx. Cells become composition of smaller components under 100 lines each.",
+      "best_practice": "Component composition, atomic design",
+      "metrics": {
+        "availability_cell_lines": 460,
+        "provider_cell_lines": 434
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-020",
+      "title": "Split lib/auth files (gate.ts 560 lines, clerk-sync.ts 516 lines)",
+      "description": "Auth library files gate.ts (560 lines) and clerk-sync.ts (516 lines) mix multiple concerns: state resolution, database queries, redirect logic, and sync operations.",
+      "rationale": "Large auth files create maintenance burden and make it hard to understand the auth flow. Separating concerns enables focused testing and clearer ownership.",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/lib/auth/gate.ts (560 lines)",
+        "apps/web/lib/auth/clerk-sync.ts (516 lines)"
+      ],
+      "current_state": "gate.ts: 560 lines with UserState enum, AuthGateResult interface, resolveUserState, getWaitlistAccess, redirect helpers. clerk-sync.ts: 516 lines with email sync, profile sync, user creation.",
+      "proposed_change": "Split gate.ts into: auth/state-types.ts (enums, interfaces ~80 lines), auth/state-resolver.ts (resolveUserState ~150 lines), auth/redirect-helpers.ts (getRedirectForState, canAccessApp ~80 lines). Split clerk-sync.ts into: auth/sync/email.ts, auth/sync/profile.ts, auth/sync/user.ts.",
+      "best_practice": "Single Responsibility Principle (SRP)",
+      "metrics": {
+        "gate_lines": 560,
+        "clerk_sync_lines": 516
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
     }
   ],
   "metadata": {
-    "files_analyzed": 1589,
+    "files_analyzed": 1650,
     "large_files_found": {
-      "lib_over_600_lines": 5,
-      "components_over_400_lines": 8
+      "lib_over_600_lines": 8,
+      "components_over_400_lines": 12,
+      "pages_over_500_lines": 3
     },
     "any_usages_found": 149,
     "console_usages_found": 358,
     "deprecated_exports": 54,
     "todo_comments": 16,
+    "ts_ignore_comments": 19,
+    "process_env_direct_access": 45,
+    "magic_timeout_values": 30,
+    "deeply_nested_files": 30,
     "potential_duplications": 0
   },
   "summary": {
-    "total_ideas": 10,
+    "total_ideas": 20,
     "by_category": {
-      "large_files": 4,
-      "code_smells": 2,
-      "types": 3,
-      "dead_code": 1
+      "large_files": 9,
+      "code_smells": 4,
+      "types": 5,
+      "dead_code": 1,
+      "complexity": 1
     },
     "by_severity": {
       "critical": 0,
-      "major": 5,
-      "minor": 5,
+      "major": 8,
+      "minor": 12,
       "suggestion": 0
     },
     "by_effort": {
       "trivial": 0,
-      "small": 1,
-      "medium": 7,
-      "large": 2
+      "small": 4,
+      "medium": 13,
+      "large": 3
     },
     "by_priority": {
-      "high": 3,
-      "medium": 4,
-      "low": 3
+      "high": 5,
+      "medium": 5,
+      "low": 10
     }
   }
 }
