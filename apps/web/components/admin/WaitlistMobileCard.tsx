@@ -11,7 +11,7 @@ import {
   Music,
   Target,
 } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /** Map platform ID to display name */
@@ -51,7 +51,14 @@ export interface WaitlistMobileCardProps {
   onApprove: () => void;
 }
 
-export function WaitlistMobileCard({
+/**
+ * WaitlistMobileCard - Mobile card view for waitlist entries
+ *
+ * Memoized to prevent unnecessary re-renders when list items change.
+ * In list contexts, this prevents all cards from re-rendering when
+ * one card's approveStatus changes or expands.
+ */
+export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
   entry,
   approveStatus,
   onApprove,
@@ -219,4 +226,4 @@ export function WaitlistMobileCard({
       )}
     </div>
   );
-}
+});
