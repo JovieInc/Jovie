@@ -133,3 +133,14 @@ export function isCodeExpired(error: unknown): boolean {
   }
   return false;
 }
+
+/**
+ * Check if a session already exists (user is already signed in)
+ */
+export function isSessionExists(error: unknown): boolean {
+  if (isClerkAPIResponseError(error)) {
+    const code = error.errors[0]?.code;
+    return code === 'session_exists';
+  }
+  return false;
+}
