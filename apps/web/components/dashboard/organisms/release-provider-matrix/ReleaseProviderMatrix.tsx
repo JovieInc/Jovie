@@ -8,15 +8,24 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
-import { useRowSelection } from '@/components/organisms/table';
+import {
+  DisplayMenuDropdown,
+  ExportCSVButton,
+  useRowSelection,
+} from '@/components/organisms/table';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
+import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
+import {
+  getReleasesForExport,
+  RELEASES_CSV_COLUMNS,
+} from './utils/exportReleases';
 
 export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   releases,
@@ -43,6 +52,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleSync,
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
+
+  // Table display preferences (column visibility, density)
+  const {
+    columnVisibility,
+    density,
+    rowHeight,
+    availableColumns,
+    onColumnVisibilityChange,
+    onDensityChange,
+    resetToDefaults,
+  } = useReleaseTablePreferences();
 
   // Row selection
   const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
@@ -219,6 +239,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onSelectionChange={setSelection}
                 bulkActions={bulkActions}
                 onClearSelection={clearSelection}
+                columnVisibility={columnVisibility}
+                rowHeight={rowHeight}
               />
             )}
 
@@ -273,11 +295,37 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   </span>
                 )}
               </span>
-              <div className='flex items-center gap-2'>
+              <div className='flex items-center gap-3'>
                 <span className='text-tertiary-token'>
                   Showing {primaryProviders.length} of{' '}
                   {Object.keys(providerConfig).length} providers
                 </span>
+                <ExportCSVButton
+                  getData={() => getReleasesForExport(rows, selectedIds)}
+                  columns={RELEASES_CSV_COLUMNS}
+                  filename='releases'
+                  label={
+                    selectedIds.size > 0
+                      ? `Export ${selectedIds.size}`
+                      : 'Export'
+                  }
+                  variant='ghost'
+                  size='sm'
+                />
+                <button
+                  type='button'
+                  onClick={resetToDefaults}
+                  className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
+                >
+                  Reset
+                </button>
+                <DisplayMenuDropdown
+                  density={density}
+                  onDensityChange={onDensityChange}
+                  columnVisibility={columnVisibility}
+                  onColumnVisibilityChange={onColumnVisibilityChange}
+                  availableColumns={[...availableColumns]}
+                />
               </div>
             </div>
           )}
