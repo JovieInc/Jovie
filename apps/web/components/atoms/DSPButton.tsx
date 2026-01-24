@@ -34,13 +34,13 @@ export function DSPButton({
   disabled,
   ...props
 }: DSPButtonProps) {
+  const isExternal = /^https?:\/\//i.test(url);
   const handleClick = () => {
     if (disabled) return;
     if (onClick) {
       onClick(dspKey, url);
       return;
     }
-    const isExternal = /^https?:\/\//i.test(url);
     if (isExternal) {
       window.open(url, '_blank', 'noopener,noreferrer');
     } else {
@@ -57,6 +57,7 @@ export function DSPButton({
       onClick={handleClick}
       disabled={disabled}
       size={sizeMap[size]}
+      aria-label={isExternal ? `Open in ${name} (opens in new tab)` : `Open in ${name}`}
       style={{
         backgroundColor: disabled ? '#9CA3AF' : backgroundColor,
         color: disabled ? '#FFFFFF' : textColor,

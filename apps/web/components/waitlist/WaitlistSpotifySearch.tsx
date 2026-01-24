@@ -313,7 +313,7 @@ export function WaitlistSpotifySearch({
           }
         />
         {state === 'loading' && (
-          <div className='w-4 h-4 border-2 border-[#6b6f76] border-t-transparent rounded-full animate-spin' />
+          <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
         )}
       </div>
 
@@ -329,7 +329,7 @@ export function WaitlistSpotifySearch({
               {LOADING_SKELETON_KEYS.map(key => (
                 <div
                   key={key}
-                  className='flex items-center gap-3 animate-pulse'
+                  className='flex items-center gap-3 animate-pulse motion-reduce:animate-none'
                 >
                   <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025]' />
                   <div className='flex-1 space-y-1'>
@@ -350,8 +350,15 @@ export function WaitlistSpotifySearch({
 
           {/* Error state */}
           {state === 'error' && (
-            <div className='p-4 text-center'>
-              <p className='text-sm text-red-400'>Search failed. Try again.</p>
+            <div className='p-4 text-center space-y-2'>
+              <p className='text-sm text-red-400'>Search failed</p>
+              <button
+                type='button'
+                onClick={() => search(searchQuery)}
+                className='text-xs text-accent hover:underline'
+              >
+                Try again
+              </button>
             </div>
           )}
 
