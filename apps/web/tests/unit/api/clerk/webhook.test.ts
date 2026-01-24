@@ -50,14 +50,9 @@ vi.mock('@/lib/env', () => ({
 
 vi.mock('@/lib/auth/clerk-sync', () => clerkSyncMocks);
 
-// Helper to create mock headers
-function createMockHeaders(entries: [string, string][]): {
-  get: (key: string) => string | null;
-} {
-  const map = new Map(entries);
-  return {
-    get: (key: string) => map.get(key) ?? null,
-  };
+// Helper to create mock headers using real Headers for case-insensitive matching
+function createMockHeaders(entries: [string, string][]): Headers {
+  return new Headers(entries);
 }
 
 // Import after mocks are set up
@@ -81,9 +76,11 @@ describe('/api/clerk/webhook', () => {
       ])
     );
 
-    // Reset webhook verification mock - use mockClear instead of mockReset
-    // to preserve the mock implementation while clearing call history
-    mockWebhookVerify.mockClear();
+    // Reset webhook verification mock completely and set safe default
+    mockWebhookVerify.mockReset();
+    mockWebhookVerify.mockImplementation(() => {
+      throw new Error('Webhook verification not mocked for this test');
+    });
   });
 
   describe('user.created event', () => {
