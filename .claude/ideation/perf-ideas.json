@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-01-24T17:15:00.000Z",
-  "updated_at": "2026-01-24T19:00:00.000Z",
+  "updated_at": "2026-01-24T19:30:00.000Z",
   "scope": "apps/web",
   "linear_issues_checked": 0,
   "ideas": [
@@ -187,7 +187,8 @@
     {
       "id": "perf-011",
       "title": "Migrate raw fetch() calls to TanStack Query mutations",
-      "status": "pending",
+      "status": "in_progress",
+      "status_note": "Started migration: SettingsBrandingSection now uses useBrandingSettingsMutation. Extended useSettingsMutation with hide_branding support. Remaining 42 files can be migrated incrementally.",
       "description": "43 files use fetch() directly instead of React Query mutations, missing caching and deduplication benefits. DATA_FETCHING_AUDIT.md documents this gap.",
       "rationale": "TanStack Query provides automatic caching, deduplication, retry logic, and optimistic updates. Raw fetch() loses these benefits.",
       "category": "network",
@@ -246,7 +247,8 @@
     {
       "id": "perf-014",
       "title": "Consider CSS animations for simple motion effects",
-      "status": "pending",
+      "status": "not_practical",
+      "status_note": "PricingToggle already uses CSS transitions. FeatureList uses stagger animations. Since framer-motion is used in 15+ core components (AnimatedArtistPage, AnimatedListenInterface, etc.), removing it from individual components won't reduce bundle - it's already chunked via webpack splitChunks.",
       "description": "Framer Motion (~60KB) is used in 15+ components, some for simple fade/slide animations that could use CSS",
       "rationale": "CSS animations are hardware-accelerated and don't require JavaScript bundle overhead",
       "category": "bundle_size",
@@ -256,7 +258,7 @@
         "apps/web/components/pricing/PricingToggle.tsx"
       ],
       "current_metric": "~60KB for framer-motion, used in 15+ components",
-      "expected_improvement": "~5-10KB if simple animations moved to CSS",
+      "expected_improvement": "No savings - framer-motion required elsewhere and already chunked",
       "implementation": "1. Identify components with simple fade/slide animations\n2. Replace with CSS transitions or @keyframes\n3. Keep Framer Motion for complex gesture/physics animations",
       "tradeoffs": "Less declarative animation code; some animations harder to implement in CSS",
       "effort": "small",
@@ -369,8 +371,9 @@
       "already_optimized": 1,
       "verified_safe": 1,
       "not_needed": 2,
+      "not_practical": 1,
       "deferred": 1,
-      "pending": 2
+      "in_progress": 1
     },
     "by_category": {
       "bundle_size": 6,
@@ -401,8 +404,7 @@
       "Unused @statsig/web-analytics removed"
     ],
     "areas_for_improvement": [
-      "Migrate 43 raw fetch() calls to React Query mutations",
-      "Consider CSS animations for simple motion effects"
+      "Continue migrating remaining fetch() calls to React Query mutations (42 remaining)"
     ]
   }
 }
