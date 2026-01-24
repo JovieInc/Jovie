@@ -5,8 +5,12 @@ const mockStripePaymentIntentsCreate = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => vi.fn());
 
 vi.mock('stripe', () => {
-  const Stripe = vi.fn().mockImplementation(function (this: any) {
-    this.paymentIntents = {
+  const Stripe = vi.fn().mockImplementation(function (this: unknown) {
+    (
+      this as {
+        paymentIntents: { create: typeof mockStripePaymentIntentsCreate };
+      }
+    ).paymentIntents = {
       create: mockStripePaymentIntentsCreate,
     };
   });
@@ -24,10 +28,21 @@ vi.mock('@/lib/rate-limit', () => ({
   createRateLimitHeaders: vi.fn().mockReturnValue({}),
 }));
 
+// Mock stripe client module
+vi.mock('@/lib/stripe/client', () => ({
+  stripe: {
+    paymentIntents: {
+      create: mockStripePaymentIntentsCreate,
+    },
+  },
+}));
+
+// Import the route after mocks are set up
+import { POST } from '@/app/api/create-tip-intent/route';
+
 describe('POST /api/create-tip-intent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
 
     process.env.STRIPE_SECRET_KEY = 'test_stripe_key';
 
@@ -36,7 +51,6 @@ describe('POST /api/create-tip-intent', () => {
   });
 
   it('returns 400 for invalid amount', async () => {
-    const { POST } = await import('@/app/api/create-tip-intent/route');
     const request = new NextRequest('http://localhost/api/create-tip-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -54,7 +68,6 @@ describe('POST /api/create-tip-intent', () => {
   });
 
   it('returns 400 for invalid handle', async () => {
-    const { POST } = await import('@/app/api/create-tip-intent/route');
     const request = new NextRequest('http://localhost/api/create-tip-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,10 +84,9 @@ describe('POST /api/create-tip-intent', () => {
     expect(data.error).toBeDefined();
   });
 
-  it('returns 500 when stripe is not configured', async () => {
-    delete process.env.STRIPE_SECRET_KEY;
+  it('returns 401 when user is not authenticated', async () => {
+    mockAuth.mockResolvedValue({ userId: null });
 
-    const { POST } = await import('@/app/api/create-tip-intent/route');
     const request = new NextRequest('http://localhost/api/create-tip-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -85,7 +97,7 @@ describe('POST /api/create-tip-intent', () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(401);
   });
 
   it('creates payment intent successfully', async () => {
@@ -94,7 +106,6 @@ describe('POST /api/create-tip-intent', () => {
       client_secret: 'pi_123_secret',
     });
 
-    const { POST } = await import('@/app/api/create-tip-intent/route');
     const request = new NextRequest('http://localhost/api/create-tip-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

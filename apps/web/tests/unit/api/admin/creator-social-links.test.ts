@@ -14,10 +14,12 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+// Import after mocks are set up
+import { GET } from '@/app/api/admin/creator-social-links/route';
+
 describe('Admin Creator Social Links API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   describe('GET /api/admin/creator-social-links', () => {
@@ -32,9 +34,6 @@ describe('Admin Creator Social Links API', () => {
         canRemoveBranding: false,
       });
 
-      const { GET } = await import(
-        '@/app/api/admin/creator-social-links/route'
-      );
       const request = new NextRequest(
         'http://localhost/api/admin/creator-social-links?profileId=profile_123'
       );
@@ -57,9 +56,6 @@ describe('Admin Creator Social Links API', () => {
         canRemoveBranding: false,
       });
 
-      const { GET } = await import(
-        '@/app/api/admin/creator-social-links/route'
-      );
       const request = new NextRequest(
         'http://localhost/api/admin/creator-social-links?profileId=profile_123'
       );
@@ -97,9 +93,6 @@ describe('Admin Creator Social Links API', () => {
         }),
       });
 
-      const { GET } = await import(
-        '@/app/api/admin/creator-social-links/route'
-      );
       const request = new NextRequest(
         'http://localhost/api/admin/creator-social-links?profileId=profile_123'
       );

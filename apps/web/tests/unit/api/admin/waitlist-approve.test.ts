@@ -6,10 +6,17 @@ const mockSendNotification = vi.hoisted(() => vi.fn());
 const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
 const mockInvalidateProxyUserStateCache = vi.hoisted(() => vi.fn());
 
-const mockWaitlistEntries = {};
-const mockWaitlistInvites = {};
-const mockCreatorProfiles = {};
-const mockUsers = {};
+const {
+  mockWaitlistEntries,
+  mockWaitlistInvites,
+  mockCreatorProfiles,
+  mockUsers,
+} = vi.hoisted(() => ({
+  mockWaitlistEntries: {},
+  mockWaitlistInvites: {},
+  mockCreatorProfiles: {},
+  mockUsers: {},
+}));
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
@@ -38,13 +45,15 @@ vi.mock('@/lib/db/schema', () => ({
   users: mockUsers,
 }));
 
+// Import after mocks are set up
+import { POST } from '@/app/app/admin/waitlist/approve/route';
+
 describe('Admin Waitlist Approve API', () => {
   const mockMessage = { id: 'test', subject: 'Welcome' };
   const mockTarget = { email: 'user@example.com' };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mockBuildWaitlistInviteEmail.mockReturnValue({
       message: mockMessage,
       target: mockTarget,
@@ -77,8 +86,6 @@ describe('Admin Waitlist Approve API', () => {
       hasAdvancedFeatures: true,
       canRemoveBranding: true,
     });
-
-    const { POST } = await import('@/app/app/admin/waitlist/approve/route');
     const url = 'http://localhost/app/admin/waitlist/approve';
     const requestInit = {
       method: 'POST',
@@ -129,7 +136,6 @@ describe('Admin Waitlist Approve API', () => {
       canRemoveBranding: true,
     });
 
-    const { POST } = await import('@/app/app/admin/waitlist/approve/route');
     const url = 'http://localhost/app/admin/waitlist/approve';
     const request = new Request(url, {
       method: 'POST',
@@ -172,7 +178,6 @@ describe('Admin Waitlist Approve API', () => {
       canRemoveBranding: true,
     });
 
-    const { POST } = await import('@/app/app/admin/waitlist/approve/route');
     const url = 'http://localhost/app/admin/waitlist/approve';
     const request = new Request(url, {
       method: 'POST',

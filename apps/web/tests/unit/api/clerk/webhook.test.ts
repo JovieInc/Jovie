@@ -1,53 +1,65 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies
-const mockUpdateUser = vi.fn();
-const mockClerkClient = {
-  users: {
-    updateUser: mockUpdateUser,
-  },
-};
+// Mock dependencies - hoisted to ensure availability in vi.mock callbacks
+const { mockUpdateUser, mockClerkClient } = vi.hoisted(() => {
+  const mockUpdateUser = vi.fn();
+  return {
+    mockUpdateUser,
+    mockClerkClient: {
+      users: {
+        updateUser: mockUpdateUser,
+      },
+    },
+  };
+});
 
 const clerkSyncMocks = vi.hoisted(() => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
   syncEmailFromClerkByClerkId: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-async function getPost() {
-  const mod = await import('@/app/api/clerk/webhook/route');
-  return mod.POST;
-}
+const mockHeaders = vi.hoisted(() => vi.fn());
+const mockWebhookVerify = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: vi.fn(() => Promise.resolve(mockClerkClient)),
 }));
 
 vi.mock('next/headers', () => ({
-  headers: vi.fn(),
+  headers: mockHeaders,
 }));
 
-vi.mock('svix', () => ({
-  Webhook: vi.fn(),
-}));
+vi.mock('svix', () => {
+  return {
+    Webhook: class MockWebhook {
+      verify = mockWebhookVerify;
+    },
+  };
+});
 
 vi.mock('@/lib/env', () => ({
   env: new Proxy(
     {},
     {
-      get: (_target, prop) => (process.env as any)[prop as any],
+      get: (_target, prop) =>
+        (process.env as Record<string, unknown>)[prop as string],
     }
-  ) as any,
+  ),
 }));
 
 vi.mock('@/lib/auth/clerk-sync', () => clerkSyncMocks);
 
-describe('/api/clerk/webhook', () => {
-  const mockWebhook = {
-    verify: vi.fn(),
-  };
+// Helper to create mock headers using real Headers for case-insensitive matching
+function createMockHeaders(entries: [string, string][]): Headers {
+  return new Headers(entries);
+}
 
-  beforeEach(async () => {
+// Import after mocks are set up
+import { POST } from '@/app/api/clerk/webhook/route';
+
+describe('/api/clerk/webhook', () => {
+  beforeEach(() => {
     vi.clearAllMocks();
 
     // Set required environment variable
@@ -55,20 +67,19 @@ describe('/api/clerk/webhook', () => {
 
     clerkSyncMocks.syncAllClerkMetadata.mockResolvedValue({ success: true });
 
-    // Mock headers
-    const { headers } = await import('next/headers');
-    vi.mocked(headers).mockReturnValue(
-      new Map([
+    // Mock headers - headers() is async in Next.js 15+
+    mockHeaders.mockResolvedValue(
+      createMockHeaders([
         ['svix-id', 'svix_123'],
         ['svix-timestamp', '1234567890'],
         ['svix-signature', 'signature_123'],
-      ]) as any
+      ])
     );
 
-    // Mock webhook verification
-    const { Webhook } = await import('svix');
-    vi.mocked(Webhook).mockImplementation(function () {
-      return mockWebhook as any;
+    // Reset webhook verification mock completely and set safe default
+    mockWebhookVerify.mockReset();
+    mockWebhookVerify.mockImplementation(() => {
+      throw new Error('Webhook verification not mocked for this test');
     });
   });
 
@@ -93,10 +104,10 @@ describe('/api/clerk/webhook', () => {
       };
 
       // Mock webhook verification to return the event data
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
 
       // Mock Clerk client
-      mockUpdateUser.mockResolvedValue({} as any);
+      mockUpdateUser.mockResolvedValue({});
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -106,7 +117,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -140,7 +151,7 @@ describe('/api/clerk/webhook', () => {
       };
 
       // Mock webhook verification to return the event data
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
 
       mockUpdateUser.mockResolvedValue({} as any);
 
@@ -152,7 +163,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -185,7 +196,7 @@ describe('/api/clerk/webhook', () => {
       };
 
       // Mock webhook verification to return the event data
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
 
       mockUpdateUser.mockResolvedValue({} as any);
 
@@ -197,7 +208,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -226,7 +237,7 @@ describe('/api/clerk/webhook', () => {
       };
 
       // Mock webhook verification to return the event data
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
 
       mockUpdateUser.mockResolvedValue({} as any);
 
@@ -238,7 +249,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -254,8 +265,7 @@ describe('/api/clerk/webhook', () => {
 
   describe('webhook security', () => {
     it('should reject requests with missing headers', async () => {
-      const { headers } = await import('next/headers');
-      vi.mocked(headers).mockReturnValue(new Map() as any);
+      mockHeaders.mockResolvedValue(createMockHeaders([]));
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -265,7 +275,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(400);
@@ -274,7 +284,7 @@ describe('/api/clerk/webhook', () => {
 
     it('should reject requests with invalid signature', async () => {
       // Use the shared mockWebhook instance
-      mockWebhook.verify.mockImplementation(() => {
+      mockWebhookVerify.mockImplementation(() => {
         throw new Error('Invalid signature');
       });
 
@@ -286,7 +296,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(400);
@@ -305,7 +315,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(500);
@@ -322,7 +332,7 @@ describe('/api/clerk/webhook', () => {
       };
 
       // Mock webhook verification to return the event data
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
 
       const request = new NextRequest(
         'http://localhost:3000/api/clerk/webhook',
@@ -332,7 +342,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -363,7 +373,7 @@ describe('/api/clerk/webhook', () => {
         type: 'user.updated' as const,
       };
 
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
       clerkSyncMocks.syncEmailFromClerkByClerkId.mockResolvedValue({
         success: true,
       });
@@ -376,7 +386,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -409,7 +419,7 @@ describe('/api/clerk/webhook', () => {
         type: 'user.updated' as const,
       };
 
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
       clerkSyncMocks.syncEmailFromClerkByClerkId.mockResolvedValue({
         success: false,
         error: 'sync-failed',
@@ -423,7 +433,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       expect(response.status).toBe(200);
@@ -457,7 +467,7 @@ describe('/api/clerk/webhook', () => {
       };
 
       // Mock webhook verification to return the event data
-      mockWebhook.verify.mockReturnValue(eventData);
+      mockWebhookVerify.mockReturnValue(eventData);
 
       // Mock Clerk API error
       mockUpdateUser.mockRejectedValue(new Error('Clerk API error'));
@@ -470,7 +480,7 @@ describe('/api/clerk/webhook', () => {
         }
       );
 
-      const response = await (await getPost())(request);
+      const response = await POST(request);
       const result = await response.json();
 
       // Should return 200 to prevent retries

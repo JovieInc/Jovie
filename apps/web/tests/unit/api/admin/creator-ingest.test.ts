@@ -78,10 +78,12 @@ vi.mock('@/lib/ingestion/status-manager', () => ({
   },
 }));
 
+// Import after mocks are set up
+import { POST } from '@/app/api/admin/creator-ingest/route';
+
 describe('Admin Creator Ingest API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   describe('POST /api/admin/creator-ingest', () => {
@@ -95,8 +97,6 @@ describe('Admin Creator Ingest API', () => {
         hasAdvancedFeatures: false,
         canRemoveBranding: false,
       });
-
-      const { POST } = await import('@/app/api/admin/creator-ingest/route');
       const request = new NextRequest(
         'http://localhost/api/admin/creator-ingest',
         {
@@ -124,7 +124,6 @@ describe('Admin Creator Ingest API', () => {
         canRemoveBranding: false,
       });
 
-      const { POST } = await import('@/app/api/admin/creator-ingest/route');
       const request = new NextRequest(
         'http://localhost/api/admin/creator-ingest',
         {
@@ -152,7 +151,6 @@ describe('Admin Creator Ingest API', () => {
         canRemoveBranding: true,
       });
 
-      const { POST } = await import('@/app/api/admin/creator-ingest/route');
       const request = new NextRequest(
         'http://localhost/api/admin/creator-ingest',
         {
