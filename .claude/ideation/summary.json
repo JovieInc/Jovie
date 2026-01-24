@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-01-23T23:15:00Z",
+  "scope": "apps/web",
+  "types_run": ["ui", "code", "quality", "perf"],
+  "linear_issues_checked": 0,
+  "totals": {
+    "ui": { "total": 10, "high_priority": 3 },
+    "code": { "total": 10, "high_priority": 3 },
+    "quality": { "total": 10, "high_priority": 3 },
+    "perf": { "total": 10, "high_priority": 2 }
+  },
+  "top_priorities": [
+    { "type": "ui", "id": "uiux-002", "title": "Add missing aria-label to ArtistSearch form input" },
+    { "type": "ui", "id": "uiux-005", "title": "Add proper error states to TipSelector component" },
+    { "type": "code", "id": "code-001", "title": "Extend TanStack Query patterns to remaining fetch hooks" },
+    { "type": "code", "id": "code-004", "title": "Add Zod validation to form hooks that have manual validation" },
+    { "type": "code", "id": "code-010", "title": "Add type inference between Zod schemas and API responses" },
+    { "type": "quality", "id": "qual-001", "title": "Split lib/db/index.ts into focused modules" },
+    { "type": "quality", "id": "qual-002", "title": "Add unit tests for lib/discography/spotify-import.ts" },
+    { "type": "quality", "id": "qual-003", "title": "Split app/onboarding/actions.ts into smaller action modules" },
+    { "type": "perf", "id": "perf-011", "title": "Lazy load framer-motion components with dynamic imports" },
+    { "type": "perf", "id": "perf-014", "title": "Implement SSR prefetch for dashboard analytics" }
+  ],
+  "files_generated": [
+    ".claude/ideation/ui-ux-ideas.json",
+    ".claude/ideation/code-ideas.json",
+    ".claude/ideation/quality-ideas.json",
+    ".claude/ideation/perf-ideas.json"
+  ]
+}

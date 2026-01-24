@@ -1,0 +1,189 @@
+{
+  "generated_at": "2026-01-23T21:45:00Z",
+  "scope": "apps/web",
+  "ideas": [
+    {
+      "id": "uiux-001",
+      "title": "Add keyboard navigation to DspMatchList filter tabs",
+      "description": "The DspMatchList component has filter buttons (All, Pending, Confirmed, etc.) that only respond to click events. These should support keyboard navigation as a tab-like interface with arrow keys.",
+      "category": "accessibility",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/dsp-matches/DspMatchList.tsx"
+      ],
+      "current_state": "Filter buttons are individual buttons without ARIA role='tablist' or keyboard arrow navigation. Users must tab through each button individually.",
+      "proposed_change": "Convert to proper tabs pattern: 1) Add role='tablist' to container, 2) Add role='tab' and aria-selected to each button, 3) Implement arrow key navigation like RangeToggle.tsx, 4) Use roving tabindex pattern (tabIndex={isActive ? 0 : -1}).",
+      "effort": "small",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-002",
+      "title": "Add missing aria-label to ArtistSearch form input",
+      "description": "The ArtistSearch component has an input field without an associated label element or aria-label. Screen reader users cannot understand what this input is for.",
+      "category": "accessibility",
+      "impact": "high",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/ArtistSearch.tsx"
+      ],
+      "current_state": "Input has placeholder text but no label element, aria-label, or aria-labelledby. The submit button also lacks descriptive aria-label when showing the loading spinner.",
+      "proposed_change": "1) Add <label className='sr-only' htmlFor='artist-search'>Search for your artist name</label>, 2) Add id='artist-search' to input, 3) Add aria-label='Search' to button, 4) Add aria-busy={isSearching} to button during loading.",
+      "effort": "small",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-003",
+      "title": "Add loading skeleton to SocialsForm during initial data fetch",
+      "description": "The SocialsForm shows a simple pulse animation during loading but lacks meaningful skeleton structure. Users cannot anticipate the form layout while data loads.",
+      "category": "loading",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/socials-form/SocialsForm.tsx"
+      ],
+      "current_state": "Shows 3 generic animated rectangles during loading. These don't match the actual form structure (platform selector + URL input + remove button).",
+      "proposed_change": "Replace generic skeletons with structured skeleton matching actual form row layout: 1) Add Skeleton component for 32px wide platform selector, 2) Add flex-1 Skeleton for URL input, 3) Add 24px wide Skeleton for remove button. Follow pattern from DashboardActivityFeed's ActivityLoadingSkeleton.",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-004",
+      "title": "Replace hardcoded colors in Combobox with design tokens",
+      "description": "The Combobox component uses hardcoded color values (bg-white/5, text-white, ring-white/10, text-red-400) instead of semantic design tokens, causing inconsistency with dark mode and theme switching.",
+      "category": "visual",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/combobox/Combobox.tsx",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/combobox/ComboboxDropdown.tsx",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/combobox/ComboboxOptionItem.tsx"
+      ],
+      "current_state": "Uses hardcoded colors: 'bg-white/5', 'text-white', 'ring-white/10', 'placeholder-white/70', 'text-red-400', 'bg-gray-900'. These assume a dark background context.",
+      "proposed_change": "Replace with semantic tokens: 1) bg-white/5 -> bg-surface-1, 2) text-white -> text-primary-token, 3) ring-white/10 -> ring-subtle, 4) placeholder-white/70 -> placeholder:text-secondary-token, 5) text-red-400 -> text-error-token. Reference ClaimBanner.tsx for proper token usage.",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-005",
+      "title": "Add proper error states to TipSelector component",
+      "description": "The TipSelector component lacks visual error handling when the onContinue callback fails. Users have no feedback if payment processing fails.",
+      "category": "error",
+      "impact": "high",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/molecules/TipSelector.tsx"
+      ],
+      "current_state": "Component only shows 'Processing...' during loading but has no error prop or error display. If onContinue throws, there's no visual feedback to the user.",
+      "proposed_change": "1) Add error?: string prop to interface, 2) Add error display below button similar to SocialsForm pattern, 3) Add aria-invalid and aria-describedby to button when error exists, 4) Add role='alert' to error message for screen reader announcement.",
+      "effort": "small",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-006",
+      "title": "Improve mobile touch targets in ArtistCarousel",
+      "description": "The ArtistCarousel has artist images at 96px (24x24) on mobile which is adequate, but the hover overlay only shows artist name on hover/focus, making it inaccessible on touch devices.",
+      "category": "responsive",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/ArtistCarousel.tsx"
+      ],
+      "current_state": "Artist names only appear on hover overlay with opacity transition. Mobile users cannot see artist names without long-press, and there's no visible indicator that these are tappable links.",
+      "proposed_change": "1) Show artist name below image on mobile (sm:hidden), 2) Add visible focus ring for keyboard navigation, 3) Consider adding a subtle 'View Profile' indicator on hover/focus, 4) Add aria-label to Link with full text: 'View {artist.name}'s profile'.",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-007",
+      "title": "Add focus trap and keyboard dismiss to ReleaseProviderMatrix sidebar",
+      "description": "The ReleaseSidebar opens as a panel but may not properly trap focus or support Escape key to close, making it difficult for keyboard users to navigate.",
+      "category": "accessibility",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/release-sidebar/ReleaseSidebar.tsx"
+      ],
+      "current_state": "ReleaseSidebar is rendered as a sibling div without focus management. When opened, focus doesn't automatically move to the sidebar, and Escape key behavior is not visible in the component.",
+      "proposed_change": "1) Use @headlessui/react Dialog or implement focus trap, 2) Auto-focus first interactive element when sidebar opens, 3) Add onKeyDown handler for Escape to call onClose, 4) Return focus to trigger element when closed. Reference RightDrawer.tsx pattern.",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-008",
+      "title": "Add empty state loading indicator to UnifiedTable",
+      "description": "The UnifiedTable component shows a LoadingTableBody during loading, but the loading state uses generic skeleton rows that don't match actual column structure.",
+      "category": "loading",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/table/organisms/UnifiedTable.tsx",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/table/molecules/LoadingTableBody.tsx"
+      ],
+      "current_state": "LoadingTableBody renders generic skeleton rows. These don't reflect actual column widths or structure, leading to layout shift when data loads.",
+      "proposed_change": "1) Pass column definitions to LoadingTableBody, 2) Generate skeleton cells matching column widths, 3) Add aria-busy='true' to table during loading, 4) Consider adding subtle progress indication in table header.",
+      "effort": "medium",
+      "priority": "low"
+    },
+    {
+      "id": "uiux-009",
+      "title": "Replace hardcoded colors in DspMatchList error state",
+      "description": "The DspMatchList error state uses hardcoded red color values (border-red-500/30, bg-red-500/10, text-red-600) instead of semantic error tokens.",
+      "category": "visual",
+      "impact": "low",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/dsp-matches/DspMatchList.tsx"
+      ],
+      "current_state": "Error state uses: 'border-red-500/30', 'bg-red-500/10', 'text-red-600 dark:text-red-400'. This is inconsistent with other error displays in the codebase.",
+      "proposed_change": "1) Use border-error-token/30 or border-destructive, 2) Use bg-error-token/10, 3) Use text-error-token. Reference ErrorBanner.tsx for consistent error styling patterns.",
+      "effort": "small",
+      "priority": "low"
+    },
+    {
+      "id": "uiux-010",
+      "title": "Add responsive breakpoints to ReleaseProviderMatrix footer stats",
+      "description": "The ReleaseProviderMatrix footer shows statistics text that may wrap awkwardly on small screens due to the justify-between layout.",
+      "category": "responsive",
+      "impact": "low",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx"
+      ],
+      "current_state": "Footer shows '15 releases (3 manual overrides)' on left and 'Showing 4 of 8 providers' on right with flex justify-between. On narrow screens, this can wrap poorly.",
+      "proposed_change": "1) Stack vertically on mobile: flex-col sm:flex-row, 2) Center text on mobile: text-center sm:text-left, 3) Hide less important 'Showing X of Y providers' on mobile: hidden sm:block, 4) Consider using a Tooltip for detailed info on mobile.",
+      "effort": "small",
+      "priority": "low"
+    }
+  ],
+  "metadata": {
+    "components_with_aria_label": 156,
+    "components_with_loading_states": 248,
+    "forms_found": 24,
+    "forms_with_error_display": 39,
+    "components_with_responsive_classes": 202,
+    "hardcoded_colors_in_components": 196,
+    "components_with_keyboard_handlers": 84,
+    "components_with_focus_styles": 120,
+    "tables_found": 35,
+    "tables_with_loading_skeleton": 6
+  },
+  "summary": {
+    "total_ideas": 10,
+    "by_category": {
+      "accessibility": 3,
+      "loading": 2,
+      "error": 1,
+      "visual": 2,
+      "responsive": 2
+    },
+    "by_impact": {
+      "high": 3,
+      "medium": 5,
+      "low": 2
+    },
+    "by_priority": {
+      "high": 3,
+      "medium": 4,
+      "low": 3
+    },
+    "key_findings": [
+      "Good ARIA label coverage (156 components) but some key interactive components missing labels",
+      "Loading states are well-implemented but skeletons don't always match final layout structure",
+      "196 occurrences of hardcoded colors (bg-white, text-gray, etc.) instead of design tokens",
+      "Keyboard navigation patterns are inconsistent - some components excellent (RangeToggle, LinkActions), others lacking",
+      "Error handling in forms is generally good, but some interactive components lack error feedback"
+    ]
+  }
+}

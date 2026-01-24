@@ -1,0 +1,167 @@
+{
+  "generated_at": "2026-01-23T12:00:00.000Z",
+  "scope": "apps/web",
+  "ideas": [
+    {
+      "id": "code-001",
+      "title": "Extend TanStack Query patterns to remaining fetch hooks",
+      "description": "Several hooks still use manual useState/useEffect with fetch calls instead of the established TanStack Query pattern. The codebase has excellent mutation-utils.ts with handleMutationError/handleMutationSuccess, but these patterns aren't applied consistently.",
+      "category": "pattern",
+      "impact": "high",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/socials-form/useSocialsForm.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/profile-form/useProfileForm.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/settings-profile-section/useSettingsProfile.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/admin/IngestProfileDialog.tsx"
+      ],
+      "current_state": "useSocialsForm.ts uses manual fetch with useState for loading/error/success state. useProfileForm.ts has inline validation and manual fetch calls. At least 16 files use try { await fetch... } pattern in components.",
+      "proposed_change": "Migrate to TanStack Query pattern: use existing fetchWithTimeout from lib/queries/fetch.ts, queryKeys from lib/queries/keys.ts, and handleMutationError/handleMutationSuccess from mutation-utils.ts. Create useSocialLinksQuery and useSocialLinksMutation following the existing useProfileMutation pattern.",
+      "effort": "medium",
+      "priority": "high"
+    },
+    {
+      "id": "code-002",
+      "title": "Create useAsyncState hook to standardize loading/error/success state",
+      "description": "Multiple component hooks duplicate the loading/error/success state pattern. While useFormState exists with retry support, a simpler useAsyncState hook could serve lighter use cases.",
+      "category": "utility",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/socials-form/useSocialsForm.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/profile-form/useProfileForm.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/admin/admin-creator-profiles/useAdminCreatorProfiles.ts"
+      ],
+      "current_state": "Hooks declare [loading, setLoading], [error, setError], [success, setSuccess] separately with manual state management. useFormState.ts exists but is heavyweight with retry/abort support.",
+      "proposed_change": "Create lib/hooks/useAsyncState.ts that returns { isLoading, error, isSuccess, execute, reset } - a lighter alternative to useFormState for simple async operations without retry requirements. Or, document when to use useFormState vs TanStack Query mutations.",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "code-003",
+      "title": "Unify API response patterns with shared response utilities",
+      "description": "API routes have inconsistent response patterns. Some use { error: string }, others { success: boolean, error?: string }. Create shared response utilities for consistency.",
+      "category": "api",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/billing/status/route.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/stripe/checkout/route.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/dashboard/profile/lib/response.ts"
+      ],
+      "current_state": "Each API route manually constructs NextResponse.json with headers. Some have NO_STORE_HEADERS, others don't. dashboard/profile/lib/response.ts exists but isn't used across all routes.",
+      "proposed_change": "Extend lib/response.ts pattern to create shared response utilities: apiResponse.success(data), apiResponse.error(message, status), apiResponse.unauthorized(). Include standard headers. Use Zod for response type validation.",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "code-004",
+      "title": "Add Zod validation to form hooks that have manual validation",
+      "description": "Form hooks implement manual validation logic when Zod schemas already exist in lib/validation/schemas/. Connect these for consistency and type inference.",
+      "category": "types",
+      "impact": "high",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/profile-form/useProfileForm.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/validation/schemas/dashboard/profile.ts"
+      ],
+      "current_state": "useProfileForm.ts has inline validation: `if (!formData.name.trim()) { errors.name = 'Artist name is required' }`. Meanwhile, profileUpdateSchema in lib/validation/schemas/dashboard/profile.ts already validates displayName with `.min(1, 'Display name cannot be empty')`.",
+      "proposed_change": "Import and use Zod schemas from lib/validation/schemas/ in form hooks. Use zodResolver or manual schema.safeParse() for validation. This ensures client and server validation stay in sync.",
+      "effort": "small",
+      "priority": "high"
+    },
+    {
+      "id": "code-005",
+      "title": "Create shared admin route factory for consistent admin endpoints",
+      "description": "Admin toggle routes (toggle-featured, toggle-marketing, toggle-verify, delete) follow near-identical patterns. lib/admin/route-factory.ts exists but could be extended.",
+      "category": "utility",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/app/admin/creators/toggle-featured/route.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/app/admin/creators/toggle-marketing/route.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/app/admin/creators/toggle-verify/route.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/app/admin/users/toggle-featured/route.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/admin/route-factory.ts"
+      ],
+      "current_state": "Toggle routes share similar auth checks, JSON parsing, and response patterns. route-factory.ts provides some utilities but routes still have duplicated boilerplate.",
+      "proposed_change": "Create createToggleRoute({ field, model, authCheck }) factory that handles: auth verification, request parsing, field toggle logic, and response formatting. Reduce each toggle route to single factory call.",
+      "effort": "medium",
+      "priority": "low"
+    },
+    {
+      "id": "code-006",
+      "title": "Extend mutation-utils pattern to more mutation hooks",
+      "description": "mutation-utils.ts provides excellent handleMutationError/handleMutationSuccess utilities, but only 4 files in lib/queries use them. Several other mutation hooks use toast directly.",
+      "category": "pattern",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useCreatorMutations.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useWaitlistMutations.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useIngestProfileMutation.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/mutation-utils.ts"
+      ],
+      "current_state": "useCreatorMutations.ts uses manual error handling. useWaitlistMutations.ts, useIngestProfileMutation.ts call toast.success/toast.error directly instead of using shared handlers.",
+      "proposed_change": "Refactor remaining mutation hooks to use handleMutationError/handleMutationSuccess from mutation-utils.ts. This ensures consistent error message extraction (FetchError handling, status codes) and dev logging.",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "code-007",
+      "title": "Create formatNumber utility to complement formatProfileViews",
+      "description": "formatProfileViews in lib/utils/format-number.ts only handles profile views. Create general-purpose number formatting utilities for consistent display across the app.",
+      "category": "utility",
+      "impact": "low",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/format-number.ts"
+      ],
+      "current_state": "formatProfileViews handles zero as em-dash and abbreviates 10k+. No general formatNumber, formatCurrency, or formatCompactNumber utilities exist.",
+      "proposed_change": "Add to lib/utils/format-number.ts: formatNumber(value, options) for locale-aware formatting, formatCompact(value) for abbreviated display (1.2k, 2.3M), formatCurrency(value, code) using types/index.ts CurrencyCode and getCurrencySymbol.",
+      "effort": "small",
+      "priority": "low"
+    },
+    {
+      "id": "code-008",
+      "title": "Add queryKeys coverage for missing query domains",
+      "description": "queryKeys in lib/queries/keys.ts is well-structured but some query patterns bypass it. Ensure all TanStack Query hooks use the centralized key factory.",
+      "category": "pattern",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useArtistSearchQuery.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useEnvHealthQuery.ts"
+      ],
+      "current_state": "queryKeys covers billing, user, dashboard, creators, waitlist, profile, notifications, spotify, suggestions, dspEnrichment, releases, handle. Some hooks may define keys inline instead of using the factory.",
+      "proposed_change": "Audit all useQuery/useMutation hooks to ensure they use queryKeys factory. Add missing domains: envHealth, artistSearch (if not using spotify.artistSearch). Document key hierarchy for cache invalidation strategies.",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "code-009",
+      "title": "Implement createQueryFn pattern for consistent query functions",
+      "description": "lib/queries/fetch.ts exports createQueryFn helper but most query hooks define inline async functions. Standardize on the factory pattern for consistency.",
+      "category": "pattern",
+      "impact": "medium",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/fetch.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useActivityFeedQuery.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useDashboardAnalyticsQuery.ts"
+      ],
+      "current_state": "fetch.ts provides createQueryFn<T>(url, options) but useActivityFeedQuery and useDashboardAnalyticsQuery define custom fetchActivityFeed/fetchDashboardAnalytics functions inline.",
+      "proposed_change": "For simple GET endpoints, use createQueryFn. For endpoints needing params, document pattern: const fetchX = createQueryFn<ResponseType>('/api/x'); then ({ signal }) => fetchX({ signal }). Reduces boilerplate.",
+      "effort": "small",
+      "priority": "low"
+    },
+    {
+      "id": "code-010",
+      "title": "Add type inference between Zod schemas and API responses",
+      "description": "Zod schemas define validation but TypeScript interfaces are often defined separately. Use z.infer to derive types automatically and ensure sync.",
+      "category": "types",
+      "impact": "high",
+      "affected_files": [
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/validation/schemas/dashboard/profile.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useProfileMutation.ts",
+        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useBillingMutations.ts"
+      ],
+      "current_state": "profileUpdateSchema in lib/validation/schemas exports ProfileUpdatePayload via z.infer. But useProfileMutation.ts defines its own ProfileUpdateInput interface that may drift from the schema.",
+      "proposed_change": "Import types from validation schemas: `import type { ProfileUpdatePayload } from '@/lib/validation/schemas/dashboard/profile'`. Use these as mutation input types to ensure client/server type sync. Add JSDoc @see links between related types and schemas.",
+      "effort": "medium",
+      "priority": "high"
+    }
+  ]
+}

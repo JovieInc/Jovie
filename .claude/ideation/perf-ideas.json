@@ -1,0 +1,210 @@
+{
+  "generated_at": "2026-01-23T22:30:00Z",
+  "scope": "apps/web",
+  "ideas": [
+    {
+      "id": "perf-011",
+      "title": "Lazy load framer-motion components with dynamic imports",
+      "description": "Framer-motion (~30KB gzipped) is bundled with the main chunk. 15 components import it directly, but animations are only needed for client-side interactions. Use next/dynamic with ssr:false for animation-heavy components to reduce initial bundle size.",
+      "category": "bundle_size",
+      "impact": "high",
+      "affected_files": [
+        "apps/web/components/profile/animated-listen-interface/AnimatedListenInterface.tsx",
+        "apps/web/components/profile/animated-artist-page/AnimatedArtistPage.tsx",
+        "apps/web/components/dashboard/organisms/grouped-links/GroupedLinksManager.tsx",
+        "apps/web/components/organisms/AnimatedAccordion.tsx",
+        "apps/web/components/molecules/FeatureCard.tsx"
+      ],
+      "current_metric": "15 components directly import framer-motion, adding ~30KB gzipped to initial bundle",
+      "expected_improvement": "20-30KB reduction in main bundle by code-splitting animation-heavy components",
+      "effort": "medium",
+      "priority": "high"
+    },
+    {
+      "id": "perf-012",
+      "title": "Add database index for click_events analytics queries",
+      "description": "The consolidated analytics query in getAnalyticsData filters by creatorProfileId and isBot, then groups by date, link_type, city, country, and referrer. While there's an index on creatorProfileId+isBot+createdAt, adding a covering index for the common aggregation columns would speed up dashboard analytics.",
+      "category": "database",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/lib/db/queries/analytics.ts",
+        "apps/web/lib/db/schema/analytics.ts"
+      ],
+      "current_metric": "Dashboard analytics queries: ~42-48ms average on seeded DB",
+      "expected_improvement": "15-25% faster analytics queries with covering index for groupBy columns",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-013",
+      "title": "Batch admin profile token backfill into single transaction",
+      "description": "backfillMissingClaimTokens uses Promise.all to update each profile individually, creating N database round trips. Batch these into a single transaction using drizzle's batch operations to reduce latency and database load.",
+      "category": "database",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/lib/admin/creator-profiles.ts"
+      ],
+      "current_metric": "N individual UPDATE queries when N profiles need tokens (lines 195-210)",
+      "expected_improvement": "Single batch transaction reduces round trips by 90%+ for bulk operations",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-014",
+      "title": "Implement SSR prefetch for dashboard analytics",
+      "description": "The dashboard analytics page fetches data client-side with useDashboardAnalyticsQuery. Since the server already has the authenticated session, prefetch analytics data in the page.tsx server component using prefetchQuery from lib/queries/server.ts for instant load.",
+      "category": "network",
+      "impact": "high",
+      "affected_files": [
+        "apps/web/app/app/dashboard/page.tsx",
+        "apps/web/lib/queries/useDashboardAnalyticsQuery.ts",
+        "apps/web/components/dashboard/dashboard-analytics/DashboardAnalytics.tsx"
+      ],
+      "current_metric": "Client-side fetch causes loading spinner on dashboard load",
+      "expected_improvement": "Eliminate loading state, instant dashboard render with SSR data hydration",
+      "effort": "medium",
+      "priority": "high"
+    },
+    {
+      "id": "perf-015",
+      "title": "Replace direct Clerk imports with tree-shakeable subpath imports",
+      "description": "87 files import from @clerk/nextjs which bundles the entire SDK (~40KB gzipped). Use subpath imports like @clerk/nextjs/server for server-only code to enable better tree-shaking and reduce client bundle size.",
+      "category": "bundle_size",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/lib/auth/cached.ts",
+        "apps/web/lib/auth/require-auth.ts",
+        "apps/web/components/providers/ClientProviders.tsx",
+        "apps/web/app/api/**/*.ts"
+      ],
+      "current_metric": "87 files import @clerk/nextjs, bundling full SDK in multiple chunks",
+      "expected_improvement": "10-15KB reduction by using @clerk/nextjs/server in API routes",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-016",
+      "title": "Add missing staleTime/gcTime to direct fetch() calls",
+      "description": "84 files use fetch() directly. While TanStack Query hooks have proper caching configured (staleTime/gcTime), many direct fetch calls in components and hooks lack caching. Convert remaining fetches to useQuery or add HTTP cache headers.",
+      "category": "caching",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/components/molecules/WrappedSocialLink.tsx",
+        "apps/web/components/dashboard/atoms/DashboardThemeToggleButton.tsx",
+        "apps/web/components/admin/CreatorAvatarCell.tsx",
+        "apps/web/lib/pacer/hooks/useAsyncSearch.ts",
+        "apps/web/lib/pacer/hooks/useAsyncValidation.ts"
+      ],
+      "current_metric": "84 files with direct fetch(), only 33 files using useQuery/useMutation",
+      "expected_improvement": "30-50% reduction in redundant API calls with proper caching",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-017",
+      "title": "Optimize array chain operations in render paths",
+      "description": "Found .filter().map() and .map().filter() chains in 5 files that create intermediate arrays. Use a single .reduce() or .flatMap() to process data in one pass, especially in frequently re-rendered components.",
+      "category": "runtime",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/app/api/admin/creator-social-links/route.ts",
+        "apps/web/components/dashboard/organisms/grouped-links/GroupedLinksManager.tsx",
+        "apps/web/lib/discography/spotify-import.ts",
+        "apps/web/app/app/dashboard/audience/audience-data.ts"
+      ],
+      "current_metric": "5 files with .filter().map() or .map().filter() chains",
+      "expected_improvement": "Minor CPU savings by reducing array allocations in hot paths",
+      "effort": "trivial",
+      "priority": "low"
+    },
+    {
+      "id": "perf-018",
+      "title": "Add partial index for audience_members retention queries",
+      "description": "The audience queries in audience-data.ts filter by creatorProfileId and lastSeenAt/updatedAt. While there's a retention index, adding a partial index filtered to recent activity (last 90 days) would speed up the common dashboard queries.",
+      "category": "database",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/lib/db/schema/analytics.ts",
+        "apps/web/app/app/dashboard/audience/audience-data.ts"
+      ],
+      "current_metric": "Full table scans for audience member queries with date filters",
+      "expected_improvement": "Smaller index size, faster lookups for dashboard audience views",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-019",
+      "title": "Move Zod schemas to shared module to reduce duplicate parsing",
+      "description": "48 files import zod directly, many defining similar validation schemas. Consolidate common schemas (email, phone, UUID, pagination) into a shared validation/schemas directory to reduce bundle duplication and improve consistency.",
+      "category": "bundle_size",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/lib/validation/schemas/base.ts",
+        "apps/web/app/app/dashboard/audience/audience-data.ts",
+        "apps/web/lib/validation/schemas/dashboard/*.ts"
+      ],
+      "current_metric": "48 files with zod imports, some with duplicate schema definitions",
+      "expected_improvement": "5-10KB bundle reduction by deduplicating schema definitions",
+      "effort": "medium",
+      "priority": "low"
+    },
+    {
+      "id": "perf-020",
+      "title": "Extend revalidate times for static marketing pages",
+      "description": "Marketing pages use revalidate=3600 (1 hour) but content rarely changes. The pricing, changelog, and legal pages could safely use revalidate=86400 (24 hours) to reduce edge regenerations and improve cache hit rates.",
+      "category": "caching",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/app/(marketing)/page.tsx",
+        "apps/web/app/(marketing)/pricing/page.tsx",
+        "apps/web/app/(marketing)/changelog/page.tsx",
+        "apps/web/app/(dynamic)/legal/privacy/page.tsx",
+        "apps/web/app/(dynamic)/legal/terms/page.tsx"
+      ],
+      "current_metric": "revalidate=3600 for mostly static content",
+      "expected_improvement": "24x fewer edge regenerations, better CDN cache efficiency",
+      "effort": "trivial",
+      "priority": "low"
+    }
+  ],
+  "metadata": {
+    "large_dependencies": [
+      "@sentry/nextjs (~50-70KB gzipped)",
+      "framer-motion (~30KB gzipped)",
+      "@clerk/nextjs (~40KB gzipped)",
+      "@tanstack/react-table (~15KB gzipped)",
+      "zod (~12KB gzipped, imported in 48 files)"
+    ],
+    "database_indexes_existing": 65,
+    "direct_fetch_calls": 84,
+    "tanstack_query_hooks": 33,
+    "framer_motion_components": 15,
+    "clerk_imports": 87,
+    "zod_imports": 48,
+    "revalidate_configured_pages": 22,
+    "prefetch_query_usage": 3,
+    "promise_all_parallel_queries": 45
+  },
+  "summary": {
+    "total_ideas": 10,
+    "by_category": {
+      "bundle_size": 3,
+      "database": 3,
+      "caching": 2,
+      "network": 1,
+      "runtime": 1
+    },
+    "by_impact": {
+      "high": 2,
+      "medium": 6,
+      "low": 2
+    },
+    "by_priority": {
+      "high": 2,
+      "medium": 5,
+      "low": 3
+    },
+    "potential_bundle_savings": "~35-55KB with framer-motion code-splitting and Clerk tree-shaking",
+    "key_finding": "Good TanStack Query adoption (33 hooks with proper caching), but 84 direct fetch() calls remain. Primary opportunities are: (1) SSR prefetching for dashboard, (2) framer-motion lazy loading, (3) database index optimization for analytics."
+  }
+}
