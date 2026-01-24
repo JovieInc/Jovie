@@ -25,6 +25,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
+import { env } from '@/lib/env-server';
 import {
   getSentryMode,
   isSentryInitialized,
@@ -53,7 +54,7 @@ function getEnvironment(): string {
       return 'preview';
     return 'production';
   }
-  return process.env.NODE_ENV || 'production';
+  return env.NODE_ENV || 'production';
 }
 
 /**
@@ -287,7 +288,7 @@ export function sanitizeErrorResponse(
     includeDebugInDev?: boolean;
   }
 ): { error: string; code?: string; debug?: string | Record<string, unknown> } {
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = env.NODE_ENV === 'development';
   const includeDebug = options?.includeDebugInDev ?? true;
 
   const response: {
@@ -325,7 +326,7 @@ export function getSafeErrorMessage(
   fallbackMessage = 'An unexpected error occurred'
 ): string {
   // In production, always return the fallback for security
-  if (process.env.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production') {
     return fallbackMessage;
   }
 

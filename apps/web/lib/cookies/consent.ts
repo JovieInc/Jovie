@@ -1,6 +1,7 @@
 'use server';
 
 import { cookies } from 'next/headers';
+import { isSecureEnv } from '@/lib/env-server';
 
 export type Consent = {
   essential: boolean;
@@ -26,7 +27,7 @@ export async function saveConsent(consent: Consent): Promise<void> {
   const store = await cookies();
   store.set(COOKIE_NAME, JSON.stringify(consent), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureEnv(),
     sameSite: 'lax',
     maxAge: MAX_AGE,
     path: '/',

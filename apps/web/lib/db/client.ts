@@ -17,7 +17,7 @@ function initializeDatabase() {
 
   if (!_db) {
     _db = drizzle(_sql, {
-      logger: process.env.NODE_ENV === 'development',
+      logger: env.NODE_ENV === 'development',
     });
   }
 

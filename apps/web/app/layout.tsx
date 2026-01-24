@@ -11,6 +11,7 @@ import './globals.css';
 import { headers } from 'next/headers';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
@@ -92,7 +93,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
   other: {
     'mobile-web-app-capable': 'yes',
@@ -149,7 +150,7 @@ export default async function RootLayout({
   const headersList = await headers();
   const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';
   const nonce = headersList.get(SCRIPT_NONCE_HEADER) ?? undefined;
-  const shouldInjectToolbar = process.env.NODE_ENV === 'development';
+  const shouldInjectToolbar = env.NODE_ENV === 'development';
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   const headContent = (
@@ -230,10 +231,7 @@ export default async function RootLayout({
 
   // Early return if no publishable key (only in production)
   if (!publishableKey) {
-    if (
-      process.env.NODE_ENV === 'test' ||
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
       logger.debug('Bypassing Clerk authentication (no keys provided)');
       // In test/dev mode, continue rendering without Clerk
     } else {
@@ -243,12 +241,13 @@ export default async function RootLayout({
         level: 'error',
         tags: {
           context: 'root_layout_clerk_key_missing',
-          vercel_env: process.env.VERCEL_ENV || 'unknown',
-          node_env: process.env.NODE_ENV,
+          vercel_env: env.VERCEL_ENV || 'unknown',
+          node_env: env.NODE_ENV,
         },
         extra: {
-          has_clerk_key_in_process_env:
-            !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+          has_clerk_key_in_public_env:
+            !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+          // VERCEL_REGION is not in the env schema; use process.env for diagnostic
           vercel_region: process.env.VERCEL_REGION,
         },
       });

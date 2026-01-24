@@ -3,6 +3,8 @@
  * Helpers for detecting runtime environment and generating base URLs
  */
 
+import { publicEnv } from '@/lib/env-public';
+
 /**
  * Production hostnames
  */
@@ -40,17 +42,14 @@ export function getBaseUrl(): string {
   }
 
   // Server-side or fallback: use environment variable or production profile URL
-  return (
-    process.env.NEXT_PUBLIC_PROFILE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    'https://jov.ie'
-  );
+  return publicEnv.NEXT_PUBLIC_PROFILE_URL || publicEnv.NEXT_PUBLIC_APP_URL;
 }
 
 /**
  * Check if we're in a development environment
  */
 export function isDevelopment(): boolean {
+  // NODE_ENV is injected at build time by Next.js, safe to access directly
   return process.env.NODE_ENV === 'development';
 }
 
@@ -64,6 +63,7 @@ export function isPreview(): boolean {
       hostname.includes('vercel.app') || PREVIEW_HOSTNAMES.includes(hostname)
     );
   }
+  // VERCEL_ENV is only available server-side
   return process.env.VERCEL_ENV === 'preview';
 }
 

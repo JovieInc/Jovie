@@ -20,6 +20,7 @@ import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { adminAuditLog, users } from '@/lib/db/schema';
+import { env, isSecureEnv } from '@/lib/env-server';
 import { isAdmin } from './roles';
 
 // Cookie name for impersonation token
@@ -36,7 +37,7 @@ const MAX_CLOCK_SKEW_MS = 30 * 1000;
  * Falls back to URL_ENCRYPTION_KEY if IMPERSONATION_SECRET not set
  */
 function getImpersonationSecret(): string | undefined {
-  return process.env.IMPERSONATION_SECRET || process.env.URL_ENCRYPTION_KEY;
+  return env.IMPERSONATION_SECRET || env.URL_ENCRYPTION_KEY;
 }
 
 /**
@@ -47,8 +48,8 @@ export function isImpersonationEnabled(): boolean {
   const hasSecret = Boolean(secret);
 
   // In production, also require explicit opt-in
-  if (process.env.NODE_ENV === 'production') {
-    return hasSecret && process.env.ENABLE_IMPERSONATION === 'true';
+  if (env.NODE_ENV === 'production') {
+    return hasSecret && env.ENABLE_IMPERSONATION === 'true';
   }
 
   return hasSecret;
@@ -250,7 +251,7 @@ export async function startImpersonation(
   const cookieStore = await cookies();
   cookieStore.set(IMPERSONATION_COOKIE, tokenString, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureEnv(),
     sameSite: 'lax',
     maxAge: Math.floor(TOKEN_TTL_MS / 1000), // Convert to seconds
     path: '/',

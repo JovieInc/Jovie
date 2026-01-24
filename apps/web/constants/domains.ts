@@ -18,28 +18,23 @@ import { publicEnv } from '@/lib/env-public';
 // ============================================================================
 
 /** Profile domain hostname - where public creator profiles and homepage live */
-export const PROFILE_HOSTNAME =
-  process.env.NEXT_PUBLIC_PROFILE_HOSTNAME ?? 'jov.ie';
+export const PROFILE_HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
 
 /** App/dashboard domain hostname (subdomain for dashboard and app) */
-export const APP_HOSTNAME =
-  process.env.NEXT_PUBLIC_APP_HOSTNAME ?? 'app.jov.ie';
+export const APP_HOSTNAME = publicEnv.NEXT_PUBLIC_APP_HOSTNAME;
 
 /** Admin email domain - emails ending with this domain get admin access */
-export const ADMIN_EMAIL_DOMAIN =
-  process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN ?? 'jov.ie';
+export const ADMIN_EMAIL_DOMAIN = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
 
 // ============================================================================
 // Full URLs (with protocol)
 // ============================================================================
 
 /** Profile base URL - for building profile links */
-export const PROFILE_URL =
-  process.env.NEXT_PUBLIC_PROFILE_URL ?? `https://${PROFILE_HOSTNAME}`;
+export const PROFILE_URL = publicEnv.NEXT_PUBLIC_PROFILE_URL;
 
 /** App/dashboard base URL */
-export const APP_URL =
-  publicEnv.NEXT_PUBLIC_APP_URL ?? `https://${APP_HOSTNAME}`;
+export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL;
 
 // ============================================================================
 // Helper Functions

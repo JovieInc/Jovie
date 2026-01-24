@@ -7,6 +7,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
+import { env } from '@/lib/env-server';
 import { MemoryRateLimiter } from './memory-limiter';
 import { createRedisRateLimiter, isRedisAvailable } from './redis-limiter';
 import type {
@@ -44,8 +45,7 @@ export class RateLimiter {
     this.config = config;
     this.options = {
       preferRedis: options.preferRedis ?? true,
-      warnOnFallback:
-        options.warnOnFallback ?? process.env.NODE_ENV === 'production',
+      warnOnFallback: options.warnOnFallback ?? env.NODE_ENV === 'production',
       logger:
         options.logger ??
         ((msg: string) =>

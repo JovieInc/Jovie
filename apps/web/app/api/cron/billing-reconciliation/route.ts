@@ -23,6 +23,7 @@ import {
 } from '@/lib/billing/reconciliation/batch-processor';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
+import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
@@ -37,7 +38,7 @@ export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET;
+const CRON_SECRET = env.CRON_SECRET;
 
 interface ReconciliationResult {
   success: boolean;
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
   const startTime = Date.now();
 
   // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production') {
     const authHeader = request.headers.get('authorization');
     if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json(

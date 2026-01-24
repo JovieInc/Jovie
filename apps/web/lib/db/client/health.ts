@@ -153,7 +153,7 @@ export async function checkDbHealth(): Promise<HealthCheckResult> {
 export async function validateDbConnection(): Promise<ConnectionValidationResult> {
   const startTime = Date.now();
 
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = env.DATABASE_URL;
 
   if (!connectionString) {
     return {
@@ -299,7 +299,7 @@ export function getDbConfig() {
     config: DB_CONFIG,
     status: {
       initialized: !!getInternalDb(),
-      environment: process.env.NODE_ENV,
+      environment: env.NODE_ENV,
       hasUrl: !!env.DATABASE_URL,
     },
   };

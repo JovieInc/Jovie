@@ -6,6 +6,8 @@ import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState } from '@/lib/auth/gate';
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 
 interface OnboardingPageProps {
   searchParams?: Promise<{
@@ -35,8 +37,8 @@ export default async function OnboardingPage({
   // - Clerk context propagation race condition
   if (!authResult.clerkUserId) {
     const isClerkBypassed =
-      process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-      !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+      publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
     // Only report to Sentry if this is truly unexpected (not bypass mode)
     if (!isClerkBypassed) {
@@ -44,7 +46,7 @@ export default async function OnboardingPage({
         level: 'warning', // Changed from 'error' - this is handled gracefully
         tags: {
           context: 'onboarding_defensive_check',
-          vercel_env: process.env.VERCEL_ENV || 'unknown',
+          vercel_env: env.VERCEL_ENV || 'unknown',
         },
         extra: {
           userState: authResult.state,

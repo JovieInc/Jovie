@@ -32,7 +32,7 @@ describe('getAdminMercuryMetrics', () => {
       isConfigured: false,
       isAvailable: false,
       errorMessage:
-        'Mercury credentials not configured (MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID required)',
+        'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     });
   });
 

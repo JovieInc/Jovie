@@ -13,6 +13,7 @@ import { SettingsNotificationsSection } from '@/components/dashboard/organisms/S
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
+import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
@@ -43,7 +44,7 @@ export function SettingsPolished({
 
   const renderAccountSection = () => (
     <div className='space-y-6'>
-      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+      {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
         <AccountSettingsSection />
       ) : (
         <DashboardCard variant='settings'>

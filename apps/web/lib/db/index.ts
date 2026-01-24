@@ -95,12 +95,11 @@ function logDbError(
         ? {
             name: error.name,
             message: error.message,
-            stack:
-              process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            stack: env.NODE_ENV === 'development' ? error.stack : undefined,
           }
         : error,
     metadata,
-    nodeEnv: process.env.NODE_ENV,
+    nodeEnv: env.NODE_ENV,
   };
 
   Sentry.captureException(
@@ -117,7 +116,7 @@ function logDbInfo(
   message: string,
   metadata?: Record<string, unknown>
 ) {
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     Sentry.addBreadcrumb({
       category: 'database',
       message: `[${context}] ${message}`,
@@ -353,7 +352,7 @@ function initializeDb(): DbType {
     );
   }
 
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const hasGlobal = typeof global !== 'undefined';
 
   if (!isProduction && hasGlobal && global.db) {
@@ -368,7 +367,7 @@ function initializeDb(): DbType {
     'db_init',
     'Initializing database connection with transaction support',
     {
-      environment: process.env.NODE_ENV,
+      environment: env.NODE_ENV,
       hasUrl: !!databaseUrl,
       transactionSupport: !isEdgeRuntime, // WebSocket/transactions not available in Edge
       isEdge: isEdgeRuntime,
@@ -611,7 +610,7 @@ export async function validateDbConnection(): Promise<{
 }> {
   const startTime = Date.now();
 
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = env.DATABASE_URL;
 
   if (!connectionString) {
     return {
@@ -794,7 +793,7 @@ export function getDbConfig() {
     config: DB_CONFIG,
     status: {
       initialized: !!_db,
-      environment: process.env.NODE_ENV,
+      environment: env.NODE_ENV,
       hasUrl: !!env.DATABASE_URL,
     },
     pool: getPoolMetrics(),

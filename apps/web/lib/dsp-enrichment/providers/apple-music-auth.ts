@@ -16,14 +16,15 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { importPKCS8, SignJWT } from 'jose';
+import { env } from '@/lib/env-server';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-const APPLE_MUSIC_KEY_ID = process.env.APPLE_MUSIC_KEY_ID;
-const APPLE_MUSIC_TEAM_ID = process.env.APPLE_MUSIC_TEAM_ID;
-const APPLE_MUSIC_PRIVATE_KEY = process.env.APPLE_MUSIC_PRIVATE_KEY;
+const APPLE_MUSIC_KEY_ID = env.APPLE_MUSIC_KEY_ID;
+const APPLE_MUSIC_TEAM_ID = env.APPLE_MUSIC_TEAM_ID;
+const APPLE_MUSIC_PRIVATE_KEY = env.APPLE_MUSIC_PRIVATE_KEY;
 
 // ============================================================================
 // Environment Validation (run once at module load)

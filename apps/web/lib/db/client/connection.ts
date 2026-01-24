@@ -81,7 +81,7 @@ export function initializeDb(): DbType {
     );
   }
 
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const hasGlobal = typeof global !== 'undefined';
 
   if (!isProduction && hasGlobal && global.db) {
@@ -96,7 +96,7 @@ export function initializeDb(): DbType {
     'db_init',
     'Initializing database connection with transaction support',
     {
-      environment: process.env.NODE_ENV,
+      environment: env.NODE_ENV,
       hasUrl: !!databaseUrl,
       transactionSupport: !isEdgeRuntime, // WebSocket/transactions not available in Edge
       isEdge: isEdgeRuntime,

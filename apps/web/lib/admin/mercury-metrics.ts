@@ -1,9 +1,10 @@
 import 'server-only';
 
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 
 const MERCURY_BASE_URL =
-  process.env.MERCURY_API_BASE_URL ?? 'https://api.mercury.com/api/v1';
+  env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface MercuryEnv {
@@ -48,11 +49,12 @@ export interface AdminMercuryMetrics {
 }
 
 function getMercuryEnv(): MercuryEnv | null {
+  // Use logical OR to treat empty strings as missing (fallback to secondary key)
   const apiToken =
-    process.env.MERCURY_API_TOKEN ?? process.env.MERCURY_API_KEY ?? '';
+    env.MERCURY_API_TOKEN?.trim() || env.MERCURY_API_KEY?.trim() || '';
   const checkingAccountId =
-    process.env.MERCURY_CHECKING_ACCOUNT_ID ??
-    process.env.MERCURY_ACCOUNT_ID ??
+    env.MERCURY_CHECKING_ACCOUNT_ID?.trim() ||
+    env.MERCURY_ACCOUNT_ID?.trim() ||
     '';
 
   if (!apiToken || !checkingAccountId) {
@@ -66,8 +68,8 @@ async function fetchMercury<T>(
   path: string,
   params?: Record<string, string>
 ): Promise<T> {
-  const env = getMercuryEnv();
-  if (!env) {
+  const mercuryEnv = getMercuryEnv();
+  if (!mercuryEnv) {
     throw new Error('Mercury API credentials are not configured.');
   }
 
@@ -83,7 +85,7 @@ async function fetchMercury<T>(
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${env.apiToken}`,
+      Authorization: `Bearer ${mercuryEnv.apiToken}`,
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
@@ -121,11 +123,11 @@ function centsToUsd(amountCents: number): number {
 }
 
 async function getCheckingBalanceCents(): Promise<number> {
-  const env = getMercuryEnv();
-  if (!env) return 0;
+  const mercuryEnv = getMercuryEnv();
+  if (!mercuryEnv) return 0;
 
   const account = await fetchMercury<MercuryAccountResponse>(
-    `/accounts/${env.checkingAccountId}`
+    `/accounts/${mercuryEnv.checkingAccountId}`
   );
 
   const balanceCents = Number(
@@ -139,15 +141,15 @@ async function getCheckingTransactionsCents(
   startDate: Date,
   endDate: Date
 ): Promise<MercuryTransaction[]> {
-  const env = getMercuryEnv();
-  if (!env) return [];
+  const mercuryEnv = getMercuryEnv();
+  if (!mercuryEnv) return [];
 
   const transactions: MercuryTransaction[] = [];
   let cursor: string | undefined;
 
   for (;;) {
     const response = await fetchMercury<MercuryTransactionsResponse>(
-      `/accounts/${env.checkingAccountId}/transactions`,
+      `/accounts/${mercuryEnv.checkingAccountId}/transactions`,
       {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
@@ -173,9 +175,9 @@ async function getCheckingTransactionsCents(
 }
 
 export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
-  const env = getMercuryEnv();
+  const mercuryEnv = getMercuryEnv();
 
-  if (!env) {
+  if (!mercuryEnv) {
     return {
       balanceUsd: 0,
       burnRateUsd: 0,
@@ -183,7 +185,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       isConfigured: false,
       isAvailable: false,
       errorMessage:
-        'Mercury credentials not configured (MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID required)',
+        'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     };
   }
 

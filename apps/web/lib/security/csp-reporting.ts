@@ -7,6 +7,8 @@
  * @see https://docs.sentry.io/platforms/javascript/security-policy-reporting/
  */
 
+import { publicEnv } from '@/lib/env-public';
+
 /**
  * Parses a Sentry DSN to extract components needed for CSP reporting.
  *
@@ -60,13 +62,13 @@ export function buildCspReportUri(dsn: string): string | null {
  */
 export function getCspReportUri(): string | null {
   // Prefer explicit URI if provided
-  const explicitUri = process.env.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI;
+  const explicitUri = publicEnv.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI;
   if (explicitUri) {
     return explicitUri;
   }
 
   // Fall back to generating from DSN
-  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  const dsn = publicEnv.NEXT_PUBLIC_SENTRY_DSN;
   if (!dsn) {
     return null;
   }

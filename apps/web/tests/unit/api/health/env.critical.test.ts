@@ -19,6 +19,10 @@ vi.mock('@/lib/utils/rate-limit', () => ({
 vi.mock('@/lib/env-server', () => ({
   validateEnvironment: mockValidateEnvironment,
   getEnvironmentInfo: mockGetEnvironmentInfo,
+  env: {
+    NODE_ENV: 'test',
+    DATABASE_URL: 'mock://db',
+  },
 }));
 
 vi.mock('@/lib/startup/environment-validator', () => ({
