@@ -1,10 +1,19 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { CTAButton } from '@/components/ui/CTAButton';
+
+const ArtistNotificationsCTA = dynamic(
+  () =>
+    import('@/components/profile/artist-notifications-cta').then(mod => ({
+      default: mod.ArtistNotificationsCTA,
+    })),
+  { ssr: false }
+);
+
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import {
   type ProfileNextAction,

@@ -1,7 +1,23 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 
-import { InviteCampaignManager } from '@/components/admin/campaigns/InviteCampaignManager';
 import { PageShell } from '@/components/organisms/PageShell';
+
+const InviteCampaignManager = dynamic(
+  () =>
+    import('@/components/admin/campaigns/InviteCampaignManager').then(mod => ({
+      default: mod.InviteCampaignManager,
+    })),
+  {
+    loading: () => (
+      <div className='space-y-4 animate-pulse'>
+        <div className='h-10 w-48 rounded-md bg-surface-1' />
+        <div className='h-64 w-full rounded-md bg-surface-1' />
+        <div className='h-10 w-32 rounded-md bg-surface-1' />
+      </div>
+    ),
+  }
+);
 
 export const metadata: Metadata = {
   title: 'Invite Campaigns - Admin',

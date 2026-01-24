@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import {
   getFadeUpMotionProps,
   getPageWrapperMotionProps,
@@ -23,6 +22,14 @@ const AnimatedListenInterface = dynamic(
 
 const VenmoTipSelector = dynamic(
   () => import('@/components/profile/VenmoTipSelector'),
+  { ssr: false }
+);
+
+const ArtistNotificationsCTA = dynamic(
+  () =>
+    import('@/components/profile/artist-notifications-cta').then(mod => ({
+      default: mod.ArtistNotificationsCTA,
+    })),
   { ssr: false }
 );
 

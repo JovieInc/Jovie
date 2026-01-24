@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-01-24T17:15:00.000Z",
-  "updated_at": "2026-01-24T18:30:00.000Z",
+  "updated_at": "2026-01-24T19:00:00.000Z",
   "scope": "apps/web",
   "linear_issues_checked": 0,
   "ideas": [
@@ -206,7 +206,8 @@
     {
       "id": "perf-012",
       "title": "Evaluate @statsig package necessity",
-      "status": "pending",
+      "status": "completed",
+      "status_note": "Removed unused @statsig/web-analytics package. @statsig/react-bindings is required for feature flags. @statsig/session-replay is already lazy-loaded for dev-only use.",
       "description": "Three Statsig packages (@statsig/js-client, @statsig/session-replay, @statsig/web-analytics) add ~60KB+ to bundle",
       "rationale": "If session replay or web analytics aren't actively used, removing them reduces bundle size",
       "category": "bundle_size",
@@ -215,7 +216,7 @@
         "apps/web/package.json"
       ],
       "current_metric": "~60KB gzipped for 3 Statsig packages",
-      "expected_improvement": "~20-40KB reduction if unused packages removed",
+      "expected_improvement": "~20KB reduction from removing unused @statsig/web-analytics",
       "implementation": "1. Audit Statsig usage across codebase\n2. Verify session-replay value vs cost\n3. Remove unused packages\n4. Consider lazy loading remaining analytics",
       "tradeoffs": "Loss of analytics/replay functionality if removed",
       "effort": "small",
@@ -224,15 +225,16 @@
     {
       "id": "perf-013",
       "title": "Add dynamic import for heavy admin components",
-      "status": "pending",
+      "status": "completed",
+      "status_note": "Added dynamic imports for InviteCampaignManager (admin page), ArtistNotificationsCTA (AnimatedArtistPage, ProfilePrimaryCTA). AvailabilityCell skipped as it's used in table cell renderer.",
       "description": "Large admin forms (InviteCampaignManager 391 lines, AvailabilityCell 460 lines) could be lazy loaded since admin pages aren't always accessed",
       "rationale": "Lazy loading reduces initial bundle for regular users who don't access admin pages",
       "category": "bundle_size",
       "impact": "medium",
       "affected_files": [
-        "apps/web/components/admin/campaigns/InviteCampaignManager.tsx",
-        "apps/web/components/dashboard/organisms/releases/cells/AvailabilityCell.tsx",
-        "apps/web/components/profile/artist-notifications-cta/ArtistNotificationsCTA.tsx"
+        "apps/web/app/app/admin/campaigns/page.tsx",
+        "apps/web/components/profile/animated-artist-page/AnimatedArtistPage.tsx",
+        "apps/web/components/profile/ProfilePrimaryCTA.tsx"
       ],
       "current_metric": "Large components (350-460 lines) loaded synchronously",
       "expected_improvement": "~15-25KB initial bundle reduction",
@@ -362,13 +364,13 @@
   "summary": {
     "total_ideas": 14,
     "by_status": {
-      "completed": 3,
+      "completed": 5,
       "already_implemented": 2,
       "already_optimized": 1,
       "verified_safe": 1,
       "not_needed": 2,
       "deferred": 1,
-      "pending": 4
+      "pending": 2
     },
     "by_category": {
       "bundle_size": 6,
@@ -382,26 +384,24 @@
       "medium": 7,
       "low": 5
     },
-    "potential_bundle_savings": "~100-150KB (if pending items implemented)",
-    "health_score": "8.5/10",
+    "potential_bundle_savings": "~35-45KB remaining (from pending items)",
+    "health_score": "9/10",
     "key_strengths": [
       "React Compiler enabled for auto-memoization",
       "TanStack Virtual for list virtualization",
-      "Dynamic imports used for heavy components (23 files)",
+      "Dynamic imports used for heavy components (26 files)",
       "optimizePackageImports configured for 12+ libraries",
       "Proper cache invalidation with React Query",
       "Bundle splitting with webpack splitChunks",
       "Image optimization with Next.js Image",
-      "Partial Prerendering (PPR) enabled in incremental mode",
       "No legacy heavy dependencies (lodash, moment.js)",
       "Database batch operations with proper limits",
       "Connection pool monitoring with timeouts",
-      "Promise.all() for parallel queries"
+      "Promise.all() for parallel queries",
+      "Unused @statsig/web-analytics removed"
     ],
     "areas_for_improvement": [
       "Migrate 43 raw fetch() calls to React Query mutations",
-      "Evaluate @statsig packages necessity",
-      "Add dynamic imports for large admin components",
       "Consider CSS animations for simple motion effects"
     ]
   }
