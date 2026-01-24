@@ -1,4 +1,3 @@
-import { validateDbConnection } from '@/lib/db';
 import {
   getEnvironmentInfo,
   validateAndLogEnvironment,
@@ -46,29 +45,6 @@ function logCriticalEnvironmentIssues(
   return true;
 }
 
-async function validateDatabaseConnection(isProduction: boolean) {
-  console.log('[STARTUP] Testing database connection...');
-  try {
-    const dbConnection = await validateDbConnection();
-
-    if (dbConnection.connected) {
-      console.log(
-        `[STARTUP] ✅ Database connection validated (${dbConnection.latency}ms)`
-      );
-      return;
-    }
-
-    console.error('[STARTUP] ❌ Database connection failed');
-    if (isProduction) {
-      console.error(
-        '[STARTUP] WARNING: Application starting without database connectivity'
-      );
-    }
-  } catch (dbError) {
-    console.error('[STARTUP] Database connection validation crashed:', dbError);
-  }
-}
-
 function logValidationSummary(
   result: ReturnType<typeof validateAndLogEnvironment>
 ) {
@@ -106,8 +82,9 @@ export async function runStartupEnvironmentValidation() {
       isProduction
     );
 
-    if (!hasCriticalIssues && envInfo.hasDatabase) {
-      await validateDatabaseConnection(isProduction);
+    if (hasCriticalIssues && isProduction) {
+      validationCompleted = true;
+      throw new Error('Critical environment validation failed');
     }
 
     logValidationSummary(validationResult);

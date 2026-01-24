@@ -1,9 +1,10 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
 import type { Artist } from '@/types/db';
 
 export interface SettingsBrandingSectionProps {
@@ -18,50 +19,42 @@ export function SettingsBrandingSection({
   const [hideBranding, setHideBranding] = useState(
     artist.settings?.hide_branding ?? false
   );
-  const [isSavingBranding, setIsSavingBranding] = useState(false);
 
-  const handleBrandingToggle = useCallback(
-    async (enabled: boolean) => {
-      setIsSavingBranding(true);
-      try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
+  const { updateBrandingAsync, isPending } = useBrandingSettingsMutation();
+
+  const handleBrandingToggle = async (enabled: boolean) => {
+    // Save previous value for rollback on error
+    const previousValue = hideBranding;
+    const previousArtistSettings = artist.settings?.hide_branding;
+
+    // Optimistic update
+    setHideBranding(enabled);
+    if (onArtistUpdate) {
+      onArtistUpdate({
+        ...artist,
+        settings: {
+          ...artist.settings,
+          hide_branding: enabled,
+        },
+      });
+    }
+
+    try {
+      await updateBrandingAsync(enabled);
+    } catch {
+      // Rollback on error - the hook already shows an error toast
+      setHideBranding(previousValue);
+      if (onArtistUpdate) {
+        onArtistUpdate({
+          ...artist,
+          settings: {
+            ...artist.settings,
+            hide_branding: previousArtistSettings,
           },
-          body: JSON.stringify({
-            updates: {
-              settings: {
-                hide_branding: enabled,
-              },
-            },
-          }),
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to update branding settings');
-        }
-
-        setHideBranding(enabled);
-
-        if (onArtistUpdate) {
-          onArtistUpdate({
-            ...artist,
-            settings: {
-              ...artist.settings,
-              hide_branding: enabled,
-            },
-          });
-        }
-      } catch (error) {
-        console.error('Failed to update branding settings:', error);
-        setHideBranding(!enabled);
-      } finally {
-        setIsSavingBranding(false);
       }
-    },
-    [artist, onArtistUpdate]
-  );
+    }
+  };
 
   return (
     <DashboardCard variant='settings'>
@@ -69,10 +62,8 @@ export function SettingsBrandingSection({
         title='Hide Jovie Branding'
         description='When enabled, Jovie branding will be removed from your profile page, giving your fans a fully custom experience.'
         checked={hideBranding}
-        onCheckedChange={enabled => {
-          void handleBrandingToggle(enabled);
-        }}
-        disabled={isSavingBranding}
+        onCheckedChange={handleBrandingToggle}
+        disabled={isPending}
         ariaLabel='Hide Jovie branding'
       />
 
