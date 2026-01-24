@@ -409,8 +409,9 @@ export const db = new Proxy({} as DbType, {
 
 export type { InferModel } from 'drizzle-orm';
 export { TABLE_NAMES } from './config';
-// Re-export schema and types
+// Re-export schema, types, and SQL helpers
 export * from './schema';
+export * from './sql-helpers';
 
 /**
  * Helper to safely execute database operations with error handling and retry logic
