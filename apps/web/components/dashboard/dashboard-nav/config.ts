@@ -3,6 +3,7 @@ import {
   Bell,
   Home,
   IdCard,
+  MessageCircle,
   Music,
   Paintbrush,
   PieChart,
@@ -60,6 +61,13 @@ export const secondaryNavigation: NavItem[] = [
     id: 'earnings',
     icon: Banknote,
     description: 'Manage tips and monetization',
+  },
+  {
+    name: 'Chat',
+    href: '/app/dashboard/chat',
+    id: 'chat',
+    icon: MessageCircle,
+    description: 'Ask Jovie about your career',
   },
 ];
 
