@@ -5,6 +5,7 @@
  * Consolidates configurations from multiple sources into one place.
  */
 
+import { env } from '@/lib/env-server';
 import type { RateLimitConfig } from './types';
 
 // ============================================================================
@@ -12,12 +13,12 @@ import type { RateLimitConfig } from './types';
 // ============================================================================
 
 const TRACKING_CLICKS_PER_HOUR = Number.parseInt(
-  process.env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR ?? '10000',
+  env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR ?? '10000',
   10
 );
 
 const TRACKING_VISITS_PER_HOUR = Number.parseInt(
-  process.env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR ?? '50000',
+  env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR ?? '50000',
   10
 );
 

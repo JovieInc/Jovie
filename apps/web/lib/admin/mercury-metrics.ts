@@ -1,9 +1,10 @@
 import 'server-only';
 
 import { captureError } from '@/lib/error-tracking';
+import { env } from '@/lib/env-server';
 
 const MERCURY_BASE_URL =
-  process.env.MERCURY_API_BASE_URL ?? 'https://api.mercury.com/api/v1';
+  env.MERCURY_API_BASE_URL ?? 'https://api.mercury.com/api/v1';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface MercuryEnv {
@@ -48,12 +49,9 @@ export interface AdminMercuryMetrics {
 }
 
 function getMercuryEnv(): MercuryEnv | null {
-  const apiToken =
-    process.env.MERCURY_API_TOKEN ?? process.env.MERCURY_API_KEY ?? '';
+  const apiToken = env.MERCURY_API_TOKEN ?? env.MERCURY_API_KEY ?? '';
   const checkingAccountId =
-    process.env.MERCURY_CHECKING_ACCOUNT_ID ??
-    process.env.MERCURY_ACCOUNT_ID ??
-    '';
+    env.MERCURY_CHECKING_ACCOUNT_ID ?? env.MERCURY_ACCOUNT_ID ?? '';
 
   if (!apiToken || !checkingAccountId) {
     return null;

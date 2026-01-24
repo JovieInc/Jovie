@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
+import { env } from '@/lib/env-server';
 
 /**
  * Detect the current runtime environment
@@ -50,7 +51,7 @@ export async function trackEvent(
     };
 
     // Log in development for debugging
-    if (process.env.NODE_ENV === 'development') {
+    if (env.NODE_ENV === 'development') {
       Sentry.addBreadcrumb({
         category: 'analytics',
         message: `[${runtime}] ${event}`,
@@ -61,7 +62,7 @@ export async function trackEvent(
 
     // In production, send critical events to Sentry for observability
     if (
-      process.env.NODE_ENV === 'production' &&
+      env.NODE_ENV === 'production' &&
       (event.startsWith('$exception') || event.startsWith('error'))
     ) {
       Sentry.addBreadcrumb({
@@ -96,7 +97,7 @@ export async function identifyUser(
       server_side: true,
     };
 
-    if (process.env.NODE_ENV === 'development') {
+    if (env.NODE_ENV === 'development') {
       Sentry.addBreadcrumb({
         category: 'analytics',
         message: `identify: ${distinctId}`,

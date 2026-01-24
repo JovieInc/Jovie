@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { Redis } from '@upstash/redis';
 import { captureError } from '@/lib/error-tracking';
+import { env } from '@/lib/env-server';
 
 // Lazy initialization with retry capability
 // This prevents permanent null state if Redis is briefly unavailable during deployment
@@ -32,8 +33,8 @@ export function getRedis(): Redis | null {
   _redisLastAttempt = now;
 
   // Check if Redis is configured
-  if (!process.env.UPSTASH_REDIS_REST_URL) {
-    if (process.env.NODE_ENV === 'production' && !_redis) {
+  if (!env.UPSTASH_REDIS_REST_URL) {
+    if (env.NODE_ENV === 'production' && !_redis) {
       Sentry.captureMessage(
         'Redis not configured in production - rate limiting and caching disabled',
         'warning'
@@ -44,8 +45,8 @@ export function getRedis(): Redis | null {
 
   try {
     _redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      url: env.UPSTASH_REDIS_REST_URL,
+      token: env.UPSTASH_REDIS_REST_TOKEN!,
     });
     Sentry.addBreadcrumb({
       category: 'redis',

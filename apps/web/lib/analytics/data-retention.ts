@@ -11,6 +11,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { env } from '@/lib/env-server';
 import {
   audienceMembers,
   clickEvents,
@@ -22,7 +23,7 @@ const DEFAULT_RETENTION_DAYS = 90;
 
 // Get configured retention period
 export function getRetentionDays(): number {
-  const envValue = process.env.ANALYTICS_RETENTION_DAYS;
+  const envValue = env.ANALYTICS_RETENTION_DAYS;
   if (envValue) {
     const parsed = Number.parseInt(envValue, 10);
     if (!Number.isNaN(parsed) && parsed > 0) {

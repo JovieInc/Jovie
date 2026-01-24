@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { revalidateTag, updateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { env } from '@/lib/env-server';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -22,9 +23,9 @@ function verifyBearerToken(authHeader: string | null, secret: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.REVALIDATE_SECRET;
+  const secret = env.REVALIDATE_SECRET;
 
-  if (process.env.NODE_ENV === 'production' && !secret) {
+  if (env.NODE_ENV === 'production' && !secret) {
     return NextResponse.json(
       { error: 'Revalidation secret not configured' },
       { status: 500, headers: NO_STORE_HEADERS }

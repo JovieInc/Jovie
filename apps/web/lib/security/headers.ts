@@ -186,6 +186,7 @@ export const CROSS_ORIGIN_RESOURCE_POLICY_CROSS_ORIGIN: SecurityHeader = {
  * @returns true if running in production or preview environment
  */
 export function isNonLocalEnvironment(): boolean {
+  // VERCEL_ENV is only available server-side, so direct access is needed here
   return !!(process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'development');
 }
 
@@ -196,6 +197,7 @@ export function isNonLocalEnvironment(): boolean {
  */
 export function getEnvironmentContext(): HeaderEnvironment {
   const isProduction = isNonLocalEnvironment();
+  // NODE_ENV is injected at build time by Next.js
   const isDevelopment = process.env.NODE_ENV === 'development';
   return { isProduction, isDevelopment };
 }

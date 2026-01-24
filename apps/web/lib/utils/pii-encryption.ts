@@ -8,6 +8,7 @@
 
 import crypto from 'crypto';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { env, isTestEnv } from '@/lib/env-server';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -17,7 +18,7 @@ const KEY_LENGTH = 32;
  * Get the PII encryption key from environment (read at runtime, not cached)
  */
 function getPIIEncryptionKey(): string | undefined {
-  return process.env.PII_ENCRYPTION_KEY;
+  return env.PII_ENCRYPTION_KEY;
 }
 
 /**
@@ -52,7 +53,7 @@ export function isPIIEncryptionEnabled(): boolean {
  * Check if running in a test environment
  */
 function isTestEnvironment(): boolean {
-  return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+  return isTestEnv();
 }
 
 /**
@@ -68,11 +69,10 @@ export function encryptPII(value: string | null | undefined): string | null {
   }
 
   if (!isPIIEncryptionEnabled()) {
-    const vercelEnv =
-      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    const vercelEnvValue = env.VERCEL_ENV || env.NODE_ENV || 'development';
 
     // Fail-fast in production and preview environments
-    if (vercelEnv === 'production' || vercelEnv === 'preview') {
+    if (vercelEnvValue === 'production' || vercelEnvValue === 'preview') {
       throw new Error(
         '[PII Encryption] PII_ENCRYPTION_KEY must be set in production/preview environments. ' +
           'Generate a key with: openssl rand -base64 32'
@@ -80,7 +80,7 @@ export function encryptPII(value: string | null | undefined): string | null {
     }
 
     // In development/test without key, return value as-is with warning
-    if (process.env.NODE_ENV === 'development' || isTestEnvironment()) {
+    if (env.NODE_ENV === 'development' || isTestEnvironment()) {
       captureWarning(
         '[PII Encryption] WARNING: PII_ENCRYPTION_KEY not set - storing value unencrypted. ' +
           'This is only acceptable in development.'
@@ -127,18 +127,17 @@ export function decryptPII(
   }
 
   if (!isPIIEncryptionEnabled()) {
-    const vercelEnv =
-      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    const vercelEnvValue = env.VERCEL_ENV || env.NODE_ENV || 'development';
 
     // Fail-fast in production and preview environments
-    if (vercelEnv === 'production' || vercelEnv === 'preview') {
+    if (vercelEnvValue === 'production' || vercelEnvValue === 'preview') {
       throw new Error(
         '[PII Encryption] PII_ENCRYPTION_KEY must be set in production/preview environments'
       );
     }
 
     // In development without key, return value as-is
-    if (process.env.NODE_ENV === 'development' || isTestEnvironment()) {
+    if (env.NODE_ENV === 'development' || isTestEnvironment()) {
       return encryptedValue;
     }
     throw new Error('PII encryption key not configured');

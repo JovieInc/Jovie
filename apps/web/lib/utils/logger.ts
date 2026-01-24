@@ -1,6 +1,8 @@
 // Lightweight environment-gated logger for dev and preview only
 // Usage: import { logger } from '@/lib/utils/logger'
 
+import { env } from '@/lib/env-server';
+
 /*
   Behavior:
   - Active when NODE_ENV !== 'production' (local dev) OR VERCEL_ENV === 'preview'
@@ -8,8 +10,8 @@
   - next.config.js retains console logs in Preview builds
 */
 
-const nodeEnv = process.env.NODE_ENV;
-const vercelEnv = process.env.VERCEL_ENV;
+const nodeEnv = env.NODE_ENV;
+const vercelEnv = env.VERCEL_ENV;
 const isTest = nodeEnv === 'test';
 const isDev = nodeEnv !== 'production' && !isTest;
 const isPreview = vercelEnv === 'preview';

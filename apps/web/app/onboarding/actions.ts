@@ -12,6 +12,7 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
 import { publicEnv } from '@/lib/env-public';
+import { isSecureEnv } from '@/lib/env-server';
 import {
   createOnboardingError,
   mapDatabaseError,
@@ -638,7 +639,7 @@ export async function completeOnboarding({
     const cookieStore = await cookies();
     cookieStore.set('jovie_onboarding_complete', '1', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecureEnv(),
       sameSite: 'lax',
       maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
       path: '/',

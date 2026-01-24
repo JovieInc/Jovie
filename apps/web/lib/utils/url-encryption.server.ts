@@ -1,15 +1,16 @@
 import 'server-only';
 
 import crypto from 'crypto';
-import { env } from '@/lib/env-server';
+import { env, isTestEnv } from '@/lib/env-server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import type { EncryptionResult } from './url-encryption';
 
 const ALGORITHM = 'aes-256-gcm';
 
-const isTestTime =
-  process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+const isTestTime = isTestEnv();
 
+// Build-time detection - these are injected by Next.js build process
+// and cannot use env module since it runs at module load
 const isBuildTime =
   process.env.CI === 'true' ||
   process.env.NEXT_PHASE === 'phase-production-build';
@@ -23,17 +24,16 @@ const DEV_FALLBACK_KEY = isTestTime
   : undefined;
 
 if (!isBuildTime && !ENCRYPTION_KEY) {
-  const vercelEnv =
-    process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+  const vercelEnvValue = env.VERCEL_ENV || env.NODE_ENV || 'development';
 
-  if (vercelEnv === 'production' || vercelEnv === 'preview') {
+  if (vercelEnvValue === 'production' || vercelEnvValue === 'preview') {
     throw new Error(
       '[url-encryption] URL_ENCRYPTION_KEY must be set to a secure value in production/preview environments. ' +
         'Generate a key with: openssl rand -base64 32'
     );
   }
 
-  if (vercelEnv === 'development') {
+  if (vercelEnvValue === 'development') {
     captureWarning(
       '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set. ' +
         'URL encryption will fail in this environment. Generate a secure key with: openssl rand -base64 32'

@@ -6,6 +6,7 @@ import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { env } from '@/lib/env-server';
 
 /**
  * Sitemap configuration for jov.ie
@@ -32,6 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
  * Sitemap for jov.ie - only profile pages
  */
 async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
+  // NEXT_PHASE is injected by Next.js at build time, must use process.env
   if (process.env.NEXT_PHASE === 'phase-production-build') {
     // During build, return homepage only (profiles fetched at runtime)
     return [
@@ -47,7 +49,7 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
   let profiles: Array<{ username: string; updatedAt: Date | null }> = [];
 
   try {
-    if (!process.env.DATABASE_URL) {
+    if (!env.DATABASE_URL) {
       return [
         {
           url: PROFILE_URL,

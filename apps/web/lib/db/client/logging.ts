@@ -6,6 +6,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
+import { env } from '@/lib/env-server';
 
 // Slow query threshold in milliseconds
 const SLOW_QUERY_THRESHOLD_MS = 100;
@@ -29,11 +30,11 @@ export function logDbError(
             name: error.name,
             message: error.message,
             stack:
-              process.env.NODE_ENV === 'development' ? error.stack : undefined,
+              env.NODE_ENV === 'development' ? error.stack : undefined,
           }
         : error,
     metadata,
-    nodeEnv: process.env.NODE_ENV,
+    nodeEnv: env.NODE_ENV,
   };
 
   Sentry.captureException(
@@ -53,7 +54,7 @@ export function logDbInfo(
   message: string,
   metadata?: Record<string, unknown>
 ): void {
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     Sentry.addBreadcrumb({
       category: 'database',
       message: `[${context}] ${message}`,
@@ -73,7 +74,7 @@ export function logSlowQuery(
   durationMs: number,
   metadata?: Record<string, unknown>
 ): void {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const isVerySlow = durationMs > VERY_SLOW_QUERY_THRESHOLD_MS;
   const isSlow = durationMs > SLOW_QUERY_THRESHOLD_MS;
 
@@ -136,7 +137,7 @@ export function createQueryLogger() {
   return {
     logQuery: (query: string, params: unknown[]): void => {
       // In development, log all queries
-      if (process.env.NODE_ENV === 'development') {
+      if (env.NODE_ENV === 'development') {
         logDbInfo('query', 'Database query executed', {
           query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
           paramsLength: params.length,

@@ -13,6 +13,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_CLERK_FRONTEND_API() {
     return process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || undefined;
   },
+  get NEXT_PUBLIC_CLERK_MOCK() {
+    return process.env.NEXT_PUBLIC_CLERK_MOCK || undefined;
+  },
   get NEXT_PUBLIC_APP_URL() {
     return process.env.NEXT_PUBLIC_APP_URL || 'https://app.jov.ie';
   },
@@ -36,5 +39,32 @@ export const publicEnv = {
   },
   get NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME() {
     return process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || undefined;
+  },
+  // Feature flags
+  get NEXT_PUBLIC_FEATURE_TIPS() {
+    return process.env.NEXT_PUBLIC_FEATURE_TIPS || undefined;
+  },
+  get NEXT_PUBLIC_SHOW_OPERATOR_BANNER() {
+    return process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER || undefined;
+  },
+  // SEO verification
+  get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() {
+    return process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined;
+  },
+  get NEXT_PUBLIC_BING_SITE_VERIFICATION() {
+    return process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || undefined;
+  },
+  get NEXT_PUBLIC_YANDEX_SITE_VERIFICATION() {
+    return process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION || undefined;
+  },
+  get NEXT_PUBLIC_PINTEREST_VERIFICATION() {
+    return process.env.NEXT_PUBLIC_PINTEREST_VERIFICATION || undefined;
+  },
+  // Sentry client-side
+  get NEXT_PUBLIC_SENTRY_DSN() {
+    return process.env.NEXT_PUBLIC_SENTRY_DSN || undefined;
+  },
+  get NEXT_PUBLIC_SENTRY_CSP_REPORT_URI() {
+    return process.env.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI || undefined;
   },
 } as const;
