@@ -7,6 +7,7 @@ import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { wrappedLinks } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import {
   categorizeDomain,
   getCrawlerSafeLabel,
@@ -131,7 +132,10 @@ export async function createWrappedLink(
       .returning();
 
     if (!data) {
-      console.error('Failed to create wrapped link: no data returned');
+      captureError('Failed to create wrapped link: no data returned', null, {
+        shortId,
+        domain,
+      });
       return null;
     }
 
@@ -147,7 +151,7 @@ export async function createWrappedLink(
 
     return result;
   } catch (error) {
-    console.error('Link wrapping service error:', error);
+    captureError('Link wrapping service error', error, { url, userId });
     return null;
   }
 }
@@ -187,7 +191,7 @@ export async function getWrappedLink(
 
     return buildWrappedLinkFromRecord(data, originalUrl);
   } catch (error: unknown) {
-    console.error('Failed to get wrapped link:', error);
+    captureError('Failed to get wrapped link', error, { shortId });
     return null;
   }
 }
@@ -206,7 +210,7 @@ export async function incrementClickCount(shortId: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Failed to increment click count:', error);
+    captureError('Failed to increment click count', error, { shortId });
     return false;
   }
 }
@@ -258,7 +262,7 @@ export async function getLinkStats(userId?: string): Promise<LinkStats> {
       topDomains,
     };
   } catch (error) {
-    console.error('Failed to get link stats:', error);
+    captureError('Failed to get link stats', error, { userId });
     return {
       totalClicks: 0,
       normalLinks: 0,
@@ -280,7 +284,7 @@ export async function cleanupExpiredLinks(): Promise<number> {
 
     return deleted.length;
   } catch (error) {
-    console.error('Cleanup error:', error);
+    captureError('Failed to cleanup expired links', error);
     return 0;
   }
 }
@@ -301,7 +305,7 @@ export async function createWrappedLinksBatch(
         results.push(wrappedLink);
       }
     } catch (error) {
-      console.error(`Failed to wrap URL ${url}:`, error);
+      captureError('Failed to wrap URL in batch', error, { url, userId });
     }
   }
 
@@ -327,7 +331,7 @@ export async function updateWrappedLink(
 
     return true;
   } catch (error) {
-    console.error('Failed to update wrapped link:', error);
+    captureError('Failed to update wrapped link', error, { shortId, updates });
     return false;
   }
 }

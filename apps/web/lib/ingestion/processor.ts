@@ -11,6 +11,7 @@
  * - Merge logic: import from './merge'
  */
 
+import * as Sentry from '@sentry/nextjs';
 import type { DbType } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema';
 import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
@@ -82,10 +83,14 @@ export async function processJob(
     case 'dsp_track_enrichment':
       // Track enrichment logic will be implemented in a future PR
       // For now, return success to avoid blocking the queue
-      console.log(
-        '[DSP Track Enrichment] Job enqueued, processor not yet implemented:',
-        job.payload
-      );
+      // See JOV-480: DSP Track Enrichment Implementation
+      Sentry.addBreadcrumb({
+        category: 'ingestion',
+        message:
+          'DSP Track Enrichment job enqueued, processor not yet implemented',
+        level: 'info',
+        data: { payload: job.payload },
+      });
       return {
         success: true,
         message: 'Track enrichment pending implementation',

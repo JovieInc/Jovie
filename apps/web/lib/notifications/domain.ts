@@ -8,6 +8,7 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -401,7 +402,7 @@ export const subscribeToNotificationsDomain = async (
     );
   } catch (error) {
     await trackServerError('subscribe', error);
-    console.error('[Notifications Subscribe Domain] Error:', error);
+    captureError('Notifications Subscribe Domain Error', error);
     return buildSubscribeServerError();
   }
 };
@@ -528,7 +529,7 @@ export const unsubscribeFromNotificationsDomain = async (
     return buildUnsubscribeSuccessResponse(deleted.length);
   } catch (error) {
     await trackServerError('unsubscribe', error);
-    console.error('[Notifications Unsubscribe Domain] Error:', error);
+    captureError('Notifications Unsubscribe Domain Error', error);
     return buildServerErrorResponse();
   }
 };
@@ -612,7 +613,7 @@ export const getNotificationStatusDomain = async (
 
     return buildStatusSuccessResponse(channels, details);
   } catch (error) {
-    console.error('[Notifications Status Domain] Error:', error);
+    captureError('Notifications Status Domain Error', error);
     return buildServerErrorResponse();
   }
 };
