@@ -1,0 +1,378 @@
+{
+  "generated_at": "2026-01-24T17:15:00.000Z",
+  "scope": "apps/web",
+  "linear_issues_checked": 0,
+  "ideas": [
+    {
+      "id": "code-001",
+      "title": "Audience CSV Export",
+      "description": "Add CSV export functionality to the audience table, allowing creators to export their audience member data for CRM integration or backup.",
+      "rationale": "The CSV export utility (lib/utils/csv.ts) and useCSVExport hook (components/admin/table/useCSVExport.ts) exist for admin tables. The audience table (DashboardAudienceTable) has similar data structure but lacks export functionality.",
+      "builds_upon": ["lib/utils/csv.ts", "components/admin/table/useCSVExport.ts", "components/dashboard/organisms/dashboard-audience-table"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/dashboard-audience-table/DashboardAudienceTable.tsx",
+        "apps/web/components/dashboard/organisms/dashboard-audience-table/AudienceTableToolbar.tsx"
+      ],
+      "existing_patterns": ["useCSVExport hook", "toCSV utility", "AdminCreatorsToolbar export button"],
+      "implementation_approach": "Add useCSVExport hook to audience table, define column mappings (email, type, lastSeenAt, visits, engagement), add export button to toolbar following admin pattern.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-002",
+      "title": "JSON Export Utility",
+      "description": "Add JSON export utility complementing the existing CSV export, enabling structured data export for API integrations and data portability.",
+      "rationale": "The CSV export utility (lib/utils/csv.ts) provides a pattern for data export with column mapping and formatting. JSON export would follow the same interface but output JSON format.",
+      "builds_upon": ["lib/utils/csv.ts"],
+      "category": "utility",
+      "affected_files": [
+        "apps/web/lib/utils/json-export.ts"
+      ],
+      "existing_patterns": ["toCSV function signature", "CSVColumn interface", "CSVOptions interface"],
+      "implementation_approach": "Create toJSON utility following CSVColumn pattern for field mapping, add Blob helper for downloads, mirror the toCSV API surface with JSONColumn and JSONOptions interfaces.",
+      "effort": "trivial",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-003",
+      "title": "Configurable Social Links Limit",
+      "description": "Make MAX_SOCIAL_LINKS configurable per subscription tier, allowing Pro users to have more links than the current fixed limit of 6.",
+      "rationale": "MAX_SOCIAL_LINKS is hardcoded to 6 in constants/app.ts. The entitlements pattern exists in lib/entitlements/. Pro tier features like ad pixels already use entitlement checks.",
+      "builds_upon": ["constants/app.ts MAX_SOCIAL_LINKS", "lib/entitlements/", "SettingsAdPixelsSection Pro gate pattern"],
+      "category": "configuration",
+      "affected_files": [
+        "apps/web/constants/app.ts",
+        "apps/web/lib/entitlements/limits.ts",
+        "apps/web/lib/services/social-links/queries.ts"
+      ],
+      "existing_patterns": ["Entitlement checks", "Pro tier gating in SettingsAdPixelsSection"],
+      "implementation_approach": "Add maxSocialLinks to entitlements config, create getMaxSocialLinks(tier) helper, update validation to use entitlement limit instead of hardcoded constant.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-004",
+      "title": "Tips Dashboard Query Hook",
+      "description": "Create useTipsSummaryQuery hook to fetch tip aggregations (total, count, average) for the dashboard, following existing TanStack Query patterns.",
+      "rationale": "The tips table exists in schema (lib/db/schema/analytics.ts) and dashboard analytics queries exist (useDashboardAnalyticsQuery). Tips data isn't surfaced via a dedicated query hook.",
+      "builds_upon": ["lib/db/schema/analytics.ts tips table", "lib/queries/useDashboardAnalyticsQuery.ts", "lib/queries/keys.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/queries/useTipsSummaryQuery.ts",
+        "apps/web/lib/queries/keys.ts",
+        "apps/web/app/api/dashboard/tips/route.ts"
+      ],
+      "existing_patterns": ["useDashboardAnalyticsQuery structure", "queryKeys.dashboard pattern", "fetchWithTimeout utility"],
+      "implementation_approach": "Add tips query key to queryKeys.dashboard, create API route returning tip stats (total, count, average by period), create query hook following useDashboardAnalyticsQuery pattern.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-005",
+      "title": "Releases List Query Hook",
+      "description": "Create useReleasesListQuery hook for dashboard releases page, enabling client-side filtering and pagination of discography.",
+      "rationale": "The discogReleases schema exists with full metadata. useReleasesQuery.ts exists but only exports a matrix query. The releases dashboard page needs a list query following existing patterns.",
+      "builds_upon": ["lib/db/schema/content.ts discogReleases", "lib/queries/useReleasesQuery.ts", "lib/queries/useDashboardProfileQuery.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/queries/useReleasesQuery.ts",
+        "apps/web/lib/queries/keys.ts",
+        "apps/web/app/api/dashboard/releases/route.ts"
+      ],
+      "existing_patterns": ["queryKeys.releases pattern exists", "createQueryFn utility", "STANDARD_CACHE preset"],
+      "implementation_approach": "Add releases.list to queryKeys, create GET endpoint returning paginated releases with filters (type, date range), create query hook with filtering support following dashboard patterns.",
+      "effort": "small",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-006",
+      "title": "Notification Preferences Settings UI",
+      "description": "Create SettingsNotificationPreferencesSection component allowing creators to configure their notification preferences (release alerts, DSP suggestions, etc.).",
+      "rationale": "NotificationPreferences interface exists in schema (lib/db/schema/profiles.ts) with options like releasePreview, releaseDay, dspMatchSuggested. SettingsNotificationsSection.tsx exists but is minimal.",
+      "builds_upon": ["lib/db/schema/profiles.ts NotificationPreferences", "components/dashboard/organisms/SettingsAppearanceSection.tsx", "lib/queries/useSettingsMutation.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/SettingsNotificationsSection.tsx",
+        "apps/web/lib/queries/useSettingsMutation.ts"
+      ],
+      "existing_patterns": ["SettingsAppearanceSection toggle pattern", "useUpdateSettingsMutation", "DashboardCard variant='settings'"],
+      "implementation_approach": "Extend SettingsNotificationsSection with toggle switches for each NotificationPreferences field, add notificationPreferences to SettingsUpdateInput, follow SettingsAppearanceSection grid layout.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-007",
+      "title": "useReleasesManager Hook",
+      "description": "Create useReleasesManager hook for managing releases with CRUD operations, following the useContactsManager pattern with optimistic updates and UI state separation.",
+      "rationale": "useContactsManager provides a comprehensive pattern for managing entity collections with local state, server sync, and UI state. Releases management needs similar functionality.",
+      "builds_upon": ["components/dashboard/hooks/useContactsManager.ts", "app/app/dashboard/contacts/actions.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/components/dashboard/hooks/useReleasesManager.ts",
+        "apps/web/app/app/dashboard/releases/actions.ts"
+      ],
+      "existing_patterns": ["useContactsManager structure", "makeTempId utility", "optimistic delete with rollback", "UI state separation"],
+      "implementation_approach": "Create server actions for release CRUD following contacts/actions.ts pattern, create useReleasesManager with releases/tracks state, implement add/save/delete/cancel operations with optimistic updates.",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-008",
+      "title": "Privacy Settings Section",
+      "description": "Create SettingsPrivacySection component for privacy-related settings like data retention preferences, marketing opt-out, and public profile visibility.",
+      "rationale": "SettingsAppearanceSection and SettingsBrandingSection exist as patterns. Privacy settings (marketingOptOut, isPublic from creatorProfiles) lack dedicated UI but are in the schema.",
+      "builds_upon": ["components/dashboard/organisms/SettingsAppearanceSection.tsx", "lib/db/schema/profiles.ts creatorProfiles.marketingOptOut/isPublic"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/SettingsPrivacySection.tsx",
+        "apps/web/components/dashboard/organisms/SettingsPolished.tsx"
+      ],
+      "existing_patterns": ["SettingsSection component", "DashboardCard variant='settings'", "Toggle switch pattern from SettingsAppearanceSection"],
+      "implementation_approach": "Create SettingsPrivacySection with toggles for isPublic and marketingOptOut, add data retention info display, add to SettingsPolished tab navigation.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-009",
+      "title": "Tips Cron Reconciliation",
+      "description": "Create cron job for tips reconciliation following the billing-reconciliation pattern, verifying tip payments match Stripe records.",
+      "rationale": "billing-reconciliation cron exists for subscription reconciliation. Tips use Stripe payment intents (paymentIntentId in tips table) but lack automated verification.",
+      "builds_upon": ["app/api/cron/billing-reconciliation/route.ts", "lib/db/schema/analytics.ts tips table"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/app/api/cron/tips-reconciliation/route.ts",
+        "apps/web/lib/billing/reconciliation/tips-processor.ts"
+      ],
+      "existing_patterns": ["verifyCronSecret function", "verifyOrigin function", "batch processing pattern from billing-reconciliation"],
+      "implementation_approach": "Create tips-reconciliation route copying cron auth pattern, implement processor that fetches tips with paymentIntentId, verifies against Stripe API, logs discrepancies.",
+      "effort": "medium",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-010",
+      "title": "Admin Releases Table",
+      "description": "Create AdminReleasesTable component for managing releases across all creators, following the AdminCreatorProfilesTable pattern.",
+      "rationale": "AdminCreatorProfilesTable provides comprehensive admin table pattern with sorting, filtering, bulk actions, and CSV export. Releases lack admin-level management UI.",
+      "builds_upon": ["components/admin/admin-creator-profiles/", "components/admin/table/"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/components/admin/admin-releases/AdminReleasesTable.tsx",
+        "apps/web/components/admin/admin-releases/AdminReleasesTableRow.tsx",
+        "apps/web/app/app/admin/releases/page.tsx"
+      ],
+      "existing_patterns": ["AdminTableShell", "SortableHeaderButton", "useCSVExport", "AdminCreatorsToolbar"],
+      "implementation_approach": "Create AdminReleasesTable using AdminTableShell, define columns (title, artist, releaseDate, type, tracks), add sorting/filtering, implement CSV export following admin patterns.",
+      "effort": "medium",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-011",
+      "title": "Audience Member Detail Query",
+      "description": "Create useAudienceMemberDetailQuery hook for the audience member sidebar, fetching full engagement history and interaction data.",
+      "rationale": "AudienceMemberSidebar component exists. Query patterns like useDashboardProfileQuery fetch single entity details. Audience member detail fetching could follow this pattern.",
+      "builds_upon": ["lib/queries/useDashboardProfileQuery.ts", "components/dashboard/organisms/audience-member-sidebar/"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/queries/useAudienceMemberDetailQuery.ts",
+        "apps/web/lib/queries/keys.ts",
+        "apps/web/app/api/dashboard/audience/[memberId]/route.ts"
+      ],
+      "existing_patterns": ["queryKeys.creators.detail pattern", "createQueryFn", "getAuthenticatedProfile authorization"],
+      "implementation_approach": "Add audience.detail to queryKeys, create API route fetching member with click history and engagement data, create query hook following profile detail pattern.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-012",
+      "title": "Phone Validation Utility Enhancement",
+      "description": "Extend phone validation with formatting and country code support, following the pattern established in email validation.",
+      "rationale": "lib/notifications/validation.ts has EMAIL_MAX_LENGTH=254 and PHONE_MAX_LENGTH=32 but limited phone validation. The pattern exists for adding more comprehensive validation.",
+      "builds_upon": ["lib/notifications/validation.ts", "lib/validation/username-core.ts validation pattern"],
+      "category": "utility",
+      "affected_files": [
+        "apps/web/lib/validation/phone.ts",
+        "apps/web/lib/notifications/validation.ts"
+      ],
+      "existing_patterns": ["ValidationResult pattern from username-core", "PHONE_MAX_LENGTH constant"],
+      "implementation_approach": "Create phone.ts validation module with validatePhone returning ValidationResult, add international format detection, country code extraction, and formatting helpers.",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-013",
+      "title": "Configurable Data Retention Per Creator",
+      "description": "Allow creators to configure their analytics data retention period within allowed bounds, extending the environment-based configuration.",
+      "rationale": "lib/analytics/data-retention.ts has ANALYTICS_RETENTION_DAYS env config. CreatorProfiles.settings JSONB field could store per-creator retention preference.",
+      "builds_upon": ["lib/analytics/data-retention.ts", "lib/db/schema/profiles.ts creatorProfiles.settings"],
+      "category": "configuration",
+      "affected_files": [
+        "apps/web/lib/analytics/data-retention.ts",
+        "apps/web/components/dashboard/organisms/SettingsPrivacySection.tsx",
+        "apps/web/lib/queries/useSettingsMutation.ts"
+      ],
+      "existing_patterns": ["getRetentionDays function", "settings JSONB field pattern", "SettingsUpdateInput interface"],
+      "implementation_approach": "Add retention_days to settings schema, modify getRetentionDays to check creator settings with fallback to env default, add retention selector to privacy settings UI.",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-014",
+      "title": "Contacts API Routes",
+      "description": "Create REST API routes for contacts following the social-links pattern, enabling mobile app and external integrations.",
+      "rationale": "Contacts currently use server actions (app/app/dashboard/contacts/actions.ts). The social-links API (app/api/dashboard/social-links/) provides a pattern for REST endpoints with versioning and rate limiting.",
+      "builds_upon": ["app/api/dashboard/social-links/route.ts", "app/app/dashboard/contacts/actions.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/app/api/dashboard/contacts/route.ts",
+        "apps/web/app/api/dashboard/contacts/route.get.ts",
+        "apps/web/app/api/dashboard/contacts/route.put.ts",
+        "apps/web/app/api/dashboard/contacts/route.delete.ts"
+      ],
+      "existing_patterns": ["social-links route structure", "withDbSessionTx pattern", "applyRateLimiting", "validateLinkStatePayload pattern"],
+      "implementation_approach": "Create contacts API routes following social-links split file pattern (route.get.ts, etc.), reuse existing server action logic for DB operations, add rate limiting and validation.",
+      "effort": "medium",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-015",
+      "title": "Bulk Release Import",
+      "description": "Create bulk release import functionality following the creator-invite bulk pattern, enabling CSV upload of release metadata.",
+      "rationale": "app/api/admin/creator-invite/bulk/ provides pattern for bulk operations with CSV processing, validation schema, and batch queries. Release import could follow this pattern.",
+      "builds_upon": ["app/api/admin/creator-invite/bulk/", "lib/utils/csv.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/app/api/admin/release-import/bulk/route.ts",
+        "apps/web/app/api/admin/release-import/bulk/lib/schema.ts",
+        "apps/web/app/api/admin/release-import/bulk/lib/utils.ts"
+      ],
+      "existing_patterns": ["bulk/lib/schema.ts Zod validation", "bulk/lib/utils.ts CSV parsing", "bulk/lib/queries.ts batch operations"],
+      "implementation_approach": "Create release-import/bulk following creator-invite/bulk structure, define CSV schema for release metadata (title, artist, date, type, UPC), implement batch insert with validation.",
+      "effort": "medium",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-016",
+      "title": "DSP Match Acceptance Optimistic Updates",
+      "description": "Add optimistic updates to DSP match accept/reject mutations following the social links mutation pattern.",
+      "rationale": "useSocialLinksMutation has optimistic updates with cache invalidation. useDspEnrichmentMutations exists but could benefit from the same optimistic update pattern for better UX.",
+      "builds_upon": ["lib/queries/useSocialLinksMutation.ts", "lib/queries/useDspEnrichmentMutations.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/queries/useDspEnrichmentMutations.ts"
+      ],
+      "existing_patterns": ["optimistic update pattern in useSocialLinksMutation", "handleMutationSuccess/Error utilities", "queryClient cache manipulation"],
+      "implementation_approach": "Add onMutate handler to DSP match mutations for optimistic state update, store previous state for rollback, implement onError rollback following social links pattern.",
+      "effort": "trivial",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-017",
+      "title": "Activity Feed Query with Filters",
+      "description": "Extend useActivityFeedQuery with filtering support (by type, date range) following dashboard analytics query pattern.",
+      "rationale": "useDashboardAnalyticsQuery supports view and range parameters. useActivityFeedQuery has profileId and range but could add activity type filtering following the same pattern.",
+      "builds_upon": ["lib/queries/useActivityFeedQuery.ts", "lib/queries/useDashboardAnalyticsQuery.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/queries/useActivityFeedQuery.ts",
+        "apps/web/lib/queries/keys.ts",
+        "apps/web/app/api/dashboard/activity/recent/route.ts"
+      ],
+      "existing_patterns": ["queryKeys with filter objects", "URL search params for filtering", "STANDARD_CACHE preset"],
+      "implementation_approach": "Add activityType filter param to query key and API, extend route to filter by type (click, tip, subscribe), update UI to use filter controls.",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-018",
+      "title": "Handle Change History",
+      "description": "Track username/handle changes with redirect support, following the contentSlugRedirects pattern for releases.",
+      "rationale": "contentSlugRedirects table tracks old release slugs for redirects. Similar pattern could apply to creator profile username changes for maintaining old profile links.",
+      "builds_upon": ["lib/db/schema/content.ts contentSlugRedirects"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/db/schema/profiles.ts",
+        "apps/web/drizzle/migrations/XXXX_handle_redirects.sql",
+        "apps/web/app/[username]/page.tsx"
+      ],
+      "existing_patterns": ["contentSlugRedirects table structure", "contentType enum pattern", "redirect lookup pattern"],
+      "implementation_approach": "Create handleRedirects table mirroring contentSlugRedirects structure, add migration, modify profile page to check redirects for 404 handles, return redirect response.",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-019",
+      "title": "Keyboard Shortcuts for Dashboard Navigation",
+      "description": "Add keyboard shortcuts for common dashboard actions following the existing keyboard shortcuts pattern.",
+      "rationale": "lib/keyboard-shortcuts.ts and useKeyboardShortcuts hook exist. useSidebarKeyboardShortcut.ts shows sidebar shortcuts. Dashboard actions could have shortcuts (g+l for links, g+a for analytics).",
+      "builds_upon": ["lib/keyboard-shortcuts.ts", "hooks/useKeyboardShortcuts.ts", "hooks/useSidebarKeyboardShortcut.ts", "components/organisms/keyboard-shortcuts-sheet/"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/keyboard-shortcuts.ts",
+        "apps/web/hooks/useDashboardKeyboardShortcuts.ts",
+        "apps/web/components/organisms/keyboard-shortcuts-sheet/KeyboardShortcutsContent.tsx"
+      ],
+      "existing_patterns": ["KEYBOARD_SHORTCUTS constant", "useSequentialShortcuts for g+x patterns", "KeyboardShortcutsSheet display"],
+      "implementation_approach": "Add dashboard navigation shortcuts to KEYBOARD_SHORTCUTS (g+l, g+a, g+p, g+s), create useDashboardKeyboardShortcuts with navigation handlers, update shortcuts sheet.",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "code-020",
+      "title": "Social Link Click Tracking Query",
+      "description": "Create useSocialLinkClicksQuery hook for per-link click analytics, extending the existing click tracking pattern.",
+      "rationale": "clickEvents table tracks per-link clicks with linkId reference. Dashboard analytics exists at profile level. Per-link analytics would provide more granular insights.",
+      "builds_upon": ["lib/db/schema/analytics.ts clickEvents", "lib/queries/useDashboardAnalyticsQuery.ts"],
+      "category": "pattern_extension",
+      "affected_files": [
+        "apps/web/lib/queries/useSocialLinkClicksQuery.ts",
+        "apps/web/lib/queries/keys.ts",
+        "apps/web/app/api/dashboard/links/[linkId]/clicks/route.ts"
+      ],
+      "existing_patterns": ["queryKeys.dashboard.analytics pattern", "date range filtering", "STANDARD_CACHE preset"],
+      "implementation_approach": "Add links.clicks query key, create API route aggregating clicks by linkId with date range, create query hook returning click counts/trends per link.",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    }
+  ],
+  "summary": {
+    "total_ideas": 20,
+    "by_category": {
+      "pattern_extension": 15,
+      "configuration": 2,
+      "utility": 2,
+      "architecture": 1
+    },
+    "by_effort": {
+      "trivial": 2,
+      "small": 11,
+      "medium": 7,
+      "large": 0
+    },
+    "by_priority": {
+      "high": 1,
+      "medium": 11,
+      "low": 8
+    }
+  }
+}
