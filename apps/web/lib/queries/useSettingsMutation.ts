@@ -178,6 +178,12 @@ export function useBrandingSettingsMutation() {
         updates: { settings: { hide_branding: hideBranding } },
       });
     },
+    /** Async variant for use with try/catch rollback patterns */
+    updateBrandingAsync: (hideBranding: boolean) => {
+      return mutation.mutateAsync({
+        updates: { settings: { hide_branding: hideBranding } },
+      });
+    },
     isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,

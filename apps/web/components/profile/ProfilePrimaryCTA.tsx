@@ -11,7 +11,14 @@ const ArtistNotificationsCTA = dynamic(
     import('@/components/profile/artist-notifications-cta').then(mod => ({
       default: mod.ArtistNotificationsCTA,
     })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className='space-y-4 py-4 sm:py-5' aria-busy='true'>
+        <div className='h-12 w-full rounded-xl bg-surface-1 animate-pulse' />
+      </div>
+    ),
+  }
 );
 
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';

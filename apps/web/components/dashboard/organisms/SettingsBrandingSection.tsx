@@ -20,12 +20,15 @@ export function SettingsBrandingSection({
     artist.settings?.hide_branding ?? false
   );
 
-  const { updateBranding, isPending } = useBrandingSettingsMutation();
+  const { updateBrandingAsync, isPending } = useBrandingSettingsMutation();
 
-  const handleBrandingToggle = (enabled: boolean) => {
+  const handleBrandingToggle = async (enabled: boolean) => {
+    // Save previous value for rollback on error
+    const previousValue = hideBranding;
+    const previousArtistSettings = artist.settings?.hide_branding;
+
+    // Optimistic update
     setHideBranding(enabled);
-    updateBranding(enabled);
-
     if (onArtistUpdate) {
       onArtistUpdate({
         ...artist,
@@ -34,6 +37,22 @@ export function SettingsBrandingSection({
           hide_branding: enabled,
         },
       });
+    }
+
+    try {
+      await updateBrandingAsync(enabled);
+    } catch {
+      // Rollback on error - the hook already shows an error toast
+      setHideBranding(previousValue);
+      if (onArtistUpdate) {
+        onArtistUpdate({
+          ...artist,
+          settings: {
+            ...artist.settings,
+            hide_branding: previousArtistSettings,
+          },
+        });
+      }
     }
   };
 
