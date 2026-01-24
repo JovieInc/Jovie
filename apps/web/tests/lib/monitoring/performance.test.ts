@@ -10,6 +10,13 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+// Mock Sentry
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+}));
+
+import * as Sentry from '@sentry/nextjs';
+
 // Mock PerformanceObserver
 const mockObserve = vi.fn();
 const mockDisconnect = vi.fn();
@@ -113,23 +120,17 @@ describe('PerformanceTracker', () => {
         },
       } as unknown as Window & typeof globalThis;
 
+      const testError = new Error('PerformanceObserver not supported');
       mockObserve.mockImplementationOnce(() => {
-        throw new Error('PerformanceObserver not supported');
+        throw testError;
       });
-
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
 
       // Should not throw
       expect(() => tracker.trackPageLoad('/test-page')).not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to observe navigation timing:',
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
+      expect(Sentry.captureException).toHaveBeenCalledWith(testError, {
+        extra: { context: 'navigation_timing_observer' },
+      });
     });
   });
 
@@ -181,22 +182,16 @@ describe('PerformanceTracker', () => {
         },
       } as unknown as Window & typeof globalThis;
 
+      const testError = new Error('PerformanceObserver not supported');
       mockObserve.mockImplementationOnce(() => {
-        throw new Error('PerformanceObserver not supported');
+        throw testError;
       });
-
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
 
       expect(() => tracker.trackResourceLoad()).not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to observe resource timing:',
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
+      expect(Sentry.captureException).toHaveBeenCalledWith(testError, {
+        extra: { context: 'resource_timing_observer' },
+      });
     });
   });
 });
