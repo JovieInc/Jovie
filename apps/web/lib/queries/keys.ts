@@ -169,6 +169,18 @@ export const queryKeys = {
       [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
   },
 
+  // Tour dates queries
+  tourDates: {
+    all: ['tour-dates'] as const,
+    list: (profileId: string) =>
+      [...queryKeys.tourDates.all, 'list', profileId] as const,
+    upcoming: (profileId: string) =>
+      [...queryKeys.tourDates.all, 'upcoming', profileId] as const,
+    detail: (id: string) => [...queryKeys.tourDates.all, 'detail', id] as const,
+    connection: (profileId: string) =>
+      [...queryKeys.tourDates.all, 'connection', profileId] as const,
+  },
+
   // Handle/username availability queries
   handle: {
     all: ['handle'] as const,
