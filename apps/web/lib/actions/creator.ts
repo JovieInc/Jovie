@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/dashboard/actions';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import type { CreatorProfile } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 
 type CreatorProfileWithLinks = Awaited<
   ReturnType<typeof getCreatorProfileWithLinks>
@@ -15,7 +16,7 @@ export async function fetchCreatorProfile(
   try {
     return await getCreatorProfileWithLinks(username);
   } catch (error) {
-    console.error('Error fetching creator profile:', error);
+    captureError('Error fetching creator profile', error, { username });
     throw new Error('Failed to fetch creator profile');
   }
 }
@@ -34,7 +35,7 @@ export async function updateCreatorProfileAction(
     revalidatePath('/app/dashboard/profile');
     return { success: true, data: updated };
   } catch (error) {
-    console.error('Error updating creator profile:', error);
+    captureError('Error updating creator profile', error, { userId });
     return { success: false, error: 'Failed to update profile' };
   }
 }

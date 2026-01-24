@@ -192,10 +192,8 @@ export async function logIngestEvent(event: IngestAuditEvent): Promise<void> {
       console.log(logPrefix, logEntry);
   }
 
-  // TODO: When database table is available, write to it here
+  // See JOV-481: Implement audit log persistence to database
   // await writeToDatabase(logEntry);
-
-  // TODO: When external audit service is available, send to it here
   // await sendToAuditService(logEntry);
 }
 
