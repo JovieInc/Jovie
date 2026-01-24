@@ -127,6 +127,36 @@ jobs:
             pnpm biome ci --reporter=github .
           fi
 
+  ci-eslint:
+    name: ESLint Server Boundaries
+    # Check server/client boundary violations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping ESLint."
+            exit 0
+          fi
+
+          # Skip for docs-only changes
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping ESLint."
+            exit 0
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run ESLint server boundary checks
+        run: pnpm --filter=@jovie/web run lint:server-boundaries
+
   ci-typecheck:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
@@ -378,13 +408,13 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-guardrails]
+    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck, Biome (lint + format), and guardrails succeeded"
+          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), and guardrails succeeded"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Social links mutation hooks for accepting/dismissing suggestions.
  *

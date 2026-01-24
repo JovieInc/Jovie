@@ -164,6 +164,32 @@ Jovie/
 - Server Components by default, Client Components when needed
 - Use `'use client'` directive sparingly and intentionally
 
+### Server/Client Boundaries (Enforced by ESLint)
+
+**Client components MUST have `'use client'`** when using React hooks (useState, useEffect, etc.).
+
+**Server-only modules CANNOT be imported in `'use client'` files:**
+- `@/lib/db/*` - Database access
+- `@clerk/nextjs/server` - Server-side auth
+- `stripe`, `resend` - API clients with secrets
+- `drizzle-orm` - ORM queries
+- `*.server.ts` files
+
+**Commands:**
+- `pnpm --filter web lint:server-boundaries` - Quick check for boundary violations
+- `pnpm --filter web lint:eslint` - Full ESLint check
+
+**Error Messages:**
+```
+# Missing 'use client':
+React hook "useState" can only be used in client components.
+Add "use client" directive at the top of this file.
+
+# Server import in client:
+Server-only import "@/lib/db" cannot be used in client components.
+Remove the import or remove "use client" if this should be a server component.
+```
+
 ### Styling
 
 - Tailwind utility classes only (no custom CSS unless necessary)

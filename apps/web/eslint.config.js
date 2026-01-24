@@ -3,6 +3,8 @@ const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
 const iconUsageRule = require('./eslint-rules/icon-usage');
 const edgeRuntimeNodeImportsRule = require('./eslint-rules/edge-runtime-node-imports');
 const noHandlerInitializationRule = require('./eslint-rules/no-handler-initialization');
+const serverOnlyImportsRule = require('./eslint-rules/server-only-imports');
+const useClientDirectiveRule = require('./eslint-rules/use-client-directive');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -15,6 +17,8 @@ const baseConfig = {
         'icon-usage': iconUsageRule,
         'edge-runtime-node-imports': edgeRuntimeNodeImportsRule,
         'no-handler-initialization': noHandlerInitializationRule,
+        'server-only-imports': serverOnlyImportsRule,
+        'use-client-directive': useClientDirectiveRule,
       },
     },
   },
@@ -93,6 +97,9 @@ const baseConfig = {
     '@jovie/icon-usage': 'error',
     '@jovie/edge-runtime-node-imports': 'error',
     '@jovie/no-handler-initialization': 'error',
+    '@jovie/server-only-imports': 'error',
+    // Warn initially for gradual adoption - promote to 'error' once violations are fixed
+    '@jovie/use-client-directive': 'warn',
   },
 };
 
@@ -158,6 +165,22 @@ module.exports = [
     files: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  // Disable server/client boundary rules for server-only contexts
+  {
+    files: ['**/app/api/**', '**/actions.ts', '**/actions/*.ts'],
+    rules: {
+      '@jovie/use-client-directive': 'off',
+      '@jovie/server-only-imports': 'off',
+    },
+  },
+  // TODO: Admin components have legacy server import patterns that need refactoring
+  // These should be migrated to use server actions instead of direct imports
+  {
+    files: ['**/components/admin/**'],
+    rules: {
+      '@jovie/server-only-imports': 'off',
     },
   },
 ];
