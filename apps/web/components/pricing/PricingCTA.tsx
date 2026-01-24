@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 // Animation constants
 const CONTAINER_ANIMATION_DURATION = 0.5;

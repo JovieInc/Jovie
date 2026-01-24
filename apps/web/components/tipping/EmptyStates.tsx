@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, type Variants } from 'framer-motion';
+import { motion, type Variants } from 'motion/react';
 import Image from 'next/image';
 import { useMemo } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';

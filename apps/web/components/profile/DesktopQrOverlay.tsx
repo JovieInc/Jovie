@@ -1,7 +1,7 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { Smartphone, X } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { QRCode } from '@/components/atoms/QRCode';

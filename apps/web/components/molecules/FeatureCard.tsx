@@ -1,6 +1,6 @@
 'use client';
 
-import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
+import { type MotionProps, motion, useReducedMotion } from 'motion/react';
 
 // Animation constants
 const ANIMATION_STIFFNESS = 400;

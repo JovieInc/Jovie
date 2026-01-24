@@ -1,6 +1,6 @@
 'use client';
 
-import type { Variants } from 'framer-motion';
+import type { Variants } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { UseAnimatedArtistPageReturn } from './types';

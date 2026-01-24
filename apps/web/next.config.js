@@ -8,6 +8,8 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 
 const nextConfig = {
   turbopack: {},
+  // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
+  reactCompiler: true,
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -176,6 +178,8 @@ const nextConfig = {
     ];
   },
   experimental: {
+    // Turbopack filesystem cache for faster dev server startup
+    turbopackFileSystemCacheForDev: true,
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
     optimizePackageImports: [
