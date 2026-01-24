@@ -87,15 +87,15 @@ export function ToastProvider({ children }: ToastProviderProps) {
           },
           classNames: {
             toast:
-              'group border-subtle bg-surface-0/95 backdrop-blur-sm shadow-lg',
+              'group bg-surface-3 border border-default rounded-xl shadow-lg',
             title: 'text-primary-token font-medium',
-            description: 'text-secondary-token text-sm',
+            description: 'text-tertiary-token text-sm',
             actionButton:
-              'bg-accent text-white font-medium hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'bg-btn-primary text-btn-primary-foreground font-medium hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
-              'bg-surface-1 text-secondary-token font-medium hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'bg-surface-2 text-secondary-token font-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             closeButton:
-              'bg-surface-1 border-subtle text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'bg-surface-2 border-subtle text-tertiary-token hover:bg-surface-1 hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             // Type-specific styles using design tokens
             success: 'border-success [&>svg]:text-success',
             error: 'border-error [&>svg]:text-error',
