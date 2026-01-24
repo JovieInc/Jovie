@@ -13,6 +13,7 @@ import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import Script from 'next/script';
 import { cache } from 'react';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
+import { UnreleasedReleaseHero } from '@/components/release';
 import { PROFILE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
@@ -378,6 +379,47 @@ export default async function ContentSmartLinkPage({
     creator
   );
 
+  // Check if release is unreleased (releaseDate > now)
+  const isUnreleased =
+    content.releaseDate && new Date(content.releaseDate) > new Date();
+
+  // Show unreleased hero with countdown and notify me CTA
+  if (isUnreleased) {
+    return (
+      <>
+        {/* JSON-LD Structured Data for SEO */}
+        <Script
+          id='music-schema'
+          type='application/ld+json'
+          strategy='afterInteractive'
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(musicSchema) }}
+        />
+        <Script
+          id='breadcrumb-schema'
+          type='application/ld+json'
+          strategy='afterInteractive'
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
+
+        <UnreleasedReleaseHero
+          release={{
+            title: content.title,
+            artworkUrl: content.artworkUrl,
+            releaseDate: content.releaseDate!,
+          }}
+          artist={{
+            id: creator.id,
+            name: creator.displayName ?? creator.username,
+            handle: creator.usernameNormalized,
+            avatarUrl: creator.avatarUrl,
+          }}
+        />
+      </>
+    );
+  }
+
   // Use the same landing page component for both releases and tracks
   return (
     <>
@@ -438,10 +480,16 @@ export async function generateMetadata({
   const contentType = content.type === 'release' ? 'album' : 'song';
   const canonicalUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
-  // Build SEO-optimized title
-  const title = `${content.title} by ${artistName} - Stream Now`;
+  // Check if release is unreleased
+  const isUnreleased =
+    content.releaseDate && new Date(content.releaseDate) > new Date();
 
-  // Build rich description with streaming context
+  // Build SEO-optimized title based on release status
+  const title = isUnreleased
+    ? `${content.title} by ${artistName} - Coming Soon`
+    : `${content.title} by ${artistName} - Stream Now`;
+
+  // Build rich description based on release status
   const releaseYear = content.releaseDate
     ? ` (${content.releaseDate.getFullYear()})`
     : '';
@@ -456,7 +504,10 @@ export async function generateMetadata({
           )
           .join(', ')
       : 'Spotify, Apple Music';
-  const description = `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+
+  const description = isUnreleased
+    ? `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`
+    : `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
 
   // Build dynamic keywords
   const keywords = [
