@@ -1,16 +1,22 @@
 {
   "generated_at": "2026-01-24T17:16:00.000Z",
-  "updated_at": "2026-01-24T17:50:00.000Z",
+  "updated_at": "2026-01-24T18:10:00.000Z",
   "scope": "apps/web",
   "types_run": ["ui", "code", "quality", "perf"],
   "linear_issues_checked": 0,
   "totals": {
-    "ui": { "total": 20, "high_priority": 5, "completed": 0 },
-    "code": { "total": 20, "high_priority": 1, "completed": 0 },
+    "ui": { "total": 20, "high_priority": 5, "completed": 3, "deferred": 1 },
+    "code": { "total": 20, "high_priority": 1, "completed": 1 },
     "quality": { "total": 20, "high_priority": 5, "completed": 0 },
     "perf": { "total": 10, "high_priority": 2, "completed": 10, "status": "all_addressed" }
   },
   "grand_total": 70,
+  "completed_high_priority": {
+    "perf": ["perf-005", "perf-006", "perf-010"],
+    "ui": ["uiux-002", "uiux-006", "uiux-008"],
+    "code": ["code-005"],
+    "quality": []
+  },
   "perf_summary": {
     "completed": ["perf-005", "perf-006", "perf-010"],
     "already_implemented": ["perf-001", "perf-007", "perf-009"],
@@ -18,19 +24,26 @@
     "not_needed": ["perf-003", "perf-004"],
     "deferred": ["perf-002"]
   },
+  "ui_summary": {
+    "completed": ["uiux-002", "uiux-006", "uiux-008"],
+    "deferred": ["uiux-001"]
+  },
+  "code_summary": {
+    "already_implemented": ["code-005"]
+  },
   "top_priorities": [
     { "type": "perf", "id": "perf-009", "title": "Implement server component streaming for dashboard", "impact": "high", "status": "already_implemented" },
     { "type": "perf", "id": "perf-010", "title": "Enable Partial Prerendering (PPR) for mixed static/dynamic pages", "impact": "high", "status": "completed" },
-    { "type": "quality", "id": "qual-001", "title": "Replace 228+ console.* calls with Sentry logging", "priority": "high" },
-    { "type": "quality", "id": "qual-002", "title": "Split lib/db/index.ts (780 lines) into focused modules", "priority": "high" },
-    { "type": "quality", "id": "qual-004", "title": "Add unit tests for lib/discography/spotify-import.ts", "priority": "high" },
-    { "type": "quality", "id": "qual-013", "title": "Replace direct process.env access with validated env module", "priority": "high" },
-    { "type": "quality", "id": "qual-018", "title": "Replace useEffect+fetch anti-pattern with TanStack Query", "priority": "high" },
-    { "type": "ui", "id": "uiux-001", "title": "Replace hardcoded hex colors with design tokens", "priority": "high" },
-    { "type": "ui", "id": "uiux-002", "title": "Add aria-label to DSPButton for screen reader accessibility", "priority": "high" },
-    { "type": "ui", "id": "uiux-006", "title": "Add motion-reduce support to loading spinners", "priority": "high" },
-    { "type": "ui", "id": "uiux-008", "title": "Add error recovery action to WaitlistSpotifySearch", "priority": "high" },
-    { "type": "code", "id": "code-005", "title": "Releases List Query Hook", "priority": "high" }
+    { "type": "quality", "id": "qual-001", "title": "Replace 228+ console.* calls with Sentry logging", "priority": "high", "status": "pending" },
+    { "type": "quality", "id": "qual-002", "title": "Split lib/db/index.ts (780 lines) into focused modules", "priority": "high", "status": "pending" },
+    { "type": "quality", "id": "qual-004", "title": "Add unit tests for lib/discography/spotify-import.ts", "priority": "high", "status": "pending" },
+    { "type": "quality", "id": "qual-013", "title": "Replace direct process.env access with validated env module", "priority": "high", "status": "pending" },
+    { "type": "quality", "id": "qual-018", "title": "Replace useEffect+fetch anti-pattern with TanStack Query", "priority": "high", "status": "verified_ok" },
+    { "type": "ui", "id": "uiux-001", "title": "Replace hardcoded hex colors with design tokens", "priority": "high", "status": "deferred_large_scope" },
+    { "type": "ui", "id": "uiux-002", "title": "Add aria-label to DSPButton for screen reader accessibility", "priority": "high", "status": "completed" },
+    { "type": "ui", "id": "uiux-006", "title": "Add motion-reduce support to loading spinners", "priority": "high", "status": "completed" },
+    { "type": "ui", "id": "uiux-008", "title": "Add error recovery action to WaitlistSpotifySearch", "priority": "high", "status": "completed" },
+    { "type": "code", "id": "code-005", "title": "Releases List Query Hook", "priority": "high", "status": "already_implemented" }
   ],
   "summary_by_category": {
     "ui_ux": {
@@ -78,6 +91,8 @@
     "Proper cache invalidation with unstable_cache",
     "Bundle splitting with webpack splitChunks",
     "Partial Prerendering (PPR) enabled in incremental mode",
-    "All database queries have proper pagination limits"
+    "All database queries have proper pagination limits",
+    "DSPButton now has accessible aria-labels",
+    "WaitlistSpotifySearch has motion-reduce support and error recovery"
   ]
 }
