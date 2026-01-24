@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  clearAdminCache,
-  invalidateAdminCache,
-  isAdmin,
-} from '@/lib/admin/roles';
-import * as dbModule from '@/lib/db';
+
+// Hoist mocks before module resolution
+const { mockCaptureError } = vi.hoisted(() => ({
+  mockCaptureError: vi.fn(),
+}));
 
 // Mock the database
 vi.mock('@/lib/db', () => ({
@@ -16,6 +15,19 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/redis', () => ({
   redis: null,
 }));
+
+// Mock error tracking
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
+  captureWarning: vi.fn(),
+}));
+
+import {
+  clearAdminCache,
+  invalidateAdminCache,
+  isAdmin,
+} from '@/lib/admin/roles';
+import * as dbModule from '@/lib/db';
 
 describe('Admin Roles', () => {
   beforeEach(() => {
@@ -142,9 +154,6 @@ describe('Admin Roles', () => {
 
     it('should return false and fail closed on database error', async () => {
       const mockUserId = 'user_error123';
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
 
       const mockFrom = vi.fn().mockReturnThis();
       const mockWhere = vi.fn().mockReturnThis();
@@ -167,12 +176,10 @@ describe('Admin Roles', () => {
       const result = await isAdmin(mockUserId);
 
       expect(result).toBe(false); // Fail closed
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[admin/roles] Failed to check admin status:',
+      expect(mockCaptureError).toHaveBeenCalledWith(
+        '[admin/roles] Failed to check admin status',
         expect.any(Error)
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('should invalidate cache when requested', async () => {

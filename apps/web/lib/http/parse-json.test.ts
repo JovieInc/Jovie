@@ -32,7 +32,6 @@ describe('parseJsonBody', () => {
   });
 
   it('logs and captures parse failures', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const request = new Request('https://example.com/api', {
       method: 'POST',
       body: 'not-json',
@@ -51,17 +50,8 @@ describe('parseJsonBody', () => {
       expect(payload.details).toBeUndefined();
     }
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      '[POST /test] JSON parse failed',
-      expect.objectContaining({
-        route: 'POST /test',
-        requestUrl: 'https://example.com/api',
-        contentType: 'application/json',
-        error: expect.stringContaining('Unexpected'),
-      })
-    );
     expect(captureError).toHaveBeenCalledWith(
-      'JSON parse failed',
+      '[POST /test] JSON parse failed',
       expect.any(SyntaxError),
       expect.objectContaining({
         context: 'json_parse_failure',
@@ -94,7 +84,6 @@ describe('parseJsonBody', () => {
   });
 
   it('returns fallback when empty body is allowed', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const request = new Request('https://example.com/api', {
       method: 'POST',
     });
@@ -107,7 +96,6 @@ describe('parseJsonBody', () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.data).toEqual({ defaulted: true });
-    expect(consoleSpy).not.toHaveBeenCalled();
     expect(captureError).not.toHaveBeenCalled();
   });
 });
