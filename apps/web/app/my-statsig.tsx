@@ -32,12 +32,6 @@ function MyStatsigEnabledInner({
   user,
   plugins,
 }: MyStatsigEnabledProps) {
-  const [isMounted, setIsMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const { client } = useClientAsyncInit(sdkKey, user, {
     logLevel: LogLevel.Debug,
     plugins,
@@ -78,13 +72,12 @@ function MyStatsigEnabledInner({
       : null),
   });
 
-  // Don't render provider until mounted (avoids SSR hydration issues)
-  if (!isMounted) {
-    return <>{children}</>;
-  }
-
+  // Always render the StatsigProvider to ensure hooks in children have context.
+  // The loadingComponent handles the case when client is still initializing.
+  // Previously, we skipped the provider until mounted, but this caused crashes
+  // when child components used Statsig hooks during hydration.
   return (
-    <StatsigProvider client={client} loadingComponent={<div />}>
+    <StatsigProvider client={client} loadingComponent={<>{children}</>}>
       {children}
     </StatsigProvider>
   );
