@@ -178,9 +178,8 @@ const nextConfig = {
     ];
   },
   experimental: {
-    // Partial Prerendering: Combines static shell with streaming dynamic content
-    // Enables near-instant initial paint while streaming dynamic sections
-    ppr: 'incremental',
+    // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
+    // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
     turbopackFileSystemCacheForDev: true,
     // Disable optimizeCss to avoid critters dependency issues
