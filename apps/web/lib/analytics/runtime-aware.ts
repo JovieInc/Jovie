@@ -1,10 +1,13 @@
 /**
  * Runtime-aware analytics implementation
  * This module provides analytics tracking that works in both Node.js and Edge runtime
+ *
+ * NOTE: This module intentionally uses process.env.NODE_ENV directly instead of the
+ * env-server module because it must work in Edge Runtime where server-only imports
+ * are not allowed. NODE_ENV is inlined at build time by Next.js so this is safe.
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { env } from '@/lib/env-server';
 
 /**
  * Detect the current runtime environment
@@ -51,7 +54,8 @@ export async function trackEvent(
     };
 
     // Log in development for debugging
-    if (env.NODE_ENV === 'development') {
+    // NOTE: Using process.env.NODE_ENV directly for Edge Runtime compatibility
+    if (process.env.NODE_ENV === 'development') {
       Sentry.addBreadcrumb({
         category: 'analytics',
         message: `[${runtime}] ${event}`,
@@ -61,8 +65,9 @@ export async function trackEvent(
     }
 
     // In production, send critical events to Sentry for observability
+    // NOTE: Using process.env.NODE_ENV directly for Edge Runtime compatibility
     if (
-      env.NODE_ENV === 'production' &&
+      process.env.NODE_ENV === 'production' &&
       (event.startsWith('$exception') || event.startsWith('error'))
     ) {
       Sentry.addBreadcrumb({
@@ -97,7 +102,8 @@ export async function identifyUser(
       server_side: true,
     };
 
-    if (env.NODE_ENV === 'development') {
+    // NOTE: Using process.env.NODE_ENV directly for Edge Runtime compatibility
+    if (process.env.NODE_ENV === 'development') {
       Sentry.addBreadcrumb({
         category: 'analytics',
         message: `identify: ${distinctId}`,

@@ -241,12 +241,13 @@ export default async function RootLayout({
         level: 'error',
         tags: {
           context: 'root_layout_clerk_key_missing',
-          vercel_env: process.env.VERCEL_ENV || 'unknown',
-          node_env: process.env.NODE_ENV,
+          vercel_env: env.VERCEL_ENV || 'unknown',
+          node_env: env.NODE_ENV,
         },
         extra: {
-          has_clerk_key_in_process_env:
-            !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+          has_clerk_key_in_public_env:
+            !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+          // VERCEL_REGION is not in the env schema; use process.env for diagnostic
           vercel_region: process.env.VERCEL_REGION,
         },
       });

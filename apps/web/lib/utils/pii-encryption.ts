@@ -7,8 +7,8 @@
  */
 
 import crypto from 'crypto';
-import { captureError, captureWarning } from '@/lib/error-tracking';
 import { env, isTestEnv } from '@/lib/env-server';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -50,13 +50,6 @@ export function isPIIEncryptionEnabled(): boolean {
 }
 
 /**
- * Check if running in a test environment
- */
-function isTestEnvironment(): boolean {
-  return isTestEnv();
-}
-
-/**
  * Encrypts a PII value using AES-256-GCM
  * Returns null if the value is null/undefined
  *
@@ -80,7 +73,7 @@ export function encryptPII(value: string | null | undefined): string | null {
     }
 
     // In development/test without key, return value as-is with warning
-    if (env.NODE_ENV === 'development' || isTestEnvironment()) {
+    if (env.NODE_ENV === 'development' || isTestEnv()) {
       captureWarning(
         '[PII Encryption] WARNING: PII_ENCRYPTION_KEY not set - storing value unencrypted. ' +
           'This is only acceptable in development.'
@@ -137,7 +130,7 @@ export function decryptPII(
     }
 
     // In development without key, return value as-is
-    if (env.NODE_ENV === 'development' || isTestEnvironment()) {
+    if (env.NODE_ENV === 'development' || isTestEnv()) {
       return encryptedValue;
     }
     throw new Error('PII encryption key not configured');

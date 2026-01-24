@@ -11,12 +11,12 @@
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { env } from '@/lib/env-server';
 import {
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
 } from '@/lib/db/schema';
+import { env } from '@/lib/env-server';
 
 // Default retention period in days
 const DEFAULT_RETENTION_DAYS = 90;

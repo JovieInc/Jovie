@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { Redis } from '@upstash/redis';
-import { captureError } from '@/lib/error-tracking';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 
 // Lazy initialization with retry capability
 // This prevents permanent null state if Redis is briefly unavailable during deployment

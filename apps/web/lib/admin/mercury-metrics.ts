@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { captureError } from '@/lib/error-tracking';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 
 const MERCURY_BASE_URL =
   env.MERCURY_API_BASE_URL ?? 'https://api.mercury.com/api/v1';
@@ -64,8 +64,8 @@ async function fetchMercury<T>(
   path: string,
   params?: Record<string, string>
 ): Promise<T> {
-  const env = getMercuryEnv();
-  if (!env) {
+  const mercuryEnv = getMercuryEnv();
+  if (!mercuryEnv) {
     throw new Error('Mercury API credentials are not configured.');
   }
 
@@ -81,7 +81,7 @@ async function fetchMercury<T>(
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${env.apiToken}`,
+      Authorization: `Bearer ${mercuryEnv.apiToken}`,
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
@@ -119,11 +119,11 @@ function centsToUsd(amountCents: number): number {
 }
 
 async function getCheckingBalanceCents(): Promise<number> {
-  const env = getMercuryEnv();
-  if (!env) return 0;
+  const mercuryEnv = getMercuryEnv();
+  if (!mercuryEnv) return 0;
 
   const account = await fetchMercury<MercuryAccountResponse>(
-    `/accounts/${env.checkingAccountId}`
+    `/accounts/${mercuryEnv.checkingAccountId}`
   );
 
   const balanceCents = Number(
@@ -137,15 +137,15 @@ async function getCheckingTransactionsCents(
   startDate: Date,
   endDate: Date
 ): Promise<MercuryTransaction[]> {
-  const env = getMercuryEnv();
-  if (!env) return [];
+  const mercuryEnv = getMercuryEnv();
+  if (!mercuryEnv) return [];
 
   const transactions: MercuryTransaction[] = [];
   let cursor: string | undefined;
 
   for (;;) {
     const response = await fetchMercury<MercuryTransactionsResponse>(
-      `/accounts/${env.checkingAccountId}/transactions`,
+      `/accounts/${mercuryEnv.checkingAccountId}/transactions`,
       {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
@@ -171,9 +171,9 @@ async function getCheckingTransactionsCents(
 }
 
 export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
-  const env = getMercuryEnv();
+  const mercuryEnv = getMercuryEnv();
 
-  if (!env) {
+  if (!mercuryEnv) {
     return {
       balanceUsd: 0,
       burnRateUsd: 0,
