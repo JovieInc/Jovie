@@ -4,6 +4,10 @@ import { ClerkProvider, useUser } from '@clerk/nextjs';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import React from 'react';
+import {
+  ClerkSafeDefaultsProvider,
+  ClerkSafeValuesProvider,
+} from '@/hooks/useClerkSafe';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
 import type { StatsigProvidersProps } from './StatsigProviders';
@@ -199,12 +203,19 @@ export function ClientProviders({
     isMockPublishableKey(publishableKey);
 
   if (shouldBypassClerk) {
-    return wrapWithStatsig({
-      children,
-      initialThemeMode,
-      enableStatsig,
-      skipCoreProviders,
-    });
+    // When Clerk is bypassed, wrap with ClerkSafeDefaultsProvider
+    // so that safe hooks (useUserSafe, useAuthSafe, etc.) return defaults
+    // instead of throwing "must be used within ClerkProvider" errors
+    return (
+      <ClerkSafeDefaultsProvider>
+        {wrapWithStatsig({
+          children,
+          initialThemeMode,
+          enableStatsig,
+          skipCoreProviders,
+        })}
+      </ClerkSafeDefaultsProvider>
+    );
   }
 
   return (
@@ -212,13 +223,15 @@ export function ClientProviders({
       publishableKey={publishableKey!}
       appearance={clerkAppearance}
     >
-      <ClientProvidersInner
-        initialThemeMode={initialThemeMode}
-        enableStatsig={enableStatsig}
-        skipCoreProviders={skipCoreProviders}
-      >
-        {children}
-      </ClientProvidersInner>
+      <ClerkSafeValuesProvider>
+        <ClientProvidersInner
+          initialThemeMode={initialThemeMode}
+          enableStatsig={enableStatsig}
+          skipCoreProviders={skipCoreProviders}
+        >
+          {children}
+        </ClientProvidersInner>
+      </ClerkSafeValuesProvider>
     </ClerkProvider>
   );
 }
