@@ -1,9 +1,9 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { CTAButton } from '@/components/ui/CTAButton';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import {
@@ -11,6 +11,21 @@ import {
   resolveProfileNextAction,
 } from '@/lib/profile-next-action';
 import type { Artist, LegacySocialLink } from '@/types/db';
+
+const ArtistNotificationsCTA = dynamic(
+  () =>
+    import('@/components/profile/artist-notifications-cta').then(mod => ({
+      default: mod.ArtistNotificationsCTA,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className='space-y-4 py-4 sm:py-5' aria-busy='true'>
+        <div className='h-12 w-full rounded-xl bg-surface-1 animate-pulse' />
+      </div>
+    ),
+  }
+);
 
 /**
  * Read Spotify preference from client-side cookie.

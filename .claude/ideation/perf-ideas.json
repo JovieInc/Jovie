@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-01-24T17:15:00.000Z",
-  "updated_at": "2026-01-24T17:45:00.000Z",
+  "updated_at": "2026-01-24T19:30:00.000Z",
   "scope": "apps/web",
   "linear_issues_checked": 0,
   "ideas": [
@@ -9,7 +9,7 @@
       "title": "Lazy load recharts for admin metrics",
       "status": "already_implemented",
       "status_note": "MetricsChartClient.tsx already uses next/dynamic with ssr: false and loading skeleton",
-      "description": "The recharts library (~300KB) is currently bundled with the main application but only used in a single admin component (MetricsChart.tsx). This adds unnecessary weight to the initial bundle.",
+      "description": "The recharts library (~150KB gzipped) is currently bundled with the main application but only used in a single admin component (MetricsChart.tsx). This adds unnecessary weight to the initial bundle.",
       "rationale": "Most users never access admin pages, so the charting library should not impact their experience. Lazy loading heavy visualization libraries is a standard optimization.",
       "category": "bundle_size",
       "impact": "medium",
@@ -17,8 +17,8 @@
         "apps/web/components/admin/MetricsChart.tsx",
         "apps/web/components/admin/MetricsChartClient.tsx"
       ],
-      "current_metric": "recharts adds ~300KB to JavaScript bundle",
-      "expected_improvement": "~300KB reduction for non-admin users, faster initial page load",
+      "current_metric": "recharts adds ~150KB gzipped to JavaScript bundle",
+      "expected_improvement": "~150KB reduction for non-admin users, faster initial page load",
       "effort": "small",
       "priority": "medium"
     },
@@ -27,17 +27,19 @@
       "title": "Refactor large component files into smaller modules",
       "status": "deferred",
       "status_note": "Tracked in quality ideation (qual-003, qual-010). Lower priority since React Compiler handles memoization.",
-      "description": "Several components exceed 400 lines: UnifiedTable.tsx (769), WaitlistSpotifySearch.tsx (499), AdminCreatorProfilesWithSidebar.tsx (445). Large files are harder to tree-shake and lazy load selectively.",
+      "description": "Several components exceed 400 lines: UnifiedTable.tsx (769), WaitlistSpotifySearch.tsx (499), AvailabilityCell.tsx (460), AdminCreatorProfilesWithSidebar.tsx (445). Large files are harder to tree-shake and lazy load selectively.",
       "rationale": "Smaller, focused components improve code splitting effectiveness, maintainability, and allow more granular lazy loading. The UnifiedTable already has good internal memoization but could benefit from splitting render logic.",
       "category": "bundle_size",
       "impact": "low",
       "affected_files": [
         "apps/web/components/organisms/table/organisms/UnifiedTable.tsx",
         "apps/web/components/waitlist/WaitlistSpotifySearch.tsx",
+        "apps/web/components/dashboard/organisms/releases/cells/AvailabilityCell.tsx",
         "apps/web/components/admin/admin-creator-profiles/AdminCreatorProfilesWithSidebar.tsx",
         "apps/web/components/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx"
       ],
-      "effort": "medium",
+      "implementation": "1. Extract useVirtualTable hook for virtualization logic\n2. Create TableContextMenu component\n3. Create TableHeaderCell component\n4. Create TableRowRenderer component\n5. Keep UnifiedTable as composition of sub-components",
+      "effort": "large",
       "priority": "low"
     },
     {
@@ -45,18 +47,19 @@
       "title": "Audit inline onClick handlers for render optimization",
       "status": "not_needed",
       "status_note": "React Compiler (reactCompiler: true) auto-optimizes inline handlers. Manual useCallback adds complexity without benefit.",
-      "description": "Found 30+ instances of inline arrow functions in onClick handlers (e.g., onClick={() => handleClick(id)}). While React Compiler (enabled) may optimize these, explicit useCallback can improve debugging and ensure optimization.",
+      "description": "Found 40+ instances of inline arrow functions in onClick handlers (e.g., onClick={() => handleClick(id)}). While React Compiler (enabled) may optimize these, explicit useCallback can improve debugging and ensure optimization.",
       "rationale": "Inline functions create new references on each render, potentially causing child components to re-render unnecessarily. React Compiler should handle this, but explicit patterns are more reliable and debuggable.",
       "category": "rendering",
       "impact": "low",
       "affected_files": [
         "apps/web/components/pricing/PricingToggle.tsx",
-        "apps/web/components/waitlist/WaitlistPrimaryGoalStep.tsx",
-        "apps/web/components/profile/notifications/CountrySelector.tsx",
-        "apps/web/components/organisms/table/molecules/TablePaginationFooter.tsx",
-        "apps/web/components/profile/artist-contacts-button/ArtistContactsButton.tsx"
+        "apps/web/components/admin/ImpersonationBanner.tsx",
+        "apps/web/components/admin/table/AdminCreatorsTableHeader.tsx",
+        "apps/web/components/dashboard/organisms/ContactsManager.tsx",
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx"
       ],
-      "effort": "small",
+      "current_metric": "40+ components with inline onClick handlers",
+      "effort": "medium",
       "priority": "low"
     },
     {
@@ -64,16 +67,17 @@
       "title": "Memoize dynamic inline style objects",
       "status": "not_needed",
       "status_note": "React Compiler (reactCompiler: true) auto-optimizes inline style objects. Manual useMemo adds complexity without benefit.",
-      "description": "Found 30+ instances of inline style={{...}} objects in components like UnifiedTable, KanbanBoard, and AnimatedListenInterface. These create new objects on each render.",
+      "description": "Found 40+ instances of inline style={{...}} objects in components like UnifiedTable, KanbanBoard, and AnimatedListenInterface. These create new objects on each render.",
       "rationale": "Inline style objects are recreated on every render, causing the DOM to potentially diff and update styles unnecessarily. Memoizing with useMemo prevents this.",
       "category": "rendering",
       "impact": "low",
       "affected_files": [
         "apps/web/components/organisms/table/organisms/UnifiedTable.tsx",
         "apps/web/components/admin/table/organisms/KanbanBoard.tsx",
-        "apps/web/components/profile/animated-listen-interface/AnimatedListenInterface.tsx",
+        "apps/web/components/dashboard/organisms/releases/cells/ProviderCell.tsx",
         "apps/web/components/admin/table/AdminCreatorsTableHeader.tsx"
       ],
+      "current_metric": "40+ instances of style={{...}} patterns",
       "effort": "small",
       "priority": "low"
     },
@@ -98,7 +102,7 @@
       "title": "Increase React.memo usage for list item components",
       "status": "completed",
       "status_note": "Added React.memo to WaitlistMobileCard.tsx in commit 983b674. AvatarCell, DateCell, SidebarMenuButton already had React.memo.",
-      "description": "Only 20 components use explicit React.memo, while there are many list-rendering scenarios. Key candidates include table cells, sidebar items, and dropdown options.",
+      "description": "Components use explicit React.memo strategically, with 48 instances found. Key candidates include table cells, sidebar items, and dropdown options.",
       "rationale": "React Compiler provides auto-memoization, but explicit React.memo for list items gives clearer intent and can be verified. List items benefit most from memoization as they render many times.",
       "category": "rendering",
       "impact": "low",
@@ -115,12 +119,13 @@
       "id": "perf-007",
       "title": "Review TanStack Query cache durations for admin endpoints",
       "status": "already_optimized",
-      "status_note": "useAdminSocialLinksQuery already has proper config: 5min staleTime, 30min gcTime, refetchOnMount: false, refetchOnWindowFocus in prod only.",
-      "description": "Admin queries use similar cache durations as user-facing queries. Since admin data changes more frequently and is accessed by fewer users, shorter cache times may be appropriate.",
-      "rationale": "Admin interfaces often need fresher data for operations like user management. Current 5-minute staleTime may show stale data during active admin sessions.",
+      "status_note": "useAdminSocialLinksQuery already has proper config: 5min staleTime, 30min gcTime, refetchOnMount: false, refetchOnWindowFocus in prod only. Cache strategies defined in lib/queries/cache-strategies.ts",
+      "description": "Cache strategy system well-defined with presets: REALTIME_CACHE (0ms), FREQUENT_CACHE (1min), STANDARD_CACHE (5min), STABLE_CACHE (15min), STATIC_CACHE (1hr), PAGINATED_CACHE (5min).",
+      "rationale": "Consistent caching improves predictability. Some hooks still use inline config instead of predefined strategies.",
       "category": "caching",
       "impact": "low",
       "affected_files": [
+        "apps/web/lib/queries/cache-strategies.ts",
         "apps/web/components/admin/admin-creator-profiles/useContactHydration.ts",
         "apps/web/lib/queries/useAdminSocialLinksQuery.ts"
       ],
@@ -131,15 +136,16 @@
       "id": "perf-008",
       "title": "Audit database queries for missing pagination limits",
       "status": "verified_safe",
-      "status_note": "Audit completed: All 20 queries have proper limits. Single-record lookups use .limit(1), paginated lists use validated pageSize (max 100), analytics use LIMIT 5 in SQL CTEs.",
-      "description": "Database queries should always include limits to prevent unbounded result sets. Need to audit lib/db queries to ensure all findMany/select operations have appropriate limits.",
+      "status_note": "Audit completed: All queries have proper limits. Single-record lookups use .limit(1), paginated lists use validated pageSize (max 100), analytics use LIMIT in SQL CTEs. Batch operations use DEFAULT_BATCH_SIZE=100, MAX_BATCH_SIZE=1000.",
+      "description": "Database queries should always include limits to prevent unbounded result sets. Audit confirmed all findMany/select operations have appropriate limits.",
       "rationale": "Unbounded queries can cause memory issues and slow responses when data grows. Even with pagination, inner queries and aggregations need limits.",
       "category": "database",
       "impact": "medium",
       "affected_files": [
         "apps/web/lib/admin/users.ts",
         "apps/web/lib/auth/session.ts",
-        "apps/web/lib/db/queries/analytics.ts"
+        "apps/web/lib/db/batch.ts",
+        "apps/web/lib/services/profile/queries.ts"
       ],
       "effort": "medium",
       "priority": "medium"
@@ -177,15 +183,125 @@
       ],
       "effort": "medium",
       "priority": "medium"
+    },
+    {
+      "id": "perf-011",
+      "title": "Migrate raw fetch() calls to TanStack Query mutations",
+      "status": "in_progress",
+      "status_note": "Started migration: SettingsBrandingSection now uses useBrandingSettingsMutation. Extended useSettingsMutation with hide_branding support. Remaining 42 files can be migrated incrementally.",
+      "description": "43 files use fetch() directly instead of React Query mutations, missing caching and deduplication benefits. DATA_FETCHING_AUDIT.md documents this gap.",
+      "rationale": "TanStack Query provides automatic caching, deduplication, retry logic, and optimistic updates. Raw fetch() loses these benefits.",
+      "category": "network",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/components/organisms/SettingsAppearanceSection.tsx",
+        "apps/web/components/dashboard/organisms/social-links/"
+      ],
+      "current_metric": "43 files with raw fetch() calls",
+      "expected_improvement": "Reduced redundant network requests, better error handling, optimistic updates",
+      "implementation": "1. Create dedicated mutation hooks in lib/queries/\n2. Use createMutationFn() wrapper for consistency\n3. Replace direct fetch() with useMutation hooks\n4. Add proper cache invalidation",
+      "tradeoffs": "More boilerplate for simple mutations; need to decide granularity of hooks",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-012",
+      "title": "Evaluate @statsig package necessity",
+      "status": "completed",
+      "status_note": "Removed unused @statsig/web-analytics package. @statsig/react-bindings is required for feature flags. @statsig/session-replay is already lazy-loaded for dev-only use.",
+      "description": "Three Statsig packages (@statsig/js-client, @statsig/session-replay, @statsig/web-analytics) add ~60KB+ to bundle",
+      "rationale": "If session replay or web analytics aren't actively used, removing them reduces bundle size",
+      "category": "bundle_size",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/package.json"
+      ],
+      "current_metric": "~60KB gzipped for 3 Statsig packages",
+      "expected_improvement": "~20KB reduction from removing unused @statsig/web-analytics",
+      "implementation": "1. Audit Statsig usage across codebase\n2. Verify session-replay value vs cost\n3. Remove unused packages\n4. Consider lazy loading remaining analytics",
+      "tradeoffs": "Loss of analytics/replay functionality if removed",
+      "effort": "small",
+      "priority": "low"
+    },
+    {
+      "id": "perf-013",
+      "title": "Add dynamic import for heavy admin components",
+      "status": "completed",
+      "status_note": "Added dynamic imports for InviteCampaignManager (admin page), ArtistNotificationsCTA (AnimatedArtistPage, ProfilePrimaryCTA). AvailabilityCell skipped as it's used in table cell renderer.",
+      "description": "Large admin forms (InviteCampaignManager 391 lines, AvailabilityCell 460 lines) could be lazy loaded since admin pages aren't always accessed",
+      "rationale": "Lazy loading reduces initial bundle for regular users who don't access admin pages",
+      "category": "bundle_size",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/app/app/admin/campaigns/page.tsx",
+        "apps/web/components/profile/animated-artist-page/AnimatedArtistPage.tsx",
+        "apps/web/components/profile/ProfilePrimaryCTA.tsx"
+      ],
+      "current_metric": "Large components (350-460 lines) loaded synchronously",
+      "expected_improvement": "~15-25KB initial bundle reduction",
+      "implementation": "1. Wrap components with next/dynamic\n2. Add loading skeletons\n3. Use { ssr: false } for client-only components",
+      "tradeoffs": "Slight delay on first interaction; loading states needed",
+      "effort": "small",
+      "priority": "medium"
+    },
+    {
+      "id": "perf-014",
+      "title": "Consider CSS animations for simple motion effects",
+      "status": "not_practical",
+      "status_note": "PricingToggle already uses CSS transitions. FeatureList uses stagger animations. Since framer-motion is used in 15+ core components (AnimatedArtistPage, AnimatedListenInterface, etc.), removing it from individual components won't reduce bundle - it's already chunked via webpack splitChunks.",
+      "description": "Framer Motion (~60KB) is used in 15+ components, some for simple fade/slide animations that could use CSS",
+      "rationale": "CSS animations are hardware-accelerated and don't require JavaScript bundle overhead",
+      "category": "bundle_size",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/components/pricing/FeatureList.tsx",
+        "apps/web/components/pricing/PricingToggle.tsx"
+      ],
+      "current_metric": "~60KB for framer-motion, used in 15+ components",
+      "expected_improvement": "No savings - framer-motion required elsewhere and already chunked",
+      "implementation": "1. Identify components with simple fade/slide animations\n2. Replace with CSS transitions or @keyframes\n3. Keep Framer Motion for complex gesture/physics animations",
+      "tradeoffs": "Less declarative animation code; some animations harder to implement in CSS",
+      "effort": "small",
+      "priority": "low"
     }
   ],
   "metadata": {
     "large_dependencies": [
       {
+        "name": "framer-motion",
+        "estimated_size": "~60KB gz",
+        "usage": "15+ components (pricing, dashboard, profile animations)",
+        "optimization": "Chunked via webpack splitChunks"
+      },
+      {
         "name": "recharts",
-        "estimated_size": "300KB",
+        "estimated_size": "~150KB gz",
         "usage": "Admin metrics only",
         "optimization": "Already lazy-loaded via MetricsChartClient"
+      },
+      {
+        "name": "@clerk/nextjs",
+        "estimated_size": "~150KB+ gz",
+        "usage": "Auth system (required)",
+        "optimization": "N/A - required for auth"
+      },
+      {
+        "name": "@radix-ui/* (16 packages)",
+        "estimated_size": "~120KB+ gz total",
+        "usage": "UI primitives",
+        "optimization": "Tree-shakable, modular imports"
+      },
+      {
+        "name": "@dnd-kit/* (4 packages)",
+        "estimated_size": "~80KB gz total",
+        "usage": "Drag-and-drop (modular)",
+        "optimization": "Properly split packages"
+      },
+      {
+        "name": "@statsig/* (3 packages)",
+        "estimated_size": "~60KB+ gz",
+        "usage": "Analytics, feature flags, session replay",
+        "optimization": "Consider removing unused packages"
       },
       {
         "name": "simple-icons",
@@ -195,57 +311,100 @@
       },
       {
         "name": "@sentry/nextjs",
-        "estimated_size": "100KB+",
+        "estimated_size": "~100KB+ gz",
         "usage": "Error monitoring",
-        "optimization": "Already has tree-shaking enabled"
+        "optimization": "Tree-shaking enabled via webpack"
       }
     ],
     "memoization_stats": {
       "useMemo_count": 183,
       "useCallback_count": 199,
-      "React_memo_count": 21,
-      "note": "React Compiler enabled for auto-memoization. Added WaitlistMobileCard to memo list."
+      "React_memo_count": 48,
+      "note": "React Compiler enabled for auto-memoization. Strong memoization adoption throughout codebase."
     },
     "virtualization_stats": {
       "using_tanstack_virtual": true,
       "virtualized_components": [
         "UnifiedTable",
         "AudienceTable",
-        "ReleaseTable"
-      ]
+        "ReleaseTable",
+        "KanbanBoard"
+      ],
+      "note": "Proper virtualization with configurable overscan (3-5 items)"
     },
-    "dynamic_imports_count": 16,
-    "potential_n_plus_one": 0,
-    "inline_handlers_count": 30,
-    "inline_styles_count": 30
+    "network_stats": {
+      "tanstack_query_hooks": "44+ files",
+      "raw_fetch_calls": 43,
+      "cache_strategies_defined": 6,
+      "fetch_timeout": "10s default with abort signal"
+    },
+    "database_stats": {
+      "batch_size_default": 100,
+      "batch_size_max": 1000,
+      "connection_pool_prod": "max 15, min 2",
+      "statement_timeout": "15s",
+      "n_plus_one_issues": 0
+    },
+    "bundle_optimization": {
+      "react_compiler": true,
+      "optimize_package_imports": "12+ packages configured",
+      "webpack_split_chunks": ["icons", "motion", "charts"],
+      "dynamic_imports_count": 23
+    },
+    "large_component_files": [
+      { "file": "UnifiedTable.tsx", "lines": 769 },
+      { "file": "WaitlistSpotifySearch.tsx", "lines": 499 },
+      { "file": "AvailabilityCell.tsx", "lines": 460 },
+      { "file": "AdminCreatorProfilesWithSidebar.tsx", "lines": 445 },
+      { "file": "DashboardAudienceTableUnified.tsx", "lines": 430 },
+      { "file": "ProviderCell.tsx", "lines": 434 },
+      { "file": "InviteCampaignManager.tsx", "lines": 391 }
+    ],
+    "inline_handlers_count": 40,
+    "inline_styles_count": 40
   },
   "summary": {
-    "total_ideas": 10,
-    "completed": 3,
-    "already_implemented": 3,
-    "verified_safe": 1,
-    "not_needed": 2,
-    "deferred": 1,
+    "total_ideas": 14,
+    "by_status": {
+      "completed": 5,
+      "already_implemented": 2,
+      "already_optimized": 1,
+      "verified_safe": 1,
+      "not_needed": 2,
+      "not_practical": 1,
+      "deferred": 1,
+      "in_progress": 1
+    },
     "by_category": {
-      "bundle_size": 3,
+      "bundle_size": 6,
       "rendering": 4,
       "caching": 1,
-      "database": 1
+      "database": 1,
+      "network": 1
     },
     "by_impact": {
       "high": 2,
-      "medium": 2,
-      "low": 6
+      "medium": 7,
+      "low": 5
     },
+    "potential_bundle_savings": "~35-45KB remaining (from pending items)",
+    "health_score": "9/10",
     "key_strengths": [
       "React Compiler enabled for auto-memoization",
       "TanStack Virtual for list virtualization",
-      "Dynamic imports used for heavy components (16 files)",
-      "optimizePackageImports configured for major libraries",
-      "Proper cache invalidation with unstable_cache and revalidation",
+      "Dynamic imports used for heavy components (26 files)",
+      "optimizePackageImports configured for 12+ libraries",
+      "Proper cache invalidation with React Query",
       "Bundle splitting with webpack splitChunks",
-      "Image optimization configured with Next.js Image",
-      "Partial Prerendering (PPR) enabled in incremental mode"
+      "Image optimization with Next.js Image",
+      "No legacy heavy dependencies (lodash, moment.js)",
+      "Database batch operations with proper limits",
+      "Connection pool monitoring with timeouts",
+      "Promise.all() for parallel queries",
+      "Unused @statsig/web-analytics removed"
+    ],
+    "areas_for_improvement": [
+      "Continue migrating remaining fetch() calls to React Query mutations (42 remaining)"
     ]
   }
 }
