@@ -11,6 +11,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { env } from '@/lib/env-server';
 import {
   audienceMembers,
   clickEvents,

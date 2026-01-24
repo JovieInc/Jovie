@@ -5,6 +5,8 @@ import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 import { resolveUserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';

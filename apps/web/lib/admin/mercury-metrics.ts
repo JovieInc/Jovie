@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { env } from '@/lib/env-server';
 
 const MERCURY_BASE_URL =
   env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';

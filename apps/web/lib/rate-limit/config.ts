@@ -12,24 +12,14 @@ import type { RateLimitConfig } from './types';
 // Environment-configurable limits
 // ============================================================================
 
-/**
- * Parse an environment value to an integer with fallback.
- * Handles undefined, empty string, and non-numeric values gracefully.
- */
-function parseIntEnv(value: string | undefined, fallback: number): number {
-  if (value === undefined || value === '') return fallback;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-const TRACKING_CLICKS_PER_HOUR = parseIntEnv(
-  env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR,
-  10000
+const TRACKING_CLICKS_PER_HOUR = Number.parseInt(
+  env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR ?? '10000',
+  10
 );
 
-const TRACKING_VISITS_PER_HOUR = parseIntEnv(
-  env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR,
-  50000
+const TRACKING_VISITS_PER_HOUR = Number.parseInt(
+  env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR ?? '50000',
+  10
 );
 
 // ============================================================================
@@ -311,19 +301,6 @@ export const RATE_LIMITERS = {
     limit: 100,
     window: '1 h',
     prefix: 'dsp:enrichment',
-    analytics: true,
-  } satisfies RateLimitConfig,
-
-  // ---------------------------------------------------------------------------
-  // AI Chat Operations
-  // ---------------------------------------------------------------------------
-
-  /** AI Chat: 30 messages per hour per user - protects Anthropic API costs */
-  aiChat: {
-    name: 'AI Chat',
-    limit: 30,
-    window: '1 h',
-    prefix: 'ai:chat',
     analytics: true,
   } satisfies RateLimitConfig,
 } as const;

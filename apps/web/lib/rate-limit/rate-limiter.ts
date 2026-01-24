@@ -45,7 +45,8 @@ export class RateLimiter {
     this.config = config;
     this.options = {
       preferRedis: options.preferRedis ?? true,
-      warnOnFallback: options.warnOnFallback ?? env.NODE_ENV === 'production',
+      warnOnFallback:
+        options.warnOnFallback ?? env.NODE_ENV === 'production',
       logger:
         options.logger ??
         ((msg: string) =>

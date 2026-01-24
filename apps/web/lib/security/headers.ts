@@ -9,8 +9,6 @@
  * @see https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html
  */
 
-import { env } from '@/lib/env-server';
-
 /**
  * Represents a single HTTP header key-value pair.
  * Compatible with Next.js headers() config format.
@@ -188,7 +186,8 @@ export const CROSS_ORIGIN_RESOURCE_POLICY_CROSS_ORIGIN: SecurityHeader = {
  * @returns true if running in production or preview environment
  */
 export function isNonLocalEnvironment(): boolean {
-  return !!(env.VERCEL_ENV && env.VERCEL_ENV !== 'development');
+  // VERCEL_ENV is only available server-side, so direct access is needed here
+  return !!(process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'development');
 }
 
 /**
@@ -198,7 +197,8 @@ export function isNonLocalEnvironment(): boolean {
  */
 export function getEnvironmentContext(): HeaderEnvironment {
   const isProduction = isNonLocalEnvironment();
-  const isDevelopment = env.NODE_ENV === 'development';
+  // NODE_ENV is injected at build time by Next.js
+  const isDevelopment = process.env.NODE_ENV === 'development';
   return { isProduction, isDevelopment };
 }
 
@@ -212,9 +212,9 @@ export function getEnvironmentContext(): HeaderEnvironment {
 export function buildBaseSecurityHeaders(
   options?: BuildSecurityHeadersOptions
 ): SecurityHeader[] {
-  const headerEnv = options?.env ?? getEnvironmentContext();
+  const env = options?.env ?? getEnvironmentContext();
   const includeProductionHeaders =
-    options?.includeProductionHeaders ?? headerEnv.isProduction;
+    options?.includeProductionHeaders ?? env.isProduction;
 
   const headers: SecurityHeader[] = [
     X_FRAME_OPTIONS,
@@ -246,9 +246,9 @@ export function buildApiSecurityHeaders(
   options?: BuildSecurityHeadersOptions
 ): SecurityHeader[] {
   const headers = buildBaseSecurityHeaders(options);
-  const headerEnv = options?.env ?? getEnvironmentContext();
+  const env = options?.env ?? getEnvironmentContext();
   const includeProductionHeaders =
-    options?.includeProductionHeaders ?? headerEnv.isProduction;
+    options?.includeProductionHeaders ?? env.isProduction;
 
   // Add CORP 'same-origin' for API routes in production
   // This prevents cross-origin sites from embedding or reading API responses
@@ -271,9 +271,9 @@ export function buildStaticAssetSecurityHeaders(
   options?: BuildSecurityHeadersOptions
 ): SecurityHeader[] {
   const headers = buildBaseSecurityHeaders(options);
-  const headerEnv = options?.env ?? getEnvironmentContext();
+  const env = options?.env ?? getEnvironmentContext();
   const includeProductionHeaders =
-    options?.includeProductionHeaders ?? headerEnv.isProduction;
+    options?.includeProductionHeaders ?? env.isProduction;
 
   // Add CORP 'cross-origin' for public assets in production
   // This allows CDNs and other sites to load these resources

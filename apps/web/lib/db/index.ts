@@ -95,7 +95,8 @@ function logDbError(
         ? {
             name: error.name,
             message: error.message,
-            stack: env.NODE_ENV === 'development' ? error.stack : undefined,
+            stack:
+              env.NODE_ENV === 'development' ? error.stack : undefined,
           }
         : error,
     metadata,
