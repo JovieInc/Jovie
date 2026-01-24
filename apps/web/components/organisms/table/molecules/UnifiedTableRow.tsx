@@ -35,7 +35,7 @@ export const UnifiedTableRow = memo(function UnifiedTableRow<TData>({
   getRowClassName,
   measureElement,
 }: UnifiedTableRowProps<TData>) {
-  const rowData = row.original as TData;
+  const rowData = row.original;
 
   const handleClick = useCallback(() => {
     onRowClick?.(rowData);
