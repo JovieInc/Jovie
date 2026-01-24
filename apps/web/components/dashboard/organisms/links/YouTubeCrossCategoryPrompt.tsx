@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import React from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { labelFor } from './utils';

@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
