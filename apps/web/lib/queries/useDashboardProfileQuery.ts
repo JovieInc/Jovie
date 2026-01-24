@@ -1,3 +1,5 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STANDARD_CACHE } from './cache-strategies';
 import { createMutationFn, createQueryFn } from './fetch';
