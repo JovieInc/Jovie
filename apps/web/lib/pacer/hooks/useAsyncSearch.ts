@@ -170,7 +170,7 @@ export function useAsyncSearch<TResult>({
       // Show loading state immediately for UX feedback
       setSearchState('loading');
 
-      void asyncDebouncer.maybeExecute(searchQuery);
+      asyncDebouncer.maybeExecute(searchQuery);
     },
     [asyncDebouncer, minQueryLength]
   );
