@@ -1,0 +1,276 @@
+{
+  "generated_at": "2026-01-24T17:15:00.000Z",
+  "scope": "apps/web",
+  "linear_issues_checked": 0,
+  "ideas": [
+    {
+      "id": "perf-001",
+      "title": "Lazy load recharts for admin metrics",
+      "description": "The recharts library (~300KB) is currently bundled with the main application but only used in a single admin component (MetricsChart.tsx). This adds unnecessary weight to the initial bundle.",
+      "rationale": "Most users never access admin pages, so the charting library should not impact their experience. Lazy loading heavy visualization libraries is a standard optimization.",
+      "category": "bundle_size",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/components/admin/MetricsChart.tsx",
+        "apps/web/components/admin/MetricsChartClient.tsx"
+      ],
+      "current_metric": "recharts adds ~300KB to JavaScript bundle",
+      "expected_improvement": "~300KB reduction for non-admin users, faster initial page load",
+      "implementation": "1. Wrap MetricsChart with next/dynamic with ssr: false\n2. Add a loading skeleton while chart loads\n3. Consider using a lighter chart library (visx) for simpler use cases",
+      "tradeoffs": "Admin users see a brief loading state when viewing metrics for the first time",
+      "effort": "small",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-002",
+      "title": "Refactor large component files into smaller modules",
+      "description": "Several components exceed 400 lines: UnifiedTable.tsx (769), WaitlistSpotifySearch.tsx (499), AdminCreatorProfilesWithSidebar.tsx (445). Large files are harder to tree-shake and lazy load selectively.",
+      "rationale": "Smaller, focused components improve code splitting effectiveness, maintainability, and allow more granular lazy loading. The UnifiedTable already has good internal memoization but could benefit from splitting render logic.",
+      "category": "bundle_size",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/components/organisms/table/organisms/UnifiedTable.tsx",
+        "apps/web/components/waitlist/WaitlistSpotifySearch.tsx",
+        "apps/web/components/admin/admin-creator-profiles/AdminCreatorProfilesWithSidebar.tsx",
+        "apps/web/components/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx"
+      ],
+      "current_metric": "4 components with 400+ lines each",
+      "expected_improvement": "Better tree-shaking, improved code maintainability",
+      "implementation": "1. Extract sub-components into separate files\n2. Create barrel exports for related components\n3. Consider extracting hooks into separate files",
+      "tradeoffs": "More files to manage, potential import complexity",
+      "effort": "medium",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-003",
+      "title": "Audit inline onClick handlers for render optimization",
+      "description": "Found 30+ instances of inline arrow functions in onClick handlers (e.g., onClick={() => handleClick(id)}). While React Compiler (enabled) may optimize these, explicit useCallback can improve debugging and ensure optimization.",
+      "rationale": "Inline functions create new references on each render, potentially causing child components to re-render unnecessarily. React Compiler should handle this, but explicit patterns are more reliable and debuggable.",
+      "category": "rendering",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/components/pricing/PricingToggle.tsx",
+        "apps/web/components/waitlist/WaitlistPrimaryGoalStep.tsx",
+        "apps/web/components/profile/notifications/CountrySelector.tsx",
+        "apps/web/components/organisms/table/molecules/TablePaginationFooter.tsx",
+        "apps/web/components/profile/artist-contacts-button/ArtistContactsButton.tsx"
+      ],
+      "current_metric": "30+ inline handlers across components",
+      "expected_improvement": "More predictable rendering, easier performance debugging",
+      "implementation": "1. Wrap handlers with useCallback when passing to memoized children\n2. For simple handlers, React Compiler should suffice\n3. Focus on handlers passed to list items or frequently re-rendered components",
+      "tradeoffs": "React Compiler may already optimize these; manual optimization adds code complexity",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-004",
+      "title": "Memoize dynamic inline style objects",
+      "description": "Found 30+ instances of inline style={{...}} objects in components like UnifiedTable, KanbanBoard, and AnimatedListenInterface. These create new objects on each render.",
+      "rationale": "Inline style objects are recreated on every render, causing the DOM to potentially diff and update styles unnecessarily. Memoizing with useMemo prevents this.",
+      "category": "rendering",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/components/organisms/table/organisms/UnifiedTable.tsx",
+        "apps/web/components/admin/table/organisms/KanbanBoard.tsx",
+        "apps/web/components/profile/animated-listen-interface/AnimatedListenInterface.tsx",
+        "apps/web/components/admin/table/AdminCreatorsTableHeader.tsx"
+      ],
+      "current_metric": "30+ inline style objects",
+      "expected_improvement": "Reduced object allocations, fewer style recalculations",
+      "implementation": "1. For static styles, extract to CSS/Tailwind classes\n2. For dynamic styles, memoize with useMemo dependent on changing values\n3. Consider CSS custom properties for theme-based dynamic values",
+      "tradeoffs": "Some inline styles are intentional for dynamic positioning (virtualization); focus on non-dynamic cases",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-005",
+      "title": "Add simple-icons to optimizePackageImports",
+      "description": "The simple-icons package (16MB+) is imported but not in the optimizePackageImports list. While SocialIcon.tsx uses tree-shaken imports, adding to the optimization list ensures consistent handling.",
+      "rationale": "Next.js optimizePackageImports transforms barrel imports into direct file imports for better tree-shaking. The simple-icons package is already imported correctly, but explicit optimization ensures consistency.",
+      "category": "bundle_size",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/next.config.js",
+        "apps/web/components/atoms/SocialIcon.tsx"
+      ],
+      "current_metric": "simple-icons not in optimizePackageImports list",
+      "expected_improvement": "Ensure consistent tree-shaking, potential 5-10KB reduction",
+      "implementation": "1. Add 'simple-icons' to experimental.optimizePackageImports in next.config.js\n2. Verify bundle size before/after with ANALYZE=true pnpm build",
+      "tradeoffs": "Minimal - this is a safe optimization",
+      "effort": "trivial",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-006",
+      "title": "Increase React.memo usage for list item components",
+      "description": "Only 20 components use explicit React.memo, while there are many list-rendering scenarios. Key candidates include table cells, sidebar items, and dropdown options.",
+      "rationale": "React Compiler provides auto-memoization, but explicit React.memo for list items gives clearer intent and can be verified. List items benefit most from memoization as they render many times.",
+      "category": "rendering",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/components/organisms/table/atoms/AvatarCell.tsx",
+        "apps/web/components/organisms/table/atoms/DateCell.tsx",
+        "apps/web/components/organisms/sidebar/menu.tsx",
+        "apps/web/components/admin/WaitlistMobileCard.tsx"
+      ],
+      "current_metric": "20 components with explicit React.memo",
+      "expected_improvement": "Reduced re-renders in list contexts, clearer optimization intent",
+      "implementation": "1. Identify components rendered in lists (map callbacks)\n2. Wrap with React.memo if they receive stable props\n3. Add custom comparison function if needed for complex props",
+      "tradeoffs": "React Compiler may already handle this; adding memo adds maintenance overhead",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-007",
+      "title": "Review TanStack Query cache durations for admin endpoints",
+      "description": "Admin queries use similar cache durations as user-facing queries. Since admin data changes more frequently and is accessed by fewer users, shorter cache times may be appropriate.",
+      "rationale": "Admin interfaces often need fresher data for operations like user management. Current 5-minute staleTime may show stale data during active admin sessions.",
+      "category": "caching",
+      "impact": "low",
+      "affected_files": [
+        "apps/web/components/admin/admin-creator-profiles/useContactHydration.ts",
+        "apps/web/lib/queries/useAdminSocialLinksQuery.ts"
+      ],
+      "current_metric": "5 minute staleTime for admin queries",
+      "expected_improvement": "Fresher admin data, better UX for admin operations",
+      "implementation": "1. Consider 1-2 minute staleTime for admin queries\n2. Add refetchOnWindowFocus for active admin sessions\n3. Consider optimistic updates for admin mutations",
+      "tradeoffs": "More frequent refetches, slightly higher server load for admin users",
+      "effort": "small",
+      "priority": "low",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-008",
+      "title": "Audit database queries for missing pagination limits",
+      "description": "Database queries should always include limits to prevent unbounded result sets. Need to audit lib/db queries to ensure all findMany/select operations have appropriate limits.",
+      "rationale": "Unbounded queries can cause memory issues and slow responses when data grows. Even with pagination, inner queries and aggregations need limits.",
+      "category": "database",
+      "impact": "medium",
+      "affected_files": [
+        "apps/web/lib/admin/users.ts",
+        "apps/web/lib/auth/session.ts",
+        "apps/web/lib/db/queries/analytics.ts"
+      ],
+      "current_metric": "Unknown - requires audit",
+      "expected_improvement": "Prevent potential memory issues, faster query responses",
+      "implementation": "1. Audit all db.select() and findMany calls\n2. Add explicit .limit() clauses\n3. Document max limits for each query type\n4. Consider adding query timeout middleware",
+      "tradeoffs": "May need to implement pagination UI where limits are added",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-009",
+      "title": "Implement server component streaming for dashboard",
+      "description": "Dashboard pages load all data before rendering. With Next.js App Router, Suspense boundaries can stream content progressively.",
+      "rationale": "Streaming allows users to see and interact with loaded content while other sections load. This improves perceived performance significantly.",
+      "category": "rendering",
+      "impact": "high",
+      "affected_files": [
+        "apps/web/app/app/dashboard/page.tsx",
+        "apps/web/components/dashboard/organisms/DashboardOverview.tsx",
+        "apps/web/components/dashboard/organisms/DashboardAudienceClient.tsx"
+      ],
+      "current_metric": "Dashboard waits for all data before rendering",
+      "expected_improvement": "50%+ improvement in perceived load time, better TTFB",
+      "implementation": "1. Wrap independent sections in Suspense with fallback skeletons\n2. Use loading.tsx for route-level streaming\n3. Prioritize above-the-fold content\n4. Consider parallel data fetching in server components",
+      "tradeoffs": "More complex error handling, need to design independent data fetching",
+      "effort": "medium",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "perf-010",
+      "title": "Enable Partial Prerendering (PPR) for mixed static/dynamic pages",
+      "description": "Next.js 15 supports Partial Prerendering which can pre-render static shells while streaming dynamic content. The homepage and profile pages are good candidates.",
+      "rationale": "PPR combines static generation speed with dynamic content flexibility. Static shells load instantly while dynamic parts stream in.",
+      "category": "rendering",
+      "impact": "high",
+      "affected_files": [
+        "apps/web/app/page.tsx",
+        "apps/web/app/[username]/page.tsx",
+        "apps/web/next.config.js"
+      ],
+      "current_metric": "Full dynamic rendering for pages with mixed content",
+      "expected_improvement": "Near-instant initial paint, improved Core Web Vitals (LCP)",
+      "implementation": "1. Enable experimental.ppr in next.config.js\n2. Identify static vs dynamic sections\n3. Wrap dynamic sections in Suspense\n4. Test with Lighthouse before/after",
+      "tradeoffs": "Experimental feature, may have edge cases; need careful testing",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    }
+  ],
+  "metadata": {
+    "large_dependencies": [
+      {
+        "name": "recharts",
+        "estimated_size": "300KB",
+        "usage": "Admin metrics only",
+        "optimization": "Lazy load or replace"
+      },
+      {
+        "name": "simple-icons",
+        "estimated_size": "16MB raw, tree-shaken to ~50KB",
+        "usage": "SocialIcon component",
+        "optimization": "Already tree-shaken, add to optimizePackageImports"
+      },
+      {
+        "name": "@sentry/nextjs",
+        "estimated_size": "100KB+",
+        "usage": "Error monitoring",
+        "optimization": "Already has tree-shaking enabled"
+      }
+    ],
+    "memoization_stats": {
+      "useMemo_count": 183,
+      "useCallback_count": 199,
+      "React_memo_count": 20,
+      "note": "React Compiler enabled for auto-memoization"
+    },
+    "virtualization_stats": {
+      "using_tanstack_virtual": true,
+      "virtualized_components": [
+        "UnifiedTable",
+        "AudienceTable",
+        "ReleaseTable"
+      ]
+    },
+    "dynamic_imports_count": 16,
+    "potential_n_plus_one": 0,
+    "inline_handlers_count": 30,
+    "inline_styles_count": 30
+  },
+  "summary": {
+    "total_ideas": 10,
+    "by_category": {
+      "bundle_size": 3,
+      "rendering": 4,
+      "caching": 1,
+      "database": 1,
+      "runtime": 0,
+      "memory": 0,
+      "network": 0
+    },
+    "by_impact": {
+      "high": 2,
+      "medium": 2,
+      "low": 6
+    },
+    "potential_bundle_savings": "~300KB",
+    "key_strengths": [
+      "React Compiler enabled for auto-memoization",
+      "TanStack Virtual for list virtualization",
+      "Dynamic imports used for heavy components (16 files)",
+      "optimizePackageImports configured for major libraries",
+      "Proper cache invalidation with unstable_cache and revalidation",
+      "Bundle splitting with webpack splitChunks",
+      "Image optimization configured with Next.js Image"
+    ]
+  }
+}
