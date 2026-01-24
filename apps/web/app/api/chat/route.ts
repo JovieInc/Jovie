@@ -1,5 +1,6 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { streamText } from 'ai';
 import { NextResponse } from 'next/server';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
@@ -196,13 +197,43 @@ export async function POST(req: Request) {
     }
   }
 
+  // Check for Anthropic API key
+  if (!process.env.ANTHROPIC_API_KEY) {
+    Sentry.captureMessage('ANTHROPIC_API_KEY is not configured', {
+      level: 'error',
+      tags: { feature: 'ai-chat' },
+    });
+    return NextResponse.json(
+      { error: 'AI chat is not configured. Please contact support.' },
+      { status: 503 }
+    );
+  }
+
   const systemPrompt = buildSystemPrompt(artistContext as ArtistContext);
 
-  const result = streamText({
-    model: anthropic('claude-sonnet-4-20250514'),
-    system: systemPrompt,
-    messages,
-  });
+  try {
+    const result = streamText({
+      model: anthropic('claude-sonnet-4-20250514'),
+      system: systemPrompt,
+      messages,
+    });
 
-  return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse();
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { feature: 'ai-chat' },
+      extra: {
+        userId,
+        messageCount: messages.length,
+      },
+    });
+
+    const message =
+      error instanceof Error ? error.message : 'An unexpected error occurred';
+
+    return NextResponse.json(
+      { error: 'Failed to process chat request', message },
+      { status: 500 }
+    );
+  }
 }

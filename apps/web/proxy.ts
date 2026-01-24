@@ -433,7 +433,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         );
       } else {
         // All other paths - user is authenticated and on correct page
-        res = NextResponse.next({ request: { headers: requestHeaders } });
+        // On app.jov.ie, rewrite root to /app to show dashboard instead of marketing
+        if (isAppSubdomain(hostname) && pathname === '/') {
+          res = NextResponse.rewrite(new URL('/app', req.url), {
+            request: { headers: requestHeaders },
+          });
+        } else {
+          res = NextResponse.next({ request: { headers: requestHeaders } });
+        }
       }
     } else {
       // Handle unauthenticated users
@@ -452,9 +459,12 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         '/billing',
       ];
 
-      const needsAuth = protectedPaths.some(
+      // On app.jov.ie, root path is also protected (it's the dashboard)
+      const isProtectedPath = protectedPaths.some(
         p => pathname === p || pathname.startsWith(`${p}/`)
       );
+      const needsAuth =
+        isProtectedPath || (isAppSubdomain(hostname) && pathname === '/');
 
       if (needsAuth) {
         // Redirect to signup for waitlist (new users creating accounts)
