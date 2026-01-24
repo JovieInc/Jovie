@@ -42,6 +42,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+  const tourDatesGate = useFeatureGate(STATSIG_FLAGS.TOUR_DATES);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -65,6 +66,14 @@ export function DashboardNav(_: DashboardNavProps) {
     [contactsGate.value]
   );
 
+  const secondaryItems = useMemo(
+    () =>
+      tourDatesGate.value
+        ? secondaryNavigation
+        : secondaryNavigation.filter(item => item.id !== 'tour-dates'),
+    [tourDatesGate.value]
+  );
+
   const isInSettings = pathname.startsWith('/app/settings');
 
   // Memoize nav sections to prevent creating new objects on every render
@@ -74,9 +83,9 @@ export function DashboardNav(_: DashboardNavProps) {
         ? [{ key: 'settings', items: settingsNavigation }]
         : [
             { key: 'primary', items: primaryItems },
-            { key: 'secondary', items: secondaryNavigation },
+            { key: 'secondary', items: secondaryItems },
           ],
-    [isInSettings, primaryItems]
+    [isInSettings, primaryItems, secondaryItems]
   );
 
   // Memoize renderNavItem to prevent creating new functions on every render
