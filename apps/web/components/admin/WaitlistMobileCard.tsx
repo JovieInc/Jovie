@@ -133,11 +133,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
             onClick={onApprove}
             className='flex-1'
           >
-            {(() => {
-              if (isApproved) return 'Approved';
-              if (isApproving) return 'Approving…';
-              return 'Approve';
-            })()}
+            {isApproved ? 'Approved' : isApproving ? 'Approving…' : 'Approve'}
           </Button>
           <Button
             size='sm'
