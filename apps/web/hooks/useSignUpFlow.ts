@@ -7,6 +7,7 @@
 
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
+import { APP_URL } from '@/constants/domains';
 import {
   isSessionExists,
   isSignInSuggested,
@@ -258,10 +259,13 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       base.storeRedirectUrl();
 
       try {
+        // Use absolute URLs to ensure OAuth callback happens on app.jov.ie
+        // This ensures the Clerk session cookie is set on the correct domain
+        // where the user will be authenticated (app subdomain, not root domain)
         await signUp.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: '/signup/sso-callback',
-          redirectUrlComplete: base.getRedirectUrl(),
+          redirectUrl: `${APP_URL}/signup/sso-callback`,
+          redirectUrlComplete: `${APP_URL}/onboarding`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard
