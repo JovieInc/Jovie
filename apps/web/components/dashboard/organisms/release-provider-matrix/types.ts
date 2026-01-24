@@ -33,7 +33,7 @@ export interface UseReleaseProviderMatrixReturn {
   isSaving: boolean;
   isSyncing: boolean;
   headerElevated: boolean;
-  tableContainerRef: React.RefObject<HTMLDivElement>;
+  tableContainerRef: React.RefObject<HTMLDivElement | null>;
   providerList: ProviderListItem[];
   totalReleases: number;
   totalOverrides: number;

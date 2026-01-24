@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ElementType } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +18,7 @@ interface ArtistNameProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showLink?: boolean;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
+  as?: ElementType;
 }
 
 const sizeClasses = {

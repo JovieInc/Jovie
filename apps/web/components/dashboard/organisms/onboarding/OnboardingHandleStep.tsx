@@ -22,7 +22,7 @@ interface OnboardingHandleStepProps {
   isSubmitting: boolean;
   isTransitioning: boolean;
   ctaDisabledReason: string | null;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   onHandleChange: (value: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
   isPendingSubmit?: boolean;

@@ -1,3 +1,4 @@
+import type { ElementType } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SectionHeadingProps {
@@ -17,7 +18,7 @@ export function SectionHeading({
   size = 'lg',
   id,
 }: SectionHeadingProps) {
-  const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+  const Tag = `h${level}` as ElementType;
 
   // Normalized type scale following 4/8pt grid system
   const sizeClasses = {

@@ -10,7 +10,7 @@ type ProfileNotificationsButtonProps = {
   notificationsState: ProfileNotificationsState;
   onClick: () => void;
   ariaExpanded?: boolean;
-  buttonRef?: React.RefObject<HTMLButtonElement>;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
 export function ProfileNotificationsButton({

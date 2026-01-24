@@ -16,7 +16,7 @@ export interface ProfileNotificationsMenuProps {
   open: boolean;
   subscribedChannels: NotificationSubscriptionState;
   subscriptionDetails: NotificationContactValues;
-  triggerRef?: React.RefObject<HTMLButtonElement>;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export interface UseNotificationConfirmReturn {

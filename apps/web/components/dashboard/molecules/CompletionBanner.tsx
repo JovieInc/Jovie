@@ -8,7 +8,7 @@ const COMPLETION_BANNER_STORAGE_KEY =
   'jovie_dashboard_completion_banner_dismissed_v1';
 
 export const CompletionBanner = memo(
-  function CompletionBanner(): JSX.Element | null {
+  function CompletionBanner(): React.ReactElement | null {
     const [dismissed, setDismissed] = useState(false);
 
     useEffect(() => {

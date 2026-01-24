@@ -13,7 +13,7 @@ export function DashboardOverviewToolbar({
   range,
   onRangeChange,
   onRefresh,
-}: DashboardOverviewToolbarProps): JSX.Element {
+}: DashboardOverviewToolbarProps): React.ReactElement {
   const rangeLabel = useMemo(() => {
     if (range === '7d') return 'Last 7 days';
     if (range === '30d') return 'Last 30 days';
