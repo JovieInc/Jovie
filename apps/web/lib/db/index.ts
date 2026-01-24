@@ -10,7 +10,7 @@
 export type { InferModel } from 'drizzle-orm';
 // Re-export from drizzle-orm for backwards compatibility
 export { and, eq } from 'drizzle-orm';
-// Re-export types
+// Re-export types from client directory
 export type {
   ActiveConnectionsRow,
   ConnectionValidationResult,
@@ -19,9 +19,9 @@ export type {
   PerformanceCheckResult,
   TableExistsRow,
   TransactionType,
-} from './client';
+} from './client/index';
 
-// Re-export client functionality
+// Re-export client functionality from client directory
 export {
   // Health Checks
   checkDbHealth,
@@ -48,7 +48,7 @@ export {
   withDb,
   withRetry,
   withTransaction,
-} from './client';
+} from './client/index';
 // Re-export configuration
 export { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 
