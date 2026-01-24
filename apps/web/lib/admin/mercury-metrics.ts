@@ -4,7 +4,7 @@ import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 
 const MERCURY_BASE_URL =
-  env.MERCURY_API_BASE_URL ?? 'https://api.mercury.com/api/v1';
+  env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface MercuryEnv {
@@ -49,9 +49,13 @@ export interface AdminMercuryMetrics {
 }
 
 function getMercuryEnv(): MercuryEnv | null {
-  const apiToken = env.MERCURY_API_TOKEN ?? env.MERCURY_API_KEY ?? '';
+  // Use logical OR to treat empty strings as missing (fallback to secondary key)
+  const apiToken =
+    env.MERCURY_API_TOKEN?.trim() || env.MERCURY_API_KEY?.trim() || '';
   const checkingAccountId =
-    env.MERCURY_CHECKING_ACCOUNT_ID ?? env.MERCURY_ACCOUNT_ID ?? '';
+    env.MERCURY_CHECKING_ACCOUNT_ID?.trim() ||
+    env.MERCURY_ACCOUNT_ID?.trim() ||
+    '';
 
   if (!apiToken || !checkingAccountId) {
     return null;
@@ -181,7 +185,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       isConfigured: false,
       isAvailable: false,
       errorMessage:
-        'Mercury credentials not configured (MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID required)',
+        'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     };
   }
 

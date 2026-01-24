@@ -12,14 +12,24 @@ import type { RateLimitConfig } from './types';
 // Environment-configurable limits
 // ============================================================================
 
-const TRACKING_CLICKS_PER_HOUR = Number.parseInt(
-  env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR ?? '10000',
-  10
+/**
+ * Parse an environment value to an integer with fallback.
+ * Handles undefined, empty string, and non-numeric values gracefully.
+ */
+function parseIntEnv(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === '') return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+const TRACKING_CLICKS_PER_HOUR = parseIntEnv(
+  env.TRACKING_RATE_LIMIT_CLICKS_PER_HOUR,
+  10000
 );
 
-const TRACKING_VISITS_PER_HOUR = Number.parseInt(
-  env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR ?? '50000',
-  10
+const TRACKING_VISITS_PER_HOUR = parseIntEnv(
+  env.TRACKING_RATE_LIMIT_VISITS_PER_HOUR,
+  50000
 );
 
 // ============================================================================

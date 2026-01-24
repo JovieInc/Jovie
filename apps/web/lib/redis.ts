@@ -32,8 +32,8 @@ export function getRedis(): Redis | null {
   _redisInitAttempted = true;
   _redisLastAttempt = now;
 
-  // Check if Redis is configured
-  if (!env.UPSTASH_REDIS_REST_URL) {
+  // Check if Redis is configured (both URL and token are required)
+  if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
     if (env.NODE_ENV === 'production' && !_redis) {
       Sentry.captureMessage(
         'Redis not configured in production - rate limiting and caching disabled',
@@ -46,7 +46,7 @@ export function getRedis(): Redis | null {
   try {
     _redis = new Redis({
       url: env.UPSTASH_REDIS_REST_URL,
-      token: env.UPSTASH_REDIS_REST_TOKEN!,
+      token: env.UPSTASH_REDIS_REST_TOKEN,
     });
     Sentry.addBreadcrumb({
       category: 'redis',

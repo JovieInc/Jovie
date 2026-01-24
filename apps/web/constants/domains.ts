@@ -31,12 +31,10 @@ export const ADMIN_EMAIL_DOMAIN = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
 // ============================================================================
 
 /** Profile base URL - for building profile links */
-export const PROFILE_URL =
-  publicEnv.NEXT_PUBLIC_PROFILE_URL ?? `https://${PROFILE_HOSTNAME}`;
+export const PROFILE_URL = publicEnv.NEXT_PUBLIC_PROFILE_URL;
 
 /** App/dashboard base URL */
-export const APP_URL =
-  publicEnv.NEXT_PUBLIC_APP_URL ?? `https://${APP_HOSTNAME}`;
+export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL;
 
 // ============================================================================
 // Helper Functions

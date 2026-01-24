@@ -212,9 +212,9 @@ export function getEnvironmentContext(): HeaderEnvironment {
 export function buildBaseSecurityHeaders(
   options?: BuildSecurityHeadersOptions
 ): SecurityHeader[] {
-  const env = options?.env ?? getEnvironmentContext();
+  const headerEnv = options?.env ?? getEnvironmentContext();
   const includeProductionHeaders =
-    options?.includeProductionHeaders ?? env.isProduction;
+    options?.includeProductionHeaders ?? headerEnv.isProduction;
 
   const headers: SecurityHeader[] = [
     X_FRAME_OPTIONS,
@@ -246,9 +246,9 @@ export function buildApiSecurityHeaders(
   options?: BuildSecurityHeadersOptions
 ): SecurityHeader[] {
   const headers = buildBaseSecurityHeaders(options);
-  const env = options?.env ?? getEnvironmentContext();
+  const headerEnv = options?.env ?? getEnvironmentContext();
   const includeProductionHeaders =
-    options?.includeProductionHeaders ?? env.isProduction;
+    options?.includeProductionHeaders ?? headerEnv.isProduction;
 
   // Add CORP 'same-origin' for API routes in production
   // This prevents cross-origin sites from embedding or reading API responses
@@ -271,9 +271,9 @@ export function buildStaticAssetSecurityHeaders(
   options?: BuildSecurityHeadersOptions
 ): SecurityHeader[] {
   const headers = buildBaseSecurityHeaders(options);
-  const env = options?.env ?? getEnvironmentContext();
+  const headerEnv = options?.env ?? getEnvironmentContext();
   const includeProductionHeaders =
-    options?.includeProductionHeaders ?? env.isProduction;
+    options?.includeProductionHeaders ?? headerEnv.isProduction;
 
   // Add CORP 'cross-origin' for public assets in production
   // This allows CDNs and other sites to load these resources
