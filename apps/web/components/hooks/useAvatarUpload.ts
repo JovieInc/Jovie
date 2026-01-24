@@ -31,7 +31,7 @@ export interface UseAvatarUploadReturn {
   handleDragLeave: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent) => void;
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function useAvatarUpload({

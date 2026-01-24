@@ -12,7 +12,7 @@ interface OnboardingNameStepProps {
   isValid: boolean;
   isTransitioning: boolean;
   isSubmitting: boolean;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   onNameChange: (value: string) => void;
   onSubmit: () => void;
 }

@@ -34,7 +34,9 @@ export interface FieldProps {
   /**
    * The form control (Input, Select, Textarea, etc.)
    */
-  children: React.ReactElement;
+  children: React.ReactElement<
+    React.HTMLAttributes<HTMLElement> & { variant?: string }
+  >;
   /**
    * Additional className for the container
    */
@@ -70,9 +72,7 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
     const isInvalid = !!error;
 
     // Clone the child element and inject accessibility props
-    const childWithProps = React.cloneElement<
-      React.HTMLAttributes<HTMLElement>
-    >(children, {
+    const childWithProps = React.cloneElement(children, {
       id,
       'aria-describedby': ariaDescribedBy,
       'aria-invalid': isInvalid || undefined,

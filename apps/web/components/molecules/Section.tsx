@@ -1,3 +1,4 @@
+import type { ElementType } from 'react';
 import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +10,7 @@ interface SectionProps {
   padding?: 'sm' | 'md' | 'lg' | 'xl' | 'none';
   withGridBg?: boolean;
   withBorder?: boolean;
-  as?: keyof JSX.IntrinsicElements;
+  as?: ElementType;
   [key: string]: unknown; // For additional props like id, aria-*, etc.
 }
 

@@ -16,7 +16,7 @@ export function SetupTaskItem({
   completeLabel,
   incompleteLabel,
   action,
-}: SetupTaskItemProps): JSX.Element {
+}: SetupTaskItemProps): React.ReactElement {
   return (
     <li className='flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-1/70 p-4 shadow-sm'>
       <div className='flex items-center gap-2'>
