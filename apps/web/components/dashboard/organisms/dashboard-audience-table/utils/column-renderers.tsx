@@ -125,7 +125,7 @@ export function createLastSeenCellRenderer(
 ) {
   return function LastSeenCell({
     row,
-  }: CellContext<AudienceMember, Date | null>) {
+  }: CellContext<AudienceMember, string | null>) {
     return (
       <AudienceLastSeenCell
         row={row.original}

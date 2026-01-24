@@ -61,6 +61,30 @@ async function requireProfile(): Promise<{
 }
 
 /**
+ * Extract genres from release metadata
+ */
+function extractGenres(metadata: Record<string, unknown> | null): string[] {
+  if (!metadata) return [];
+
+  // Try common genre field names from various sources
+  const genreField =
+    metadata.genres ??
+    metadata.genre ??
+    metadata.spotifyGenres ??
+    metadata.spotify_genres;
+
+  if (Array.isArray(genreField)) {
+    return genreField.filter((g): g is string => typeof g === 'string');
+  }
+
+  if (typeof genreField === 'string') {
+    return [genreField];
+  }
+
+  return [];
+}
+
+/**
  * Map database release to view model
  */
 function mapReleaseToViewModel(
@@ -104,6 +128,14 @@ function mapReleaseToViewModel(
         };
       })
       .filter(provider => provider.url !== ''),
+    // Extended fields
+    releaseType: release.releaseType,
+    upc: release.upc,
+    label: release.label,
+    totalTracks: release.totalTracks,
+    totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
+    primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
+    genres: extractGenres(release.metadata),
   };
 }
 
