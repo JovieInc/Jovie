@@ -1,3 +1,4 @@
+import { captureError } from '@/lib/error-tracking';
 import {
   enqueueBeaconsIngestionJob,
   enqueueLayloIngestionJob,
@@ -59,7 +60,10 @@ export async function scheduleIngestionJobs(
           creatorProfileId: profileId,
           sourceUrl: link.url,
         }).catch(err => {
-          console.error('Failed to enqueue beacons ingestion job', err);
+          captureError('Failed to enqueue beacons ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
           return null;
         })
       )
@@ -73,7 +77,10 @@ export async function scheduleIngestionJobs(
           creatorProfileId: profileId,
           sourceUrl: link.url,
         }).catch(err => {
-          console.error('Failed to enqueue linktree ingestion job', err);
+          captureError('Failed to enqueue linktree ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
           return null;
         })
       )
@@ -87,7 +94,10 @@ export async function scheduleIngestionJobs(
           creatorProfileId: profileId,
           sourceUrl: link.url,
         }).catch(err => {
-          console.error('Failed to enqueue laylo ingestion job', err);
+          captureError('Failed to enqueue laylo ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
           return null;
         })
       )
@@ -101,7 +111,10 @@ export async function scheduleIngestionJobs(
           creatorProfileId: profileId,
           sourceUrl: link.url,
         }).catch(err => {
-          console.error('Failed to enqueue youtube ingestion job', err);
+          captureError('Failed to enqueue youtube ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
           return null;
         })
       )

@@ -11,6 +11,8 @@
  * - Error codes are stable identifiers for client handling
  */
 
+import { captureError } from '@/lib/error-tracking';
+
 // ============================================================================
 // Error Codes
 // ============================================================================
@@ -280,8 +282,8 @@ export function handleIngestError(
   retryAfter?: number;
 } {
   if (isIngestError(error)) {
-    // Log internal details server-side
-    console.error('[Ingest Error]', {
+    // Log internal details server-side via Sentry
+    captureError('[Ingest Error]', error, {
       ...error.toLogObject(),
       ...context,
     });
@@ -290,11 +292,7 @@ export function handleIngestError(
   }
 
   // Unknown error - never leak details
-  console.error('[Ingest Error] Unexpected error', {
-    error: error instanceof Error ? error.message : 'Unknown error',
-    stack: error instanceof Error ? error.stack : undefined,
-    ...context,
-  });
+  captureError('[Ingest Error] Unexpected error', error, context);
 
   return {
     error: 'An unexpected error occurred. Please try again.',

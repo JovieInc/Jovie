@@ -1,4 +1,5 @@
 import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Clerk API error codes mapped to user-friendly messages.
@@ -83,7 +84,9 @@ export function parseClerkError(error: unknown): string {
   // Handle standard Error objects
   if (error instanceof Error) {
     // Don't expose internal error messages to users
-    console.error('[Auth Error]', error);
+    Sentry.captureException(error, {
+      tags: { context: 'clerk_auth_error' },
+    });
     return 'An unexpected error occurred. Please try again.';
   }
 
@@ -130,6 +133,17 @@ export function isCodeExpired(error: unknown): boolean {
   if (isClerkAPIResponseError(error)) {
     const code = error.errors[0]?.code;
     return code === 'verification_expired';
+  }
+  return false;
+}
+
+/**
+ * Check if a session already exists (user is already signed in)
+ */
+export function isSessionExists(error: unknown): boolean {
+  if (isClerkAPIResponseError(error)) {
+    const code = error.errors[0]?.code;
+    return code === 'session_exists';
   }
   return false;
 }

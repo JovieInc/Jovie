@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerPropertyRowProps {
@@ -22,6 +22,12 @@ export function DrawerPropertyRow({
 }: DrawerPropertyRowProps) {
   const Wrapper = interactive ? 'button' : 'div';
 
+  // Memoize dynamic style object to avoid creating new object on each render
+  const gridStyle = useMemo(
+    () => ({ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }),
+    [labelWidth]
+  );
+
   return (
     <Wrapper
       type={interactive ? 'button' : undefined}
@@ -32,7 +38,7 @@ export function DrawerPropertyRow({
           'rounded-md -mx-2 px-2 py-1.5 hover:bg-surface-2 transition-colors cursor-pointer',
         className
       )}
-      style={{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }}
+      style={gridStyle}
     >
       <div className='pt-0.5 text-xs text-secondary-token'>{label}</div>
       <div className='min-w-0 text-sm text-primary-token'>{value}</div>

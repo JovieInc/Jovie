@@ -266,9 +266,6 @@ importers:
       nuqs:
         specifier: ^2.8.6
         version: 2.8.6(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
-      postgres:
-        specifier: ^3.4.8
-        version: 3.4.8
       react:
         specifier: 18.3.1
         version: 18.3.1
@@ -20032,7 +20029,8 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  postgres@3.4.8: {}
+  postgres@3.4.8:
+    optional: true
 
   powershell-utils@0.1.0: {}
 

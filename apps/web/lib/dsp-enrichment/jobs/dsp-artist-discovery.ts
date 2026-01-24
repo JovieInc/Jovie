@@ -431,7 +431,7 @@ export async function processDspArtistDiscoveryJob(
           result.errors.push(`Apple Music: ${error}`);
         }
       }
-      // TODO: Add deezer and musicbrainz support
+      // See JOV-479: Add Deezer and MusicBrainz support
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown error occurred';

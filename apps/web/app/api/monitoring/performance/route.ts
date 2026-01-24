@@ -36,7 +36,7 @@ export async function GET(): Promise<NextResponse<PerformanceResponse>> {
     }
 
     // Performance metrics endpoint is not yet implemented
-    // TODO: Integrate with analytics service (e.g., Vercel Analytics, Sentry) to fetch real metrics
+    // See JOV-480: Integrate with analytics service (Vercel Analytics, Sentry)
     return NextResponse.json(
       { error: 'Performance metrics not yet available', metrics: [] },
       { status: 501, headers: NO_STORE_HEADERS }

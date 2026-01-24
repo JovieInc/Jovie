@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { db } from '@/lib/db';
 import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 /**
  * Clerk metadata fields that Jovie mirrors from the database.
@@ -206,9 +206,9 @@ export async function handleClerkUserDeleted(
       .limit(1);
 
     if (!dbUser) {
-      console.warn(
-        `[clerk-sync] User ${clerkUserId} not found in DB for deletion`
-      );
+      captureWarning('User not found in DB for Clerk deletion', {
+        clerkUserId,
+      });
       return { success: true }; // Already doesn't exist
     }
 

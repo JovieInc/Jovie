@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * DSP Matches Query Hook
  *

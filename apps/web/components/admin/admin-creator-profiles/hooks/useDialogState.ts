@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Dialog State Hook
  *

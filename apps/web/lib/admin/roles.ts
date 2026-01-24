@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { cache } from 'react';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { redis } from '@/lib/redis';
 
 /**
@@ -64,7 +65,7 @@ async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
 
     return user?.isAdmin ?? false;
   } catch (error) {
-    console.error('[admin/roles] Failed to check admin status:', error);
+    captureError('[admin/roles] Failed to check admin status', error);
     // Fail closed - deny access on error
     return false;
   }
@@ -106,9 +107,11 @@ export const isAdmin = cache(async function isAdmin(
 
       return isUserAdmin;
     } catch (error) {
-      console.warn(
-        '[admin/roles] Redis cache failed, falling back to memory:',
-        error
+      captureWarning(
+        '[admin/roles] Redis cache failed, falling back to memory',
+        {
+          error,
+        }
       );
       // Fall through to memory cache
     }
@@ -152,7 +155,9 @@ export function invalidateAdminCache(userId: string): void {
   if (redis) {
     const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
     redis.del(cacheKey).catch(error => {
-      console.warn('[admin/roles] Failed to invalidate Redis cache:', error);
+      captureWarning('[admin/roles] Failed to invalidate Redis cache', {
+        error,
+      });
     });
   }
 }

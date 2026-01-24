@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Context Menu Items Hook
  *

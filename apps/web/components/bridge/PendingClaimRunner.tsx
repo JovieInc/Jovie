@@ -1,5 +1,6 @@
 'use client';
 
+import { captureException } from '@sentry/nextjs';
 import { useEffect } from 'react';
 
 export function PendingClaimRunner() {
@@ -8,12 +9,8 @@ export function PendingClaimRunner() {
       try {
         // Clear any pending claims from session storage
         sessionStorage.removeItem('pendingClaim');
-
-        // For now, just clear the pending claim
-        // In the future, this could process actual claims
-        console.log('Cleared pending claims');
       } catch (error) {
-        console.error('Error processing pending claims:', error);
+        captureException(error, { extra: { context: 'pending-claim-runner' } });
       }
     };
 

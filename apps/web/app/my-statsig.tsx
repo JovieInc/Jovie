@@ -26,18 +26,16 @@ interface MyStatsigEnabledProps {
   plugins: StatsigPlugin<StatsigClient>[];
 }
 
-function MyStatsigEnabledInner({
+/**
+ * Inner component that actually initializes the Statsig client.
+ * Separated to ensure hooks are only called when this component is rendered.
+ */
+function StatsigClientProvider({
   children,
   sdkKey,
   user,
   plugins,
 }: MyStatsigEnabledProps) {
-  const [isMounted, setIsMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const { client } = useClientAsyncInit(sdkKey, user, {
     logLevel: LogLevel.Debug,
     plugins,
@@ -78,15 +76,30 @@ function MyStatsigEnabledInner({
       : null),
   });
 
-  // Don't render provider until mounted (avoids SSR hydration issues)
-  if (!isMounted) {
-    return <>{children}</>;
-  }
-
   return (
-    <StatsigProvider client={client} loadingComponent={<div />}>
+    <StatsigProvider client={client} loadingComponent={null}>
       {children}
     </StatsigProvider>
+  );
+}
+
+/**
+ * Wrapper that always renders StatsigProvider for consistent hook behavior.
+ * The client initialization is deferred until after hydration to avoid
+ * state updates during render, but the provider context is always present.
+ */
+function MyStatsigEnabledInner({
+  children,
+  sdkKey,
+  user,
+  plugins,
+}: MyStatsigEnabledProps) {
+  // Always render through StatsigClientProvider to ensure consistent hook calls
+  // in child components that use useFeatureGate, useExperiment, etc.
+  return (
+    <StatsigClientProvider sdkKey={sdkKey} user={user} plugins={plugins}>
+      {children}
+    </StatsigClientProvider>
   );
 }
 

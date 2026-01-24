@@ -5,6 +5,7 @@
  * error handling and user feedback across the app.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { toast } from 'sonner';
 import { FetchError } from './fetch';
 
@@ -47,9 +48,14 @@ export function handleMutationError(
   const message = getErrorMessage(error, fallbackMessage);
   toast.error(message);
 
-  // Log for debugging in development
+  // Log mutation errors for debugging
   if (process.env.NODE_ENV === 'development') {
-    console.error(`[Mutation Error] ${fallbackMessage}:`, error);
+    Sentry.addBreadcrumb({
+      category: 'mutation',
+      message: `Mutation Error: ${fallbackMessage}`,
+      level: 'error',
+      data: { error: error instanceof Error ? error.message : String(error) },
+    });
   }
 }
 

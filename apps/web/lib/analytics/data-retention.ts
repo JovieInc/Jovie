@@ -8,6 +8,7 @@
  * Compliance: GDPR Article 5(1)(e), CCPA data minimization
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
@@ -109,9 +110,14 @@ export async function runDataRetentionCleanup(options?: {
   const cutoffDate = getRetentionCutoffDate(retentionDays);
   const dryRun = options?.dryRun ?? false;
 
-  console.log(`[Data Retention] Starting cleanup (dry run: ${dryRun})`, {
-    retentionDays,
-    cutoffDate: cutoffDate.toISOString(),
+  Sentry.addBreadcrumb({
+    category: 'data-retention',
+    message: `Starting cleanup (dry run: ${dryRun})`,
+    level: 'info',
+    data: {
+      retentionDays,
+      cutoffDate: cutoffDate.toISOString(),
+    },
   });
 
   let clickEventsDeleted = 0;
@@ -170,10 +176,15 @@ export async function runDataRetentionCleanup(options?: {
     duration,
   };
 
-  console.log('[Data Retention] Cleanup complete', {
-    ...result,
-    cutoffDate: result.cutoffDate.toISOString(),
-    dryRun,
+  Sentry.addBreadcrumb({
+    category: 'data-retention',
+    message: 'Cleanup complete',
+    level: 'info',
+    data: {
+      ...result,
+      cutoffDate: result.cutoffDate.toISOString(),
+      dryRun,
+    },
   });
 
   return result;

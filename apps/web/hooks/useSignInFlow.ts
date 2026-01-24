@@ -7,7 +7,12 @@
 
 import { useSignIn } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
-import { isSignUpSuggested, parseClerkError } from '@/lib/auth/clerk-errors';
+import { APP_URL } from '@/constants/domains';
+import {
+  isSessionExists,
+  isSignUpSuggested,
+  parseClerkError,
+} from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
@@ -109,6 +114,13 @@ export function useSignInFlow(): UseSignInFlowReturn {
         base.setLoadingState({ type: 'idle' });
         return true;
       } catch (err) {
+        // If user already has a session, redirect to dashboard
+        if (isSessionExists(err)) {
+          const redirectUrl = base.getRedirectUrl();
+          base.router.push(redirectUrl);
+          return false;
+        }
+
         const message = parseClerkError(err);
         base.setError(message);
         setShouldSuggestSignUp(isSignUpSuggested(err));
@@ -216,12 +228,22 @@ export function useSignInFlow(): UseSignInFlowReturn {
       base.storeRedirectUrl();
 
       try {
+        // Use absolute URLs to ensure OAuth callback happens on app.jov.ie
+        // This ensures the Clerk session cookie is set on the correct domain
+        // where the user will be authenticated (app subdomain, not root domain)
         await signIn.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: '/signin/sso-callback',
-          redirectUrlComplete: base.getRedirectUrl(),
+          redirectUrl: `${APP_URL}/signin/sso-callback`,
+          redirectUrlComplete: `${APP_URL}/`,
         });
       } catch (err) {
+        // If user already has a session, redirect to dashboard
+        if (isSessionExists(err)) {
+          const redirectUrl = base.getRedirectUrl();
+          base.router.push(redirectUrl);
+          return;
+        }
+
         const message = parseClerkError(err);
         base.setError(message);
         base.setLoadingState({ type: 'idle' });

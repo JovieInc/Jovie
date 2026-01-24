@@ -2,13 +2,13 @@
 
 import { Star } from 'lucide-react';
 import { useState } from 'react';
-import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
+import { useAvatarUploadMutation } from '@/lib/queries/useAvatarUploadMutation';
 
 export interface CreatorAvatarCellProps {
   profileId: string;
@@ -30,42 +30,26 @@ export function CreatorAvatarCell({
     avatarUrl ?? null
   );
 
-  const uploadImage = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch('/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const message =
-        (errorData as { error?: string }).error || 'Upload failed';
-      throw new Error(message);
-    }
-
-    const data = (await response.json()) as { blobUrl: string };
-    return data.blobUrl;
-  };
+  const { mutateAsync: uploadAvatar } = useAvatarUploadMutation();
 
   const handleUpload = async (file: File): Promise<string> => {
-    const url = await uploadImage(file);
+    const result = await uploadAvatar(
+      { file, profileId },
+      {
+        onSuccess: data => {
+          setPreviewUrl(data.blobUrl);
+          notifications.success('Avatar updated');
+        },
+        onError: error => {
+          // Re-throw so AvatarUploadable can show error state
+          throw error instanceof Error
+            ? error
+            : new Error('Failed to update avatar');
+        },
+      }
+    );
 
-    try {
-      await updateCreatorAvatarAsAdmin(profileId, url);
-      setPreviewUrl(url);
-      notifications.success('Avatar updated');
-    } catch (error) {
-      console.error('Failed to update creator avatar as admin', error);
-      // Re-throw so AvatarUploadable can show error state
-      throw error instanceof Error
-        ? error
-        : new Error('Failed to update avatar');
-    }
-
-    return url;
+    return result.blobUrl;
   };
 
   return (

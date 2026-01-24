@@ -7,7 +7,12 @@
 
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
-import { isSignInSuggested, parseClerkError } from '@/lib/auth/clerk-errors';
+import { APP_URL } from '@/constants/domains';
+import {
+  isSessionExists,
+  isSignInSuggested,
+  parseClerkError,
+} from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
@@ -131,6 +136,12 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         base.setLoadingState({ type: 'idle' });
         return true;
       } catch (err) {
+        // If user already has a session, redirect to dashboard
+        if (isSessionExists(err)) {
+          base.router.push('/app/dashboard');
+          return false;
+        }
+
         const message = parseClerkError(err);
         base.setError(message);
         setShouldSuggestSignIn(isSignInSuggested(err));
@@ -248,12 +259,21 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       base.storeRedirectUrl();
 
       try {
+        // Use absolute URLs to ensure OAuth callback happens on app.jov.ie
+        // This ensures the Clerk session cookie is set on the correct domain
+        // where the user will be authenticated (app subdomain, not root domain)
         await signUp.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: '/signup/sso-callback',
-          redirectUrlComplete: base.getRedirectUrl(),
+          redirectUrl: `${APP_URL}/signup/sso-callback`,
+          redirectUrlComplete: `${APP_URL}/onboarding`,
         });
       } catch (err) {
+        // If user already has a session, redirect to dashboard
+        if (isSessionExists(err)) {
+          base.router.push('/app/dashboard');
+          return;
+        }
+
         const message = parseClerkError(err);
         base.setError(message);
         base.setLoadingState({ type: 'idle' });

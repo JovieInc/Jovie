@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * DSP Enrichment Mutations
  *
@@ -7,6 +9,7 @@
  * - Trigger discovery for new profiles
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
@@ -227,10 +230,12 @@ export function useConfirmDspMatchMutation() {
 
     onError: (error, variables) => {
       // Log error for monitoring
-      console.error(
-        `[DSP] Failed to confirm match ${variables.matchId}:`,
-        error
-      );
+      Sentry.addBreadcrumb({
+        category: 'dsp-enrichment',
+        message: `Failed to confirm match ${variables.matchId}`,
+        level: 'error',
+        data: { error: error instanceof Error ? error.message : String(error) },
+      });
     },
   });
 }
@@ -266,10 +271,12 @@ export function useRejectDspMatchMutation() {
     },
 
     onError: (error, variables) => {
-      console.error(
-        `[DSP] Failed to reject match ${variables.matchId}:`,
-        error
-      );
+      Sentry.addBreadcrumb({
+        category: 'dsp-enrichment',
+        message: `Failed to reject match ${variables.matchId}`,
+        level: 'error',
+        data: { error: error instanceof Error ? error.message : String(error) },
+      });
     },
   });
 }
@@ -307,10 +314,12 @@ export function useTriggerDiscoveryMutation() {
     },
 
     onError: (error, variables) => {
-      console.error(
-        `[DSP] Failed to trigger discovery for profile ${variables.profileId}:`,
-        error
-      );
+      Sentry.addBreadcrumb({
+        category: 'dsp-enrichment',
+        message: `Failed to trigger discovery for profile ${variables.profileId}`,
+        level: 'error',
+        data: { error: error instanceof Error ? error.message : String(error) },
+      });
     },
 
     // Discovery is not idempotent, so don't retry automatically

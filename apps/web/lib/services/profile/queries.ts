@@ -14,6 +14,7 @@ import {
   socialLinks,
   users,
 } from '@/lib/db/schema';
+import { captureWarning } from '@/lib/error-tracking';
 import { redis } from '@/lib/redis';
 import type {
   ProfileData,
@@ -199,7 +200,7 @@ export async function getProfileSocialLinks(
     .limit(MAX_SOCIAL_LINKS);
 
   if (links.length === MAX_SOCIAL_LINKS) {
-    console.warn('[profile-service] MAX_SOCIAL_LINKS limit hit', {
+    captureWarning('[profile-service] MAX_SOCIAL_LINKS limit hit', {
       profileId,
       count: links.length,
     });
@@ -246,7 +247,7 @@ export async function getProfileContacts(
       .limit(MAX_CONTACTS);
 
     if (contacts.length === MAX_CONTACTS) {
-      console.warn('[profile-service] MAX_CONTACTS limit hit', {
+      captureWarning('[profile-service] MAX_CONTACTS limit hit', {
         profileId,
         count: contacts.length,
       });
@@ -263,7 +264,7 @@ export async function getProfileContacts(
       errorMessage.includes('does not exist') ||
       causeMessage.includes('does not exist')
     ) {
-      console.warn(
+      captureWarning(
         '[profile-service] creator_contacts table does not exist, returning empty'
       );
       return [];
@@ -301,7 +302,7 @@ export async function getProfileWithLinks(
         return reviveProfileDates(cached);
       }
     } catch (error) {
-      console.warn('[profile-service] Redis cache read failed:', error);
+      captureWarning('[profile-service] Redis cache read failed', { error });
       // Fall through to database query
     }
   }
@@ -314,7 +315,7 @@ export async function getProfileWithLinks(
     redis
       .set(cacheKey, result, { ex: PROFILE_CACHE_TTL_SECONDS })
       .catch(error => {
-        console.warn('[profile-service] Redis cache write failed:', error);
+        captureWarning('[profile-service] Redis cache write failed', { error });
       });
   }
 
@@ -472,7 +473,9 @@ export async function invalidateProfileEdgeCache(
   try {
     await redis.del(cacheKey);
   } catch (error) {
-    console.warn('[profile-service] Failed to invalidate edge cache:', error);
+    captureWarning('[profile-service] Failed to invalidate edge cache', {
+      error,
+    });
   }
 }
 

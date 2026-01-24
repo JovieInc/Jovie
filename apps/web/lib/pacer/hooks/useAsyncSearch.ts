@@ -6,7 +6,7 @@
 
 import type { AsyncDebouncerState } from '@tanstack/react-pacer';
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAbortError } from '../errors';
 import { PACER_TIMING } from './timing';
 
@@ -69,6 +69,60 @@ export function useAsyncSearch<TResult>({
   >('idle');
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Store callbacks in refs to avoid recreating debouncer on every render
+  const searchFnRef = useRef(searchFn);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    searchFnRef.current = searchFn;
+    onErrorRef.current = onError;
+  }, [searchFn, onError]);
+
+  // Shared search execution logic
+  const executeSearch = useCallback(
+    async (trimmedQuery: string, controller: AbortController) => {
+      try {
+        const searchResults = await searchFnRef.current(
+          trimmedQuery,
+          controller.signal
+        );
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setResults(searchResults);
+        setSearchState(searchResults.length === 0 ? 'empty' : 'success');
+      } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
+
+        const searchError =
+          err instanceof Error ? err : new Error('Search failed');
+        setError(searchError);
+        setResults([]);
+        setSearchState('error');
+        onErrorRef.current?.(searchError);
+      }
+    },
+    []
+  );
+
+  // Stabilize debouncer options to prevent recreation on every render
+  const debouncerOptions = useMemo(
+    () => ({
+      wait,
+      onError: (err: unknown) => {
+        const searchError =
+          err instanceof Error ? err : new Error('Search failed');
+        setError(searchError);
+        setSearchState('error');
+        onErrorRef.current?.(searchError);
+      },
+    }),
+    [wait]
+  );
+
   const asyncDebouncer = useAsyncDebouncer(
     async (searchQuery: string) => {
       const trimmed = searchQuery.trim();
@@ -88,39 +142,9 @@ export function useAsyncSearch<TResult>({
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      try {
-        const searchResults = await searchFn(trimmed, controller.signal);
-
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setResults(searchResults);
-        setSearchState(searchResults.length === 0 ? 'empty' : 'success');
-      } catch (err) {
-        // Use standardized error check
-        if (isAbortError(err)) {
-          return;
-        }
-
-        const searchError =
-          err instanceof Error ? err : new Error('Search failed');
-        setError(searchError);
-        setResults([]);
-        setSearchState('error');
-        onError?.(searchError);
-      }
+      await executeSearch(trimmed, controller);
     },
-    {
-      wait,
-      onError: err => {
-        const searchError =
-          err instanceof Error ? err : new Error('Search failed');
-        setError(searchError);
-        setSearchState('error');
-        onError?.(searchError);
-      },
-    },
+    debouncerOptions,
     (state: AsyncDebouncerState<(searchQuery: string) => Promise<void>>) => ({
       isExecuting: state.isExecuting,
       isPending: state.isPending,
@@ -133,6 +157,10 @@ export function useAsyncSearch<TResult>({
 
       const trimmed = searchQuery.trim();
       if (trimmed.length < minQueryLength) {
+        // Cancel any pending debounced work and in-flight requests
+        asyncDebouncer.cancel();
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
         setResults([]);
         setSearchState('idle');
         setError(null);
@@ -142,7 +170,7 @@ export function useAsyncSearch<TResult>({
       // Show loading state immediately for UX feedback
       setSearchState('loading');
 
-      void asyncDebouncer.maybeExecute(searchQuery);
+      asyncDebouncer.maybeExecute(searchQuery);
     },
     [asyncDebouncer, minQueryLength]
   );
@@ -154,6 +182,8 @@ export function useAsyncSearch<TResult>({
 
       const trimmed = searchQuery.trim();
       if (trimmed.length < minQueryLength) {
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
         setResults([]);
         setSearchState('idle');
         setError(null);
@@ -161,36 +191,16 @@ export function useAsyncSearch<TResult>({
       }
 
       setSearchState('loading');
+      setError(null);
 
       // Cancel any previous request
       abortControllerRef.current?.abort();
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      try {
-        const searchResults = await searchFn(trimmed, controller.signal);
-
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setResults(searchResults);
-        setSearchState(searchResults.length === 0 ? 'empty' : 'success');
-      } catch (err) {
-        // Use standardized error check
-        if (isAbortError(err)) {
-          return;
-        }
-
-        const searchError =
-          err instanceof Error ? err : new Error('Search failed');
-        setError(searchError);
-        setResults([]);
-        setSearchState('error');
-        onError?.(searchError);
-      }
+      await executeSearch(trimmed, controller);
     },
-    [asyncDebouncer, minQueryLength, searchFn, onError]
+    [asyncDebouncer, minQueryLength, executeSearch]
   );
 
   const clear = useCallback(() => {
@@ -203,12 +213,13 @@ export function useAsyncSearch<TResult>({
     setQuery('');
   }, [asyncDebouncer]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - cancel both debouncer and in-flight requests
   useEffect(() => {
     return () => {
+      asyncDebouncer.cancel();
       abortControllerRef.current?.abort();
     };
-  }, []);
+  }, [asyncDebouncer]);
 
   return {
     search,
