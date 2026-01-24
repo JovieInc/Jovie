@@ -73,7 +73,6 @@ export async function GET(request: Request) {
     }
 
     let totalScheduled = 0;
-    let totalSkipped = 0;
 
     // Process each release
     for (const release of upcomingReleases) {
@@ -105,54 +104,38 @@ export async function GET(request: Request) {
         // Create a unique dedup key to prevent duplicate notifications
         const dedupKey = `release_day:${release.id}:${subscriber.id}`;
 
-        try {
-          // Insert notification entry (will fail silently on duplicate)
-          await db
-            .insert(fanReleaseNotifications)
-            .values({
-              creatorProfileId: release.creatorProfileId,
-              releaseId: release.id,
-              notificationSubscriptionId: subscriber.id,
-              notificationType: 'release_day',
-              scheduledFor: release.releaseDate,
-              status: 'pending',
-              dedupKey,
-              metadata: {
-                releaseTitle: release.title,
-                channel: subscriber.channel,
-              },
-            })
-            .onConflictDoNothing({ target: fanReleaseNotifications.dedupKey });
+        // Insert notification entry (onConflictDoNothing silently skips duplicates)
+        await db
+          .insert(fanReleaseNotifications)
+          .values({
+            creatorProfileId: release.creatorProfileId,
+            releaseId: release.id,
+            notificationSubscriptionId: subscriber.id,
+            notificationType: 'release_day',
+            scheduledFor: release.releaseDate,
+            status: 'pending',
+            dedupKey,
+            metadata: {
+              releaseTitle: release.title,
+              channel: subscriber.channel,
+            },
+          })
+          .onConflictDoNothing({ target: fanReleaseNotifications.dedupKey });
 
-          totalScheduled++;
-        } catch (error) {
-          // Skip duplicates and log other errors
-          if (
-            error instanceof Error &&
-            error.message.includes('duplicate key')
-          ) {
-            totalSkipped++;
-          } else {
-            logger.error(
-              '[schedule-release-notifications] Failed to schedule notification:',
-              error
-            );
-          }
-        }
+        totalScheduled++;
       }
     }
 
     logger.info(
-      `[schedule-release-notifications] Scheduled ${totalScheduled} notifications, skipped ${totalSkipped} duplicates`
+      `[schedule-release-notifications] Processed ${totalScheduled} notifications for ${upcomingReleases.length} releases`
     );
 
     return NextResponse.json(
       {
         success: true,
-        message: `Scheduled ${totalScheduled} release notifications`,
-        scheduled: totalScheduled,
-        skipped: totalSkipped,
-        releasesProcessed: upcomingReleases.length,
+        message: `Processed ${totalScheduled} notifications`,
+        processed: totalScheduled,
+        releasesFound: upcomingReleases.length,
         timestamp: now.toISOString(),
       },
       { headers: NO_STORE_HEADERS }

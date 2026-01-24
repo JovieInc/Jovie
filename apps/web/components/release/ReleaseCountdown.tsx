@@ -38,19 +38,17 @@ interface ReleaseCountdownProps {
   releaseDate: Date;
 }
 
+const UPDATE_INTERVAL_MS = 60_000;
+
 export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>(() =>
     getTimeLeft(releaseDate)
   );
 
   useEffect(() => {
-    // Update immediately on mount
-    setTimeLeft(getTimeLeft(releaseDate));
-
-    // Update every minute
     const timer = setInterval(() => {
       setTimeLeft(getTimeLeft(releaseDate));
-    }, 60000);
+    }, UPDATE_INTERVAL_MS);
 
     return () => clearInterval(timer);
   }, [releaseDate]);

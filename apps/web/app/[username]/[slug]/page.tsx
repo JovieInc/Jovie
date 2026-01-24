@@ -383,44 +383,6 @@ export default async function ContentSmartLinkPage({
   const isUnreleased =
     content.releaseDate && new Date(content.releaseDate) > new Date();
 
-  // Show unreleased hero with countdown and notify me CTA
-  if (isUnreleased) {
-    return (
-      <>
-        {/* JSON-LD Structured Data for SEO */}
-        <Script
-          id='music-schema'
-          type='application/ld+json'
-          strategy='afterInteractive'
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(musicSchema) }}
-        />
-        <Script
-          id='breadcrumb-schema'
-          type='application/ld+json'
-          strategy='afterInteractive'
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
-        />
-
-        <UnreleasedReleaseHero
-          release={{
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-            releaseDate: content.releaseDate!,
-          }}
-          artist={{
-            id: creator.id,
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-          }}
-        />
-      </>
-    );
-  }
-
-  // Use the same landing page component for both releases and tracks
   return (
     <>
       {/* JSON-LD Structured Data for SEO */}
@@ -439,19 +401,35 @@ export default async function ContentSmartLinkPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
 
-      <ReleaseLandingPage
-        release={{
-          title: content.title,
-          artworkUrl: content.artworkUrl,
-          releaseDate: content.releaseDate?.toISOString() ?? null,
-        }}
-        artist={{
-          name: creator.displayName ?? creator.username,
-          avatarUrl: creator.avatarUrl,
-        }}
-        providers={allProviders}
-        slug={`${creator.usernameNormalized}/${content.slug}`}
-      />
+      {isUnreleased ? (
+        <UnreleasedReleaseHero
+          release={{
+            title: content.title,
+            artworkUrl: content.artworkUrl,
+            releaseDate: content.releaseDate!,
+          }}
+          artist={{
+            id: creator.id,
+            name: creator.displayName ?? creator.username,
+            handle: creator.usernameNormalized,
+            avatarUrl: creator.avatarUrl,
+          }}
+        />
+      ) : (
+        <ReleaseLandingPage
+          release={{
+            title: content.title,
+            artworkUrl: content.artworkUrl,
+            releaseDate: content.releaseDate?.toISOString() ?? null,
+          }}
+          artist={{
+            name: creator.displayName ?? creator.username,
+            avatarUrl: creator.avatarUrl,
+          }}
+          providers={allProviders}
+          slug={`${creator.usernameNormalized}/${content.slug}`}
+        />
+      )}
     </>
   );
 }
