@@ -27,13 +27,30 @@ async function getAppUserId(): Promise<string> {
     const authResult = await resolveUserState();
 
     // Defensive check: ensure we have a valid Clerk user ID
+    // This can happen legitimately in certain scenarios:
+    // - Clerk bypass/mock mode is enabled
+    // - Session expired between proxy.ts and layout render
+    // - Clerk context propagation race condition
     if (!authResult.clerkUserId) {
-      const error = new Error('Missing clerkUserId despite proxy routing');
-      Sentry.captureException(error, {
-        tags: { context: 'app_layout_defensive_check' },
-        level: 'error',
-      });
-      console.error('[app-layout] Missing clerkUserId despite proxy routing');
+      const isClerkBypassed =
+        process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+        !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+      // Only report to Sentry if this is truly unexpected (not bypass mode)
+      if (!isClerkBypassed) {
+        Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
+          level: 'warning', // Changed from 'error' - this is handled gracefully
+          tags: {
+            context: 'app_layout_defensive_check',
+            vercel_env: process.env.VERCEL_ENV || 'unknown',
+          },
+          extra: {
+            userState: authResult.state,
+            hasDbUser: !!authResult.dbUserId,
+          },
+        });
+      }
+      console.warn('[app-layout] Missing clerkUserId, redirecting to signin');
       redirect('/signin?redirect_url=/app/dashboard');
     }
 

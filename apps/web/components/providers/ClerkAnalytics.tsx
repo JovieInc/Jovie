@@ -1,7 +1,7 @@
 'use client';
 
-import { useAuth, useUser } from '@clerk/nextjs';
 import { useEffect } from 'react';
+import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { identify } from '@/lib/analytics';
 
 /**
@@ -9,8 +9,8 @@ import { identify } from '@/lib/analytics';
  * Extend this to integrate Clerk analytics events as needed.
  */
 export function ClerkAnalytics() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  const { user } = useUser();
+  const { isLoaded, isSignedIn, userId } = useAuthSafe();
+  const { user } = useUserSafe();
 
   useEffect(() => {
     if (!isLoaded) return;

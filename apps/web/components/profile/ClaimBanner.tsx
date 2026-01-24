@@ -1,9 +1,9 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback } from 'react';
+import { useUserSafe } from '@/hooks/useClerkSafe';
 
 export interface ClaimBannerProps {
   /** The claim token for this profile */
@@ -27,7 +27,7 @@ export function ClaimBanner({
   profileHandle,
   displayName,
 }: ClaimBannerProps) {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded } = useUserSafe();
 
   const claimPath = `/claim/${encodeURIComponent(claimToken)}`;
 
