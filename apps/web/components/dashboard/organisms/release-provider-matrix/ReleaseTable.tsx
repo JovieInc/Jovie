@@ -1,11 +1,12 @@
 'use client';
 
+import { useDebouncer } from '@tanstack/react-pacer';
 import {
   type ColumnDef,
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 // Cell components are now used via factory functions in ./utils/column-renderers
 import {
@@ -28,8 +29,15 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   createSmartLinkCellRenderer,
+  renderDurationCell,
+  renderGenresCell,
+  renderIsrcCell,
+  renderLabelCell,
   renderPopularityCell,
   renderReleaseDateCell,
+  renderReleaseTypeCell,
+  renderTotalTracksCell,
+  renderUpcCell,
 } from './utils/column-renderers';
 
 interface ProviderConfig {
@@ -59,9 +67,16 @@ interface ReleaseTableProps {
   bulkActions?: HeaderBulkAction[];
   /** Callback to clear selection */
   onClearSelection?: () => void;
+  /** Column visibility state from preferences */
+  columnVisibility?: Record<string, boolean>;
+  /** Row height from density preference */
+  rowHeight?: number;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
+
+/** Threshold above which sorting is debounced to prevent UI jank */
+const LARGE_DATASET_THRESHOLD = 500;
 
 /**
  * ReleaseTable - Releases table using UnifiedTable
@@ -87,10 +102,37 @@ export function ReleaseTable({
   onSelectionChange,
   bulkActions = [],
   onClearSelection,
+  columnVisibility,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
 }: ReleaseTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'releaseDate', desc: true },
   ]);
+  const [isSorting, startTransition] = useTransition();
+
+  // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
+  const sortingDebouncer = useDebouncer(
+    (newSorting: SortingState) => {
+      startTransition(() => {
+        setSorting(newSorting);
+      });
+    },
+    { wait: 150 }
+  );
+
+  // Use immediate sorting for small datasets, debounced for large
+  const handleSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const newSorting =
+        typeof updater === 'function' ? updater(sorting) : updater;
+      if (releases.length > LARGE_DATASET_THRESHOLD) {
+        sortingDebouncer.maybeExecute(newSorting);
+      } else {
+        setSorting(newSorting);
+      }
+    },
+    [sorting, releases.length, sortingDebouncer]
+  );
 
   // Row selection - use external selection if provided, otherwise use internal
   const rowIds = useMemo(() => releases.map(r => r.id), [releases]);
@@ -106,7 +148,7 @@ export function ReleaseTable({
       if (rowIdSet.has(id)) count++;
     }
     return count;
-  }, [selectedIds.size, rowIds.length]);
+  }, [selectedIds, rowIdSet]);
 
   // Compute header checkbox state based on visible selection
   const headerCheckboxState = useMemo(() => {
@@ -139,7 +181,7 @@ export function ReleaseTable({
         internalSelection.toggleSelect(id);
       }
     },
-    [onSelectionChange, selectedIds.size, internalSelection.toggleSelect]
+    [onSelectionChange, selectedIds, internalSelection.toggleSelect]
   );
 
   const toggleSelectAll = useCallback(() => {
@@ -166,8 +208,8 @@ export function ReleaseTable({
   }, [
     onSelectionChange,
     visibleSelectedCount,
-    rowIds.length,
-    selectedIds.size,
+    rowIds,
+    selectedIds,
     internalSelection.toggleSelectAll,
   ]);
 
@@ -233,6 +275,15 @@ export function ReleaseTable({
         enableSorting: true,
       }),
 
+      // Release type column (badge)
+      columnHelper.accessor('releaseType', {
+        id: 'releaseType',
+        header: 'Type',
+        cell: renderReleaseTypeCell,
+        size: 80,
+        enableSorting: true,
+      }),
+
       // Availability column showing all providers
       columnHelper.display({
         id: 'availability',
@@ -273,6 +324,59 @@ export function ReleaseTable({
         enableSorting: true,
       }),
 
+      // ISRC column (copyable)
+      columnHelper.accessor('primaryIsrc', {
+        id: 'primaryIsrc',
+        header: 'ISRC',
+        cell: renderIsrcCell,
+        size: 120,
+        enableSorting: true,
+      }),
+
+      // UPC column (copyable)
+      columnHelper.accessor('upc', {
+        id: 'upc',
+        header: 'UPC',
+        cell: renderUpcCell,
+        size: 130,
+        enableSorting: true,
+      }),
+
+      // Label column
+      columnHelper.accessor('label', {
+        id: 'label',
+        header: 'Label',
+        cell: renderLabelCell,
+        size: 150,
+        enableSorting: true,
+      }),
+
+      // Total tracks column
+      columnHelper.accessor('totalTracks', {
+        id: 'totalTracks',
+        header: 'Tracks',
+        cell: renderTotalTracksCell,
+        size: 60,
+        enableSorting: true,
+      }),
+
+      // Duration column
+      columnHelper.accessor('totalDurationMs', {
+        id: 'totalDurationMs',
+        header: 'Duration',
+        cell: renderDurationCell,
+        size: 80,
+        enableSorting: true,
+      }),
+
+      // Genres column
+      columnHelper.accessor('genres', {
+        id: 'genres',
+        header: 'Genre',
+        cell: renderGenresCell,
+        size: 120,
+      }),
+
       // Actions column - header shows toolbar buttons, cells show row menu
       columnHelper.display({
         id: 'actions',
@@ -287,7 +391,19 @@ export function ReleaseTable({
       }),
     ];
 
-    return [checkboxColumn, ...columns];
+    const allColumns = [checkboxColumn, ...columns];
+
+    // Filter columns based on visibility (always show select, release, actions)
+    if (!columnVisibility) return allColumns;
+
+    return allColumns.filter(col => {
+      const id = col.id;
+      if (!id) return true;
+      // Always show select, release, actions
+      if (id === 'select' || id === 'release' || id === 'actions') return true;
+      // Check visibility state (default to visible if not specified)
+      return columnVisibility[id] !== false;
+    });
   }, [
     providerConfig,
     artistName,
@@ -304,6 +420,7 @@ export function ReleaseTable({
     toggleSelect,
     toggleSelectAll,
     getContextMenuItems,
+    columnVisibility,
   ]);
 
   // Fixed min width - availability column consolidates all providers
@@ -314,7 +431,8 @@ export function ReleaseTable({
       data={releases}
       columns={columns as ColumnDef<ReleaseViewModel, unknown>[]}
       sorting={sorting}
-      onSortingChange={setSorting}
+      onSortingChange={handleSortingChange}
+      isLoading={isSorting && releases.length > LARGE_DATASET_THRESHOLD}
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={row => row.id}
@@ -323,8 +441,8 @@ export function ReleaseTable({
           ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
           : 'group hover:bg-surface-2/50'
       }
-      enableVirtualization={false} // Low row count, no need for virtualization
-      rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+      enableVirtualization // Auto-enabled at 20+ rows, explicit for large datasets
+      rowHeight={rowHeight}
       minWidth={minWidth}
       className='text-[13px]'
     />
