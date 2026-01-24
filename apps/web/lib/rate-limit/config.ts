@@ -302,6 +302,19 @@ export const RATE_LIMITERS = {
     prefix: 'dsp:enrichment',
     analytics: true,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // AI Chat Operations
+  // ---------------------------------------------------------------------------
+
+  /** AI Chat: 30 messages per hour per user - protects Anthropic API costs */
+  aiChat: {
+    name: 'AI Chat',
+    limit: 30,
+    window: '1 h',
+    prefix: 'ai:chat',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

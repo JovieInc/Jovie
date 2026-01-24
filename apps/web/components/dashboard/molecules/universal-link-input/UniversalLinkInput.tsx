@@ -7,6 +7,14 @@
  * and supports artist search mode for Spotify.
  */
 
+import {
+  autoUpdate,
+  FloatingPortal,
+  flip,
+  offset,
+  shift,
+  useFloating,
+} from '@floating-ui/react';
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
@@ -208,6 +216,14 @@ export const UniversalLinkInput = forwardRef<
       return groupedSuggestions.flatMap(group => group.options);
     }, [groupedSuggestions, platformSuggestions]);
 
+    // FloatingPortal for auto-suggest dropdown to escape overflow containers
+    const { refs, floatingStyles } = useFloating({
+      open: shouldShowAutosuggest,
+      placement: 'bottom-start',
+      middleware: [offset(0), flip(), shift({ padding: 8 })],
+      whileElementsMounted: autoUpdate,
+    });
+
     return searchMode ? (
       <UniversalLinkInputArtistSearchMode
         provider={searchMode}
@@ -220,7 +236,7 @@ export const UniversalLinkInput = forwardRef<
         focusInput={focusInput}
       />
     ) : (
-      <div className='relative w-full'>
+      <div ref={refs.setReference} className='relative w-full'>
         <UniversalLinkInputUrlMode
           url={url}
           placeholder={placeholder}
@@ -264,65 +280,69 @@ export const UniversalLinkInput = forwardRef<
 
         {shouldShowAutosuggest ? (
           // NOSONAR S6819: Custom autocomplete requires ARIA listbox pattern; native <select> can't support search or custom styling
-          <div
-            id={autosuggestListId}
-            role='listbox'
-            aria-label='Platform suggestions'
-            tabIndex={-1}
-            className='absolute left-0 right-0 top-full z-50 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
-            onMouseDown={event => {
-              event.preventDefault();
-            }}
-          >
-            {groupedSuggestions
-              ? // Grouped view for short queries (popular platforms by category)
-                groupedSuggestions.map((group, groupIndex) => {
-                  const groupStartIndex = flatSuggestions.findIndex(
-                    opt => opt.id === group.options[0]?.id
-                  );
-                  return (
-                    <div key={group.category}>
-                      {/* Divider between categories (not before first) */}
-                      {groupIndex > 0 && (
-                        <div className='mx-3 my-1 border-t border-default' />
-                      )}
-                      <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
-                        {group.label}
+          <FloatingPortal>
+            <div
+              ref={refs.setFloating}
+              style={floatingStyles}
+              id={autosuggestListId}
+              role='listbox'
+              aria-label='Platform suggestions'
+              tabIndex={-1}
+              className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
+              onMouseDown={event => {
+                event.preventDefault();
+              }}
+            >
+              {groupedSuggestions
+                ? // Grouped view for short queries (popular platforms by category)
+                  groupedSuggestions.map((group, groupIndex) => {
+                    const groupStartIndex = flatSuggestions.findIndex(
+                      opt => opt.id === group.options[0]?.id
+                    );
+                    return (
+                      <div key={group.category}>
+                        {/* Divider between categories (not before first) */}
+                        {groupIndex > 0 && (
+                          <div className='mx-3 my-1 border-t border-default' />
+                        )}
+                        <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                          {group.label}
+                        </div>
+                        {group.options.map((option, indexInGroup) => {
+                          const globalIndex = groupStartIndex + indexInGroup;
+                          const active = globalIndex === activeSuggestionIndex;
+                          return (
+                            <PlatformSuggestionItem
+                              key={option.id}
+                              option={option}
+                              active={active}
+                              optionId={`${autosuggestListId}-option-${globalIndex}`}
+                              onMouseEnter={() =>
+                                setActiveSuggestionIndex(globalIndex)
+                              }
+                              onClick={() => commitPlatformSelection(option)}
+                            />
+                          );
+                        })}
                       </div>
-                      {group.options.map((option, indexInGroup) => {
-                        const globalIndex = groupStartIndex + indexInGroup;
-                        const active = globalIndex === activeSuggestionIndex;
-                        return (
-                          <PlatformSuggestionItem
-                            key={option.id}
-                            option={option}
-                            active={active}
-                            optionId={`${autosuggestListId}-option-${globalIndex}`}
-                            onMouseEnter={() =>
-                              setActiveSuggestionIndex(globalIndex)
-                            }
-                            onClick={() => commitPlatformSelection(option)}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })
-              : // Flat view for longer queries (fuzzy matched results)
-                platformSuggestions.map((option, index) => {
-                  const active = index === activeSuggestionIndex;
-                  return (
-                    <PlatformSuggestionItem
-                      key={option.id}
-                      option={option}
-                      active={active}
-                      optionId={`${autosuggestListId}-option-${index}`}
-                      onMouseEnter={() => setActiveSuggestionIndex(index)}
-                      onClick={() => commitPlatformSelection(option)}
-                    />
-                  );
-                })}
-          </div>
+                    );
+                  })
+                : // Flat view for longer queries (fuzzy matched results)
+                  platformSuggestions.map((option, index) => {
+                    const active = index === activeSuggestionIndex;
+                    return (
+                      <PlatformSuggestionItem
+                        key={option.id}
+                        option={option}
+                        active={active}
+                        optionId={`${autosuggestListId}-option-${index}`}
+                        onMouseEnter={() => setActiveSuggestionIndex(index)}
+                        onClick={() => commitPlatformSelection(option)}
+                      />
+                    );
+                  })}
+            </div>
+          </FloatingPortal>
         ) : null}
 
         {/* Multi-link paste dialog */}
