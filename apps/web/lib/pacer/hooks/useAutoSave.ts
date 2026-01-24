@@ -100,7 +100,7 @@ export function useAutoSave<TData>({
     (data: TData) => {
       pendingDataRef.current = data;
       setError(null);
-      void asyncDebouncer.maybeExecute(data);
+      asyncDebouncer.maybeExecute(data);
     },
     [asyncDebouncer]
   );
