@@ -20,13 +20,21 @@ import { handleMutationError } from './mutation-utils';
 // ============================================================================
 
 /**
- * Profile update payload for display name, username, and avatar.
+ * Profile update payload for display name, username, avatar, and other fields.
+ * The updates object supports any string fields that the API accepts.
  */
 export interface ProfileUpdateInput {
+  profileId?: string;
   updates: {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    // Music links
+    spotify_url?: string | null;
+    apple_music_url?: string | null;
+    youtube_url?: string | null;
+    // Allow additional fields the API may accept
+    [key: string]: string | null | undefined;
   };
 }
 

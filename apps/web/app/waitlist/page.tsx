@@ -23,6 +23,8 @@ import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
 import { captureWarning } from '@/lib/error-tracking';
+import { FetchError } from '@/lib/queries/fetch';
+import { useWaitlistSubmitMutation } from '@/lib/queries/useWaitlistMutations';
 import { useWaitlistStatusQuery } from '@/lib/queries/useWaitlistStatusQuery';
 
 export default function WaitlistPage() {
@@ -44,10 +46,13 @@ export default function WaitlistPage() {
   const [primarySocialUrl, setPrimarySocialUrl] = useState('');
   const [spotifyUrl, setSpotifyUrl] = useState('');
   const [heardAbout, setHeardAbout] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+
+  // TanStack Query mutation for waitlist submission
+  const { mutate: submitWaitlist, isPending: isSubmitting } =
+    useWaitlistSubmitMutation();
 
   // TanStack Query for waitlist status (cached, deduplicated)
   const { data: waitlistStatus } = useWaitlistStatusQuery(
@@ -347,7 +352,7 @@ export default function WaitlistPage() {
     socialPlatformButtonRefs.current[nextIndex]?.focus();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setFieldErrors({});
@@ -363,66 +368,55 @@ export default function WaitlistPage() {
       return;
     }
 
-    setIsSubmitting(true);
+    const resolvedPrimarySocialUrl = resolvePrimarySocialUrl(
+      primarySocialUrl,
+      socialPlatform
+    );
+    const normalizedSpotifyUrl = spotifyUrl ? normalizeUrl(spotifyUrl) : null;
+    const sanitizedHeardAbout = heardAbout.trim() || null;
 
-    try {
-      const resolvedPrimarySocialUrl = resolvePrimarySocialUrl(
-        primarySocialUrl,
-        socialPlatform
-      );
-      const normalizedSpotifyUrl = spotifyUrl ? normalizeUrl(spotifyUrl) : null;
-      const sanitizedHeardAbout = heardAbout.trim() || null;
-
-      const response = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          primaryGoal,
-          primarySocialUrl: resolvedPrimarySocialUrl,
-          spotifyUrl: normalizedSpotifyUrl,
-          heardAbout: sanitizedHeardAbout,
-          selectedPlan,
-        }),
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-
-      if (!contentType.includes('application/json')) {
-        const text = await response.text();
-        void captureWarning('Waitlist API returned non-JSON response', null, {
-          contentType,
-          responsePreview: text.substring(0, 500),
-        });
-        throw new Error(`Expected JSON but got ${contentType}`);
+    submitWaitlist(
+      {
+        primaryGoal: primaryGoal!,
+        primarySocialUrl: resolvedPrimarySocialUrl,
+        spotifyUrl: normalizedSpotifyUrl,
+        heardAbout: sanitizedHeardAbout,
+        selectedPlan,
+      },
+      {
+        onSuccess: () => {
+          clearWaitlistStorage();
+          try {
+            window.sessionStorage.setItem(
+              WAITLIST_STORAGE_KEYS.submitted,
+              'true'
+            );
+          } catch {
+            // Ignore storage errors
+          }
+          setIsSubmitted(true);
+        },
+        onError: err => {
+          // Check for field validation errors
+          const fetchErr = err as FetchError & {
+            errors?: Record<string, string[]>;
+          };
+          if (fetchErr.errors) {
+            setFieldErrors(fetchErr.errors as FormErrors);
+          } else {
+            void captureWarning('Waitlist signup error', err, {
+              primaryGoal,
+              socialPlatform,
+            });
+            setError(
+              err instanceof Error
+                ? err.message
+                : 'Something went wrong. Please try again.'
+            );
+          }
+        },
       }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        if (result.errors) {
-          setFieldErrors(result.errors as FormErrors);
-        } else {
-          setError(result.error || 'Something went wrong. Please try again.');
-        }
-        return;
-      }
-
-      clearWaitlistStorage();
-      try {
-        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
-      } catch {
-        // Ignore storage errors
-      }
-      setIsSubmitted(true);
-    } catch (err) {
-      void captureWarning('Waitlist signup error', err, {
-        primaryGoal,
-        socialPlatform,
-      });
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    );
   };
 
   if (isSubmitted) {

@@ -2,18 +2,11 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { AlertTriangle, Clock, Eye, EyeOff, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-
-interface ImpersonationState {
-  enabled: boolean;
-  isImpersonating: boolean;
-  effectiveClerkId?: string;
-  effectiveDbId?: string;
-  realAdminClerkId?: string;
-  timeRemainingMs?: number;
-  timeRemainingMinutes?: number;
-  expiresAt?: number;
-}
+import { useEffect, useState } from 'react';
+import {
+  useEndImpersonationMutation,
+  useImpersonationQuery,
+} from '@/lib/queries';
 
 export interface ImpersonationBannerProps {
   /** Optional callback when impersonation ends */
@@ -35,34 +28,26 @@ export function ImpersonationBanner({
   onEnd,
   className = '',
 }: ImpersonationBannerProps) {
-  const [state, setState] = useState<ImpersonationState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [ending, setEnding] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [minimized, setMinimized] = useState(false);
 
-  // Fetch impersonation status
-  const fetchStatus = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/impersonate');
-      if (response.ok) {
-        const data = await response.json();
-        setState(data);
-        if (data.timeRemainingMs) {
-          setTimeRemaining(data.timeRemainingMs);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch impersonation status:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // TanStack Query for fetching impersonation status
+  const {
+    data: state,
+    isLoading: loading,
+    refetch: refetchStatus,
+  } = useImpersonationQuery();
 
-  // Initial fetch
+  // TanStack Query mutation for ending impersonation
+  const { mutate: endImpersonation, isPending: ending } =
+    useEndImpersonationMutation();
+
+  // Initialize time remaining from query data
   useEffect(() => {
-    void fetchStatus();
-  }, [fetchStatus]);
+    if (state?.timeRemainingMs) {
+      setTimeRemaining(state.timeRemainingMs);
+    }
+  }, [state?.timeRemainingMs]);
 
   // Countdown timer
   useEffect(() => {
@@ -73,7 +58,7 @@ export function ImpersonationBanner({
         const newTime = prev - 1000;
         if (newTime <= 0) {
           // Session expired - refresh status
-          void fetchStatus();
+          void refetchStatus();
           return 0;
         }
         return newTime;
@@ -81,27 +66,17 @@ export function ImpersonationBanner({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state?.isImpersonating, timeRemaining, fetchStatus]);
+  }, [state?.isImpersonating, timeRemaining, refetchStatus]);
 
   // End impersonation handler
-  const handleEndImpersonation = async () => {
-    setEnding(true);
-    try {
-      const response = await fetch('/api/admin/impersonate', {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setState(prev => (prev ? { ...prev, isImpersonating: false } : null));
+  const handleEndImpersonation = () => {
+    endImpersonation(undefined, {
+      onSuccess: () => {
         onEnd?.();
         // Reload page to clear any cached user state
         window.location.reload();
-      }
-    } catch (error) {
-      console.error('Failed to end impersonation:', error);
-    } finally {
-      setEnding(false);
-    }
+      },
+    });
   };
 
   // Format time remaining

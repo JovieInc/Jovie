@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FetchError } from './fetch';
 import { queryKeys } from './keys';
 
 // Types
@@ -17,6 +18,20 @@ export interface WaitlistMutationResponse {
   success: boolean;
   status?: string;
   error?: string;
+}
+
+export interface WaitlistSubmitInput {
+  primaryGoal: string;
+  primarySocialUrl: string;
+  spotifyUrl: string | null;
+  heardAbout: string | null;
+  selectedPlan: string | null;
+}
+
+export interface WaitlistSubmitResponse {
+  success: boolean;
+  error?: string;
+  errors?: Record<string, string[]>;
 }
 
 /**
@@ -126,6 +141,89 @@ export function useUpdateWaitlistStatusMutation() {
   return useMutation({
     mutationFn: updateWaitlistStatus,
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitlist.all });
+    },
+  });
+}
+
+/**
+ * Mutation function for submitting a new waitlist entry.
+ */
+async function submitWaitlistEntry(
+  input: WaitlistSubmitInput
+): Promise<WaitlistSubmitResponse> {
+  const response = await fetch('/api/waitlist', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    throw new FetchError(
+      `Expected JSON but got ${contentType}`,
+      response.status,
+      response
+    );
+  }
+
+  const result = (await response.json()) as WaitlistSubmitResponse;
+
+  if (!response.ok) {
+    // Preserve field errors for form validation
+    if (result.errors) {
+      const error = new FetchError(
+        result.error ?? 'Validation failed',
+        response.status,
+        response
+      );
+      (error as FetchError & { errors?: Record<string, string[]> }).errors =
+        result.errors;
+      throw error;
+    }
+    throw new FetchError(
+      result.error ?? 'Failed to submit waitlist entry',
+      response.status,
+      response
+    );
+  }
+
+  return result;
+}
+
+/**
+ * TanStack Query mutation hook for submitting a waitlist entry.
+ *
+ * @example
+ * const { mutate: submitWaitlist, isPending } = useWaitlistSubmitMutation();
+ *
+ * submitWaitlist(
+ *   {
+ *     primaryGoal: 'streams',
+ *     primarySocialUrl: 'https://instagram.com/artist',
+ *     spotifyUrl: null,
+ *     heardAbout: null,
+ *     selectedPlan: null,
+ *   },
+ *   {
+ *     onSuccess: () => setIsSubmitted(true),
+ *     onError: (error) => {
+ *       if ('errors' in error) {
+ *         setFieldErrors(error.errors);
+ *       }
+ *     },
+ *   }
+ * );
+ */
+export function useWaitlistSubmitMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: submitWaitlistEntry,
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.waitlist.all });
     },
   });

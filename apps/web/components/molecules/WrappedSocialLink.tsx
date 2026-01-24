@@ -5,10 +5,10 @@
 
 'use client';
 
-import { captureException } from '@sentry/nextjs';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { useWrapLinkMutation } from '@/lib/queries/useWrapLinkMutation';
 import { getCrawlerSafeLabel } from '@/lib/utils/domain-categorizer';
 import { extractDomain } from '@/lib/utils/url-parsing';
 
@@ -38,24 +38,30 @@ export function WrappedSocialLink({
   'aria-label': ariaLabel,
 }: WrappedSocialLinkProps) {
   const [wrappedData, setWrappedData] = useState<WrappedLinkData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Generate crawler-safe label
   const domain = extractDomain(href);
   const crawlerSafeLabel = getCrawlerSafeLabel(domain, platform);
 
+  const { mutate: wrapLink, isPending: isLoading } = useWrapLinkMutation();
+
+  // Check if this is an external link that needs wrapping
+  const needsWrapping = useMemo(() => {
+    if (!href || href.startsWith('/')) return false;
+    if (
+      typeof window !== 'undefined' &&
+      href.includes(window.location.hostname)
+    )
+      return false;
+    return true;
+  }, [href]);
+
   useEffect(() => {
     // Reset state for new href/platform
     setWrappedData(null);
-    setIsLoading(false);
 
-    // Only wrap external links that aren't already wrapped
-    if (
-      !href ||
-      href.startsWith('/') ||
-      href.includes(window.location.hostname)
-    ) {
-      // Skip wrapping: just use original href + safe label
+    // Skip wrapping for internal links
+    if (!needsWrapping) {
       setWrappedData({
         wrappedUrl: href,
         kind: 'normal',
@@ -64,63 +70,31 @@ export function WrappedSocialLink({
       return;
     }
 
-    const controller = new AbortController();
-
-    const wrapLink = async () => {
-      setIsLoading(true);
-
-      try {
-        const response = await fetch('/api/wrap-link', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: href,
-            platform,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to wrap link');
-        }
-
-        const data = await response.json();
-        setWrappedData({
-          wrappedUrl:
-            data.kind === 'sensitive'
-              ? `/out/${data.shortId}`
-              : `/go/${data.shortId}`,
-          kind: data.kind,
-          alias: data.titleAlias || crawlerSafeLabel,
-        });
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return;
-        }
-        captureException(err, {
-          extra: { context: 'link-wrapping', href, platform },
-        });
-        // Fallback to original URL
-        setWrappedData({
-          wrappedUrl: href,
-          kind: 'normal',
-          alias: crawlerSafeLabel,
-        });
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
+    // Wrap external link using TanStack Query mutation
+    wrapLink(
+      { url: href, platform },
+      {
+        onSuccess: data => {
+          setWrappedData({
+            wrappedUrl:
+              data.kind === 'sensitive'
+                ? `/out/${data.shortId}`
+                : `/go/${data.shortId}`,
+            kind: data.kind,
+            alias: data.titleAlias || crawlerSafeLabel,
+          });
+        },
+        onError: () => {
+          // Fallback to original URL on error
+          setWrappedData({
+            wrappedUrl: href,
+            kind: 'normal',
+            alias: crawlerSafeLabel,
+          });
+        },
       }
-    };
-
-    wrapLink();
-
-    return () => {
-      controller.abort();
-    };
-  }, [href, platform, crawlerSafeLabel]);
+    );
+  }, [href, platform, crawlerSafeLabel, needsWrapping, wrapLink]);
 
   // Default security attributes
   const securityRel = rel || 'noreferrer noopener ugc nofollow';
