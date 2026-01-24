@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/nextjs';
+
 export type ProviderKey =
   | 'apple_music'
   | 'spotify'
@@ -138,7 +140,15 @@ export async function lookupDeezerByIsrc(
       albumId: payload.album?.id ? String(payload.album.id) : null,
     };
   } catch (error) {
-    console.debug('Deezer lookup failed', error);
+    Sentry.addBreadcrumb({
+      category: 'discography',
+      message: 'Deezer lookup failed',
+      level: 'debug',
+      data: {
+        isrc,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
     return null;
   }
 }
@@ -190,7 +200,16 @@ export async function lookupAppleMusicByIsrc(
       trackId,
     };
   } catch (error) {
-    console.debug('Apple Music lookup failed', error);
+    Sentry.addBreadcrumb({
+      category: 'discography',
+      message: 'Apple Music lookup failed',
+      level: 'debug',
+      data: {
+        isrc,
+        storefront,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
     return null;
   }
 }

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 
 /**
@@ -29,10 +30,13 @@ export function withPerformanceMonitoring(handler: NextApiHandler) {
         city: req.headers['x-vercel-ip-city'],
       };
 
-      // Log performance data
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] ${method} ${route} - ${status} - ${duration}ms`);
-      }
+      // Log performance data via Sentry breadcrumbs
+      Sentry.addBreadcrumb({
+        category: 'api',
+        message: `${method} ${route} - ${status} - ${duration}ms`,
+        level: 'info',
+        data: metricData,
+      });
 
       // Send to server-side analytics
       // In a real implementation, you would send this to your analytics service
@@ -50,18 +54,11 @@ export function withPerformanceMonitoring(handler: NextApiHandler) {
  * This is a placeholder for server-side analytics
  */
 function sendApiMetric(data: Record<string, unknown>) {
-  // In a real implementation, you would send this to your analytics service
-  // For example, using a server-side analytics SDK or API
-
-  // For now, we'll just log it in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[API Metric]', data);
-  }
-
-  // In production, you might use:
-  // - Server-side PostHog
-  // - Datadog
-  // - New Relic
-  // - Custom logging to database
-  // - etc.
+  // Send API metrics via Sentry custom performance tracking
+  Sentry.addBreadcrumb({
+    category: 'api-metric',
+    message: 'API performance metric',
+    level: 'info',
+    data,
+  });
 }

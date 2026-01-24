@@ -2,6 +2,7 @@
  * Image versioning utilities for cache busting and optimization
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { isDevelopment } from '@/lib/utils/platform-detection/environment';
 
 // Cache for generated hashes with LRU eviction to prevent memory leaks
@@ -286,9 +287,12 @@ export function preloadImage(
   // Limit total preloaded URLs to prevent memory issues
   if (preloadedUrls.size >= MAX_PRELOADED_URLS) {
     if (isDevelopment()) {
-      console.warn(
-        `[preloadImage] Max preloaded URLs (${MAX_PRELOADED_URLS}) reached, skipping: ${url}`
-      );
+      Sentry.addBreadcrumb({
+        category: 'images',
+        message: `Max preloaded URLs (${MAX_PRELOADED_URLS}) reached, skipping`,
+        level: 'warning',
+        data: { url },
+      });
     }
     return;
   }

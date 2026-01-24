@@ -11,7 +11,9 @@
  * - Logs can be easily extended to write to a database table
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 // ============================================================================
 // Types
@@ -178,18 +180,22 @@ export async function logIngestEvent(event: IngestAuditEvent): Promise<void> {
     metadata: sanitizeMetadata(event.metadata),
   };
 
-  // Log in structured format
-  const logPrefix = `[Ingest Audit] [${logEntry.level.toUpperCase()}]`;
-
+  // Log in structured format to Sentry
+  const context = { ...logEntry } as Record<string, unknown>;
   switch (logEntry.level) {
     case 'error':
-      console.error(logPrefix, logEntry);
+      captureError(`[Ingest Audit] ${logEntry.type}`, null, context);
       break;
     case 'warn':
-      console.warn(logPrefix, logEntry);
+      captureWarning(`[Ingest Audit] ${logEntry.type}`, context);
       break;
     default:
-      console.log(logPrefix, logEntry);
+      Sentry.addBreadcrumb({
+        category: 'ingest-audit',
+        message: logEntry.type,
+        level: 'info',
+        data: logEntry,
+      });
   }
 
   // See JOV-481: Implement audit log persistence to database

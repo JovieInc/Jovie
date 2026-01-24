@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 
 /**
@@ -147,13 +148,15 @@ export class RegressionDetector {
     // - Send a Slack notification
     // - Log to a monitoring service
 
-    // For now, we'll just log to console in development
+    // Log regression events as breadcrumbs for debugging
     if (process.env.NODE_ENV === 'development') {
       const regression = alertData.regression as number;
-      console.warn(
-        `[REGRESSION] ${alertData.metric}: ${regression.toFixed(1)}% regression detected`,
-        alertData
-      );
+      Sentry.addBreadcrumb({
+        category: 'performance-regression',
+        message: `${alertData.metric}: ${regression.toFixed(1)}% regression detected`,
+        level: 'warning',
+        data: alertData,
+      });
     }
 
     return alertData;

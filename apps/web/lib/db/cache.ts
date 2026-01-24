@@ -10,6 +10,8 @@
  * - Explicit invalidation on mutations
  */
 
+import * as Sentry from '@sentry/nextjs';
+import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
 const CACHE_PREFIX = 'db:cache:';
@@ -111,7 +113,7 @@ async function tryReadFromRedis<T>(cacheKey: string): Promise<T | null> {
   try {
     return await redis.get<T>(cacheKey);
   } catch (error) {
-    console.warn('[db-cache] Redis read failed:', error);
+    captureWarning('[db-cache] Redis read failed', { error });
     return null;
   }
 }
@@ -124,7 +126,7 @@ function writeToRedis<T>(cacheKey: string, value: T, ttlSeconds: number): void {
   if (!redis) return;
 
   redis.set(cacheKey, value, { ex: ttlSeconds }).catch(err => {
-    console.warn('[db-cache] Redis write failed:', err);
+    captureWarning('[db-cache] Redis write failed', { error: err });
   });
 }
 
@@ -205,7 +207,7 @@ export async function invalidateCache(key: string): Promise<void> {
   const redis = getRedis();
   if (redis) {
     await redis.del(cacheKey).catch(err => {
-      console.warn('[db-cache] Redis delete failed:', err);
+      captureWarning('[db-cache] Redis delete failed', { error: err });
     });
   }
 }
@@ -222,7 +224,11 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
   // Invalidate memory cache
   const deleted = memoryCache.deleteByPrefix(fullPrefix);
   if (deleted > 0) {
-    console.info(`[db-cache] Invalidated ${deleted} memory cache entries`);
+    Sentry.addBreadcrumb({
+      category: 'db-cache',
+      message: `Invalidated ${deleted} memory cache entries`,
+      level: 'info',
+    });
   }
 
   // For Redis, we'd need SCAN which isn't ideal for Upstash REST API

@@ -17,6 +17,8 @@
 
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -273,10 +275,11 @@ export class CircuitBreaker {
     }
 
     // Log state transition for monitoring
-    console.log('[Circuit Breaker] State transition', {
-      from: oldState,
-      to: newState,
-      stats: this.getStats(),
+    Sentry.addBreadcrumb({
+      category: 'circuit-breaker',
+      message: `State transition: ${oldState} -> ${newState}`,
+      level: 'info',
+      data: this.getStats(),
     });
   }
 

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
@@ -371,7 +372,15 @@ export async function resolveUserState(
   if (dbUser && verifiedClerkEmail && dbUser.email !== verifiedClerkEmail) {
     // Best-effort sync - don't block auth on sync failure
     await syncEmailFromClerk(dbUser.id, verifiedClerkEmail).catch(err => {
-      console.warn('[gate] Email sync failed:', err);
+      Sentry.addBreadcrumb({
+        category: 'auth-gate',
+        message: 'Email sync failed',
+        level: 'warning',
+        data: {
+          error: err instanceof Error ? err.message : String(err),
+          userId: dbUser.id,
+        },
+      });
     });
   }
 

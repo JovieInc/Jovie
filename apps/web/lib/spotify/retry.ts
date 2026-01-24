@@ -11,6 +11,7 @@
  */
 
 import 'server-only';
+import * as Sentry from '@sentry/nextjs';
 
 // ============================================================================
 // Types
@@ -197,11 +198,16 @@ export async function withRetry<T>(
       const delay = calculateDelay(attempt, mergedConfig, retryAfter);
       totalDelay += delay;
 
-      console.log('[Spotify Retry] Retrying request', {
-        attempt: actualAttempts,
-        maxRetries: mergedConfig.maxRetries,
-        delay,
-        error: lastError.message,
+      Sentry.addBreadcrumb({
+        category: 'spotify',
+        message: 'Retrying request',
+        level: 'info',
+        data: {
+          attempt: actualAttempts,
+          maxRetries: mergedConfig.maxRetries,
+          delay,
+          error: lastError.message,
+        },
       });
 
       await sleep(delay);

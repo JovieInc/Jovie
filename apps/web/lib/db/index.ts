@@ -1,4 +1,5 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { env } from '@/lib/env-server';
@@ -102,7 +103,13 @@ function logDbError(
     nodeEnv: process.env.NODE_ENV,
   };
 
-  console.error('[DB_ERROR]', JSON.stringify(errorInfo, null, 2));
+  Sentry.captureException(
+    error instanceof Error ? error : new Error(String(error)),
+    {
+      extra: errorInfo,
+      tags: { context: 'db_error', dbContext: context },
+    }
+  );
 }
 
 function logDbInfo(
@@ -111,13 +118,12 @@ function logDbInfo(
   metadata?: Record<string, unknown>
 ) {
   if (process.env.NODE_ENV === 'development') {
-    const info = {
-      context,
-      message,
-      timestamp: new Date().toISOString(),
-      metadata,
-    };
-    console.info('[DB_INFO]', JSON.stringify(info, null, 2));
+    Sentry.addBreadcrumb({
+      category: 'database',
+      message: `[${context}] ${message}`,
+      level: 'info',
+      data: metadata,
+    });
   }
 }
 

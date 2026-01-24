@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 
 declare global {
@@ -53,7 +54,11 @@ export class UserJourneyTracker {
     this.currentStep++;
 
     if (this.currentStep >= this.steps.length) {
-      console.warn(`Journey ${this.journeyName} has no more steps defined`);
+      Sentry.addBreadcrumb({
+        category: 'user-journey',
+        message: `Journey ${this.journeyName} has no more steps defined`,
+        level: 'warning',
+      });
       return this;
     }
 
@@ -105,7 +110,11 @@ export class UserJourneyTracker {
     const stepIndex = this.steps.indexOf(stepName);
 
     if (stepIndex === -1) {
-      console.warn(`Step ${stepName} not found in journey ${this.journeyName}`);
+      Sentry.addBreadcrumb({
+        category: 'user-journey',
+        message: `Step ${stepName} not found in journey ${this.journeyName}`,
+        level: 'warning',
+      });
       return this;
     }
 

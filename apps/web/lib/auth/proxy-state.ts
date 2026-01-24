@@ -3,7 +3,7 @@ import 'server-only';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
 export interface ProxyUserState {
@@ -45,7 +45,9 @@ export async function getUserState(
       }
     } catch (cacheError) {
       // Log but don't fail - fall through to DB query
-      console.warn('[proxy-state] Redis cache read failed:', cacheError);
+      captureWarning('[proxy-state] Redis cache read failed', {
+        error: cacheError,
+      });
     }
   }
 
@@ -122,7 +124,9 @@ export async function getUserState(
       redis
         .set(cacheKey, userState, { ex: USER_STATE_CACHE_TTL_SECONDS })
         .catch(cacheError => {
-          console.warn('[proxy-state] Redis cache write failed:', cacheError);
+          captureWarning('[proxy-state] Redis cache write failed', {
+            error: cacheError,
+          });
         });
     }
 
@@ -155,6 +159,6 @@ export async function invalidateProxyUserStateCache(
   try {
     await redis.del(cacheKey);
   } catch (error) {
-    console.warn('[proxy-state] Failed to invalidate cache:', error);
+    captureWarning('[proxy-state] Failed to invalidate cache', { error });
   }
 }

@@ -7,6 +7,7 @@
  */
 
 import crypto from 'crypto';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -80,7 +81,7 @@ export function encryptPII(value: string | null | undefined): string | null {
 
     // In development/test without key, return value as-is with warning
     if (process.env.NODE_ENV === 'development' || isTestEnvironment()) {
-      console.warn(
+      captureWarning(
         '[PII Encryption] WARNING: PII_ENCRYPTION_KEY not set - storing value unencrypted. ' +
           'This is only acceptable in development.'
       );
@@ -103,7 +104,7 @@ export function encryptPII(value: string | null | undefined): string | null {
     const combined = `${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted}`;
     return combined;
   } catch (error) {
-    console.error('[PII Encryption] Failed to encrypt:', error);
+    captureError('[PII Encryption] Failed to encrypt', error);
     throw new Error('Failed to encrypt PII data');
   }
 }
@@ -146,10 +147,10 @@ export function decryptPII(
   // Check if value is encrypted (contains our separator pattern)
   if (!encryptedValue.includes(':')) {
     // Value is not encrypted (legacy data) - log warning for migration tracking
-    console.warn(
+    captureWarning(
       '[PII Encryption] Detected legacy unencrypted PII data. ' +
-        'This data should be migrated to encrypted format. ' +
-        `Data length: ${encryptedValue.length} chars`
+        'This data should be migrated to encrypted format.',
+      { dataLength: encryptedValue.length }
     );
     return encryptedValue;
   }
@@ -158,7 +159,7 @@ export function decryptPII(
     const parts = encryptedValue.split(':');
     if (parts.length !== 3) {
       // Not our encryption format - log warning for migration tracking
-      console.warn(
+      captureWarning(
         '[PII Encryption] Detected data with unexpected format (not iv:authTag:ciphertext). ' +
           'This may be legacy data that needs migration.'
       );
@@ -179,8 +180,7 @@ export function decryptPII(
     return decrypted;
   } catch (error) {
     // Log detailed error for debugging and security monitoring
-    console.error('[PII Encryption] Decryption failed:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+    captureError('[PII Encryption] Decryption failed', error, {
       dataLength: encryptedValue.length,
       hasExpectedFormat: encryptedValue.split(':').length === 3,
     });
