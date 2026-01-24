@@ -353,6 +353,30 @@ export async function checkSpotifyRefreshRateLimit(
   );
 }
 
+// ============================================================================
+// AI Chat Operations
+// ============================================================================
+
+/**
+ * Rate limiter for AI chat messages
+ * Limit: 30 messages per hour per user - protects Anthropic API costs
+ */
+export const aiChatLimiter = createRateLimiter(RATE_LIMITERS.aiChat);
+
+/**
+ * Check AI chat rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkAiChatRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    aiChatLimiter,
+    userId,
+    'You have reached the chat limit. Please try again later.'
+  );
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -378,5 +402,6 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     spotifyClaim: spotifyClaimLimiter,
     spotifyRefresh: spotifyRefreshLimiter,
     spotifyPublicSearch: spotifyPublicSearchLimiter,
+    aiChat: aiChatLimiter,
   };
 }

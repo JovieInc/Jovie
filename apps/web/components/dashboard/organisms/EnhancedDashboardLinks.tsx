@@ -183,12 +183,23 @@ export function EnhancedDashboardLinks({
     username,
   ]);
 
+  // Determine if we should use chat layout (sidebar closed with links)
+  const useChatLayout = !sidebarOpen && links.length > 0;
+
   return (
     <div
-      className='min-w-0 min-h-screen'
+      className={
+        useChatLayout ? 'flex h-full min-w-0 flex-col' : 'min-h-screen min-w-0'
+      }
       data-testid='enhanced-dashboard-links'
     >
-      <div className='w-full min-w-0 space-y-4'>
+      <div
+        className={
+          useChatLayout
+            ? 'flex min-w-0 flex-1 flex-col'
+            : 'w-full min-w-0 space-y-4'
+        }
+      >
         {/* Profile editor section - hidden when sidebar is open */}
         {!sidebarOpen && profileId && artist && (
           <ProfileEditorSection
@@ -227,6 +238,7 @@ export function EnhancedDashboardLinks({
           suggestionsEnabled={suggestionsEnabled}
           profileId={profileId}
           sidebarOpen={sidebarOpen}
+          className={useChatLayout ? 'flex-1' : undefined}
         />
       </div>
     </div>

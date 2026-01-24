@@ -1,7 +1,16 @@
 import { anthropic } from '@ai-sdk/anthropic';
+import { auth } from '@clerk/nextjs/server';
 import { streamText } from 'ai';
+import { NextResponse } from 'next/server';
+import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 
 export const maxDuration = 30;
+
+/** Maximum allowed message length (characters) */
+const MAX_MESSAGE_LENGTH = 4000;
+
+/** Maximum allowed messages per request */
+const MAX_MESSAGES_PER_REQUEST = 50;
 
 interface ArtistContext {
   displayName: string;
@@ -74,10 +83,117 @@ function buildSystemPrompt(context: ArtistContext): string {
 }
 
 export async function POST(req: Request) {
-  const { messages, artistContext } = await req.json();
+  // Auth check - ensure user is authenticated
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  if (!artistContext) {
-    return new Response('Missing artist context', { status: 400 });
+  // Rate limiting - protect Anthropic API costs
+  const rateLimitResult = await checkAiChatRateLimit(userId);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        message: rateLimitResult.reason,
+        retryAfter: Math.ceil(
+          (rateLimitResult.reset.getTime() - Date.now()) / 1000
+        ),
+      },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimitResult),
+      }
+    );
+  }
+
+  // Parse and validate request body
+  let body: { messages?: unknown; artistContext?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const { messages, artistContext } = body;
+
+  // Validate artist context
+  if (!artistContext || typeof artistContext !== 'object') {
+    return NextResponse.json(
+      { error: 'Missing or invalid artist context' },
+      { status: 400 }
+    );
+  }
+
+  // Validate messages array
+  if (!Array.isArray(messages)) {
+    return NextResponse.json(
+      { error: 'Messages must be an array' },
+      { status: 400 }
+    );
+  }
+
+  if (messages.length === 0) {
+    return NextResponse.json(
+      { error: 'Messages array cannot be empty' },
+      { status: 400 }
+    );
+  }
+
+  if (messages.length > MAX_MESSAGES_PER_REQUEST) {
+    return NextResponse.json(
+      { error: `Too many messages. Maximum is ${MAX_MESSAGES_PER_REQUEST}` },
+      { status: 400 }
+    );
+  }
+
+  // Validate individual messages
+  for (const message of messages) {
+    if (
+      typeof message !== 'object' ||
+      message === null ||
+      !('role' in message) ||
+      !('content' in message)
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid message format' },
+        { status: 400 }
+      );
+    }
+
+    const { role, content } = message as { role: unknown; content: unknown };
+
+    if (role !== 'user' && role !== 'assistant') {
+      return NextResponse.json(
+        { error: 'Invalid message role' },
+        { status: 400 }
+      );
+    }
+
+    // Validate content length for user messages
+    if (role === 'user') {
+      const contentStr =
+        typeof content === 'string'
+          ? content
+          : Array.isArray(content)
+            ? content
+                .filter(
+                  (p): p is { type: 'text'; text: string } =>
+                    p.type === 'text' && typeof p.text === 'string'
+                )
+                .map(p => p.text)
+                .join('')
+            : '';
+
+      if (contentStr.length > MAX_MESSAGE_LENGTH) {
+        return NextResponse.json(
+          {
+            error: `Message too long. Maximum is ${MAX_MESSAGE_LENGTH} characters`,
+          },
+          { status: 400 }
+        );
+      }
+    }
   }
 
   const systemPrompt = buildSystemPrompt(artistContext as ArtistContext);
