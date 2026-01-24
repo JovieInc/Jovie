@@ -77,7 +77,15 @@ export async function runStartupEnvironmentValidation() {
 
     const envInfo = logEnvironmentInfo();
     const isProduction = envInfo.nodeEnv === 'production';
-    logCriticalEnvironmentIssues(validationResult, isProduction);
+    const hasCriticalIssues = logCriticalEnvironmentIssues(
+      validationResult,
+      isProduction
+    );
+
+    if (hasCriticalIssues && isProduction) {
+      validationCompleted = true;
+      throw new Error('Critical environment validation failed');
+    }
 
     logValidationSummary(validationResult);
 

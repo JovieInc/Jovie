@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import { CTAButton } from '@/components/ui/CTAButton';
+import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
+import {
+  type ProfileNextAction,
+  resolveProfileNextAction,
+} from '@/lib/profile-next-action';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 const ArtistNotificationsCTA = dynamic(
   () =>
@@ -20,13 +26,6 @@ const ArtistNotificationsCTA = dynamic(
     ),
   }
 );
-
-import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
-import {
-  type ProfileNextAction,
-  resolveProfileNextAction,
-} from '@/lib/profile-next-action';
-import type { Artist, LegacySocialLink } from '@/types/db';
 
 /**
  * Read Spotify preference from client-side cookie.

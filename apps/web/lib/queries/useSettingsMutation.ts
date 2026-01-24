@@ -105,6 +105,8 @@ export function useUpdateSettingsMutation() {
       // Show appropriate error message based on what was attempted
       if (variables.updates.theme) {
         handleMutationError(error, 'Failed to save theme preference');
+      } else if (variables.updates.settings?.hide_branding !== undefined) {
+        handleMutationError(error, 'Failed to save branding settings');
       } else if (variables.updates.settings) {
         handleMutationError(error, 'Failed to save settings');
       } else {
