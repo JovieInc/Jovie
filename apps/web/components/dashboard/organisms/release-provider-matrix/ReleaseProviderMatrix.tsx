@@ -122,14 +122,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       toggle: rows.length > 0 ? toggle : null,
       rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
     });
-  }, [
-    editingRelease,
-    rows.length,
-    closeEditor,
-    openEditor,
-    isSidebarOpen,
-    setTableMeta,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [editingRelease, rows.length, closeEditor, openEditor, isSidebarOpen]);
 
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useHeaderActions();
@@ -156,7 +150,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       setHeaderBadge(null);
       setHeaderActions(null);
     };
-  }, [isConnected, artistName, spotifyBadge, setHeaderBadge, setHeaderActions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
+  }, [isConnected, artistName, spotifyBadge]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
