@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
+import { useProfileMutation } from '@/lib/queries';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
   Artist,
@@ -17,7 +18,6 @@ interface ListenNowFormProps {
 }
 
 export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,6 +27,22 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   });
   // Debounce timers per field
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const { mutate: updateProfile, isPending: loading } = useProfileMutation({
+    silent: true, // We handle our own success/error UI
+    onSuccess: data => {
+      const updatedArtist = convertCreatorProfileToArtist(
+        data.profile as unknown as CreatorProfile
+      );
+      onUpdate(updatedArtist);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    },
+    onError: err => {
+      console.error('Error:', err);
+      setError('Failed to update music links');
+    },
+  });
 
   // Cleanup all timers on unmount
   useEffect(() => {
@@ -59,44 +75,19 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(undefined);
     setSuccess(false);
 
-    try {
-      const res = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId: artist.id,
-          updates: {
-            spotify_url: formData.spotify_url || null,
-            apple_music_url: formData.apple_music_url || null,
-            youtube_url: formData.youtube_url || null,
-          },
-        }),
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(err?.error ?? 'Failed to update music links');
-      }
-      const json: { profile: unknown } = await res.json();
-      const updatedArtist = convertCreatorProfileToArtist(
-        json.profile as CreatorProfile
-      );
-      onUpdate(updatedArtist);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to update music links');
-    } finally {
-      setLoading(false);
-    }
+    updateProfile({
+      profileId: artist.id,
+      updates: {
+        spotify_url: formData.spotify_url || null,
+        apple_music_url: formData.apple_music_url || null,
+        youtube_url: formData.youtube_url || null,
+      },
+    });
   };
 
   return (

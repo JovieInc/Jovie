@@ -9,6 +9,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { useArtistThemeMutation } from '@/lib/queries';
 import { Artist } from '@/types/db';
 
 export type ArtistTheme = 'light' | 'dark' | 'auto';
@@ -37,6 +38,8 @@ export function ArtistThemeProvider({
   const [artistTheme, setArtistTheme] = useState<ArtistTheme>('auto');
   const [isCustomTheme, setIsCustomTheme] = useState(false);
 
+  const { mutate: saveTheme } = useArtistThemeMutation();
+
   // Initialize theme from artist settings or default to auto
   useEffect(() => {
     const artistThemeData = artist.theme as { mode?: ArtistTheme } | undefined;
@@ -54,7 +57,7 @@ export function ArtistThemeProvider({
   }, [artist.theme, setSystemTheme]);
 
   const handleSetTheme = useCallback(
-    async (newTheme: ArtistTheme) => {
+    (newTheme: ArtistTheme) => {
       setArtistTheme(newTheme);
       setIsCustomTheme(true);
 
@@ -65,24 +68,10 @@ export function ArtistThemeProvider({
         setSystemTheme(newTheme);
       }
 
-      // Save theme preference to database
-      try {
-        await fetch('/api/artist/theme', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            artistId: artist.id,
-            theme: newTheme,
-          }),
-        });
-      } catch (error) {
-        console.error('Failed to save theme preference:', error);
-        // Don't throw error - theme change still works locally
-      }
+      // Save theme preference to database using TanStack Query mutation
+      saveTheme({ artistId: artist.id, theme: newTheme });
     },
-    [artist.id, setSystemTheme]
+    [artist.id, setSystemTheme, saveTheme]
   );
 
   // Ensure resolvedTheme is always 'light' or 'dark'

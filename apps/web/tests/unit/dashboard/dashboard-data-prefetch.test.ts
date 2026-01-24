@@ -38,22 +38,28 @@ const startSpanMock = vi.fn(
   }
 );
 
+// Persistent cache store that survives module resets
+const cacheStore = new Map<Function, { promise: Promise<unknown> | null }>();
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
 
   return {
     ...actual,
-    cache:
-      actual.cache ??
-      (<T>(fn: () => Promise<T>) => {
-        let promise: Promise<T> | null = null;
-        return () => {
-          if (!promise) {
-            promise = fn();
-          }
-          return promise;
-        };
-      }),
+    // Custom cache implementation that uses a persistent store
+    cache: <T>(fn: () => Promise<T>) => {
+      // Each function gets its own cache entry
+      if (!cacheStore.has(fn)) {
+        cacheStore.set(fn, { promise: null });
+      }
+      const entry = cacheStore.get(fn)!;
+      return () => {
+        if (!entry.promise) {
+          entry.promise = fn();
+        }
+        return entry.promise as Promise<T>;
+      };
+    },
   };
 });
 
@@ -98,6 +104,8 @@ describe('dashboard data prefetch', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    // Clear the persistent cache store
+    cacheStore.clear();
     withDbSessionTxMock.mockResolvedValue({ ...baseDashboardResponse });
     getCurrentUserEntitlementsMock.mockResolvedValue({
       userId: 'user_123',

@@ -181,6 +181,18 @@ export const queryKeys = {
     all: ['links'] as const,
     wrapped: () => [...queryKeys.links.all, 'wrapped'] as const,
   },
+
+  // Health monitoring
+  health: {
+    all: ['health'] as const,
+    buildInfo: () => [...queryKeys.health.all, 'build-info'] as const,
+  },
+
+  // Admin queries
+  admin: {
+    all: ['admin'] as const,
+    impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
