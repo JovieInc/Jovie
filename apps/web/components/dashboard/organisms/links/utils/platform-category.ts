@@ -4,22 +4,14 @@
  * Functions for categorizing platforms and determining platform types.
  */
 
+import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import type { PlatformType } from '../types';
 
 /**
  * Set of DSP (Digital Service Provider) platforms
+ * Uses canonical source from social-links/types for consistency
  */
-const DSP_PLATFORMS = new Set([
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'soundcloud',
-  'bandcamp',
-  'tidal',
-  'deezer',
-  'amazon_music',
-  'pandora',
-]);
+const DSP_PLATFORMS_SET = new Set<string>(DSP_PLATFORMS);
 
 /**
  * Set of website/link-in-bio platforms
@@ -61,7 +53,7 @@ const SOCIAL_PLATFORMS = new Set([
  * @returns The platform type category
  */
 export function getPlatformCategory(platform: string): PlatformType {
-  if (DSP_PLATFORMS.has(platform)) return 'dsp';
+  if (DSP_PLATFORMS_SET.has(platform)) return 'dsp';
   if (EARNINGS_PLATFORMS.has(platform)) return 'earnings';
   if (SOCIAL_PLATFORMS.has(platform)) return 'social';
   if (WEBSITE_PLATFORMS.has(platform)) return 'websites';

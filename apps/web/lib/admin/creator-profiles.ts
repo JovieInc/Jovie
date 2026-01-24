@@ -250,7 +250,7 @@ async function fetchRelatedProfileData(profileIds: string[]): Promise<{
     db
       .select({
         creatorProfileId: socialLinks.creatorProfileId,
-        averageConfidence: drizzleSql`AVG(${socialLinks.confidence})`,
+        averageConfidence: drizzleSql<number>`AVG(${socialLinks.confidence})`,
       })
       .from(socialLinks)
       .where(inArray(socialLinks.creatorProfileId, profileIds))

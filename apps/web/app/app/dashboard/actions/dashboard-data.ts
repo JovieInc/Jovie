@@ -13,7 +13,7 @@ import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { cache } from 'react';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { type DbType } from '@/lib/db';
+import { type DbType, sqlAny } from '@/lib/db';
 import {
   type CreatorProfile,
   clickEvents,
@@ -167,14 +167,10 @@ async function fetchDashboardDataWithSession(
           throw error;
         }),
       // Consolidated link count query - counts all active links and music links in one query
-      // Note: DSP_PLATFORMS must be passed as a PostgreSQL array, not individual params
       dbClient
         .select({
           totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ANY(ARRAY[${drizzleSql.join(
-            DSP_PLATFORMS.map(p => drizzleSql`${p}`),
-            drizzleSql`, `
-          )}]))`,
+          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
         })
         .from(socialLinks)
         .where(
