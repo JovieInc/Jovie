@@ -8,6 +8,7 @@ import {
   formatAcceptedImageTypes,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
+import { useUserAvatarMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 interface AvatarUploadProps {
@@ -30,37 +31,23 @@ export function AvatarUpload({
   className,
 }: AvatarUploadProps) {
   const uploadableRef = useRef<HTMLDivElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
-  const handleUpload = useCallback(async (file: File) => {
-    setLastError(null);
-    setIsUploading(true);
+  // Note: We don't use mutation callbacks here because AvatarUploadable
+  // handles success/error via its own onSuccess/onError props
+  const { mutateAsync: uploadAvatar, isPending: isUploading } =
+    useUserAvatarMutation();
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/images/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const { blobUrl } = (await response.json()) as { blobUrl: string };
-      return blobUrl;
-    } finally {
-      setIsUploading(false);
-    }
-  }, []);
+  const handleUpload = useCallback(
+    async (file: File) => {
+      setLastError(null);
+      return uploadAvatar(file);
+    },
+    [uploadAvatar]
+  );
 
   const handleSuccess = useCallback(
     (url: string) => {
-      setIsUploading(false);
       setLastError(null);
       toast.success('Profile photo updated');
       onUploadSuccess?.(url);
@@ -70,7 +57,6 @@ export function AvatarUpload({
 
   const handleError = useCallback(
     (message: string) => {
-      setIsUploading(false);
       setLastError(message);
       toast.error(message);
       onUploadError?.(message);

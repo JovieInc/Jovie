@@ -96,6 +96,13 @@ export {
   type UseArtistSearchQueryReturn,
   useArtistSearchQuery,
 } from './useArtistSearchQuery';
+// Artist theme mutation
+export {
+  type ArtistTheme,
+  type ArtistThemeInput,
+  type ArtistThemeResponse,
+  useArtistThemeMutation,
+} from './useArtistThemeMutation';
 export {
   type CheckoutInput,
   type CheckoutResponse,
@@ -107,6 +114,15 @@ export {
   type BillingStatusData,
   useBillingStatusQuery,
 } from './useBillingStatusQuery';
+// Build info / version monitoring
+export {
+  type BuildInfo,
+  type UseVersionMonitorOptions,
+  type UseVersionMonitorResult,
+  useBuildInfoQuery,
+  useVersionMonitor,
+  type VersionMismatchInfo,
+} from './useBuildInfoQuery';
 // Admin creator mutations
 export {
   useDeleteCreatorMutation,
@@ -158,18 +174,37 @@ export {
   useHandleAvailabilityQuery,
   useInvalidateHandleAvailability,
 } from './useHandleAvailabilityQuery';
+// Admin impersonation query and mutation
+export {
+  type ImpersonationState,
+  useEndImpersonationMutation,
+  useImpersonationQuery,
+} from './useImpersonationQuery';
 // Ingest refresh mutation
 export {
   type IngestRefreshInput,
   type IngestRefreshResponse,
   useIngestRefreshMutation,
 } from './useIngestRefreshMutation';
+// Link verification mutation
+export {
+  type LinkVerificationInput,
+  type LinkVerificationResponse,
+  type UseLinkVerificationMutationOptions,
+  useLinkVerificationMutation,
+} from './useLinkVerificationMutation';
 // Notification status/subscription
 export {
   useNotificationStatusQuery,
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
 } from './useNotificationStatusQuery';
+// Pixel settings mutation
+export {
+  type PixelSettingsInput,
+  type PixelSettingsResponse,
+  usePixelSettingsMutation,
+} from './usePixelSettingsMutation';
 export {
   type PricingOption,
   type PricingOptionsResponse,
@@ -219,3 +254,19 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+// User avatar upload mutation
+export {
+  type UseUserAvatarMutationOptions,
+  useUserAvatarMutation,
+} from './useUserAvatarMutation';
+// Waitlist mutations (admin + public)
+export {
+  type ApproveWaitlistInput,
+  type UpdateWaitlistStatusInput,
+  useApproveWaitlistMutation,
+  useUpdateWaitlistStatusMutation,
+  useWaitlistSubmitMutation,
+  type WaitlistMutationResponse,
+  type WaitlistSubmitInput,
+  type WaitlistSubmitResponse,
+} from './useWaitlistMutations';

@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useState } from 'react';
+import { useLinkVerificationMutation } from '@/lib/queries';
 
 interface InterstitialClientProps {
   shortId: string;
@@ -18,55 +19,33 @@ export function InterstitialClient({
   titleAlias,
   domain,
 }: InterstitialClientProps) {
-  const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
 
-  const handleContinue = useCallback(async () => {
-    if (isVerifying) return;
-
-    setIsVerifying(true);
-    setError(null);
-
-    try {
-      // Request signed URL for this link
-      const response = await fetch(`/api/link/${shortId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          verified: true,
-          timestamp: Date.now(),
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Too many requests. Please wait a moment.');
-        } else if (response.status === 404) {
-          throw new Error('Link not found or expired.');
-        } else {
-          throw new Error('Failed to verify link.');
-        }
-      }
-
-      const data = await response.json();
-
-      if (data.url) {
+  const { mutate: verifyLink, isPending: isVerifying } =
+    useLinkVerificationMutation({
+      onSuccess: data => {
         setIsVerified(true);
         // Short delay to show success state, then redirect
         setTimeout(() => {
           window.location.replace(data.url);
         }, 1000);
-      } else {
-        throw new Error('Invalid response from server.');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setIsVerifying(false);
-    }
-  }, [shortId, isVerifying]);
+      },
+      onError: err => {
+        setError(err.message || 'An error occurred');
+      },
+    });
+
+  const handleContinue = useCallback(() => {
+    if (isVerifying) return;
+    setError(null);
+
+    verifyLink({
+      shortId,
+      verified: true,
+      timestamp: Date.now(),
+    });
+  }, [shortId, isVerifying, verifyLink]);
 
   if (isVerified) {
     return (
