@@ -3,6 +3,7 @@
  * Categorizes domains and provides crawler-safe aliases
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { extractDomain } from './url-parsing';
 
 export interface DomainCategory {
@@ -256,9 +257,12 @@ export async function addSensitiveDomain(
 ): Promise<boolean> {
   // Adding sensitive domains to database is disabled
   // Consider implementing with alternative storage if needed
-  console.log(
-    `Would add sensitive domain: ${domain} -> ${category} (${alias})`
-  );
+  Sentry.addBreadcrumb({
+    category: 'domain-categorizer',
+    message: 'Would add sensitive domain (feature disabled)',
+    level: 'info',
+    data: { domain, category, alias },
+  });
   return false;
 }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface BuildInfo {
@@ -39,7 +40,12 @@ export async function fetchBuildInfo(): Promise<BuildInfo | null> {
     const response = await fetch(ENDPOINT);
     return await response.json();
   } catch (error) {
-    console.warn('[version-monitor] Fetch failed:', error);
+    Sentry.addBreadcrumb({
+      category: 'version-monitor',
+      message: 'Fetch failed',
+      level: 'warning',
+      data: { error: error instanceof Error ? error.message : String(error) },
+    });
     return null;
   }
 }
@@ -70,10 +76,12 @@ export function useVersionMonitor(
       setHasMismatch(true);
       setMismatchInfo(info);
 
-      console.info(
-        '[version-monitor] New version detected:',
-        `${initialBuildId.current} → ${data.buildId}`
-      );
+      Sentry.addBreadcrumb({
+        category: 'version-monitor',
+        message: `New version detected: ${initialBuildId.current} → ${data.buildId}`,
+        level: 'info',
+        data: info,
+      });
 
       onVersionMismatch?.(info);
     },

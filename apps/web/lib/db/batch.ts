@@ -5,6 +5,7 @@
  * Uses Drizzle's native batch support and PostgreSQL's advanced features.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, getTableName } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 
@@ -67,7 +68,10 @@ export async function batchInsert<T extends PgTable>(
         inserted += result.length;
       }
     } catch (error) {
-      console.error('[batch] Insert chunk failed:', error);
+      Sentry.captureException(error, {
+        tags: { context: 'batch_insert' },
+        extra: { chunkSize: chunk.length, chunkIndex: i / batchSize },
+      });
       throw error;
     }
   }

@@ -4,6 +4,7 @@ import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
 
 export type AdminUserPlan = 'free' | 'pro';
@@ -148,7 +149,11 @@ export async function getAdminUsers(
       total,
     };
   } catch (error) {
-    console.error('Error loading admin users', error);
+    captureError('Error loading admin users', error, {
+      page,
+      pageSize,
+      search: params.search,
+    });
 
     return {
       users: [],

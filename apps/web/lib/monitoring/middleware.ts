@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -77,12 +78,14 @@ export function withPerformanceMonitoring(
       const route = req.nextUrl.pathname;
       const method = req.method;
 
-      // In a real implementation, you would send metric data to your analytics service
-      // For now, we'll just log it in development
+      // Log API performance metrics as breadcrumbs
       if (process.env.NODE_ENV === 'development') {
-        console.log(
-          `[API Middleware] ${method} ${route} - ${duration}ms [${requestId}]`
-        );
+        Sentry.addBreadcrumb({
+          category: 'api-middleware',
+          message: `${method} ${route} - ${duration}ms`,
+          level: 'info',
+          data: { route, method, duration, requestId },
+        });
       }
     }
 

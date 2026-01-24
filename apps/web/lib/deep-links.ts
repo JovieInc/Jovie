@@ -5,6 +5,7 @@
  * Supports iOS and Android URL schemes plus universal links.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { detectPlatformFromUA } from './utils';
 
 export interface DeepLinkConfig {
@@ -342,7 +343,12 @@ export function openDeepLink(
         window.location.href = deepLink.nativeUrl;
       }
     } catch (error) {
-      console.debug('Native app opening failed:', error);
+      Sentry.addBreadcrumb({
+        category: 'deep-links',
+        message: 'Native app opening failed',
+        level: 'debug',
+        data: { error: error instanceof Error ? error.message : String(error) },
+      });
     }
 
     // Set timeout for fallback

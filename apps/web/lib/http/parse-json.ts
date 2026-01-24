@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 interface ParseJsonOptions<T> {
   route: string;
@@ -104,7 +104,7 @@ export async function parseJsonBody<T = unknown>(
   // Check Content-Length header first for early rejection
   const contentLength = request.headers.get('content-length');
   if (contentLength && Number.parseInt(contentLength, 10) > maxBodySize) {
-    console.warn(`[${options.route}] Request body too large`, {
+    captureWarning(`[${options.route}] Request body too large`, {
       contentLength,
       maxBodySize,
     });
@@ -126,7 +126,7 @@ export async function parseJsonBody<T = unknown>(
 
   // Check if body exceeded limit during streaming read
   if (exceeded) {
-    console.warn(`[${options.route}] Request body exceeds size limit`, {
+    captureWarning(`[${options.route}] Request body exceeds size limit`, {
       actualSize,
       maxBodySize,
     });
@@ -159,12 +159,7 @@ export async function parseJsonBody<T = unknown>(
       ...options.logContext,
     };
 
-    console.error(`[${options.route}] JSON parse failed`, {
-      ...context,
-      error: message,
-    });
-
-    await captureError('JSON parse failed', error, {
+    await captureError(`[${options.route}] JSON parse failed`, error, {
       context: 'json_parse_failure',
       ...context,
     });

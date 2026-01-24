@@ -3,6 +3,7 @@
  * Conservative bot detection to avoid anti-cloaking penalties
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { NextRequest } from 'next/server';
 
 export interface BotDetectionResult {
@@ -105,9 +106,13 @@ export async function logBotDetection(
   endpoint: string,
   blocked: boolean
 ): Promise<void> {
-  // Bot detection logging is disabled in this version
-  // Consider implementing with alternative storage if needed
-  console.log(`Bot detection: ${ip} - ${reason} - blocked: ${blocked}`);
+  // Bot detection logging via Sentry breadcrumbs
+  Sentry.addBreadcrumb({
+    category: 'bot-detection',
+    message: `Bot detection: ${reason}`,
+    level: blocked ? 'warning' : 'info',
+    data: { ip, reason, blocked, endpoint },
+  });
 }
 
 /**
@@ -121,7 +126,12 @@ export async function checkRateLimit(
   // Rate limiting is disabled in this version
   // Always return false (not rate limited) for now
   // Consider implementing with Redis/Upstash if needed
-  console.log(`Rate limit check: ${ip} - ${endpoint} (disabled)`);
+  Sentry.addBreadcrumb({
+    category: 'rate-limit',
+    message: `Rate limit check (disabled)`,
+    level: 'info',
+    data: { ip, endpoint },
+  });
   return false;
 }
 

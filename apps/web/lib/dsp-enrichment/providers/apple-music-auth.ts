@@ -14,6 +14,7 @@
 
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { importPKCS8, SignJWT } from 'jose';
 
 // ============================================================================
@@ -85,9 +86,6 @@ const TOKEN_EXPIRY_SECONDS = 86400; // 24 hours
  * Buffer before expiry to trigger refresh (5 minutes)
  */
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
-/** Log prefix for structured logging */
-const LOG_PREFIX = '[AppleMusicAuth]';
 
 // ============================================================================
 // Token Cache
@@ -170,7 +168,11 @@ export async function getAppleMusicToken(): Promise<string> {
   // If a token generation is already in progress, wait for it
   // This prevents multiple concurrent token generations
   if (pendingTokenGeneration) {
-    console.debug(`${LOG_PREFIX} Waiting for pending token generation`);
+    Sentry.addBreadcrumb({
+      category: 'apple-music-auth',
+      message: 'Waiting for pending token generation',
+      level: 'debug',
+    });
     return pendingTokenGeneration;
   }
 
@@ -182,9 +184,14 @@ export async function getAppleMusicToken(): Promise<string> {
 
       cachedToken = { token, expiresAt };
 
-      console.info(`${LOG_PREFIX} Generated new developer token`, {
-        expiresAt: new Date(expiresAt).toISOString(),
-        expiresInMs: TOKEN_EXPIRY_SECONDS * 1000,
+      Sentry.addBreadcrumb({
+        category: 'apple-music-auth',
+        message: 'Generated new developer token',
+        level: 'info',
+        data: {
+          expiresAt: new Date(expiresAt).toISOString(),
+          expiresInMs: TOKEN_EXPIRY_SECONDS * 1000,
+        },
       });
 
       return token;

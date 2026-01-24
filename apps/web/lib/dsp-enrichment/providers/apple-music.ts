@@ -15,6 +15,7 @@
 
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import {
   getCachedArtistProfile,
   getCachedIsrcTrack,
@@ -221,9 +222,12 @@ async function musicKitRequest<T>(
 
       // Retry once with fresh token
       if (!isRetry) {
-        console.warn(
-          '[AppleMusicProvider] 401 received, retrying with fresh token'
-        );
+        Sentry.addBreadcrumb({
+          category: 'apple-music-provider',
+          message: '401 received, retrying with fresh token',
+          level: 'warning',
+          data: { endpoint },
+        });
         return musicKitRequest<T>(endpoint, options, true);
       }
 
