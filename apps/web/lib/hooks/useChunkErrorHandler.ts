@@ -116,7 +116,7 @@ export function useChunkErrorHandler() {
       }
 
       // Check if this is due to a version mismatch
-      const buildInfo = await fetchBuildInfo();
+      const buildInfo = await fetchBuildInfo({ signal: undefined });
       const hasVersionInfo = buildInfo && buildInfo.buildId !== 'unknown';
 
       hasShownNotification.current = true;

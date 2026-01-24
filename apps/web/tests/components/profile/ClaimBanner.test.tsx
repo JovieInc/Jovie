@@ -2,10 +2,10 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 
-// Mock Clerk's useUser hook
+// Mock useUserSafe hook (used by ClaimBanner)
 const mockUseUser = vi.fn();
-vi.mock('@clerk/nextjs', () => ({
-  useUser: () => mockUseUser(),
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: () => mockUseUser(),
 }));
 
 // Mock next/link

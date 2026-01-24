@@ -5,11 +5,13 @@ import { type FormEvent, useCallback, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { Textarea } from '@/components/atoms/Textarea';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { usePixelSettingsMutation } from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 export function SettingsAdPixelsSection() {
-  const [isPixelSaving, setIsPixelSaving] = useState(false);
+  const { mutate: savePixels, isPending: isPixelSaving } =
+    usePixelSettingsMutation();
   const [pixelData, setPixelData] = useState({
     facebookPixel: '',
     googleAdsConversion: '',
@@ -22,38 +24,20 @@ export function SettingsAdPixelsSection() {
   };
 
   const handlePixelSubmit = useCallback(
-    async (e: FormEvent<HTMLFormElement>) => {
+    (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      setIsPixelSaving(true);
 
-      try {
-        // Read form data from the form element to avoid dependency on state
-        const formData = new FormData(e.currentTarget);
-        const response = await fetch('/api/dashboard/pixels', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            facebookPixel: formData.get('facebookPixel') ?? '',
-            googleAdsConversion: formData.get('googleAdsConversion') ?? '',
-            tiktokPixel: formData.get('tiktokPixel') ?? '',
-            customPixel: formData.get('customPixel') ?? '',
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save pixels');
-        }
-
-        console.log('Pixels saved successfully');
-      } catch (error) {
-        console.error('Failed to save pixels:', error);
-      } finally {
-        setIsPixelSaving(false);
-      }
+      // Read form data from the form element to avoid dependency on state
+      const formData = new FormData(e.currentTarget);
+      savePixels({
+        facebookPixel: (formData.get('facebookPixel') as string) ?? '',
+        googleAdsConversion:
+          (formData.get('googleAdsConversion') as string) ?? '',
+        tiktokPixel: (formData.get('tiktokPixel') as string) ?? '',
+        customPixel: (formData.get('customPixel') as string) ?? '',
+      });
     },
-    []
+    [savePixels]
   );
 
   return (

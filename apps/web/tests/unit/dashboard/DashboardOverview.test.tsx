@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
@@ -120,8 +126,6 @@ describe('DashboardOverview', () => {
   });
 
   it('supports copy-to-clipboard with aria-live status', async () => {
-    vi.useFakeTimers();
-
     const writeText = vi.fn().mockResolvedValue(undefined);
     (navigator as any).clipboard = { writeText };
 
@@ -146,31 +150,31 @@ describe('DashboardOverview', () => {
     const expectedBase = window.location.origin;
     expect(writeText.mock.calls[0][0]).toBe(`${expectedBase}/artist1`);
 
-    // Wait for the async clipboard write to resolve so the component can update state
-    const copyPromise = writeText.mock.results[0]?.value as Promise<void>;
-    if (copyPromise) {
-      await copyPromise;
-    }
-    // Allow React state update microtask to flush
-    await Promise.resolve();
-
-    // Status updates to success and aria-live announces it (at least one button shows Copied!)
-    const copiedBtns = screen.getAllByRole('button', { name: /Copied!/i });
-    expect(copiedBtns.length).toBeGreaterThanOrEqual(1);
+    // Wait for the copy success state to appear
+    await waitFor(() => {
+      const copiedBtns = screen.getAllByRole('button', { name: /Copied!/i });
+      expect(copiedBtns.length).toBeGreaterThanOrEqual(1);
+    });
 
     // At least one status element should announce the copy
-    const statuses = screen.getAllByRole('status');
-    const hasAnnouncement = statuses.some(s =>
-      s.textContent?.includes('Profile URL copied to clipboard')
-    );
-    expect(hasAnnouncement).toBe(true);
+    await waitFor(() => {
+      const statuses = screen.getAllByRole('status');
+      const hasAnnouncement = statuses.some(s =>
+        s.textContent?.includes('Profile URL copied to clipboard')
+      );
+      expect(hasAnnouncement).toBe(true);
+    });
 
-    // After timer elapses, reset back to idle
-    vi.advanceTimersByTime(2000);
-    // Flush microtask to reflect state reset
-    await Promise.resolve();
-    expect(
-      within(headerEl as HTMLElement).getByRole('button', { name: 'Copy URL' })
-    ).toBeInTheDocument();
+    // After timeout, button should reset back to idle (this happens after ~2 seconds)
+    await waitFor(
+      () => {
+        expect(
+          within(headerEl as HTMLElement).getByRole('button', {
+            name: 'Copy URL',
+          })
+        ).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
   });
 });

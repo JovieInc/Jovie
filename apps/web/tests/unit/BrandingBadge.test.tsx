@@ -1,12 +1,14 @@
-import { useUser } from '@clerk/nextjs';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrandingBadge } from '@/components/organisms/BrandingBadge';
+import * as useClerkSafe from '@/hooks/useClerkSafe';
 
-// Mock Clerk's useUser hook
-vi.mock('@clerk/nextjs', () => ({
-  useUser: vi.fn(),
+// Mock the useUserSafe hook
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: vi.fn(),
 }));
+
+const mockUseUserSafe = useClerkSafe.useUserSafe as ReturnType<typeof vi.fn>;
 
 describe('BrandingBadge', () => {
   beforeEach(() => {
@@ -14,11 +16,12 @@ describe('BrandingBadge', () => {
   });
 
   it('shows branding for free plan users', () => {
-    (useUser as any).mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       user: {
         publicMetadata: { plan: 'free' },
       },
       isLoaded: true,
+      isSignedIn: true,
     });
 
     render(<BrandingBadge />);
@@ -27,11 +30,12 @@ describe('BrandingBadge', () => {
   });
 
   it('hides branding for pro plan users', () => {
-    (useUser as any).mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       user: {
         publicMetadata: { plan: 'pro' },
       },
       isLoaded: true,
+      isSignedIn: true,
     });
 
     const { container } = render(<BrandingBadge />);
@@ -40,11 +44,12 @@ describe('BrandingBadge', () => {
   });
 
   it('shows branding for users without plan metadata (defaults to free)', () => {
-    (useUser as any).mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       user: {
         publicMetadata: {},
       },
       isLoaded: true,
+      isSignedIn: true,
     });
 
     render(<BrandingBadge />);
@@ -53,9 +58,10 @@ describe('BrandingBadge', () => {
   });
 
   it('shows placeholder while loading', () => {
-    (useUser as any).mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       user: null,
       isLoaded: false,
+      isSignedIn: false,
     });
 
     const { container } = render(<BrandingBadge />);
@@ -64,9 +70,10 @@ describe('BrandingBadge', () => {
   });
 
   it('shows branding for unauthenticated users', () => {
-    (useUser as any).mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       user: null,
       isLoaded: true,
+      isSignedIn: false,
     });
 
     render(<BrandingBadge />);

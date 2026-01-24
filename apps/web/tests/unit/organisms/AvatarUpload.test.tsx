@@ -1,4 +1,6 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import {
   afterEach,
   beforeEach,
@@ -9,7 +11,23 @@ import {
   vi,
 } from 'vitest';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
-import { fastRender } from '@/tests/utils/fast-render';
+
+// Create a wrapper with QueryClientProvider for testing
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 // Mock Sonner toast with vi.hoisted for proper setup
 const mockToast = vi.hoisted(() => ({
@@ -85,7 +103,7 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should show error toast for invalid file type', async () => {
-    fastRender(
+    renderWithQueryClient(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -106,7 +124,7 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should show error toast for file too large', async () => {
-    fastRender(
+    renderWithQueryClient(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -137,7 +155,7 @@ describe('AvatarUpload - Error Handling', () => {
 
     const onUploadSuccess = vi.fn();
 
-    fastRender(
+    renderWithQueryClient(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -163,7 +181,7 @@ describe('AvatarUpload - Error Handling', () => {
       json: () => Promise.resolve({ error: 'Upload failed' }),
     });
 
-    fastRender(
+    renderWithQueryClient(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -181,7 +199,7 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should display upload instructions', () => {
-    fastRender(
+    renderWithQueryClient(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
