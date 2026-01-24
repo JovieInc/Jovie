@@ -24,17 +24,20 @@ test.describe('Full onboarding flow @nightly', () => {
 
     const { getContext, cleanup } = setupPageMonitoring(page);
 
-    // Skip if env not properly configured
+    // Skip if env not properly configured or Clerk setup failed
     const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
     const sk = process.env.CLERK_SECRET_KEY || '';
     const dbUrl = process.env.DATABASE_URL || '';
+    const clerkSetupSucceeded =
+      process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
     if (
       !pk ||
       !sk ||
       !dbUrl ||
       pk.includes('dummy') ||
       sk.includes('dummy') ||
-      dbUrl.includes('dummy')
+      dbUrl.includes('dummy') ||
+      !clerkSetupSucceeded
     ) {
       test.skip();
     }

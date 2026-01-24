@@ -45,6 +45,8 @@ async function globalSetup() {
         publishableKey: publishableKey!,
         secretKey: secretKey!,
       });
+      // Signal to tests that clerkSetup succeeded
+      process.env.CLERK_TESTING_SETUP_SUCCESS = 'true';
       console.log('✓ Clerk testing token set up successfully');
     } catch (error) {
       console.warn('⚠ Failed to set up Clerk testing token');

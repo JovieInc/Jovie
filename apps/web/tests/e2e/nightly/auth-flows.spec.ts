@@ -34,7 +34,8 @@ function canRunAuthenticatedFixtures(): boolean {
   return (
     hasRealClerkConfig() &&
     Boolean(process.env.E2E_CLERK_USER_USERNAME) &&
-    Boolean(process.env.DATABASE_URL)
+    Boolean(process.env.DATABASE_URL) &&
+    process.env.CLERK_TESTING_SETUP_SUCCESS === 'true'
   );
 }
 
