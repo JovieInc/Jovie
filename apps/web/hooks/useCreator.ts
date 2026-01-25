@@ -1,34 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { fetchCreatorProfile } from '@/lib/actions/creator';
+import { usePublicProfileQuery } from '@/lib/queries';
 
-type CreatorWithSocialLinks = Awaited<ReturnType<typeof fetchCreatorProfile>>;
-
+/**
+ * Hook to fetch creator profile data by username.
+ *
+ * Uses TanStack Query for caching and background refetching.
+ *
+ * @param username - The creator's username to fetch
+ * @returns Creator profile data, loading state, and error
+ */
 export function useCreator(username: string) {
-  const [creator, setCreator] = useState<CreatorWithSocialLinks | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const {
+    data: creator,
+    isLoading: loading,
+    error,
+  } = usePublicProfileQuery({
+    username,
+    enabled: Boolean(username),
+  });
 
-  useEffect(() => {
-    async function loadCreator() {
-      try {
-        setLoading(true);
-        const data = await fetchCreatorProfile(username);
-        setCreator(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err : new Error('Failed to load creator')
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (username) {
-      loadCreator();
-    }
-  }, [username]);
-
-  return { creator, loading, error };
+  return {
+    creator: creator ?? null,
+    loading,
+    error: error instanceof Error ? error : null,
+  };
 }
