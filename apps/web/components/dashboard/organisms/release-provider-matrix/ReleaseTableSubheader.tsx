@@ -1,21 +1,9 @@
 'use client';
 
-import {
-  Button,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Separator,
-} from '@jovie/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ExportCSVButton } from '@/components/organisms/table';
-import type { Density } from '@/components/organisms/table/molecules/DisplayMenuDropdown';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import {
@@ -34,37 +22,15 @@ interface ReleaseTableSubheaderProps {
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   /** Available columns to toggle */
   availableColumns: readonly { id: string; label: string }[];
-  /** Current density setting */
-  density: Density;
-  /** Callback when density changes */
-  onDensityChange: (density: Density) => void;
   /** Active filter count for badge (0 = no filters) */
   activeFilterCount?: number;
 }
 
-/** Grouping options for the display menu */
-const GROUPING_OPTIONS = [
-  { value: 'none', label: 'No grouping' },
-  { value: 'releaseType', label: 'Release type' },
-  { value: 'releaseDate', label: 'Release year' },
-  { value: 'label', label: 'Label' },
-] as const;
-
-/** Ordering options for the display menu */
-const ORDERING_OPTIONS = [
-  { value: 'releaseDate', label: 'Release date' },
-  { value: 'title', label: 'Title' },
-  { value: 'popularity', label: 'Popularity' },
-  { value: 'totalTracks', label: 'Track count' },
-] as const;
-
 /**
- * LinearStyleDisplayMenu - Display settings popover with Linear-style UI
+ * LinearStyleDisplayMenu - Compact display settings popover
  *
  * Features:
- * - Grouping dropdown row
- * - Ordering dropdown row
- * - Display properties as pill toggles
+ * - Display properties as pill toggles (tightened spacing)
  */
 function LinearStyleDisplayMenu({
   columnVisibility,
@@ -81,59 +47,18 @@ function LinearStyleDisplayMenu({
         <Button
           variant='ghost'
           size='sm'
-          className='h-8 gap-1.5 text-secondary-token'
+          className='h-7 gap-1.5 text-secondary-token'
         >
-          <Icon name='SlidersHorizontal' className='h-4 w-4' />
+          <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
           Display
         </Button>
       </PopoverTrigger>
-      <PopoverContent align='end' className='w-72 p-0'>
-        {/* Grouping row */}
-        <div className='flex items-center justify-between px-3 py-2.5'>
-          <div className='flex items-center gap-2 text-sm text-secondary-token'>
-            <Icon name='Rows3' className='h-4 w-4' />
-            Grouping
-          </div>
-          <Select defaultValue='none'>
-            <SelectTrigger className='h-7 w-32 text-xs'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {GROUPING_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Ordering row */}
-        <div className='flex items-center justify-between px-3 py-2.5'>
-          <div className='flex items-center gap-2 text-sm text-secondary-token'>
-            <Icon name='ArrowUpDown' className='h-4 w-4' />
-            Ordering
-          </div>
-          <Select defaultValue='releaseDate'>
-            <SelectTrigger className='h-7 w-32 text-xs'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ORDERING_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Separator />
-
-        {/* Display properties as pills */}
-        <div className='p-3'>
-          <p className='mb-2 text-xs text-tertiary-token'>Display properties</p>
-          <div className='flex flex-wrap gap-1.5'>
+      <PopoverContent align='end' className='w-56 p-0'>
+        <div className='p-2.5'>
+          <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
+            Display properties
+          </p>
+          <div className='flex flex-wrap gap-1'>
             {availableColumns.map(col => {
               const isVisible = columnVisibility[col.id] !== false;
               return (
@@ -142,7 +67,7 @@ function LinearStyleDisplayMenu({
                   type='button'
                   onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
                   className={cn(
-                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
                     isVisible
                       ? 'bg-surface-2 text-primary-token'
                       : 'text-tertiary-token hover:bg-surface-2/50'
@@ -175,17 +100,17 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   activeFilterCount = 0,
 }: ReleaseTableSubheaderProps) {
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-2'>
+    <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-1.5'>
       {/* Left: Filter button */}
       <Button
         variant='ghost'
         size='sm'
-        className='h-8 gap-1.5 text-secondary-token'
+        className='h-7 gap-1.5 text-secondary-token'
       >
-        <Icon name='SlidersHorizontal' className='h-4 w-4' />
+        <Icon name='Filter' className='h-3.5 w-3.5' />
         Filter
         {activeFilterCount > 0 && (
-          <span className='ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-medium text-white'>
+          <span className='ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white'>
             {activeFilterCount}
           </span>
         )}

@@ -258,7 +258,7 @@ export function ReleaseTable({
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) =>
       selectedIdsRef.current?.has(row.id)
-        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
+        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-primary'
         : 'group hover:bg-surface-2/50',
     [selectedIdsRef]
   );
@@ -321,7 +321,8 @@ export function ReleaseTable({
       size: 80,
     });
 
-    const allColumns = [
+    // Return all columns - TanStack Table handles visibility natively
+    return [
       checkboxColumn,
       releaseColumn,
       STATIC_COLUMNS.releaseType,
@@ -337,17 +338,6 @@ export function ReleaseTable({
       STATIC_COLUMNS.genres,
       actionsColumn,
     ];
-
-    // Filter columns based on visibility
-    if (!columnVisibility) return allColumns;
-
-    return allColumns.filter(col => {
-      const id = col.id;
-      if (!id) return true;
-      // Always show select, release, actions
-      if (id === 'select' || id === 'release' || id === 'actions') return true;
-      return columnVisibility[id] !== false;
-    });
   }, [
     providerConfig,
     artistName,
@@ -358,12 +348,22 @@ export function ReleaseTable({
     isSyncing,
     onSync,
     getContextMenuItems,
-    columnVisibility,
     headerCheckboxStateRef,
     selectedIdsRef,
     toggleSelect,
     toggleSelectAll,
   ]);
+
+  // Transform columnVisibility to TanStack format (always show select, release, actions)
+  const tanstackColumnVisibility = useMemo(() => {
+    if (!columnVisibility) return undefined;
+    return {
+      ...columnVisibility,
+      select: true,
+      release: true,
+      actions: true,
+    };
+  }, [columnVisibility]);
 
   const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
 
@@ -382,6 +382,7 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       className='text-[13px]'
+      columnVisibility={tanstackColumnVisibility}
     />
   );
 }

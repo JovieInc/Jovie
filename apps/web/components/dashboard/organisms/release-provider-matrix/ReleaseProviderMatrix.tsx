@@ -62,14 +62,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
-  // Table display preferences (column visibility, density)
+  // Table display preferences (column visibility)
   const {
     columnVisibility,
-    density,
     rowHeight,
     availableColumns,
     onColumnVisibilityChange,
-    onDensityChange,
     resetToDefaults,
   } = useReleaseTablePreferences();
 
@@ -245,8 +243,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   columnVisibility={columnVisibility}
                   onColumnVisibilityChange={onColumnVisibilityChange}
                   availableColumns={availableColumns}
-                  density={density}
-                  onDensityChange={onDensityChange}
                 />
                 <QueryErrorBoundary>
                   <ReleaseTable
