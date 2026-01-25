@@ -160,6 +160,7 @@ export async function GET(request: Request) {
         }
 
         // Fetch subscriber details
+        // Also verify releaseDay preference is still enabled to honor opt-outs after scheduling
         const [subscriber] = await db
           .select({
             id: notificationSubscriptions.id,
@@ -174,13 +175,14 @@ export async function GET(request: Request) {
                 notificationSubscriptions.id,
                 notification.notificationSubscriptionId
               ),
-              sql`${notificationSubscriptions.unsubscribedAt} IS NULL`
+              sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+              sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
             )
           )
           .limit(1);
 
         if (!subscriber) {
-          // Subscriber unsubscribed, cancel notification
+          // Subscriber unsubscribed or disabled releaseDay preference, cancel notification
           await db
             .update(fanReleaseNotifications)
             .set({ status: 'cancelled', updatedAt: now })

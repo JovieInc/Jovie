@@ -101,8 +101,11 @@ export async function GET(request: Request) {
         // Create a unique dedup key to prevent duplicate notifications
         const dedupKey = `release_day:${release.id}:${subscriber.id}`;
 
-        // Insert notification entry (onConflictDoNothing silently skips duplicates)
-        // Use returning() to track only successful inserts
+        // Insert notification entry
+        // Use onConflictDoUpdate to handle rescheduled releases:
+        // - If the notification exists and was cancelled (e.g., release date changed),
+        //   update it back to pending with the new scheduledFor date
+        // - If it's already pending/sending/sent, keep the existing record
         const inserted = await db
           .insert(fanReleaseNotifications)
           .values({
@@ -118,7 +121,18 @@ export async function GET(request: Request) {
               channel: subscriber.channel,
             },
           })
-          .onConflictDoNothing({ target: fanReleaseNotifications.dedupKey })
+          .onConflictDoUpdate({
+            target: fanReleaseNotifications.dedupKey,
+            set: {
+              scheduledFor: release.releaseDate,
+              status: 'pending',
+              error: null,
+              updatedAt: now,
+            },
+            // Only update if the existing notification was cancelled
+            // (e.g., due to release date change) - don't touch pending/sent ones
+            setWhere: eq(fanReleaseNotifications.status, 'cancelled'),
+          })
           .returning({ id: fanReleaseNotifications.id });
 
         if (inserted.length > 0) {
