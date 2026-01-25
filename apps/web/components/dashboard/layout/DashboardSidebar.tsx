@@ -7,7 +7,6 @@ import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
-import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 import {
   Sidebar,
@@ -160,9 +159,6 @@ export function DashboardSidebar({
       {!isInSettings && (
         <SidebarFooter className='mt-auto'>
           <SidebarSeparator className='mx-0' />
-          <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
-            <DashboardRemoveBrandingCard />
-          </div>
           <div className='px-2 py-3'>
             <div
               className={cn(
