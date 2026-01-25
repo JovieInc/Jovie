@@ -78,7 +78,7 @@ interface InsertNewLinkOptions {
   link: { url: string; title?: string | null; sourcePlatform?: string };
   detected: {
     normalizedUrl: string;
-    platform: { id: string; category: string };
+    platform: { id: string; category: string; icon: string };
   };
   sortOrder: number;
   evidence: SocialLinkRow['evidence'];
@@ -101,7 +101,7 @@ async function insertNewLink(options: InsertNewLinkOptions): Promise<void> {
   const insertPayload: typeof socialLinks.$inferInsert = {
     creatorProfileId: profileId,
     platform: detected.platform.id,
-    platformType: detected.platform.category,
+    platformType: detected.platform.icon,
     url: detected.normalizedUrl,
     displayText: link.title,
     sortOrder,

@@ -9,10 +9,10 @@ import type Stripe from 'stripe';
 /**
  * Stripe subscription statuses that grant Pro access.
  */
-const PRO_SUBSCRIPTION_STATUSES: Stripe.Subscription.Status[] = [
+const PRO_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
   'active',
   'trialing',
-];
+]);
 
 /**
  * Determines if a subscription status should grant Pro access.
@@ -23,7 +23,7 @@ const PRO_SUBSCRIPTION_STATUSES: Stripe.Subscription.Status[] = [
 export function shouldGrantProAccess(
   status: Stripe.Subscription.Status
 ): boolean {
-  return PRO_SUBSCRIPTION_STATUSES.includes(status);
+  return PRO_SUBSCRIPTION_STATUSES.has(status);
 }
 
 /**

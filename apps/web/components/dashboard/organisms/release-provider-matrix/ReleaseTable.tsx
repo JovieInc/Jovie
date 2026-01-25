@@ -114,6 +114,9 @@ export function ReleaseTable({
   const sortingRef = useRef(sorting);
   sortingRef.current = sorting;
 
+  // Ref to store debouncer execute function - prevents callback recreation
+  const sortingDebouncerRef = useRef<((s: SortingState) => void) | null>(null);
+
   // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
   const sortingDebouncer = useDebouncer(
     (newSorting: SortingState) => {
@@ -123,6 +126,9 @@ export function ReleaseTable({
     },
     { wait: 150 }
   );
+
+  // Keep ref updated with latest debouncer function
+  sortingDebouncerRef.current = sortingDebouncer.maybeExecute;
 
   // Use immediate sorting for small datasets, debounced for large
   // Note: Using ref to access current sorting avoids adding it to deps,
@@ -134,12 +140,12 @@ export function ReleaseTable({
       // Update ref immediately to prevent stale state during rapid debounced updates
       sortingRef.current = newSorting;
       if (releases.length > LARGE_DATASET_THRESHOLD) {
-        sortingDebouncer.maybeExecute(newSorting);
+        sortingDebouncerRef.current?.(newSorting);
       } else {
         setSorting(newSorting);
       }
     },
-    [releases.length, sortingDebouncer]
+    [releases.length]
   );
 
   // Row selection - use external selection if provided, otherwise use internal

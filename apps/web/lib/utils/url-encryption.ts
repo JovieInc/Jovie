@@ -3,7 +3,7 @@
  * Anti-cloaking compliant URL encryption for link wrapping
  */
 
-import {
+export {
   extractDomain,
   isValidUrl,
   sanitizeUrlForLogging,
@@ -92,5 +92,3 @@ export function generateSignedToken(): string {
     '[url-encryption] generateSignedToken is server-only. Import from @/lib/utils/url-encryption.server'
   );
 }
-
-export { extractDomain, isValidUrl, sanitizeUrlForLogging };

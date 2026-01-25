@@ -40,7 +40,7 @@ export function SkeletonRow({
   columnConfig,
   height = layoutStability.skeletonRowHeight,
   className,
-}: SkeletonRowProps) {
+}: Readonly<SkeletonRowProps>) {
   const columnKeys = useMemo(
     () => Array.from({ length: columns }, (_, i) => `skeleton-col-${i}`),
     [columns]

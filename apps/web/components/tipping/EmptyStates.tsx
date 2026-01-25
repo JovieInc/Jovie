@@ -43,7 +43,7 @@ export function TippingEmptyState({
   type,
   className = '',
   animate = true,
-}: TippingEmptyStateProps) {
+}: Readonly<TippingEmptyStateProps>) {
   const config = EMPTY_STATE_CONFIG[type];
 
   const containerVariants: Variants = {
@@ -122,7 +122,7 @@ export function TippingEmptyState({
 export function TippingMetricsSkeleton({
   className = '',
   rows = 3,
-}: TippingSkeletonProps) {
+}: Readonly<TippingSkeletonProps>) {
   const rowKeys = useMemo(
     () => Array.from({ length: rows }, (_, i) => `tipping-row-${i}`),
     [rows]

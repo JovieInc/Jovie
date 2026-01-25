@@ -41,7 +41,7 @@ export type LazyAdminCreatorProfilesWithSidebarProps =
   AdminCreatorProfilesWithSidebarProps;
 
 export function LazyAdminCreatorProfilesWithSidebar(
-  props: AdminCreatorProfilesWithSidebarProps
+  props: Readonly<AdminCreatorProfilesWithSidebarProps>
 ) {
   return <AdminCreatorProfilesWithSidebar {...props} />;
 }
