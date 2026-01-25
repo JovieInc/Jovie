@@ -82,6 +82,13 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
       }).format(entry.createdAt)
     : null;
 
+  // Determine button label based on approval state
+  const approveButtonLabel = isApproved
+    ? 'Approved'
+    : isApproving
+      ? 'Approving…'
+      : 'Approve';
+
   return (
     <div className='bg-surface-0 border border-subtle rounded-xl overflow-hidden'>
       {/* Main card content - always visible */}
@@ -133,7 +140,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
             onClick={onApprove}
             className='flex-1'
           >
-            {isApproved ? 'Approved' : isApproving ? 'Approving…' : 'Approve'}
+            {approveButtonLabel}
           </Button>
           <Button
             size='sm'
