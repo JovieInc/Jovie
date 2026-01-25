@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import {
   type ProviderLink as DbProviderLink,
@@ -108,7 +108,7 @@ async function getTrackSummariesForReleases(
         ),
     })
     .from(discogTracks)
-    .where(sql`${discogTracks.releaseId} = ANY(${releaseIds}::uuid[])`)
+    .where(inArray(discogTracks.releaseId, releaseIds))
     .groupBy(discogTracks.releaseId);
 
   const summaryMap = new Map<string, TrackSummary>();

@@ -4,7 +4,7 @@ import { Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
@@ -70,6 +70,12 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
   const rowSelection = useMemo(() => {
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
+
+  // Refs for selection state to avoid column recreation on every selection change
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const headerCheckboxStateRef = useRef(headerCheckboxState);
+  headerCheckboxStateRef.current = headerCheckboxState;
 
   // Context menu items for right-click AND actions button
   const getContextMenuItems = useCallback(
@@ -161,15 +167,16 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     ];
   }, [users, selectedIds, clearSelection]);
 
-  // Create memoized cell renderers to avoid component-in-component warnings
+  // Create memoized cell renderers using refs to avoid column recreation on selection change
   const SelectHeader = useMemo(
-    () => createSelectHeaderRenderer(headerCheckboxState, toggleSelectAll),
-    [headerCheckboxState, toggleSelectAll]
+    () => createSelectHeaderRenderer(headerCheckboxStateRef, toggleSelectAll),
+    [toggleSelectAll]
   );
 
   const SelectCell = useMemo(
-    () => createSelectCellRenderer(selectedIds, page, pageSize, toggleSelect),
-    [selectedIds, page, pageSize, toggleSelect]
+    () =>
+      createSelectCellRenderer(selectedIdsRef, page, pageSize, toggleSelect),
+    [page, pageSize, toggleSelect]
   );
 
   const ActionsCell = useMemo(

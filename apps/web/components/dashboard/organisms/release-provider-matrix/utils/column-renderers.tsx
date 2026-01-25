@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
+import type { RefObject } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -27,10 +28,12 @@ export const DATE_TOOLTIP_FORMAT_OPTIONS = {
 } as const;
 
 /**
- * Creates a header renderer for the checkbox column
+ * Creates a header renderer for the checkbox column.
+ * Uses a ref for headerCheckboxState to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectHeaderRenderer(
-  headerCheckboxState: boolean | 'indeterminate',
+  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>,
   onToggleSelectAll: () => void
 ) {
   return function SelectHeader({
@@ -39,7 +42,7 @@ export function createSelectHeaderRenderer(
     return (
       <TableCheckboxCell
         table={table as Table<ReleaseViewModel>}
-        headerCheckboxState={headerCheckboxState}
+        headerCheckboxState={headerCheckboxStateRef.current ?? false}
         onToggleSelectAll={onToggleSelectAll}
       />
     );
@@ -47,15 +50,17 @@ export function createSelectHeaderRenderer(
 }
 
 /**
- * Creates a cell renderer for the checkbox column
+ * Creates a cell renderer for the checkbox column.
+ * Uses a ref for selectedIds to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectCellRenderer(
-  selectedIds: Set<string>,
+  selectedIdsRef: RefObject<Set<string>>,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
-    const isChecked = selectedIds.has(release.id);
+    const isChecked = selectedIdsRef.current?.has(release.id) ?? false;
     const rowNumber = row.index + 1;
 
     return (
@@ -70,14 +75,18 @@ export function createSelectCellRenderer(
 }
 
 /**
- * Creates a header renderer for the release column with bulk actions
+ * Creates a header renderer for the release column with bulk actions.
+ * Uses refs for selectedCount and bulkActions to read current values at render time,
+ * preventing column recreation on every selection change.
  */
 export function createReleaseHeaderRenderer(
-  selectedCount: number,
-  bulkActions: HeaderBulkAction[],
+  selectedCountRef: RefObject<number>,
+  bulkActionsRef: RefObject<HeaderBulkAction[]>,
   onClearSelection: (() => void) | undefined
 ) {
   return function ReleaseHeader() {
+    const selectedCount = selectedCountRef.current ?? 0;
+    const bulkActions = bulkActionsRef.current ?? [];
     return (
       <div className='flex items-center gap-2'>
         {selectedCount === 0 && <span>Release</span>}
@@ -110,15 +119,18 @@ export function renderReleaseDateCell({
 }
 
 /**
- * Creates a header renderer for the actions column
+ * Creates a header renderer for the actions column.
+ * Uses a ref for selectedCount to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createActionsHeaderRenderer(
-  selectedCount: number,
+  selectedCountRef: RefObject<number>,
   onClearSelection: (() => void) | undefined,
   onSync: () => void,
   isSyncing: boolean | undefined
 ) {
   return function ActionsHeader() {
+    const selectedCount = selectedCountRef.current ?? 0;
     return (
       <div className='flex items-center justify-end gap-1'>
         {selectedCount > 0 ? (

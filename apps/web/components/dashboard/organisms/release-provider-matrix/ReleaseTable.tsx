@@ -6,7 +6,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 // Cell components are now used via factory functions in ./utils/column-renderers
 import {
@@ -110,6 +110,10 @@ export function ReleaseTable({
   ]);
   const [isSorting, startTransition] = useTransition();
 
+  // Ref to track current sorting for debouncer (avoids stale closure)
+  const sortingRef = useRef(sorting);
+  sortingRef.current = sorting;
+
   // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
   const sortingDebouncer = useDebouncer(
     (newSorting: SortingState) => {
@@ -121,17 +125,21 @@ export function ReleaseTable({
   );
 
   // Use immediate sorting for small datasets, debounced for large
+  // Note: Using ref to access current sorting avoids adding it to deps,
+  // which would cause callback recreation on every sort change
   const handleSortingChange = useCallback(
     (updater: SortingState | ((old: SortingState) => SortingState)) => {
       const newSorting =
-        typeof updater === 'function' ? updater(sorting) : updater;
+        typeof updater === 'function' ? updater(sortingRef.current) : updater;
+      // Update ref immediately to prevent stale state during rapid debounced updates
+      sortingRef.current = newSorting;
       if (releases.length > LARGE_DATASET_THRESHOLD) {
         sortingDebouncer.maybeExecute(newSorting);
       } else {
         setSorting(newSorting);
       }
     },
-    [sorting, releases.length, sortingDebouncer]
+    [releases.length, sortingDebouncer]
   );
 
   // Row selection - use external selection if provided, otherwise use internal
@@ -141,6 +149,13 @@ export function ReleaseTable({
 
   const selectedIds = externalSelectedIds ?? internalSelection.selectedIds;
 
+  // Refs for selection state to avoid callback recreation
+  // This prevents infinite loops when selection changes trigger column recreation
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const rowIdsRef = useRef(rowIds);
+  rowIdsRef.current = rowIds;
+
   // Compute visible selected (intersection of selectedIds and current rowIds)
   const visibleSelectedCount = useMemo(() => {
     let count = 0;
@@ -149,6 +164,9 @@ export function ReleaseTable({
     }
     return count;
   }, [selectedIds, rowIdSet]);
+
+  const visibleSelectedCountRef = useRef(visibleSelectedCount);
+  visibleSelectedCountRef.current = visibleSelectedCount;
 
   // Compute header checkbox state based on visible selection
   const headerCheckboxState = useMemo(() => {
@@ -167,10 +185,21 @@ export function ReleaseTable({
     rowIds.length,
   ]);
 
+  // Ref for header checkbox state to prevent column recreation
+  const headerCheckboxStateRef = useRef(headerCheckboxState);
+  headerCheckboxStateRef.current = headerCheckboxState;
+
+  // Refs for bulk actions header to prevent column recreation
+  const selectedCountRef = useRef(selectedIds.size);
+  selectedCountRef.current = selectedIds.size;
+  const bulkActionsRef = useRef(bulkActions);
+  bulkActionsRef.current = bulkActions;
+
+  // Stable callbacks using refs to avoid recreation on selection change
   const toggleSelect = useCallback(
     (id: string) => {
       if (onSelectionChange) {
-        const newSet = new Set(selectedIds);
+        const newSet = new Set(selectedIdsRef.current);
         if (newSet.has(id)) {
           newSet.delete(id);
         } else {
@@ -181,23 +210,24 @@ export function ReleaseTable({
         internalSelection.toggleSelect(id);
       }
     },
-    [onSelectionChange, selectedIds, internalSelection.toggleSelect]
+    [onSelectionChange, internalSelection.toggleSelect]
   );
 
   const toggleSelectAll = useCallback(() => {
     if (onSelectionChange) {
+      const currentRowIds = rowIdsRef.current;
       // Check if all visible rows are selected
-      if (visibleSelectedCount === rowIds.length) {
+      if (visibleSelectedCountRef.current === currentRowIds.length) {
         // Deselect all visible rows (preserve non-visible selections)
-        const newSet = new Set(selectedIds);
-        for (const id of rowIds) {
+        const newSet = new Set(selectedIdsRef.current);
+        for (const id of currentRowIds) {
           newSet.delete(id);
         }
         onSelectionChange(newSet);
       } else {
         // Select all visible rows (preserve existing selections)
-        const newSet = new Set(selectedIds);
-        for (const id of rowIds) {
+        const newSet = new Set(selectedIdsRef.current);
+        for (const id of currentRowIds) {
           newSet.add(id);
         }
         onSelectionChange(newSet);
@@ -205,13 +235,7 @@ export function ReleaseTable({
     } else {
       internalSelection.toggleSelectAll();
     }
-  }, [
-    onSelectionChange,
-    visibleSelectedCount,
-    rowIds,
-    selectedIds,
-    internalSelection.toggleSelectAll,
-  ]);
+  }, [onSelectionChange, internalSelection.toggleSelectAll]);
 
   // Context menu items for right-click - memoized to prevent recreation
   const getContextMenuItems = useCallback(
@@ -248,12 +272,25 @@ export function ReleaseTable({
     [onEdit, onCopy]
   );
 
+  // Stable callbacks for UnifiedTable props
+  const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
+  const getRowClassName = useCallback(
+    (row: ReleaseViewModel) =>
+      selectedIdsRef.current.has(row.id)
+        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
+        : 'group hover:bg-surface-2/50',
+    []
+  );
+
   // Build dynamic column definitions
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
       id: 'select',
-      header: createSelectHeaderRenderer(headerCheckboxState, toggleSelectAll),
-      cell: createSelectCellRenderer(selectedIds, toggleSelect),
+      header: createSelectHeaderRenderer(
+        headerCheckboxStateRef,
+        toggleSelectAll
+      ),
+      cell: createSelectCellRenderer(selectedIdsRef, toggleSelect),
       size: 56,
     });
 
@@ -266,8 +303,8 @@ export function ReleaseTable({
       columnHelper.accessor('title', {
         id: 'release',
         header: createReleaseHeaderRenderer(
-          selectedIds.size,
-          bulkActions,
+          selectedCountRef,
+          bulkActionsRef,
           onClearSelection
         ),
         cell: createReleaseCellRenderer(artistName),
@@ -381,7 +418,7 @@ export function ReleaseTable({
       columnHelper.display({
         id: 'actions',
         header: createActionsHeaderRenderer(
-          selectedIds.size,
+          selectedCountRef,
           onClearSelection,
           onSync,
           isSyncing
@@ -410,15 +447,12 @@ export function ReleaseTable({
     onCopy,
     onAddUrl,
     isAddingUrl,
-    headerCheckboxState,
-    selectedIds.size,
+    // Note: headerCheckboxState, selectedIds.size, toggleSelect, toggleSelectAll, bulkActions
+    // are intentionally excluded - they use refs to prevent recreation loops
     releases.length,
-    bulkActions,
     onClearSelection,
     isSyncing,
     onSync,
-    toggleSelect,
-    toggleSelectAll,
     getContextMenuItems,
     columnVisibility,
   ]);
@@ -435,12 +469,8 @@ export function ReleaseTable({
       isLoading={isSorting && releases.length > LARGE_DATASET_THRESHOLD}
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
-      getRowId={row => row.id}
-      getRowClassName={row =>
-        selectedIds.has(row.id)
-          ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
-          : 'group hover:bg-surface-2/50'
-      }
+      getRowId={getRowId}
+      getRowClassName={getRowClassName}
       enableVirtualization // Auto-enabled at 20+ rows, explicit for large datasets
       rowHeight={rowHeight}
       minWidth={minWidth}

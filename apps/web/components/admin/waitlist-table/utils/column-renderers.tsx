@@ -1,6 +1,7 @@
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';
+import type { RefObject } from 'react';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
@@ -166,10 +167,12 @@ export function renderStatusCell(status: WaitlistEntryRow['status']) {
 }
 
 /**
- * Creates a header renderer for the checkbox column
+ * Creates a header renderer for the checkbox column.
+ * Uses a ref for headerCheckboxState to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectHeaderRenderer(
-  headerCheckboxState: boolean | 'indeterminate',
+  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>,
   onToggleSelectAll: () => void
 ) {
   return function SelectHeader({
@@ -178,7 +181,7 @@ export function createSelectHeaderRenderer(
     return (
       <TableCheckboxCell
         table={table as Table<WaitlistEntryRow>}
-        headerCheckboxState={headerCheckboxState}
+        headerCheckboxState={headerCheckboxStateRef.current ?? false}
         onToggleSelectAll={onToggleSelectAll}
       />
     );
@@ -186,17 +189,19 @@ export function createSelectHeaderRenderer(
 }
 
 /**
- * Creates a cell renderer for the checkbox column
+ * Creates a cell renderer for the checkbox column.
+ * Uses a ref for selectedIds to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectCellRenderer(
-  selectedIds: Set<string>,
+  selectedIdsRef: RefObject<Set<string>>,
   page: number,
   pageSize: number,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<WaitlistEntryRow, unknown>) {
     const entry = row.original;
-    const isChecked = selectedIds.has(entry.id);
+    const isChecked = selectedIdsRef.current?.has(entry.id) ?? false;
     const rowNumber = (page - 1) * pageSize + row.index + 1;
 
     return (

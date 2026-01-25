@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Configuration options for the useTableGrouping hook
@@ -117,28 +117,31 @@ export function useTableGrouping<T>({
   // 1. Reduce data array into a Record<groupKey, T[]>
   // 2. Convert Record to array of GroupedData objects
   // 3. Preserve insertion order (first appearance of each group key)
-  const groupedData: GroupedData<T>[] = enabled
-    ? Object.entries(
-        data.reduce(
-          (groups, row) => {
-            const key = getGroupKey(row);
-            // Initialize empty array for new group keys
-            if (!groups[key]) {
-              groups[key] = [];
-            }
-            // Add row to its group
-            groups[key].push(row);
-            return groups;
-          },
-          {} as Record<string, T[]>
-        )
-      ).map(([key, rows]) => ({
-        key,
-        label: getGroupLabel(key),
-        rows,
-        count: rows.length,
-      }))
-    : [];
+  // Memoized to prevent useEffect from running on every render
+  const groupedData: GroupedData<T>[] = useMemo(() => {
+    if (!enabled) return [];
+
+    return Object.entries(
+      data.reduce(
+        (groups, row) => {
+          const key = getGroupKey(row);
+          // Initialize empty array for new group keys
+          if (!groups[key]) {
+            groups[key] = [];
+          }
+          // Add row to its group
+          groups[key].push(row);
+          return groups;
+        },
+        {} as Record<string, T[]>
+      )
+    ).map(([key, rows]) => ({
+      key,
+      label: getGroupLabel(key),
+      rows,
+      count: rows.length,
+    }));
+  }, [enabled, data, getGroupKey, getGroupLabel]);
 
   // Handle intersection entry for sticky header tracking
   const handleIntersectionEntry = (

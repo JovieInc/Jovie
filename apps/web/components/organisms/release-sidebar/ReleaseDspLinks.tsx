@@ -16,10 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { Copy, ExternalLink, Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import React from 'react';
 
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import { SidebarLinkRow } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -104,68 +105,26 @@ export function ReleaseDspLinks({
             const dspId = PROVIDER_TO_DSP[provider.key];
             const isManual = provider.source === 'manual';
 
-            return (
-              <div
-                key={provider.key}
-                className='group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-sidebar-surface-hover transition-colors'
-              >
-                {/* Left: Icon + Name */}
-                <div className='flex items-center gap-2 min-w-0'>
-                  {dspId ? (
-                    <DspProviderIcon provider={dspId} size='sm' />
-                  ) : (
-                    <span
-                      className='h-4 w-4 rounded-full shrink-0'
-                      style={{ backgroundColor: config?.accent }}
-                    />
-                  )}
-                  <span className='text-sm text-sidebar-foreground truncate'>
-                    {config?.label || provider.key}
-                  </span>
-                  {isManual && (
-                    <span className='text-[10px] text-sidebar-muted shrink-0'>
-                      Custom
-                    </span>
-                  )}
-                </div>
+            const icon = dspId ? (
+              <DspProviderIcon provider={dspId} size='sm' />
+            ) : (
+              <span
+                className='h-4 w-4 rounded-full shrink-0'
+                style={{ backgroundColor: config?.accent }}
+              />
+            );
 
-                {/* Right: Actions (visible on hover/focus) */}
-                <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0'>
-                  <button
-                    type='button'
-                    onClick={() =>
-                      window.open(provider.url, '_blank', 'noopener,noreferrer')
-                    }
-                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-                    aria-label={`Open ${config?.label || provider.key}`}
-                  >
-                    <ExternalLink className='h-4 w-4' aria-hidden='true' />
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => {
-                      navigator.clipboard.writeText(provider.url).catch(() => {
-                        // Silently fail - clipboard may not be available
-                      });
-                    }}
-                    className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-                    aria-label={`Copy ${config?.label || provider.key} link`}
-                  >
-                    <Copy className='h-4 w-4' aria-hidden='true' />
-                  </button>
-                  {isEditable && (
-                    <button
-                      type='button'
-                      onClick={() => void onRemoveLink(provider.key)}
-                      disabled={isRemovingDspLink === provider.key}
-                      className='p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-                      aria-label={`Remove ${config?.label || provider.key}`}
-                    >
-                      <X className='h-4 w-4' aria-hidden='true' />
-                    </button>
-                  )}
-                </div>
-              </div>
+            return (
+              <SidebarLinkRow
+                key={provider.key}
+                icon={icon}
+                label={config?.label || provider.key}
+                url={provider.url}
+                badge={isManual ? 'Custom' : undefined}
+                isEditable={isEditable}
+                isRemoving={isRemovingDspLink === provider.key}
+                onRemove={() => void onRemoveLink(provider.key)}
+              />
             );
           })}
         </div>
