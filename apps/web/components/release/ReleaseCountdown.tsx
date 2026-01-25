@@ -4,9 +4,11 @@
  * ReleaseCountdown Component
  *
  * Displays a countdown timer for upcoming releases. Updates every minute
- * to show days, hours, and minutes until release.
+ * to show days, hours, and minutes until release. When the countdown ends,
+ * triggers a page refresh to show the released content.
  */
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface TimeLeft {
@@ -41,17 +43,25 @@ interface ReleaseCountdownProps {
 const UPDATE_INTERVAL_MS = 60_000;
 
 export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
+  const router = useRouter();
   const [timeLeft, setTimeLeft] = useState<TimeLeft>(() =>
     getTimeLeft(releaseDate)
   );
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft(getTimeLeft(releaseDate));
+      const newTimeLeft = getTimeLeft(releaseDate);
+      setTimeLeft(newTimeLeft);
+
+      // When countdown ends, refresh the page to show released content
+      // This ensures users see the correct UI state without manual refresh
+      if (newTimeLeft.total <= 0) {
+        router.refresh();
+      }
     }, UPDATE_INTERVAL_MS);
 
     return () => clearInterval(timer);
-  }, [releaseDate]);
+  }, [releaseDate, router]);
 
   // Don't render if release has passed
   if (timeLeft.total <= 0) {

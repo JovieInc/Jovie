@@ -1,4 +1,4 @@
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { and, eq, lt, lte, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   creatorProfiles,
@@ -20,6 +20,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Process up to 100 notifications per run to avoid timeouts
 const BATCH_SIZE = 100;
+
+// Timeout for stuck "sending" rows - if a notification has been in "sending" state
+// for longer than this, reset it to "pending" for retry
+const SENDING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Cron job to send pending release day notifications.
@@ -43,9 +47,30 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
+  const sendingTimeoutThreshold = new Date(now.getTime() - SENDING_TIMEOUT_MS);
 
   try {
+    // Recovery: Reset stuck "sending" rows back to "pending" for retry
+    // This handles cases where the worker crashed after claiming but before completing
+    const recoveredRows = await db
+      .update(fanReleaseNotifications)
+      .set({ status: 'pending', updatedAt: now })
+      .where(
+        and(
+          eq(fanReleaseNotifications.status, 'sending'),
+          lt(fanReleaseNotifications.updatedAt, sendingTimeoutThreshold)
+        )
+      )
+      .returning({ id: fanReleaseNotifications.id });
+
+    if (recoveredRows.length > 0) {
+      logger.info(
+        `[send-release-notifications] Recovered ${recoveredRows.length} stuck "sending" rows`
+      );
+    }
+
     // Find pending notifications that are due
+    // Filter by notification type to ensure we only process release_day notifications
     const pendingNotifications = await db
       .select({
         id: fanReleaseNotifications.id,
@@ -60,6 +85,7 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(fanReleaseNotifications.status, 'pending'),
+          eq(fanReleaseNotifications.notificationType, 'release_day'),
           lte(fanReleaseNotifications.scheduledFor, now)
         )
       )

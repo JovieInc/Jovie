@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   db,
@@ -129,9 +129,12 @@ export async function GET(request: Request) {
               error: null,
               updatedAt: now,
             },
-            // Only update if the existing notification was cancelled
-            // (e.g., due to release date change) - don't touch pending/sent ones
-            setWhere: eq(fanReleaseNotifications.status, 'cancelled'),
+            // Update if cancelled OR pending (to handle rescheduled releases)
+            // Don't touch sent/sending notifications
+            setWhere: inArray(fanReleaseNotifications.status, [
+              'cancelled',
+              'pending',
+            ]),
           })
           .returning({ id: fanReleaseNotifications.id });
 
