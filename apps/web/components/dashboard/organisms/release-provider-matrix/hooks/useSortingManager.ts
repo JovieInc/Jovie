@@ -8,7 +8,7 @@
  *
  * Features:
  * - URL-persisted sort state via nuqs for shareable/bookmarkable URLs
- * - Debounced sorting for datasets > 500 rows to prevent UI jank
+ * - Debounced sorting for datasets > 50 rows to prevent UI jank
  * - React transition for smooth loading states
  * - Ref-based state tracking to avoid stale closures
  */
@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef, useTransition } from 'react';
 import { type ReleaseSortField, useReleaseSortParams } from '@/lib/nuqs/hooks';
 
 /** Threshold above which sorting is debounced to prevent UI jank */
-const LARGE_DATASET_THRESHOLD = 500;
+const LARGE_DATASET_THRESHOLD = 50;
 
 /** Debounce wait time in milliseconds */
 const DEBOUNCE_WAIT_MS = 150;

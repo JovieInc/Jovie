@@ -33,7 +33,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
     if (!value) return;
     navigator.clipboard.writeText(value);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), 2000);
   }, [value]);
 
   if (!value) {
@@ -50,7 +50,11 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       )}
       title={`Copy ${label}`}
     >
-      <span className='truncate' style={{ maxWidth: `${maxWidth}px` }}>
+      <span
+        className='truncate'
+        style={{ maxWidth: `${maxWidth}px` }}
+        title={value}
+      >
         {value}
       </span>
       <Icon

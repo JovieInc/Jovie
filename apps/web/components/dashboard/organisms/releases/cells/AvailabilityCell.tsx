@@ -195,7 +195,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         <button
           type='button'
           aria-label='Show provider availability details'
-          aria-haspopup='dialog'
+          aria-haspopup='listbox'
           aria-expanded={open}
           className='inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-surface-2'
         >
@@ -275,9 +275,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 className='flex items-center justify-between border-b border-subtle px-3 py-2 last:border-b-0'
               >
                 <div className='flex items-center gap-2'>
-                  {/* Status dot */}
+                  {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
-                    <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
+                    <span
+                      className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'
+                      role='img'
+                      aria-label={`${config.label}: not linked`}
+                    >
                       <span className='h-1 w-1 rounded-full bg-tertiary-token' />
                     </span>
                   ) : (
@@ -287,6 +291,8 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         status === 'manual' && 'ring-2 ring-amber-400/30'
                       )}
                       style={{ backgroundColor: config.accent }}
+                      role='img'
+                      aria-label={`${config.label}: ${status === 'manual' ? 'manually linked' : 'linked'}`}
                     >
                       {status === 'manual' && (
                         <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />
