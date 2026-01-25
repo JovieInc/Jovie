@@ -6,7 +6,7 @@
 
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
-  SUPPORTED_IMAGE_MIME_TYPES,
+  SUPPORTED_IMAGE_MIME_TYPES_SET,
   type SupportedImageMimeType,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
@@ -187,11 +187,7 @@ export async function downloadImage(
     throw new Error('Unsupported image content type');
   }
 
-  if (
-    !SUPPORTED_IMAGE_MIME_TYPES.includes(
-      contentTypeHeader as SupportedImageMimeType
-    )
-  ) {
+  if (!SUPPORTED_IMAGE_MIME_TYPES_SET.has(contentTypeHeader)) {
     throw new Error('Unsupported image content type');
   }
 
