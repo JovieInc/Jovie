@@ -2,12 +2,20 @@
 
 import { Button } from '@jovie/ui';
 import { Copy } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   DisplayMenuDropdown,
   ExportCSVButton,
@@ -27,6 +35,13 @@ import {
   getReleasesForExport,
   RELEASES_CSV_COLUMNS,
 } from './utils/exportReleases';
+
+// Lazy load ReleaseSidebar - reduces initial bundle by ~30-50KB
+const ReleaseSidebar = lazy(() =>
+  import('@/components/organisms/release-sidebar').then(m => ({
+    default: m.ReleaseSidebar,
+  }))
+);
 
 export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   releases,
@@ -344,18 +359,29 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         </div>
       </div>
 
-      {/* Release Sidebar */}
-      <ReleaseSidebar
-        release={editingRelease}
-        mode='admin'
-        isOpen={isSidebarOpen}
-        providerConfig={providerConfig}
-        artistName={artistName}
-        onClose={closeEditor}
-        onRefresh={handleSync}
-        onAddDspLink={handleAddUrl}
-        isSaving={isSaving}
-      />
+      {/* Release Sidebar - Lazy loaded to reduce initial bundle */}
+      {isSidebarOpen && (
+        <Suspense
+          fallback={
+            <div
+              className='h-full animate-pulse bg-surface-1'
+              style={{ width: SIDEBAR_WIDTH }}
+            />
+          }
+        >
+          <ReleaseSidebar
+            release={editingRelease}
+            mode='admin'
+            isOpen={isSidebarOpen}
+            providerConfig={providerConfig}
+            artistName={artistName}
+            onClose={closeEditor}
+            onRefresh={handleSync}
+            onAddDspLink={handleAddUrl}
+            isSaving={isSaving}
+          />
+        </Suspense>
+      )}
     </div>
   );
 });
