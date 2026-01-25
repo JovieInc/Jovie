@@ -107,7 +107,7 @@ export function ReleaseTable({
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
 }: ReleaseTableProps) {
   // URL-persisted sort state via nuqs - enables shareable URLs and preserves sort on refresh
-  const [urlSortState, { toggleSort: nuqsToggleSort }] = useReleaseSortParams();
+  const [urlSortState, { setSorting: nuqsSetSorting }] = useReleaseSortParams();
 
   // Convert nuqs state to TanStack SortingState format
   const sorting = useMemo<SortingState>(
@@ -123,17 +123,17 @@ export function ReleaseTable({
 
   // Ref to store debouncer execute function - prevents callback recreation
   const sortingDebouncerRef = useRef<
-    ((field: ReleaseSortField) => void) | null
+    ((field: ReleaseSortField, direction: 'asc' | 'desc') => void) | null
   >(null);
 
   // Memoized callback for the debouncer to prevent recreation on every render
   const debouncedSortingCallback = useCallback(
-    (field: ReleaseSortField) => {
+    (field: ReleaseSortField, direction: 'asc' | 'desc') => {
       startTransition(() => {
-        nuqsToggleSort(field);
+        nuqsSetSorting(field, direction);
       });
     },
-    [nuqsToggleSort]
+    [nuqsSetSorting]
   );
 
   // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
@@ -151,22 +151,23 @@ export function ReleaseTable({
       const newSorting =
         typeof updater === 'function' ? updater(sortingRef.current) : updater;
 
-      // Extract field from TanStack sorting state
+      // Extract field and direction from TanStack sorting state
       const sortItem = newSorting[0];
       if (!sortItem) return;
 
       const field = sortItem.id as ReleaseSortField;
+      const direction = sortItem.desc ? 'desc' : 'asc';
 
       // Update ref immediately to prevent stale state during rapid debounced updates
       sortingRef.current = newSorting;
 
       if (releases.length > LARGE_DATASET_THRESHOLD) {
-        sortingDebouncerRef.current?.(field);
+        sortingDebouncerRef.current?.(field, direction);
       } else {
-        nuqsToggleSort(field);
+        nuqsSetSorting(field, direction);
       }
     },
-    [releases.length, nuqsToggleSort]
+    [releases.length, nuqsSetSorting]
   );
 
   // Row selection - use external selection if provided, otherwise use internal
