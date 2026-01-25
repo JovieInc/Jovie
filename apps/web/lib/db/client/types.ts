@@ -56,3 +56,11 @@ export interface PerformanceCheckResult {
   };
   error?: string;
 }
+
+/** Pool metrics for monitoring */
+export interface PoolMetrics {
+  total: number;
+  idle: number;
+  waiting: number;
+  utilization: number;
+}
