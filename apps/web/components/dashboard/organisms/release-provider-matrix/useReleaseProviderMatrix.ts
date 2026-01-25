@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import {
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
@@ -141,7 +142,12 @@ export function useReleaseProviderMatrix({
           toast.success('Link updated');
         },
         onError: error => {
-          console.error(error);
+          captureError('Failed to save provider override', error, {
+            context: 'release-mutation',
+            releaseId: editingRelease.id,
+            provider,
+            action: 'save-provider-override',
+          });
           toast.error('Failed to save override');
         },
       }
@@ -168,7 +174,12 @@ export function useReleaseProviderMatrix({
             );
           },
           onError: error => {
-            console.error(error);
+            captureError('Failed to add provider link', error, {
+              context: 'release-mutation',
+              releaseId,
+              provider,
+              action: 'add-provider-link',
+            });
             toast.error('Failed to add link');
           },
         }
@@ -196,7 +207,12 @@ export function useReleaseProviderMatrix({
           toast.success('Reverted to detected link');
         },
         onError: error => {
-          console.error(error);
+          captureError('Failed to reset provider link', error, {
+            context: 'release-mutation',
+            releaseId: editingRelease.id,
+            provider,
+            action: 'reset-provider-link',
+          });
           toast.error('Failed to reset link');
         },
       }
@@ -214,11 +230,15 @@ export function useReleaseProviderMatrix({
         }
       },
       onError: error => {
-        console.error(error);
+        captureError('Failed to sync releases from Spotify', error, {
+          context: 'release-mutation',
+          profileId,
+          action: 'sync-from-spotify',
+        });
         toast.error('Failed to sync from Spotify');
       },
     });
-  }, [syncMutation]);
+  }, [syncMutation, profileId]);
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(

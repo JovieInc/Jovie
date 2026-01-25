@@ -43,20 +43,32 @@ export function getErrorMessage(error: unknown, fallback: string): string {
  */
 export function handleMutationError(
   error: unknown,
-  fallbackMessage: string
+  fallbackMessage: string,
+  context?: Record<string, unknown>
 ): void {
   const message = getErrorMessage(error, fallbackMessage);
   toast.error(message);
 
-  // Log mutation errors for debugging
-  if (process.env.NODE_ENV === 'development') {
-    Sentry.addBreadcrumb({
+  // Capture mutation errors in Sentry (production + development)
+  Sentry.captureException(error, {
+    tags: {
       category: 'mutation',
-      message: `Mutation Error: ${fallbackMessage}`,
-      level: 'error',
-      data: { error: error instanceof Error ? error.message : String(error) },
-    });
-  }
+      source: 'handleMutationError',
+    },
+    extra: {
+      fallbackMessage,
+      userMessage: message,
+      ...context,
+    },
+  });
+
+  // Add breadcrumb for error trail
+  Sentry.addBreadcrumb({
+    category: 'mutation',
+    message: `Mutation Error: ${fallbackMessage}`,
+    level: 'error',
+    data: { error: error instanceof Error ? error.message : String(error) },
+  });
 }
 
 /**
