@@ -33,6 +33,8 @@ interface ContactSocialLinksProps {
   onAddLink: () => void;
   onRemoveLink: (index: number) => void;
   onNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Index of the link currently being removed (for loading state) */
+  removingLinkIndex?: number | null;
 }
 
 export const ContactSocialLinks = memo(function ContactSocialLinks({
@@ -46,6 +48,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
   onAddLink,
   onRemoveLink,
   onNewLinkKeyDown,
+  removingLinkIndex,
 }: ContactSocialLinksProps) {
   const hasNoLinks = contact.socialLinks.length === 0 && !isAddingLink;
 
@@ -94,6 +97,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
                 label={displayUsername || platformId}
                 url={link.url}
                 isEditable={isEditable}
+                isRemoving={removingLinkIndex === index}
                 onRemove={() => onRemoveLink(index)}
                 testId={`contact-social-link-${platformId}-${index}`}
               />
