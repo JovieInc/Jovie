@@ -40,6 +40,7 @@ import {
   type NotificationSubscribeDomainResponse,
 } from '@/lib/notifications/response';
 import { sendNotification } from '@/lib/notifications/service';
+import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
@@ -338,6 +339,24 @@ export const subscribeToNotificationsDomain = async (
     );
     if (validationError) {
       return validationError;
+    }
+
+    // Check if email is suppressed (hard bounce, spam complaint, etc.)
+    if (channel === 'email' && normalizedEmail) {
+      const suppressionCheck = await isEmailSuppressed(normalizedEmail);
+      if (suppressionCheck.suppressed) {
+        await trackSubscribeError({
+          artist_id,
+          error_type: 'suppressed',
+          validation_errors: [
+            `Email suppressed: ${suppressionCheck.reason ?? 'unknown'}`,
+          ],
+          source,
+        });
+        return buildSubscribeValidationError(
+          'This email cannot receive notifications. Please try a different email address.'
+        );
+      }
     }
 
     const conflictTarget =

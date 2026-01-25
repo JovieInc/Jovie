@@ -7,10 +7,34 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
-const DASHBOARD_ANALYTICS_LOADING_KEYS = Array.from(
-  { length: 5 },
-  (_, i) => `dashboard-analytics-loading-${i + 1}`
+const LOADING_SKELETON_COUNT = 5;
+const LOADING_SKELETON_KEYS = Array.from(
+  { length: LOADING_SKELETON_COUNT },
+  (_, i) => `loading-${i}`
 );
+
+/** Reusable metric card for the analytics grid */
+function MetricCard({
+  label,
+  value,
+  subtitle,
+}: {
+  label: string;
+  value: string | number;
+  subtitle: string;
+}) {
+  return (
+    <DashboardCard variant='analytics' className='p-6'>
+      <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+        {label}
+      </p>
+      <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
+        {value}
+      </p>
+      <p className='mt-2 text-xs text-secondary-token'>{subtitle}</p>
+    </DashboardCard>
+  );
+}
 
 export function DashboardAnalytics() {
   const {
@@ -34,7 +58,9 @@ export function DashboardAnalytics() {
       <div className='flex items-start justify-between'>
         <div className='mb-2'>
           <h1 className='text-2xl font-bold text-primary-token'>Analytics</h1>
-          <p className='text-secondary-token mt-1'>MVP overview</p>
+          <p className='text-secondary-token mt-1'>
+            Track your profile performance
+          </p>
         </div>
         <div className='flex items-center gap-2'>
           <DashboardRefreshButton
@@ -86,42 +112,27 @@ export function DashboardAnalytics() {
         {typeof data?.listen_clicks === 'number' &&
           typeof data?.subscribers === 'number' &&
           typeof data?.identified_users === 'number' && (
-            <section className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-              <DashboardCard variant='analytics' className='p-6'>
-                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-                  Listen clicks
-                </p>
-                <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
-                  {Intl.NumberFormat().format(data.listen_clicks)}
-                </p>
-                <p className='mt-2 text-xs text-secondary-token'>
-                  {rangeLabel}
-                </p>
-              </DashboardCard>
-
-              <DashboardCard variant='analytics' className='p-6'>
-                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-                  Subscribers
-                </p>
-                <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
-                  {Intl.NumberFormat().format(data.subscribers)}
-                </p>
-                <p className='mt-2 text-xs text-secondary-token'>
-                  {rangeLabel}
-                </p>
-              </DashboardCard>
-
-              <DashboardCard variant='analytics' className='p-6'>
-                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-                  Identified
-                </p>
-                <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
-                  {Intl.NumberFormat().format(data.identified_users)}
-                </p>
-                <p className='mt-2 text-xs text-secondary-token'>
-                  {rangeLabel}
-                </p>
-              </DashboardCard>
+            <section className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+              <MetricCard
+                label='Capture Rate'
+                value={`${data.capture_rate ?? 0}%`}
+                subtitle='Visitors → Subscribers'
+              />
+              <MetricCard
+                label='Subscribers'
+                value={Intl.NumberFormat().format(data.subscribers)}
+                subtitle={rangeLabel}
+              />
+              <MetricCard
+                label='Listen clicks'
+                value={Intl.NumberFormat().format(data.listen_clicks)}
+                subtitle={rangeLabel}
+              />
+              <MetricCard
+                label='Identified'
+                value={Intl.NumberFormat().format(data.identified_users)}
+                subtitle={rangeLabel}
+              />
             </section>
           )}
 
@@ -133,7 +144,7 @@ export function DashboardAnalytics() {
             </h3>
             {loading ? (
               <ul className='space-y-3' aria-hidden='true'>
-                {DASHBOARD_ANALYTICS_LOADING_KEYS.map(key => (
+                {LOADING_SKELETON_KEYS.map(key => (
                   <li key={key} className='flex items-center justify-between'>
                     <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
                     <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
@@ -170,7 +181,7 @@ export function DashboardAnalytics() {
             </h3>
             {loading ? (
               <ul className='space-y-3' aria-hidden='true'>
-                {DASHBOARD_ANALYTICS_LOADING_KEYS.map(key => (
+                {LOADING_SKELETON_KEYS.map(key => (
                   <li key={key} className='flex items-center justify-between'>
                     <LoadingSkeleton height='h-4' width='w-36' rounded='md' />
                     <LoadingSkeleton height='h-4' width='w-10' rounded='md' />

@@ -455,6 +455,14 @@ export async function getUserDashboardAnalytics(
     return base;
   }
 
+  const subscribers = Number(aggregates?.subscribers ?? 0);
+  const uniqueUsers = Number(aggregates?.unique_users ?? 0);
+
+  // Calculate capture rate: (subscribers / unique_users) * 100
+  // Only calculate if we have unique users to avoid division by zero
+  const captureRate =
+    uniqueUsers > 0 ? Math.round((subscribers / uniqueUsers) * 1000) / 10 : 0;
+
   return {
     ...base,
     total_clicks: Number(aggregates?.total_clicks ?? 0),
@@ -462,8 +470,9 @@ export async function getUserDashboardAnalytics(
     social_clicks: Number(aggregates?.social_clicks ?? 0),
     recent_clicks: Number(aggregates?.recent_clicks ?? 0),
     listen_clicks: Number(aggregates?.listen_clicks ?? 0),
-    subscribers: Number(aggregates?.subscribers ?? 0),
+    subscribers,
     identified_users: Number(aggregates?.identified_users ?? 0),
+    capture_rate: captureRate,
   };
 }
 
