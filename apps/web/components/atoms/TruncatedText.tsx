@@ -50,15 +50,25 @@ export const TruncatedText = memo(function TruncatedText({
 
   useEffect(() => {
     const el = textRef.current;
-    if (el) {
+    if (!el) return;
+
+    const checkTruncation = () => {
       // For single line: compare scrollWidth > clientWidth
       // For multi-line: compare scrollHeight > clientHeight
       const truncated =
         lines === 1
           ? el.scrollWidth > el.clientWidth
           : el.scrollHeight > el.clientHeight;
-      setIsTruncated(truncated);
-    }
+      setIsTruncated(prev => (prev === truncated ? prev : truncated));
+    };
+
+    checkTruncation();
+
+    // Re-check when element size changes (e.g., column resize, window resize)
+    const resizeObserver = new ResizeObserver(checkTruncation);
+    resizeObserver.observe(el);
+
+    return () => resizeObserver.disconnect();
   }, [children, lines]);
 
   const textElement = (

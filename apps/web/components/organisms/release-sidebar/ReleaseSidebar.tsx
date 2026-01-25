@@ -54,7 +54,6 @@ export function ReleaseSidebar({
     isRemovingDspLink,
     handleArtworkUpload,
     handleCopySmartLink,
-    handleTitleChange,
     handleAddLink,
     handleRemoveLink,
     handleNewLinkKeyDown,
@@ -162,8 +161,6 @@ export function ReleaseSidebar({
                 title={release.title}
                 releaseDate={release.releaseDate}
                 smartLinkPath={release.smartLinkPath}
-                isEditable={isEditable}
-                onTitleChange={handleTitleChange}
               />
 
               <ReleaseDspLinks

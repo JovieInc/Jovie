@@ -3,7 +3,7 @@
 /**
  * ReleaseFields Component
  *
- * Editable/readonly fields for release title and date
+ * Read-only fields for release title and date display
  */
 
 import { Label } from '@jovie/ui';
@@ -18,16 +18,12 @@ interface ReleaseFieldsProps {
   title: string;
   releaseDate: string | undefined;
   smartLinkPath: string;
-  isEditable: boolean;
-  onTitleChange: (value: string) => void;
 }
 
 export function ReleaseFields({
   title,
   releaseDate,
   smartLinkPath,
-  isEditable: _isEditable,
-  onTitleChange: _onTitleChange,
 }: ReleaseFieldsProps) {
   const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
 

@@ -257,7 +257,7 @@ export function ReleaseTable({
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) =>
       selectedIdsRef.current?.has(row.id)
-        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-primary'
+        ? 'group bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary'
         : 'group hover:bg-surface-2/50',
     [selectedIdsRef]
   );
@@ -265,6 +265,8 @@ export function ReleaseTable({
   // Keyboard navigation callback - open sidebar for focused row
   const handleFocusedRowChange = useCallback(
     (index: number) => {
+      // Guard against stale index when releases array changes
+      if (index < 0 || index >= releases.length) return;
       const release = releases[index];
       if (release && onFocusedRowChange) {
         onFocusedRowChange(release);

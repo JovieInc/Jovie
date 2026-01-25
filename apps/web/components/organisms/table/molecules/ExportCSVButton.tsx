@@ -152,9 +152,9 @@ export function ExportCSVButton<T extends object>({
       aria-busy={isExporting}
     >
       {isExporting ? (
-        <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden='true' />
+        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
       ) : (
-        <Download className='h-3.5 w-3.5' aria-hidden='true' />
+        <Download className='h-4 w-4' aria-hidden='true' />
       )}
       <span>{isExporting ? 'Exporting...' : label}</span>
     </Button>

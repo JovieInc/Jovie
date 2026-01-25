@@ -70,8 +70,10 @@ function LinearStyleDisplayMenu({
                   key={col.id}
                   type='button'
                   onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
+                  aria-pressed={isVisible}
+                  aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
                   className={cn(
-                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
                     isVisible
                       ? 'bg-surface-2 text-primary-token'
                       : 'text-tertiary-token hover:bg-surface-2/50'
@@ -88,7 +90,7 @@ function LinearStyleDisplayMenu({
             <button
               type='button'
               onClick={onResetToDefaults}
-              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors'
+              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1'
             >
               Reset to defaults
             </button>
@@ -117,11 +119,13 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 }: ReleaseTableSubheaderProps) {
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-1.5'>
-      {/* Left: Filter button */}
+      {/* Left: Filter button (disabled until filtering is implemented) */}
       <Button
         variant='ghost'
         size='sm'
-        className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
+        disabled
+        aria-label='Filter releases (coming soon)'
+        className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token disabled:opacity-50 disabled:cursor-not-allowed'
       >
         <Icon name='Filter' className='h-3.5 w-3.5' />
         Filter
