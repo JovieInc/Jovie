@@ -126,43 +126,30 @@ export function createReleaseHeaderRenderer(
  */
 export function createActionsHeaderRenderer(
   selectedCountRef: RefObject<number>,
-  onClearSelection: (() => void) | undefined,
-  onSync: () => void,
-  isSyncing: boolean | undefined
+  onClearSelection: (() => void) | undefined
 ) {
   return function ActionsHeader() {
     const selectedCount = selectedCountRef.current ?? 0;
-    return (
-      <div className='flex items-center justify-end gap-1'>
-        {selectedCount > 0 ? (
-          onClearSelection && (
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={onClearSelection}
-              className='h-7 gap-1 text-xs'
-            >
-              <Icon name='X' className='h-3.5 w-3.5' />
-              Clear
-            </Button>
-          )
-        ) : (
+
+    // Show clear button only when items are selected
+    if (selectedCount > 0 && onClearSelection) {
+      return (
+        <div className='flex items-center justify-end'>
           <Button
             variant='ghost'
             size='sm'
-            onClick={onSync}
-            disabled={isSyncing}
+            onClick={onClearSelection}
             className='h-7 gap-1 text-xs'
           >
-            <Icon
-              name={isSyncing ? 'Loader2' : 'RefreshCw'}
-              className={isSyncing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'}
-            />
-            Sync
+            <Icon name='X' className='h-3.5 w-3.5' />
+            Clear
           </Button>
-        )}
-      </div>
-    );
+        </div>
+      );
+    }
+
+    // Empty header when no selection
+    return null;
   };
 }
 

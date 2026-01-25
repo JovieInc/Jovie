@@ -52,9 +52,7 @@ interface ReleaseTableProps {
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
-  onSync: () => void;
   isAddingUrl?: boolean;
-  isSyncing?: boolean;
   /** Selected release IDs (controlled from parent) */
   selectedIds?: Set<string>;
   /** Callback when selection changes */
@@ -158,9 +156,7 @@ export function ReleaseTable({
   onCopy,
   onEdit,
   onAddUrl,
-  onSync,
   isAddingUrl,
-  isSyncing,
   selectedIds: externalSelectedIds,
   onSelectionChange,
   bulkActions = [],
@@ -311,12 +307,7 @@ export function ReleaseTable({
 
     const actionsColumn = columnHelper.display({
       id: 'actions',
-      header: createActionsHeaderRenderer(
-        selectedCountRef,
-        onClearSelection,
-        onSync,
-        isSyncing
-      ),
+      header: createActionsHeaderRenderer(selectedCountRef, onClearSelection),
       cell: createActionsCellRenderer(getContextMenuItems),
       size: 80,
     });
@@ -345,8 +336,6 @@ export function ReleaseTable({
     onAddUrl,
     isAddingUrl,
     onClearSelection,
-    isSyncing,
-    onSync,
     getContextMenuItems,
     headerCheckboxStateRef,
     selectedIdsRef,

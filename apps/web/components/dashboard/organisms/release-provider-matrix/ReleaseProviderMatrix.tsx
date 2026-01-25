@@ -205,6 +205,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
         <div className='flex-1 min-h-0 flex flex-col bg-base'>
+          {/* Sticky subheader - outside scroll container */}
+          {showReleasesTable && (
+            <ReleaseTableSubheader
+              releases={rows}
+              selectedIds={selectedIds}
+              columnVisibility={columnVisibility}
+              onColumnVisibilityChange={onColumnVisibilityChange}
+              availableColumns={availableColumns}
+              onResetToDefaults={resetToDefaults}
+            />
+          )}
+
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
             {showEmptyState && (
@@ -235,35 +247,23 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <>
-                {/* Subheader with Filter, Display, Export */}
-                <ReleaseTableSubheader
+              <QueryErrorBoundary>
+                <ReleaseTable
                   releases={rows}
+                  providerConfig={providerConfig}
+                  artistName={artistName}
+                  onCopy={handleCopy}
+                  onEdit={openEditor}
+                  onAddUrl={handleAddUrl}
+                  isAddingUrl={isSaving}
                   selectedIds={selectedIds}
+                  onSelectionChange={setSelection}
+                  bulkActions={bulkActions}
+                  onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
-                  onColumnVisibilityChange={onColumnVisibilityChange}
-                  availableColumns={availableColumns}
+                  rowHeight={rowHeight}
                 />
-                <QueryErrorBoundary>
-                  <ReleaseTable
-                    releases={rows}
-                    providerConfig={providerConfig}
-                    artistName={artistName}
-                    onCopy={handleCopy}
-                    onEdit={openEditor}
-                    onAddUrl={handleAddUrl}
-                    onSync={handleSync}
-                    isAddingUrl={isSaving}
-                    isSyncing={isSyncing}
-                    selectedIds={selectedIds}
-                    onSelectionChange={setSelection}
-                    bulkActions={bulkActions}
-                    onClearSelection={clearSelection}
-                    columnVisibility={columnVisibility}
-                    rowHeight={rowHeight}
-                  />
-                </QueryErrorBoundary>
-              </>
+              </QueryErrorBoundary>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}

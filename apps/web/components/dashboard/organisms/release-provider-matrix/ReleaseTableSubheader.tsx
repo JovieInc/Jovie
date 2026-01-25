@@ -22,6 +22,8 @@ interface ReleaseTableSubheaderProps {
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   /** Available columns to toggle */
   availableColumns: readonly { id: string; label: string }[];
+  /** Callback to reset display settings to defaults */
+  onResetToDefaults?: () => void;
   /** Active filter count for badge (0 = no filters) */
   activeFilterCount?: number;
 }
@@ -36,10 +38,12 @@ function LinearStyleDisplayMenu({
   columnVisibility,
   onColumnVisibilityChange,
   availableColumns,
+  onResetToDefaults,
 }: {
   columnVisibility: Record<string, boolean>;
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   availableColumns: readonly { id: string; label: string }[];
+  onResetToDefaults?: () => void;
 }) {
   return (
     <Popover>
@@ -47,7 +51,7 @@ function LinearStyleDisplayMenu({
         <Button
           variant='ghost'
           size='sm'
-          className='h-7 gap-1.5 text-secondary-token'
+          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
         >
           <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
           Display
@@ -79,6 +83,17 @@ function LinearStyleDisplayMenu({
             })}
           </div>
         </div>
+        {onResetToDefaults && (
+          <div className='border-t border-subtle px-2.5 py-2'>
+            <button
+              type='button'
+              onClick={onResetToDefaults}
+              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors'
+            >
+              Reset to defaults
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -97,6 +112,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   columnVisibility,
   onColumnVisibilityChange,
   availableColumns,
+  onResetToDefaults,
   activeFilterCount = 0,
 }: ReleaseTableSubheaderProps) {
   return (
@@ -105,7 +121,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       <Button
         variant='ghost'
         size='sm'
-        className='h-7 gap-1.5 text-secondary-token'
+        className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
       >
         <Icon name='Filter' className='h-3.5 w-3.5' />
         Filter
@@ -122,6 +138,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={onColumnVisibilityChange}
           availableColumns={availableColumns}
+          onResetToDefaults={onResetToDefaults}
         />
         <ExportCSVButton
           getData={() => getReleasesForExport(releases, selectedIds)}
@@ -130,6 +147,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label={selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'}
           variant='ghost'
           size='sm'
+          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
         />
       </div>
     </div>
