@@ -65,6 +65,8 @@ interface ReleaseTableProps {
   columnVisibility?: Record<string, boolean>;
   /** Row height from density preference */
   rowHeight?: number;
+  /** Callback when focused row changes via keyboard navigation */
+  onFocusedRowChange?: (release: ReleaseViewModel) => void;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -163,6 +165,7 @@ export function ReleaseTable({
   onClearSelection,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  onFocusedRowChange,
 }: ReleaseTableProps) {
   // Sorting with URL persistence and debouncing
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
@@ -257,6 +260,17 @@ export function ReleaseTable({
         ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-primary'
         : 'group hover:bg-surface-2/50',
     [selectedIdsRef]
+  );
+
+  // Keyboard navigation callback - open sidebar for focused row
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      const release = releases[index];
+      if (release && onFocusedRowChange) {
+        onFocusedRowChange(release);
+      }
+    },
+    [releases, onFocusedRowChange]
   );
 
   // Build column definitions (dynamic columns only)
@@ -371,7 +385,9 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       className='text-[13px]'
+      containerClassName='h-full'
       columnVisibility={tanstackColumnVisibility}
+      onFocusedRowChange={handleFocusedRowChange}
     />
   );
 }

@@ -165,17 +165,28 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         type='button'
         onClick={handleSync}
         disabled={isSyncing}
-        className='group inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
+        className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
         aria-label={
           isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
         }
       >
         <SocialIcon platform='spotify' className='h-3 w-3' />
         <span>{artistName}</span>
+        {/* Status dot - visible when not hovered/syncing */}
+        <span
+          className={cn(
+            'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
+            'group-hover:opacity-0 group-focus-visible:opacity-0',
+            isSyncing && 'opacity-0'
+          )}
+          aria-hidden='true'
+        />
+        {/* Refresh icon - visible on hover or when syncing */}
         <Icon
           name={isSyncing ? 'Loader2' : 'RefreshCw'}
           className={cn(
-            'h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+            'absolute right-2 h-3 w-3 opacity-0 transition-opacity duration-150',
+            'group-hover:opacity-100 group-focus-visible:opacity-100',
             isSyncing && 'animate-spin opacity-100'
           )}
           aria-hidden='true'
@@ -262,6 +273,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
+                  onFocusedRowChange={openEditor}
                 />
               </QueryErrorBoundary>
             )}

@@ -144,14 +144,17 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleExport}
       disabled={disabled || isExporting}
-      className={cn('gap-3 rounded-lg border-subtle hover:bg-base', className)}
+      className={cn(
+        'gap-1.5 rounded-lg border-subtle hover:bg-base',
+        className
+      )}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >
       {isExporting ? (
-        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+        <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden='true' />
       ) : (
-        <Download className='h-4 w-4' aria-hidden='true' />
+        <Download className='h-3.5 w-3.5' aria-hidden='true' />
       )}
       <span>{isExporting ? 'Exporting...' : label}</span>
     </Button>
