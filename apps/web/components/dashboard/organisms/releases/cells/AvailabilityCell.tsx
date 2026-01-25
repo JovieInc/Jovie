@@ -89,6 +89,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const [validationError, setValidationError] = useState('');
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Ref for urlInput to avoid recreating handleAddUrl on every keystroke
+  const urlInputRef = useRef(urlInput);
+  urlInputRef.current = urlInput;
 
   // Create provider Map for O(1) lookups instead of O(n) .find() operations
   const providerMap = useMemo(() => {
@@ -141,7 +144,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
       e.preventDefault();
       if (!addingProvider || !onAddUrl) return;
 
-      const trimmed = urlInput.trim();
+      const trimmed = urlInputRef.current.trim();
       if (!trimmed) return;
 
       // Validate URL format
@@ -178,7 +181,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         // Error toast is shown by parent
       }
     },
-    [addingProvider, onAddUrl, release.id, urlInput]
+    [addingProvider, onAddUrl, release.id]
   );
 
   // Get status for a provider

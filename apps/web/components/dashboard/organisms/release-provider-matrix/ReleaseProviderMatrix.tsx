@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Copy } from 'lucide-react';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
@@ -64,6 +64,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     resetToDefaults,
   } = useReleaseTablePreferences();
 
+  // Memoize mutable copy of availableColumns for DisplayMenuDropdown type compatibility
+  const mutableAvailableColumns = useMemo(
+    () => [...availableColumns],
+    [availableColumns]
+  );
+
   // Row selection
   const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
   const { selectedIds, clearSelection, setSelection } = useRowSelection(rowIds);
@@ -96,20 +102,20 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     ];
   }, [rows, selectedIds, clearSelection]);
 
-  const handleArtistConnected = (
-    newReleases: ReleaseViewModel[],
-    newArtistName: string
-  ) => {
-    setIsConnected(true);
-    setArtistName(newArtistName);
-    setRows(newReleases);
-    setIsImporting(false);
-  };
+  const handleArtistConnected = useCallback(
+    (newReleases: ReleaseViewModel[], newArtistName: string) => {
+      setIsConnected(true);
+      setArtistName(newArtistName);
+      setRows(newReleases);
+      setIsImporting(false);
+    },
+    [setRows]
+  );
 
-  const handleImportStart = (importingArtistName: string) => {
+  const handleImportStart = useCallback((importingArtistName: string) => {
     setIsImporting(true);
     setArtistName(importingArtistName);
-  };
+  }, []);
 
   // Show importing state when we're actively importing
   const showImportingState = isImporting && rows.length === 0;
@@ -324,7 +330,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onDensityChange={onDensityChange}
                   columnVisibility={columnVisibility}
                   onColumnVisibilityChange={onColumnVisibilityChange}
-                  availableColumns={[...availableColumns]}
+                  availableColumns={mutableAvailableColumns}
                 />
               </div>
             </div>
