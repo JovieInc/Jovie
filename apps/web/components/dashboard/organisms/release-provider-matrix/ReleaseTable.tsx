@@ -270,6 +270,16 @@ export function ReleaseTable({
     [onEdit, onCopy]
   );
 
+  // Stable callbacks for UnifiedTable props
+  const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
+  const getRowClassName = useCallback(
+    (row: ReleaseViewModel) =>
+      selectedIdsRef.current.has(row.id)
+        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
+        : 'group hover:bg-surface-2/50',
+    []
+  );
+
   // Build dynamic column definitions
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
@@ -457,12 +467,8 @@ export function ReleaseTable({
       isLoading={isSorting && releases.length > LARGE_DATASET_THRESHOLD}
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
-      getRowId={row => row.id}
-      getRowClassName={row =>
-        selectedIds.has(row.id)
-          ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
-          : 'group hover:bg-surface-2/50'
-      }
+      getRowId={getRowId}
+      getRowClassName={getRowClassName}
       enableVirtualization // Auto-enabled at 20+ rows, explicit for large datasets
       rowHeight={rowHeight}
       minWidth={minWidth}

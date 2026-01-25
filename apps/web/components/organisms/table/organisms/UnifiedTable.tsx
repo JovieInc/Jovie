@@ -379,6 +379,10 @@ export function UnifiedTable<TData>({
     enableVirtualization ?? (data.length >= 20 && !isLoading);
 
   // Initialize TanStack Table
+  // Memoize row model factories to prevent recreation
+  const coreRowModel = useMemo(() => getCoreRowModel(), []);
+  const sortedRowModel = useMemo(() => getSortedRowModel(), []);
+
   const table = useReactTable({
     data,
     columns,
@@ -388,8 +392,8 @@ export function UnifiedTable<TData>({
     },
     onRowSelectionChange,
     onSortingChange,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getCoreRowModel: coreRowModel,
+    getSortedRowModel: sortedRowModel,
     getRowId,
     enableRowSelection: !!onRowSelectionChange,
   });
