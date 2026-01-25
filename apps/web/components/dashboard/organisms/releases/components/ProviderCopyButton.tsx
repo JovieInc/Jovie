@@ -24,6 +24,9 @@ export function ProviderCopyButton({
   isManual,
   onCopy,
 }: Readonly<ProviderCopyButtonProps>) {
+  // Determine button label based on state
+  const buttonLabel = isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected';
+
   return (
     <button
       type='button'
@@ -60,9 +63,7 @@ export function ProviderCopyButton({
           aria-hidden='true'
         />
       </span>
-      <span className='line-clamp-1'>
-        {isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected'}
-      </span>
+      <span className='line-clamp-1'>{buttonLabel}</span>
     </button>
   );
 }

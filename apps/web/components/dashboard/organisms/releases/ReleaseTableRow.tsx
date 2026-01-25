@@ -250,11 +250,15 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         const isCopied = copiedId === testId;
         const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
         const isNotFoundCopied = copiedId === notFoundTestId;
-        const status = isManual
-          ? 'manual'
-          : available
-            ? 'available'
-            : 'missing';
+        // Determine provider status for visual indicator
+        let status: 'manual' | 'available' | 'missing';
+        if (isManual) {
+          status = 'manual';
+        } else if (available) {
+          status = 'available';
+        } else {
+          status = 'missing';
+        }
 
         return (
           <td key={providerKey} className='px-4 py-4 align-middle sm:px-6'>
