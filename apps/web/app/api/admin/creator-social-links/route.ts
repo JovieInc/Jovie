@@ -184,7 +184,7 @@ export async function PUT(request: NextRequest) {
 
       const detected = detectPlatform(link.url);
       const platform = detected.platform.id;
-      const platformType = link.platformType || detected.platform.category;
+      const platformType = link.platformType || detected.platform.icon;
       const normalizedUrl = detected.normalizedUrl || link.url;
 
       if (link.id && existingIds.has(link.id)) {
