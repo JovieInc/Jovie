@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import React from 'react';
 import { CoreProviders } from '@/components/providers/CoreProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -16,11 +16,12 @@ import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
 
-// Configure Inter Variable font (app-wide)
-const inter = Inter({
-  subsets: ['latin'],
+// Configure Inter Variable font from local file (no external network requests)
+const inter = localFont({
+  src: '../public/fonts/Inter-Variable.woff2',
   variable: '--font-inter',
   display: 'swap',
+  weight: '100 900',
 });
 
 export const metadata: Metadata = {
