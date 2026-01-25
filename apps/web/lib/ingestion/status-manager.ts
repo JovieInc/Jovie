@@ -150,9 +150,16 @@ export const IngestionStatusManager = {
   ): Promise<void> {
     if (profileIds.length === 0) return;
 
+    const MAX_LOG_IDS = 10;
     logger.warn('Ingestion status: resetting stuck jobs (batch)', {
       count: profileIds.length,
-      profileIds,
+      profileIds:
+        profileIds.length > MAX_LOG_IDS
+          ? [
+              ...profileIds.slice(0, MAX_LOG_IDS),
+              `...and ${profileIds.length - MAX_LOG_IDS} more`,
+            ]
+          : profileIds,
     });
 
     // Single batch update instead of sequential updates for O(1) round-trips

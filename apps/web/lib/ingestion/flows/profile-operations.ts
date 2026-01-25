@@ -70,11 +70,7 @@ export async function findAvailableHandle(
     .where(inArray(creatorProfiles.usernameNormalized, candidates));
 
   // Convert to Set for O(1) lookup
-  const existingSet = new Set(
-    existingHandles.map(
-      (h: { usernameNormalized: string }) => h.usernameNormalized
-    )
-  );
+  const existingSet = new Set(existingHandles.map(h => h.usernameNormalized));
 
   // Return first available candidate (maintains priority order)
   return candidates.find(c => !existingSet.has(c)) ?? null;

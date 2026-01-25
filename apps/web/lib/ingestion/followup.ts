@@ -93,8 +93,10 @@ async function enqueueIngestionJobTx(params: {
       maxAttempts: 3,
       updatedAt: new Date(),
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
+  // Returns null when conflict occurred (job already exists)
   return inserted?.id ?? null;
 }
 
@@ -135,8 +137,8 @@ function classifyLink(
  * Enqueue follow-up ingestion jobs for discovered links.
  * Detects platform types and creates appropriate jobs for recursive ingestion.
  *
- * Uses Promise.all() to enqueue jobs in parallel instead of sequentially,
- * reducing total execution time when processing multiple links.
+ * Jobs are enqueued sequentially within the transaction to ensure reliable
+ * execution (Promise.all is not supported within Drizzle transactions).
  */
 export async function enqueueFollowupIngestionJobs(params: {
   tx: DbType;
@@ -158,16 +160,14 @@ export async function enqueueFollowupIngestionJobs(params: {
     .map(link => classifyLink(link.url!))
     .filter((job): job is ClassifiedJob => job !== null);
 
-  // Enqueue all jobs in parallel
-  await Promise.all(
-    jobsToEnqueue.map(job =>
-      enqueueIngestionJobTx({
-        tx,
-        jobType: job.jobType,
-        creatorProfileId,
-        sourceUrl: job.sourceUrl,
-        depth: nextDepth,
-      })
-    )
-  );
+  // Enqueue jobs sequentially (Promise.all not supported in Drizzle tx)
+  for (const job of jobsToEnqueue) {
+    await enqueueIngestionJobTx({
+      tx,
+      jobType: job.jobType,
+      creatorProfileId,
+      sourceUrl: job.sourceUrl,
+      depth: nextDepth,
+    });
+  }
 }
