@@ -9,6 +9,7 @@
 import { Disc3 } from 'lucide-react';
 import Image from 'next/image';
 
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
 interface ReleaseArtworkProps {
@@ -62,11 +63,13 @@ export function ReleaseArtwork({
         </div>
       )}
       <div className='min-w-0 flex-1'>
-        <div className='text-sm font-medium truncate'>{title}</div>
+        <TruncatedText lines={1} className='text-sm font-medium'>
+          {title || 'Untitled'}
+        </TruncatedText>
         {artistName && (
-          <div className='text-xs text-sidebar-muted truncate'>
+          <TruncatedText lines={1} className='text-xs text-sidebar-muted'>
             {artistName}
-          </div>
+          </TruncatedText>
         )}
       </div>
     </div>

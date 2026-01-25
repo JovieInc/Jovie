@@ -7,6 +7,7 @@
  */
 
 import { Label } from '@jovie/ui';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -32,14 +33,22 @@ export function ReleaseFields({
 
   return (
     <div className='space-y-3'>
-      {/* Title field - always read-only */}
+      {/* Title field - always read-only, 2 lines max with tooltip */}
       <DrawerPropertyRow
         label='Title'
         value={
           title ? (
-            <span className='font-medium'>{title}</span>
+            <TruncatedText
+              lines={2}
+              className='font-medium min-h-10'
+              tooltipSide='bottom'
+            >
+              {title}
+            </TruncatedText>
           ) : (
-            <span className='text-secondary-token italic'>Untitled</span>
+            <span className='text-secondary-token italic min-h-10'>
+              Untitled
+            </span>
           )
         }
       />
