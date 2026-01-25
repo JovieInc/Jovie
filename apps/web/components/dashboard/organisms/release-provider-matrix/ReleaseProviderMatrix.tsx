@@ -16,11 +16,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import {
-  DisplayMenuDropdown,
-  ExportCSVButton,
-  useRowSelection,
-} from '@/components/organisms/table';
+import { useRowSelection } from '@/components/organisms/table';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -29,12 +25,9 @@ import { cn } from '@/lib/utils';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
+import { ReleaseTableSubheader } from './ReleaseTableSubheader';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
-import {
-  getReleasesForExport,
-  RELEASES_CSV_COLUMNS,
-} from './utils/exportReleases';
 
 // Lazy load ReleaseSidebar - reduces initial bundle by ~30-50KB
 const ReleaseSidebar = lazy(() =>
@@ -79,12 +72,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     onDensityChange,
     resetToDefaults,
   } = useReleaseTablePreferences();
-
-  // Memoize mutable copy of availableColumns for DisplayMenuDropdown type compatibility
-  const mutableAvailableColumns = useMemo(
-    () => [...availableColumns],
-    [availableColumns]
-  );
 
   // Row selection
   const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
@@ -250,25 +237,37 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <QueryErrorBoundary>
-                <ReleaseTable
+              <>
+                {/* Subheader with Filter, Display, Export */}
+                <ReleaseTableSubheader
                   releases={rows}
-                  providerConfig={providerConfig}
-                  artistName={artistName}
-                  onCopy={handleCopy}
-                  onEdit={openEditor}
-                  onAddUrl={handleAddUrl}
-                  onSync={handleSync}
-                  isAddingUrl={isSaving}
-                  isSyncing={isSyncing}
                   selectedIds={selectedIds}
-                  onSelectionChange={setSelection}
-                  bulkActions={bulkActions}
-                  onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
-                  rowHeight={rowHeight}
+                  onColumnVisibilityChange={onColumnVisibilityChange}
+                  availableColumns={availableColumns}
+                  density={density}
+                  onDensityChange={onDensityChange}
                 />
-              </QueryErrorBoundary>
+                <QueryErrorBoundary>
+                  <ReleaseTable
+                    releases={rows}
+                    providerConfig={providerConfig}
+                    artistName={artistName}
+                    onCopy={handleCopy}
+                    onEdit={openEditor}
+                    onAddUrl={handleAddUrl}
+                    onSync={handleSync}
+                    isAddingUrl={isSaving}
+                    isSyncing={isSyncing}
+                    selectedIds={selectedIds}
+                    onSelectionChange={setSelection}
+                    bulkActions={bulkActions}
+                    onClearSelection={clearSelection}
+                    columnVisibility={columnVisibility}
+                    rowHeight={rowHeight}
+                  />
+                </QueryErrorBoundary>
+              </>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}
@@ -310,9 +309,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
           </div>
 
-          {/* Footer - direct flex child anchored to bottom */}
+          {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-3 text-xs text-secondary-token sm:px-6'>
+            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
                 {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
@@ -322,38 +321,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   </span>
                 )}
               </span>
-              <div className='flex items-center gap-3'>
-                <span className='text-tertiary-token'>
-                  Showing {primaryProviders.length} of{' '}
-                  {Object.keys(providerConfig).length} providers
-                </span>
-                <ExportCSVButton
-                  getData={() => getReleasesForExport(rows, selectedIds)}
-                  columns={RELEASES_CSV_COLUMNS}
-                  filename='releases'
-                  label={
-                    selectedIds.size > 0
-                      ? `Export ${selectedIds.size}`
-                      : 'Export'
-                  }
-                  variant='ghost'
-                  size='sm'
-                />
-                <button
-                  type='button'
-                  onClick={resetToDefaults}
-                  className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
-                >
-                  Reset
-                </button>
-                <DisplayMenuDropdown
-                  density={density}
-                  onDensityChange={onDensityChange}
-                  columnVisibility={columnVisibility}
-                  onColumnVisibilityChange={onColumnVisibilityChange}
-                  availableColumns={mutableAvailableColumns}
-                />
-              </div>
+              <button
+                type='button'
+                onClick={resetToDefaults}
+                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
+              >
+                Reset display
+              </button>
             </div>
           )}
         </div>
