@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
+import { HowItWorksSection } from '@/components/home/HowItWorksSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionSafe } from '@/components/home/SeeItInActionSafe';
@@ -257,7 +258,10 @@ export default function HomePage() {
       {/* 5. What You Get Section */}
       <WhatYouGetSection />
 
-      {/* 6. Final CTA Section */}
+      {/* 6. How It Works Section */}
+      <HowItWorksSection />
+
+      {/* 7. Final CTA Section */}
       <FinalCTASection />
     </div>
   );
