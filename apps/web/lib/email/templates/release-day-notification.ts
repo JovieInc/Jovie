@@ -37,10 +37,17 @@ function escapeHtml(unsafe: string): string {
 }
 
 /**
- * Build the release page URL
+ * Build the release page URL with encoded path segments
  */
 function buildReleaseUrl(username: string, slug: string): string {
-  return `${PROFILE_URL}/${username}/${slug}`;
+  return `${PROFILE_URL}/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
+}
+
+/**
+ * Build the manage notifications URL with encoded path segments
+ */
+function buildManageNotificationsUrl(username: string): string {
+  return `${PROFILE_URL}/${encodeURIComponent(username)}`;
 }
 
 /**
@@ -85,7 +92,7 @@ Or view all platforms: ${releaseUrl}
 
 ---
 You're getting this because you asked to be notified.
-To unsubscribe, visit: ${PROFILE_URL}/${username}`;
+To unsubscribe, visit: ${buildManageNotificationsUrl(username)}`;
 }
 
 /**
@@ -177,7 +184,7 @@ export function getReleaseDayNotificationHtml(
 
               <!-- More Platforms Link -->
               <div style="text-align: center;">
-                <a href="${releaseUrl}" style="font-size: 14px; color: #666; text-decoration: underline;">
+                <a href="${escapeHtml(releaseUrl)}" style="font-size: 14px; color: #666; text-decoration: underline;">
                   View all platforms
                 </a>
               </div>
@@ -191,7 +198,7 @@ export function getReleaseDayNotificationHtml(
                 You're getting this because you asked to be notified.
               </p>
               <p style="margin: 8px 0 0; font-size: 12px; color: #999; text-align: center;">
-                <a href="${PROFILE_URL}/${escapeHtml(username)}" style="color: #999; text-decoration: underline;">
+                <a href="${escapeHtml(buildManageNotificationsUrl(username))}" style="color: #999; text-decoration: underline;">
                   Manage notifications
                 </a>
               </p>

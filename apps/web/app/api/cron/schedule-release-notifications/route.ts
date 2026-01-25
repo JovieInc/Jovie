@@ -6,14 +6,13 @@ import {
   fanReleaseNotifications,
   notificationSubscriptions,
 } from '@/lib/db';
+import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * Cron job to schedule release day notifications for upcoming releases.
@@ -26,15 +25,13 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * Schedule: Daily at 00:00 UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  // Verify cron secret in all environments
+  const authHeader = request.headers.get('authorization');
+  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const now = new Date();
@@ -105,7 +102,8 @@ export async function GET(request: Request) {
         const dedupKey = `release_day:${release.id}:${subscriber.id}`;
 
         // Insert notification entry (onConflictDoNothing silently skips duplicates)
-        await db
+        // Use returning() to track only successful inserts
+        const inserted = await db
           .insert(fanReleaseNotifications)
           .values({
             creatorProfileId: release.creatorProfileId,
@@ -120,9 +118,12 @@ export async function GET(request: Request) {
               channel: subscriber.channel,
             },
           })
-          .onConflictDoNothing({ target: fanReleaseNotifications.dedupKey });
+          .onConflictDoNothing({ target: fanReleaseNotifications.dedupKey })
+          .returning({ id: fanReleaseNotifications.id });
 
-        totalScheduled++;
+        if (inserted.length > 0) {
+          totalScheduled++;
+        }
       }
     }
 
