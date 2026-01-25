@@ -18,35 +18,12 @@ import {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import {
+  PROVIDER_DOMAINS,
+  PROVIDER_TO_DSP,
+} from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
-
-// Provider domain mapping for URL validation
-const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
-  apple_music: ['music.apple.com', 'itunes.apple.com'],
-  spotify: ['open.spotify.com', 'spotify.com'],
-  youtube: ['music.youtube.com', 'youtube.com'],
-  soundcloud: ['soundcloud.com'],
-  deezer: ['deezer.com'],
-  amazon_music: ['music.amazon.com', 'amazon.com'],
-  tidal: ['tidal.com'],
-  bandcamp: ['bandcamp.com'],
-  beatport: ['beatport.com'],
-};
-
-// Maps ProviderKey to DspProviderId for icons
-const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
-  spotify: 'spotify',
-  apple_music: 'apple_music',
-  youtube: 'youtube_music',
-  soundcloud: 'soundcloud',
-  deezer: 'deezer',
-  tidal: 'tidal',
-  amazon_music: 'amazon_music',
-  bandcamp: null,
-  beatport: null,
-};
 
 interface ProviderConfig {
   label: string;

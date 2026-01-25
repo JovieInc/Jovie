@@ -122,6 +122,11 @@ export type {
 } from './hooks/useRowSelection';
 export { useRowSelection } from './hooks/useRowSelection';
 export type {
+  UseStableSelectionRefsOptions,
+  UseStableSelectionRefsResult,
+} from './hooks/useStableSelectionRefs';
+export { useStableSelectionRefs } from './hooks/useStableSelectionRefs';
+export type {
   UseTableKeyboardNavProps,
   UseTableKeyboardNavReturn,
 } from './hooks/useTableKeyboardNav';
@@ -131,6 +136,11 @@ export { useTableKeyboardNav } from './hooks/useTableKeyboardNav';
 // Utilities & Hooks
 // =============================================================================
 
+export type {
+  SelectionColumnOptions,
+  SelectionColumnRenderers,
+} from './utils/createSelectionColumnFactory';
+export { createSelectionColumnFactory } from './utils/createSelectionColumnFactory';
 export { useTableGrouping } from './utils/useTableGrouping';
 
 // =============================================================================
