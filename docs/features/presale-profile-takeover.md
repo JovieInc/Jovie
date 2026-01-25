@@ -295,19 +295,24 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 ```typescript
 // apps/web/app/[username]/[slug]/page.tsx
 
+import { redirect } from 'next/navigation';
 import { getReleaseVisibility } from '@/lib/db/queries/presale';
 
 export default async function ReleasePage({ params }: Props) {
-  const release = await getRelease(params.slug);
+  const { username, slug } = params;
+  const release = await getRelease(username, slug);
 
-  if (!release) notFound();
+  // Invalid slug → redirect to artist profile (never 404)
+  if (!release) {
+    redirect(`/${username}?ref=invalid_link`);
+  }
 
   const visibility = await getReleaseVisibility(release.id);
 
   switch (visibility) {
     case 'not_announced':
-      // Release exists but not announced yet - 404 or redirect
-      notFound();
+      // Release exists but not announced → redirect (don't leak existence)
+      redirect(`/${username}`);
 
     case 'presale':
       // Show presale page with countdown and notification signup
@@ -705,10 +710,12 @@ Timeline shown:
 - Release date can still be pushed back (countdown updates)
 - If release date pushed earlier, may need to handle edge cases
 
-### Smart Link Before Announcement
-- Returns 404 (release not found)
-- Or: Shows "Coming soon" page with just artist info (no release details)
-- Prevents leaks while giving graceful handling
+### Invalid or Unannounced Smart Links
+- **Always redirect to artist profile** - never 404 on `/{username}/*`
+- Protects artists from typos in shared links
+- Prevents leaks of unannounced releases (no confirmation slug exists)
+- Old/deleted release links gracefully degrade to profile
+- Optional: Show subtle toast on redirect ("Couldn't find that link")
 
 ---
 
