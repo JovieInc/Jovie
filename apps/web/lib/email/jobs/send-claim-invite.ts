@@ -171,6 +171,7 @@ export async function processSendClaimInviteJob(
     claimToken: profile.claimToken,
     avatarUrl: profile.avatarUrl,
     fitScore: profile.fitScore,
+    recipientEmail: invite.email,
   };
 
   const emailContent = getClaimInviteEmail(templateData);
