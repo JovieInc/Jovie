@@ -341,6 +341,8 @@ export interface ReleaseSortState {
 export interface ReleaseSortActions {
   setSort: (field: ReleaseSortField) => void;
   setDirection: (direction: 'asc' | 'desc') => void;
+  /** Set both field and direction at once - use when syncing from TanStack Table */
+  setSorting: (field: ReleaseSortField, direction: 'asc' | 'desc') => void;
   toggleSort: (field: ReleaseSortField) => void;
 }
 
@@ -393,6 +395,17 @@ export function useReleaseSortParams(): [ReleaseSortState, ReleaseSortActions] {
     [setQueryStates]
   );
 
+  // Set both field and direction at once - avoids intermediate states
+  // Use this when syncing from TanStack Table's onSortingChange
+  const setSorting = useCallback(
+    (field: ReleaseSortField, direction: 'asc' | 'desc') => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (state.sort === field && state.direction === direction) return;
+      setQueryStates({ sort: field, direction });
+    },
+    [state.sort, state.direction, setQueryStates]
+  );
+
   const toggleSort = useCallback(
     (field: ReleaseSortField) => {
       const isSameField = state.sort === field;
@@ -409,7 +422,10 @@ export function useReleaseSortParams(): [ReleaseSortState, ReleaseSortActions] {
     [state.sort, state.direction, setQueryStates]
   );
 
-  return [state as ReleaseSortState, { setSort, setDirection, toggleSort }];
+  return [
+    state as ReleaseSortState,
+    { setSort, setDirection, setSorting, toggleSort },
+  ];
 }
 
 // ============================================================================
