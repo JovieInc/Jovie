@@ -6,7 +6,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useMemo, useRef, useTransition } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 // Cell components are now used via factory functions in ./utils/column-renderers
 import {
@@ -20,6 +20,7 @@ import {
   TABLE_ROW_HEIGHTS,
 } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { type ReleaseSortField, useReleaseSortParams } from '@/lib/nuqs/hooks';
 import {
   createActionsCellRenderer,
   createActionsHeaderRenderer,
@@ -105,9 +106,15 @@ export function ReleaseTable({
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
 }: ReleaseTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: 'releaseDate', desc: true },
-  ]);
+  // URL-persisted sort state via nuqs - enables shareable URLs and preserves sort on refresh
+  const [urlSortState, { toggleSort: nuqsToggleSort }] = useReleaseSortParams();
+
+  // Convert nuqs state to TanStack SortingState format
+  const sorting = useMemo<SortingState>(
+    () => [{ id: urlSortState.sort, desc: urlSortState.direction === 'desc' }],
+    [urlSortState.sort, urlSortState.direction]
+  );
+
   const [isSorting, startTransition] = useTransition();
 
   // Ref to track current sorting for debouncer (avoids stale closure)
@@ -115,14 +122,19 @@ export function ReleaseTable({
   sortingRef.current = sorting;
 
   // Ref to store debouncer execute function - prevents callback recreation
-  const sortingDebouncerRef = useRef<((s: SortingState) => void) | null>(null);
+  const sortingDebouncerRef = useRef<
+    ((field: ReleaseSortField) => void) | null
+  >(null);
 
   // Memoized callback for the debouncer to prevent recreation on every render
-  const debouncedSortingCallback = useCallback((newSorting: SortingState) => {
-    startTransition(() => {
-      setSorting(newSorting);
-    });
-  }, []);
+  const debouncedSortingCallback = useCallback(
+    (field: ReleaseSortField) => {
+      startTransition(() => {
+        nuqsToggleSort(field);
+      });
+    },
+    [nuqsToggleSort]
+  );
 
   // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
   const sortingDebouncer = useDebouncer(debouncedSortingCallback, {
@@ -132,22 +144,29 @@ export function ReleaseTable({
   // Keep ref updated with latest debouncer function
   sortingDebouncerRef.current = sortingDebouncer.maybeExecute;
 
+  // Handle sorting changes from TanStack Table, routing to nuqs
   // Use immediate sorting for small datasets, debounced for large
-  // Note: Using ref to access current sorting avoids adding it to deps,
-  // which would cause callback recreation on every sort change
   const handleSortingChange = useCallback(
     (updater: SortingState | ((old: SortingState) => SortingState)) => {
       const newSorting =
         typeof updater === 'function' ? updater(sortingRef.current) : updater;
+
+      // Extract field from TanStack sorting state
+      const sortItem = newSorting[0];
+      if (!sortItem) return;
+
+      const field = sortItem.id as ReleaseSortField;
+
       // Update ref immediately to prevent stale state during rapid debounced updates
       sortingRef.current = newSorting;
+
       if (releases.length > LARGE_DATASET_THRESHOLD) {
-        sortingDebouncerRef.current?.(newSorting);
+        sortingDebouncerRef.current?.(field);
       } else {
-        setSorting(newSorting);
+        nuqsToggleSort(field);
       }
     },
-    [releases.length]
+    [releases.length, nuqsToggleSort]
   );
 
   // Row selection - use external selection if provided, otherwise use internal
