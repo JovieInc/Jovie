@@ -21,7 +21,7 @@ const SOCIALS_FORM_LOADING_KEYS = [
   'socials-form-loading-3',
 ];
 
-export function SocialsForm({ artist }: SocialsFormProps) {
+export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   const {
     loading,
     error,

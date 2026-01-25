@@ -76,7 +76,7 @@ export function DashboardAudienceClient({
   sort,
   direction,
   profileUrl,
-}: DashboardAudienceClientProps) {
+}: Readonly<DashboardAudienceClientProps>) {
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,

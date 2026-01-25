@@ -24,7 +24,7 @@ export function UniversalLinkInputArtistSearchMode({
   onQueryChange,
   inputRef,
   focusInput,
-}: ArtistSearchModeProps) {
+}: Readonly<ArtistSearchModeProps>) {
   const {
     searchQuery,
     showResults,
