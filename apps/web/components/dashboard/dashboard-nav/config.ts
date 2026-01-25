@@ -1,6 +1,7 @@
 import {
   Banknote,
   Bell,
+  Contact,
   Home,
   IdCard,
   MessageCircle,
@@ -55,6 +56,13 @@ export const primaryNavigation: NavItem[] = [
 ];
 
 export const secondaryNavigation: NavItem[] = [
+  {
+    name: 'Contact',
+    href: '/app/contact',
+    id: 'contact_mode',
+    icon: Contact,
+    description: 'Quick access to your contacts',
+  },
   {
     name: 'Earnings',
     href: '/app/dashboard/earnings',
