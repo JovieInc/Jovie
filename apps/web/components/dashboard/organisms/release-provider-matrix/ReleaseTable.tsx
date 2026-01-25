@@ -1,11 +1,12 @@
 'use client';
 
+import { useDebouncer } from '@tanstack/react-pacer';
 import {
   type ColumnDef,
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 // Cell components are now used via factory functions in ./utils/column-renderers
 import {
@@ -28,8 +29,15 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   createSmartLinkCellRenderer,
+  renderDurationCell,
+  renderGenresCell,
+  renderIsrcCell,
+  renderLabelCell,
   renderPopularityCell,
   renderReleaseDateCell,
+  renderReleaseTypeCell,
+  renderTotalTracksCell,
+  renderUpcCell,
 } from './utils/column-renderers';
 
 interface ProviderConfig {
@@ -59,9 +67,16 @@ interface ReleaseTableProps {
   bulkActions?: HeaderBulkAction[];
   /** Callback to clear selection */
   onClearSelection?: () => void;
+  /** Column visibility state from preferences */
+  columnVisibility?: Record<string, boolean>;
+  /** Row height from density preference */
+  rowHeight?: number;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
+
+/** Threshold above which sorting is debounced to prevent UI jank */
+const LARGE_DATASET_THRESHOLD = 500;
 
 /**
  * ReleaseTable - Releases table using UnifiedTable
@@ -87,10 +102,45 @@ export function ReleaseTable({
   onSelectionChange,
   bulkActions = [],
   onClearSelection,
+  columnVisibility,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
 }: ReleaseTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'releaseDate', desc: true },
   ]);
+  const [isSorting, startTransition] = useTransition();
+
+  // Ref to track current sorting for debouncer (avoids stale closure)
+  const sortingRef = useRef(sorting);
+  sortingRef.current = sorting;
+
+  // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
+  const sortingDebouncer = useDebouncer(
+    (newSorting: SortingState) => {
+      startTransition(() => {
+        setSorting(newSorting);
+      });
+    },
+    { wait: 150 }
+  );
+
+  // Use immediate sorting for small datasets, debounced for large
+  // Note: Using ref to access current sorting avoids adding it to deps,
+  // which would cause callback recreation on every sort change
+  const handleSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const newSorting =
+        typeof updater === 'function' ? updater(sortingRef.current) : updater;
+      // Update ref immediately to prevent stale state during rapid debounced updates
+      sortingRef.current = newSorting;
+      if (releases.length > LARGE_DATASET_THRESHOLD) {
+        sortingDebouncer.maybeExecute(newSorting);
+      } else {
+        setSorting(newSorting);
+      }
+    },
+    [releases.length, sortingDebouncer]
+  );
 
   // Row selection - use external selection if provided, otherwise use internal
   const rowIds = useMemo(() => releases.map(r => r.id), [releases]);
@@ -99,6 +149,13 @@ export function ReleaseTable({
 
   const selectedIds = externalSelectedIds ?? internalSelection.selectedIds;
 
+  // Refs for selection state to avoid callback recreation
+  // This prevents infinite loops when selection changes trigger column recreation
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const rowIdsRef = useRef(rowIds);
+  rowIdsRef.current = rowIds;
+
   // Compute visible selected (intersection of selectedIds and current rowIds)
   const visibleSelectedCount = useMemo(() => {
     let count = 0;
@@ -106,7 +163,10 @@ export function ReleaseTable({
       if (rowIdSet.has(id)) count++;
     }
     return count;
-  }, [selectedIds.size, rowIds.length]);
+  }, [selectedIds, rowIdSet]);
+
+  const visibleSelectedCountRef = useRef(visibleSelectedCount);
+  visibleSelectedCountRef.current = visibleSelectedCount;
 
   // Compute header checkbox state based on visible selection
   const headerCheckboxState = useMemo(() => {
@@ -125,10 +185,21 @@ export function ReleaseTable({
     rowIds.length,
   ]);
 
+  // Ref for header checkbox state to prevent column recreation
+  const headerCheckboxStateRef = useRef(headerCheckboxState);
+  headerCheckboxStateRef.current = headerCheckboxState;
+
+  // Refs for bulk actions header to prevent column recreation
+  const selectedCountRef = useRef(selectedIds.size);
+  selectedCountRef.current = selectedIds.size;
+  const bulkActionsRef = useRef(bulkActions);
+  bulkActionsRef.current = bulkActions;
+
+  // Stable callbacks using refs to avoid recreation on selection change
   const toggleSelect = useCallback(
     (id: string) => {
       if (onSelectionChange) {
-        const newSet = new Set(selectedIds);
+        const newSet = new Set(selectedIdsRef.current);
         if (newSet.has(id)) {
           newSet.delete(id);
         } else {
@@ -139,23 +210,24 @@ export function ReleaseTable({
         internalSelection.toggleSelect(id);
       }
     },
-    [onSelectionChange, selectedIds.size, internalSelection.toggleSelect]
+    [onSelectionChange, internalSelection.toggleSelect]
   );
 
   const toggleSelectAll = useCallback(() => {
     if (onSelectionChange) {
+      const currentRowIds = rowIdsRef.current;
       // Check if all visible rows are selected
-      if (visibleSelectedCount === rowIds.length) {
+      if (visibleSelectedCountRef.current === currentRowIds.length) {
         // Deselect all visible rows (preserve non-visible selections)
-        const newSet = new Set(selectedIds);
-        for (const id of rowIds) {
+        const newSet = new Set(selectedIdsRef.current);
+        for (const id of currentRowIds) {
           newSet.delete(id);
         }
         onSelectionChange(newSet);
       } else {
         // Select all visible rows (preserve existing selections)
-        const newSet = new Set(selectedIds);
-        for (const id of rowIds) {
+        const newSet = new Set(selectedIdsRef.current);
+        for (const id of currentRowIds) {
           newSet.add(id);
         }
         onSelectionChange(newSet);
@@ -163,13 +235,7 @@ export function ReleaseTable({
     } else {
       internalSelection.toggleSelectAll();
     }
-  }, [
-    onSelectionChange,
-    visibleSelectedCount,
-    rowIds.length,
-    selectedIds.size,
-    internalSelection.toggleSelectAll,
-  ]);
+  }, [onSelectionChange, internalSelection.toggleSelectAll]);
 
   // Context menu items for right-click - memoized to prevent recreation
   const getContextMenuItems = useCallback(
@@ -206,12 +272,25 @@ export function ReleaseTable({
     [onEdit, onCopy]
   );
 
+  // Stable callbacks for UnifiedTable props
+  const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
+  const getRowClassName = useCallback(
+    (row: ReleaseViewModel) =>
+      selectedIdsRef.current.has(row.id)
+        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
+        : 'group hover:bg-surface-2/50',
+    []
+  );
+
   // Build dynamic column definitions
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
       id: 'select',
-      header: createSelectHeaderRenderer(headerCheckboxState, toggleSelectAll),
-      cell: createSelectCellRenderer(selectedIds, toggleSelect),
+      header: createSelectHeaderRenderer(
+        headerCheckboxStateRef,
+        toggleSelectAll
+      ),
+      cell: createSelectCellRenderer(selectedIdsRef, toggleSelect),
       size: 56,
     });
 
@@ -224,12 +303,21 @@ export function ReleaseTable({
       columnHelper.accessor('title', {
         id: 'release',
         header: createReleaseHeaderRenderer(
-          selectedIds.size,
-          bulkActions,
+          selectedCountRef,
+          bulkActionsRef,
           onClearSelection
         ),
         cell: createReleaseCellRenderer(artistName),
         size: 280,
+        enableSorting: true,
+      }),
+
+      // Release type column (badge)
+      columnHelper.accessor('releaseType', {
+        id: 'releaseType',
+        header: 'Type',
+        cell: renderReleaseTypeCell,
+        size: 80,
         enableSorting: true,
       }),
 
@@ -273,11 +361,64 @@ export function ReleaseTable({
         enableSorting: true,
       }),
 
+      // ISRC column (copyable)
+      columnHelper.accessor('primaryIsrc', {
+        id: 'primaryIsrc',
+        header: 'ISRC',
+        cell: renderIsrcCell,
+        size: 120,
+        enableSorting: true,
+      }),
+
+      // UPC column (copyable)
+      columnHelper.accessor('upc', {
+        id: 'upc',
+        header: 'UPC',
+        cell: renderUpcCell,
+        size: 130,
+        enableSorting: true,
+      }),
+
+      // Label column
+      columnHelper.accessor('label', {
+        id: 'label',
+        header: 'Label',
+        cell: renderLabelCell,
+        size: 150,
+        enableSorting: true,
+      }),
+
+      // Total tracks column
+      columnHelper.accessor('totalTracks', {
+        id: 'totalTracks',
+        header: 'Tracks',
+        cell: renderTotalTracksCell,
+        size: 60,
+        enableSorting: true,
+      }),
+
+      // Duration column
+      columnHelper.accessor('totalDurationMs', {
+        id: 'totalDurationMs',
+        header: 'Duration',
+        cell: renderDurationCell,
+        size: 80,
+        enableSorting: true,
+      }),
+
+      // Genres column
+      columnHelper.accessor('genres', {
+        id: 'genres',
+        header: 'Genre',
+        cell: renderGenresCell,
+        size: 120,
+      }),
+
       // Actions column - header shows toolbar buttons, cells show row menu
       columnHelper.display({
         id: 'actions',
         header: createActionsHeaderRenderer(
-          selectedIds.size,
+          selectedCountRef,
           onClearSelection,
           onSync,
           isSyncing
@@ -287,23 +428,33 @@ export function ReleaseTable({
       }),
     ];
 
-    return [checkboxColumn, ...columns];
+    const allColumns = [checkboxColumn, ...columns];
+
+    // Filter columns based on visibility (always show select, release, actions)
+    if (!columnVisibility) return allColumns;
+
+    return allColumns.filter(col => {
+      const id = col.id;
+      if (!id) return true;
+      // Always show select, release, actions
+      if (id === 'select' || id === 'release' || id === 'actions') return true;
+      // Check visibility state (default to visible if not specified)
+      return columnVisibility[id] !== false;
+    });
   }, [
     providerConfig,
     artistName,
     onCopy,
     onAddUrl,
     isAddingUrl,
-    headerCheckboxState,
-    selectedIds.size,
+    // Note: headerCheckboxState, selectedIds.size, toggleSelect, toggleSelectAll, bulkActions
+    // are intentionally excluded - they use refs to prevent recreation loops
     releases.length,
-    bulkActions,
     onClearSelection,
     isSyncing,
     onSync,
-    toggleSelect,
-    toggleSelectAll,
     getContextMenuItems,
+    columnVisibility,
   ]);
 
   // Fixed min width - availability column consolidates all providers
@@ -314,17 +465,14 @@ export function ReleaseTable({
       data={releases}
       columns={columns as ColumnDef<ReleaseViewModel, unknown>[]}
       sorting={sorting}
-      onSortingChange={setSorting}
+      onSortingChange={handleSortingChange}
+      isLoading={isSorting && releases.length > LARGE_DATASET_THRESHOLD}
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
-      getRowId={row => row.id}
-      getRowClassName={row =>
-        selectedIds.has(row.id)
-          ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
-          : 'group hover:bg-surface-2/50'
-      }
-      enableVirtualization={false} // Low row count, no need for virtualization
-      rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+      getRowId={getRowId}
+      getRowClassName={getRowClassName}
+      enableVirtualization // Auto-enabled at 20+ rows, explicit for large datasets
+      rowHeight={rowHeight}
       minWidth={minWidth}
       className='text-[13px]'
     />

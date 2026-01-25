@@ -23,6 +23,8 @@ export type DashboardAnalyticsResponse = {
   listen_clicks?: number;
   subscribers?: number;
   identified_users?: number;
+  /** Capture rate: (subscribers / unique_users) * 100, as a percentage */
+  capture_rate?: number;
   top_cities: AnalyticsCityRow[];
   top_countries: AnalyticsCountryRow[];
   top_referrers: AnalyticsReferrerRow[];

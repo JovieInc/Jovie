@@ -31,6 +31,11 @@ import {
   type SentryMode,
 } from '@/lib/sentry/init';
 
+// NOTE: This module is used in both server and client contexts, so we read
+// NODE_ENV directly from process.env rather than importing from env-server.ts
+// which has 'server-only' protection.
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+
 type ErrorSeverity = 'error' | 'critical' | 'warning';
 type ErrorContext = Record<string, unknown>;
 
@@ -53,8 +58,7 @@ function getEnvironment(): string {
       return 'preview';
     return 'production';
   }
-  // Use process.env directly to avoid importing server-only code into client components
-  return process.env.NODE_ENV || 'production';
+  return nodeEnv || 'production';
 }
 
 /**
@@ -288,7 +292,7 @@ export function sanitizeErrorResponse(
     includeDebugInDev?: boolean;
   }
 ): { error: string; code?: string; debug?: string | Record<string, unknown> } {
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = nodeEnv === 'development';
   const includeDebug = options?.includeDebugInDev ?? true;
 
   const response: {
@@ -326,7 +330,7 @@ export function getSafeErrorMessage(
   fallbackMessage = 'An unexpected error occurred'
 ): string {
   // In production, always return the fallback for security
-  if (process.env.NODE_ENV === 'production') {
+  if (nodeEnv === 'production') {
     return fallbackMessage;
   }
 

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import {
   type ProviderLink as DbProviderLink,
@@ -11,9 +11,16 @@ import {
   providerLinks,
 } from '@/lib/db/schema';
 
+/** Track summary data aggregated per release */
+export interface TrackSummary {
+  totalDurationMs: number | null;
+  primaryIsrc: string | null;
+}
+
 // Types for release data with provider links
 export interface ReleaseWithProviders extends DiscogRelease {
   providerLinks: DbProviderLink[];
+  trackSummary?: TrackSummary;
 }
 
 async function hasDiscogReleasesTable(): Promise<boolean> {
@@ -79,6 +86,42 @@ export type UpsertProviderLinkInput =
   | UpsertTrackProviderLinkInput;
 
 /**
+ * Get track summaries (total duration, primary ISRC) for releases
+ */
+async function getTrackSummariesForReleases(
+  releaseIds: string[]
+): Promise<Map<string, TrackSummary>> {
+  if (releaseIds.length === 0 || !(await hasDiscogTracksTable())) {
+    return new Map();
+  }
+
+  // Aggregate track data per release using raw SQL for efficiency
+  const summaries = await db
+    .select({
+      releaseId: discogTracks.releaseId,
+      totalDurationMs: sql<number>`sum(${discogTracks.durationMs})`.as(
+        'total_duration_ms'
+      ),
+      primaryIsrc:
+        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}))[1]`.as(
+          'primary_isrc'
+        ),
+    })
+    .from(discogTracks)
+    .where(inArray(discogTracks.releaseId, releaseIds))
+    .groupBy(discogTracks.releaseId);
+
+  const summaryMap = new Map<string, TrackSummary>();
+  for (const row of summaries) {
+    summaryMap.set(row.releaseId, {
+      totalDurationMs: row.totalDurationMs ?? null,
+      primaryIsrc: row.primaryIsrc ?? null,
+    });
+  }
+  return summaryMap;
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(
@@ -99,44 +142,39 @@ export async function getReleasesForProfile(
     return [];
   }
 
-  if (!(await hasProviderLinksTable())) {
-    return releases.map(release => ({
-      ...release,
-      providerLinks: [],
-    }));
-  }
-
-  // Fetch all provider links for these releases
   const releaseIds = releases.map(r => r.id);
-  const links = await db
-    .select()
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release')
-        // We need to filter by release IDs - use a subquery approach
-      )
-    );
 
-  // Filter links to only those belonging to our releases
-  const releaseIdSet = new Set(releaseIds);
-  const filteredLinks = links.filter(
-    link => link.releaseId && releaseIdSet.has(link.releaseId)
-  );
+  // Fetch track summaries (duration, ISRC) in parallel with provider links
+  const [trackSummaries, providerLinksResult] = await Promise.all([
+    getTrackSummariesForReleases(releaseIds),
+    hasProviderLinksTable().then(async hasTable => {
+      if (!hasTable) return [];
+      const links = await db
+        .select()
+        .from(providerLinks)
+        .where(eq(providerLinks.ownerType, 'release'));
+      // Filter links to only those belonging to our releases
+      const releaseIdSet = new Set(releaseIds);
+      return links.filter(
+        link => link.releaseId && releaseIdSet.has(link.releaseId)
+      );
+    }),
+  ]);
 
   // Group links by release ID
   const linksByRelease = new Map<string, DbProviderLink[]>();
-  for (const link of filteredLinks) {
+  for (const link of providerLinksResult) {
     if (!link.releaseId) continue;
     const existing = linksByRelease.get(link.releaseId) ?? [];
     existing.push(link);
     linksByRelease.set(link.releaseId, existing);
   }
 
-  // Combine releases with their links
+  // Combine releases with their links and track summaries
   return releases.map(release => ({
     ...release,
     providerLinks: linksByRelease.get(release.id) ?? [],
+    trackSummary: trackSummaries.get(release.id),
   }));
 }
 

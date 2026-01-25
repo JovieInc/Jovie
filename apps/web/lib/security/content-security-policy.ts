@@ -113,9 +113,24 @@ const buildCspDirectives = ({
       'https://jov.ie',
       'https://app.jov.ie',
       'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
-    ].join(' '),
+      'https://clerk-telemetry.com', // Clerk telemetry (all environments)
+      isDev ? 'http://localhost:25011' : null, // Neon local dev controller
+    ]
+      .filter(Boolean)
+      .join(' '),
     "font-src 'self' data:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://clerk.jov.ie https://challenges.cloudflare.com",
+    [
+      "frame-src 'self'",
+      'https://js.stripe.com',
+      'https://checkout.stripe.com',
+      'https://*.clerk.com',
+      'https://*.clerk.accounts.dev',
+      'https://clerk.jov.ie',
+      'https://challenges.cloudflare.com',
+      isDev ? 'https://vercel.live' : null, // Vercel toolbar (dev only)
+    ]
+      .filter(Boolean)
+      .join(' '),
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];
