@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
+import { captureError } from '@/lib/error-tracking';
 import {
   getNotificationUnsubscribeSuccessMessage,
   NOTIFICATION_COPY,
@@ -395,6 +396,14 @@ export function useProfileNotificationsController({
             : NOTIFICATION_COPY.errors.unsubscribe;
 
         onError(message);
+
+        // Track error in Sentry for monitoring
+        void captureError('Notification unsubscribe failed', error, {
+          artistId,
+          artistHandle,
+          channel: targetChannel,
+          source: 'profile_inline',
+        });
 
         track('notifications_unsubscribe_error', {
           channel: targetChannel,
