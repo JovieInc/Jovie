@@ -4,7 +4,7 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -135,13 +135,11 @@ export function AdminCreatorProfilesUnified({
     clearSelection,
   } = useRowSelection(rowIds);
 
-  const selectedIdsKey = useMemo(
-    () =>
-      Array.from(selectedIds)
-        .sort((a, b) => a.localeCompare(b))
-        .join(','),
-    [selectedIds]
-  );
+  // Refs for selection state to avoid column recreation on every selection change
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const headerCheckboxStateRef = useRef(headerCheckboxState);
+  headerCheckboxStateRef.current = headerCheckboxState;
 
   const confirmBulkDelete = useCallback((count: number) => {
     setBulkDeleteCount(count);
@@ -269,13 +267,14 @@ export function AdminCreatorProfilesUnified({
   );
 
   // Define columns using factory function
+  // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
   const columns = useMemo(
     () =>
       createCreatorProfileColumns({
         page,
         pageSize,
-        selectedIds,
-        headerCheckboxState,
+        selectedIdsRef,
+        headerCheckboxStateRef,
         toggleSelectAll,
         toggleSelect,
         getContextMenuItems,
@@ -283,30 +282,32 @@ export function AdminCreatorProfilesUnified({
     [
       page,
       pageSize,
-      selectedIdsKey,
-      headerCheckboxState,
+      // Note: selectedIds and headerCheckboxState are intentionally excluded
+      // - they use refs to prevent column recreation on selection change
       toggleSelectAll,
       toggleSelect,
       getContextMenuItems,
     ]
   );
 
+  // Ref for selectedId to prevent callback recreation
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+
   // Get row className based on selection state - uses unified tokens
-  const getRowClassName = useCallback(
-    (profile: AdminCreatorProfileRow) => {
-      const isChecked = selectedIds.has(profile.id);
-      const isSelected = profile.id === selectedId;
+  // Uses refs to read current values at render time, preventing callback recreation on selection change
+  const getRowClassName = useCallback((profile: AdminCreatorProfileRow) => {
+    const isChecked = selectedIdsRef.current.has(profile.id);
+    const isSelected = profile.id === selectedIdRef.current;
 
-      const getSelectionClass = () => {
-        if (isChecked) return 'bg-surface-2/70 hover:bg-surface-2';
-        if (isSelected) return 'bg-surface-2';
-        return 'hover:bg-surface-2/50';
-      };
+    const getSelectionClass = () => {
+      if (isChecked) return 'bg-surface-2/70 hover:bg-surface-2';
+      if (isSelected) return 'bg-surface-2';
+      return 'hover:bg-surface-2/50';
+    };
 
-      return cn('group', getSelectionClass());
-    },
-    [selectedIds, selectedId]
-  );
+    return cn('group', getSelectionClass());
+  }, []);
 
   return (
     <div className='flex h-full min-h-0 flex-row items-stretch overflow-hidden'>
