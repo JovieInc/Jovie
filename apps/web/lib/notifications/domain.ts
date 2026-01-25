@@ -128,6 +128,38 @@ async function validateContactForChannel(
 }
 
 /**
+ * Checks if an email is suppressed (hard bounce, spam complaint, etc.)
+ * Returns an error response if suppressed, null otherwise.
+ */
+async function checkEmailSuppression(
+  channel: NotificationChannel,
+  normalizedEmail: string | null,
+  artist_id: string,
+  source: string | undefined
+): Promise<NotificationSubscribeDomainResponse | null> {
+  if (channel !== 'email' || !normalizedEmail) {
+    return null;
+  }
+
+  const suppressionCheck = await isEmailSuppressed(normalizedEmail);
+  if (!suppressionCheck.suppressed) {
+    return null;
+  }
+
+  await trackSubscribeError({
+    artist_id,
+    error_type: 'suppressed',
+    validation_errors: [
+      `Email suppressed: ${suppressionCheck.reason ?? 'unknown'}`,
+    ],
+    source,
+  });
+  return buildSubscribeValidationError(
+    'This email cannot receive notifications. Please try a different email address.'
+  );
+}
+
+/**
  * Creates or updates an audience member for dynamic engagement tracking.
  */
 async function upsertAudienceMember(
@@ -342,21 +374,14 @@ export const subscribeToNotificationsDomain = async (
     }
 
     // Check if email is suppressed (hard bounce, spam complaint, etc.)
-    if (channel === 'email' && normalizedEmail) {
-      const suppressionCheck = await isEmailSuppressed(normalizedEmail);
-      if (suppressionCheck.suppressed) {
-        await trackSubscribeError({
-          artist_id,
-          error_type: 'suppressed',
-          validation_errors: [
-            `Email suppressed: ${suppressionCheck.reason ?? 'unknown'}`,
-          ],
-          source,
-        });
-        return buildSubscribeValidationError(
-          'This email cannot receive notifications. Please try a different email address.'
-        );
-      }
+    const suppressionError = await checkEmailSuppression(
+      channel,
+      normalizedEmail,
+      artist_id,
+      source
+    );
+    if (suppressionError) {
+      return suppressionError;
     }
 
     const conflictTarget =
