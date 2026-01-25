@@ -219,6 +219,12 @@ export function useReleaseProviderMatrix({
     );
   };
 
+  // Use ref for profileId to avoid recreation when it changes
+  const profileIdRef = useRef(profileId);
+  profileIdRef.current = profileId;
+
+  // CRITICAL: Use syncMutation.mutate directly (it's stable from TanStack Query)
+  // Don't depend on the whole syncMutation object which changes every render
   const handleSync = useCallback(() => {
     syncMutation.mutate(undefined, {
       onSuccess: result => {
@@ -232,13 +238,14 @@ export function useReleaseProviderMatrix({
       onError: error => {
         captureError('Failed to sync releases from Spotify', error, {
           context: 'release-mutation',
-          profileId,
+          profileId: profileIdRef.current,
           action: 'sync-from-spotify',
         });
         toast.error('Failed to sync from Spotify');
       },
     });
-  }, [syncMutation, profileId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
+  }, [syncMutation.mutate]);
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(

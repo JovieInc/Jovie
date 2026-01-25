@@ -155,7 +155,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useHeaderActions();
 
-  // Memoize the badge to avoid creating new JSX object on every render
+  // Memoize both badge and actions to avoid creating new JSX on every render
+  // This is CRITICAL to prevent infinite render loops when updating context
+  const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
+
   const spotifyBadge = useMemo(
     () => (
       <button
@@ -186,15 +189,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // Spotify pill on left side of header
     setHeaderBadge(isConnected && artistName ? spotifyBadge : null);
 
-    // Drawer toggle on right side
-    setHeaderActions(<DrawerToggleButton />);
+    // Drawer toggle on right side (use memoized element to prevent infinite loops)
+    setHeaderActions(drawerToggle);
 
     return () => {
       setHeaderBadge(null);
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [isConnected, artistName, spotifyBadge]);
+  }, [isConnected, artistName, spotifyBadge, drawerToggle]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>

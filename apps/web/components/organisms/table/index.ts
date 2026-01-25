@@ -117,6 +117,11 @@ export { UnifiedTable } from './organisms/UnifiedTable';
 // =============================================================================
 
 export type {
+  UseRowKeyboardOptions,
+  UseRowKeyboardResult,
+} from './hooks/useRowKeyboard';
+export { useRowKeyboard } from './hooks/useRowKeyboard';
+export type {
   HeaderCheckboxState,
   UseRowSelectionResult,
 } from './hooks/useRowSelection';
@@ -131,6 +136,11 @@ export type {
   UseTableKeyboardNavReturn,
 } from './hooks/useTableKeyboardNav';
 export { useTableKeyboardNav } from './hooks/useTableKeyboardNav';
+export type {
+  TableStateResult,
+  UseTableStateOptions,
+} from './hooks/useTableState';
+export { useTableState } from './hooks/useTableState';
 
 // =============================================================================
 // Utilities & Hooks
