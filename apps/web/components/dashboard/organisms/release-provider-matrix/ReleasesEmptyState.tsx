@@ -105,10 +105,10 @@ export function ReleasesEmptyState({
           aria-hidden='true'
         />
       </div>
-      <h3 className='mt-4 text-lg font-semibold text-primary-token'>
+      <h3 className='mt-4 text-xl font-semibold text-primary-token'>
         Connect your music
       </h3>
-      <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+      <p className='mt-1 max-w-sm text-sm text-tertiary-token'>
         Search for your Spotify artist profile to import your releases.
       </p>
 
