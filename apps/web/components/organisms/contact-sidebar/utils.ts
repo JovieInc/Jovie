@@ -121,11 +121,11 @@ export function extractUsernameFromLabel(
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const lastSegment = trimmed
+  const segments = trimmed
     .replace(/^https?:\/\//, '')
     .split('/')
-    .filter(Boolean)
-    .pop();
+    .filter(Boolean);
+  const lastSegment = segments.at(-1);
 
   if (!lastSegment) return null;
 

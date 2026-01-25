@@ -126,8 +126,8 @@ function validateYouTubeUrl(url: string): boolean {
  * Check if URL has a valid handle in path
  */
 function hasValidHandle(url: string): boolean {
-  const pathParts = new URL(url).pathname.split('/').filter(Boolean);
-  const last = pathParts[pathParts.length - 1] ?? '';
+  const pathParts = new URL(url).pathname.split('/').filter(s => s.length > 0);
+  const last = pathParts.at(-1) ?? '';
   // must have at least one non-separator character (not just @)
   return !!last.replace(/^@/, '').trim();
 }

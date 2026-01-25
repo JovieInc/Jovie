@@ -26,7 +26,7 @@ function getSocialMediaTitle(
   platform: PlatformInfo,
   creatorName?: string
 ): string {
-  const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+  const pathParts = parsedUrl.pathname.split('/').filter(s => s.length > 0);
   const username = pathParts[0]?.replace('@', '') || '';
 
   if (creatorName) {
