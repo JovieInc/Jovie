@@ -112,7 +112,8 @@ export function AuthLayout({
     <div
       className={cn(
         // Base layout - use dvh for mobile keyboard handling
-        'min-h-dvh flex flex-col items-center bg-[#f5f5f5] text-[#1f2023] dark:bg-[#090909] dark:text-[#e3e4e6] relative overflow-x-hidden',
+        // overscroll-contain prevents iOS rubber-band effect from pulling the entire page
+        'min-h-dvh flex flex-col items-center bg-[#f5f5f5] text-[#1f2023] dark:bg-[#090909] dark:text-[#e3e4e6] relative overflow-x-hidden overscroll-contain',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
