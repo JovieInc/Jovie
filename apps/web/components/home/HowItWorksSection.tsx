@@ -1,26 +1,25 @@
+import { Globe, Link, Sparkles } from 'lucide-react';
 import { Container } from '@/components/site/Container';
 
-interface Step {
-  number: string;
-  title: string;
-  description: string;
-}
-
-const steps: Step[] = [
+const steps = [
   {
-    number: '1',
-    title: 'Paste your Spotify',
-    description: "Drop your artist link. That's it.",
+    icon: Link,
+    title: 'Connect Spotify',
+    description: 'Sign in with your Spotify for Artists account.',
+    iconColor: 'text-green-500',
   },
   {
-    number: '2',
-    title: 'We build your page',
-    description: 'Music, photos, tour dates—pulled automatically.',
+    icon: Globe,
+    title: 'We find every link',
+    description:
+      'Your whole catalog, discovered across Apple Music, YouTube, Tidal, and more.',
+    iconColor: 'text-blue-500',
   },
   {
-    number: '3',
-    title: 'Capture every fan',
-    description: 'Visitors subscribe before they bounce.',
+    icon: Sparkles,
+    title: 'SmartLinks created instantly',
+    description: 'Every song gets a link. New releases added automatically.',
+    iconColor: 'text-amber-500',
   },
 ];
 
@@ -31,28 +30,31 @@ export function HowItWorksSection() {
       className='section-spacing-linear bg-base border-t border-subtle'
     >
       <Container size='homepage'>
-        <div className='max-w-3xl mx-auto'>
-          <h2 className='marketing-h2-linear text-center mb-4'>
-            Paste your Spotify. We do the rest.
+        <div className='max-w-4xl mx-auto'>
+          <h2 className='marketing-h2-linear text-center mb-12'>
+            How it works
           </h2>
-          <p className='marketing-lead-linear text-secondary-token text-center mb-12'>
-            Your page is ready in seconds, not hours.
-          </p>
 
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
-            {steps.map(step => (
-              <div key={step.number} className='text-center'>
-                <div className='inline-flex items-center justify-center w-10 h-10 rounded-full border border-subtle text-primary-token font-medium mb-4'>
-                  {step.number}
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12'>
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.title} className='text-center'>
+                  <div className='flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-subtle'>
+                    <Icon className={`w-6 h-6 ${step.iconColor}`} />
+                  </div>
+                  <div className='text-xs font-medium text-tertiary-token mb-2'>
+                    Step {index + 1}
+                  </div>
+                  <h3 className='text-lg font-medium text-primary-token mb-2'>
+                    {step.title}
+                  </h3>
+                  <p className='text-sm leading-relaxed text-tertiary-token'>
+                    {step.description}
+                  </p>
                 </div>
-                <h3 className='text-lg font-medium text-primary-token mb-2'>
-                  {step.title}
-                </h3>
-                <p className='text-sm text-tertiary-token'>
-                  {step.description}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </Container>

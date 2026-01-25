@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, type ButtonProps } from '@jovie/ui';
+import { Button, type ButtonProps, Kbd } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,8 @@ type PrimaryAction =
       onClick: () => void;
       variant?: ButtonProps['variant'];
       ariaLabel?: string;
+      /** Keyboard shortcut to display (e.g., "N then I" or "Ctrl+N") */
+      shortcut?: string;
     }
   | {
       label: string;
@@ -21,6 +23,8 @@ type PrimaryAction =
       rel?: string;
       variant?: ButtonProps['variant'];
       ariaLabel?: string;
+      /** Keyboard shortcut to display (e.g., "N then I" or "Ctrl+N") */
+      shortcut?: string;
     };
 
 type SecondaryAction =
@@ -29,6 +33,7 @@ type SecondaryAction =
       href: string;
       target?: React.HTMLAttributeAnchorTarget;
       rel?: string;
+      ariaLabel?: string;
     }
   | {
       label: string;
@@ -55,38 +60,56 @@ const variantStyles: Record<
     iconWrapper: string;
     heading: string;
     description: string;
-    secondary: string;
   }
 > = {
   default: {
     iconWrapper:
       'bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200 dark:bg-gray-900/60 dark:text-gray-400 dark:ring-gray-800',
-    heading: 'text-gray-900 dark:text-gray-100',
-    description: 'text-gray-600 dark:text-gray-400',
-    secondary: 'text-indigo-600 dark:text-indigo-400',
+    heading: 'text-primary-token',
+    description: 'text-tertiary-token',
   },
   search: {
     iconWrapper:
       'bg-sky-50 text-sky-600 ring-1 ring-inset ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/60',
     heading: 'text-sky-800 dark:text-sky-200',
-    description: 'text-sky-700 dark:text-sky-300/90',
-    secondary: 'text-sky-600 dark:text-sky-300',
+    description: 'text-sky-700/70 dark:text-sky-300/70',
   },
   error: {
     iconWrapper:
       'bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/50',
     heading: 'text-rose-700 dark:text-rose-200',
-    description: 'text-rose-600 dark:text-rose-300/90',
-    secondary: 'text-rose-600 dark:text-rose-300',
+    description: 'text-rose-600/70 dark:text-rose-300/70',
   },
   permission: {
     iconWrapper:
       'bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/50',
     heading: 'text-amber-800 dark:text-amber-200',
-    description: 'text-amber-700 dark:text-amber-300/90',
-    secondary: 'text-amber-700 dark:text-amber-300',
+    description: 'text-amber-700/70 dark:text-amber-300/70',
   },
 };
+
+/**
+ * Parses a shortcut string like "N then I" or "Ctrl+N" into displayable parts
+ */
+function parseShortcut(shortcut: string): React.ReactNode {
+  // Handle "X then Y" format
+  if (shortcut.includes(' then ')) {
+    const parts = shortcut.split(' then ');
+    return (
+      <span className='ml-2 inline-flex items-center gap-1'>
+        <Kbd>{parts[0]}</Kbd>
+        <span className='text-[10px] text-tertiary-token'>then</span>
+        <Kbd>{parts[1]}</Kbd>
+      </span>
+    );
+  }
+  // Handle simple shortcut like "Ctrl+N"
+  return (
+    <span className='ml-2'>
+      <Kbd>{shortcut}</Kbd>
+    </span>
+  );
+}
 
 export function EmptyState({
   icon,
@@ -102,25 +125,28 @@ export function EmptyState({
   const headingId = React.useId();
   const descriptionId = React.useId();
   const styles = variantStyles[variant] ?? variantStyles.default;
+  const buttonSize = size === 'sm' ? 'sm' : 'default';
 
   const renderPrimaryAction = (): React.ReactNode => {
     if (!action) return null;
 
+    const buttonContent = (
+      <>
+        {action.label}
+        {action.shortcut && parseShortcut(action.shortcut)}
+      </>
+    );
+
     if ('href' in action) {
       return (
-        <Button
-          asChild
-          variant={action.variant ?? 'primary'}
-          size={size === 'sm' ? 'sm' : 'default'}
-          className='mt-2 w-full max-w-xs sm:w-auto'
-        >
+        <Button asChild variant={action.variant ?? 'primary'} size={buttonSize}>
           <Link
             href={action.href}
             target={action.target}
             rel={action.rel}
             aria-label={action.ariaLabel ?? action.label}
           >
-            {action.label}
+            {buttonContent}
           </Link>
         </Button>
       );
@@ -129,12 +155,11 @@ export function EmptyState({
     return (
       <Button
         variant={action.variant ?? 'primary'}
-        size={size === 'sm' ? 'sm' : 'default'}
+        size={buttonSize}
         onClick={action.onClick}
         aria-label={action.ariaLabel ?? action.label}
-        className='mt-2 w-full max-w-xs sm:w-auto'
       >
-        {action.label}
+        {buttonContent}
       </Button>
     );
   };
@@ -144,33 +169,28 @@ export function EmptyState({
 
     if ('href' in secondaryAction) {
       return (
-        <Link
-          href={secondaryAction.href}
-          target={secondaryAction.target}
-          rel={secondaryAction.rel}
-          aria-label={secondaryAction.label}
-          className={cn(
-            'mt-4 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary',
-            styles.secondary
-          )}
-        >
-          {secondaryAction.label}
-        </Link>
+        <Button asChild variant='outline' size={buttonSize}>
+          <Link
+            href={secondaryAction.href}
+            target={secondaryAction.target}
+            rel={secondaryAction.rel}
+            aria-label={secondaryAction.ariaLabel ?? secondaryAction.label}
+          >
+            {secondaryAction.label}
+          </Link>
+        </Button>
       );
     }
 
     return (
-      <button
-        type='button'
+      <Button
+        variant='outline'
+        size={buttonSize}
         onClick={secondaryAction.onClick}
         aria-label={secondaryAction.ariaLabel ?? secondaryAction.label}
-        className={cn(
-          'mt-4 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary',
-          styles.secondary
-        )}
       >
         {secondaryAction.label}
-      </button>
+      </Button>
     );
   };
 
@@ -202,7 +222,7 @@ export function EmptyState({
 
       <h3
         id={headingId}
-        className={cn('mb-2 text-lg font-semibold', styles.heading)}
+        className={cn('mb-1 text-xl font-semibold', styles.heading)}
       >
         {heading}
       </h3>
@@ -216,8 +236,12 @@ export function EmptyState({
         </p>
       )}
 
-      {renderPrimaryAction()}
-      {renderSecondaryAction()}
+      {(action || secondaryAction) && (
+        <div className='flex items-center gap-3'>
+          {renderPrimaryAction()}
+          {renderSecondaryAction()}
+        </div>
+      )}
     </section>
   );
 }

@@ -12,6 +12,9 @@ import {
 
 vi.mock('@/lib/queries', () => ({
   useBillingStatusQuery: vi.fn(),
+  usePricingOptionsQuery: vi.fn(),
+  useCheckoutMutation: vi.fn(),
+  usePortalMutation: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -44,7 +47,12 @@ import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
 import { track } from '@/lib/analytics';
-import { useBillingStatusQuery } from '@/lib/queries';
+import {
+  useBillingStatusQuery,
+  useCheckoutMutation,
+  usePortalMutation,
+  usePricingOptionsQuery,
+} from '@/lib/queries';
 
 const flushMicrotasks = async () => {
   await act(async () => {
@@ -54,6 +62,9 @@ const flushMicrotasks = async () => {
 };
 
 const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
+const mockUsePricingOptionsQuery = vi.mocked(usePricingOptionsQuery);
+const mockUseCheckoutMutation = vi.mocked(useCheckoutMutation);
+const mockUsePortalMutation = vi.mocked(usePortalMutation);
 const mockUseUser = vi.mocked(useUser);
 const mockUseClerk = vi.mocked(useClerk);
 const mockUseRouter = vi.mocked(useRouter);
@@ -69,6 +80,46 @@ describe('UserButton billing actions', () => {
 
     fetchMock = vi.fn();
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
+
+    // Mock TanStack Query hooks
+    mockUsePricingOptionsQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn().mockResolvedValue({
+        data: {
+          pricingOptions: [
+            { interval: 'year', priceId: 'price_year' },
+            { interval: 'month', priceId: 'price_month' },
+          ],
+        },
+      }),
+    } as any);
+
+    mockUseCheckoutMutation.mockReturnValue({
+      mutateAsync: vi.fn().mockImplementation(async ({ priceId }) => {
+        const response = await fetch('/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId }),
+        });
+        return response.json();
+      }),
+      isPending: false,
+      isError: false,
+    } as any);
+
+    mockUsePortalMutation.mockReturnValue({
+      mutateAsync: vi.fn().mockImplementation(async () => {
+        const response = await fetch('/api/stripe/portal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        return response.json();
+      }),
+      isPending: false,
+      isError: false,
+    } as any);
 
     mockUseUser.mockReturnValue({
       isLoaded: true,
@@ -118,16 +169,8 @@ describe('UserButton billing actions', () => {
       error: null,
     } as any);
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        pricingOptions: [
-          { interval: 'year', priceId: 'price_year' },
-          { interval: 'month', priceId: 'price_month' },
-        ],
-      }),
-    });
-
+    // Pricing options are fetched via usePricingOptionsQuery (already mocked in beforeEach)
+    // Only checkout goes through fetch
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ url: checkoutUrl }),
@@ -144,9 +187,9 @@ describe('UserButton billing actions', () => {
 
     await flushMicrotasks();
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/stripe/pricing-options');
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    // Pricing options are now fetched via usePricingOptionsQuery (mocked)
+    // Only the checkout call goes through fetch
+    expect(fetchMock).toHaveBeenCalledWith(
       '/api/stripe/checkout',
       expect.objectContaining({
         method: 'POST',

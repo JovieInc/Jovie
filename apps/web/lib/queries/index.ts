@@ -135,6 +135,13 @@ export {
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
 } from './useDashboardProfileQuery';
+// Dashboard social links query and mutation
+export {
+  type DashboardSocialLink,
+  type SaveSocialLinksInput,
+  useDashboardSocialLinksQuery,
+  useSaveSocialLinksMutation,
+} from './useDashboardSocialLinksQuery';
 // DSP enrichment queries and mutations
 export {
   type ConfirmDspMatchInput,
