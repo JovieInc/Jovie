@@ -16,22 +16,10 @@ import {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-
-// Provider domain mapping for URL validation
-const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
-  apple_music: ['music.apple.com', 'itunes.apple.com'],
-  spotify: ['open.spotify.com', 'spotify.com'],
-  youtube: ['music.youtube.com', 'youtube.com'],
-  soundcloud: ['soundcloud.com'],
-  deezer: ['deezer.com'],
-  amazon_music: ['music.amazon.com', 'amazon.com'],
-  tidal: ['tidal.com'],
-  bandcamp: ['bandcamp.com'],
-  beatport: ['beatport.com'],
-};
 
 interface ProviderConfig {
   label: string;
