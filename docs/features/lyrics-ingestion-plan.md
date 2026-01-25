@@ -4,6 +4,43 @@
 
 A comprehensive lyrics management system that enables artists to ingest, edit, standardize, and verify lyrics for their tracks. This feature adds a **Lyrics tab** to the existing release sidebar alongside DSP links.
 
+**Key Principles:**
+- **Leverage existing infrastructure** - Use the ingestion job system, DSP enrichment patterns, and provider link architecture
+- **Auto-sync on import** - When tracks are synced from Spotify, automatically queue lyrics discovery
+- **Provider priority** - Official sources (Apple Music, Spotify) are weighted higher than community sources (Genius)
+- **Lock to truth** - Once verified against audio transcript, lyrics become "locked" as authoritative
+
+---
+
+## Architecture: Integration with Existing Systems
+
+### How It Fits
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     EXISTING INFRASTRUCTURE                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  Spotify Import (spotify-import.ts)                                 │
+│       │                                                             │
+│       ▼                                                             │
+│  DSP Enrichment (dsp-enrichment/)  ◄─── NEW: Lyrics Discovery Job  │
+│       │                                                             │
+│       ▼                                                             │
+│  Ingestion Job Queue (ingestionJobs table)                          │
+│       │                                                             │
+│       ▼                                                             │
+│  Job Processor (/api/ingestion/jobs)  ◄─── NEW: 'import_lyrics'    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Auto-Sync Flow
+
+When `syncReleasesFromSpotify()` completes:
+1. For each track with ISRC, enqueue `import_lyrics` job
+2. Job processor tries providers in priority order (Apple > Spotify > Musixmatch > Genius)
+3. Best available lyrics stored with reliability score
+4. Higher-reliability source can overwrite lower (but manual edits preserved)
+
 ---
 
 ## Phase 1: Data Model & Schema
@@ -11,7 +48,7 @@ A comprehensive lyrics management system that enables artists to ingest, edit, s
 ### New Database Tables
 
 ```sql
--- Core lyrics storage
+-- Core lyrics storage with provider reliability tracking
 CREATE TABLE track_lyrics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   track_id UUID NOT NULL REFERENCES discog_tracks(id) ON DELETE CASCADE,
@@ -30,13 +67,16 @@ CREATE TABLE track_lyrics (
   compliance_issues JSONB,                     -- Array of issues found
   standardized_text TEXT,                      -- Apple-formatted version
 
-  -- Source tracking
-  source_type VARCHAR(50) NOT NULL,            -- 'genius', 'manual', 'musixmatch', 'transcription'
+  -- Source tracking with reliability
+  source_provider VARCHAR(50) NOT NULL,        -- 'apple_music', 'spotify', 'musixmatch', 'genius', 'manual'
   source_url TEXT,                             -- Original source URL
-  source_id TEXT,                              -- External ID (Genius ID, etc.)
+  source_id TEXT,                              -- External ID (Apple track ID, Genius ID, etc.)
+  reliability_score DECIMAL(5,4) NOT NULL,     -- 0.0000 to 1.0000 - provider-based weight
+  is_official BOOLEAN DEFAULT false,           -- From label/artist via DSP
 
-  -- Verification
-  verification_status VARCHAR(50) DEFAULT 'unverified', -- 'unverified', 'pending', 'verified', 'disputed'
+  -- Verification & Locking
+  verification_status VARCHAR(50) DEFAULT 'unverified', -- 'unverified', 'pending', 'verified', 'locked'
+  is_locked BOOLEAN DEFAULT false,             -- Verified against transcript, cannot be auto-overwritten
   verified_at TIMESTAMPTZ,
   verified_by UUID REFERENCES users(id),
   transcript_match_score DECIMAL(5,4),         -- 0.0000 to 1.0000
@@ -106,11 +146,30 @@ CREATE TABLE transcript_verification_jobs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Lyrics provider sync tracking (replaces genius-only sync)
+CREATE TABLE lyrics_provider_sync (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  track_id UUID NOT NULL REFERENCES discog_tracks(id) ON DELETE CASCADE,
+  provider VARCHAR(50) NOT NULL,               -- 'apple_music', 'spotify', 'musixmatch', 'genius'
+  external_id TEXT NOT NULL,                   -- Provider's song/track ID
+  external_url TEXT,
+  last_fetched_at TIMESTAMPTZ,
+  content_hash VARCHAR(64),                    -- SHA-256 of fetched lyrics
+  fetch_status VARCHAR(50) DEFAULT 'pending',  -- 'pending', 'success', 'not_found', 'failed'
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(track_id, provider)
+);
+
 -- Indexes
 CREATE INDEX idx_track_lyrics_track ON track_lyrics(track_id) WHERE is_current = true;
-CREATE INDEX idx_track_lyrics_source ON track_lyrics(source_type);
+CREATE INDEX idx_track_lyrics_source ON track_lyrics(source_provider);
 CREATE INDEX idx_track_lyrics_verification ON track_lyrics(verification_status);
-CREATE INDEX idx_genius_sync_track ON genius_sync_status(track_id);
+CREATE INDEX idx_track_lyrics_reliability ON track_lyrics(reliability_score DESC) WHERE is_current = true;
+CREATE INDEX idx_lyrics_provider_sync_track ON lyrics_provider_sync(track_id);
+CREATE INDEX idx_lyrics_provider_sync_status ON lyrics_provider_sync(fetch_status) WHERE fetch_status = 'pending';
 CREATE INDEX idx_transcript_jobs_status ON transcript_verification_jobs(status);
 ```
 
@@ -119,9 +178,22 @@ CREATE INDEX idx_transcript_jobs_status ON transcript_verification_jobs(status);
 ```typescript
 // apps/web/lib/lyrics/types.ts
 
-export type LyricsSourceType = 'genius' | 'manual' | 'musixmatch' | 'transcription';
-export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'disputed';
+// Provider priority - higher number = more reliable/authoritative
+export type LyricsProvider = 'apple_music' | 'spotify' | 'musixmatch' | 'genius' | 'manual';
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'locked';
 export type SyncDirection = 'pull' | 'push' | 'bidirectional';
+
+// Provider reliability weights - used to determine which source wins
+export const LYRICS_PROVIDER_RELIABILITY: Record<LyricsProvider, number> = {
+  apple_music: 0.95,    // Official, label-provided, highest quality
+  spotify: 0.90,        // Official via Musixmatch partnership
+  musixmatch: 0.75,     // Licensed, curated, synced
+  genius: 0.60,         // Community-sourced, can have errors
+  manual: 0.50,         // Artist-provided but unverified
+};
+
+// When transcript-verified, any source becomes locked at 1.0
+export const VERIFIED_RELIABILITY = 1.0;
 
 export interface TimedLyricLine {
   time: number;        // Milliseconds from start
@@ -182,22 +254,312 @@ export interface GeniusSyncStatus {
 
 export interface LyricsViewModel {
   lyrics?: TrackLyrics;
-  geniusSync?: GeniusSyncStatus;
+  providerSync: ProviderSyncStatus[];
   hasLyrics: boolean;
   isVerified: boolean;
+  isLocked: boolean;
   needsStandardization: boolean;
-  canPushToGenius: boolean;
+  reliabilityScore: number;
+  bestAvailableProvider?: LyricsProvider;
+}
+
+export interface ProviderSyncStatus {
+  provider: LyricsProvider;
+  externalId?: string;
+  externalUrl?: string;
+  lastFetchedAt?: string;
+  fetchStatus: 'pending' | 'success' | 'not_found' | 'failed';
+  hasLyrics: boolean;
 }
 ```
 
 ---
 
-## Phase 2: Genius API Integration
+## Phase 2: Ingestion Job Integration
 
-### API Setup
+### Job Type Registration
+
+Add to existing ingestion job system (`lib/ingestion/jobs/`):
 
 ```typescript
-// apps/web/lib/lyrics/genius-client.ts
+// apps/web/lib/ingestion/jobs/lyrics.ts
+
+import { z } from 'zod';
+import type { JobExecutorConfig } from './types';
+
+export const lyricsIngestionPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  trackId: z.string().uuid(),
+  isrc: z.string().optional(),
+  title: z.string(),
+  artistName: z.string(),
+  dedupKey: z.string(),
+  // Which providers to try (defaults to all in priority order)
+  providers: z.array(z.enum(['apple_music', 'spotify', 'musixmatch', 'genius'])).optional(),
+});
+
+export type LyricsIngestionPayload = z.infer<typeof lyricsIngestionPayloadSchema>;
+
+export const lyricsJobConfig: JobExecutorConfig<LyricsIngestionPayload> = {
+  payloadSchema: lyricsIngestionPayloadSchema,
+  platformName: 'Lyrics Ingestion',
+
+  async fetchAndExtract(payload) {
+    const providers = payload.providers ?? ['apple_music', 'spotify', 'musixmatch', 'genius'];
+
+    // Try providers in priority order until we get lyrics
+    for (const provider of providers) {
+      const result = await tryFetchLyrics(provider, payload);
+      if (result.success && result.lyrics) {
+        await storeLyrics(payload.trackId, {
+          plainText: result.lyrics,
+          timedLyrics: result.timedLyrics,
+          sourceProvider: provider,
+          sourceId: result.externalId,
+          sourceUrl: result.url,
+          reliabilityScore: LYRICS_PROVIDER_RELIABILITY[provider],
+          isOfficial: provider === 'apple_music' || provider === 'spotify',
+        });
+
+        // Update sync status
+        await updateProviderSync(payload.trackId, provider, {
+          externalId: result.externalId,
+          externalUrl: result.url,
+          fetchStatus: 'success',
+          contentHash: hashLyrics(result.lyrics),
+        });
+
+        return { links: [], displayName: undefined, avatarUrl: undefined };
+      }
+
+      // Mark this provider as checked (not_found or failed)
+      await updateProviderSync(payload.trackId, provider, {
+        fetchStatus: result.error === 'not_found' ? 'not_found' : 'failed',
+        errorMessage: result.error,
+      });
+    }
+
+    // No lyrics found from any provider
+    return { links: [], displayName: undefined, avatarUrl: undefined };
+  },
+};
+```
+
+### Hooking into Spotify Import
+
+Modify `spotify-import.ts` to enqueue lyrics jobs:
+
+```typescript
+// In syncReleasesFromSpotify(), after upserting tracks:
+
+// Queue lyrics discovery for each track with ISRC
+for (const track of importedTracks) {
+  if (track.isrc) {
+    await enqueueIngestionJob({
+      jobType: 'import_lyrics',
+      creatorProfileId,
+      payload: {
+        creatorProfileId,
+        trackId: track.id,
+        isrc: track.isrc,
+        title: track.title,
+        artistName: track.artistName,
+        dedupKey: `lyrics:${track.id}`,
+      },
+      // Lower priority than release sync - lyrics are enhancement
+      priority: 10,
+    });
+  }
+}
+```
+
+### Provider Fetching Functions
+
+```typescript
+// apps/web/lib/lyrics/providers/index.ts
+
+interface LyricsFetchResult {
+  success: boolean;
+  lyrics?: string;
+  timedLyrics?: TimedLyricLine[];
+  externalId?: string;
+  url?: string;
+  error?: string;
+}
+
+export async function tryFetchLyrics(
+  provider: LyricsProvider,
+  track: { isrc?: string; title: string; artistName: string }
+): Promise<LyricsFetchResult> {
+  switch (provider) {
+    case 'apple_music':
+      return fetchAppleMusicLyrics(track);
+    case 'spotify':
+      return fetchSpotifyLyrics(track);
+    case 'musixmatch':
+      return fetchMusixmatchLyrics(track);
+    case 'genius':
+      return fetchGeniusLyrics(track);
+    default:
+      return { success: false, error: 'unknown_provider' };
+  }
+}
+```
+
+### Apple Music Lyrics (Highest Priority)
+
+```typescript
+// apps/web/lib/lyrics/providers/apple-music.ts
+
+// Apple Music provides official, synced lyrics via MusicKit API
+// Requires Apple Music subscription token for lyrics endpoint
+
+export async function fetchAppleMusicLyrics(
+  track: { isrc?: string; title: string; artistName: string }
+): Promise<LyricsFetchResult> {
+  // 1. First, look up track by ISRC (most reliable)
+  if (track.isrc) {
+    const appleMusicTrack = await lookupAppleMusicByIsrc(track.isrc);
+    if (appleMusicTrack?.trackId) {
+      // 2. Fetch lyrics using catalog endpoint
+      // GET /v1/catalog/{storefront}/songs/{id}/lyrics
+      const lyrics = await fetchAppleMusicSongLyrics(appleMusicTrack.trackId);
+      if (lyrics) {
+        return {
+          success: true,
+          lyrics: lyrics.plainText,
+          timedLyrics: lyrics.ttml ? parseTTML(lyrics.ttml) : undefined,
+          externalId: appleMusicTrack.trackId,
+          url: appleMusicTrack.url,
+        };
+      }
+    }
+  }
+
+  return { success: false, error: 'not_found' };
+}
+```
+
+### Spotify Lyrics (via Musixmatch partnership)
+
+```typescript
+// apps/web/lib/lyrics/providers/spotify.ts
+
+// Spotify's lyrics come from Musixmatch but are accessed via Spotify API
+// Requires authenticated Spotify session
+
+export async function fetchSpotifyLyrics(
+  track: { isrc?: string; title: string; artistName: string }
+): Promise<LyricsFetchResult> {
+  // Spotify doesn't have a public lyrics API
+  // Options:
+  // 1. Use internal /lyrics endpoint (requires auth, may break)
+  // 2. Fall through to Musixmatch directly
+
+  // For now, skip Spotify direct and rely on Musixmatch
+  return { success: false, error: 'not_implemented' };
+}
+```
+
+### Reliability-Based Overwrite Logic
+
+```typescript
+// apps/web/lib/lyrics/storage.ts
+
+export async function storeLyrics(
+  trackId: string,
+  newLyrics: LyricsInput
+): Promise<{ stored: boolean; reason?: string }> {
+  const existing = await getCurrentLyrics(trackId);
+
+  // If no existing lyrics, always store
+  if (!existing) {
+    await insertLyrics(trackId, newLyrics);
+    return { stored: true };
+  }
+
+  // LOCKED lyrics cannot be auto-overwritten (verified against transcript)
+  if (existing.isLocked) {
+    return { stored: false, reason: 'locked' };
+  }
+
+  // Manual edits by artist are preserved unless new source is more reliable
+  if (existing.sourceProvider === 'manual' && newLyrics.reliabilityScore <= LYRICS_PROVIDER_RELIABILITY.manual) {
+    return { stored: false, reason: 'manual_preserved' };
+  }
+
+  // Higher reliability source wins
+  if (newLyrics.reliabilityScore > existing.reliabilityScore) {
+    await createNewVersion(trackId, newLyrics, existing.version + 1);
+    return { stored: true };
+  }
+
+  // Same or lower reliability - don't overwrite
+  return { stored: false, reason: 'lower_reliability' };
+}
+```
+
+---
+
+## Phase 3: Provider Implementations
+
+### Musixmatch (Licensed Provider)
+
+```typescript
+// apps/web/lib/lyrics/providers/musixmatch.ts
+
+// Musixmatch has the largest licensed lyrics database
+// API requires commercial license for full lyrics (free tier = 30% preview)
+
+const MUSIXMATCH_API_BASE = 'https://api.musixmatch.com/ws/1.1';
+
+export async function fetchMusixmatchLyrics(
+  track: { isrc?: string; title: string; artistName: string }
+): Promise<LyricsFetchResult> {
+  // 1. Match track by ISRC (most reliable)
+  if (track.isrc) {
+    const match = await musixmatchTrackGet({ track_isrc: track.isrc });
+    if (match?.track_id) {
+      const lyrics = await musixmatchLyricsGet({ track_id: match.track_id });
+      if (lyrics?.lyrics_body) {
+        return {
+          success: true,
+          lyrics: lyrics.lyrics_body,
+          // Musixmatch provides synced lyrics with premium
+          timedLyrics: lyrics.subtitle_body ? parseMusixmatchSubtitle(lyrics.subtitle_body) : undefined,
+          externalId: String(match.track_id),
+          url: match.track_share_url,
+        };
+      }
+    }
+  }
+
+  // 2. Fallback to search
+  const searchResult = await musixmatchTrackSearch({
+    q_track: track.title,
+    q_artist: track.artistName,
+  });
+
+  if (searchResult?.track_list?.[0]) {
+    const trackId = searchResult.track_list[0].track.track_id;
+    const lyrics = await musixmatchLyricsGet({ track_id: trackId });
+    if (lyrics?.lyrics_body) {
+      return {
+        success: true,
+        lyrics: lyrics.lyrics_body,
+        externalId: String(trackId),
+      };
+    }
+  }
+
+  return { success: false, error: 'not_found' };
+}
+```
+
+### Genius (Community Fallback)
+
+```typescript
+// apps/web/lib/lyrics/providers/genius.ts
 
 const GENIUS_API_BASE = 'https://api.genius.com';
 
@@ -364,7 +726,7 @@ export async function syncWithGenius(
 
 ---
 
-## Phase 3: Sidebar UI - Tabbed Interface
+## Phase 4: Sidebar UI - Tabbed Interface
 
 ### Component Structure
 
@@ -522,7 +884,7 @@ export function LyricsTab({ release, track }: LyricsTabProps) {
 
 ---
 
-## Phase 4: Apple Music Guidelines Compliance
+## Phase 5: Apple Music Guidelines Compliance
 
 ### Guidelines Reference
 
@@ -707,7 +1069,7 @@ export function LyricsCompliancePanel({ lyrics }: { lyrics: TrackLyrics }) {
 
 ---
 
-## Phase 5: Transcript Verification
+## Phase 6: Transcript Verification & Locking
 
 ### Architecture
 
@@ -866,7 +1228,7 @@ export function LyricsVerificationBadge({
 
 ---
 
-## Phase 6: Additional "Magic" Features
+## Phase 7: Additional "Magic" Features
 
 ### 1. AI-Powered Lyrics Enhancement
 
@@ -1011,39 +1373,49 @@ export async function searchByLyrics(
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Week 1-2)
-- [ ] Database schema and migrations
+### Phase 1: Foundation & Infrastructure
+- [ ] Database schema and migrations (track_lyrics, lyrics_provider_sync tables)
 - [ ] TypeScript types and Zod schemas
-- [ ] Basic CRUD operations for lyrics
+- [ ] Register `import_lyrics` job type in ingestion system
+- [ ] Add lyrics job processor to `/lib/ingestion/jobs/`
+- [ ] Update job dispatcher in `processor.ts`
 
-### Phase 2: Genius Integration (Week 3-4)
-- [ ] Genius API client
-- [ ] Search and matching algorithm
-- [ ] Lyrics scraping
-- [ ] Sync status tracking
+### Phase 2: Ingestion Job Integration
+- [ ] Hook into `syncReleasesFromSpotify()` to auto-enqueue lyrics jobs
+- [ ] Implement provider priority ordering
+- [ ] Build reliability-based overwrite logic
+- [ ] Add deduplication via `dedupKey: lyrics:{trackId}`
 
-### Phase 3: UI Implementation (Week 5-6)
-- [ ] Sidebar tab structure
-- [ ] Lyrics display component
-- [ ] Lyrics editor component
+### Phase 3: Provider Implementations
+- [ ] Apple Music lyrics fetcher (MusicKit API, ISRC lookup)
+- [ ] Musixmatch API client (licensed lyrics)
+- [ ] Genius scraper (community fallback)
+- [ ] Rate limiting per provider (use existing patterns)
+
+### Phase 4: UI Implementation
+- [ ] Sidebar tab structure (DSPs | Lyrics)
+- [ ] Lyrics display component with source badge
+- [ ] Lyrics editor component with line numbers
 - [ ] Track selector for multi-track releases
+- [ ] Reliability score indicator
 
-### Phase 4: Apple Compliance (Week 7)
-- [ ] Compliance checker
+### Phase 5: Apple Compliance
+- [ ] Compliance checker algorithm
 - [ ] Auto-fix functionality
-- [ ] Compliance panel UI
+- [ ] Compliance panel UI with one-click fix
 
-### Phase 5: Verification (Week 8-9)
-- [ ] Transcription service integration
-- [ ] Comparison algorithm
-- [ ] Verification job queue
-- [ ] Verification UI
+### Phase 6: Verification & Locking
+- [ ] Transcription service integration (Whisper/AssemblyAI)
+- [ ] Word-level comparison algorithm
+- [ ] Verification job queue (reuse ingestion pattern)
+- [ ] Locking mechanism - verified lyrics become authoritative
+- [ ] Verification UI with confidence score
 
-### Phase 6: Polish & Magic (Week 10+)
-- [ ] Analytics dashboard
-- [ ] Export functionality
+### Phase 7: Polish & Magic
+- [ ] Lyrics analytics (word count, themes, sentiment)
+- [ ] Export functionality (LRC, SRT, Apple format)
 - [ ] Annotation system
-- [ ] Collaborative editing
+- [ ] Search catalog by lyrics
 
 ---
 
@@ -1113,20 +1485,60 @@ export const queryKeys = {
 ## Monitoring & Analytics
 
 Track these metrics:
-- Lyrics coverage: % of tracks with lyrics
-- Genius match rate: % successful auto-matches
-- Compliance rate: % of lyrics passing Apple guidelines
-- Verification rate: % of verified lyrics
-- Edit frequency: Average edits per lyrics entry
-- Sync conflicts: Pull vs push preference
+- **Lyrics coverage**: % of tracks with lyrics
+- **Provider distribution**: Breakdown by source (Apple > Musixmatch > Genius > Manual)
+- **Auto-sync success rate**: % of tracks that got lyrics automatically on import
+- **Reliability scores**: Average reliability across catalog
+- **Verification rate**: % of locked (transcript-verified) lyrics
+- **Compliance rate**: % of lyrics passing Apple guidelines
+- **Overwrite events**: When higher-reliability source replaced lower
+
+---
+
+## Key Concepts Summary
+
+### Provider Priority (Highest to Lowest)
+| Provider | Reliability | Source Type | Notes |
+|----------|-------------|-------------|-------|
+| Apple Music | 0.95 | Official | Label-provided, synced, highest quality |
+| Spotify | 0.90 | Official | Via Musixmatch partnership |
+| Musixmatch | 0.75 | Licensed | Curated, often synced |
+| Genius | 0.60 | Community | User-contributed, may have errors |
+| Manual | 0.50 | Artist | Unverified artist input |
+| Transcript-Verified | 1.00 | Any | Once verified, becomes authoritative |
+
+### Reliability-Based Resolution
+```
+New lyrics arrive from provider X
+  │
+  ├─ No existing lyrics? → Store with provider's reliability score
+  │
+  ├─ Existing lyrics LOCKED? → Reject (verified lyrics are truth)
+  │
+  ├─ Existing is MANUAL edit? → Only overwrite if new is more reliable
+  │
+  └─ Compare reliability scores → Higher score wins, version incremented
+```
+
+### Lock-to-Truth Flow
+```
+1. Lyrics ingested from any provider
+2. Artist can edit (creates 'manual' version at 0.50 reliability)
+3. Higher-reliability source can still overwrite manual edits
+4. Artist requests transcript verification
+5. Audio transcribed via Whisper/AssemblyAI
+6. If match score > 0.90 → Lyrics LOCKED at 1.00 reliability
+7. Locked lyrics cannot be auto-overwritten (are "truth")
+8. Manual unlock requires explicit artist action
+```
 
 ---
 
 ## Future Considerations
 
-1. **Musixmatch Integration**: Alternative/backup lyrics source
-2. **LyricFind**: Licensed lyrics for commercial use
-3. **Apple Music Lyrics API**: When/if Apple opens their API
-4. **Spotify Lyrics**: Currently closed, monitor for changes
-5. **User-Generated Lyrics**: Community contributions with moderation
-6. **AI Lyrics Generation**: Help artists with writer's block
+1. **LyricFind Integration**: Commercial licensed lyrics for legal compliance
+2. **Spotify Lyrics API**: Monitor for public API access
+3. **Real-time sync**: WebSocket updates when lyrics change
+4. **Lyrics duet/multi-voice**: Support for tracks with multiple vocalists
+5. **AI Lyrics Generation**: Help artists with writer's block (separate from verification)
+6. **Cross-artist deduplication**: Detect covers/samples with same lyrics
