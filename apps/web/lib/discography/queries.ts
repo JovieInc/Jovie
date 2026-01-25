@@ -122,6 +122,26 @@ async function getTrackSummariesForReleases(
 }
 
 /**
+ * Get the latest release for a creator profile (by release date, most recent first)
+ */
+export async function getLatestReleaseForProfile(
+  creatorProfileId: string
+): Promise<DiscogRelease | null> {
+  if (!(await hasDiscogReleasesTable())) {
+    return null;
+  }
+
+  const [release] = await db
+    .select()
+    .from(discogReleases)
+    .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(1);
+
+  return release ?? null;
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(

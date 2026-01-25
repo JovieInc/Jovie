@@ -15,7 +15,11 @@ import {
   incrementProfileViews,
   isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
-import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
+import type {
+  CreatorContact as DbCreatorContact,
+  DiscogRelease,
+} from '@/lib/db/schema';
+import { getLatestReleaseForProfile } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
@@ -126,6 +130,7 @@ const fetchProfileAndLinks = async (
   creatorIsPro: boolean;
   creatorClerkId: string | null;
   genres: string[] | null;
+  latestRelease: DiscogRelease | null;
   status: 'ok' | 'not_found' | 'error';
 }> => {
   try {
@@ -139,6 +144,7 @@ const fetchProfileAndLinks = async (
         creatorIsPro: false,
         creatorClerkId: null,
         genres: null,
+        latestRelease: null,
         status: 'not_found',
       };
     }
@@ -192,6 +198,9 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
 
+    // Fetch latest release for the profile
+    const latestRelease = await getLatestReleaseForProfile(result.id);
+
     return {
       profile,
       links,
@@ -199,6 +208,7 @@ const fetchProfileAndLinks = async (
       creatorIsPro,
       creatorClerkId,
       genres: result.genres ?? null,
+      latestRelease,
       status: 'ok',
     };
   } catch (error) {
@@ -210,6 +220,7 @@ const fetchProfileAndLinks = async (
       creatorIsPro: false,
       creatorClerkId: null,
       genres: null,
+      latestRelease: null,
       status: 'error',
     };
   }
@@ -308,6 +319,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     status,
     creatorIsPro,
     creatorClerkId,
+    latestRelease,
   } = await getProfileAndLinks(normalizedUsername, {
     forceNoStore: Boolean(claimTokenParam),
   });
@@ -427,6 +439,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         showTipButton={showTipButton}
         showBackButton={showBackButton}
         enableDynamicEngagement={dynamicEnabled}
+        latestRelease={latestRelease}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>
