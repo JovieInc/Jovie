@@ -98,8 +98,7 @@ function getSuggestionIdentity(
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
     const path = trimTrailingSlashes(parsed.pathname);
-    const segments = path.split('/').filter(Boolean);
-    const first = segments[0] ?? '';
+    const first = path.split('/').find(Boolean) ?? '';
 
     if (first.startsWith('@')) {
       return first;

@@ -122,7 +122,7 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     // Find matching platform configuration
     for (const config of Object.values(PLATFORM_CONFIGS)) {
       if (config.hosts.includes(host)) {
-        const seg = url.pathname.split('/').filter(Boolean)[0];
+        const seg = url.pathname.split('/').find(Boolean);
         if (!seg) return null;
 
         // YouTube requires @ symbol, others allow it optionally
