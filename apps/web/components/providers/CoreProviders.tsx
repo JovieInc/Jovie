@@ -66,27 +66,22 @@ export interface CoreProvidersProps {
   initialThemeMode?: ThemeMode;
 }
 
-export function CoreProviders({
+/**
+ * Inner component that must be rendered inside QueryProvider.
+ * This ensures hooks that depend on QueryClient context have access to it.
+ */
+function CoreProvidersInner({
   children,
-  initialThemeMode = 'system',
-}: CoreProvidersProps) {
-  const pathname = usePathname() ?? '';
-  const marketingPrefixes = [
-    '/blog',
-    '/changelog',
-    '/engagement-engine',
-    '/investors',
-    '/link-in-bio',
-    '/pricing',
-    '/support',
-    '/waitlist',
-  ];
-  const isMarketingRoute =
-    pathname === '/' ||
-    marketingPrefixes.some(prefix => pathname.startsWith(prefix));
-  const enableAnalytics = !isMarketingRoute;
-
+  enableAnalytics,
+  initialThemeMode,
+}: {
+  children: React.ReactNode;
+  enableAnalytics: boolean;
+  initialThemeMode: ThemeMode;
+}) {
   // Monitor for version mismatches and show notification when detected
+  // These hooks require QueryClient context, so they must be called
+  // from a component rendered inside QueryProvider
   useVersionMismatchNotification();
 
   // Handle chunk load errors gracefully (common with version mismatches)
@@ -143,32 +138,62 @@ export function CoreProviders({
   }, []);
 
   return (
+    <PacerProvider
+      defaultOptions={{
+        debouncer: { wait: PACER_TIMING.DEBOUNCE_MS },
+        throttler: {
+          wait: PACER_TIMING.THROTTLE_MS,
+          leading: true,
+          trailing: true,
+        },
+      }}
+    >
+      <ThemeProvider
+        attribute='class'
+        defaultTheme={initialThemeMode}
+        enableSystem={true}
+        disableTransitionOnChange
+        storageKey='jovie-theme'
+      >
+        <ThemeKeyboardShortcut />
+        <LazyProviders enableAnalytics={enableAnalytics}>
+          {children}
+        </LazyProviders>
+      </ThemeProvider>
+    </PacerProvider>
+  );
+}
+
+export function CoreProviders({
+  children,
+  initialThemeMode = 'system',
+}: CoreProvidersProps) {
+  const pathname = usePathname() ?? '';
+  const marketingPrefixes = [
+    '/blog',
+    '/changelog',
+    '/engagement-engine',
+    '/investors',
+    '/link-in-bio',
+    '/pricing',
+    '/support',
+    '/waitlist',
+  ];
+  const isMarketingRoute =
+    pathname === '/' ||
+    marketingPrefixes.some(prefix => pathname.startsWith(prefix));
+  const enableAnalytics = !isMarketingRoute;
+
+  return (
     <React.StrictMode>
       <NuqsProvider>
         <QueryProvider>
-          <PacerProvider
-            defaultOptions={{
-              debouncer: { wait: PACER_TIMING.DEBOUNCE_MS },
-              throttler: {
-                wait: PACER_TIMING.THROTTLE_MS,
-                leading: true,
-                trailing: true,
-              },
-            }}
+          <CoreProvidersInner
+            enableAnalytics={enableAnalytics}
+            initialThemeMode={initialThemeMode}
           >
-            <ThemeProvider
-              attribute='class'
-              defaultTheme={initialThemeMode}
-              enableSystem={true}
-              disableTransitionOnChange
-              storageKey='jovie-theme'
-            >
-              <ThemeKeyboardShortcut />
-              <LazyProviders enableAnalytics={enableAnalytics}>
-                {children}
-              </LazyProviders>
-            </ThemeProvider>
-          </PacerProvider>
+            {children}
+          </CoreProvidersInner>
         </QueryProvider>
       </NuqsProvider>
     </React.StrictMode>

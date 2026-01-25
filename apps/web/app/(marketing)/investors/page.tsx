@@ -4,8 +4,7 @@ import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 
-const INVESTOR_MEMO_RELATIVE_PATH =
-  'docs/marcdoc/investor-memo-jovie-angel-round.md';
+const INVESTOR_MEMO_RELATIVE_PATH = 'content/investors/investor-memo.md';
 
 export const metadata: Metadata = {
   title: `Investor Memo | ${APP_NAME}`,
