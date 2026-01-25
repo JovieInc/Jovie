@@ -149,13 +149,14 @@ export async function enqueueFollowupIngestionJobs(params: {
   const nextDepth = currentDepth + 1;
 
   // Classify all links and filter to valid ones
+  type ClassifiedJob = {
+    jobType: SupportedRecursiveJobType;
+    sourceUrl: string;
+  };
   const jobsToEnqueue = extraction.links
     .filter(link => link.url)
     .map(link => classifyLink(link.url!))
-    .filter(
-      (job): job is { jobType: SupportedRecursiveJobType; sourceUrl: string } =>
-        job !== null
-    );
+    .filter((job): job is ClassifiedJob => job !== null);
 
   // Enqueue all jobs in parallel
   await Promise.all(

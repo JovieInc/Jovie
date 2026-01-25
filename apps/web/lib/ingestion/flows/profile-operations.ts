@@ -71,7 +71,9 @@ export async function findAvailableHandle(
 
   // Convert to Set for O(1) lookup
   const existingSet = new Set(
-    existingHandles.map((h: { usernameNormalized: string }) => h.usernameNormalized)
+    existingHandles.map(
+      (h: { usernameNormalized: string }) => h.usernameNormalized
+    )
   );
 
   // Return first available candidate (maintains priority order)

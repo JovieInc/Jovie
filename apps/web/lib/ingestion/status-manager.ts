@@ -139,7 +139,8 @@ export const IngestionStatusManager = {
    * Only affects profiles that are in 'processing' state and haven't been
    * updated within the timeout period
    *
-   * Uses a single batch UPDATE query instead of sequential updates for better performance.
+   * Uses a single batch UPDATE query instead of sequential updates
+   * for better performance.
    */
   async handleStuckJobs(
     tx: DbType,
