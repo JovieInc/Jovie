@@ -11,10 +11,12 @@
   - No-ops in production builds on main
   - next.config.js retains console logs in Preview builds
 
-  Note: We read process.env directly here (not from env-server) to avoid
-  importing server-only code into client components that use this logger.
-  process.env.NODE_ENV is inlined by Next.js at build time for both server
-  and client bundles, so this is safe to use anywhere.
+  Why we use process.env directly here:
+  - lib/env.ts has 'server-only' protection, so importing it breaks client components
+  - lib/env-public.ts only exposes NEXT_PUBLIC_* variables, not NODE_ENV/VERCEL_ENV
+  - NODE_ENV and VERCEL_ENV are Next.js build-time constants that get inlined during
+    compilation for both server and client bundles (not runtime secrets), making
+    direct process.env access the correct and safe pattern for this specific case
 */
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
@@ -52,18 +54,22 @@ export const logger = {
   },
   info(message: unknown, payload?: unknown, scope?: string) {
     if (!active) return;
-    safeConsole().info(formatMsg(scope, message), payload ?? '');
+    const c = safeConsole();
+    c.info?.(formatMsg(scope, message), payload ?? '');
   },
   debug(message: unknown, payload?: unknown, scope?: string) {
     if (!active) return;
-    safeConsole().debug(formatMsg(scope, message), payload ?? '');
+    const c = safeConsole();
+    c.debug?.(formatMsg(scope, message), payload ?? '');
   },
   warn(message: unknown, payload?: unknown, scope?: string) {
     if (!active) return;
-    safeConsole().warn(formatMsg(scope, message), payload ?? '');
+    const c = safeConsole();
+    c.warn?.(formatMsg(scope, message), payload ?? '');
   },
   error(message: unknown, payload?: unknown, scope?: string) {
     if (!active) return;
-    safeConsole().error(formatMsg(scope, message), payload ?? '');
+    const c = safeConsole();
+    c.error?.(formatMsg(scope, message), payload ?? '');
   },
 };
