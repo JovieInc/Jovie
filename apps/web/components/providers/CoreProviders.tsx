@@ -151,7 +151,7 @@ function CoreProvidersInner({
       <ThemeProvider
         attribute='class'
         defaultTheme={initialThemeMode}
-        enableSystem={true}
+        enableSystem
         disableTransitionOnChange
         storageKey='jovie-theme'
       >
@@ -164,24 +164,26 @@ function CoreProvidersInner({
   );
 }
 
+/** Marketing route prefixes where analytics are disabled */
+const MARKETING_PREFIXES = [
+  '/blog',
+  '/changelog',
+  '/engagement-engine',
+  '/investors',
+  '/link-in-bio',
+  '/pricing',
+  '/support',
+  '/waitlist',
+] as const;
+
 export function CoreProviders({
   children,
   initialThemeMode = 'system',
 }: CoreProvidersProps) {
   const pathname = usePathname() ?? '';
-  const marketingPrefixes = [
-    '/blog',
-    '/changelog',
-    '/engagement-engine',
-    '/investors',
-    '/link-in-bio',
-    '/pricing',
-    '/support',
-    '/waitlist',
-  ];
   const isMarketingRoute =
     pathname === '/' ||
-    marketingPrefixes.some(prefix => pathname.startsWith(prefix));
+    MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix));
   const enableAnalytics = !isMarketingRoute;
 
   return (

@@ -1,3 +1,5 @@
+# Investor Memo
+
 **Company:** Jovie
 
 **Stage:** MVP built; incorporated; $25K angel committed
@@ -6,7 +8,7 @@
 
 ## Problem
 
-> Producing high quality music went from something that required access to a recording studio to something any teenager with a laptop could do.
+> Producing high-quality music went from something that required access to a recording studio to something any teenager with a laptop could do.
 >
 > But 10x more accessibility to tools didn't mean it was 10x easier to be a commercially successful musician. The hard part is elsewhere.
 >

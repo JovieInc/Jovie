@@ -65,6 +65,7 @@ export function SidebarLinkRow({
         <button
           type='button'
           onClick={() => {
+            if (!navigator.clipboard?.writeText) return;
             navigator.clipboard.writeText(url).catch(() => {
               // Silently fail - clipboard may not be available
             });

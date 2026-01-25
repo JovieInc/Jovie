@@ -131,6 +131,8 @@ export function ReleaseTable({
     (updater: SortingState | ((old: SortingState) => SortingState)) => {
       const newSorting =
         typeof updater === 'function' ? updater(sortingRef.current) : updater;
+      // Update ref immediately to prevent stale state during rapid debounced updates
+      sortingRef.current = newSorting;
       if (releases.length > LARGE_DATASET_THRESHOLD) {
         sortingDebouncer.maybeExecute(newSorting);
       } else {
