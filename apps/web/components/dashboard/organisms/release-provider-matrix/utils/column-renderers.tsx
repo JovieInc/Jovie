@@ -119,15 +119,18 @@ export function renderReleaseDateCell({
 }
 
 /**
- * Creates a header renderer for the actions column
+ * Creates a header renderer for the actions column.
+ * Uses a ref for selectedCount to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createActionsHeaderRenderer(
-  selectedCount: number,
+  selectedCountRef: RefObject<number>,
   onClearSelection: (() => void) | undefined,
   onSync: () => void,
   isSyncing: boolean | undefined
 ) {
   return function ActionsHeader() {
+    const selectedCount = selectedCountRef.current ?? 0;
     return (
       <div className='flex items-center justify-end gap-1'>
         {selectedCount > 0 ? (

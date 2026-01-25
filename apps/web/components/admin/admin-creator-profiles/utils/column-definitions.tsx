@@ -2,10 +2,12 @@
  * Column Definitions Factory
  *
  * Creates TanStack Table column definitions for the admin creator profiles table.
+ * Uses refs for selection state to prevent column recreation on every selection change.
  */
 
 import type { ColumnDef, HeaderContext, Row } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
+import type { RefObject } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import {
@@ -25,8 +27,10 @@ const columnHelper = createColumnHelper<AdminCreatorProfileRow>();
 export interface ColumnFactoryParams {
   page: number;
   pageSize: number;
-  selectedIds: Set<string>;
-  headerCheckboxState: boolean | 'indeterminate';
+  /** Ref to current selected IDs - prevents column recreation on selection change */
+  selectedIdsRef: RefObject<Set<string>>;
+  /** Ref to current header checkbox state - prevents column recreation on selection change */
+  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>;
   toggleSelectAll: () => void;
   toggleSelect: (id: string) => void;
   getContextMenuItems: (
@@ -36,12 +40,14 @@ export interface ColumnFactoryParams {
 
 /**
  * Creates column definitions for the admin creator profiles table.
+ * Uses refs for selection state to read current values at render time,
+ * preventing column recreation on every selection change.
  */
 export function createCreatorProfileColumns({
   page,
   pageSize,
-  selectedIds,
-  headerCheckboxState,
+  selectedIdsRef,
+  headerCheckboxStateRef,
   toggleSelectAll,
   toggleSelect,
   getContextMenuItems,
@@ -54,13 +60,13 @@ export function createCreatorProfileColumns({
       header: ({ table }: HeaderContext<AdminCreatorProfileRow, unknown>) => (
         <TableCheckboxCell
           table={table}
-          headerCheckboxState={headerCheckboxState}
+          headerCheckboxState={headerCheckboxStateRef.current ?? false}
           onToggleSelectAll={toggleSelectAll}
         />
       ),
       cell: ({ row }: { row: Row<AdminCreatorProfileRow> }) => {
         const profile = row.original;
-        const isChecked = selectedIds.has(profile.id);
+        const isChecked = selectedIdsRef.current?.has(profile.id) ?? false;
         const rowNumber = (page - 1) * pageSize + row.index + 1;
 
         return (

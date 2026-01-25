@@ -416,7 +416,7 @@ export function ReleaseTable({
       columnHelper.display({
         id: 'actions',
         header: createActionsHeaderRenderer(
-          selectedIds.size,
+          selectedCountRef,
           onClearSelection,
           onSync,
           isSyncing

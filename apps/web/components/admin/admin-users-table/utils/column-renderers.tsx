@@ -1,5 +1,6 @@
 import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
+import type { RefObject } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
@@ -70,10 +71,12 @@ export function renderStatusCell({ row }: CellContext<AdminUserRow, unknown>) {
 }
 
 /**
- * Creates a header renderer for the checkbox column
+ * Creates a header renderer for the checkbox column.
+ * Uses a ref for headerCheckboxState to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectHeaderRenderer(
-  headerCheckboxState: boolean | 'indeterminate',
+  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>,
   onToggleSelectAll: () => void
 ) {
   return function SelectHeader({
@@ -82,7 +85,7 @@ export function createSelectHeaderRenderer(
     return (
       <TableCheckboxCell
         table={table as Table<AdminUserRow>}
-        headerCheckboxState={headerCheckboxState}
+        headerCheckboxState={headerCheckboxStateRef.current ?? false}
         onToggleSelectAll={onToggleSelectAll}
       />
     );
@@ -90,17 +93,19 @@ export function createSelectHeaderRenderer(
 }
 
 /**
- * Creates a cell renderer for the checkbox column
+ * Creates a cell renderer for the checkbox column.
+ * Uses a ref for selectedIds to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectCellRenderer(
-  selectedIds: Set<string>,
+  selectedIdsRef: RefObject<Set<string>>,
   page: number,
   pageSize: number,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<AdminUserRow, unknown>) {
     const user = row.original;
-    const isChecked = selectedIds.has(user.id);
+    const isChecked = selectedIdsRef.current?.has(user.id) ?? false;
     const rowNumber = (page - 1) * pageSize + row.index + 1;
 
     return (

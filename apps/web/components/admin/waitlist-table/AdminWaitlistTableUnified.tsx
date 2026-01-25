@@ -6,7 +6,7 @@ import {
   type RowSelectionState,
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   type ContextMenuItemType,
   UnifiedTable,
@@ -80,6 +80,12 @@ export function AdminWaitlistTableUnified({
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
 
+  // Refs for selection state to avoid column recreation on every selection change
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const headerCheckboxStateRef = useRef(headerCheckboxState);
+  headerCheckboxStateRef.current = headerCheckboxState;
+
   const handleRowSelectionChange = useCallback(
     (
       updaterOrValue:
@@ -120,17 +126,18 @@ export function AdminWaitlistTableUnified({
   );
 
   // Define columns using TanStack Table
+  // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
   const columns = useMemo<ColumnDef<WaitlistEntryRow, any>[]>(
     () => [
       // Checkbox column
       columnHelper.display({
         id: 'select',
         header: createSelectHeaderRenderer(
-          headerCheckboxState,
+          headerCheckboxStateRef,
           toggleSelectAll
         ),
         cell: createSelectCellRenderer(
-          selectedIds,
+          selectedIdsRef,
           page,
           pageSize,
           toggleSelect
@@ -212,9 +219,9 @@ export function AdminWaitlistTableUnified({
     ],
     [
       createContextMenuItems,
-      headerCheckboxState,
+      // Note: headerCheckboxState and selectedIds are intentionally excluded
+      // - they use refs to prevent column recreation on selection change
       toggleSelectAll,
-      selectedIds,
       toggleSelect,
       page,
       pageSize,
