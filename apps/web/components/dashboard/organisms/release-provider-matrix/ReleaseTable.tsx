@@ -117,15 +117,17 @@ export function ReleaseTable({
   // Ref to store debouncer execute function - prevents callback recreation
   const sortingDebouncerRef = useRef<((s: SortingState) => void) | null>(null);
 
+  // Memoized callback for the debouncer to prevent recreation on every render
+  const debouncedSortingCallback = useCallback((newSorting: SortingState) => {
+    startTransition(() => {
+      setSorting(newSorting);
+    });
+  }, []);
+
   // Debounced sorting for large datasets - prevents UI jank during rapid sort changes
-  const sortingDebouncer = useDebouncer(
-    (newSorting: SortingState) => {
-      startTransition(() => {
-        setSorting(newSorting);
-      });
-    },
-    { wait: 150 }
-  );
+  const sortingDebouncer = useDebouncer(debouncedSortingCallback, {
+    wait: 150,
+  });
 
   // Keep ref updated with latest debouncer function
   sortingDebouncerRef.current = sortingDebouncer.maybeExecute;
