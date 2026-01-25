@@ -20,8 +20,14 @@ import { handleMutationError } from './mutation-utils';
 // ============================================================================
 
 /**
+ * Profile settings update payload.
+ */
+export interface ProfileSettingsUpdate {
+  hide_branding?: boolean;
+}
+
+/**
  * Profile update payload for display name, username, avatar, and other fields.
- * The updates object supports any string fields that the API accepts.
  */
 export interface ProfileUpdateInput {
   profileId?: string;
@@ -29,12 +35,13 @@ export interface ProfileUpdateInput {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    bio?: string;
     // Music links
     spotify_url?: string | null;
     apple_music_url?: string | null;
     youtube_url?: string | null;
-    // Allow additional fields the API may accept
-    [key: string]: string | null | undefined;
+    // Settings object for feature flags
+    settings?: ProfileSettingsUpdate;
   };
 }
 

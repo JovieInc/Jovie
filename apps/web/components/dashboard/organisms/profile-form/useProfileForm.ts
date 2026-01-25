@@ -1,7 +1,8 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useProfileMutation } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { ProfileFormData, UseProfileFormReturn } from './types';
 
@@ -18,9 +19,6 @@ export function useProfileForm({
   const formRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const [success, setSuccess] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
@@ -35,6 +33,42 @@ export function useProfileForm({
     image_url: artist.image_url || '',
     hide_branding: artist.settings?.hide_branding ?? false,
   });
+
+  // TanStack Query mutation for profile updates
+  const {
+    mutateAsync: updateProfile,
+    isPending: loading,
+    isError,
+    error: mutationError,
+    isSuccess,
+    reset: resetMutation,
+  } = useProfileMutation({
+    onSuccess: data => {
+      const updatedArtist = convertDrizzleCreatorProfileToArtist(
+        data.profile as Parameters<
+          typeof convertDrizzleCreatorProfileToArtist
+        >[0]
+      );
+      onUpdate(updatedArtist);
+
+      const successMessage = document.getElementById('success-message');
+      if (successMessage) {
+        successMessage.textContent = 'Profile updated successfully!';
+      }
+    },
+    // Let the hook handle error toasts
+    silent: false,
+  });
+
+  // Auto-clear success state after 3 seconds
+  useEffect(() => {
+    if (isSuccess) {
+      const timer = setTimeout(() => {
+        resetMutation();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSuccess, resetMutation]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -64,55 +98,24 @@ export function useProfileForm({
       return;
     }
 
-    setLoading(true);
-    setError(undefined);
-    setSuccess(false);
+    const settingsUpdates = hasRemoveBrandingFeature
+      ? { hide_branding: formData.hide_branding }
+      : undefined;
 
-    try {
-      const settingsUpdates = hasRemoveBrandingFeature
-        ? { hide_branding: formData.hide_branding }
-        : undefined;
-
-      const res = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          updates: {
-            displayName: formData.name,
-            bio: formData.tagline,
-            avatarUrl: formData.image_url || null,
-            ...(settingsUpdates ? { settings: settingsUpdates } : {}),
-          },
-        }),
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(err?.error ?? 'Failed to update profile');
-      }
-      const json: { profile: unknown } = await res.json();
-      const updatedArtist = convertDrizzleCreatorProfileToArtist(
-        json.profile as Parameters<
-          typeof convertDrizzleCreatorProfileToArtist
-        >[0]
-      );
-      onUpdate(updatedArtist);
-      setSuccess(true);
-
-      const successMessage = document.getElementById('success-message');
-      if (successMessage) {
-        successMessage.textContent = 'Profile updated successfully!';
-      }
-
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to update profile');
-    } finally {
-      setLoading(false);
-    }
+    await updateProfile({
+      updates: {
+        displayName: formData.name,
+        bio: formData.tagline,
+        avatarUrl: formData.image_url || undefined,
+        ...(settingsUpdates ? { settings: settingsUpdates } : {}),
+      },
+    });
   };
+
+  // Derive error message from mutation state
+  const error = isError
+    ? (mutationError?.message ?? 'Failed to update profile')
+    : undefined;
 
   const formErrors = useMemo(() => {
     const errors: Record<string, string> = {};
@@ -133,7 +136,7 @@ export function useProfileForm({
     nameInputRef,
     loading,
     error,
-    success,
+    success: isSuccess,
     formSubmitted,
     validationErrors,
     hasRemoveBrandingFeature,

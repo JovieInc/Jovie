@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { track } from '@/lib/analytics';
+import {
+  useDashboardSocialLinksQuery,
+  useSaveSocialLinksMutation,
+} from '@/lib/queries/useDashboardSocialLinksQuery';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import type { SocialLink, UseSocialsFormReturn } from './types';
 
@@ -12,75 +15,59 @@ interface UseSocialsFormOptions {
 export function useSocialsForm({
   artistId,
 }: UseSocialsFormOptions): UseSocialsFormReturn {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const [success, setSuccess] = useState(false);
+  // Local state for editing links (initialized from query data)
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  useEffect(() => {
-    const fetchSocialLinks = async () => {
-      try {
-        const res = await fetch(
-          `/api/dashboard/social-links?profileId=${encodeURIComponent(artistId)}`,
-          { cache: 'no-store' }
-        );
-        if (!res.ok) {
-          const err = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          throw new Error(err?.error ?? 'Failed to fetch social links');
-        }
-        const json: { links: SocialLink[] } = await res.json();
-        setSocialLinks(json.links || []);
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
+  // TanStack Query for fetching social links
+  const {
+    data: fetchedLinks,
+    isLoading: isFetching,
+    error: fetchError,
+  } = useDashboardSocialLinksQuery(artistId);
 
-    fetchSocialLinks();
-  }, [artistId]);
+  // TanStack Query mutation for saving social links
+  const {
+    mutateAsync: saveMutation,
+    isPending: isSaving,
+    isSuccess,
+    reset: resetMutation,
+  } = useSaveSocialLinksMutation(artistId);
+
+  // Sync fetched data to local state when it changes
+  useEffect(() => {
+    if (fetchedLinks) {
+      setSocialLinks(fetchedLinks);
+    }
+  }, [fetchedLinks]);
+
+  // Auto-clear success state after 3 seconds
+  useEffect(() => {
+    if (isSuccess) {
+      const timer = setTimeout(() => {
+        resetMutation();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSuccess, resetMutation]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      setLoading(true);
-      setError(undefined);
-      setSuccess(false);
 
-      try {
-        const linksToInsert = socialLinks
-          .filter(link => link.url.trim())
-          .map((link, index) => ({
-            platform: link.platform,
-            platformType: link.platform,
-            url: link.url.trim(),
-            sortOrder: index,
-            isActive: true,
-          }));
+      const linksToInsert = socialLinks
+        .filter(link => link.url.trim())
+        .map((link, index) => ({
+          platform: link.platform,
+          platformType: link.platform,
+          url: link.url.trim(),
+          sortOrder: index,
+          isActive: true,
+        }));
 
-        const res = await fetch('/api/dashboard/social-links', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId: artistId, links: linksToInsert }),
-        });
-        if (!res.ok) {
-          const err = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          throw new Error(err?.error ?? 'Failed to update social links');
-        }
-        setSuccess(true);
-        track('dashboard_social_links_saved', { profileId: artistId });
-        setTimeout(() => setSuccess(false), 3000);
-      } catch (error) {
-        console.error('Error:', error);
-        setError('Failed to update social links');
-      } finally {
-        setLoading(false);
-      }
+      await saveMutation({ profileId: artistId, links: linksToInsert });
     },
-    [artistId, socialLinks]
+    [artistId, socialLinks, saveMutation]
   );
 
   const removeSocialLink = useCallback((index: number) => {
@@ -138,9 +125,9 @@ export function useSocialsForm({
   }, []);
 
   return {
-    loading,
-    error,
-    success,
+    loading: isFetching || isSaving,
+    error: fetchError ? 'Failed to load social links' : undefined,
+    success: isSuccess,
     socialLinks,
     handleSubmit,
     removeSocialLink,
