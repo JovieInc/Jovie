@@ -1,7 +1,7 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { streamText } from 'ai';
+import { type ModelMessage, streamText } from 'ai';
 import { NextResponse } from 'next/server';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 
@@ -29,6 +29,82 @@ interface ArtistContext {
     totalReceivedCents: number;
     monthReceivedCents: number;
   };
+}
+
+/**
+ * Extracts text content from a message's content field.
+ * Handles both string content and array content (with text parts).
+ */
+function extractMessageText(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (p): p is { type: 'text'; text: string } =>
+          p.type === 'text' && typeof p.text === 'string'
+      )
+      .map(p => p.text)
+      .join('');
+  }
+  return '';
+}
+
+/**
+ * Validates a single message object.
+ * Returns an error message string if invalid, null if valid.
+ */
+function validateMessage(message: unknown): string | null {
+  if (
+    typeof message !== 'object' ||
+    message === null ||
+    !('role' in message) ||
+    !('content' in message)
+  ) {
+    return 'Invalid message format';
+  }
+
+  const { role, content } = message as { role: unknown; content: unknown };
+
+  if (role !== 'user' && role !== 'assistant') {
+    return 'Invalid message role';
+  }
+
+  // Validate content length for user messages
+  if (role === 'user') {
+    const contentStr = extractMessageText(content);
+    if (contentStr.length > MAX_MESSAGE_LENGTH) {
+      return `Message too long. Maximum is ${MAX_MESSAGE_LENGTH} characters`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Validates the messages array.
+ * Returns an error message string if invalid, null if valid.
+ */
+function validateMessagesArray(messages: unknown): string | null {
+  if (!Array.isArray(messages)) {
+    return 'Messages must be an array';
+  }
+  if (messages.length === 0) {
+    return 'Messages array cannot be empty';
+  }
+  if (messages.length > MAX_MESSAGES_PER_REQUEST) {
+    return `Too many messages. Maximum is ${MAX_MESSAGES_PER_REQUEST}`;
+  }
+
+  for (const message of messages) {
+    const error = validateMessage(message);
+    if (error) {
+      return error;
+    }
+  }
+
+  return null;
 }
 
 function buildSystemPrompt(context: ArtistContext): string {
@@ -126,76 +202,14 @@ export async function POST(req: Request) {
     );
   }
 
-  // Validate messages array
-  if (!Array.isArray(messages)) {
-    return NextResponse.json(
-      { error: 'Messages must be an array' },
-      { status: 400 }
-    );
+  // Validate messages array and individual messages
+  const messagesError = validateMessagesArray(messages);
+  if (messagesError) {
+    return NextResponse.json({ error: messagesError }, { status: 400 });
   }
 
-  if (messages.length === 0) {
-    return NextResponse.json(
-      { error: 'Messages array cannot be empty' },
-      { status: 400 }
-    );
-  }
-
-  if (messages.length > MAX_MESSAGES_PER_REQUEST) {
-    return NextResponse.json(
-      { error: `Too many messages. Maximum is ${MAX_MESSAGES_PER_REQUEST}` },
-      { status: 400 }
-    );
-  }
-
-  // Validate individual messages
-  for (const message of messages) {
-    if (
-      typeof message !== 'object' ||
-      message === null ||
-      !('role' in message) ||
-      !('content' in message)
-    ) {
-      return NextResponse.json(
-        { error: 'Invalid message format' },
-        { status: 400 }
-      );
-    }
-
-    const { role, content } = message as { role: unknown; content: unknown };
-
-    if (role !== 'user' && role !== 'assistant') {
-      return NextResponse.json(
-        { error: 'Invalid message role' },
-        { status: 400 }
-      );
-    }
-
-    // Validate content length for user messages
-    if (role === 'user') {
-      const contentStr =
-        typeof content === 'string'
-          ? content
-          : Array.isArray(content)
-            ? content
-                .filter(
-                  (p): p is { type: 'text'; text: string } =>
-                    p.type === 'text' && typeof p.text === 'string'
-                )
-                .map(p => p.text)
-                .join('')
-            : '';
-
-      if (contentStr.length > MAX_MESSAGE_LENGTH) {
-        return NextResponse.json(
-          {
-            error: `Message too long. Maximum is ${MAX_MESSAGE_LENGTH} characters`,
-          },
-          { status: 400 }
-        );
-      }
-    }
-  }
+  // After validation, we know messages is a valid ModelMessage array
+  const validatedMessages = messages as ModelMessage[];
 
   // Check for Anthropic API key
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -215,7 +229,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: anthropic('claude-sonnet-4-20250514'),
       system: systemPrompt,
-      messages,
+      messages: validatedMessages,
     });
 
     return result.toUIMessageStreamResponse();
@@ -224,7 +238,7 @@ export async function POST(req: Request) {
       tags: { feature: 'ai-chat' },
       extra: {
         userId,
-        messageCount: messages.length,
+        messageCount: validatedMessages.length,
       },
     });
 
