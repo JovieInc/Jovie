@@ -4,8 +4,10 @@
 // This file exports commonly used types and enums for easy importing across the app
 // Usage: import { LinkType, SubscriptionPlan } from '@/types';
 
-// Import SOCIAL_PLATFORMS constant from canonical source
+// Import and re-export SOCIAL_PLATFORMS from canonical source
+// (import needed for local use in isValidSocialPlatform, export for consumers)
 import { SOCIAL_PLATFORMS } from '@/constants/platforms';
+export { SOCIAL_PLATFORMS }; // NOSONAR - must import locally for isValidSocialPlatform
 
 // Import types for internal use
 import type {
@@ -158,9 +160,6 @@ export const CURRENCY_CODES: readonly CurrencyCode[] = [
   'NOK',
   'DKK',
 ] as const;
-
-// Re-export SOCIAL_PLATFORMS from canonical source for backward compatibility
-export { SOCIAL_PLATFORMS };
 
 // =====================================
 // VALIDATION HELPERS
