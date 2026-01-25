@@ -1,4 +1,4 @@
-import { and, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   db,
@@ -49,8 +49,8 @@ export async function GET(request: Request) {
       .from(discogReleases)
       .where(
         and(
-          gt(discogReleases.releaseDate, now),
-          lt(discogReleases.releaseDate, in24Hours)
+          gte(discogReleases.releaseDate, now),
+          lte(discogReleases.releaseDate, in24Hours)
         )
       );
 

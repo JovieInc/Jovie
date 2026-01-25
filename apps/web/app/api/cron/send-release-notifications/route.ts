@@ -63,6 +63,10 @@ export async function GET(request: Request) {
           lte(fanReleaseNotifications.scheduledFor, now)
         )
       )
+      .orderBy(
+        fanReleaseNotifications.scheduledFor,
+        fanReleaseNotifications.createdAt
+      )
       .limit(BATCH_SIZE);
 
     if (pendingNotifications.length === 0) {

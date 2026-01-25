@@ -8,6 +8,7 @@ import { APP_NAME } from '@/constants/app';
 import { PROFILE_URL } from '@/constants/domains';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { escapeHtml } from '../utils';
 
 export interface ReleaseDayNotificationData {
   /** Artist's display name */
@@ -22,18 +23,6 @@ export interface ReleaseDayNotificationData {
   slug: string;
   /** Streaming links for the release */
   streamingLinks: Array<{ providerId: string; url: string }>;
-}
-
-/**
- * Escape HTML special characters to prevent XSS in email templates.
- */
-function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 /**
