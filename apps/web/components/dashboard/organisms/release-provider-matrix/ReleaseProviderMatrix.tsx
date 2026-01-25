@@ -16,6 +16,7 @@ import {
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
@@ -231,23 +232,25 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <ReleaseTable
-                releases={rows}
-                providerConfig={providerConfig}
-                artistName={artistName}
-                onCopy={handleCopy}
-                onEdit={openEditor}
-                onAddUrl={handleAddUrl}
-                onSync={handleSync}
-                isAddingUrl={isSaving}
-                isSyncing={isSyncing}
-                selectedIds={selectedIds}
-                onSelectionChange={setSelection}
-                bulkActions={bulkActions}
-                onClearSelection={clearSelection}
-                columnVisibility={columnVisibility}
-                rowHeight={rowHeight}
-              />
+              <QueryErrorBoundary>
+                <ReleaseTable
+                  releases={rows}
+                  providerConfig={providerConfig}
+                  artistName={artistName}
+                  onCopy={handleCopy}
+                  onEdit={openEditor}
+                  onAddUrl={handleAddUrl}
+                  onSync={handleSync}
+                  isAddingUrl={isSaving}
+                  isSyncing={isSyncing}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelection}
+                  bulkActions={bulkActions}
+                  onClearSelection={clearSelection}
+                  columnVisibility={columnVisibility}
+                  rowHeight={rowHeight}
+                />
+              </QueryErrorBoundary>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}
