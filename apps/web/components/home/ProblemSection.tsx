@@ -4,7 +4,8 @@ import { Container } from '@/components/site/Container';
 const benefits = [
   {
     title: 'Capture every visitor',
-    description: 'Email & SMS on first visit. No bounce, no lost fans.',
+    description:
+      'Email & SMS on first visit. No bounce, no lost fans. Export to Mailchimp, Kit, or your favorite tools.',
   },
   {
     title: 'One clear action',
