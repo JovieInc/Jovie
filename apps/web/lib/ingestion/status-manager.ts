@@ -138,6 +138,8 @@ export const IngestionStatusManager = {
    * Handle stuck jobs by resetting them to idle
    * Only affects profiles that are in 'processing' state and haven't been
    * updated within the timeout period
+   *
+   * Uses a single batch UPDATE query instead of sequential updates for better performance.
    */
   async handleStuckJobs(
     tx: DbType,
@@ -147,22 +149,25 @@ export const IngestionStatusManager = {
   ): Promise<void> {
     if (profileIds.length === 0) return;
 
-    for (const profileId of profileIds) {
-      logger.warn('Ingestion status: resetting stuck job', { profileId });
-      await tx
-        .update(creatorProfiles)
-        .set({
-          ingestionStatus: 'idle',
-          lastIngestionError: errorMessage,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(creatorProfiles.id, profileId),
-            eq(creatorProfiles.ingestionStatus, 'processing'),
-            lte(creatorProfiles.updatedAt, stuckBefore)
-          )
-        );
-    }
+    logger.warn('Ingestion status: resetting stuck jobs (batch)', {
+      count: profileIds.length,
+      profileIds,
+    });
+
+    // Single batch update instead of sequential updates for O(1) round-trips
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'idle',
+        lastIngestionError: errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          inArray(creatorProfiles.id, profileIds),
+          eq(creatorProfiles.ingestionStatus, 'processing'),
+          lte(creatorProfiles.updatedAt, stuckBefore)
+        )
+      );
   },
 };

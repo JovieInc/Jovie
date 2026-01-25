@@ -4,7 +4,7 @@
  * Common profile operations used across ingestion flows.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -33,6 +33,9 @@ export interface ExistingProfileCheck {
 /**
  * Finds an available handle by trying suffixes (-1, -2, etc.).
  *
+ * Uses a single batch query to check all candidate handles at once,
+ * reducing database round-trips from up to 20 to just 1.
+ *
  * @param tx - Database transaction
  * @param baseHandle - Base handle to start from
  * @returns Available handle, or null if all attempts exhausted
@@ -45,24 +48,34 @@ export async function findAvailableHandle(
   const normalizedBase = baseHandle.slice(0, MAX_LEN);
   const maxAttempts = 20;
 
+  // Generate all candidate handles upfront
+  const candidates: string[] = [];
   for (let i = 0; i < maxAttempts; i++) {
     const suffix = i === 0 ? '' : `-${i}`;
     const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
     const candidate = `${trimmedBase}${suffix}`;
-    if (!isValidHandle(candidate)) continue;
-
-    const [existing] = await tx
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, candidate))
-      .limit(1);
-
-    if (!existing) {
-      return candidate;
+    if (isValidHandle(candidate)) {
+      candidates.push(candidate);
     }
   }
 
-  return null;
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // Single batch query to find all existing handles
+  const existingHandles = await tx
+    .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+    .from(creatorProfiles)
+    .where(inArray(creatorProfiles.usernameNormalized, candidates));
+
+  // Convert to Set for O(1) lookup
+  const existingSet = new Set(
+    existingHandles.map((h: { usernameNormalized: string }) => h.usernameNormalized)
+  );
+
+  // Return first available candidate (maintains priority order)
+  return candidates.find(c => !existingSet.has(c)) ?? null;
 }
 
 /**
