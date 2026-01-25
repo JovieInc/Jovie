@@ -69,6 +69,51 @@ export const sortFieldParser = parseAsString;
 export const searchQueryParser = parseAsString;
 
 // ============================================================================
+// Release Table Search Params
+// ============================================================================
+
+/**
+ * Valid sort fields for the release table.
+ */
+export const releaseSortFields = [
+  'releaseDate',
+  'title',
+  'releaseType',
+  'popularity',
+  'primaryIsrc',
+  'upc',
+  'label',
+  'totalTracks',
+  'totalDurationMs',
+] as const;
+
+export type ReleaseSortField = (typeof releaseSortFields)[number];
+
+/**
+ * Parser for release table sort field.
+ */
+export const releaseSortParser =
+  parseAsStringLiteral(releaseSortFields).withDefault('releaseDate');
+
+/**
+ * Search params cache for release table pages.
+ * Use this in server components to parse URL params.
+ *
+ * @example
+ * ```tsx
+ * // In a server component
+ * export default async function ReleasesPage({ searchParams }) {
+ *   const { sort, direction } = await releaseSearchParams.parse(searchParams);
+ *   // Use type-safe params
+ * }
+ * ```
+ */
+export const releaseSearchParams = createSearchParamsCache({
+  sort: releaseSortParser,
+  direction: sortDirectionParser,
+});
+
+// ============================================================================
 // Audience Table Search Params
 // ============================================================================
 
