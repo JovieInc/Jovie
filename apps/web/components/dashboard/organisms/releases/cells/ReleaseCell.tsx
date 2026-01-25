@@ -50,8 +50,8 @@ export const ReleaseCell = memo(function ReleaseCell({
 
   return (
     <div className='flex items-center gap-3'>
-      {/* Artwork thumbnail */}
-      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm'>
+      {/* Artwork thumbnail - hidden on mobile to save space */}
+      <div className='relative hidden h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm sm:block'>
         {release.artworkUrl ? (
           <Image
             src={release.artworkUrl}

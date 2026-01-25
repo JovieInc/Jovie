@@ -250,7 +250,7 @@ export function renderReleaseDateCell({
       tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
     />
   ) : (
-    <span className='text-xs text-tertiary-token'>TBD</span>
+    <span className='text-xs text-tertiary-token'>—</span>
   );
 }
 
@@ -352,7 +352,7 @@ export function renderGenresCell({
       </span>
       {remainingCount > 0 && (
         <span
-          className='inline-flex items-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
+          className='inline-flex min-w-[24px] items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
           title={genres.slice(1).join(', ')}
         >
           +{remainingCount}
