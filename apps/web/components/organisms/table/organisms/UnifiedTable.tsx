@@ -423,15 +423,21 @@ export function UnifiedTable<TData>({
     [enableFiltering]
   );
 
+  // Build state object conditionally to avoid passing undefined values
+  // that could cause TanStack Table to throw errors
+  const tableState = useMemo(() => {
+    const state: Record<string, unknown> = {};
+    if (rowSelection !== undefined) state.rowSelection = rowSelection;
+    if (sorting !== undefined) state.sorting = sorting;
+    if (globalFilter !== undefined) state.globalFilter = globalFilter;
+    if (columnPinning !== undefined) state.columnPinning = columnPinning;
+    return state;
+  }, [rowSelection, sorting, globalFilter, columnPinning]);
+
   const table = useReactTable({
     data,
     columns,
-    state: {
-      rowSelection,
-      sorting,
-      globalFilter,
-      columnPinning,
-    },
+    state: tableState,
     onRowSelectionChange,
     onSortingChange,
     onGlobalFilterChange,
