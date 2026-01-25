@@ -27,7 +27,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
   openMenuId,
   onAnyMenuOpen,
   lastAddedId,
-  buildPillLabel,
+  buildPillLabel: _buildPillLabel,
   addingLink,
   pendingPreview,
   onAddPendingPreview,
@@ -36,8 +36,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
   modifiers = [],
   className,
 }: LinkCategoryGridProps<T>) {
-  // Note: buildPillLabel is intentionally unused - kept for type compatibility with LinkCategoryGridProps
-  void buildPillLabel;
+  // Note: _buildPillLabel is intentionally unused - kept for type compatibility with LinkCategoryGridProps
 
   const { sensors, sortedGroups, mapIdToIndex, onDragEnd } =
     useLinkCategoryGrid({
