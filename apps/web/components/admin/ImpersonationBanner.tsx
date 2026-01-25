@@ -2,7 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { AlertTriangle, Clock, Eye, EyeOff, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   useEndImpersonationMutation,
   useImpersonationQuery,
@@ -49,24 +49,36 @@ export function ImpersonationBanner({
     }
   }, [state?.timeRemainingMs]);
 
+  // Handler for session expiry - extracted to reduce nesting depth
+  const handleSessionExpiry = useCallback(() => {
+    refetchStatus().catch(() => {
+      // Silently handle refresh failure - user will be redirected on next action
+    });
+  }, [refetchStatus]);
+
+  // Countdown timer tick handler - extracted to reduce nesting depth
+  const handleCountdownTick = useCallback(
+    (prev: number): number => {
+      const newTime = prev - 1000;
+      if (newTime <= 0) {
+        handleSessionExpiry();
+        return 0;
+      }
+      return newTime;
+    },
+    [handleSessionExpiry]
+  );
+
   // Countdown timer
   useEffect(() => {
     if (!state?.isImpersonating || timeRemaining <= 0) return;
 
     const interval = setInterval(() => {
-      setTimeRemaining(prev => {
-        const newTime = prev - 1000;
-        if (newTime <= 0) {
-          // Session expired - refresh status
-          void refetchStatus();
-          return 0;
-        }
-        return newTime;
-      });
+      setTimeRemaining(handleCountdownTick);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state?.isImpersonating, timeRemaining, refetchStatus]);
+  }, [state?.isImpersonating, timeRemaining, handleCountdownTick]);
 
   // End impersonation handler
   const handleEndImpersonation = () => {

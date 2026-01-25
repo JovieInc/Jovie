@@ -48,6 +48,8 @@ const MetricsChartImpl = dynamic(
   }
 );
 
-export function MetricsChartClient({ points }: MetricsChartClientProps) {
+export function MetricsChartClient({
+  points,
+}: Readonly<MetricsChartClientProps>) {
   return <MetricsChartImpl points={points} />;
 }

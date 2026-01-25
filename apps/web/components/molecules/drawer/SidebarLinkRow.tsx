@@ -1,7 +1,7 @@
 'use client';
 
-import { Copy, ExternalLink, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Check, Copy, ExternalLink, X } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -31,6 +31,21 @@ export function SidebarLinkRow({
   className,
   testId,
 }: SidebarLinkRowProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (!navigator.clipboard?.writeText) return;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {
+        // Silently fail - clipboard may not be available
+      });
+  };
+
   return (
     <div
       className={cn(
@@ -53,7 +68,7 @@ export function SidebarLinkRow({
       </div>
 
       {/* Right: Actions (visible on hover/focus) */}
-      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0'>
+      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0'>
         <button
           type='button'
           onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
@@ -64,16 +79,15 @@ export function SidebarLinkRow({
         </button>
         <button
           type='button'
-          onClick={() => {
-            if (!navigator.clipboard?.writeText) return;
-            navigator.clipboard.writeText(url).catch(() => {
-              // Silently fail - clipboard may not be available
-            });
-          }}
+          onClick={handleCopy}
           className={ACTION_BUTTON_CLASS}
-          aria-label={`Copy ${label} link`}
+          aria-label={copied ? 'Copied!' : `Copy ${label} link`}
         >
-          <Copy className='h-4 w-4' aria-hidden='true' />
+          {copied ? (
+            <Check className='h-4 w-4 text-success' aria-hidden='true' />
+          ) : (
+            <Copy className='h-4 w-4' aria-hidden='true' />
+          )}
         </button>
         {isEditable && onRemove && (
           <button

@@ -10,7 +10,6 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 import {
   Sidebar,
@@ -309,9 +308,6 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         {isDashboardOrAdmin && (
           <SidebarFooter className='mt-auto'>
             <SidebarSeparator className='mx-0' />
-            <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
-              <DashboardRemoveBrandingCard />
-            </div>
             <div className='px-2 py-3'>
               <div
                 className={cn(
@@ -368,9 +364,6 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             {/* Footer */}
             {isDashboardOrAdmin && (
               <div className='mt-auto border-t border-subtle'>
-                <div className='px-2 pt-3'>
-                  <DashboardRemoveBrandingCard />
-                </div>
                 <div className='px-2 py-3'>
                   <UserButton
                     showUserInfo={true}

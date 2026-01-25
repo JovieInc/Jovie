@@ -55,7 +55,7 @@ export function LoadingTableBody({
   columns,
   columnConfig,
   rowHeight,
-}: LoadingTableBodyProps) {
+}: Readonly<LoadingTableBodyProps>) {
   const rowKeys = useMemo(
     () => Array.from({ length: rows }, (_, i) => `loading-row-${i}`),
     [rows]

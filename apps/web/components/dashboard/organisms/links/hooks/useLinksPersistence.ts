@@ -201,7 +201,7 @@ export function useLinksPersistence({
       try {
         const payload = normalized.map((l, index) => ({
           platform: l.platform.id,
-          platformType: l.platform.category,
+          platformType: l.platform.icon,
           url: l.normalizedUrl,
           sortOrder: index,
           isActive: l.isVisible !== false,

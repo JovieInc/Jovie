@@ -285,7 +285,7 @@ export const buildSocialLinksInsertPayload = (
     return {
       creatorProfileId: profileId,
       platform: link.platform,
-      platformType: detected.platform.category,
+      platformType: detected.platform.icon,
       url: normalizedUrl,
       sortOrder: link.sortOrder ?? index,
       state: scored.state,
