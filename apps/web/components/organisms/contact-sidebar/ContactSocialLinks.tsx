@@ -7,10 +7,11 @@
  */
 
 import { Button, Input, Label } from '@jovie/ui';
-import { ExternalLink, Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import React, { memo } from 'react';
 
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { SidebarLinkRow } from '@/components/molecules/drawer';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
 import type { Contact, SocialLink } from './types';
@@ -74,7 +75,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
       )}
 
       {contact.socialLinks.length > 0 && (
-        <div className='flex flex-wrap gap-2 overflow-hidden py-1'>
+        <div className='space-y-0.5'>
           {contact.socialLinks.map((link: SocialLink, index: number) => {
             const username =
               extractUsernameFromUrl(link.url) ??
@@ -86,44 +87,15 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
               detectPlatform(link.url, fullName || contact.username).platform
                 .icon;
 
-            const ariaLabel = displayUsername
-              ? `Open ${platformId} profile ${displayUsername}`
-              : `Open ${platformId} link`;
-
             return (
-              <PlatformPill
+              <SidebarLinkRow
                 key={link.id ?? `${link.url}-${index}`}
-                platformIcon={platformId}
-                platformName={platformId}
-                primaryText={displayUsername || platformId}
-                tone='faded'
-                testId={`contact-social-pill-${platformId}-${index}`}
-                onClick={() => {
-                  window.open(link.url, '_blank', 'noopener,noreferrer');
-                }}
-                trailing={
-                  <div className='flex items-center gap-1'>
-                    <ExternalLink
-                      className='h-3.5 w-3.5 text-tertiary-token'
-                      aria-hidden
-                    />
-                    {isEditable && (
-                      <button
-                        type='button'
-                        className='inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
-                        aria-label={`Remove ${ariaLabel}`}
-                        onClick={event => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onRemoveLink(index);
-                        }}
-                      >
-                        <X className='h-3 w-3' aria-hidden />
-                      </button>
-                    )}
-                  </div>
-                }
-                className='border-sidebar-border text-sidebar-foreground hover:bg-sidebar-surface-hover'
+                icon={<SocialIcon platform={platformId} className='h-4 w-4' />}
+                label={displayUsername || platformId}
+                url={link.url}
+                isEditable={isEditable}
+                onRemove={() => onRemoveLink(index)}
+                testId={`contact-social-link-${platformId}-${index}`}
               />
             );
           })}

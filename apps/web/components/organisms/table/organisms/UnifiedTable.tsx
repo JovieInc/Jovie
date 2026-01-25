@@ -402,12 +402,16 @@ export function UnifiedTable<TData>({
     [groupingEnabled, rows]
   );
 
+  // Stable fallback functions for grouping (prevents recreation on every render)
+  const noopGetGroupKey = useCallback(() => '', []);
+  const identityGetGroupLabel = useCallback((key: string) => key, []);
+
   // Initialize grouping (uses TanStack-sorted row order)
   const { groupedData, observeGroupHeader, visibleGroupIndex } =
     useTableGrouping({
       data: groupingSourceData,
-      getGroupKey: groupingConfig?.getGroupKey ?? (() => ''),
-      getGroupLabel: groupingConfig?.getGroupLabel ?? (key => key),
+      getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
+      getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
       enabled: groupingEnabled,
     });
 
