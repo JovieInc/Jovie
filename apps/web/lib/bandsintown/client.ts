@@ -50,9 +50,10 @@ function parseCoordinate(value: string | undefined): number | null {
 }
 
 /**
- * Sanitize a raw Bandsintown event into our internal format
+ * Sanitize a raw Bandsintown event into our internal format.
+ * Returns null if the event has an invalid datetime.
  */
-function sanitizeEvent(event: BandsintownEvent): SanitizedEvent {
+function sanitizeEvent(event: BandsintownEvent): SanitizedEvent | null {
   // Find ticket URL from offers
   const ticketOffer = event.offers?.find(
     offer => offer.type === 'Tickets' && offer.url
@@ -66,6 +67,15 @@ function sanitizeEvent(event: BandsintownEvent): SanitizedEvent {
 
   // Parse datetime - Bandsintown uses ISO format
   const startDate = new Date(event.datetime);
+
+  // Validate the parsed date
+  if (Number.isNaN(startDate.getTime())) {
+    captureWarning('[Bandsintown] Invalid datetime for event', {
+      eventId: event.id,
+      datetime: event.datetime,
+    });
+    return null;
+  }
 
   // Extract time from datetime for display
   const startTime = startDate.toLocaleTimeString('en-US', {
@@ -230,8 +240,10 @@ class BandsintownClient {
 
           span.setAttribute('bandsintown.event_count', events.length);
 
-          // Sanitize and return events
-          return events.map(sanitizeEvent);
+          // Sanitize and return events, filtering out any with invalid dates
+          return events
+            .map(sanitizeEvent)
+            .filter((event): event is SanitizedEvent => event !== null);
         } catch (error) {
           if (error instanceof Error && error.message.includes('not found')) {
             return [];

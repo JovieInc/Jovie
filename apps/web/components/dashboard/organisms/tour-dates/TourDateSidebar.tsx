@@ -284,7 +284,13 @@ export function TourDateSidebar({
         <div className='flex items-center gap-2'>
           <Button
             onClick={handleSave}
-            disabled={isPending || !formData.startDate || !formData.venueName}
+            disabled={
+              isPending ||
+              !formData.startDate ||
+              !formData.venueName ||
+              !formData.city ||
+              !formData.country
+            }
             className='flex-1'
           >
             {updateMutation.isPending ? (

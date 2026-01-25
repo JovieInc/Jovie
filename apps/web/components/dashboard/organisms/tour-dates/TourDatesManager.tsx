@@ -9,6 +9,7 @@ import type {
 } from '@/app/app/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
+  useDeleteTourDateMutation,
   useDisconnectBandsintownMutation,
   useSyncFromBandsintownMutation,
 } from '@/lib/queries/useTourDateMutations';
@@ -35,14 +36,14 @@ export function TourDatesManager({
 
   const syncMutation = useSyncFromBandsintownMutation(profileId);
   const disconnectMutation = useDisconnectBandsintownMutation(profileId);
+  const deleteMutation = useDeleteTourDateMutation(profileId);
 
   const handleSync = useCallback(async () => {
     try {
       const result = await syncMutation.mutateAsync();
       if (result.success) {
         toast.success(result.message);
-        // Reload page to get fresh data
-        window.location.reload();
+        // Query invalidation in onSuccess handles cache refresh
       } else {
         toast.error(result.message);
       }
@@ -72,13 +73,27 @@ export function TourDatesManager({
 
   const handleDelete = useCallback(
     async (id: string) => {
+      if (!confirm('Are you sure you want to delete this tour date?')) {
+        return;
+      }
+
       // Optimistically remove from list
+      const previousTourDates = tourDates;
       setTourDates(prev => prev.filter(td => td.id !== id));
       if (selectedTourDate?.id === id) {
         setSelectedTourDate(null);
       }
+
+      try {
+        await deleteMutation.mutateAsync(id);
+        toast.success('Tour date deleted');
+      } catch {
+        // Rollback on error
+        setTourDates(previousTourDates);
+        toast.error('Failed to delete tour date');
+      }
     },
-    [selectedTourDate]
+    [selectedTourDate, tourDates, deleteMutation]
   );
 
   const handleConnected = useCallback((newTourDates: TourDateViewModel[]) => {
@@ -107,7 +122,7 @@ export function TourDatesManager({
               <div className='flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30'>
                 <Icon
                   name='Check'
-                  className='h-3.5 w-3.5 text-teal-600 dark:text-teal-400'
+                  className='h-4 w-4 text-teal-600 dark:text-teal-400'
                 />
               </div>
               <span className='text-sm text-secondary-token'>
@@ -127,7 +142,7 @@ export function TourDatesManager({
               >
                 <Icon
                   name='RefreshCw'
-                  className={`mr-1.5 h-3.5 w-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`}
+                  className={`mr-1.5 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`}
                 />
                 Sync
               </Button>
@@ -138,7 +153,7 @@ export function TourDatesManager({
                 disabled={disconnectMutation.isPending}
                 className='text-tertiary-token hover:text-secondary-token'
               >
-                <Icon name='Unlink' className='mr-1.5 h-3.5 w-3.5' />
+                <Icon name='Unlink' className='mr-1.5 h-4 w-4' />
                 Disconnect
               </Button>
             </div>
@@ -174,7 +189,7 @@ export function TourDatesManager({
                 >
                   <Icon
                     name='RefreshCw'
-                    className={`mr-1.5 h-3.5 w-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`}
+                    className={`mr-1.5 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`}
                   />
                   Sync from Bandsintown
                 </Button>

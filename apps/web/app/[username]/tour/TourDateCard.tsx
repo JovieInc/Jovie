@@ -23,9 +23,9 @@ export function TourDateCard({ tourDate }: TourDateCardProps) {
   const isCancelled = tourDate.ticketStatus === 'cancelled';
 
   const handleAddToCalendar = () => {
-    // Generate ICS file URL
+    // Generate ICS file URL - use direct navigation for reliable download
     const icsUrl = `/api/calendar/${tourDate.id}`;
-    window.open(icsUrl, '_blank');
+    window.location.href = icsUrl;
   };
 
   return (
@@ -86,13 +86,15 @@ export function TourDateCard({ tourDate }: TourDateCardProps) {
           <div className='mt-3 flex items-center gap-2'>
             {tourDate.ticketUrl && !isCancelled && (
               <a
-                href={tourDate.ticketUrl}
+                href={isSoldOut ? undefined : tourDate.ticketUrl}
                 target='_blank'
                 rel='noopener noreferrer'
+                aria-disabled={isSoldOut}
+                tabIndex={isSoldOut ? -1 : undefined}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
                   isSoldOut
-                    ? 'bg-surface-2 text-tertiary-token'
+                    ? 'pointer-events-none bg-surface-2 text-tertiary-token'
                     : 'bg-accent text-white hover:bg-accent/90'
                 )}
               >

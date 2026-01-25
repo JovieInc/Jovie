@@ -94,8 +94,9 @@ export async function GET(
     .filter(Boolean)
     .join('\r\n');
 
-  // Generate filename
-  const filename = `${artistName.replace(/[^a-zA-Z0-9]/g, '_')}_${tourDate.city.replace(/[^a-zA-Z0-9]/g, '_')}.ics`;
+  // Generate filename with null-safe city handling
+  const citySlug = (tourDate.city || 'event').replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `${artistName.replace(/[^a-zA-Z0-9]/g, '_')}_${citySlug}.ics`;
 
   return new NextResponse(icsContent, {
     headers: {

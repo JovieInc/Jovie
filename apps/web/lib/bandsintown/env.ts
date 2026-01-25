@@ -5,6 +5,7 @@
  */
 
 import 'server-only';
+import { env } from '@/lib/env';
 
 // ============================================================================
 // Constants
@@ -28,7 +29,7 @@ export const BANDSINTOWN_DEFAULT_TIMEOUT_MS = 10_000;
  * Check if Bandsintown is configured.
  */
 export function isBandsintownConfigured(): boolean {
-  return !!process.env.BANDSINTOWN_APP_ID;
+  return !!env.BANDSINTOWN_APP_ID;
 }
 
 /**
@@ -36,7 +37,7 @@ export function isBandsintownConfigured(): boolean {
  * Returns empty string if not configured.
  */
 export function getBandsintownAppId(): string {
-  return process.env.BANDSINTOWN_APP_ID ?? '';
+  return env.BANDSINTOWN_APP_ID ?? '';
 }
 
 /**

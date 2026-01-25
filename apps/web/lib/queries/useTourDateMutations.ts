@@ -43,9 +43,14 @@ export function useSyncFromBandsintownMutation(profileId: string) {
   return useMutation({
     mutationFn: syncFromBandsintown,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tourDates.list(profileId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.tourDates.list(profileId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.tourDates.connection(profileId),
+        }),
+      ]);
     },
   });
 }

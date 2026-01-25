@@ -85,7 +85,7 @@ export function TourDatesTable({
         {
           id: 'edit',
           label: 'Edit',
-          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          icon: <Icon name='PencilLine' className='h-4 w-4' />,
           onClick: () => onEdit(tourDate),
         },
       ];
@@ -94,15 +94,16 @@ export function TourDatesTable({
         items.push({
           id: 'open-tickets',
           label: 'Open ticket link',
-          icon: <Icon name='ExternalLink' className='h-3.5 w-3.5' />,
-          onClick: () => window.open(tourDate.ticketUrl!, '_blank'),
+          icon: <Icon name='ExternalLink' className='h-4 w-4' />,
+          onClick: () =>
+            window.open(tourDate.ticketUrl!, '_blank', 'noopener,noreferrer'),
         });
       }
 
       items.push({
         id: 'delete',
         label: 'Delete',
-        icon: <Icon name='Trash2' className='h-3.5 w-3.5' />,
+        icon: <Icon name='Trash2' className='h-4 w-4' />,
         onClick: () => onDelete(tourDate.id),
         destructive: true,
       });
@@ -191,7 +192,7 @@ export function TourDatesTable({
               className='inline-flex items-center gap-1 text-accent hover:underline'
               onClick={e => e.stopPropagation()}
             >
-              <Icon name='Ticket' className='h-3.5 w-3.5' />
+              <Icon name='Ticket' className='h-4 w-4' />
               <span className='text-sm'>Buy</span>
             </a>
           );
@@ -238,7 +239,7 @@ export function TourDatesTable({
               >
                 <Icon
                   name='RefreshCw'
-                  className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')}
+                  className={cn('h-4 w-4', isSyncing && 'animate-spin')}
                 />
                 Sync
               </button>
@@ -251,11 +252,12 @@ export function TourDatesTable({
             <div className='flex items-center justify-end'>
               <button
                 type='button'
+                aria-label={`Edit ${tourDate.venueName} tour date`}
                 onClick={e => {
                   e.stopPropagation();
                   onEdit(tourDate);
                 }}
-                className='rounded p-1 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token'
+                className='rounded p-1 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               >
                 <Icon name='MoreHorizontal' className='h-4 w-4' />
               </button>

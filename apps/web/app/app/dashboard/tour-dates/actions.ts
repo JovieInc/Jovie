@@ -2,6 +2,7 @@
 
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
@@ -180,7 +181,9 @@ export async function checkBandsintownConnection(): Promise<BandsintownConnectio
       artistName: profile.bandsintownArtistName,
       lastSyncedAt: lastSynced?.lastSyncedAt?.toISOString() ?? null,
     };
-  } catch {
+  } catch (error) {
+    // Re-throw redirect errors to allow onboarding flows to work
+    if (isRedirectError(error)) throw error;
     return { connected: false, artistName: null, lastSyncedAt: null };
   }
 }
@@ -421,13 +424,31 @@ export async function createTourDate(params: {
 
   const profile = await requireProfile();
 
+  // Validate startDate
+  const parsedStartDate = new Date(params.startDate);
+  if (Number.isNaN(parsedStartDate.getTime())) {
+    throw new Error('Invalid start date');
+  }
+
+  // Validate ticketUrl if provided
+  if (params.ticketUrl) {
+    try {
+      const url = new URL(params.ticketUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error('Invalid ticket URL: must use http or https');
+      }
+    } catch {
+      throw new Error('Invalid ticket URL');
+    }
+  }
+
   const [created] = await db
     .insert(tourDates)
     .values({
       profileId: profile.id,
       provider: 'manual',
       title: params.title ?? null,
-      startDate: new Date(params.startDate),
+      startDate: parsedStartDate,
       startTime: params.startTime ?? null,
       venueName: params.venueName,
       city: params.city,
@@ -491,14 +512,31 @@ export async function updateTourDate(params: {
   };
 
   if (params.title !== undefined) updateData.title = params.title;
-  if (params.startDate !== undefined)
-    updateData.startDate = new Date(params.startDate);
+  if (params.startDate !== undefined) {
+    const parsedStartDate = new Date(params.startDate);
+    if (Number.isNaN(parsedStartDate.getTime())) {
+      throw new Error('Invalid start date');
+    }
+    updateData.startDate = parsedStartDate;
+  }
   if (params.startTime !== undefined) updateData.startTime = params.startTime;
   if (params.venueName !== undefined) updateData.venueName = params.venueName;
   if (params.city !== undefined) updateData.city = params.city;
   if (params.region !== undefined) updateData.region = params.region;
   if (params.country !== undefined) updateData.country = params.country;
-  if (params.ticketUrl !== undefined) updateData.ticketUrl = params.ticketUrl;
+  if (params.ticketUrl !== undefined) {
+    if (params.ticketUrl) {
+      try {
+        const url = new URL(params.ticketUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new Error('Invalid ticket URL: must use http or https');
+        }
+      } catch {
+        throw new Error('Invalid ticket URL');
+      }
+    }
+    updateData.ticketUrl = params.ticketUrl;
+  }
   if (params.ticketStatus !== undefined)
     updateData.ticketStatus = params.ticketStatus;
 

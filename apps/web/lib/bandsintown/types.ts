@@ -64,6 +64,6 @@ export interface SanitizedEvent {
   latitude: number | null;
   longitude: number | null;
   ticketUrl: string | null;
-  ticketStatus: 'available' | 'sold_out';
+  ticketStatus: 'available' | 'sold_out' | 'cancelled';
   rawData: Record<string, unknown>;
 }
