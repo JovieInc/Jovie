@@ -16,6 +16,11 @@ export const SUPPORTED_IMAGE_MIME_TYPES = [
 export type SupportedImageMimeType =
   (typeof SUPPORTED_IMAGE_MIME_TYPES)[number];
 
+/** Set of supported image MIME types for O(1) lookups. */
+export const SUPPORTED_IMAGE_MIME_TYPES_SET = new Set<string>(
+  SUPPORTED_IMAGE_MIME_TYPES
+);
+
 export const AVATAR_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB API limit
 
 // Square targets, ordered from largest to smallest
