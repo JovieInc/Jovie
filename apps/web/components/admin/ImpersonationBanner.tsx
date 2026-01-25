@@ -58,7 +58,9 @@ export function ImpersonationBanner({
         const newTime = prev - 1000;
         if (newTime <= 0) {
           // Session expired - refresh status
-          void refetchStatus();
+          refetchStatus().catch(() => {
+            // Silently handle refresh failure - user will be redirected on next action
+          });
           return 0;
         }
         return newTime;
