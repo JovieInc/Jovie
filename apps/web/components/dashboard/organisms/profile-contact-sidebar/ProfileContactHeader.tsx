@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/atoms/Avatar/Avatar';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
@@ -15,23 +15,19 @@ export interface ProfileContactHeaderProps {
   profilePath: string;
 }
 
-/**
- * Generate a vCard string for download
- */
 function generateVCard(
   displayName: string,
   username: string,
   profileUrl: string
 ): string {
-  const lines = [
+  return [
     'BEGIN:VCARD',
     'VERSION:3.0',
     `FN:${displayName || username}`,
     `URL:${profileUrl}`,
     `NOTE:Jovie profile: @${username}`,
     'END:VCARD',
-  ];
-  return lines.join('\r\n');
+  ].join('\r\n');
 }
 
 export function ProfileContactHeader({
@@ -45,104 +41,89 @@ export function ProfileContactHeader({
 
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
-  const profileUrl = useMemo(() => {
-    if (typeof window === 'undefined') return profilePath;
-    return `${window.location.origin}${profilePath}`;
-  }, [profilePath]);
+  // Compute URL once per render (no hook needed)
+  const profileUrl =
+    typeof window === 'undefined'
+      ? profilePath
+      : `${window.location.origin}${profilePath}`;
 
-  const handleCopyUrl = useCallback(async () => {
+  // Action handlers - defined inline, no useCallback needed
+  const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(profileUrl);
       setIsCopied(true);
       toast.success('Profile URL copied');
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        setIsCopied(false);
-        timeoutRef.current = null;
-      }, 2000);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
     }
-  }, [profileUrl]);
+  };
 
-  const handleOpenProfile = useCallback(() => {
+  const handleOpenProfile = () => {
     window.open(profilePath, '_blank', 'noopener,noreferrer');
-  }, [profilePath]);
+  };
 
-  const handleDownloadVCard = useCallback(() => {
-    const vCardContent = generateVCard(displayName, username, profileUrl);
-    const blob = new Blob([vCardContent], { type: 'text/vcard' });
+  const handleDownloadVCard = () => {
+    const blob = new Blob([generateVCard(displayName, username, profileUrl)], {
+      type: 'text/vcard',
+    });
     const blobUrl = URL.createObjectURL(blob);
-
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = `${username}.vcf`;
     link.click();
-
     URL.revokeObjectURL(blobUrl);
     toast.success('vCard downloaded');
-  }, [displayName, username, profileUrl]);
+  };
 
-  const handleDownloadQRCode = useCallback(() => {
+  const handleDownloadQRCode = () => {
     const link = document.createElement('a');
     link.href = getQrCodeUrl(profileUrl, 420);
     link.download = `${username}-qr.png`;
     link.click();
     toast.success('QR code downloaded');
-  }, [profileUrl, username]);
+  };
 
-  // Primary actions: Copy URL (with check animation)
-  const primaryActions: DrawerHeaderAction[] = useMemo(
-    () => [
-      {
-        id: 'copy',
-        label: isCopied ? 'Copied!' : 'Copy profile link',
-        icon: Copy,
-        activeIcon: Check,
-        isActive: isCopied,
-        onClick: handleCopyUrl,
-      },
-    ],
-    [isCopied, handleCopyUrl]
-  );
+  // Action arrays - computed inline, no useMemo needed
+  const primaryActions: DrawerHeaderAction[] = [
+    {
+      id: 'copy',
+      label: isCopied ? 'Copied!' : 'Copy profile link',
+      icon: Copy,
+      activeIcon: Check,
+      isActive: isCopied,
+      onClick: handleCopyUrl,
+    },
+  ];
 
-  // Overflow actions: Open, vCard, QR Code
-  const overflowActions: DrawerHeaderAction[] = useMemo(
-    () => [
-      {
-        id: 'open',
-        label: 'Open profile',
-        icon: ExternalLink,
-        onClick: handleOpenProfile,
-      },
-      {
-        id: 'vcard',
-        label: 'Download vCard',
-        icon: Contact,
-        onClick: handleDownloadVCard,
-      },
-      {
-        id: 'qr',
-        label: 'Download QR code',
-        icon: QrCode,
-        onClick: handleDownloadQRCode,
-      },
-    ],
-    [handleOpenProfile, handleDownloadVCard, handleDownloadQRCode]
-  );
+  const overflowActions: DrawerHeaderAction[] = [
+    {
+      id: 'open',
+      label: 'Open profile',
+      icon: ExternalLink,
+      onClick: handleOpenProfile,
+    },
+    {
+      id: 'vcard',
+      label: 'Download vCard',
+      icon: Contact,
+      onClick: handleDownloadVCard,
+    },
+    {
+      id: 'qr',
+      label: 'Download QR code',
+      icon: QrCode,
+      onClick: handleDownloadQRCode,
+    },
+  ];
 
   return (
     <div className='space-y-3'>
-      {/* Avatar, Name, and Actions Row */}
       <div className='flex items-center gap-3'>
         <Avatar
           src={avatarUrl}
