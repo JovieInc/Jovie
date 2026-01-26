@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
+import type { PopularityLevel } from '../ReleaseTableSubheader';
 
 export interface ReleaseFilterCounts {
   /** Counts by release type */
@@ -12,6 +13,26 @@ export interface ReleaseFilterCounts {
     complete: number;
     incomplete: number;
   };
+  /** Counts by popularity level */
+  byPopularity: {
+    low: number;
+    med: number;
+    high: number;
+  };
+  /** Unique labels with counts */
+  byLabel: { label: string; count: number }[];
+}
+
+/**
+ * Get popularity level from score (0-100)
+ */
+export function getPopularityLevel(
+  popularity: number | null | undefined
+): PopularityLevel | null {
+  if (popularity == null || !Number.isFinite(popularity)) return null;
+  if (popularity <= 33) return 'low';
+  if (popularity <= 66) return 'med';
+  return 'high';
 }
 
 /**
@@ -35,18 +56,45 @@ export function useReleaseFilterCounts(
     let complete = 0;
     let incomplete = 0;
 
+    const byPopularity = {
+      low: 0,
+      med: 0,
+      high: 0,
+    };
+
+    const labelCounts = new Map<string, number>();
+
     for (const release of releases) {
       // Count by type
       byType[release.releaseType]++;
 
       // Count by availability - check if all providers have URLs
-      const hasAllProviders = release.providers.every(p => p.url);
+      // Releases with no providers are considered incomplete
+      const hasAllProviders =
+        release.providers.length > 0 && release.providers.every(p => p.url);
       if (hasAllProviders) {
         complete++;
       } else {
         incomplete++;
       }
+
+      // Count by popularity level
+      const level = getPopularityLevel(release.spotifyPopularity);
+      if (level) {
+        byPopularity[level]++;
+      }
+
+      // Count by label
+      if (release.label) {
+        const current = labelCounts.get(release.label) || 0;
+        labelCounts.set(release.label, current + 1);
+      }
     }
+
+    // Convert label map to sorted array
+    const byLabel = Array.from(labelCounts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count); // Sort by count descending
 
     return {
       byType,
@@ -55,6 +103,8 @@ export function useReleaseFilterCounts(
         complete,
         incomplete,
       },
+      byPopularity,
+      byLabel,
     };
   }, [releases]);
 }

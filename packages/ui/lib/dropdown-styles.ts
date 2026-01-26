@@ -167,7 +167,7 @@ export const MENU_ITEM_BASE =
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-3) ' +
   '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
-  'hover:[&_svg]:text-secondary-token data-[highlighted]:[&_svg]:text-secondary-token';
+  'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
 
 /**
  * Destructive variant for menu items (delete, remove actions)

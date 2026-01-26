@@ -22,6 +22,7 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
+import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
@@ -73,6 +74,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     availableColumns,
     onColumnVisibilityChange,
     resetToDefaults,
+    showTracks,
+    onShowTracksChange,
+    groupByYear,
+    onGroupByYearChange,
   } = useReleaseTablePreferences();
 
   // Filter state
@@ -80,46 +85,31 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
-  // Check if release has all provider URLs configured
-  const hasAllProviderUrls = useCallback(
-    (release: ReleaseViewModel, providerKeys: string[]): boolean => {
-      return providerKeys.every(key =>
-        release.providers.some(p => p.key === key && p.url)
-      );
-    },
-    []
-  );
-
   // Apply filters to rows
   const filteredRows = useMemo(() => {
-    const providerKeys = Object.keys(providerConfig);
-
     return rows.filter(release => {
       // Filter by release type
-      if (
-        filters.releaseTypes.length > 0 &&
-        !filters.releaseTypes.includes(release.releaseType)
-      ) {
-        return false;
+      const matchesType =
+        filters.releaseTypes.length === 0 ||
+        filters.releaseTypes.includes(release.releaseType);
+
+      if (!matchesType) return false;
+
+      // Filter by popularity level
+      if (filters.popularity.length > 0) {
+        const level = getPopularityLevel(release.spotifyPopularity);
+        if (!level || !filters.popularity.includes(level)) return false;
       }
 
-      // Filter by availability
-      if (filters.availability === 'all') {
-        return true;
-      }
-
-      const hasAll = hasAllProviderUrls(release, providerKeys);
-
-      if (filters.availability === 'complete') {
-        return hasAll;
-      }
-      if (filters.availability === 'incomplete') {
-        return !hasAll;
+      // Filter by label
+      if (filters.labels.length > 0) {
+        if (!release.label || !filters.labels.includes(release.label))
+          return false;
       }
 
       return true;
     });
-  }, [rows, filters, providerConfig, hasAllProviderUrls]);
+  }, [rows, filters]);
 
   // Row selection - use filtered rows
   const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);
@@ -277,11 +267,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
+              showTracks={showTracks}
+              onShowTracksChange={onShowTracksChange}
+              groupByYear={groupByYear}
+              onGroupByYearChange={onGroupByYearChange}
             />
           )}
 
           {/* Scrollable content area */}
-          <div className='flex-1 min-h-0 overflow-auto'>
+          <div className='flex-1 min-h-0 overflow-auto pb-4'>
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnected={handleArtistConnected}
@@ -325,6 +319,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
+                  showTracks={showTracks}
+                  groupByYear={groupByYear}
                 />
               </QueryErrorBoundary>
             )}
@@ -372,17 +368,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           {rows.length > 0 && (
             <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
-                {filteredRows.length !== rows.length ? (
-                  <>
-                    {filteredRows.length} of {totalReleases}{' '}
-                    {totalReleases === 1 ? 'release' : 'releases'}
-                  </>
-                ) : (
-                  <>
-                    {totalReleases}{' '}
-                    {totalReleases === 1 ? 'release' : 'releases'}
-                  </>
-                )}
+                {filteredRows.length !== rows.length
+                  ? `${filteredRows.length} of ${totalReleases}`
+                  : `${totalReleases}`}{' '}
+                {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
                   <span className='ml-1.5 text-tertiary-token'>
                     ({totalOverrides} manual{' '}
