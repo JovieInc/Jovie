@@ -123,7 +123,7 @@ export const ContactItem = memo(function ContactItem({
           )}
 
           {contact.error ? (
-            <p className='text-sm text-red-600'>{contact.error}</p>
+            <p className='text-sm text-error'>{contact.error}</p>
           ) : null}
 
           <ContactItemActions

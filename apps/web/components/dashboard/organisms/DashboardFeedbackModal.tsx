@@ -86,7 +86,7 @@ export function DashboardFeedbackModal({
     <Dialog open={isOpen} onClose={handleClose} size='sm' hideClose>
       {isSubmitted ? (
         <div className='px-6 py-8 text-center'>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
           <DialogTitle className='mt-4 text-balance text-lg font-semibold'>
