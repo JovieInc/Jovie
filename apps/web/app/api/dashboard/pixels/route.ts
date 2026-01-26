@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorPixels, creatorProfiles, users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { encryptPII } from '@/lib/utils/pii-encryption';
 import { logger } from '@/lib/utils/logger';
+import { encryptPII } from '@/lib/utils/pii-encryption';
 
 export const runtime = 'nodejs';
 
@@ -151,36 +151,42 @@ export async function PUT(req: Request) {
         );
       }
 
-      // Encrypt access tokens before storage
-      const encryptedData = {
-        facebookPixelId: input.facebookPixelId || null,
-        facebookAccessToken: input.facebookAccessToken
-          ? encryptPII(input.facebookAccessToken)
-          : null,
-        googleMeasurementId: input.googleMeasurementId || null,
-        googleApiSecret: input.googleApiSecret
-          ? encryptPII(input.googleApiSecret)
-          : null,
-        tiktokPixelId: input.tiktokPixelId || null,
-        tiktokAccessToken: input.tiktokAccessToken
-          ? encryptPII(input.tiktokAccessToken)
-          : null,
-        enabled: input.enabled,
-        // Enable per-platform tracking based on whether credentials are provided
-        facebookEnabled: !!(input.facebookPixelId && input.facebookAccessToken),
-        googleEnabled: !!(input.googleMeasurementId && input.googleApiSecret),
-        tiktokEnabled: !!(input.tiktokPixelId && input.tiktokAccessToken),
-        updatedAt: new Date(),
-      };
-
-      // Check if config already exists
+      // Check if config already exists (need to fetch before building encrypted data)
       const [existingConfig] = await tx
-        .select({ id: creatorPixels.id })
+        .select()
         .from(creatorPixels)
         .where(eq(creatorPixels.profileId, userProfile.profileId))
         .limit(1);
 
-      if (existingConfig) {
+      // Encrypt access tokens before storage
+      // Preserve existing tokens if new ones are not provided
+      const facebookAccessToken = input.facebookAccessToken
+        ? encryptPII(input.facebookAccessToken)
+        : existingConfig?.facebookAccessToken || null;
+      const googleApiSecret = input.googleApiSecret
+        ? encryptPII(input.googleApiSecret)
+        : existingConfig?.googleApiSecret || null;
+      const tiktokAccessToken = input.tiktokAccessToken
+        ? encryptPII(input.tiktokAccessToken)
+        : existingConfig?.tiktokAccessToken || null;
+
+      const encryptedData = {
+        facebookPixelId: input.facebookPixelId || null,
+        facebookAccessToken,
+        googleMeasurementId: input.googleMeasurementId || null,
+        googleApiSecret,
+        tiktokPixelId: input.tiktokPixelId || null,
+        tiktokAccessToken,
+        enabled: input.enabled,
+        // Enable per-platform tracking based on whether credentials are configured
+        // Use either new token from input or preserved existing token
+        facebookEnabled: !!(input.facebookPixelId && facebookAccessToken),
+        googleEnabled: !!(input.googleMeasurementId && googleApiSecret),
+        tiktokEnabled: !!(input.tiktokPixelId && tiktokAccessToken),
+        updatedAt: new Date(),
+      };
+
+      if (existingConfig?.id) {
         // Update existing config
         await tx
           .update(creatorPixels)

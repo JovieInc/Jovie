@@ -6,16 +6,18 @@
  */
 
 import { logger } from '@/lib/utils/logger';
-import type { ForwardingResult, NormalizedEvent, PlatformConfig } from './types';
+import type {
+  ForwardingResult,
+  NormalizedEvent,
+  PlatformConfig,
+} from './types';
 
 const GOOGLE_MP_URL = 'https://www.google-analytics.com/mp/collect';
 
 /**
  * Map our event types to Google GA4 events
  */
-function mapEventToGoogle(
-  eventType: NormalizedEvent['eventType']
-): string {
+function mapEventToGoogle(eventType: NormalizedEvent['eventType']): string {
   switch (eventType) {
     case 'page_view':
       return 'page_view';

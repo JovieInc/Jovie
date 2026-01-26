@@ -4,7 +4,7 @@
  * Shared types for server-side pixel forwarding to ad platforms.
  */
 
-import type { PixelEvent, CreatorPixel } from '@/lib/db/schema';
+import type { CreatorPixel, PixelEvent } from '@/lib/db/schema';
 
 /**
  * Result of a forwarding attempt to a single platform
@@ -76,16 +76,16 @@ export function normalizeEvent(event: PixelEvent): NormalizedEvent {
 /**
  * Extract platform config from creator pixel settings
  */
-export function extractPlatformConfigs(
-  config: CreatorPixel
-): {
+export function extractPlatformConfigs(config: CreatorPixel): {
   facebook: PlatformConfig | null;
   google: PlatformConfig | null;
   tiktok: PlatformConfig | null;
 } {
   return {
     facebook:
-      config.facebookPixelId && config.facebookAccessToken && config.facebookEnabled
+      config.facebookPixelId &&
+      config.facebookAccessToken &&
+      config.facebookEnabled
         ? {
             pixelId: config.facebookPixelId,
             accessToken: config.facebookAccessToken,
@@ -93,7 +93,9 @@ export function extractPlatformConfigs(
           }
         : null,
     google:
-      config.googleMeasurementId && config.googleApiSecret && config.googleEnabled
+      config.googleMeasurementId &&
+      config.googleApiSecret &&
+      config.googleEnabled
         ? {
             pixelId: config.googleMeasurementId,
             accessToken: config.googleApiSecret,

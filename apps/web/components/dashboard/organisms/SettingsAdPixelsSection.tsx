@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Switch } from '@jovie/ui';
-import { Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useCallback, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -229,9 +229,7 @@ export function SettingsAdPixelsSection() {
             tokenValue={pixelData.tiktokAccessToken}
             helpUrl='https://ads.tiktok.com/marketing_api/docs?id=1771101027431425'
             helpText='Get credentials'
-            onPixelIdChange={value =>
-              handleInputChange('tiktokPixelId', value)
-            }
+            onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
             onTokenChange={value =>
               handleInputChange('tiktokAccessToken', value)
             }

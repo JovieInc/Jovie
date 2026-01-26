@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import {
-  getConsentState,
   getOrCreateSessionId,
   isTrackingAllowed,
 } from '@/lib/tracking/consent';
@@ -47,7 +46,6 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
       eventType: PixelEventPayload['eventType'],
       eventData?: Record<string, unknown>
     ) => {
-      const consentState = getConsentState();
       const hasConsent = isTrackingAllowed();
 
       // Still send event even without consent, but mark it

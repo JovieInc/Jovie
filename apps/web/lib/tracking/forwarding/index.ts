@@ -6,23 +6,32 @@
  * 2. Creator's configured pixels (when configured)
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, lte, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { creatorPixels, pixelEvents, type PixelEvent } from '@/lib/db/schema';
+import {
+  creatorPixels,
+  type PixelEvent,
+  type PixelForwardingStatus,
+  pixelEvents,
+} from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
-import { decryptPII } from '@/lib/utils/pii-encryption';
 import { logger } from '@/lib/utils/logger';
+import { decryptPII } from '@/lib/utils/pii-encryption';
 import { forwardToFacebook } from './facebook';
 import { forwardToGoogle } from './google';
 import { forwardToTikTok } from './tiktok';
 import {
-  type ForwardingResult,
-  type PlatformConfig,
-  normalizeEvent,
   extractPlatformConfigs,
+  type ForwardingResult,
+  normalizeEvent,
+  type PlatformConfig,
 } from './types';
 
-export type { ForwardingResult, NormalizedEvent, PlatformConfig } from './types';
+export type {
+  ForwardingResult,
+  NormalizedEvent,
+  PlatformConfig,
+} from './types';
 
 /**
  * Get Jovie's own pixel configs from environment
@@ -81,7 +90,10 @@ export async function forwardEvent(
   const jovieConfigs = getJoviePixelConfigs();
 
   if (jovieConfigs.facebook) {
-    const result = await forwardToFacebook(normalizedEvent, jovieConfigs.facebook);
+    const result = await forwardToFacebook(
+      normalizedEvent,
+      jovieConfigs.facebook
+    );
     results.push({ ...result, platform: 'jovie' });
   }
 
@@ -111,26 +123,40 @@ export async function forwardEvent(
       tiktokAccessToken: decryptPII(creatorConfig.tiktokAccessToken),
     };
 
-    const platformConfigs = extractPlatformConfigs(decryptedConfig as typeof creatorConfig);
+    const platformConfigs = extractPlatformConfigs(
+      decryptedConfig as typeof creatorConfig
+    );
 
     if (platformConfigs.facebook) {
-      const result = await forwardToFacebook(normalizedEvent, platformConfigs.facebook);
+      const result = await forwardToFacebook(
+        normalizedEvent,
+        platformConfigs.facebook
+      );
       results.push(result);
     }
 
     if (platformConfigs.google) {
-      const result = await forwardToGoogle(normalizedEvent, platformConfigs.google);
+      const result = await forwardToGoogle(
+        normalizedEvent,
+        platformConfigs.google
+      );
       results.push(result);
     }
 
     if (platformConfigs.tiktok) {
-      const result = await forwardToTikTok(normalizedEvent, platformConfigs.tiktok);
+      const result = await forwardToTikTok(
+        normalizedEvent,
+        platformConfigs.tiktok
+      );
       results.push(result);
     }
   }
 
   // Update event with forwarding status
-  const forwardingStatus: Record<string, { status: string; sentAt: string; error?: string }> = {};
+  const forwardingStatus: Record<
+    string,
+    { status: string; sentAt: string; error?: string }
+  > = {};
 
   for (const result of results) {
     forwardingStatus[result.platform] = {
@@ -149,8 +175,19 @@ export async function forwardEvent(
 }
 
 /**
+ * Check if an event has any failed platform forwarding that needs retry
+ */
+function hasFailedForwarding(status: PixelForwardingStatus): boolean {
+  return Object.values(status).some(platform => platform?.status === 'failed');
+}
+
+/**
  * Process a batch of events for forwarding
  * Called by cron job
+ *
+ * Selects events that:
+ * 1. Have never been forwarded (empty forwardingStatus)
+ * 2. Have failed forwarding and are due for retry (forwardAt <= now)
  */
 export async function processPendingEvents(limit = 100): Promise<{
   processed: number;
@@ -162,11 +199,24 @@ export async function processPendingEvents(limit = 100): Promise<{
   let failed = 0;
 
   try {
-    // Get events that haven't been forwarded yet
+    // Get events that need forwarding:
+    // - New events with empty forwardingStatus
+    // - Failed events that are due for retry (forwardAt <= now)
     const pendingEvents = await db
       .select()
       .from(pixelEvents)
-      .where(eq(pixelEvents.forwardingStatus, {}))
+      .where(
+        and(
+          lte(pixelEvents.forwardAt, new Date()),
+          or(
+            eq(pixelEvents.forwardingStatus, {}),
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"facebook":{"status":"failed"}}'::jsonb`,
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"google":{"status":"failed"}}'::jsonb`,
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"tiktok":{"status":"failed"}}'::jsonb`,
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie":{"status":"failed"}}'::jsonb`
+          )
+        )
+      )
       .limit(limit);
 
     for (const event of pendingEvents) {
@@ -179,6 +229,18 @@ export async function processPendingEvents(limit = 100): Promise<{
           successful++;
         } else {
           failed++;
+          // Schedule retry with exponential backoff (5 min, 15 min, 45 min, etc.)
+          // Count existing retries by checking for failed status
+          const retryCount = hasFailedForwarding(event.forwardingStatus || {})
+            ? 1
+            : 0;
+          const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
+          const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+
+          await db
+            .update(pixelEvents)
+            .set({ forwardAt: nextRetry })
+            .where(eq(pixelEvents.id, event.id));
         }
       } catch (error) {
         logger.error('[Pixel Forwarding] Event processing error', {

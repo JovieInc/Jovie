@@ -5,7 +5,11 @@
  * Respects Global Privacy Control (GPC) and Do Not Track (DNT) signals.
  */
 
-export type ConsentState = 'undecided' | 'accepted' | 'rejected' | 'gpc-opted-out';
+export type ConsentState =
+  | 'undecided'
+  | 'accepted'
+  | 'rejected'
+  | 'gpc-opted-out';
 
 const CONSENT_COOKIE_NAME = 'jv_tracking_consent';
 const CONSENT_STORAGE_KEY = 'jovie_tracking_consent';
@@ -93,8 +97,13 @@ export function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem(SESSION_KEY);
 
   if (!sessionId) {
-    // Generate a random session ID
-    sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    // Generate a random session ID using crypto for better randomness
+    const randomBytes = new Uint8Array(16);
+    crypto.getRandomValues(randomBytes);
+    const randomHex = Array.from(randomBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    sessionId = `${Date.now()}-${randomHex}`;
     sessionStorage.setItem(SESSION_KEY, sessionId);
   }
 

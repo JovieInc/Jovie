@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting and hashing
     const clientIP = extractClientIP(request.headers);
 
-    // Public rate limiting check (per-IP)
-    if (checkPublicRateLimit(clientIP, 'pixel')) {
-      const status = getPublicRateLimitStatus(clientIP, 'pixel');
+    // Public rate limiting check (per-IP) - use 'visit' limiter for pixel events
+    if (checkPublicRateLimit(clientIP, 'visit')) {
+      const status = getPublicRateLimitStatus(clientIP, 'visit');
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         {
@@ -82,8 +82,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { profileId, sessionId, eventType, eventData, consent, referrer, pageUrl } =
-      parsed.data;
+    const {
+      profileId,
+      sessionId,
+      eventType,
+      eventData,
+      consent,
+      referrer,
+      pageUrl,
+    } = parsed.data;
 
     // Validate profile exists and is public
     const [profile] = await db
@@ -139,10 +146,7 @@ export async function POST(request: NextRequest) {
 
     // Return success
     // The forwarding happens asynchronously via cron job
-    return NextResponse.json(
-      { success: true },
-      { headers: NO_STORE_HEADERS }
-    );
+    return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('[Pixel] Error recording event', error);
     return NextResponse.json(

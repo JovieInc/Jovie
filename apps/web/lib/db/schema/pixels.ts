@@ -10,17 +10,33 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { pixelEventTypeEnum } from './enums';
 import { creatorProfiles } from './profiles';
-import { pixelEventTypeEnum, pixelForwardStatusEnum } from './enums';
 
 /**
  * Forwarding status for each platform
  */
 export interface PixelForwardingStatus {
-  facebook?: { status: 'pending' | 'sent' | 'failed'; sentAt?: string; error?: string };
-  google?: { status: 'pending' | 'sent' | 'failed'; sentAt?: string; error?: string };
-  tiktok?: { status: 'pending' | 'sent' | 'failed'; sentAt?: string; error?: string };
-  jovie?: { status: 'pending' | 'sent' | 'failed'; sentAt?: string; error?: string };
+  facebook?: {
+    status: 'pending' | 'sent' | 'failed';
+    sentAt?: string;
+    error?: string;
+  };
+  google?: {
+    status: 'pending' | 'sent' | 'failed';
+    sentAt?: string;
+    error?: string;
+  };
+  tiktok?: {
+    status: 'pending' | 'sent' | 'failed';
+    sentAt?: string;
+    error?: string;
+  };
+  jovie?: {
+    status: 'pending' | 'sent' | 'failed';
+    sentAt?: string;
+    error?: string;
+  };
 }
 
 /**
@@ -32,17 +48,25 @@ export interface PixelEventData {
   linkUrl?: string;
   linkTitle?: string;
   // For form_submit events
-  formType?: 'capture' | 'contact';
-  // UTM parameters
+  formType?: string;
+  // UTM parameters (normalized)
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
   utmTerm?: string;
   utmContent?: string;
+  // UTM parameters (raw from client - snake_case)
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
   // Referrer
   referrer?: string;
   // Page info
   pageUrl?: string;
+  // Allow additional fields
+  [key: string]: unknown;
 }
 
 /**

@@ -6,16 +6,19 @@
  */
 
 import { logger } from '@/lib/utils/logger';
-import type { ForwardingResult, NormalizedEvent, PlatformConfig } from './types';
+import type {
+  ForwardingResult,
+  NormalizedEvent,
+  PlatformConfig,
+} from './types';
 
-const TIKTOK_API_URL = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
+const TIKTOK_API_URL =
+  'https://business-api.tiktok.com/open_api/v1.3/event/track/';
 
 /**
  * Map our event types to TikTok standard events
  */
-function mapEventToTikTok(
-  eventType: NormalizedEvent['eventType']
-): string {
+function mapEventToTikTok(eventType: NormalizedEvent['eventType']): string {
   switch (eventType) {
     case 'page_view':
       return 'ViewContent';

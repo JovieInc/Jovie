@@ -6,7 +6,11 @@
  */
 
 import { logger } from '@/lib/utils/logger';
-import type { ForwardingResult, NormalizedEvent, PlatformConfig } from './types';
+import type {
+  ForwardingResult,
+  NormalizedEvent,
+  PlatformConfig,
+} from './types';
 
 const FACEBOOK_API_VERSION = 'v18.0';
 const FACEBOOK_API_URL = 'https://graph.facebook.com';
@@ -14,9 +18,7 @@ const FACEBOOK_API_URL = 'https://graph.facebook.com';
 /**
  * Map our event types to Facebook standard events
  */
-function mapEventToFacebook(
-  eventType: NormalizedEvent['eventType']
-): string {
+function mapEventToFacebook(eventType: NormalizedEvent['eventType']): string {
   switch (eventType) {
     case 'page_view':
       return 'PageView';
