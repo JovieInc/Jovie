@@ -377,6 +377,32 @@ export async function checkAiChatRateLimit(
   );
 }
 
+// ============================================================================
+// Tour Date Operations
+// ============================================================================
+
+/**
+ * Rate limiter for Bandsintown sync
+ * Limit: 1 sync per 5 minutes per profile - conservative for external API
+ */
+export const bandsintownSyncLimiter = createRateLimiter(
+  RATE_LIMITERS.bandsintownSync
+);
+
+/**
+ * Check Bandsintown sync rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkBandsintownSyncRateLimit(
+  profileId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    bandsintownSyncLimiter,
+    profileId,
+    'Tour dates were recently synced. Please wait 5 minutes before syncing again.'
+  );
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -403,5 +429,6 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     spotifyRefresh: spotifyRefreshLimiter,
     spotifyPublicSearch: spotifyPublicSearchLimiter,
     aiChat: aiChatLimiter,
+    bandsintownSync: bandsintownSyncLimiter,
   };
 }

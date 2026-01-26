@@ -37,16 +37,12 @@ const StatCard = memo(function StatCard({
   description,
 }: StatCardProps) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1/40 p-4'>
-      <p className='text-[11px] font-medium uppercase tracking-wide text-secondary-token'>
-        {label}
-      </p>
-      <p className='mt-2 text-3xl font-semibold tabular-nums tracking-tight text-primary-token'>
+    <div className='rounded-xl bg-surface-1 p-5'>
+      <p className='text-xs font-medium text-tertiary-token'>{label}</p>
+      <p className='mt-3 text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
         {formatCount(value)}
       </p>
-      <p className='mt-2 text-xs leading-5 text-secondary-token'>
-        {description}
-      </p>
+      <p className='mt-2 text-xs text-secondary-token'>{description}</p>
     </div>
   );
 });
@@ -61,9 +57,9 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
   onEdit,
 }: VenmoConnectedBadgeProps) {
   return (
-    <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
-      <Wallet className='h-4 w-4 text-accent' />
-      <span className='rounded-md bg-surface-2 px-2 py-1 font-sans text-sm text-primary-token'>
+    <div className='flex flex-wrap items-center gap-3 rounded-xl bg-surface-1 px-4 py-2.5'>
+      <Wallet className='h-4 w-4 text-accent-token' />
+      <span className='rounded-full bg-accent/10 px-2.5 py-0.5 text-sm font-medium text-accent-token'>
         {venmoHandle}
       </span>
       <span className='text-sm text-secondary-token'>Connected</span>
@@ -90,8 +86,8 @@ const VenmoEditForm = memo(function VenmoEditForm({
   isSaving,
 }: VenmoEditFormProps) {
   return (
-    <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
-      <Wallet className='h-4 w-4 text-accent' />
+    <div className='flex flex-wrap items-center gap-3 rounded-xl bg-surface-1 px-4 py-2.5'>
+      <Wallet className='h-4 w-4 text-accent-token' />
       <span className='text-sm font-medium text-primary-token'>Venmo</span>
       <div className='flex items-center gap-2'>
         <span className='text-sm text-secondary-token'>@</span>
@@ -144,20 +140,20 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
   const buttonText = isSaving ? 'Saving...' : 'Connect';
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
+    <div className='space-y-4'>
       <SectionHeader
         title='Venmo Handle'
         description='Your handle will appear on your profile so fans can tip you directly.'
         right={<Wallet className='h-6 w-6 text-accent' />}
-        className='border-b border-subtle px-5 py-4'
+        className='pb-1'
       />
 
-      <div className='px-5 py-4'>
+      <div>
         <div className='space-y-4'>
           <div>
             <label
               htmlFor='venmo-handle'
-              className='mb-2 block text-sm font-medium text-primary-token'
+              className='mb-1.5 block text-sm font-medium text-primary-token'
             >
               Venmo Username
             </label>
@@ -173,7 +169,7 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
                 className='flex-1'
               />
             </div>
-            <p className='mt-2 text-xs text-secondary-token'>
+            <p className='mt-1.5 text-xs text-tertiary-token'>
               Your handle will be shown on your public profile and fans can tip
               you directly via Venmo.
             </p>
@@ -190,7 +186,7 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
           </div>
           {saveSuccess && (
             <output
-              className='block rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-sm text-primary-token'
+              className='flex items-center gap-2 rounded-lg bg-green-500/10 px-3 py-2 text-sm font-medium text-green-600 dark:text-green-400'
               aria-live='polite'
             >
               ✓ {saveSuccess}
@@ -214,15 +210,15 @@ const TipLinkSection = memo(function TipLinkSection({
   displayHandle,
 }: TipLinkSectionProps) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
+    <div className='space-y-4'>
       <SectionHeader
         title='Share your tip link'
         description='Send fans directly to your profile so they can tip instantly.'
-        className='border-b border-subtle px-5 py-4'
+        className='pb-1'
       />
-      <div className='px-5 py-4'>
+      <div>
         <div className='space-y-3'>
-          <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2/60 px-3 py-2 font-sans text-sm text-primary-token'>
+          <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm text-primary-token'>
             <span className='min-w-0 flex-1 truncate'>{tipUrl}</span>
             <CopyToClipboardButton
               relativePath={tipRelativePathLink}
@@ -257,15 +253,15 @@ const QRCodeSection = memo(function QRCodeSection({
   displayHandle,
 }: QRCodeSectionProps) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
+    <div className='space-y-4'>
       <SectionHeader
         title='Downloadable QR'
         description='Perfect for merch tables, receipts, or posters.'
-        className='border-b border-subtle px-5 py-4'
+        className='pb-1'
       />
-      <div className='px-5 py-4'>
+      <div>
         <div className='flex flex-col items-center gap-3'>
-          <div className='w-full rounded-xl border border-subtle bg-surface-2/40 px-4 py-5'>
+          <div className='w-full rounded-xl bg-surface-2 p-6'>
             <QRCodeCard
               data={tipShareUrlQr}
               qrSize={QR_DISPLAY_SIZE}
@@ -339,12 +335,14 @@ export function DashboardTipping() {
   }
 
   return (
-    <div className='space-y-5'>
+    <div className='space-y-6'>
       {/* Header */}
       <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
         <div>
-          <h1 className='text-2xl font-bold text-primary-token'>Earnings</h1>
-          <p className='mt-1 text-secondary-token'>
+          <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
+            Earnings
+          </h1>
+          <p className='mt-1 text-sm text-secondary-token'>
             Connect your payout handle and view your earnings history
           </p>
         </div>
@@ -379,25 +377,25 @@ export function DashboardTipping() {
       {/* Activity & Sharing Section (blurred when not connected) */}
       <div
         className={cn(
-          'space-y-5',
+          'space-y-6',
           !hasVenmoHandle && 'pointer-events-none select-none blur-sm'
         )}
         aria-hidden={!hasVenmoHandle || undefined}
         inert={!hasVenmoHandle || undefined}
       >
-        <div className='grid gap-5 lg:grid-cols-12'>
+        <div className='grid gap-6 lg:grid-cols-12'>
           {/* Activity Stats */}
-          <div className='space-y-3 lg:col-span-12'>
+          <div className='space-y-4 lg:col-span-12'>
             <div className='space-y-1'>
-              <h2 className='text-base font-semibold tracking-tight text-primary-token'>
+              <h2 className='text-lg font-medium text-primary-token'>
                 Activity
               </h2>
-              <p className='text-sm leading-6 text-secondary-token'>
+              <p className='text-sm text-secondary-token'>
                 Track how fans reach your tipping page.
               </p>
             </div>
 
-            <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+            <div className='grid grid-cols-1 gap-5 sm:grid-cols-3'>
               <StatCard
                 label='QR code scans'
                 value={qrTipClicks}
@@ -417,7 +415,7 @@ export function DashboardTipping() {
           </div>
 
           {/* Tip Link & QR Code Sections */}
-          <div className='grid gap-5 lg:col-span-12 lg:grid-cols-2'>
+          <div className='grid gap-6 lg:col-span-12 lg:grid-cols-2'>
             <TipLinkSection
               tipUrl={tipUrls.tipUrl}
               tipRelativePathLink={tipUrls.tipRelativePathLink}

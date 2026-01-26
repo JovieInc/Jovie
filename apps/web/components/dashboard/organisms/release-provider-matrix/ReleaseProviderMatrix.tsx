@@ -62,14 +62,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
-  // Table display preferences (column visibility, density)
+  // Table display preferences (column visibility)
   const {
     columnVisibility,
-    density,
     rowHeight,
     availableColumns,
     onColumnVisibilityChange,
-    onDensityChange,
     resetToDefaults,
   } = useReleaseTablePreferences();
 
@@ -167,17 +165,28 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         type='button'
         onClick={handleSync}
         disabled={isSyncing}
-        className='group inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
+        className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
         aria-label={
           isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
         }
       >
         <SocialIcon platform='spotify' className='h-3 w-3' />
         <span>{artistName}</span>
+        {/* Status dot - visible when not hovered/syncing */}
+        <span
+          className={cn(
+            'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
+            'group-hover:opacity-0 group-focus-visible:opacity-0',
+            isSyncing && 'opacity-0'
+          )}
+          aria-hidden='true'
+        />
+        {/* Refresh icon - visible on hover or when syncing */}
         <Icon
           name={isSyncing ? 'Loader2' : 'RefreshCw'}
           className={cn(
-            'h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+            'absolute right-2 h-3 w-3 opacity-0 transition-opacity duration-150',
+            'group-hover:opacity-100 group-focus-visible:opacity-100',
             isSyncing && 'animate-spin opacity-100'
           )}
           aria-hidden='true'
@@ -207,6 +216,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
         <div className='flex-1 min-h-0 flex flex-col bg-base'>
+          {/* Sticky subheader - outside scroll container */}
+          {showReleasesTable && (
+            <ReleaseTableSubheader
+              releases={rows}
+              selectedIds={selectedIds}
+              columnVisibility={columnVisibility}
+              onColumnVisibilityChange={onColumnVisibilityChange}
+              availableColumns={availableColumns}
+              onResetToDefaults={resetToDefaults}
+            />
+          )}
+
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
             {showEmptyState && (
@@ -237,37 +258,23 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <>
-                {/* Subheader with Filter, Display, Export */}
-                <ReleaseTableSubheader
+              <QueryErrorBoundary>
+                <ReleaseTable
                   releases={rows}
+                  providerConfig={providerConfig}
+                  artistName={artistName}
+                  onCopy={handleCopy}
+                  onEdit={openEditor}
+                  onAddUrl={handleAddUrl}
+                  isAddingUrl={isSaving}
                   selectedIds={selectedIds}
+                  onSelectionChange={setSelection}
+                  bulkActions={bulkActions}
+                  onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
-                  onColumnVisibilityChange={onColumnVisibilityChange}
-                  availableColumns={availableColumns}
-                  density={density}
-                  onDensityChange={onDensityChange}
+                  rowHeight={rowHeight}
                 />
-                <QueryErrorBoundary>
-                  <ReleaseTable
-                    releases={rows}
-                    providerConfig={providerConfig}
-                    artistName={artistName}
-                    onCopy={handleCopy}
-                    onEdit={openEditor}
-                    onAddUrl={handleAddUrl}
-                    onSync={handleSync}
-                    isAddingUrl={isSaving}
-                    isSyncing={isSyncing}
-                    selectedIds={selectedIds}
-                    onSelectionChange={setSelection}
-                    bulkActions={bulkActions}
-                    onClearSelection={clearSelection}
-                    columnVisibility={columnVisibility}
-                    rowHeight={rowHeight}
-                  />
-                </QueryErrorBoundary>
-              </>
+              </QueryErrorBoundary>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}
@@ -324,7 +331,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <button
                 type='button'
                 onClick={resetToDefaults}
-                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
+                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2'
               >
                 Reset display
               </button>

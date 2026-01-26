@@ -1,8 +1,10 @@
-import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';
 import type { RefObject } from 'react';
+import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import {
@@ -62,7 +64,7 @@ export function renderPrimaryGoalCell(value: string | null) {
       {primaryGoalLabel}
     </Badge>
   ) : (
-    <span className='text-tertiary-token'>—</span>
+    <EmptyCell />
   );
 }
 
@@ -97,7 +99,7 @@ export function renderPrimarySocialCell(entry: WaitlistEntryRow) {
  */
 export function renderSpotifyCell(spotifyUrl: string | null) {
   if (!spotifyUrl) {
-    return <span className='text-tertiary-token'>—</span>;
+    return <EmptyCell />;
   }
 
   const artistName = extractUsername(spotifyUrl) || 'Spotify';
@@ -117,27 +119,14 @@ export function renderSpotifyCell(spotifyUrl: string | null) {
  */
 export function renderHeardAboutCell(value: string | null) {
   if (!value) {
-    return <span className='text-tertiary-token'>—</span>;
+    return <EmptyCell />;
   }
 
-  const truncatedValue = value.length > 30 ? value.slice(0, 30) + '…' : value;
-
-  if (value.length > 30) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className='cursor-help text-secondary-token'>
-            {truncatedValue}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side='top' className='max-w-xs'>
-          {value}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return <span className='text-secondary-token'>{value}</span>;
+  return (
+    <TruncatedText lines={1} className='text-secondary-token'>
+      {value}
+    </TruncatedText>
+  );
 }
 
 /**

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
 import type { AudienceMemberType } from '@/types';
 
@@ -45,12 +46,14 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   const secondaryLabel = getSecondaryLabel();
 
   return (
-    <div className={cn('text-xs text-primary-token', className)}>
-      <div className='font-medium line-clamp-1'>{displayName || 'Visitor'}</div>
+    <div className={cn('text-xs text-primary-token min-w-0', className)}>
+      <TruncatedText lines={1} className='font-medium'>
+        {displayName || 'Visitor'}
+      </TruncatedText>
       {secondaryLabel && (
-        <div className='text-[11px] text-secondary-token line-clamp-1'>
+        <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
           {secondaryLabel}
-        </div>
+        </TruncatedText>
       )}
     </div>
   );

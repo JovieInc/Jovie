@@ -26,7 +26,7 @@ export interface PillClassNameParams {
  * Base classes applied to all pills
  */
 const BASE_CLASSES = [
-  'group/pill relative inline-flex items-center rounded-full border text-xs font-medium',
+  'group/pill relative inline-flex items-center rounded-lg border text-xs font-medium',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
   'bg-surface-1 hover:bg-(--pill-bg-hover) dark:bg-surface-1/60 dark:hover:bg-(--pill-bg-hover) dark:backdrop-blur-sm',
   'text-secondary-token hover:text-primary-token',

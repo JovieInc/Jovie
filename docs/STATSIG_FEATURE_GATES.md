@@ -138,6 +138,17 @@ Ask Claude to create the gate using the Statsig MCP, providing:
   - `components/dashboard/organisms/ContactsManager.tsx`
   - `components/profile/ArtistContactsButton.tsx`
 
+#### `feature_tour_dates`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Gate the tour dates dashboard page and public tour page. Enables one-way sync from Bandsintown.
+- **Expiry**: Review after pilot rollout
+- **Used in**:
+  - `app/app/dashboard/tour-dates/page.tsx`
+  - `app/[username]/tour/page.tsx`
+  - `components/dashboard/dashboard-nav/DashboardNav.tsx`
+  - `components/dashboard/organisms/tour-dates/*`
+
 ### Backend Features
 
 #### `feature_universal_notifications`

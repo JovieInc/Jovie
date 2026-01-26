@@ -29,13 +29,13 @@ export type LinkSection = 'social' | 'dsp' | 'earnings' | 'custom';
 export function labelFor(section: LinkSection): string {
   switch (section) {
     case 'social':
-      return 'SOCIAL';
+      return 'Social';
     case 'dsp':
-      return 'MUSIC SERVICE';
+      return 'Music service';
     case 'earnings':
-      return 'MONETIZATION';
+      return 'Monetization';
     default:
-      return 'CUSTOM';
+      return 'Custom';
   }
 }
 
