@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { startTransition, useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { STATSIG_FLAGS } from '@/lib/flags';
@@ -165,15 +165,13 @@ export function EnhancedDashboardLinks({
 
   // Sync preview data
   useEffect(() => {
-    startTransition(() =>
-      setPreviewData({
-        username,
-        displayName,
-        avatarUrl: avatarUrl || null,
-        links: dashboardLinks,
-        profilePath,
-      })
-    );
+    setPreviewData({
+      username,
+      displayName,
+      avatarUrl: avatarUrl || null,
+      links: dashboardLinks,
+      profilePath,
+    });
   }, [
     avatarUrl,
     dashboardLinks,

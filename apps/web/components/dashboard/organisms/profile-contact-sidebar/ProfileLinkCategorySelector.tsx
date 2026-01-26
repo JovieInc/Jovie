@@ -43,11 +43,10 @@ export function ProfileLinkCategorySelector({
     <div
       role='group'
       aria-label='Link categories'
-      className='relative inline-flex w-full rounded-lg border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/5 dark:ring-white/10 backdrop-blur-sm'
+      className='relative inline-flex w-full rounded-lg bg-surface-1 p-0.5'
     >
       {visibleCategories.map(category => {
         const isActive = selectedCategory === category.id;
-        const count = categoryCounts?.[category.id] ?? 0;
 
         return (
           <button
@@ -55,13 +54,13 @@ export function ProfileLinkCategorySelector({
             type='button'
             onClick={() => onCategoryChange(category.id)}
             aria-pressed={isActive}
-            className='relative flex-1 h-7 rounded-lg px-2.5 text-xs font-medium text-secondary-token transition-colors ease-out hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1 z-10'
+            className='relative flex-1 h-7 rounded-md px-3 text-xs font-medium text-secondary-token transition-colors ease-out hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1 z-10'
           >
             {isActive && (
               <motion.span
                 layoutId='category-selector-active'
-                className='absolute inset-0 rounded-lg bg-surface-2 shadow-sm shadow-black/10 dark:shadow-black/40'
-                transition={{ type: 'tween', ease: 'easeOut', duration: 0.2 }}
+                className='absolute inset-0 rounded-md bg-surface-2'
+                transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
               />
             )}
             <span
@@ -72,17 +71,6 @@ export function ProfileLinkCategorySelector({
               }
             >
               {category.label}
-              {count > 0 && (
-                <span
-                  className={
-                    isActive
-                      ? 'ml-1 text-secondary-token'
-                      : 'ml-1 text-tertiary-token'
-                  }
-                >
-                  {count}
-                </span>
-              )}
             </span>
           </button>
         );

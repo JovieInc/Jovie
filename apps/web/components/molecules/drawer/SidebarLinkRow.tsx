@@ -49,14 +49,16 @@ export function SidebarLinkRow({
   return (
     <div
       className={cn(
-        'group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-sidebar-surface-hover transition-colors',
+        'group flex items-center justify-between rounded-md py-2 hover:bg-sidebar-surface-hover transition-colors',
         className
       )}
       data-testid={testId}
     >
       {/* Left: Icon + Label */}
-      <div className='flex items-center gap-2 min-w-0'>
-        <span className='shrink-0'>{icon}</span>
+      <div className='flex items-center gap-2.5 min-w-0'>
+        <span className='shrink-0 w-5 flex items-center justify-center'>
+          {icon}
+        </span>
         <span className='text-sm text-sidebar-foreground truncate'>
           {label}
         </span>
