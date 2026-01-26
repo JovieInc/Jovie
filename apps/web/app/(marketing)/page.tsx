@@ -244,22 +244,22 @@ export default function HomePage() {
       {/* 1. Hero Section */}
       <RedesignedHero />
 
-      {/* 2. See It In Action Section with error boundary */}
+      {/* 2. Problem Section */}
+      <ProblemSection />
+
+      {/* 3. Comparison Section */}
+      <ComparisonSection />
+
+      {/* 4. What You Get Section */}
+      <WhatYouGetSection />
+
+      {/* 5. How It Works Section */}
+      <HowItWorksSection />
+
+      {/* 6. See It In Action Section */}
       <Suspense fallback={<SeeItInActionSkeleton />}>
         <SeeItInActionSafe />
       </Suspense>
-
-      {/* 3. Problem Section */}
-      <ProblemSection />
-
-      {/* 4. Comparison Section */}
-      <ComparisonSection />
-
-      {/* 5. What You Get Section */}
-      <WhatYouGetSection />
-
-      {/* 6. How It Works Section */}
-      <HowItWorksSection />
 
       {/* 7. Final CTA Section */}
       <FinalCTASection />
