@@ -25,6 +25,371 @@ const BATCH_SIZE = 100;
 // for longer than this, reset it to "pending" for retry
 const SENDING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
+// ============================================================================
+// Types
+// ============================================================================
+
+interface PendingNotification {
+  id: string;
+  creatorProfileId: string;
+  releaseId: string;
+  notificationSubscriptionId: string;
+  notificationType: string;
+  metadata: unknown;
+}
+
+interface ProcessingContext {
+  now: Date;
+  notification: PendingNotification;
+}
+
+type ProcessResult = 'sent' | 'failed' | 'skipped';
+
+// ============================================================================
+// Database Operations
+// ============================================================================
+
+async function recoverStuckNotifications(
+  now: Date,
+  timeoutThreshold: Date
+): Promise<number> {
+  const recoveredRows = await db
+    .update(fanReleaseNotifications)
+    .set({ status: 'pending', updatedAt: now })
+    .where(
+      and(
+        eq(fanReleaseNotifications.status, 'sending'),
+        lt(fanReleaseNotifications.updatedAt, timeoutThreshold)
+      )
+    )
+    .returning({ id: fanReleaseNotifications.id });
+
+  return recoveredRows.length;
+}
+
+async function fetchPendingNotifications(
+  now: Date
+): Promise<PendingNotification[]> {
+  return db
+    .select({
+      id: fanReleaseNotifications.id,
+      creatorProfileId: fanReleaseNotifications.creatorProfileId,
+      releaseId: fanReleaseNotifications.releaseId,
+      notificationSubscriptionId:
+        fanReleaseNotifications.notificationSubscriptionId,
+      notificationType: fanReleaseNotifications.notificationType,
+      metadata: fanReleaseNotifications.metadata,
+    })
+    .from(fanReleaseNotifications)
+    .where(
+      and(
+        eq(fanReleaseNotifications.status, 'pending'),
+        eq(fanReleaseNotifications.notificationType, 'release_day'),
+        lte(fanReleaseNotifications.scheduledFor, now)
+      )
+    )
+    .orderBy(
+      fanReleaseNotifications.scheduledFor,
+      fanReleaseNotifications.createdAt
+    )
+    .limit(BATCH_SIZE);
+}
+
+async function claimNotification(
+  notificationId: string,
+  now: Date
+): Promise<boolean> {
+  const claimed = await db
+    .update(fanReleaseNotifications)
+    .set({ status: 'sending', updatedAt: now })
+    .where(
+      and(
+        eq(fanReleaseNotifications.id, notificationId),
+        eq(fanReleaseNotifications.status, 'pending')
+      )
+    )
+    .returning({ id: fanReleaseNotifications.id });
+
+  return claimed.length > 0;
+}
+
+async function updateNotificationStatus(
+  notificationId: string,
+  now: Date,
+  status: 'sent' | 'failed' | 'cancelled',
+  error?: string | null
+): Promise<void> {
+  await db
+    .update(fanReleaseNotifications)
+    .set({
+      status,
+      sentAt: status === 'sent' ? now : null,
+      error: error ?? null,
+      updatedAt: now,
+    })
+    .where(eq(fanReleaseNotifications.id, notificationId));
+}
+
+async function fetchReleaseDetails(releaseId: string) {
+  const [release] = await db
+    .select({
+      id: discogReleases.id,
+      title: discogReleases.title,
+      slug: discogReleases.slug,
+      artworkUrl: discogReleases.artworkUrl,
+      releaseDate: discogReleases.releaseDate,
+    })
+    .from(discogReleases)
+    .where(eq(discogReleases.id, releaseId))
+    .limit(1);
+
+  return release;
+}
+
+async function fetchCreatorProfile(creatorProfileId: string) {
+  const [creator] = await db
+    .select({
+      id: creatorProfiles.id,
+      displayName: creatorProfiles.displayName,
+      username: creatorProfiles.username,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, creatorProfileId))
+    .limit(1);
+
+  return creator;
+}
+
+async function fetchActiveSubscriber(subscriptionId: string) {
+  const [subscriber] = await db
+    .select({
+      id: notificationSubscriptions.id,
+      channel: notificationSubscriptions.channel,
+      email: notificationSubscriptions.email,
+      phone: notificationSubscriptions.phone,
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.id, subscriptionId),
+        sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+      )
+    )
+    .limit(1);
+
+  return subscriber;
+}
+
+async function fetchStreamingLinks(releaseId: string) {
+  return db
+    .select({
+      providerId: providerLinks.providerId,
+      url: providerLinks.url,
+    })
+    .from(providerLinks)
+    .where(
+      and(
+        eq(providerLinks.ownerType, 'release'),
+        eq(providerLinks.releaseId, releaseId)
+      )
+    );
+}
+
+// ============================================================================
+// Notification Processing
+// ============================================================================
+
+async function sendEmailNotification(
+  ctx: ProcessingContext,
+  subscriber: { email: string },
+  emailData: { subject: string; text: string; html: string }
+): Promise<ProcessResult> {
+  const result = await sendNotification(
+    {
+      id: ctx.notification.id,
+      subject: emailData.subject,
+      text: emailData.text,
+      html: emailData.html,
+      channels: ['email'],
+      category: 'marketing',
+    },
+    { email: subscriber.email }
+  );
+
+  const success = result.delivered.length > 0;
+  const error = success ? null : (result.errors[0]?.error ?? 'Unknown error');
+
+  await updateNotificationStatus(
+    ctx.notification.id,
+    ctx.now,
+    success ? 'sent' : 'failed',
+    error
+  );
+
+  return success ? 'sent' : 'failed';
+}
+
+async function processNotification(
+  ctx: ProcessingContext
+): Promise<ProcessResult> {
+  // Atomically claim the notification
+  const claimed = await claimNotification(ctx.notification.id, ctx.now);
+  if (!claimed) {
+    return 'skipped';
+  }
+
+  // Fetch release details
+  const release = await fetchReleaseDetails(ctx.notification.releaseId);
+  if (!release) {
+    throw new Error(`Release not found: ${ctx.notification.releaseId}`);
+  }
+
+  // Validate release date hasn't been rescheduled to future
+  if (release.releaseDate && release.releaseDate > ctx.now) {
+    await updateNotificationStatus(
+      ctx.notification.id,
+      ctx.now,
+      'cancelled',
+      'Release date changed to future date'
+    );
+    logger.info(
+      `[send-release-notifications] Cancelled notification ${ctx.notification.id} - release date changed to ${release.releaseDate.toISOString()}`
+    );
+    return 'skipped';
+  }
+
+  // Fetch creator profile
+  const creator = await fetchCreatorProfile(ctx.notification.creatorProfileId);
+  if (!creator) {
+    throw new Error(`Creator not found: ${ctx.notification.creatorProfileId}`);
+  }
+
+  // Fetch subscriber (also verifies they haven't unsubscribed)
+  const subscriber = await fetchActiveSubscriber(
+    ctx.notification.notificationSubscriptionId
+  );
+  if (!subscriber) {
+    await updateNotificationStatus(ctx.notification.id, ctx.now, 'cancelled');
+    return 'skipped';
+  }
+
+  // Fetch streaming links
+  const links = await fetchStreamingLinks(release.id);
+
+  // Build email content
+  const artistName = creator.displayName ?? creator.username;
+  const emailData = getReleaseDayNotificationEmail({
+    artistName,
+    releaseTitle: release.title,
+    artworkUrl: release.artworkUrl,
+    username: creator.usernameNormalized,
+    slug: release.slug,
+    streamingLinks: links.map(link => ({
+      providerId: link.providerId,
+      url: link.url,
+    })),
+  });
+
+  // Send notification based on channel
+  if (subscriber.channel === 'email' && subscriber.email) {
+    return sendEmailNotification(ctx, { email: subscriber.email }, emailData);
+  }
+
+  if (subscriber.channel === 'sms' && subscriber.phone) {
+    await updateNotificationStatus(
+      ctx.notification.id,
+      ctx.now,
+      'failed',
+      'SMS channel not yet implemented'
+    );
+    return 'failed';
+  }
+
+  // No valid contact info
+  await updateNotificationStatus(
+    ctx.notification.id,
+    ctx.now,
+    'failed',
+    'No valid contact information'
+  );
+  return 'failed';
+}
+
+async function processNotificationWithErrorHandling(
+  ctx: ProcessingContext
+): Promise<ProcessResult> {
+  try {
+    return await processNotification(ctx);
+  } catch (error) {
+    await updateNotificationStatus(
+      ctx.notification.id,
+      ctx.now,
+      'failed',
+      error instanceof Error ? error.message : 'Unknown error'
+    );
+    logger.error(
+      '[send-release-notifications] Failed to send notification:',
+      error
+    );
+    return 'failed';
+  }
+}
+
+// ============================================================================
+// API Route Handler
+// ============================================================================
+
+function createUnauthorizedResponse(): NextResponse {
+  return NextResponse.json(
+    { error: 'Unauthorized' },
+    { status: 401, headers: NO_STORE_HEADERS }
+  );
+}
+
+function createEmptyResponse(now: Date): NextResponse {
+  return NextResponse.json(
+    {
+      success: true,
+      message: 'No pending notifications to send',
+      sent: 0,
+      failed: 0,
+      timestamp: now.toISOString(),
+    },
+    { headers: NO_STORE_HEADERS }
+  );
+}
+
+function createSuccessResponse(
+  totalSent: number,
+  totalFailed: number,
+  processed: number,
+  now: Date
+): NextResponse {
+  return NextResponse.json(
+    {
+      success: true,
+      message: `Sent ${totalSent} notifications, ${totalFailed} failed`,
+      sent: totalSent,
+      failed: totalFailed,
+      processed,
+      timestamp: now.toISOString(),
+    },
+    { headers: NO_STORE_HEADERS }
+  );
+}
+
+function createErrorResponse(error: unknown): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      error: error instanceof Error ? error.message : 'Processing failed',
+    },
+    { status: 500, headers: NO_STORE_HEADERS }
+  );
+}
+
 /**
  * Cron job to send pending release day notifications.
  *
@@ -40,10 +405,7 @@ export async function GET(request: Request) {
   // Verify cron secret in all environments
   const authHeader = request.headers.get('authorization');
   if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
+    return createUnauthorizedResponse();
   }
 
   const now = new Date();
@@ -51,299 +413,50 @@ export async function GET(request: Request) {
 
   try {
     // Recovery: Reset stuck "sending" rows back to "pending" for retry
-    // This handles cases where the worker crashed after claiming but before completing
-    const recoveredRows = await db
-      .update(fanReleaseNotifications)
-      .set({ status: 'pending', updatedAt: now })
-      .where(
-        and(
-          eq(fanReleaseNotifications.status, 'sending'),
-          lt(fanReleaseNotifications.updatedAt, sendingTimeoutThreshold)
-        )
-      )
-      .returning({ id: fanReleaseNotifications.id });
-
-    if (recoveredRows.length > 0) {
+    const recoveredCount = await recoverStuckNotifications(
+      now,
+      sendingTimeoutThreshold
+    );
+    if (recoveredCount > 0) {
       logger.info(
-        `[send-release-notifications] Recovered ${recoveredRows.length} stuck "sending" rows`
+        `[send-release-notifications] Recovered ${recoveredCount} stuck "sending" rows`
       );
     }
 
     // Find pending notifications that are due
-    // Filter by notification type to ensure we only process release_day notifications
-    const pendingNotifications = await db
-      .select({
-        id: fanReleaseNotifications.id,
-        creatorProfileId: fanReleaseNotifications.creatorProfileId,
-        releaseId: fanReleaseNotifications.releaseId,
-        notificationSubscriptionId:
-          fanReleaseNotifications.notificationSubscriptionId,
-        notificationType: fanReleaseNotifications.notificationType,
-        metadata: fanReleaseNotifications.metadata,
-      })
-      .from(fanReleaseNotifications)
-      .where(
-        and(
-          eq(fanReleaseNotifications.status, 'pending'),
-          eq(fanReleaseNotifications.notificationType, 'release_day'),
-          lte(fanReleaseNotifications.scheduledFor, now)
-        )
-      )
-      .orderBy(
-        fanReleaseNotifications.scheduledFor,
-        fanReleaseNotifications.createdAt
-      )
-      .limit(BATCH_SIZE);
+    const pendingNotifications = await fetchPendingNotifications(now);
 
     if (pendingNotifications.length === 0) {
       logger.info('[send-release-notifications] No pending notifications');
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'No pending notifications to send',
-          sent: 0,
-          failed: 0,
-          timestamp: now.toISOString(),
-        },
-        { headers: NO_STORE_HEADERS }
-      );
+      return createEmptyResponse(now);
     }
 
+    // Process all notifications and count results
     let totalSent = 0;
     let totalFailed = 0;
 
-    // Process each notification
     for (const notification of pendingNotifications) {
-      try {
-        // Atomically claim the notification to prevent duplicate processing
-        // Only update if status is still 'pending' to handle concurrent cron runs
-        const claimed = await db
-          .update(fanReleaseNotifications)
-          .set({ status: 'sending', updatedAt: now })
-          .where(
-            and(
-              eq(fanReleaseNotifications.id, notification.id),
-              eq(fanReleaseNotifications.status, 'pending')
-            )
-          )
-          .returning({ id: fanReleaseNotifications.id });
+      const result = await processNotificationWithErrorHandling({
+        now,
+        notification,
+      });
 
-        // Skip if already processed/claimed by another cron run
-        if (claimed.length === 0) {
-          continue;
-        }
-
-        // Fetch release details including releaseDate to validate timing
-        const [release] = await db
-          .select({
-            id: discogReleases.id,
-            title: discogReleases.title,
-            slug: discogReleases.slug,
-            artworkUrl: discogReleases.artworkUrl,
-            releaseDate: discogReleases.releaseDate,
-          })
-          .from(discogReleases)
-          .where(eq(discogReleases.id, notification.releaseId))
-          .limit(1);
-
-        if (!release) {
-          throw new Error(`Release not found: ${notification.releaseId}`);
-        }
-
-        // Validate release date hasn't changed to a future date
-        // If the release was rescheduled to the future, cancel this notification
-        if (release.releaseDate && release.releaseDate > now) {
-          await db
-            .update(fanReleaseNotifications)
-            .set({
-              status: 'cancelled',
-              error: 'Release date changed to future date',
-              updatedAt: now,
-            })
-            .where(eq(fanReleaseNotifications.id, notification.id));
-          logger.info(
-            `[send-release-notifications] Cancelled notification ${notification.id} - release date changed to ${release.releaseDate.toISOString()}`
-          );
-          continue;
-        }
-
-        // Fetch creator profile
-        const [creator] = await db
-          .select({
-            id: creatorProfiles.id,
-            displayName: creatorProfiles.displayName,
-            username: creatorProfiles.username,
-            usernameNormalized: creatorProfiles.usernameNormalized,
-          })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.id, notification.creatorProfileId))
-          .limit(1);
-
-        if (!creator) {
-          throw new Error(
-            `Creator not found: ${notification.creatorProfileId}`
-          );
-        }
-
-        // Fetch subscriber details
-        // Also verify releaseDay preference is still enabled to honor opt-outs after scheduling
-        const [subscriber] = await db
-          .select({
-            id: notificationSubscriptions.id,
-            channel: notificationSubscriptions.channel,
-            email: notificationSubscriptions.email,
-            phone: notificationSubscriptions.phone,
-          })
-          .from(notificationSubscriptions)
-          .where(
-            and(
-              eq(
-                notificationSubscriptions.id,
-                notification.notificationSubscriptionId
-              ),
-              sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-              sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
-            )
-          )
-          .limit(1);
-
-        if (!subscriber) {
-          // Subscriber unsubscribed or disabled releaseDay preference, cancel notification
-          await db
-            .update(fanReleaseNotifications)
-            .set({ status: 'cancelled', updatedAt: now })
-            .where(eq(fanReleaseNotifications.id, notification.id));
-          continue;
-        }
-
-        // Fetch streaming links for the release
-        const links = await db
-          .select({
-            providerId: providerLinks.providerId,
-            url: providerLinks.url,
-          })
-          .from(providerLinks)
-          .where(
-            and(
-              eq(providerLinks.ownerType, 'release'),
-              eq(providerLinks.releaseId, release.id)
-            )
-          );
-
-        // Build email content
-        const artistName = creator.displayName ?? creator.username;
-        const emailData = getReleaseDayNotificationEmail({
-          artistName,
-          releaseTitle: release.title,
-          artworkUrl: release.artworkUrl,
-          username: creator.usernameNormalized,
-          slug: release.slug,
-          streamingLinks: links.map(link => ({
-            providerId: link.providerId,
-            url: link.url,
-          })),
-        });
-
-        // Send notification based on channel
-        if (subscriber.channel === 'email' && subscriber.email) {
-          const result = await sendNotification(
-            {
-              id: notification.id,
-              subject: emailData.subject,
-              text: emailData.text,
-              html: emailData.html,
-              channels: ['email'],
-              category: 'marketing',
-            },
-            {
-              email: subscriber.email,
-            }
-          );
-
-          const success = result.delivered.length > 0;
-
-          await db
-            .update(fanReleaseNotifications)
-            .set({
-              status: success ? 'sent' : 'failed',
-              sentAt: success ? now : null,
-              error: success
-                ? null
-                : (result.errors[0]?.error ?? 'Unknown error'),
-              updatedAt: now,
-            })
-            .where(eq(fanReleaseNotifications.id, notification.id));
-
-          if (success) {
-            totalSent++;
-          } else {
-            totalFailed++;
-          }
-        } else if (subscriber.channel === 'sms' && subscriber.phone) {
-          // SMS not yet implemented - mark as failed with note
-          await db
-            .update(fanReleaseNotifications)
-            .set({
-              status: 'failed',
-              error: 'SMS channel not yet implemented',
-              updatedAt: now,
-            })
-            .where(eq(fanReleaseNotifications.id, notification.id));
-          totalFailed++;
-        } else {
-          // No valid contact info
-          await db
-            .update(fanReleaseNotifications)
-            .set({
-              status: 'failed',
-              error: 'No valid contact information',
-              updatedAt: now,
-            })
-            .where(eq(fanReleaseNotifications.id, notification.id));
-          totalFailed++;
-        }
-      } catch (error) {
-        // Mark notification as failed
-        await db
-          .update(fanReleaseNotifications)
-          .set({
-            status: 'failed',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            updatedAt: now,
-          })
-          .where(eq(fanReleaseNotifications.id, notification.id));
-
-        logger.error(
-          '[send-release-notifications] Failed to send notification:',
-          error
-        );
-        totalFailed++;
-      }
+      if (result === 'sent') totalSent++;
+      if (result === 'failed') totalFailed++;
     }
 
     logger.info(
       `[send-release-notifications] Sent ${totalSent} notifications, ${totalFailed} failed`
     );
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: `Sent ${totalSent} notifications, ${totalFailed} failed`,
-        sent: totalSent,
-        failed: totalFailed,
-        processed: pendingNotifications.length,
-        timestamp: now.toISOString(),
-      },
-      { headers: NO_STORE_HEADERS }
+    return createSuccessResponse(
+      totalSent,
+      totalFailed,
+      pendingNotifications.length,
+      now
     );
   } catch (error) {
     logger.error('[send-release-notifications] Processing failed:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Processing failed',
-      },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+    return createErrorResponse(error);
   }
 }
