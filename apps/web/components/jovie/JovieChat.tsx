@@ -217,11 +217,11 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                 ref={inputRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder='What do you want to know about your career?'
+                placeholder='What do you wanna ask Jovie?'
                 className={cn(
                   'w-full resize-none rounded-xl border bg-surface-1 px-4 py-4 pr-14',
                   'text-primary-token placeholder:text-tertiary-token',
-                  'focus:outline-none focus:ring-2 focus:ring-offset-2',
+                  'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
                   'transition-colors duration-fast',
                   'min-h-[120px]',
                   isOverLimit
@@ -372,7 +372,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                   className={cn(
                     'w-full resize-none rounded-xl border bg-surface-1 px-4 py-3 pr-14',
                     'text-primary-token placeholder:text-tertiary-token',
-                    'focus:outline-none focus:ring-2 focus:ring-offset-2',
+                    'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
                     'transition-colors duration-fast',
                     'max-h-32',
                     isOverLimit
