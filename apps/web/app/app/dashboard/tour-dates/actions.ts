@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq, gte } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
@@ -119,59 +119,60 @@ function validateTicketUrl(ticketUrl: string | undefined | null): void {
 }
 
 /**
- * Upsert Bandsintown events into the database
+ * Upsert Bandsintown events into the database (batch insert for performance)
  */
 async function upsertBandsintownEvents(
   profileId: string,
   events: Awaited<ReturnType<typeof fetchBandsintownEvents>>
 ): Promise<number> {
+  if (events.length === 0) return 0;
+
   const now = new Date();
-  let synced = 0;
 
-  for (const event of events) {
-    await db
-      .insert(tourDates)
-      .values({
-        profileId,
-        externalId: event.externalId,
-        provider: 'bandsintown',
-        title: event.title,
-        startDate: event.startDate,
-        startTime: event.startTime,
-        venueName: event.venueName,
-        city: event.city,
-        region: event.region,
-        country: event.country,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        ticketUrl: event.ticketUrl,
-        ticketStatus: event.ticketStatus,
-        lastSyncedAt: now,
-        rawData: event.rawData,
-      })
-      .onConflictDoUpdate({
-        target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
-        set: {
-          title: event.title,
-          startDate: event.startDate,
-          startTime: event.startTime,
-          venueName: event.venueName,
-          city: event.city,
-          region: event.region,
-          country: event.country,
-          latitude: event.latitude,
-          longitude: event.longitude,
-          ticketUrl: event.ticketUrl,
-          ticketStatus: event.ticketStatus,
-          lastSyncedAt: now,
-          rawData: event.rawData,
-          updatedAt: now,
-        },
-      });
-    synced++;
-  }
+  // Batch all events into a single insert with conflict handling
+  const insertValues = events.map(event => ({
+    profileId,
+    externalId: event.externalId,
+    provider: 'bandsintown' as const,
+    title: event.title,
+    startDate: event.startDate,
+    startTime: event.startTime,
+    venueName: event.venueName,
+    city: event.city,
+    region: event.region,
+    country: event.country,
+    latitude: event.latitude,
+    longitude: event.longitude,
+    ticketUrl: event.ticketUrl,
+    ticketStatus: event.ticketStatus,
+    lastSyncedAt: now,
+    rawData: event.rawData,
+  }));
 
-  return synced;
+  await db
+    .insert(tourDates)
+    .values(insertValues)
+    .onConflictDoUpdate({
+      target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
+      set: {
+        title: sql`excluded.title`,
+        startDate: sql`excluded.start_date`,
+        startTime: sql`excluded.start_time`,
+        venueName: sql`excluded.venue_name`,
+        city: sql`excluded.city`,
+        region: sql`excluded.region`,
+        country: sql`excluded.country`,
+        latitude: sql`excluded.latitude`,
+        longitude: sql`excluded.longitude`,
+        ticketUrl: sql`excluded.ticket_url`,
+        ticketStatus: sql`excluded.ticket_status`,
+        lastSyncedAt: sql`excluded.last_synced_at`,
+        rawData: sql`excluded.raw_data`,
+        updatedAt: now,
+      },
+    });
+
+  return events.length;
 }
 
 // ============================================================================

@@ -5,7 +5,7 @@ import {
   useSession as useSessionOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
-import { createContext, type ReactNode, useContext } from 'react';
+import { createContext, type ReactNode, useContext, useMemo } from 'react';
 
 // Derive types from the actual hook return types
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
@@ -114,8 +114,10 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
 
+  const value = useMemo(() => ({ user, auth, session }), [user, auth, session]);
+
   return (
-    <ClerkSafeContext.Provider value={{ user, auth, session }}>
+    <ClerkSafeContext.Provider value={value}>
       {children}
     </ClerkSafeContext.Provider>
   );

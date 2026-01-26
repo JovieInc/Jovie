@@ -225,34 +225,29 @@ export async function getUserAnalytics(
   clerkUserId: string,
   range: TimeRange = '30d'
 ) {
-  // Map Clerk user ID to internal users.id (UUID)
-  const found = await db
-    .select({ id: users.id })
+  // Single JOIN query to get user and profile in one round-trip
+  const result = await db
+    .select({
+      creatorProfileId: creatorProfiles.id,
+      profileViews: creatorProfiles.profileViews,
+    })
     .from(users)
+    .innerJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
-  const appUserId = found?.[0]?.id;
-  if (!appUserId) {
-    throw new Error('User not found for Clerk ID');
+  const row = result[0];
+  if (!row) {
+    throw new Error('User or creator profile not found for Clerk ID');
   }
 
-  // First get the creator profile for this internal user id
-  const creatorProfile = await db.query.creatorProfiles.findFirst({
-    where: (profiles, { eq }) => eq(profiles.userId, appUserId),
-  });
-
-  if (!creatorProfile) {
-    throw new Error('Creator profile not found');
-  }
-
-  const analytics = await getAnalyticsData(creatorProfile.id, range);
+  const analytics = await getAnalyticsData(row.creatorProfileId, range);
 
   return {
     ...analytics,
     // Profile page visits increment creator_profiles.profile_views.
     // The click_events table tracks link clicks; it is not a reliable proxy for views.
-    profileViewsInRange: creatorProfile.profileViews ?? 0,
+    profileViewsInRange: row.profileViews ?? 0,
   };
 }
 
