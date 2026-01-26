@@ -58,7 +58,7 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
+            className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2 hover:text-primary-token'
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
             Display
@@ -134,7 +134,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           size='sm'
           disabled
           aria-label='Filter releases (coming soon)'
-          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token disabled:opacity-50 disabled:cursor-not-allowed'
+          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2 hover:text-primary-token disabled:opacity-50 disabled:cursor-not-allowed'
         >
           <Icon name='Filter' className='h-3.5 w-3.5' />
           Filter
