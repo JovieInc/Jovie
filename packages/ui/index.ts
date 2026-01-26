@@ -146,6 +146,14 @@ export {
 } from './atoms/popover';
 // Radio Group
 export { RadioGroup, RadioGroupItem } from './atoms/radio-group';
+// Searchable Submenu
+export type {
+  SearchableListProps,
+  SearchableSubmenuItem,
+  SearchableSubmenuProps,
+  SearchableSubmenuSection,
+} from './atoms/searchable-submenu';
+export { SearchableList, SearchableSubmenu } from './atoms/searchable-submenu';
 // Select
 export {
   Select,

@@ -273,7 +273,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
-                  onFocusedRowChange={openEditor}
                 />
               </QueryErrorBoundary>
             )}
