@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { ContactMode } from '@/components/dashboard/organisms/contact-mode';
 import { getCachedAuth } from '@/lib/auth/cached';
+import type { DashboardContact } from '@/types/contacts';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardDataCached } from '../dashboard/actions';
 import { getProfileContactsForOwner } from '../dashboard/contacts/actions';
@@ -28,7 +29,18 @@ export default async function ContactPage() {
   }
 
   const artist = convertDrizzleCreatorProfileToArtist(profile);
-  const contacts = await getProfileContactsForOwner(profileId);
+
+  let contacts: DashboardContact[];
+  try {
+    contacts = await getProfileContactsForOwner(profileId);
+  } catch (error) {
+    console.error('Failed to fetch contacts:', {
+      error,
+      profileId,
+      userId,
+    });
+    contacts = [];
+  }
 
   return (
     <div className='h-full'>

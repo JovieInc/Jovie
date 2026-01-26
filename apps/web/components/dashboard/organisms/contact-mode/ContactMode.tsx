@@ -9,6 +9,7 @@ import {
   ContextMenuTrigger,
 } from '@jovie/ui';
 import { Mail, Phone } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import {
@@ -137,6 +138,7 @@ function ContactListItem({
 }
 
 export function ContactMode({ artistName, contacts }: ContactModeProps) {
+  const router = useRouter();
   const gate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
   const featureEnabled = gate.value;
 
@@ -175,7 +177,7 @@ export function ContactMode({ artistName, contacts }: ContactModeProps) {
         <Button
           size='sm'
           variant='secondary'
-          onClick={() => (window.location.href = '/app/dashboard/contacts')}
+          onClick={() => router.push('/app/dashboard/contacts')}
         >
           Add contacts
         </Button>
@@ -207,7 +209,7 @@ export function ContactMode({ artistName, contacts }: ContactModeProps) {
         <Button
           size='sm'
           variant='ghost'
-          onClick={() => (window.location.href = '/app/dashboard/contacts')}
+          onClick={() => router.push('/app/dashboard/contacts')}
           className='w-full text-xs text-secondary-token'
         >
           Manage contacts
