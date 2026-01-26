@@ -24,8 +24,8 @@ export type PixelEventType = z.infer<typeof pixelEventTypeSchema>;
 export const pixelEventDataSchema = z
   .object({
     // Link click data
-    linkId: z.string().optional(),
-    linkUrl: z.string().optional(),
+    linkId: z.string().max(200).optional(),
+    linkUrl: z.string().max(2000).optional(),
     linkTitle: z.string().max(500).optional(),
 
     // Form submit data

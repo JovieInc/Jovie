@@ -14,6 +14,7 @@ import type {
 
 const TIKTOK_API_URL =
   'https://business-api.tiktok.com/open_api/v1.3/event/track/';
+const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 /**
  * Map our event types to TikTok standard events
@@ -42,6 +43,15 @@ export async function forwardToTikTok(
 ): Promise<ForwardingResult> {
   const { pixelId, accessToken } = config;
 
+  // Fail fast if credentials are missing
+  if (!pixelId || !accessToken) {
+    return {
+      platform: 'tiktok',
+      success: false,
+      error: 'Missing pixelId or accessToken',
+    };
+  }
+
   try {
     const payload = {
       pixel_code: pixelId,
@@ -66,14 +76,24 @@ export async function forwardToTikTok(
       },
     };
 
-    const response = await fetch(TIKTOK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Token': accessToken,
-      },
-      body: JSON.stringify(payload),
-    });
+    // Create abort controller with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(TIKTOK_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Token': accessToken,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();

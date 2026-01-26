@@ -78,11 +78,26 @@ export async function forwardEvent(
   const results: ForwardingResult[] = [];
   const normalizedEvent = normalizeEvent(event);
 
-  // Only forward if consent was given
+  // Only forward if consent was given - mark as skipped to prevent retries
   if (!event.consentGiven) {
     logger.info('[Pixel Forwarding] Skipping event without consent', {
       eventId: event.id,
     });
+
+    // Mark event as skipped so cron doesn't keep retrying
+    const skippedStatus: PixelForwardingStatus = {
+      skipped: {
+        status: 'skipped',
+        sentAt: new Date().toISOString(),
+        error: 'consent_not_given',
+      },
+    };
+
+    await db
+      .update(pixelEvents)
+      .set({ forwardingStatus: skippedStatus })
+      .where(eq(pixelEvents.id, event.id));
+
     return results;
   }
 
@@ -94,17 +109,17 @@ export async function forwardEvent(
       normalizedEvent,
       jovieConfigs.facebook
     );
-    results.push({ ...result, platform: 'jovie' });
+    results.push({ ...result, platform: 'jovie_facebook' });
   }
 
   if (jovieConfigs.google) {
     const result = await forwardToGoogle(normalizedEvent, jovieConfigs.google);
-    results.push({ ...result, platform: 'jovie' });
+    results.push({ ...result, platform: 'jovie_google' });
   }
 
   if (jovieConfigs.tiktok) {
     const result = await forwardToTikTok(normalizedEvent, jovieConfigs.tiktok);
-    results.push({ ...result, platform: 'jovie' });
+    results.push({ ...result, platform: 'jovie_tiktok' });
   }
 
   // 2. Forward to creator's pixels (if configured)
@@ -115,12 +130,18 @@ export async function forwardEvent(
     .limit(1);
 
   if (creatorConfig && creatorConfig.enabled) {
-    // Decrypt access tokens
+    // Decrypt access tokens (guard against null values)
     const decryptedConfig = {
       ...creatorConfig,
-      facebookAccessToken: decryptPII(creatorConfig.facebookAccessToken),
-      googleApiSecret: decryptPII(creatorConfig.googleApiSecret),
-      tiktokAccessToken: decryptPII(creatorConfig.tiktokAccessToken),
+      facebookAccessToken: creatorConfig.facebookAccessToken
+        ? decryptPII(creatorConfig.facebookAccessToken)
+        : null,
+      googleApiSecret: creatorConfig.googleApiSecret
+        ? decryptPII(creatorConfig.googleApiSecret)
+        : null,
+      tiktokAccessToken: creatorConfig.tiktokAccessToken
+        ? decryptPII(creatorConfig.tiktokAccessToken)
+        : null,
     };
 
     const platformConfigs = extractPlatformConfigs(
@@ -158,12 +179,21 @@ export async function forwardEvent(
     { status: string; sentAt: string; error?: string }
   > = {};
 
-  for (const result of results) {
-    forwardingStatus[result.platform] = {
-      status: result.success ? 'sent' : 'failed',
+  // If no platforms configured, mark as skipped to prevent endless retries
+  if (results.length === 0) {
+    forwardingStatus['skipped'] = {
+      status: 'skipped',
       sentAt: new Date().toISOString(),
-      ...(result.error && { error: result.error }),
+      error: 'no_platforms_configured',
     };
+  } else {
+    for (const result of results) {
+      forwardingStatus[result.platform] = {
+        status: result.success ? 'sent' : 'failed',
+        sentAt: new Date().toISOString(),
+        ...(result.error && { error: result.error }),
+      };
+    }
   }
 
   await db
@@ -213,7 +243,9 @@ export async function processPendingEvents(limit = 100): Promise<{
             sql`${pixelEvents.forwardingStatus}::jsonb @> '{"facebook":{"status":"failed"}}'::jsonb`,
             sql`${pixelEvents.forwardingStatus}::jsonb @> '{"google":{"status":"failed"}}'::jsonb`,
             sql`${pixelEvents.forwardingStatus}::jsonb @> '{"tiktok":{"status":"failed"}}'::jsonb`,
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie":{"status":"failed"}}'::jsonb`
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_facebook":{"status":"failed"}}'::jsonb`,
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_google":{"status":"failed"}}'::jsonb`,
+            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_tiktok":{"status":"failed"}}'::jsonb`
           )
         )
       )

@@ -14,6 +14,7 @@ import type {
 
 const FACEBOOK_API_VERSION = 'v18.0';
 const FACEBOOK_API_URL = 'https://graph.facebook.com';
+const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 /**
  * Map our event types to Facebook standard events
@@ -70,13 +71,23 @@ export async function forwardToFacebook(
       ],
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    // Create abort controller with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();

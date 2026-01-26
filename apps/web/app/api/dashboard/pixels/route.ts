@@ -52,7 +52,7 @@ export async function GET() {
         );
       }
 
-      // Get pixel settings
+      // Get pixel settings (including token presence check, but not token values)
       const [pixelConfig] = await tx
         .select({
           facebookPixelId: creatorPixels.facebookPixelId,
@@ -62,15 +62,34 @@ export async function GET() {
           facebookEnabled: creatorPixels.facebookEnabled,
           googleEnabled: creatorPixels.googleEnabled,
           tiktokEnabled: creatorPixels.tiktokEnabled,
-          // Note: Access tokens are NOT returned for security
+          // Token presence check (for hasTokens response)
+          facebookAccessToken: creatorPixels.facebookAccessToken,
+          googleApiSecret: creatorPixels.googleApiSecret,
+          tiktokAccessToken: creatorPixels.tiktokAccessToken,
         })
         .from(creatorPixels)
         .where(eq(creatorPixels.profileId, userProfile.profileId))
         .limit(1);
 
-      return NextResponse.json(
-        {
-          pixels: pixelConfig || {
+      // Extract token presence (don't return actual token values)
+      const hasTokens = {
+        facebook: !!pixelConfig?.facebookAccessToken,
+        google: !!pixelConfig?.googleApiSecret,
+        tiktok: !!pixelConfig?.tiktokAccessToken,
+      };
+
+      // Build response without exposing token values
+      const pixelsResponse = pixelConfig
+        ? {
+            facebookPixelId: pixelConfig.facebookPixelId,
+            googleMeasurementId: pixelConfig.googleMeasurementId,
+            tiktokPixelId: pixelConfig.tiktokPixelId,
+            enabled: pixelConfig.enabled,
+            facebookEnabled: pixelConfig.facebookEnabled,
+            googleEnabled: pixelConfig.googleEnabled,
+            tiktokEnabled: pixelConfig.tiktokEnabled,
+          }
+        : {
             facebookPixelId: null,
             googleMeasurementId: null,
             tiktokPixelId: null,
@@ -78,13 +97,13 @@ export async function GET() {
             facebookEnabled: true,
             googleEnabled: true,
             tiktokEnabled: true,
-          },
+          };
+
+      return NextResponse.json(
+        {
+          pixels: pixelsResponse,
           // Indicate whether tokens are configured (without revealing them)
-          hasTokens: {
-            facebook: !!pixelConfig?.facebookPixelId,
-            google: !!pixelConfig?.googleMeasurementId,
-            tiktok: !!pixelConfig?.tiktokPixelId,
-          },
+          hasTokens,
         },
         { headers: NO_STORE_HEADERS }
       );

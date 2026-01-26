@@ -34,10 +34,13 @@ const updatePixelSettings = createMutationFn<
  * const { mutate: savePixels, isPending } = usePixelSettingsMutation();
  *
  * savePixels({
- *   facebookPixel: '123',
- *   googleAdsConversion: 'AW-123',
- *   tiktokPixel: 'ABC123',
- *   customPixel: '',
+ *   facebookPixelId: '123456789012345',
+ *   facebookAccessToken: 'EAAxxxxxxx...',
+ *   googleMeasurementId: 'G-XXXXXXXXXX',
+ *   googleApiSecret: 'xxxxxxxxxx',
+ *   tiktokPixelId: 'CXXXXXXXXXX',
+ *   tiktokAccessToken: 'xxxxxxxxxx',
+ *   enabled: true,
  * });
  */
 export function usePixelSettingsMutation() {

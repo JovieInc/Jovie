@@ -14,29 +14,29 @@ import { pixelEventTypeEnum } from './enums';
 import { creatorProfiles } from './profiles';
 
 /**
- * Forwarding status for each platform
+ * Forwarding status entry for a single platform
+ */
+interface PlatformForwardingStatus {
+  status: 'pending' | 'sent' | 'failed' | 'skipped';
+  sentAt?: string;
+  error?: string;
+}
+
+/**
+ * Forwarding status for each platform.
+ * Uses string index signature to support both creator pixels (facebook, google, tiktok)
+ * and Jovie's own pixels (jovie_facebook, jovie_google, jovie_tiktok).
  */
 export interface PixelForwardingStatus {
-  facebook?: {
-    status: 'pending' | 'sent' | 'failed';
-    sentAt?: string;
-    error?: string;
-  };
-  google?: {
-    status: 'pending' | 'sent' | 'failed';
-    sentAt?: string;
-    error?: string;
-  };
-  tiktok?: {
-    status: 'pending' | 'sent' | 'failed';
-    sentAt?: string;
-    error?: string;
-  };
-  jovie?: {
-    status: 'pending' | 'sent' | 'failed';
-    sentAt?: string;
-    error?: string;
-  };
+  facebook?: PlatformForwardingStatus;
+  google?: PlatformForwardingStatus;
+  tiktok?: PlatformForwardingStatus;
+  // Jovie's own marketing pixels (distinct keys to prevent overwriting)
+  jovie_facebook?: PlatformForwardingStatus;
+  jovie_google?: PlatformForwardingStatus;
+  jovie_tiktok?: PlatformForwardingStatus;
+  // Allow additional dynamic keys for extensibility
+  [key: string]: PlatformForwardingStatus | undefined;
 }
 
 /**

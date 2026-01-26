@@ -56,7 +56,7 @@ function PlatformSection({
           className='text-xs text-interactive hover:text-interactive/80 flex items-center gap-1'
         >
           {helpText}
-          <ExternalLink className='h-3 w-3' />
+          <ExternalLink className='h-4 w-4' />
         </a>
       </div>
 
@@ -246,7 +246,7 @@ export function SettingsAdPixelsSection() {
               server-side to your ad platforms.
             </li>
             <li>
-              No JavaScript loaded on your profile - faster page loads for
+              No third-party JavaScript on your profile - faster page loads for
               visitors.
             </li>
             <li>
