@@ -20,9 +20,7 @@ export const TOGGLEABLE_COLUMNS = [
   { id: 'releaseType', label: 'Type' },
   { id: 'availability', label: 'Availability' },
   { id: 'smartLink', label: 'Smart Link' },
-  { id: 'releaseDate', label: 'Released' },
-  { id: 'metrics', label: 'Metrics' },
-  { id: 'popularity', label: 'Popularity' },
+  { id: 'stats', label: 'Stats' },
   { id: 'upc', label: 'UPC' },
   { id: 'primaryIsrc', label: 'ISRC' },
 ] as const;
@@ -33,11 +31,9 @@ const ALWAYS_VISIBLE_COLUMNS = ['select', 'release', 'actions'];
 /** Default column visibility for desktop - cleaner view with essential columns */
 const DEFAULT_DESKTOP_VISIBILITY: ColumnVisibility = {
   releaseType: false, // Moved into release cell
-  availability: true, // Keep - actionable
+  availability: false, // Hidden for now - accessible via context menu
   smartLink: false, // Hide - accessible via context menu
-  releaseDate: true, // Keep - essential
-  metrics: true, // Combined: tracks, duration, label
-  popularity: false, // Hide - less essential
+  stats: true, // Combined: year, popularity icon, duration
   upc: false, // Hide - accessible via context menu
   primaryIsrc: false, // Hide - accessible via context menu
 };
@@ -45,11 +41,9 @@ const DEFAULT_DESKTOP_VISIBILITY: ColumnVisibility = {
 /** Default column visibility for tablet (768-1024px) */
 const DEFAULT_TABLET_VISIBILITY: ColumnVisibility = {
   releaseType: false,
-  availability: true,
+  availability: false,
   smartLink: false,
-  releaseDate: true,
-  metrics: true,
-  popularity: false,
+  stats: true,
   upc: false,
   primaryIsrc: false,
 };
@@ -59,9 +53,7 @@ const DEFAULT_MOBILE_VISIBILITY: ColumnVisibility = {
   releaseType: false,
   availability: false,
   smartLink: false,
-  releaseDate: true,
-  metrics: false,
-  popularity: false,
+  stats: true,
   upc: false,
   primaryIsrc: false,
 };

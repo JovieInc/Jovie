@@ -19,8 +19,6 @@ import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
 import {
-  createActionsCellRenderer,
-  createActionsHeaderRenderer,
   createAvailabilityCellRenderer,
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
@@ -36,6 +34,7 @@ import {
   renderPopularityCell,
   renderReleaseDateCell,
   renderReleaseTypeCell,
+  renderStatsCell,
   renderTotalTracksCell,
   renderUpcCell,
 } from './utils/column-renderers';
@@ -154,6 +153,13 @@ const STATIC_COLUMNS = {
     header: () => <span className='sr-only'>Metrics</span>,
     cell: renderMetricsCell,
     size: 180,
+  }),
+  // Combined stats column: year + popularity icon + duration
+  stats: columnHelper.display({
+    id: 'stats',
+    header: () => <span className='sr-only'>Stats</span>,
+    cell: renderStatsCell,
+    size: 100, // Compact: ~40px year + 16px icon + 44px duration
   }),
 };
 
@@ -431,27 +437,18 @@ export function ReleaseTable({
       size: 160,
     });
 
-    const actionsColumn = columnHelper.display({
-      id: 'actions',
-      header: createActionsHeaderRenderer(selectedCountRef, onClearSelection),
-      cell: createActionsCellRenderer(getContextMenuItems),
-      size: 56,
-    });
-
     // Return all columns - TanStack Table handles visibility natively
-    // Uses combined metrics column for cleaner layout with sr-only header
+    // Uses combined stats column for cleaner layout: year + popularity icon + duration
+    // Actions are now handled via context menu (right-click) only
     return [
       checkboxColumn,
       releaseColumn,
       STATIC_COLUMNS.releaseType,
       availabilityColumn,
       smartLinkColumn,
-      STATIC_COLUMNS.releaseDate,
-      STATIC_COLUMNS.metrics, // Combined: tracks, duration, label
-      STATIC_COLUMNS.popularity,
+      STATIC_COLUMNS.stats, // Combined: year, popularity icon, duration
       STATIC_COLUMNS.isrc,
       STATIC_COLUMNS.upc,
-      actionsColumn,
     ];
   }, [
     providerConfig,
@@ -460,7 +457,6 @@ export function ReleaseTable({
     onAddUrl,
     isAddingUrl,
     onClearSelection,
-    getContextMenuItems,
     headerCheckboxStateRef,
     selectedIdsRef,
     toggleSelect,
@@ -471,14 +467,13 @@ export function ReleaseTable({
     toggleExpansion,
   ]);
 
-  // Transform columnVisibility to TanStack format (always show select, release, actions)
+  // Transform columnVisibility to TanStack format (always show select and release)
   const tanstackColumnVisibility = useMemo(() => {
     if (!columnVisibility) return undefined;
     return {
       ...columnVisibility,
       select: true,
       release: true,
-      actions: true,
     };
   }, [columnVisibility]);
 

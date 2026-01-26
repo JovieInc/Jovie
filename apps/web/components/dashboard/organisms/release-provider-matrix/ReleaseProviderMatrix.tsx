@@ -22,6 +22,7 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
+import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
@@ -84,20 +85,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
-  // Check if release has all provider URLs configured
-  const hasAllProviderUrls = useCallback(
-    (release: ReleaseViewModel, providerKeys: string[]): boolean => {
-      return providerKeys.every(key =>
-        release.providers.some(p => p.key === key && p.url)
-      );
-    },
-    []
-  );
-
   // Apply filters to rows
   const filteredRows = useMemo(() => {
-    const providerKeys = Object.keys(providerConfig);
-
     return rows.filter(release => {
       // Filter by release type
       const matchesType =
@@ -106,13 +95,21 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
       if (!matchesType) return false;
 
-      // Filter by availability
-      if (filters.availability === 'all') return true;
+      // Filter by popularity level
+      if (filters.popularity.length > 0) {
+        const level = getPopularityLevel(release.spotifyPopularity);
+        if (!level || !filters.popularity.includes(level)) return false;
+      }
 
-      const hasAll = hasAllProviderUrls(release, providerKeys);
-      return filters.availability === 'complete' ? hasAll : !hasAll;
+      // Filter by label
+      if (filters.labels.length > 0) {
+        if (!release.label || !filters.labels.includes(release.label))
+          return false;
+      }
+
+      return true;
     });
-  }, [rows, filters, providerConfig, hasAllProviderUrls]);
+  }, [rows, filters]);
 
   // Row selection - use filtered rows
   const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);

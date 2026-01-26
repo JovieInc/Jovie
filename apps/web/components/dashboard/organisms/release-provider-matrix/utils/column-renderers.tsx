@@ -10,6 +10,7 @@ import { ExpandButton } from '@/components/dashboard/organisms/release-provider-
 import {
   AvailabilityCell,
   PopularityCell,
+  PopularityIcon,
   ReleaseCell,
   SmartLinkCell,
 } from '@/components/dashboard/organisms/releases/cells';
@@ -291,7 +292,7 @@ export function renderReleaseTypeCell({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style.border} ${style.text}`}
     >
       {style.label}
     </span>
@@ -418,6 +419,46 @@ export function renderMetricsCell({
           {release.label}
         </TruncatedText>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Stats Cell (Compact: Year + Popularity Icon + Duration)
+// ============================================================================
+
+/**
+ * Combined stats cell that displays year, popularity icon, and duration in a
+ * compact fixed-width layout. Replaces separate releaseDate, popularity, and
+ * metrics columns.
+ */
+export function renderStatsCell({
+  row,
+}: CellContext<ReleaseViewModel, unknown>) {
+  const release = row.original;
+
+  // Extract year from release date
+  const year = release.releaseDate
+    ? new Date(release.releaseDate).getFullYear()
+    : null;
+
+  // Format duration
+  const duration = release.totalDurationMs
+    ? formatDuration(release.totalDurationMs)
+    : null;
+
+  return (
+    <div className='flex items-center gap-2 text-xs text-secondary-token tabular-nums'>
+      {/* Year - fixed width, right aligned */}
+      <span className='w-10 text-right'>{year ?? '—'}</span>
+
+      {/* Popularity icon - compact bars */}
+      <div className='w-4 flex justify-center'>
+        <PopularityIcon popularity={release.spotifyPopularity} />
+      </div>
+
+      {/* Duration - fixed width, right aligned */}
+      <span className='w-12 text-right'>{duration ?? '—'}</span>
     </div>
   );
 }

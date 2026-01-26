@@ -19,16 +19,21 @@ import {
   RELEASES_CSV_COLUMNS,
 } from './utils/exportReleases';
 
+/** Popularity level for filtering */
+export type PopularityLevel = 'low' | 'med' | 'high';
+
 /** Filter state for releases table */
 export interface ReleaseFilters {
   releaseTypes: ReleaseType[];
-  availability: 'all' | 'complete' | 'incomplete';
+  popularity: PopularityLevel[];
+  labels: string[];
 }
 
 /** Default filter state */
 export const DEFAULT_RELEASE_FILTERS: ReleaseFilters = {
   releaseTypes: [],
-  availability: 'all',
+  popularity: [],
+  labels: [],
 };
 
 interface ReleaseTableSubheaderProps {
@@ -157,6 +162,7 @@ function LinearStyleDisplayMenu({
           </div>
         )}
 
+        {/* Column visibility toggles - temporarily disabled for refinement
         <div className='p-2.5'>
           <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
             Display properties
@@ -184,6 +190,8 @@ function LinearStyleDisplayMenu({
             })}
           </div>
         </div>
+        */}
+        {/* Reset to defaults - temporarily disabled with column visibility toggles
         {onResetToDefaults && (
           <div className='border-t border-subtle px-2.5 py-2'>
             <button
@@ -195,6 +203,7 @@ function LinearStyleDisplayMenu({
             </button>
           </div>
         )}
+        */}
       </PopoverContent>
     </Popover>
   );

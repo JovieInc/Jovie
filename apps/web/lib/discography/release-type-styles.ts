@@ -5,8 +5,8 @@
  */
 
 export interface ReleaseTypeStyle {
-  /** Background color classes */
-  bg: string;
+  /** Border color classes */
+  border: string;
   /** Text color classes */
   text: string;
   /** Display label */
@@ -15,42 +15,42 @@ export interface ReleaseTypeStyle {
 
 /**
  * Styling configuration for each release type.
- * Used for badges, pills, and other visual indicators.
+ * Uses bordered badge style for subtle visual distinction.
  */
 export const RELEASE_TYPE_STYLES: Record<string, ReleaseTypeStyle> = {
   single: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-300 dark:border-blue-700',
+    text: 'text-blue-600 dark:text-blue-400',
     label: 'Single',
   },
   ep: {
-    bg: 'bg-purple-100 dark:bg-purple-900/30',
-    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-300 dark:border-purple-700',
+    text: 'text-purple-600 dark:text-purple-400',
     label: 'EP',
   },
   album: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-700 dark:text-green-300',
+    border: 'border-green-300 dark:border-green-700',
+    text: 'text-green-600 dark:text-green-400',
     label: 'Album',
   },
   compilation: {
-    bg: 'bg-amber-100 dark:bg-amber-900/30',
-    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-300 dark:border-amber-700',
+    text: 'text-amber-600 dark:text-amber-400',
     label: 'Compilation',
   },
   live: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-700 dark:text-red-300',
+    border: 'border-red-300 dark:border-red-700',
+    text: 'text-red-600 dark:text-red-400',
     label: 'Live',
   },
   mixtape: {
-    bg: 'bg-pink-100 dark:bg-pink-900/30',
-    text: 'text-pink-700 dark:text-pink-300',
+    border: 'border-pink-300 dark:border-pink-700',
+    text: 'text-pink-600 dark:text-pink-400',
     label: 'Mixtape',
   },
   other: {
-    bg: 'bg-gray-100 dark:bg-gray-800',
-    text: 'text-gray-700 dark:text-gray-300',
+    border: 'border-gray-300 dark:border-gray-600',
+    text: 'text-gray-600 dark:text-gray-400',
     label: 'Other',
   },
 };
