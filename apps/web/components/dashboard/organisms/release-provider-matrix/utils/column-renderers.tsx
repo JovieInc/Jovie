@@ -1,5 +1,7 @@
 import { Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
+import type { RefObject } from 'react';
+import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -16,9 +18,15 @@ import {
   HeaderBulkActions,
   TableCheckboxCell,
 } from '@/components/organisms/table';
+import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { formatDuration } from '@/lib/utils/formatDuration';
 
-// Date format options (extracted to prevent inline object creation)
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Date format options for release date display */
 export const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
 export const DATE_TOOLTIP_FORMAT_OPTIONS = {
   year: 'numeric',
@@ -26,11 +34,23 @@ export const DATE_TOOLTIP_FORMAT_OPTIONS = {
   day: 'numeric',
 } as const;
 
+// Provider config type for availability cell
+interface ProviderConfig {
+  label: string;
+  accent: string;
+}
+
+// ============================================================================
+// Selection Column Renderers
+// ============================================================================
+
 /**
- * Creates a header renderer for the checkbox column
+ * Creates a header renderer for the checkbox column.
+ * Uses a ref for headerCheckboxState to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectHeaderRenderer(
-  headerCheckboxState: boolean | 'indeterminate',
+  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>,
   onToggleSelectAll: () => void
 ) {
   return function SelectHeader({
@@ -39,7 +59,7 @@ export function createSelectHeaderRenderer(
     return (
       <TableCheckboxCell
         table={table as Table<ReleaseViewModel>}
-        headerCheckboxState={headerCheckboxState}
+        headerCheckboxState={headerCheckboxStateRef.current ?? false}
         onToggleSelectAll={onToggleSelectAll}
       />
     );
@@ -47,15 +67,17 @@ export function createSelectHeaderRenderer(
 }
 
 /**
- * Creates a cell renderer for the checkbox column
+ * Creates a cell renderer for the checkbox column.
+ * Uses a ref for selectedIds to read current value at render time,
+ * preventing column recreation on every selection change.
  */
 export function createSelectCellRenderer(
-  selectedIds: Set<string>,
+  selectedIdsRef: RefObject<Set<string>>,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
-    const isChecked = selectedIds.has(release.id);
+    const isChecked = selectedIdsRef.current?.has(release.id) ?? false;
     const rowNumber = row.index + 1;
 
     return (
@@ -69,15 +91,22 @@ export function createSelectCellRenderer(
   };
 }
 
+// ============================================================================
+// Header Renderers
+// ============================================================================
+
 /**
- * Creates a header renderer for the release column with bulk actions
+ * Creates a header renderer for the release column with bulk actions.
+ * Uses refs for selectedCount and bulkActions to read current values at render time.
  */
 export function createReleaseHeaderRenderer(
-  selectedCount: number,
-  bulkActions: HeaderBulkAction[],
+  selectedCountRef: RefObject<number>,
+  bulkActionsRef: RefObject<HeaderBulkAction[]>,
   onClearSelection: (() => void) | undefined
 ) {
   return function ReleaseHeader() {
+    const selectedCount = selectedCountRef.current ?? 0;
+    const bulkActions = bulkActionsRef.current ?? [];
     return (
       <div className='flex items-center gap-2'>
         {selectedCount === 0 && <span>Release</span>}
@@ -92,37 +121,20 @@ export function createReleaseHeaderRenderer(
 }
 
 /**
- * Renders the release date cell
- */
-export function renderReleaseDateCell({
-  getValue,
-}: CellContext<ReleaseViewModel, string | null>) {
-  const date = getValue();
-  return date ? (
-    <DateCell
-      date={new Date(date)}
-      formatOptions={DATE_FORMAT_OPTIONS}
-      tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
-    />
-  ) : (
-    <span className='text-xs text-tertiary-token'>TBD</span>
-  );
-}
-
-/**
- * Creates a header renderer for the actions column
+ * Creates a header renderer for the actions column.
+ * Uses a ref for selectedCount to read current value at render time.
  */
 export function createActionsHeaderRenderer(
-  selectedCount: number,
+  selectedCountRef: RefObject<number>,
   onClearSelection: (() => void) | undefined,
   onSync: () => void,
   isSyncing: boolean | undefined
 ) {
   return function ActionsHeader() {
+    const selectedCount = selectedCountRef.current ?? 0;
     return (
       <div className='flex items-center justify-end gap-1'>
         {selectedCount > 0 ? (
-          // Clear button when items selected
           onClearSelection && (
             <Button
               variant='ghost'
@@ -135,7 +147,6 @@ export function createActionsHeaderRenderer(
             </Button>
           )
         ) : (
-          // Sync button when nothing selected
           <Button
             variant='ghost'
             size='sm'
@@ -155,33 +166,11 @@ export function createActionsHeaderRenderer(
   };
 }
 
-/**
- * Creates a cell renderer for the actions column
- */
-export function createActionsCellRenderer(
-  getContextMenuItems: (release: ReleaseViewModel) => ContextMenuItemType[]
-) {
-  return function ActionsCell({ row }: CellContext<ReleaseViewModel, unknown>) {
-    const contextMenuItems = getContextMenuItems(row.original);
-    const actionMenuItems = convertContextMenuItems(contextMenuItems);
+// ============================================================================
+// Cell Factory Renderers
+// ============================================================================
 
-    return (
-      <div className='flex items-center justify-end'>
-        <TableActionMenu items={actionMenuItems} align='end' />
-      </div>
-    );
-  };
-}
-
-// Provider config type for availability cell
-interface ProviderConfig {
-  label: string;
-  accent: string;
-}
-
-/**
- * Creates a cell renderer for the release column
- */
+/** Creates a cell renderer for the release column */
 export function createReleaseCellRenderer(artistName?: string | null) {
   return function ReleaseCellRenderer({
     row,
@@ -190,9 +179,7 @@ export function createReleaseCellRenderer(artistName?: string | null) {
   };
 }
 
-/**
- * Creates a cell renderer for the availability column
- */
+/** Creates a cell renderer for the availability column */
 export function createAvailabilityCellRenderer(
   allProviders: ProviderKey[],
   providerConfig: Record<ProviderKey, ProviderConfig>,
@@ -220,9 +207,7 @@ export function createAvailabilityCellRenderer(
   };
 }
 
-/**
- * Creates a cell renderer for the smart link column
- */
+/** Creates a cell renderer for the smart link column */
 export function createSmartLinkCellRenderer(
   onCopy: (path: string, label: string, testId: string) => Promise<string>
 ) {
@@ -233,11 +218,146 @@ export function createSmartLinkCellRenderer(
   };
 }
 
-/**
- * Renders the popularity cell
- */
+/** Creates a cell renderer for the actions column */
+export function createActionsCellRenderer(
+  getContextMenuItems: (release: ReleaseViewModel) => ContextMenuItemType[]
+) {
+  return function ActionsCell({ row }: CellContext<ReleaseViewModel, unknown>) {
+    const contextMenuItems = getContextMenuItems(row.original);
+    const actionMenuItems = convertContextMenuItems(contextMenuItems);
+
+    return (
+      <div className='flex items-center justify-end'>
+        <TableActionMenu items={actionMenuItems} align='end' />
+      </div>
+    );
+  };
+}
+
+// ============================================================================
+// Static Cell Renderers
+// ============================================================================
+
+/** Renders the release date cell */
+export function renderReleaseDateCell({
+  getValue,
+}: CellContext<ReleaseViewModel, string | undefined>) {
+  const date = getValue();
+  return date ? (
+    <DateCell
+      date={new Date(date)}
+      formatOptions={DATE_FORMAT_OPTIONS}
+      tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
+    />
+  ) : (
+    <span className='text-xs text-tertiary-token'>—</span>
+  );
+}
+
+/** Renders the popularity cell */
 export function renderPopularityCell({
   getValue,
 }: CellContext<ReleaseViewModel, number | null | undefined>) {
   return <PopularityCell popularity={getValue()} />;
+}
+
+/** Renders the release type badge cell */
+export function renderReleaseTypeCell({
+  getValue,
+}: CellContext<ReleaseViewModel, string>) {
+  const type = getValue();
+  const style = getReleaseTypeStyle(type);
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}
+    >
+      {style.label}
+    </span>
+  );
+}
+
+/** Renders the ISRC cell */
+export function renderIsrcCell({
+  getValue,
+}: CellContext<ReleaseViewModel, string | null | undefined>) {
+  return <CopyableMonospaceCell value={getValue()} label='ISRC' />;
+}
+
+/** Renders the UPC cell */
+export function renderUpcCell({
+  getValue,
+}: CellContext<ReleaseViewModel, string | null | undefined>) {
+  return <CopyableMonospaceCell value={getValue()} label='UPC' />;
+}
+
+/** Renders the label cell with truncation */
+export function renderLabelCell({
+  getValue,
+}: CellContext<ReleaseViewModel, string | null | undefined>) {
+  const label = getValue();
+  if (!label) return <span className='text-tertiary-token'>—</span>;
+
+  return (
+    <span className='truncate text-xs text-secondary-token' title={label}>
+      {label}
+    </span>
+  );
+}
+
+/** Renders the total tracks cell */
+export function renderTotalTracksCell({
+  getValue,
+}: CellContext<ReleaseViewModel, number>) {
+  return (
+    <span className='text-xs text-secondary-token tabular-nums'>
+      {getValue()}
+    </span>
+  );
+}
+
+/** Renders the duration cell */
+export function renderDurationCell({
+  getValue,
+}: CellContext<ReleaseViewModel, number | null | undefined>) {
+  const durationMs = getValue();
+  if (!durationMs) return <span className='text-tertiary-token'>—</span>;
+
+  return (
+    <span className='text-xs text-secondary-token tabular-nums'>
+      {formatDuration(durationMs)}
+    </span>
+  );
+}
+
+/** Renders the genres cell with overflow indicator */
+export function renderGenresCell({
+  getValue,
+}: CellContext<ReleaseViewModel, string[] | undefined>) {
+  const genres = getValue();
+  if (!genres || genres.length === 0) {
+    return <span className='text-tertiary-token'>—</span>;
+  }
+
+  const firstGenre = genres[0];
+  const remainingCount = genres.length - 1;
+
+  return (
+    <div className='flex items-center gap-1'>
+      <span
+        className='truncate text-xs text-secondary-token'
+        title={firstGenre}
+      >
+        {firstGenre}
+      </span>
+      {remainingCount > 0 && (
+        <span
+          className='inline-flex min-w-[24px] items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
+          title={genres.slice(1).join(', ')}
+        >
+          +{remainingCount}
+        </span>
+      )}
+    </div>
+  );
 }

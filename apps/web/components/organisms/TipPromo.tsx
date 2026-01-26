@@ -1,8 +1,9 @@
 'use client';
 import { CTASection } from '@/components/organisms/CTASection';
+import { publicEnv } from '@/lib/env-public';
 
 export default function TipPromo() {
-  if (process.env.NEXT_PUBLIC_FEATURE_TIPS !== 'true') return null;
+  if (publicEnv.NEXT_PUBLIC_FEATURE_TIPS !== 'true') return null;
 
   return (
     <CTASection

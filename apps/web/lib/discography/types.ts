@@ -35,6 +35,15 @@ export interface ReleaseRecord {
   providers: ProviderLink[];
 }
 
+export type ReleaseType =
+  | 'single'
+  | 'ep'
+  | 'album'
+  | 'compilation'
+  | 'live'
+  | 'mixtape'
+  | 'other';
+
 export interface ReleaseViewModel {
   profileId: string;
   id: string;
@@ -51,4 +60,12 @@ export interface ReleaseViewModel {
       isPrimary: boolean;
     }
   >;
+  // Extended fields for table display
+  releaseType: ReleaseType;
+  upc?: string | null;
+  label?: string | null;
+  totalTracks: number;
+  totalDurationMs?: number | null;
+  primaryIsrc?: string | null;
+  genres?: string[];
 }

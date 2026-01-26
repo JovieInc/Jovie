@@ -7,6 +7,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { Ratelimit } from '@upstash/ratelimit';
 
+import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 
@@ -41,7 +42,7 @@ export function createRedisRateLimiter(
 ): Ratelimit | null {
   const redisClient = getRedis();
   if (!redisClient) {
-    if (process.env.NODE_ENV === 'production') {
+    if (env.NODE_ENV === 'production') {
       Sentry.captureMessage(
         `Rate limiter "${config.name}" falling back to memory - Redis unavailable`,
         'warning'

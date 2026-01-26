@@ -68,7 +68,6 @@ export function ToastProvider({ children }: ToastProviderProps) {
         position='bottom-right'
         // Expand stacked notifications on hover
         expand
-        richColors
         // Close button on every toast for accessibility
         closeButton
         // Gap between toasts

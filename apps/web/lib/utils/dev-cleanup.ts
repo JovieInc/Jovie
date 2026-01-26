@@ -1,3 +1,5 @@
+import { env } from '@/lib/env-server';
+
 export type DevCleanupFn = () => void | Promise<void>;
 
 interface ProcessWithOnce {
@@ -19,7 +21,7 @@ function isDevNodeRuntime(): boolean {
   }
 
   return (
-    process.env.NODE_ENV !== 'production' &&
+    env.NODE_ENV !== 'production' &&
     typeof (process as unknown as ProcessWithOnce).once === 'function'
   );
 }
@@ -134,8 +136,7 @@ export function startDevMemoryMonitor(options?: {
 
   const enabled =
     options?.enabled ??
-    (typeof process !== 'undefined' &&
-      process.env.JOVIE_DEV_MEMORY_MONITOR === '1');
+    (typeof process !== 'undefined' && env.JOVIE_DEV_MEMORY_MONITOR === '1');
   if (!enabled) {
     return;
   }

@@ -10,6 +10,7 @@ import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
   getReleaseById,
@@ -61,6 +62,30 @@ async function requireProfile(): Promise<{
 }
 
 /**
+ * Extract genres from release metadata
+ */
+function extractGenres(metadata: Record<string, unknown> | null): string[] {
+  if (!metadata) return [];
+
+  // Try common genre field names from various sources
+  const genreField =
+    metadata.genres ??
+    metadata.genre ??
+    metadata.spotifyGenres ??
+    metadata.spotify_genres;
+
+  if (Array.isArray(genreField)) {
+    return genreField.filter((g): g is string => typeof g === 'string');
+  }
+
+  if (typeof genreField === 'string') {
+    return [genreField];
+  }
+
+  return [];
+}
+
+/**
  * Map database release to view model
  */
 function mapReleaseToViewModel(
@@ -104,6 +129,14 @@ function mapReleaseToViewModel(
         };
       })
       .filter(provider => provider.url !== ''),
+    // Extended fields
+    releaseType: release.releaseType,
+    upc: release.upc,
+    label: release.label,
+    totalTracks: release.totalTracks,
+    totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
+    primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
+    genres: extractGenres(release.metadata),
   };
 }
 
@@ -122,70 +155,6 @@ export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
   return releases.map(release =>
     mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
   );
-}
-
-/**
- * Known provider domains for validation
- */
-const PROVIDER_DOMAINS: Partial<Record<ProviderKey, string[]>> = {
-  spotify: ['open.spotify.com', 'spotify.com', 'spotify.link'],
-  apple_music: [
-    'music.apple.com',
-    'itunes.apple.com',
-    'geo.music.apple.com',
-    'apple.co',
-  ],
-  youtube: [
-    'youtube.com',
-    'www.youtube.com',
-    'm.youtube.com',
-    'youtu.be',
-    'music.youtube.com',
-  ],
-  soundcloud: ['soundcloud.com', 'on.soundcloud.com', 'm.soundcloud.com'],
-  deezer: ['deezer.com', 'www.deezer.com', 'deezer.page.link'],
-  tidal: ['tidal.com', 'listen.tidal.com'],
-  amazon_music: ['music.amazon.com', 'amazon.com'],
-  bandcamp: ['bandcamp.com'],
-};
-
-/**
- * Validate URL format and optionally check provider domain
- */
-function validateUrl(
-  url: string,
-  provider?: ProviderKey
-): { valid: boolean; error?: string } {
-  try {
-    const parsed = new URL(url);
-
-    // Check protocol
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return { valid: false, error: 'URL must use http:// or https://' };
-    }
-
-    // Check provider domain if specified
-    if (provider && PROVIDER_DOMAINS[provider]) {
-      const domains = PROVIDER_DOMAINS[provider]!;
-      const hostname = parsed.hostname.toLowerCase();
-
-      const isValidDomain = domains.some(
-        domain => hostname === domain || hostname.endsWith(`.${domain}`)
-      );
-
-      if (!isValidDomain) {
-        const expectedDomains = domains.join(', ');
-        return {
-          valid: false,
-          error: `URL must be from ${PROVIDER_CONFIG[provider].label} (${expectedDomains})`,
-        };
-      }
-    }
-
-    return { valid: true };
-  } catch {
-    return { valid: false, error: 'Invalid URL format' };
-  }
 }
 
 export async function saveProviderOverride(params: {
@@ -213,7 +182,12 @@ export async function saveProviderOverride(params: {
     }
 
     // Validate URL format and provider domain
-    const validation = validateUrl(trimmedUrl, params.provider);
+    const providerLabel = PROVIDER_CONFIG[params.provider]?.label;
+    const validation = validateProviderUrl(
+      trimmedUrl,
+      params.provider,
+      providerLabel
+    );
     if (!validation.valid) {
       throw new Error(validation.error);
     }

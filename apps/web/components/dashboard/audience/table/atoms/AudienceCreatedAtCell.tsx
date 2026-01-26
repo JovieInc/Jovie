@@ -20,7 +20,7 @@ export function AudienceCreatedAtCell({
   isMenuOpen,
   onMenuOpenChange,
   className,
-}: AudienceCreatedAtCellProps) {
+}: Readonly<AudienceCreatedAtCellProps>) {
   return (
     <div
       className={cn(

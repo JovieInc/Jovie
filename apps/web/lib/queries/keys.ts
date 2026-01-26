@@ -45,7 +45,12 @@ export const queryKeys = {
         ...(view === undefined ? [] : [{ view, range }]),
       ] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
-    socialLinks: () => [...queryKeys.dashboard.all, 'social-links'] as const,
+    socialLinks: (profileId?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'social-links',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
     activityFeed: (profileId?: string, range?: string) =>
       [
         ...queryKeys.dashboard.all,

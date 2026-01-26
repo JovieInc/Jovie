@@ -2,21 +2,39 @@
 
 import { Button } from '@jovie/ui';
 import { Copy } from 'lucide-react';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import { useRowSelection } from '@/components/organisms/table';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
+import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
+import { ReleaseTableSubheader } from './ReleaseTableSubheader';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
+
+// Lazy load ReleaseSidebar - reduces initial bundle by ~30-50KB
+const ReleaseSidebar = lazy(() =>
+  import('@/components/organisms/release-sidebar').then(m => ({
+    default: m.ReleaseSidebar,
+  }))
+);
 
 export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   releases,
@@ -43,6 +61,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleSync,
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
+
+  // Table display preferences (column visibility, density)
+  const {
+    columnVisibility,
+    density,
+    rowHeight,
+    availableColumns,
+    onColumnVisibilityChange,
+    onDensityChange,
+    resetToDefaults,
+  } = useReleaseTablePreferences();
 
   // Row selection
   const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
@@ -76,20 +105,20 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     ];
   }, [rows, selectedIds, clearSelection]);
 
-  const handleArtistConnected = (
-    newReleases: ReleaseViewModel[],
-    newArtistName: string
-  ) => {
-    setIsConnected(true);
-    setArtistName(newArtistName);
-    setRows(newReleases);
-    setIsImporting(false);
-  };
+  const handleArtistConnected = useCallback(
+    (newReleases: ReleaseViewModel[], newArtistName: string) => {
+      setIsConnected(true);
+      setArtistName(newArtistName);
+      setRows(newReleases);
+      setIsImporting(false);
+    },
+    [setRows]
+  );
 
-  const handleImportStart = (importingArtistName: string) => {
+  const handleImportStart = useCallback((importingArtistName: string) => {
     setIsImporting(true);
     setArtistName(importingArtistName);
-  };
+  }, []);
 
   // Show importing state when we're actively importing
   const showImportingState = isImporting && rows.length === 0;
@@ -128,7 +157,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useHeaderActions();
 
-  // Memoize the badge to avoid creating new JSX object on every render
+  // Memoize both badge and actions to avoid creating new JSX on every render
+  // This is CRITICAL to prevent infinite render loops when updating context
+  const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
+
   const spotifyBadge = useMemo(
     () => (
       <button
@@ -159,15 +191,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // Spotify pill on left side of header
     setHeaderBadge(isConnected && artistName ? spotifyBadge : null);
 
-    // Drawer toggle on right side
-    setHeaderActions(<DrawerToggleButton />);
+    // Drawer toggle on right side (use memoized element to prevent infinite loops)
+    setHeaderActions(drawerToggle);
 
     return () => {
       setHeaderBadge(null);
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [isConnected, artistName, spotifyBadge]);
+  }, [isConnected, artistName, spotifyBadge, drawerToggle]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
@@ -205,21 +237,37 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <ReleaseTable
-                releases={rows}
-                providerConfig={providerConfig}
-                artistName={artistName}
-                onCopy={handleCopy}
-                onEdit={openEditor}
-                onAddUrl={handleAddUrl}
-                onSync={handleSync}
-                isAddingUrl={isSaving}
-                isSyncing={isSyncing}
-                selectedIds={selectedIds}
-                onSelectionChange={setSelection}
-                bulkActions={bulkActions}
-                onClearSelection={clearSelection}
-              />
+              <>
+                {/* Subheader with Filter, Display, Export */}
+                <ReleaseTableSubheader
+                  releases={rows}
+                  selectedIds={selectedIds}
+                  columnVisibility={columnVisibility}
+                  onColumnVisibilityChange={onColumnVisibilityChange}
+                  availableColumns={availableColumns}
+                  density={density}
+                  onDensityChange={onDensityChange}
+                />
+                <QueryErrorBoundary>
+                  <ReleaseTable
+                    releases={rows}
+                    providerConfig={providerConfig}
+                    artistName={artistName}
+                    onCopy={handleCopy}
+                    onEdit={openEditor}
+                    onAddUrl={handleAddUrl}
+                    onSync={handleSync}
+                    isAddingUrl={isSaving}
+                    isSyncing={isSyncing}
+                    selectedIds={selectedIds}
+                    onSelectionChange={setSelection}
+                    bulkActions={bulkActions}
+                    onClearSelection={clearSelection}
+                    columnVisibility={columnVisibility}
+                    rowHeight={rowHeight}
+                  />
+                </QueryErrorBoundary>
+              </>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}
@@ -261,9 +309,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
           </div>
 
-          {/* Footer - direct flex child anchored to bottom */}
+          {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-3 text-xs text-secondary-token sm:px-6'>
+            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
                 {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
@@ -273,29 +321,41 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   </span>
                 )}
               </span>
-              <div className='flex items-center gap-2'>
-                <span className='text-tertiary-token'>
-                  Showing {primaryProviders.length} of{' '}
-                  {Object.keys(providerConfig).length} providers
-                </span>
-              </div>
+              <button
+                type='button'
+                onClick={resetToDefaults}
+                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
+              >
+                Reset display
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Release Sidebar */}
-      <ReleaseSidebar
-        release={editingRelease}
-        mode='admin'
-        isOpen={isSidebarOpen}
-        providerConfig={providerConfig}
-        artistName={artistName}
-        onClose={closeEditor}
-        onRefresh={handleSync}
-        onAddDspLink={handleAddUrl}
-        isSaving={isSaving}
-      />
+      {/* Release Sidebar - Lazy loaded to reduce initial bundle */}
+      {isSidebarOpen && (
+        <Suspense
+          fallback={
+            <div
+              className='h-full animate-pulse bg-surface-1'
+              style={{ width: SIDEBAR_WIDTH }}
+            />
+          }
+        >
+          <ReleaseSidebar
+            release={editingRelease}
+            mode='admin'
+            isOpen={isSidebarOpen}
+            providerConfig={providerConfig}
+            artistName={artistName}
+            onClose={closeEditor}
+            onRefresh={handleSync}
+            onAddDspLink={handleAddUrl}
+            isSaving={isSaving}
+          />
+        </Suspense>
+      )}
     </div>
   );
 });

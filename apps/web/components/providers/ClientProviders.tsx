@@ -8,6 +8,7 @@ import {
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
+import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
 import type { StatsigProvidersProps } from './StatsigProviders';
@@ -199,7 +200,7 @@ export function ClientProviders({
 
   const shouldBypassClerk =
     !publishableKey ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
     isMockPublishableKey(publishableKey);
 
   if (shouldBypassClerk) {

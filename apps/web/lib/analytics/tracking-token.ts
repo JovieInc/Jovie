@@ -11,6 +11,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import crypto from 'crypto';
+import { env } from '@/lib/env-server';
 
 // Token validity in milliseconds (5 minutes default)
 const TOKEN_VALIDITY_MS = 5 * 60 * 1000;
@@ -22,7 +23,7 @@ const MAX_CLOCK_SKEW_MS = 30 * 1000;
  * Get the tracking token secret (read at runtime, not cached at import)
  */
 function getTrackingSecret(): string | undefined {
-  return process.env.TRACKING_TOKEN_SECRET;
+  return env.TRACKING_TOKEN_SECRET;
 }
 
 export interface TrackingTokenPayload {
@@ -112,7 +113,7 @@ function generateSignature(profileId: string, timestamp: number): string {
 export function generateTrackingToken(profileId: string): string {
   if (!isTrackingTokenEnabled()) {
     // Return a placeholder token in development
-    if (process.env.NODE_ENV === 'development') {
+    if (env.NODE_ENV === 'development') {
       Sentry.addBreadcrumb({
         category: 'tracking-token',
         message: 'TRACKING_TOKEN_SECRET not set - using dev token',
@@ -147,7 +148,7 @@ export function validateTrackingToken(
 
   // In development without secret, allow dev tokens
   if (!isTrackingTokenEnabled()) {
-    if (process.env.NODE_ENV === 'development') {
+    if (env.NODE_ENV === 'development') {
       return parseDevToken(token, expectedProfileId);
     }
     return { valid: false, error: 'Token validation not configured' };

@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { LISTEN_COOKIE } from '@/constants/app';
+import { isSecureEnv } from '@/lib/env-server';
 
 export async function getListenPreference(): Promise<string | undefined> {
   const cookieStore = await cookies();
@@ -11,7 +12,7 @@ export async function setListenPreference(value: string): Promise<void> {
   cookieStore.set(LISTEN_COOKIE, value, {
     maxAge: 60 * 60 * 24 * 365, // 1 year
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureEnv(),
     sameSite: 'lax',
   });
 }

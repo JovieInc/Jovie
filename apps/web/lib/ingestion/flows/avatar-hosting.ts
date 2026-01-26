@@ -13,7 +13,8 @@ import { env } from '@/lib/env';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
-  SUPPORTED_IMAGE_MIME_TYPES,
+  SUPPORTED_IMAGE_MIME_TYPES_SET,
+  type SupportedImageMimeType,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { maybeCopyIngestionAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
@@ -93,12 +94,7 @@ export async function copyAvatarToBlob(
 
     const contentType =
       response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
-    if (
-      !contentType ||
-      !SUPPORTED_IMAGE_MIME_TYPES.includes(
-        contentType as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
-      )
-    ) {
+    if (!contentType || !SUPPORTED_IMAGE_MIME_TYPES_SET.has(contentType)) {
       throw new Error(`Unsupported content type: ${contentType}`);
     }
 
@@ -108,12 +104,7 @@ export async function copyAvatarToBlob(
     }
     const buffer = Buffer.from(arrayBuffer);
 
-    if (
-      !validateMagicBytes(
-        buffer,
-        contentType as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
-      )
-    ) {
+    if (!validateMagicBytes(buffer, contentType as SupportedImageMimeType)) {
       throw new Error('Magic bytes validation failed');
     }
 

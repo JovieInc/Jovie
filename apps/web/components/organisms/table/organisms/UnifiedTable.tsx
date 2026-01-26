@@ -2,8 +2,10 @@
 
 import {
   type ColumnDef,
+  type ColumnPinningState,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   type OnChangeFn,
   type Row,
@@ -160,6 +162,35 @@ export interface UnifiedTableProps<TData> {
    * Callback when focused row changes via keyboard
    */
   onFocusedRowChange?: (index: number) => void;
+
+  /**
+   * Global filter value for client-side filtering
+   */
+  globalFilter?: string;
+
+  /**
+   * Callback when global filter changes
+   */
+  onGlobalFilterChange?: OnChangeFn<string>;
+
+  /**
+   * Enable client-side filtering
+   * @default false
+   */
+  enableFiltering?: boolean;
+
+  /**
+   * Column pinning configuration
+   * Pin columns to left or right edges so they're always visible when scrolling
+   * @example { left: ['select'], right: ['actions'] }
+   */
+  columnPinning?: ColumnPinningState;
+
+  /**
+   * Enable column pinning
+   * @default false
+   */
+  enablePinning?: boolean;
 }
 
 /**
@@ -350,6 +381,11 @@ export function UnifiedTable<TData>({
   enableKeyboardNavigation,
   focusedRowIndex: controlledFocusedIndex,
   onFocusedRowChange,
+  globalFilter,
+  onGlobalFilterChange,
+  enableFiltering = false,
+  columnPinning,
+  enablePinning = false,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
@@ -379,19 +415,40 @@ export function UnifiedTable<TData>({
     enableVirtualization ?? (data.length >= 20 && !isLoading);
 
   // Initialize TanStack Table
+  // Memoize row model factories to prevent recreation
+  const coreRowModel = useMemo(() => getCoreRowModel(), []);
+  const sortedRowModel = useMemo(() => getSortedRowModel(), []);
+  const filteredRowModel = useMemo(
+    () => (enableFiltering ? getFilteredRowModel() : undefined),
+    [enableFiltering]
+  );
+
+  // Build state object conditionally to avoid passing undefined values
+  // that could cause TanStack Table to throw errors
+  const tableState = useMemo(() => {
+    const state: Record<string, unknown> = {};
+    if (rowSelection !== undefined) state.rowSelection = rowSelection;
+    if (sorting !== undefined) state.sorting = sorting;
+    if (globalFilter !== undefined) state.globalFilter = globalFilter;
+    if (columnPinning !== undefined) state.columnPinning = columnPinning;
+    return state;
+  }, [rowSelection, sorting, globalFilter, columnPinning]);
+
   const table = useReactTable({
     data,
     columns,
-    state: {
-      rowSelection,
-      sorting,
-    },
+    state: tableState,
     onRowSelectionChange,
     onSortingChange,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    onGlobalFilterChange,
+    getCoreRowModel: coreRowModel,
+    getSortedRowModel: sortedRowModel,
+    getFilteredRowModel: filteredRowModel,
     getRowId,
     enableRowSelection: !!onRowSelectionChange,
+    enableGlobalFilter: enableFiltering,
+    enableColumnPinning: enablePinning,
+    globalFilterFn: 'includesString',
   });
 
   const { rows } = table.getRowModel();
@@ -402,12 +459,16 @@ export function UnifiedTable<TData>({
     [groupingEnabled, rows]
   );
 
+  // Stable fallback functions for grouping (prevents recreation on every render)
+  const noopGetGroupKey = useCallback(() => '', []);
+  const identityGetGroupLabel = useCallback((key: string) => key, []);
+
   // Initialize grouping (uses TanStack-sorted row order)
   const { groupedData, observeGroupHeader, visibleGroupIndex } =
     useTableGrouping({
       data: groupingSourceData,
-      getGroupKey: groupingConfig?.getGroupKey ?? (() => ''),
-      getGroupLabel: groupingConfig?.getGroupLabel ?? (key => key),
+      getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
+      getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
       enabled: groupingEnabled,
     });
 

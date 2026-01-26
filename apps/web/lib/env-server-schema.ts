@@ -89,6 +89,41 @@ export const ServerEnvSchema = z.object({
   HUD_GITHUB_OWNER: z.string().optional(),
   HUD_GITHUB_REPO: z.string().optional(),
   HUD_GITHUB_WORKFLOW: z.string().optional(),
+
+  // Revalidation
+  REVALIDATE_SECRET: z.string().optional(),
+
+  // Apple Music DSP enrichment
+  APPLE_MUSIC_KEY_ID: z.string().optional(),
+  APPLE_MUSIC_TEAM_ID: z.string().optional(),
+  APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
+
+  // Mercury (banking metrics)
+  MERCURY_API_BASE_URL: z.string().url().optional(),
+  MERCURY_API_TOKEN: z.string().optional(),
+  MERCURY_API_KEY: z.string().optional(),
+  MERCURY_CHECKING_ACCOUNT_ID: z.string().optional(),
+  MERCURY_ACCOUNT_ID: z.string().optional(),
+
+  // Upstash Redis
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+
+  // Analytics
+  ANALYTICS_RETENTION_DAYS: z.string().optional(),
+  TRACKING_TOKEN_SECRET: z.string().optional(),
+  TRACKING_RATE_LIMIT_CLICKS_PER_HOUR: z.string().optional(),
+  TRACKING_RATE_LIMIT_VISITS_PER_HOUR: z.string().optional(),
+
+  // Admin impersonation
+  ENABLE_IMPERSONATION: z.string().optional(),
+  IMPERSONATION_SECRET: z.string().optional(),
+
+  // Sentry server-side
+  SENTRY_DSN: z.string().optional(),
+
+  // Development tools
+  JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 });
 
 /**
@@ -135,4 +170,23 @@ export const ENV_KEYS = [
   'HUD_GITHUB_OWNER',
   'HUD_GITHUB_REPO',
   'HUD_GITHUB_WORKFLOW',
+  'REVALIDATE_SECRET',
+  'APPLE_MUSIC_KEY_ID',
+  'APPLE_MUSIC_TEAM_ID',
+  'APPLE_MUSIC_PRIVATE_KEY',
+  'MERCURY_API_BASE_URL',
+  'MERCURY_API_TOKEN',
+  'MERCURY_API_KEY',
+  'MERCURY_CHECKING_ACCOUNT_ID',
+  'MERCURY_ACCOUNT_ID',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'ANALYTICS_RETENTION_DAYS',
+  'TRACKING_TOKEN_SECRET',
+  'TRACKING_RATE_LIMIT_CLICKS_PER_HOUR',
+  'TRACKING_RATE_LIMIT_VISITS_PER_HOUR',
+  'ENABLE_IMPERSONATION',
+  'IMPERSONATION_SECRET',
+  'SENTRY_DSN',
+  'JOVIE_DEV_MEMORY_MONITOR',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

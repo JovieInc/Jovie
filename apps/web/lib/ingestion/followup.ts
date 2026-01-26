@@ -93,14 +93,52 @@ async function enqueueIngestionJobTx(params: {
       maxAttempts: 3,
       updatedAt: new Date(),
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
+  // Returns null when conflict occurred (job already exists)
   return inserted?.id ?? null;
+}
+
+/**
+ * Determines the job type and validated URL for a given link.
+ * Returns null if the link doesn't match any supported platform.
+ */
+function classifyLink(
+  url: string
+): { jobType: SupportedRecursiveJobType; sourceUrl: string } | null {
+  // YouTube
+  if (isYouTubeChannelUrl(url)) {
+    return { jobType: 'import_youtube', sourceUrl: url };
+  }
+
+  // Beacons
+  const validatedBeacons = validateBeaconsUrl(url);
+  if (validatedBeacons && isBeaconsUrl(validatedBeacons)) {
+    return { jobType: 'import_beacons', sourceUrl: validatedBeacons };
+  }
+
+  // Linktree
+  const validatedLinktree = validateLinktreeUrl(url);
+  if (validatedLinktree) {
+    return { jobType: 'import_linktree', sourceUrl: validatedLinktree };
+  }
+
+  // Laylo
+  const validatedLaylo = validateLayloUrl(url);
+  if (validatedLaylo) {
+    return { jobType: 'import_laylo', sourceUrl: validatedLaylo };
+  }
+
+  return null;
 }
 
 /**
  * Enqueue follow-up ingestion jobs for discovered links.
  * Detects platform types and creates appropriate jobs for recursive ingestion.
+ *
+ * Jobs are enqueued sequentially within the transaction to ensure reliable
+ * execution (Promise.all is not supported within Drizzle transactions).
  */
 export async function enqueueFollowupIngestionJobs(params: {
   tx: DbType;
@@ -112,58 +150,24 @@ export async function enqueueFollowupIngestionJobs(params: {
 
   const nextDepth = currentDepth + 1;
 
-  for (const link of extraction.links) {
-    const url = link.url;
-    if (!url) continue;
+  // Classify all links and filter to valid ones
+  type ClassifiedJob = {
+    jobType: SupportedRecursiveJobType;
+    sourceUrl: string;
+  };
+  const jobsToEnqueue = extraction.links
+    .filter(link => link.url)
+    .map(link => classifyLink(link.url!))
+    .filter((job): job is ClassifiedJob => job !== null);
 
-    // YouTube
-    if (isYouTubeChannelUrl(url)) {
-      await enqueueIngestionJobTx({
-        tx,
-        jobType: 'import_youtube',
-        creatorProfileId,
-        sourceUrl: url,
-        depth: nextDepth,
-      });
-      continue;
-    }
-
-    // Beacons
-    const validatedBeacons = validateBeaconsUrl(url);
-    if (validatedBeacons && isBeaconsUrl(validatedBeacons)) {
-      await enqueueIngestionJobTx({
-        tx,
-        jobType: 'import_beacons',
-        creatorProfileId,
-        sourceUrl: validatedBeacons,
-        depth: nextDepth,
-      });
-      continue;
-    }
-
-    // Linktree
-    const validatedLinktree = validateLinktreeUrl(url);
-    if (validatedLinktree) {
-      await enqueueIngestionJobTx({
-        tx,
-        jobType: 'import_linktree',
-        creatorProfileId,
-        sourceUrl: validatedLinktree,
-        depth: nextDepth,
-      });
-      continue;
-    }
-
-    // Laylo
-    const validatedLaylo = validateLayloUrl(url);
-    if (validatedLaylo) {
-      await enqueueIngestionJobTx({
-        tx,
-        jobType: 'import_laylo',
-        creatorProfileId,
-        sourceUrl: validatedLaylo,
-        depth: nextDepth,
-      });
-    }
+  // Enqueue jobs sequentially (Promise.all not supported in Drizzle tx)
+  for (const job of jobsToEnqueue) {
+    await enqueueIngestionJobTx({
+      tx,
+      jobType: job.jobType,
+      creatorProfileId,
+      sourceUrl: job.sourceUrl,
+      depth: nextDepth,
+    });
   }
 }

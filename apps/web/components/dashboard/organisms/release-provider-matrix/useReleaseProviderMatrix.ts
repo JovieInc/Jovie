@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import {
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
@@ -63,6 +64,12 @@ export function useReleaseProviderMatrix({
   }, []);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // Refs for stable callback access (prevents recreation on state changes)
+  const rawRowsRef = useRef(rawRows);
+  rawRowsRef.current = rawRows;
+  const providerConfigRef = useRef(providerConfig);
+  providerConfigRef.current = providerConfig;
+
   // No custom sorting needed - UnifiedTable handles this
   const rows = rawRows;
 
@@ -77,14 +84,14 @@ export function useReleaseProviderMatrix({
     [providerConfig, primaryProviders]
   );
 
-  const openEditor = (release: ReleaseViewModel) => {
+  const openEditor = useCallback((release: ReleaseViewModel) => {
     setEditingRelease(release);
     const nextDrafts: DraftState = {};
     release.providers.forEach(provider => {
       nextDrafts[provider.key] = provider.url ?? '';
     });
     setDrafts(nextDrafts);
-  };
+  }, []);
 
   const closeEditor = useCallback(() => {
     setEditingRelease(null);
@@ -100,16 +107,19 @@ export function useReleaseProviderMatrix({
     );
   };
 
-  const handleCopy = async (path: string, label: string, testId: string) => {
-    const absoluteUrl = `${getBaseUrl()}${path}`;
-    const success = await copyToClipboard(absoluteUrl);
-    if (success) {
-      toast.success(`${label} copied`, { id: testId });
-    } else {
-      toast.error('Unable to copy link', { id: `${testId}-error` });
-    }
-    return absoluteUrl;
-  };
+  const handleCopy = useCallback(
+    async (path: string, label: string, testId: string) => {
+      const absoluteUrl = `${getBaseUrl()}${path}`;
+      const success = await copyToClipboard(absoluteUrl);
+      if (success) {
+        toast.success(`${label} copied`, { id: testId });
+      } else {
+        toast.error('Unable to copy link', { id: `${testId}-error` });
+      }
+      return absoluteUrl;
+    },
+    []
+  );
 
   const handleSave = (provider: ProviderKey) => {
     if (!editingRelease) return;
@@ -132,40 +142,51 @@ export function useReleaseProviderMatrix({
           toast.success('Link updated');
         },
         onError: error => {
-          console.error(error);
+          captureError('Failed to save provider override', error, {
+            context: 'release-mutation',
+            releaseId: editingRelease.id,
+            provider,
+            action: 'save-provider-override',
+          });
           toast.error('Failed to save override');
         },
       }
     );
   };
 
-  const handleAddUrl = async (
-    releaseId: string,
-    provider: ProviderKey,
-    url: string
-  ) => {
-    const release = rawRows.find(r => r.id === releaseId);
-    if (!release) return;
+  const handleAddUrl = useCallback(
+    async (releaseId: string, provider: ProviderKey, url: string) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
 
-    saveProviderMutation.mutate(
-      {
-        profileId: release.profileId,
-        releaseId,
-        provider,
-        url,
-      },
-      {
-        onSuccess: updated => {
-          updateRow(updated);
-          toast.success(`${providerConfig[provider].label} link added`);
+      saveProviderMutation.mutate(
+        {
+          profileId: release.profileId,
+          releaseId,
+          provider,
+          url,
         },
-        onError: error => {
-          console.error(error);
-          toast.error('Failed to add link');
-        },
-      }
-    );
-  };
+        {
+          onSuccess: updated => {
+            updateRow(updated);
+            toast.success(
+              `${providerConfigRef.current[provider].label} link added`
+            );
+          },
+          onError: error => {
+            captureError('Failed to add provider link', error, {
+              context: 'release-mutation',
+              releaseId,
+              provider,
+              action: 'add-provider-link',
+            });
+            toast.error('Failed to add link');
+          },
+        }
+      );
+    },
+    [saveProviderMutation]
+  );
 
   const handleReset = (provider: ProviderKey) => {
     if (!editingRelease) return;
@@ -186,14 +207,25 @@ export function useReleaseProviderMatrix({
           toast.success('Reverted to detected link');
         },
         onError: error => {
-          console.error(error);
+          captureError('Failed to reset provider link', error, {
+            context: 'release-mutation',
+            releaseId: editingRelease.id,
+            provider,
+            action: 'reset-provider-link',
+          });
           toast.error('Failed to reset link');
         },
       }
     );
   };
 
-  const handleSync = () => {
+  // Use ref for profileId to avoid recreation when it changes
+  const profileIdRef = useRef(profileId);
+  profileIdRef.current = profileId;
+
+  // CRITICAL: Use syncMutation.mutate directly (it's stable from TanStack Query)
+  // Don't depend on the whole syncMutation object which changes every render
+  const handleSync = useCallback(() => {
     syncMutation.mutate(undefined, {
       onSuccess: result => {
         if (result.success) {
@@ -204,11 +236,16 @@ export function useReleaseProviderMatrix({
         }
       },
       onError: error => {
-        console.error(error);
+        captureError('Failed to sync releases from Spotify', error, {
+          context: 'release-mutation',
+          profileId: profileIdRef.current,
+          action: 'sync-from-spotify',
+        });
         toast.error('Failed to sync from Spotify');
       },
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
+  }, [syncMutation.mutate]);
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(

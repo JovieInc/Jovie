@@ -22,11 +22,13 @@ declare global {
 
 // Mock the entire @neondatabase/serverless module
 vi.mock('@neondatabase/serverless', () => {
+  // Use a class to properly support `new Pool()` constructor calls
+  class MockPool {
+    end = vi.fn().mockReturnValue(Promise.resolve());
+  }
   return {
     neonConfig: { webSocketConstructor: undefined },
-    Pool: vi.fn().mockImplementation(() => ({
-      end: vi.fn().mockReturnValue(Promise.resolve()),
-    })),
+    Pool: MockPool,
   };
 });
 
@@ -49,12 +51,17 @@ vi.mock('drizzle-orm/neon-serverless', () => {
   };
 });
 
-// Mock the env module
+// Mock the env module with a getter that reads from process.env
 vi.mock('@/lib/env-server', () => ({
   env: {
-    DATABASE_URL: 'postgres://mock:mock@localhost:5432/mock',
+    get DATABASE_URL() {
+      return process.env.DATABASE_URL;
+    },
   },
 }));
+
+// Set default DATABASE_URL for tests
+process.env.DATABASE_URL = 'postgres://mock:mock@localhost:5432/mock';
 
 import {
   checkDbHealth,

@@ -259,7 +259,7 @@ export async function retryAsync<T>(
 // Spotify-specific Retry Configuration
 // ============================================================================
 
-const SPOTIFY_RETRYABLE_STATUSES = [429, 500, 502, 503, 504] as const;
+const SPOTIFY_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 /**
  * Default retry configuration optimized for Spotify API.
@@ -270,7 +270,7 @@ export const SPOTIFY_RETRY_CONFIG: Partial<RetryConfig> = {
   maxDelay: 10_000, // Cap at 10 seconds
   backoffMultiplier: 2,
   jitter: 0.2, // 20% jitter
-  retryableStatuses: Array.from(SPOTIFY_RETRYABLE_STATUSES),
+  retryableStatuses: [...SPOTIFY_RETRYABLE_STATUSES],
   isRetryable: error => {
     // Retry on rate limit errors (message-based detection)
     if (error instanceof Error && error.message.includes('rate limit')) {
@@ -290,9 +290,7 @@ export const SPOTIFY_RETRY_CONFIG: Partial<RetryConfig> = {
     // Check for HTTP status codes (important: this was missing before)
     if (error instanceof Error && 'status' in error) {
       const status = (error as Error & { status: number }).status;
-      return SPOTIFY_RETRYABLE_STATUSES.includes(
-        status as (typeof SPOTIFY_RETRYABLE_STATUSES)[number]
-      );
+      return SPOTIFY_RETRYABLE_STATUSES.has(status);
     }
 
     return false;

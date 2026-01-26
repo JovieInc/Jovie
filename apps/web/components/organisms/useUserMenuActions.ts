@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  useCheckoutMutation,
+  usePortalMutation,
+  usePricingOptionsQuery,
+} from '@/lib/queries';
 import type { BillingStatus } from './user-button/useUserButton';
 
 type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
@@ -18,19 +23,6 @@ export interface UserMenuLoadingState {
   manageBilling: boolean;
   upgrade: boolean;
   any: boolean;
-}
-
-interface StripeRedirectResponse {
-  url?: string;
-}
-
-interface PricingOption {
-  interval: 'month' | 'year';
-  priceId: string;
-}
-
-interface PricingOptionsResponse {
-  pricingOptions: PricingOption[];
 }
 
 interface UseUserMenuActionsParams {
@@ -50,18 +42,26 @@ export function useUserMenuActions({
 }: UseUserMenuActionsParams) {
   const notifications = useNotifications();
   const router = useRouter();
-  const [loading, setLoading] = useState<Omit<UserMenuLoadingState, 'any'>>({
-    manageBilling: false,
-    signOut: false,
-    upgrade: false,
-  });
+  const [signOutLoading, setSignOutLoading] = useState(false);
+
+  // TanStack Query for pricing options (pre-fetched for faster checkout)
+  const { data: pricingData, refetch: fetchPricing } = usePricingOptionsQuery();
+
+  // TanStack Query mutations for Stripe operations
+  const checkoutMutation = useCheckoutMutation();
+  const portalMutation = usePortalMutation();
 
   const derivedLoading = useMemo<UserMenuLoadingState>(
     () => ({
-      ...loading,
-      any: loading.manageBilling || loading.signOut || loading.upgrade,
+      signOut: signOutLoading,
+      manageBilling: portalMutation.isPending,
+      upgrade: checkoutMutation.isPending,
+      any:
+        signOutLoading ||
+        portalMutation.isPending ||
+        checkoutMutation.isPending,
     }),
-    [loading]
+    [signOutLoading, portalMutation.isPending, checkoutMutation.isPending]
   );
 
   const navigateTo = (href?: string) => {
@@ -75,34 +75,33 @@ export function useUserMenuActions({
   const handleSignOut = async () => {
     if (derivedLoading.signOut) return;
 
-    setLoading(prev => ({ ...prev, signOut: true }));
+    setSignOutLoading(true);
     try {
       await signOut({ redirectUrl: '/' });
     } catch (error) {
       console.error('Sign out error:', error);
       notifications.error("Couldn't sign you out. Please try again.");
-      setLoading(prev => ({ ...prev, signOut: false }));
+      setSignOutLoading(false);
     }
   };
 
   const handleUpgrade = async () => {
     if (derivedLoading.upgrade) return;
 
-    setLoading(prev => ({ ...prev, upgrade: true }));
     try {
       track('billing_upgrade_clicked', {
         ...ANALYTICS_CONTEXT,
         plan: billingStatus.plan ?? 'unknown',
       });
 
-      const pricingResponse = await fetch('/api/stripe/pricing-options');
-      if (!pricingResponse.ok) {
-        throw new Error('Failed to load pricing options');
+      // Use cached data or fetch pricing options
+      let pricing = pricingData;
+      if (!pricing?.pricingOptions?.length) {
+        const result = await fetchPricing();
+        pricing = result.data;
       }
 
-      const pricingData =
-        (await pricingResponse.json()) as PricingOptionsResponse;
-      const monthPrice = pricingData.pricingOptions.find(
+      const monthPrice = pricing?.pricingOptions?.find(
         option => option.interval === 'month'
       );
 
@@ -110,18 +109,11 @@ export function useUserMenuActions({
         throw new Error('Monthly pricing option missing');
       }
 
-      const checkoutResponse = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: monthPrice.priceId }),
+      // Use TanStack Query mutation for checkout
+      const checkout = await checkoutMutation.mutateAsync({
+        priceId: monthPrice.priceId,
       });
 
-      if (!checkoutResponse.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-
-      const checkout =
-        (await checkoutResponse.json()) as StripeRedirectResponse;
       if (!checkout.url) {
         throw new Error('Checkout URL missing from response');
       }
@@ -142,18 +134,17 @@ export function useUserMenuActions({
         reason: message,
       });
 
-      notifications.error("Couldn't start your upgrade. Please try again.", {
-        duration: 6000,
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, upgrade: false }));
+      // Only show notification if mutation didn't already show one
+      if (!checkoutMutation.isError) {
+        notifications.error("Couldn't start your upgrade. Please try again.", {
+          duration: 6000,
+        });
+      }
     }
   };
 
   const handleManageBilling = async () => {
     if (derivedLoading.manageBilling) return;
-
-    setLoading(prev => ({ ...prev, manageBilling: true }));
 
     try {
       if (!billingStatus.hasStripeCustomer) {
@@ -174,16 +165,8 @@ export function useUserMenuActions({
         plan: billingStatus.plan ?? 'unknown',
       });
 
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create billing portal session');
-      }
-
-      const portal = (await response.json()) as StripeRedirectResponse;
+      // Use TanStack Query mutation for portal
+      const portal = await portalMutation.mutateAsync();
 
       if (!portal.url) {
         throw new Error('Billing portal URL missing from response');
@@ -207,14 +190,15 @@ export function useUserMenuActions({
         reason: message,
       });
 
-      notifications.error(
-        "Couldn't open billing portal. Taking you to pricing instead.",
-        { duration: 6000 }
-      );
+      // Only show notification if mutation didn't already show one
+      if (!portalMutation.isError) {
+        notifications.error(
+          "Couldn't open billing portal. Taking you to pricing instead.",
+          { duration: 6000 }
+        );
+      }
 
       router.push('/pricing');
-    } finally {
-      setLoading(prev => ({ ...prev, manageBilling: false }));
     }
   };
 

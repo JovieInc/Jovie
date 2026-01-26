@@ -40,6 +40,7 @@ import {
   type NotificationSubscribeDomainResponse,
 } from '@/lib/notifications/response';
 import { sendNotification } from '@/lib/notifications/service';
+import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
@@ -124,6 +125,38 @@ async function validateContactForChannel(
   }
 
   return null;
+}
+
+/**
+ * Checks if an email is suppressed (hard bounce, spam complaint, etc.)
+ * Returns an error response if suppressed, null otherwise.
+ */
+async function checkEmailSuppression(
+  channel: NotificationChannel,
+  normalizedEmail: string | null,
+  artist_id: string,
+  source: string | undefined
+): Promise<NotificationSubscribeDomainResponse | null> {
+  if (channel !== 'email' || !normalizedEmail) {
+    return null;
+  }
+
+  const suppressionCheck = await isEmailSuppressed(normalizedEmail);
+  if (!suppressionCheck.suppressed) {
+    return null;
+  }
+
+  await trackSubscribeError({
+    artist_id,
+    error_type: 'suppressed',
+    validation_errors: [
+      `Email suppressed: ${suppressionCheck.reason ?? 'unknown'}`,
+    ],
+    source,
+  });
+  return buildSubscribeValidationError(
+    'This email cannot receive notifications. Please try a different email address.'
+  );
 }
 
 /**
@@ -338,6 +371,17 @@ export const subscribeToNotificationsDomain = async (
     );
     if (validationError) {
       return validationError;
+    }
+
+    // Check if email is suppressed (hard bounce, spam complaint, etc.)
+    const suppressionError = await checkEmailSuppression(
+      channel,
+      normalizedEmail,
+      artist_id,
+      source
+    );
+    if (suppressionError) {
+      return suppressionError;
     }
 
     const conflictTarget =

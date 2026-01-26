@@ -27,10 +27,11 @@ interface MyStatsigEnabledProps {
 }
 
 /**
- * Inner component that actually initializes the Statsig client.
- * Separated to ensure hooks are only called when this component is rendered.
+ * Inner component that initializes the Statsig client after mount.
+ * Defers hook call until component is mounted to prevent async state
+ * updates during initial render (React Strict Mode compatibility).
  */
-function StatsigClientProvider({
+function StatsigClientProviderInner({
   children,
   sdkKey,
   user,
@@ -80,6 +81,35 @@ function StatsigClientProvider({
     <StatsigProvider client={client} loadingComponent={null}>
       {children}
     </StatsigProvider>
+  );
+}
+
+/**
+ * Wrapper that defers Statsig initialization until after mount.
+ * This prevents the "state update on unmounted component" warning
+ * that occurs when useClientAsyncInit runs during initial render.
+ */
+function StatsigClientProvider({
+  children,
+  sdkKey,
+  user,
+  plugins,
+}: MyStatsigEnabledProps) {
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't initialize Statsig until after mount to prevent async state updates
+  if (!isMounted) {
+    return <>{children}</>;
+  }
+
+  return (
+    <StatsigClientProviderInner sdkKey={sdkKey} user={user} plugins={plugins}>
+      {children}
+    </StatsigClientProviderInner>
   );
 }
 

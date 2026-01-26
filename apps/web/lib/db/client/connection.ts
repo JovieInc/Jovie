@@ -5,6 +5,7 @@
  */
 
 import { neonConfig, Pool } from '@neondatabase/serverless';
+import * as Sentry from '@sentry/nextjs';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { env } from '@/lib/env-server';
 import {
@@ -13,7 +14,7 @@ import {
 } from '@/lib/utils/dev-cleanup';
 import * as schema from '../schema';
 import { logDbError, logDbInfo } from './logging';
-import type { DbType } from './types';
+import type { DbType, PoolMetrics } from './types';
 
 type WebSocketConstructor = typeof WebSocket;
 
@@ -67,6 +68,113 @@ declare global {
 // Lazy initialization of database connection
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
+// Flag to prevent concurrent pool initialization (race condition fix)
+let _poolInitializing = false;
+
+/**
+ * Initialize the pool if needed, with race condition protection
+ */
+function initializePoolIfNeeded(
+  databaseUrl: string,
+  isProduction: boolean
+): void {
+  if (_pool || _poolInitializing) return;
+
+  // Set flag immediately to prevent concurrent initialization attempts
+  _poolInitializing = true;
+
+  try {
+    // Double-check after setting flag (another thread may have just finished)
+    if (!_pool) {
+      _pool = new Pool({
+        connectionString: databaseUrl,
+        // Performance-optimized pool settings for Neon serverless:
+        // - Increased max for higher concurrency under load
+        // - Added min to keep connections warm (reduces cold start latency)
+        // - Reduced idle timeout since Neon connections are cheap to recreate
+        // - Connection timeout allows for Neon cold start (can take 10-15s)
+        max: isProduction ? 15 : 3, // Increased from 10 for higher concurrency
+        min: isProduction ? 2 : 1, // Keep minimum connections warm
+        idleTimeoutMillis: 20000, // 20s idle timeout (reduced from 30s - Neon connections are cheap)
+        connectionTimeoutMillis: 15000, // 15s connection timeout (allows for Neon cold start)
+        statement_timeout: 15000, // 15s max query execution time
+        query_timeout: 15000, // 15s max query time (includes network latency)
+        allowExitOnIdle: !isProduction, // Allow clean shutdown in dev
+      });
+
+      // Handle pool errors to prevent unhandled rejections
+      // and allow the pool to recover from transient failures
+      _pool.on('error', (err: Error) => {
+        logDbError('pool_error', err, {
+          message: 'Pool encountered an error, will attempt to recover',
+        });
+        // Don't throw - let the pool attempt to recover
+      });
+
+      // Monitor pool pressure to detect exhaustion issues
+      _pool.on('acquire', () => {
+        if (_pool && _pool.waitingCount > 2) {
+          Sentry.captureMessage('[db] Pool under pressure', {
+            level: 'warning',
+            extra: {
+              waiting: _pool.waitingCount,
+              total: _pool.totalCount,
+              idle: _pool.idleCount,
+            },
+            tags: { context: 'db_pool_pressure' },
+          });
+        }
+      });
+
+      // In development, register pool cleanup so hot reloads and Ctrl+C don't leak pools.
+      registerDevCleanup('db_pool', async () => {
+        const poolToClose =
+          _pool ?? (typeof global !== 'undefined' ? global.pool : undefined);
+        if (poolToClose) {
+          try {
+            await poolToClose.end();
+          } catch (error) {
+            logDbError('pool_cleanup_failed', error, { reason: 'dev_cleanup' });
+          }
+        }
+
+        _pool = undefined;
+        _db = undefined;
+        _poolInitializing = false;
+        if (typeof global !== 'undefined') {
+          global.pool = undefined;
+          global.db = undefined;
+        }
+      });
+
+      // Optional dev-only memory monitor (opt-in via env)
+      startDevMemoryMonitor();
+    }
+  } finally {
+    _poolInitializing = false;
+  }
+}
+
+/**
+ * Create a database instance with appropriate logging
+ */
+function createDbInstance(pool: Pool, isProduction: boolean): DbType {
+  if (isProduction) {
+    return drizzle(pool, { schema, logger: false });
+  }
+
+  return drizzle(pool, {
+    schema,
+    logger: {
+      logQuery: (query: string, params: unknown[]): void => {
+        logDbInfo('query', 'Database query executed', {
+          query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
+          paramsLength: params.length,
+        });
+      },
+    },
+  });
+}
 
 /**
  * Initialize the database connection
@@ -81,7 +189,7 @@ export function initializeDb(): DbType {
     );
   }
 
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const hasGlobal = typeof global !== 'undefined';
 
   if (!isProduction && hasGlobal && global.db) {
@@ -96,76 +204,30 @@ export function initializeDb(): DbType {
     'db_init',
     'Initializing database connection with transaction support',
     {
-      environment: process.env.NODE_ENV,
+      environment: env.NODE_ENV,
       hasUrl: !!databaseUrl,
       transactionSupport: !isEdgeRuntime, // WebSocket/transactions not available in Edge
       isEdge: isEdgeRuntime,
     }
   );
 
-  // Create the database connection pool
+  // Create the database connection pool with flag guard to prevent race conditions
   // Note: Pool works in both Edge and Node, but WebSocket (for transactions) is Node-only
+  initializePoolIfNeeded(databaseUrl, isProduction);
+
+  // Ensure pool was initialized (should always be true at this point)
   if (!_pool) {
-    _pool = new Pool({
-      connectionString: databaseUrl,
-      // Neon serverless connections can be terminated unexpectedly;
-      // keep pool small and allow quick reconnection
-      max: isProduction ? 10 : 3,
-      idleTimeoutMillis: 30000, // 30s idle timeout
-      connectionTimeoutMillis: 15000, // 15s connection timeout (allows Neon wake-up)
-    });
-
-    // Handle pool errors to prevent unhandled rejections
-    // and allow the pool to recover from transient failures
-    _pool.on('error', (err: Error) => {
-      logDbError('pool_error', err, {
-        message: 'Pool encountered an error, will attempt to recover',
-      });
-      // Don't throw - let the pool attempt to recover
-    });
-
-    // In development, register pool cleanup so hot reloads and Ctrl+C don't leak pools.
-    registerDevCleanup('db_pool', async () => {
-      const poolToClose =
-        _pool ?? (typeof global !== 'undefined' ? global.pool : undefined);
-      if (poolToClose) {
-        try {
-          await poolToClose.end();
-        } catch (error) {
-          logDbError('pool_cleanup_failed', error, { reason: 'dev_cleanup' });
-        }
-      }
-
-      _pool = undefined;
-      _db = undefined;
-      if (typeof global !== 'undefined') {
-        global.pool = undefined;
-        global.db = undefined;
-      }
-    });
-
-    // Optional dev-only memory monitor (opt-in via env)
-    startDevMemoryMonitor();
+    throw new Error('Database pool failed to initialize');
   }
 
   // Use a single connection in development to avoid connection pool exhaustion
   // In Edge runtime (where global is undefined), always create fresh instance
   if (isProduction || !hasGlobal) {
-    return drizzle(_pool, { schema, logger: false });
+    return createDbInstance(_pool, isProduction);
   } else {
     if (!global.db) {
       global.pool = _pool;
-      global.db = drizzle(_pool, {
-        schema,
-        logger: {
-          logQuery: (query: string, params: unknown[]): void => {
-            logDbInfo('query', 'Database query executed', {
-              query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
-              paramsLength: params.length,
-            });
-          },
-        },
-      });
+      global.db = createDbInstance(_pool, isProduction);
     }
     return global.db;
   }
@@ -204,3 +266,40 @@ export const db = new Proxy({} as DbType, {
     return Reflect.get(_db, prop);
   },
 });
+
+/**
+ * Get connection pool metrics for monitoring.
+ * Returns null if pool is not initialized.
+ */
+export function getPoolMetrics(): PoolMetrics | null {
+  if (!_pool) return null;
+
+  const total = _pool.totalCount;
+  const idle = _pool.idleCount;
+  const waiting = _pool.waitingCount;
+
+  return {
+    total,
+    idle,
+    waiting,
+    // Utilization percentage: (active connections / total connections) * 100
+    utilization: total > 0 ? Math.round(((total - idle) / total) * 100) : 0,
+  };
+}
+
+/**
+ * Get pool state for health checks (internal use)
+ */
+export function getPoolState(): {
+  totalCount: number;
+  idleCount: number;
+  waitingCount: number;
+} | null {
+  return _pool
+    ? {
+        totalCount: _pool.totalCount,
+        idleCount: _pool.idleCount,
+        waitingCount: _pool.waitingCount,
+      }
+    : null;
+}

@@ -12,6 +12,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAutoSave } from '@/lib/pacer/hooks';
+import {
+  useProfileMutation,
+  useProfileSaveMutation,
+  useUserAvatarMutation,
+} from '@/lib/queries';
 import type { Artist } from '@/types/db';
 import type { ProfileFormData, ProfileSaveStatus } from './types';
 
@@ -79,6 +84,21 @@ export function useSettingsProfile({
   const artistRef = useRef(artist);
   artistRef.current = artist;
 
+  // TanStack Query mutation for profile saves (silent, for auto-save)
+  const { mutateAsync: saveProfileMutation } = useProfileSaveMutation();
+
+  // Store mutation ref for use in saveFn callback
+  const saveProfileMutationRef = useRef(saveProfileMutation);
+  saveProfileMutationRef.current = saveProfileMutation;
+
+  // TanStack Query mutation for avatar upload
+  const { mutateAsync: uploadAvatarMutation } = useUserAvatarMutation();
+
+  // TanStack Query mutation for avatar URL update (with notifications)
+  const { mutateAsync: updateProfileMutation } = useProfileMutation({
+    silent: true, // We handle notifications manually for avatar updates
+  });
+
   // Use the shared auto-save hook
   const {
     save: triggerSave,
@@ -107,51 +127,31 @@ export function useSettingsProfile({
 
       setProfileSaveStatus({ saving: true, success: null, error: null });
 
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      // Use TanStack Query mutation via ref to get latest function
+      const response = await saveProfileMutationRef.current({
+        updates: {
+          username,
+          displayName,
         },
-        body: JSON.stringify({
-          updates: {
-            username,
-            displayName,
-          },
-        }),
       });
-
-      const responseData = (await response.json().catch(() => ({}))) as {
-        profile?: {
-          username?: string;
-          usernameNormalized?: string;
-          displayName?: string;
-          bio?: string | null;
-        };
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to update profile');
-      }
 
       // Update cache
       lastProfileSavedRef.current = { displayName, username };
 
       // Update artist state
-      if (responseData.profile && onArtistUpdate) {
+      if (response.profile && onArtistUpdate) {
         onArtistUpdate({
           ...artistRef.current,
-          handle: responseData.profile.username ?? artistRef.current.handle,
-          name: responseData.profile.displayName ?? artistRef.current.name,
-          tagline: responseData.profile.bio ?? artistRef.current.tagline,
+          handle: response.profile.username ?? artistRef.current.handle,
+          name: response.profile.displayName ?? artistRef.current.name,
         });
       }
 
       // Update form data
       setFormData(prev => ({
         ...prev,
-        username: responseData.profile?.username ?? username,
-        displayName: responseData.profile?.displayName ?? displayName,
+        username: response.profile?.username ?? username,
+        displayName: response.profile?.displayName ?? displayName,
       }));
 
       setProfileSaveStatus({ saving: false, success: true, error: null });
@@ -182,76 +182,35 @@ export function useSettingsProfile({
     }
   }, [saveError]);
 
-  const handleAvatarUpload = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch('/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = (await response.json().catch(() => ({}))) as {
-      blobUrl?: string;
-      error?: string;
-      code?: string;
-      retryable?: boolean;
-    };
-
-    if (!response.ok) {
-      const error = new Error(data.error || 'Upload failed') as Error & {
-        code?: string;
-        retryable?: boolean;
-      };
-      error.code = data.code;
-      error.retryable = data.retryable;
-      throw error;
-    }
-
-    if (!data.blobUrl) {
-      throw new Error('No image URL returned from upload');
-    }
-
-    return data.blobUrl;
-  }, []);
+  const handleAvatarUpload = useCallback(
+    async (file: File) => {
+      // Use TanStack Query mutation for upload
+      return uploadAvatarMutation(file);
+    },
+    [uploadAvatarMutation]
+  );
 
   const handleAvatarUpdate = useCallback(
     async (imageUrl: string) => {
       const previousImage = artist.image_url;
 
       try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
+        // Use TanStack Query mutation for profile update
+        const response = await updateProfileMutation({
+          updates: {
+            avatarUrl: imageUrl,
           },
-          body: JSON.stringify({
-            updates: {
-              avatarUrl: imageUrl,
-            },
-          }),
         });
-
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(
-            (data as { error?: string }).error ||
-              'Failed to update profile photo'
-          );
-        }
-
-        const profile = (data as { profile?: { avatarUrl?: string } }).profile;
-        const warning = (data as { warning?: string }).warning;
 
         if (onArtistUpdate) {
           onArtistUpdate({
             ...artist,
-            image_url: profile?.avatarUrl ?? imageUrl,
+            image_url: response.profile?.avatarUrl ?? imageUrl,
           });
         }
 
-        if (warning) {
-          notifications.warning(warning);
+        if (response.warning) {
+          notifications.warning(response.warning);
         }
       } catch (error) {
         if (onArtistUpdate) {
@@ -268,7 +227,7 @@ export function useSettingsProfile({
         notifications.error(message);
       }
     },
-    [artist, notifications, onArtistUpdate]
+    [artist, notifications, onArtistUpdate, updateProfileMutation]
   );
 
   const saveProfile = useCallback(

@@ -2,6 +2,7 @@
 
 import { AlertTriangle, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { publicEnv } from '@/lib/env-public';
 import { useEnvHealthQuery } from '@/lib/queries/useEnvHealthQuery';
 
 /**
@@ -31,7 +32,7 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const showBanner =
     isAdmin &&
     (process.env.NODE_ENV !== 'production' ||
-      process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true');
+      publicEnv.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true');
 
   // Use TanStack Query for fetching environment health
   const { data: envHealth } = useEnvHealthQuery({

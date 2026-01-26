@@ -191,8 +191,7 @@ async function incrementViewsDirectly(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      // Retry logging - only capture on final failure
-      void lastError;
+      // Retry logging - lastError is captured on final failure below
 
       if (attempt < maxRetries) {
         await new Promise(resolve =>

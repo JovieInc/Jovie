@@ -40,7 +40,7 @@ function extractHandleFromUrl(url: string | undefined): string | null {
   if (!url) return null;
   try {
     const parsed = new URL(url);
-    const [first] = parsed.pathname.split('/').filter(Boolean);
+    const first = parsed.pathname.split('/').find(Boolean);
     if (!first) return null;
     return first.replace(/^@/, '').toLowerCase();
   } catch {

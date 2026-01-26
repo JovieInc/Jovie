@@ -18,35 +18,12 @@ import {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import {
+  PROVIDER_DOMAINS,
+  PROVIDER_TO_DSP,
+} from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
-
-// Provider domain mapping for URL validation
-const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
-  apple_music: ['music.apple.com', 'itunes.apple.com'],
-  spotify: ['open.spotify.com', 'spotify.com'],
-  youtube: ['music.youtube.com', 'youtube.com'],
-  soundcloud: ['soundcloud.com'],
-  deezer: ['deezer.com'],
-  amazon_music: ['music.amazon.com', 'amazon.com'],
-  tidal: ['tidal.com'],
-  bandcamp: ['bandcamp.com'],
-  beatport: ['beatport.com'],
-};
-
-// Maps ProviderKey to DspProviderId for icons
-const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
-  spotify: 'spotify',
-  apple_music: 'apple_music',
-  youtube: 'youtube_music',
-  soundcloud: 'soundcloud',
-  deezer: 'deezer',
-  tidal: 'tidal',
-  amazon_music: 'amazon_music',
-  bandcamp: null,
-  beatport: null,
-};
 
 interface ProviderConfig {
   label: string;
@@ -89,6 +66,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const [validationError, setValidationError] = useState('');
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Ref for urlInput to avoid recreating handleAddUrl on every keystroke
+  const urlInputRef = useRef(urlInput);
+  urlInputRef.current = urlInput;
 
   // Create provider Map for O(1) lookups instead of O(n) .find() operations
   const providerMap = useMemo(() => {
@@ -141,7 +121,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
       e.preventDefault();
       if (!addingProvider || !onAddUrl) return;
 
-      const trimmed = urlInput.trim();
+      const trimmed = urlInputRef.current.trim();
       if (!trimmed) return;
 
       // Validate URL format
@@ -178,7 +158,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         // Error toast is shown by parent
       }
     },
-    [addingProvider, onAddUrl, release.id, urlInput]
+    [addingProvider, onAddUrl, release.id]
   );
 
   // Get status for a provider
@@ -215,7 +195,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         <button
           type='button'
           aria-label='Show provider availability details'
-          aria-haspopup='dialog'
+          aria-haspopup='listbox'
           aria-expanded={open}
           className='inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-surface-2'
         >
@@ -295,9 +275,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 className='flex items-center justify-between border-b border-subtle px-3 py-2 last:border-b-0'
               >
                 <div className='flex items-center gap-2'>
-                  {/* Status dot */}
+                  {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
-                    <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
+                    <span
+                      className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'
+                      role='img'
+                      aria-label={`${config.label}: not linked`}
+                    >
                       <span className='h-1 w-1 rounded-full bg-tertiary-token' />
                     </span>
                   ) : (
@@ -307,6 +291,8 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         status === 'manual' && 'ring-2 ring-amber-400/30'
                       )}
                       style={{ backgroundColor: config.accent }}
+                      role='img'
+                      aria-label={`${config.label}: ${status === 'manual' ? 'manually linked' : 'linked'}`}
                     >
                       {status === 'manual' && (
                         <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />
