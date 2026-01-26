@@ -2,17 +2,19 @@
 -- Server-side pixel forwarding for creator ad platforms and Jovie marketing
 
 -- Pixel event type enum
-DO $$ BEGIN
-  CREATE TYPE "pixel_event_type" AS ENUM ('page_view', 'link_click', 'form_submit', 'scroll_depth');
-EXCEPTION
-  WHEN duplicate_object THEN null;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pixel_event_type') THEN
+    CREATE TYPE "pixel_event_type" AS ENUM ('page_view', 'link_click', 'form_submit', 'scroll_depth');
+  END IF;
 END $$;--> statement-breakpoint
 
 -- Pixel forward status enum
-DO $$ BEGIN
-  CREATE TYPE "pixel_forward_status" AS ENUM ('pending', 'sent', 'failed');
-EXCEPTION
-  WHEN duplicate_object THEN null;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pixel_forward_status') THEN
+    CREATE TYPE "pixel_forward_status" AS ENUM ('pending', 'sent', 'failed');
+  END IF;
 END $$;--> statement-breakpoint
 
 -- Pixel events table - stores all tracking events from public profiles
