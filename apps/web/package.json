@@ -42,6 +42,8 @@
     "e2e:visual": "playwright test tests/e2e/visual-regression.spec.ts",
     "e2e:visual:update": "playwright test tests/e2e/visual-regression.spec.ts --update-snapshots",
     "e2e:full:noauth": "playwright test --config=playwright.config.noauth.ts",
+    "e2e:chaos": "playwright test --config=playwright.config.nightly.ts tests/e2e/nightly/chaos-click-testing.spec.ts",
+    "e2e:chaos:extended": "CHAOS_EXTENDED=1 playwright test --config=playwright.config.nightly.ts -g 'extended'",
     "a11y:ci": "playwright test -g @a11y",
     "a11y:axe": "playwright test tests/e2e/axe-audit.spec.ts",
     "a11y:check:staged": "biome lint .",
