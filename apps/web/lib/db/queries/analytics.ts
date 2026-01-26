@@ -337,6 +337,11 @@ export async function getUserDashboardAnalytics(
           listen_clicks: string | number | null;
           subscribers: string | number | null;
           identified_users: string | number | null;
+          top_links: JsonArray<{
+            id: string | null;
+            url: string | null;
+            clicks: number;
+          }>;
         }>(
           drizzleSql`
             with base_events as (
@@ -378,6 +383,14 @@ export async function getUserDashboardAnalytics(
               order by count desc
               limit 5
             ),
+            top_links as (
+              select link_id as id, link_type as url, count(*) as clicks
+              from ranged_events
+              where link_id is not null
+              group by link_id, link_type
+              order by clicks desc
+              limit 5
+            ),
             notification_recent as (
               select 1
               from ${notificationSubscriptions}
@@ -409,7 +422,8 @@ export async function getUserDashboardAnalytics(
               (select count(*) from audience_identified) as identified_users,
               coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
               coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
-              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers,
+              coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
             ;
           `
         )
@@ -439,6 +453,15 @@ export async function getUserDashboardAnalytics(
     ).map(row => ({
       referrer: (row.referrer ?? '') as string,
       count: Number(row.count),
+    })),
+    top_links: parseJsonArray<{
+      id: string | null;
+      url: string | null;
+      clicks: number;
+    }>(aggregates?.top_links ?? []).map(row => ({
+      id: row.id ?? 'unknown',
+      url: row.url ?? '',
+      clicks: Number(row.clicks),
     })),
   };
 
