@@ -27,10 +27,11 @@ export function isGPCEnabled(): boolean {
 /**
  * Check if Do Not Track is enabled
  * DNT is older but still respected as a signal
+ * Supports both '1' (most browsers) and 'yes' (some older browsers)
  */
 export function isDNTEnabled(): boolean {
   if (typeof navigator === 'undefined') return false;
-  return navigator.doNotTrack === '1';
+  return navigator.doNotTrack === '1' || navigator.doNotTrack === 'yes';
 }
 
 /**
@@ -75,7 +76,9 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
   // 1 year expiry
   const expires = new Date();
   expires.setFullYear(expires.getFullYear() + 1);
-  document.cookie = `${CONSENT_COOKIE_NAME}=${state}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+  // Add Secure flag for HTTPS environments
+  const isSecure = window.location.protocol === 'https:';
+  document.cookie = `${CONSENT_COOKIE_NAME}=${state}; path=/; expires=${expires.toUTCString()}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
 }
 
 /**

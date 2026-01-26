@@ -1,8 +1,9 @@
 'use client';
 
 import { Button, Switch } from '@jovie/ui';
+import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { type FormEvent, useCallback, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { usePixelSettingsMutation } from '@/lib/queries';
@@ -115,9 +116,39 @@ function PlatformSection({
   );
 }
 
+// Token placeholder shown when a token is configured but not revealed
+const TOKEN_PLACEHOLDER = '••••••••';
+
+interface PixelSettingsResponse {
+  pixels: {
+    facebookPixelId: string | null;
+    googleMeasurementId: string | null;
+    tiktokPixelId: string | null;
+    enabled: boolean;
+    facebookEnabled: boolean;
+    googleEnabled: boolean;
+    tiktokEnabled: boolean;
+  };
+  hasTokens: {
+    facebook: boolean;
+    google: boolean;
+    tiktok: boolean;
+  };
+}
+
 export function SettingsAdPixelsSection() {
   const { mutate: savePixels, isPending: isPixelSaving } =
     usePixelSettingsMutation();
+
+  // Fetch existing pixel settings on mount
+  const { data: existingSettings } = useQuery<PixelSettingsResponse>({
+    queryKey: ['pixelSettings'],
+    queryFn: async () => {
+      const res = await fetch('/api/dashboard/pixels');
+      if (!res.ok) throw new Error('Failed to fetch pixel settings');
+      return res.json();
+    },
+  });
 
   const [pixelData, setPixelData] = useState({
     facebookPixelId: '',
@@ -129,8 +160,48 @@ export function SettingsAdPixelsSection() {
     enabled: true,
   });
 
+  // Track whether tokens have been modified (to know whether to send them)
+  const [tokenModified, setTokenModified] = useState({
+    facebook: false,
+    google: false,
+    tiktok: false,
+  });
+
+  // Populate form with existing settings when fetched
+  useEffect(() => {
+    if (existingSettings?.pixels) {
+      setPixelData(prev => ({
+        ...prev,
+        facebookPixelId: existingSettings.pixels.facebookPixelId ?? '',
+        googleMeasurementId: existingSettings.pixels.googleMeasurementId ?? '',
+        tiktokPixelId: existingSettings.pixels.tiktokPixelId ?? '',
+        enabled: existingSettings.pixels.enabled ?? true,
+        // Show placeholder for configured tokens (actual values not returned by API)
+        facebookAccessToken: existingSettings.hasTokens?.facebook
+          ? TOKEN_PLACEHOLDER
+          : '',
+        googleApiSecret: existingSettings.hasTokens?.google
+          ? TOKEN_PLACEHOLDER
+          : '',
+        tiktokAccessToken: existingSettings.hasTokens?.tiktok
+          ? TOKEN_PLACEHOLDER
+          : '',
+      }));
+      // Reset token modified flags when settings are loaded
+      setTokenModified({ facebook: false, google: false, tiktok: false });
+    }
+  }, [existingSettings]);
+
   const handleInputChange = (field: string, value: string | boolean) => {
     setPixelData(prev => ({ ...prev, [field]: value }));
+    // Track when token fields are modified
+    if (field === 'facebookAccessToken') {
+      setTokenModified(prev => ({ ...prev, facebook: true }));
+    } else if (field === 'googleApiSecret') {
+      setTokenModified(prev => ({ ...prev, google: true }));
+    } else if (field === 'tiktokAccessToken') {
+      setTokenModified(prev => ({ ...prev, tiktok: true }));
+    }
   };
 
   const handlePixelSubmit = useCallback(
@@ -138,19 +209,37 @@ export function SettingsAdPixelsSection() {
       e.preventDefault();
 
       const formData = new FormData(e.currentTarget);
+
+      // Only send token values if they were actually modified
+      // (not if they're still showing the placeholder)
+      const getFacebookToken = () => {
+        const value = formData.get('facebookAccessToken') as string;
+        if (!tokenModified.facebook || value === TOKEN_PLACEHOLDER) return '';
+        return value ?? '';
+      };
+      const getGoogleSecret = () => {
+        const value = formData.get('googleApiSecret') as string;
+        if (!tokenModified.google || value === TOKEN_PLACEHOLDER) return '';
+        return value ?? '';
+      };
+      const getTiktokToken = () => {
+        const value = formData.get('tiktokAccessToken') as string;
+        if (!tokenModified.tiktok || value === TOKEN_PLACEHOLDER) return '';
+        return value ?? '';
+      };
+
       savePixels({
         facebookPixelId: (formData.get('facebookPixelId') as string) ?? '',
-        facebookAccessToken:
-          (formData.get('facebookAccessToken') as string) ?? '',
+        facebookAccessToken: getFacebookToken(),
         googleMeasurementId:
           (formData.get('googleMeasurementId') as string) ?? '',
-        googleApiSecret: (formData.get('googleApiSecret') as string) ?? '',
+        googleApiSecret: getGoogleSecret(),
         tiktokPixelId: (formData.get('tiktokPixelId') as string) ?? '',
-        tiktokAccessToken: (formData.get('tiktokAccessToken') as string) ?? '',
+        tiktokAccessToken: getTiktokToken(),
         enabled: pixelData.enabled,
       });
     },
-    [savePixels, pixelData.enabled]
+    [savePixels, pixelData.enabled, tokenModified]
   );
 
   return (

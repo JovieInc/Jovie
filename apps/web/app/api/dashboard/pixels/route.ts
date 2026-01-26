@@ -189,19 +189,30 @@ export async function PUT(req: Request) {
         ? encryptPII(input.tiktokAccessToken)
         : existingConfig?.tiktokAccessToken || null;
 
+      // Preserve existing pixel IDs if new ones are not provided (same pattern as tokens)
+      const facebookPixelId = input.facebookPixelId
+        ? input.facebookPixelId
+        : existingConfig?.facebookPixelId || null;
+      const googleMeasurementId = input.googleMeasurementId
+        ? input.googleMeasurementId
+        : existingConfig?.googleMeasurementId || null;
+      const tiktokPixelId = input.tiktokPixelId
+        ? input.tiktokPixelId
+        : existingConfig?.tiktokPixelId || null;
+
       const encryptedData = {
-        facebookPixelId: input.facebookPixelId || null,
+        facebookPixelId,
         facebookAccessToken,
-        googleMeasurementId: input.googleMeasurementId || null,
+        googleMeasurementId,
         googleApiSecret,
-        tiktokPixelId: input.tiktokPixelId || null,
+        tiktokPixelId,
         tiktokAccessToken,
         enabled: input.enabled,
         // Enable per-platform tracking based on whether credentials are configured
-        // Use either new token from input or preserved existing token
-        facebookEnabled: !!(input.facebookPixelId && facebookAccessToken),
-        googleEnabled: !!(input.googleMeasurementId && googleApiSecret),
-        tiktokEnabled: !!(input.tiktokPixelId && tiktokAccessToken),
+        // Use preserved IDs and tokens for enabled check
+        facebookEnabled: !!(facebookPixelId && facebookAccessToken),
+        googleEnabled: !!(googleMeasurementId && googleApiSecret),
+        tiktokEnabled: !!(tiktokPixelId && tiktokAccessToken),
         updatedAt: new Date(),
       };
 

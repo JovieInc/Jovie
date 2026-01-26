@@ -43,6 +43,15 @@ export async function forwardToFacebook(
 ): Promise<ForwardingResult> {
   const { pixelId, accessToken } = config;
 
+  // Fail fast if credentials are missing
+  if (!pixelId || !accessToken) {
+    return {
+      platform: 'facebook',
+      success: false,
+      error: 'Missing pixelId or accessToken',
+    };
+  }
+
   try {
     const url = `${FACEBOOK_API_URL}/${FACEBOOK_API_VERSION}/${pixelId}/events?access_token=${accessToken}`;
 

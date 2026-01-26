@@ -104,8 +104,10 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
   // Set up link click tracking
   useEffect(() => {
     const handleLinkClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const link = target.closest('a[data-track-link]');
+      // Guard against non-Element targets (e.g., TextNode)
+      if (!(e.target instanceof Element)) return;
+
+      const link = e.target.closest('a[data-track-link]');
 
       if (link) {
         const linkId = link.getAttribute('data-link-id');
@@ -129,7 +131,10 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
   // Set up form submit tracking
   useEffect(() => {
     const handleFormSubmit = (e: Event) => {
-      const form = e.target as HTMLFormElement;
+      // Guard against non-HTMLFormElement targets
+      if (!(e.target instanceof HTMLFormElement)) return;
+
+      const form = e.target;
       if (form.hasAttribute('data-track-form')) {
         const formType = form.getAttribute('data-form-type') || 'unknown';
 
