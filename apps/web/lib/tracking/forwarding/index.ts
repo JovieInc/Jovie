@@ -174,10 +174,7 @@ export async function forwardEvent(
   }
 
   // Update event with forwarding status
-  const forwardingStatus: Record<
-    string,
-    { status: string; sentAt: string; error?: string }
-  > = {};
+  const forwardingStatus: PixelForwardingStatus = {};
 
   // If no platforms configured, mark as skipped to prevent endless retries
   if (results.length === 0) {

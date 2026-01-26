@@ -7,10 +7,21 @@
 import type { CreatorPixel, PixelEvent } from '@/lib/db/schema';
 
 /**
- * Result of a forwarding attempt to a single platform
+ * Result of a forwarding attempt to a single platform.
+ * Platform can be:
+ * - 'facebook', 'google', 'tiktok': Creator's own pixels
+ * - 'jovie_facebook', 'jovie_google', 'jovie_tiktok': Jovie's marketing pixels
+ * - 'skipped': Event was skipped (no consent, no platforms configured)
  */
 export interface ForwardingResult {
-  platform: 'facebook' | 'google' | 'tiktok' | 'jovie';
+  platform:
+    | 'facebook'
+    | 'google'
+    | 'tiktok'
+    | 'jovie_facebook'
+    | 'jovie_google'
+    | 'jovie_tiktok'
+    | 'skipped';
   success: boolean;
   error?: string;
   responseId?: string;
