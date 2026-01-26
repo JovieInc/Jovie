@@ -13,11 +13,7 @@ interface SocialLinkProps {
   artistName: string;
 }
 
-export const SocialLink = memo(function SocialLink({
-  link,
-  handle,
-  artistName,
-}: SocialLinkProps) {
+function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
   // Guard against incomplete link data
   if (!link.platform || !link.url) {
     return null;
@@ -104,4 +100,7 @@ export const SocialLink = memo(function SocialLink({
       <SocialIcon platform={link.platform} className='h-4 w-4' />
     </a>
   );
-});
+}
+
+export const SocialLink = memo(SocialLinkComponent);
+SocialLink.displayName = 'SocialLink';
