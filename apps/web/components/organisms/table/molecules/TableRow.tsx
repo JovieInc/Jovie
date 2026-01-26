@@ -24,8 +24,8 @@ export function TableRow({
         'group transition-colors',
         // Fixed height to prevent layout shift
         'h-[60px]',
-        // Hover state
-        'hover:bg-surface-2',
+        // Hover state - uses design token for consistent dark/light mode
+        'hover:bg-(--color-cell-hover)',
         // Selected state
         selected && 'bg-surface-2/50',
         // Clickable cursor
