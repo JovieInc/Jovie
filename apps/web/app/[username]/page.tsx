@@ -570,10 +570,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export const revalidate = 3600; // 1 hour
 
 // Pre-render top profiles at build time for instant TTFB
-// Featured and claimed profiles are prioritized
+// Featured and claimed profiles are prioritized, ordered by view count
+// Expanded to 250 profiles (from 100) for better coverage of high-traffic pages
 export async function generateStaticParams(): Promise<{ username: string }[]> {
   try {
-    const profiles = await getTopProfilesForStaticGeneration(100);
+    const profiles = await getTopProfilesForStaticGeneration(250);
     return profiles;
   } catch (error) {
     console.error('[generateStaticParams] Failed to fetch profiles:', error);
