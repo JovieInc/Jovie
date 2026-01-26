@@ -1,6 +1,5 @@
 'use client';
 
-import { TooltipProvider } from '@jovie/ui';
 import React from 'react';
 import { useIsMobile } from '@/hooks/useMobile';
 import { useSidebarCookieState } from '@/hooks/useSidebarCookieState';
@@ -85,25 +84,23 @@ export const SidebarProvider = React.forwardRef<
 
     return (
       <SidebarContext.Provider value={contextValue}>
-        <TooltipProvider delayDuration={0}>
-          <div
-            style={
-              {
-                '--sidebar-width': '260px',
-                '--sidebar-width-icon': '52px',
-                ...style,
-              } as React.CSSProperties
-            }
-            className={cn(
-              'group/sidebar-wrapper flex h-svh w-full overflow-x-hidden bg-base',
-              className
-            )}
-            ref={ref}
-            {...props}
-          >
-            {children}
-          </div>
-        </TooltipProvider>
+        <div
+          style={
+            {
+              '--sidebar-width': '260px',
+              '--sidebar-width-icon': '52px',
+              ...style,
+            } as React.CSSProperties
+          }
+          className={cn(
+            'group/sidebar-wrapper flex h-svh w-full overflow-x-hidden bg-base',
+            className
+          )}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </div>
       </SidebarContext.Provider>
     );
   }
