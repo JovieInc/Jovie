@@ -1,6 +1,7 @@
 import {
   Banknote,
   Bell,
+  CalendarDays,
   Home,
   IdCard,
   MessageCircle,
@@ -44,6 +45,13 @@ export const primaryNavigation: NavItem[] = [
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
+  },
+  {
+    name: 'Tour Dates',
+    href: '/app/dashboard/tour-dates',
+    id: 'tour-dates',
+    icon: CalendarDays,
+    description: 'Sync and manage your tour dates',
   },
   {
     name: 'Audience',
