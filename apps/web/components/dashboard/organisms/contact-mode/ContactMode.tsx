@@ -23,6 +23,7 @@ import type { DashboardContact } from '@/types/contacts';
 export interface ContactModeProps {
   artistName: string;
   contacts: DashboardContact[];
+  hasError?: boolean;
 }
 
 interface ContactListItemProps {
@@ -137,7 +138,11 @@ function ContactListItem({
   );
 }
 
-export function ContactMode({ artistName, contacts }: ContactModeProps) {
+export function ContactMode({
+  artistName,
+  contacts,
+  hasError,
+}: ContactModeProps) {
   const router = useRouter();
   const gate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
   const featureEnabled = gate.value;
@@ -166,6 +171,17 @@ export function ContactMode({ artistName, contacts }: ContactModeProps) {
     return (
       <div className='flex h-full items-center justify-center'>
         <p className='text-secondary-token'>Contacts coming soon</p>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center'>
+        <p className='text-secondary-token'>Unable to load contacts</p>
+        <Button size='sm' variant='secondary' onClick={() => router.refresh()}>
+          Try again
+        </Button>
       </div>
     );
   }

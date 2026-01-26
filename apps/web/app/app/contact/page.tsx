@@ -30,7 +30,8 @@ export default async function ContactPage() {
 
   const artist = convertDrizzleCreatorProfileToArtist(profile);
 
-  let contacts: DashboardContact[];
+  let contacts: DashboardContact[] = [];
+  let hasError = false;
   try {
     contacts = await getProfileContactsForOwner(profileId);
   } catch (error) {
@@ -39,12 +40,16 @@ export default async function ContactPage() {
       profileId,
       userId,
     });
-    contacts = [];
+    hasError = true;
   }
 
   return (
     <div className='h-full'>
-      <ContactMode artistName={artist.name} contacts={contacts} />
+      <ContactMode
+        artistName={artist.name}
+        contacts={contacts}
+        hasError={hasError}
+      />
     </div>
   );
 }
