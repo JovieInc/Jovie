@@ -1,19 +1,44 @@
 'use client';
 
-import { Bell, Mail, Phone } from 'lucide-react';
+import { AlertCircle, Bell, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/atoms/Tooltip';
+
 /** Prevents synthetic font weight rendering for better typography */
 const noFontSynthesisStyle: CSSProperties = { fontSynthesisWeight: 'none' };
 
+import { Skeleton } from '@/components/atoms/Skeleton';
 import { CountrySelector } from '@/components/profile/notifications';
 import { CTAButton } from '@/components/ui/CTAButton';
 import { track } from '@/lib/analytics';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
+
+/**
+ * Loading skeleton - shown during hydration while checking subscription status
+ */
+function SubscriptionFormSkeleton() {
+  return (
+    <output className='block space-y-3' aria-busy='true'>
+      <span className='sr-only'>Loading subscription form</span>
+      {/* Input area skeleton */}
+      <Skeleton className='h-12 w-full rounded-2xl' />
+      {/* Button skeleton */}
+      <Skeleton className='h-11 w-full rounded-md' />
+      {/* Disclaimer area skeleton - fixed height to prevent layout shift */}
+      <div className='h-4' />
+    </output>
+  );
+}
 
 /**
  * Listen Now CTA - shown when notifications are disabled or in idle state
@@ -235,6 +260,7 @@ export function ArtistNotificationsCTA({
     subscribedChannels,
     openSubscription,
     registerInputFocus,
+    hydrationStatus,
   } = useSubscriptionForm({ artist });
 
   const inputId = useId();
@@ -263,6 +289,11 @@ export function ArtistNotificationsCTA({
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
   const shouldShowCountrySelector = channel === 'sms' && phoneInput.length > 0;
+
+  // Show loading skeleton while checking subscription status
+  if (hydrationStatus === 'checking') {
+    return <SubscriptionFormSkeleton />;
+  }
 
   if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
@@ -348,22 +379,40 @@ export function ArtistNotificationsCTA({
         {isSubmitting ? 'Subscribing…' : 'Subscribe'}
       </button>
 
-      <p
-        id={disclaimerId}
-        className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
-          isInputFocused ? 'opacity-100' : 'opacity-0'
-        }`}
-        style={noFontSynthesisStyle}
-        aria-hidden={!isInputFocused}
-      >
-        No spam. Opt-out anytime.
-      </p>
+      <div className='flex items-center justify-center gap-2'>
+        <p
+          id={disclaimerId}
+          className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
+            isInputFocused && !error ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={noFontSynthesisStyle}
+          aria-hidden={!isInputFocused || Boolean(error)}
+        >
+          No spam. Opt-out anytime.
+        </p>
 
-      <div className='h-5'>
+        {/* Error tooltip - no layout shift, shows inline icon with tooltip */}
         {error && (
-          <p className='text-sm text-red-500 dark:text-red-400' role='alert'>
-            {error}
-          </p>
+          <TooltipProvider delayDuration={0}>
+            <Tooltip defaultOpen>
+              <TooltipTrigger>
+                <span
+                  className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
+                  role='alert'
+                  aria-live='assertive'
+                >
+                  <AlertCircle className='h-4 w-4' aria-hidden='true' />
+                  <span className='sr-only'>{error}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side='bottom'
+                className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
+              >
+                {error}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </div>

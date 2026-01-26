@@ -63,7 +63,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
           return (
             <div key={section} className='space-y-2'>
               {/* Category header */}
-              <h3 className='px-2 text-xs font-semibold uppercase tracking-wider text-tertiary-token'>
+              <h3 className='px-2 text-xs font-semibold tracking-wider text-tertiary-token'>
                 {labelFor(section)}
               </h3>
 

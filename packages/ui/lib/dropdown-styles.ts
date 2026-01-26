@@ -14,7 +14,7 @@
  * - Item padding: px-3 py-2.5 (12px horizontal, 10px vertical)
  * - Font size: text-sm (14px)
  * - Background: bg-surface-3 (darker, elevated)
- * - Border: subtle white border (border-white/5)
+ * - Border: border-subtle (semantic token)
  * - Transition: duration-150 ease-out
  */
 
@@ -42,9 +42,11 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
 /**
  * Base styles for dropdown/popover content containers
  * Used by: DropdownMenuContent, ContextMenuContent, PopoverContent, SelectContent
+ *
+ * Border uses design token (--color-border-default) for consistency across themes
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-white/5 bg-surface-3 p-1.5 text-primary-token';
+  'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-subtle bg-surface-3 p-1.5 text-primary-token';
 
 /**
  * Shadow effect for elevated appearance
@@ -136,11 +138,12 @@ export const popoverContentClasses = [
 
 /**
  * Complete Select content classes
+ * Border uses design token (--color-border-default) for consistency across themes
  */
 export const selectContentClasses = [
   'relative z-50',
   SELECT_MAX_HEIGHT,
-  'min-w-[8rem] overflow-hidden rounded-xl border border-white/5 bg-surface-3 text-primary-token',
+  'min-w-[8rem] overflow-hidden rounded-xl border border-subtle bg-surface-3 text-primary-token',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -206,8 +209,10 @@ export const MENU_LABEL_BASE =
 
 /**
  * Menu separator styles
+ * Uses design token for border consistency
  */
-export const MENU_SEPARATOR_BASE = '-mx-0.5 my-1 h-px bg-white/10';
+export const MENU_SEPARATOR_BASE =
+  '-mx-0.5 my-1 h-px bg-(--color-border-default)';
 
 /**
  * Keyboard shortcut indicator styles

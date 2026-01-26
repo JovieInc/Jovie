@@ -126,10 +126,12 @@ export function ProfileShell({
               <div className={`${maxWidthClass} space-y-8`}>
                 <ArtistInfo artist={artist} subtitle={subtitle} />
                 {children}
-                {(showSocialBar || showTipButton) && (
+                {/* Show social bar when explicitly enabled, tip button shown, or user is subscribed */}
+                {(showSocialBar || showTipButton || hasActiveSubscriptions) && (
                   <div className='flex items-center justify-between gap-4'>
                     <div className='flex flex-1 justify-start'>
-                      {showSocialBar && (
+                      {/* Show social links when enabled OR when user has active subscriptions */}
+                      {(showSocialBar || hasActiveSubscriptions) && (
                         <div
                           className='flex items-center gap-3'
                           data-testid='social-links'

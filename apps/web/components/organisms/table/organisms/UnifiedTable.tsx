@@ -12,6 +12,7 @@ import {
   type RowSelectionState,
   type SortingState,
   useReactTable,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import React, {
@@ -128,6 +129,11 @@ export interface UnifiedTableProps<TData> {
   className?: string;
 
   /**
+   * Additional container class names (applied to scroll container)
+   */
+  containerClassName?: string;
+
+  /**
    * Min width for table (prevents column squishing)
    */
   minWidth?: string;
@@ -191,6 +197,17 @@ export interface UnifiedTableProps<TData> {
    * @default false
    */
   enablePinning?: boolean;
+
+  /**
+   * Column visibility state (controlled)
+   * Maps column ID to visibility boolean
+   */
+  columnVisibility?: VisibilityState;
+
+  /**
+   * Column visibility change handler
+   */
+  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 }
 
 /**
@@ -375,6 +392,7 @@ export function UnifiedTable<TData>({
   getContextMenuItems,
   getRowClassName,
   className,
+  containerClassName,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   skeletonRows = 20,
   groupingConfig,
@@ -386,6 +404,8 @@ export function UnifiedTable<TData>({
   enableFiltering = false,
   columnPinning,
   enablePinning = false,
+  columnVisibility,
+  onColumnVisibilityChange,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
@@ -431,8 +451,10 @@ export function UnifiedTable<TData>({
     if (sorting !== undefined) state.sorting = sorting;
     if (globalFilter !== undefined) state.globalFilter = globalFilter;
     if (columnPinning !== undefined) state.columnPinning = columnPinning;
+    if (columnVisibility !== undefined)
+      state.columnVisibility = columnVisibility;
     return state;
-  }, [rowSelection, sorting, globalFilter, columnPinning]);
+  }, [rowSelection, sorting, globalFilter, columnPinning, columnVisibility]);
 
   const table = useReactTable({
     data,
@@ -441,6 +463,7 @@ export function UnifiedTable<TData>({
     onRowSelectionChange,
     onSortingChange,
     onGlobalFilterChange,
+    onColumnVisibilityChange,
     getCoreRowModel: coreRowModel,
     getSortedRowModel: sortedRowModel,
     getFilteredRowModel: filteredRowModel,
@@ -540,7 +563,10 @@ export function UnifiedTable<TData>({
   // Loading state
   if (isLoading) {
     return (
-      <div ref={tableContainerRef} className='overflow-auto'>
+      <div
+        ref={tableContainerRef}
+        className={cn('overflow-auto', containerClassName)}
+      >
         <table
           className={cn(
             'w-full border-separate border-spacing-0 text-[13px]',
@@ -581,7 +607,10 @@ export function UnifiedTable<TData>({
   // Empty state
   if (rows.length === 0 && emptyState) {
     return (
-      <div ref={tableContainerRef} className='overflow-auto'>
+      <div
+        ref={tableContainerRef}
+        className={cn('overflow-auto', containerClassName)}
+      >
         <table
           className={cn(
             'w-full border-separate border-spacing-0 text-[13px]',
@@ -624,7 +653,10 @@ export function UnifiedTable<TData>({
   // Render grouped table if grouping is enabled
   if (groupingConfig && groupedData.length > 0) {
     return (
-      <div ref={tableContainerRef} className='overflow-auto'>
+      <div
+        ref={tableContainerRef}
+        className={cn('overflow-auto', containerClassName)}
+      >
         <table
           className={cn(
             'w-full border-separate border-spacing-0 text-[13px]',
@@ -717,7 +749,10 @@ export function UnifiedTable<TData>({
 
   // Render table with data
   return (
-    <div ref={tableContainerRef} className='overflow-auto'>
+    <div
+      ref={tableContainerRef}
+      className={cn('overflow-auto', containerClassName)}
+    >
       <table
         className={cn(
           'w-full border-separate border-spacing-0 text-[13px]',

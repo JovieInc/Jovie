@@ -30,6 +30,8 @@ export * from './links';
 export * from './profiles';
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
 export * from './suppression';
+// Tour (Tour Dates)
+export * from './tour';
 
 // Waitlist
 export * from './waitlist';

@@ -21,6 +21,7 @@ export const STATSIG_FLAGS = {
   // Profile Features
   CONTACTS: 'feature_contacts',
   DYNAMIC_ENGAGEMENT: 'feature_dynamic_engagement',
+  TOUR_DATES: 'feature_tour_dates',
 
   // Backend Features
   AUDIENCE_V2: 'feature_audience_v2',

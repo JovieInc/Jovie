@@ -6,7 +6,13 @@
  */
 
 // Connection
-export { db, getDb, initializeDb } from './connection';
+export {
+  db,
+  getDb,
+  getPoolMetrics,
+  getPoolState,
+  initializeDb,
+} from './connection';
 // Type Guards
 export { isActiveConnectionsRow, isRecord, isTableExistsRow } from './guards';
 // Health Checks
@@ -31,6 +37,7 @@ export type {
   DbType,
   HealthCheckResult,
   PerformanceCheckResult,
+  PoolMetrics,
   TableExistsRow,
   TransactionType,
 } from './types';

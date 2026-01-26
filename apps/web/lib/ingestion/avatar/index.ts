@@ -21,9 +21,48 @@ import { downloadImage, sanitizeHttpsUrl } from './http-client';
 import { optimizeToAvatarAvif, withTimeout } from './image-optimizer';
 
 /**
+ * Process a single link to extract and upload an avatar.
+ * Returns the blob URL on success, throws on failure.
+ */
+async function processAvatarLink(
+  linkUrl: string,
+  safeHandle: string
+): Promise<string> {
+  const candidate = await extractAvatarCandidateFromLinkUrl(linkUrl);
+  if (!candidate) {
+    throw new Error('No avatar candidate found');
+  }
+
+  const downloaded = await downloadImage(candidate.avatarUrl);
+  const optimized = await withTimeout(
+    optimizeToAvatarAvif(downloaded.buffer),
+    PROCESSING_TIMEOUT_MS
+  );
+
+  const seoFileName = buildSeoFilename({
+    originalFilename: downloaded.filename,
+    photoId: randomUUID(),
+    userLabel: safeHandle,
+  });
+
+  const blobPath = `avatars/ingestion/${safeHandle}/${seoFileName}.avif`;
+  const blobUrl = await withTimeout(
+    uploadBufferToBlob({
+      path: blobPath,
+      buffer: optimized.data,
+      contentType: AVIF_MIME_TYPE,
+    }),
+    PROCESSING_TIMEOUT_MS
+  );
+
+  return blobUrl;
+}
+
+/**
  * Copy an avatar from discovered links during ingestion.
  *
- * Iterates through links to find and copy an avatar image.
+ * Processes links in parallel and returns the first successful avatar URL.
+ * Uses Promise.any() to race candidates for faster extraction.
  */
 export async function maybeCopyIngestionAvatarFromLinks(params: {
   handle: string;
@@ -34,46 +73,40 @@ export async function maybeCopyIngestionAvatarFromLinks(params: {
   if (!safeHandle) return null;
   if (links.length === 0) return null;
 
-  for (const linkUrl of links) {
-    try {
-      const candidate = await extractAvatarCandidateFromLinkUrl(linkUrl);
-      if (!candidate) continue;
+  try {
+    // Race all link processing in parallel - first success wins
+    const blobUrl = await Promise.any(
+      links.map(linkUrl => processAvatarLink(linkUrl, safeHandle))
+    );
+    return blobUrl;
+  } catch {
+    // All promises rejected (AggregateError) - no valid avatar found
+    return null;
+  }
+}
 
-      const downloaded = await downloadImage(candidate.avatarUrl);
-      const optimized = await withTimeout(
-        optimizeToAvatarAvif(downloaded.buffer),
-        PROCESSING_TIMEOUT_MS
-      );
-
-      const seoFileName = buildSeoFilename({
-        originalFilename: downloaded.filename,
-        photoId: randomUUID(),
-        userLabel: safeHandle,
-      });
-
-      const blobPath = `avatars/ingestion/${safeHandle}/${seoFileName}.avif`;
-      const blobUrl = await withTimeout(
-        uploadBufferToBlob({
-          path: blobPath,
-          buffer: optimized.data,
-          contentType: AVIF_MIME_TYPE,
-        }),
-        PROCESSING_TIMEOUT_MS
-      );
-
-      return blobUrl;
-    } catch {
-      continue;
-    }
+/**
+ * Extract and download avatar candidate from a link URL.
+ * Returns candidate info and downloaded image on success, throws on failure.
+ */
+async function extractAndDownloadCandidate(linkUrl: string): Promise<{
+  candidate: { avatarUrl: string; sourcePlatform: string };
+  downloaded: { buffer: Buffer; contentType: string; filename: string };
+}> {
+  const candidate = await extractAvatarCandidateFromLinkUrl(linkUrl);
+  if (!candidate) {
+    throw new Error('No avatar candidate found');
   }
 
-  return null;
+  const downloaded = await downloadImage(candidate.avatarUrl);
+  return { candidate, downloaded };
 }
 
 /**
  * Set a profile avatar from discovered links.
  *
- * Creates a profile photo record and updates the profile avatar.
+ * Extracts and downloads candidates in parallel for faster processing,
+ * then creates the profile photo record for the first successful candidate.
  */
 export async function maybeSetProfileAvatarFromLinks(params: {
   db: DbType;
@@ -104,81 +137,88 @@ export async function maybeSetProfileAvatarFromLinks(params: {
   if (avatarLockedByUser) return null;
   if (currentAvatarUrl) return null;
 
-  for (const linkUrl of links) {
-    try {
-      const candidate = await extractAvatarCandidateFromLinkUrl(linkUrl);
-      if (!candidate) continue;
-
-      const downloaded = await downloadImage(candidate.avatarUrl);
-
-      const [photoRecord] = await db
-        .insert(profilePhotos)
-        .values({
-          userId,
-          creatorProfileId: profileId,
-          ingestionOwnerUserId,
-          status: 'processing',
-          sourcePlatform: candidate.sourcePlatform,
-          sourceType,
-          confidence,
-          lockedByUser: false,
-          originalFilename: downloaded.filename,
-          mimeType: downloaded.contentType,
-          fileSize: downloaded.buffer.length,
-        })
-        .returning({ id: profilePhotos.id });
-
-      if (!photoRecord?.id) continue;
-
-      const optimized = await withTimeout(
-        optimizeToAvatarAvif(downloaded.buffer),
-        PROCESSING_TIMEOUT_MS
-      );
-
-      const seoFileName = buildSeoFilename({
-        originalFilename: downloaded.filename,
-        photoId: photoRecord.id,
-      });
-      const blobPath = `avatars/users/${clerkUserId}/${seoFileName}.avif`;
-
-      const blobUrl = await withTimeout(
-        uploadBufferToBlob({
-          path: blobPath,
-          buffer: optimized.data,
-          contentType: AVIF_MIME_TYPE,
-        }),
-        PROCESSING_TIMEOUT_MS
-      );
-
-      await db
-        .update(profilePhotos)
-        .set({
-          blobUrl,
-          smallUrl: blobUrl,
-          mediumUrl: blobUrl,
-          largeUrl: blobUrl,
-          status: 'ready',
-          mimeType: AVIF_MIME_TYPE,
-          fileSize: optimized.info.size ?? optimized.data.length,
-          width: optimized.width,
-          height: optimized.height,
-          processedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(profilePhotos.id, photoRecord.id));
-
-      await db
-        .update(creatorProfiles)
-        .set({ avatarUrl: blobUrl, updatedAt: new Date() })
-        .where(eq(creatorProfiles.id, profileId));
-
-      return blobUrl;
-    } catch {
-      continue;
-    }
+  // Phase 1: Race extraction and download in parallel - first success wins
+  let extractedCandidate: Awaited<
+    ReturnType<typeof extractAndDownloadCandidate>
+  >;
+  try {
+    extractedCandidate = await Promise.any(
+      links.map(linkUrl => extractAndDownloadCandidate(linkUrl))
+    );
+  } catch {
+    // All promises rejected - no valid avatar found
+    return null;
   }
 
-  return null;
+  // Phase 2: Process the winning candidate (DB operations are sequential)
+  const { candidate, downloaded } = extractedCandidate;
+
+  try {
+    const [photoRecord] = await db
+      .insert(profilePhotos)
+      .values({
+        userId,
+        creatorProfileId: profileId,
+        ingestionOwnerUserId,
+        status: 'processing',
+        sourcePlatform: candidate.sourcePlatform,
+        sourceType,
+        confidence,
+        lockedByUser: false,
+        originalFilename: downloaded.filename,
+        mimeType: downloaded.contentType,
+        fileSize: downloaded.buffer.length,
+      })
+      .returning({ id: profilePhotos.id });
+
+    if (!photoRecord?.id) return null;
+
+    const optimized = await withTimeout(
+      optimizeToAvatarAvif(downloaded.buffer),
+      PROCESSING_TIMEOUT_MS
+    );
+
+    const seoFileName = buildSeoFilename({
+      originalFilename: downloaded.filename,
+      photoId: photoRecord.id,
+    });
+    const blobPath = `avatars/users/${clerkUserId}/${seoFileName}.avif`;
+
+    const blobUrl = await withTimeout(
+      uploadBufferToBlob({
+        path: blobPath,
+        buffer: optimized.data,
+        contentType: AVIF_MIME_TYPE,
+      }),
+      PROCESSING_TIMEOUT_MS
+    );
+
+    await db
+      .update(profilePhotos)
+      .set({
+        blobUrl,
+        smallUrl: blobUrl,
+        mediumUrl: blobUrl,
+        largeUrl: blobUrl,
+        status: 'ready',
+        mimeType: AVIF_MIME_TYPE,
+        fileSize: optimized.info.size ?? optimized.data.length,
+        width: optimized.width,
+        height: optimized.height,
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(profilePhotos.id, photoRecord.id));
+
+    await db
+      .update(creatorProfiles)
+      .set({ avatarUrl: blobUrl, updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profileId));
+
+    return blobUrl;
+  } catch {
+    return null;
+  }
 }
 
 /**

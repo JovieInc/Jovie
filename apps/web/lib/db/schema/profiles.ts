@@ -101,6 +101,8 @@ export const creatorProfiles = pgTable(
     tidalId: text('tidal_id'),
     soundcloudId: text('soundcloud_id'),
     musicbrainzId: text('musicbrainz_id'), // MusicBrainz MBID
+    // Tour date integration
+    bandsintownArtistName: text('bandsintown_artist_name'), // For Bandsintown sync
     isPublic: boolean('is_public').default(true),
     isVerified: boolean('is_verified').default(false),
     isFeatured: boolean('is_featured').default(false),
