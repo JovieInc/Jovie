@@ -110,7 +110,7 @@ export function ReleaseDspLinks({
             const isManual = provider.source === 'manual';
 
             const icon = dspId ? (
-              <DspProviderIcon provider={dspId} size='md' />
+              <DspProviderIcon provider={dspId} size='sm' />
             ) : (
               <span
                 className='h-4 w-4 rounded-full shrink-0'

@@ -258,7 +258,7 @@ export function ReleaseTable({
     (row: ReleaseViewModel) =>
       selectedIdsRef.current?.has(row.id)
         ? 'group bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary'
-        : 'group hover:bg-surface-2/50',
+        : 'group hover:bg-(--color-cell-hover)',
     [selectedIdsRef]
   );
 

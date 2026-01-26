@@ -53,12 +53,12 @@ export function TableEmptyState({
   const content = (
     <div
       className={cn(
-        'flex flex-col items-center justify-center gap-4 py-12 px-4 text-center min-h-[400px]',
+        'flex flex-1 flex-col items-center justify-center gap-4 py-12 px-4 text-center min-h-[400px]',
         className
       )}
     >
       {icon && (
-        <div className='flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-secondary-token'>
+        <div className='flex h-10 w-10 items-center justify-center text-tertiary-token'>
           {icon}
         </div>
       )}

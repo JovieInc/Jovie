@@ -34,9 +34,28 @@ const SECTION_LABELS: Record<LinkSection, string> = {
   custom: 'Web',
 };
 
+/**
+ * Display labels for platforms with special casing requirements
+ */
+const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
+  youtube_music: 'YouTube Music',
+  youtubemusic: 'YouTube Music',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  linkedin: 'LinkedIn',
+  soundcloud: 'SoundCloud',
+  bandcamp: 'Bandcamp',
+  apple_music: 'Apple Music',
+  amazon_music: 'Amazon Music',
+  dsp: 'DSP',
+};
+
 function formatPlatformName(platform: string): string {
-  // Capitalize first letter and handle common abbreviations
-  if (platform.toLowerCase() === 'dsp') return 'DSP';
+  const lower = platform.toLowerCase();
+  if (PLATFORM_DISPLAY_LABELS[lower]) {
+    return PLATFORM_DISPLAY_LABELS[lower];
+  }
+  // Fallback: capitalize first letter for unknown platforms
   return platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
 }
 
@@ -86,7 +105,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
           className='shrink-0'
           style={brandColor ? { color: brandColor } : undefined}
         >
-          <SocialIcon platform={link.platform} className='h-5 w-5' />
+          <SocialIcon platform={link.platform} className='h-4 w-4' />
         </span>
         <span className='text-sm font-medium text-primary-token truncate'>
           {platformName}

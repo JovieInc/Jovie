@@ -144,10 +144,7 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleExport}
       disabled={disabled || isExporting}
-      className={cn(
-        'gap-1.5 rounded-lg border-subtle hover:bg-base',
-        className
-      )}
+      className={cn('gap-2 rounded-lg border-subtle hover:bg-base', className)}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >
