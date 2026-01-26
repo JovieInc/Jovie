@@ -55,6 +55,8 @@ interface SearchInputProps {
   onClear: () => void;
   placeholder?: string;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  /** Called when Escape is pressed in the search input */
+  onEscape?: () => void;
 }
 
 function SearchInput({
@@ -63,7 +65,35 @@ function SearchInput({
   onClear,
   placeholder = 'Search...',
   inputRef,
+  onEscape,
 }: SearchInputProps) {
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Escape') {
+        if (value) {
+          // Clear search first, then if pressed again close submenu
+          e.preventDefault();
+          e.stopPropagation();
+          onClear();
+        } else if (onEscape) {
+          // No search value, propagate escape to close submenu
+          onEscape();
+        }
+      } else if (e.key === 'ArrowDown') {
+        // Move focus to first checkbox item
+        e.preventDefault();
+        const container = (e.target as HTMLElement).closest(
+          '[data-radix-menu-content]'
+        );
+        const firstItem = container?.querySelector(
+          'button[data-filter-item]'
+        ) as HTMLElement;
+        firstItem?.focus();
+      }
+    },
+    [value, onClear, onEscape]
+  );
+
   return (
     <div className='sticky top-0 z-10 bg-surface-3 p-2 pb-1'>
       <div className='relative'>
@@ -74,6 +104,7 @@ function SearchInput({
           placeholder={placeholder}
           value={value}
           onChange={e => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
           className={cn(
             'w-full rounded-md border border-subtle bg-surface-2 py-1.5 pl-8 pr-7 text-xs',
             'text-primary-token placeholder:text-tertiary-token',
@@ -85,7 +116,7 @@ function SearchInput({
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
+            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -131,7 +162,7 @@ function ActiveFilterPill({
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -150,6 +181,8 @@ interface SubmenuCheckboxItemProps {
   count?: number;
   checked: boolean;
   onCheckedChange: () => void;
+  /** Ref to the search input to return focus on ArrowUp from first item */
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 function SubmenuCheckboxItem({
@@ -158,15 +191,45 @@ function SubmenuCheckboxItem({
   count,
   checked,
   onCheckedChange,
+  searchInputRef,
 }: SubmenuCheckboxItemProps) {
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = (e.target as HTMLElement)
+          .nextElementSibling as HTMLElement;
+        if (next?.hasAttribute('data-filter-item')) {
+          next.focus();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = (e.target as HTMLElement)
+          .previousElementSibling as HTMLElement;
+        if (prev?.hasAttribute('data-filter-item')) {
+          prev.focus();
+        } else {
+          // At first item, go back to search input
+          searchInputRef?.current?.focus();
+        }
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onCheckedChange();
+      }
+    },
+    [onCheckedChange, searchInputRef]
+  );
+
   return (
     <button
       type='button'
+      data-filter-item
       onClick={e => {
         e.preventDefault();
         e.stopPropagation();
         onCheckedChange();
       }}
+      onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
         'gap-2 pl-2 pr-2 w-full',
@@ -401,7 +464,8 @@ export function ReleaseFilterDropdown({
                     <DropdownMenuPrimitive.Sub
                       onOpenChange={open => {
                         if (open) {
-                          setTimeout(() => typeSearchRef.current?.focus(), 0);
+                          // Delay focus to ensure submenu is rendered
+                          setTimeout(() => typeSearchRef.current?.focus(), 50);
                         } else {
                           setTypeSearch('');
                         }
@@ -463,6 +527,7 @@ export function ReleaseFilterDropdown({
                                   onCheckedChange={() =>
                                     handleTypeToggle(opt.id)
                                   }
+                                  searchInputRef={typeSearchRef}
                                 />
                               ))
                             )}
@@ -477,9 +542,10 @@ export function ReleaseFilterDropdown({
                     <DropdownMenuPrimitive.Sub
                       onOpenChange={open => {
                         if (open) {
+                          // Delay focus to ensure submenu is rendered
                           setTimeout(
                             () => popularitySearchRef.current?.focus(),
-                            0
+                            50
                           );
                         } else {
                           setPopularitySearch('');
@@ -540,6 +606,7 @@ export function ReleaseFilterDropdown({
                                   onCheckedChange={() =>
                                     handlePopularityToggle(opt.id)
                                   }
+                                  searchInputRef={popularitySearchRef}
                                 />
                               ))
                             )}
@@ -554,7 +621,8 @@ export function ReleaseFilterDropdown({
                     <DropdownMenuPrimitive.Sub
                       onOpenChange={open => {
                         if (open) {
-                          setTimeout(() => labelSearchRef.current?.focus(), 0);
+                          // Delay focus to ensure submenu is rendered
+                          setTimeout(() => labelSearchRef.current?.focus(), 50);
                         } else {
                           setLabelSearch('');
                         }
@@ -616,6 +684,7 @@ export function ReleaseFilterDropdown({
                                   onCheckedChange={() =>
                                     handleLabelToggle(opt.label)
                                   }
+                                  searchInputRef={labelSearchRef}
                                 />
                               ))
                             )}
