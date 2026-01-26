@@ -47,7 +47,7 @@ export const CompletionBanner = memo(
           className='shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2 ring-1 ring-inset ring-white/5 dark:ring-white/10'
           aria-hidden='true'
         >
-          <CheckCircle className='h-5 w-5 text-emerald-500' />
+          <CheckCircle className='h-5 w-5 text-success' />
         </div>
         <div className='min-w-0 flex-1 space-y-1'>
           <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
