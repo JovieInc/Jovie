@@ -183,8 +183,8 @@ importers:
         specifier: ^3.31.2
         version: 3.31.2
       '@stripe/stripe-js':
-        specifier: ^7.8.0
-        version: 7.9.0
+        specifier: ^8.6.4
+        version: 8.6.4
       '@tanstack/react-pacer':
         specifier: ^0.19.3
         version: 0.19.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -3620,8 +3620,8 @@ packages:
     resolution: {integrity: sha512-w8CEY73X/7tw2KKlL3iOk679V9bWseE4GzNz3zlaYxcTjmcmWOathRb0emgo/QQ3eoNzmq68+2Y2gxluAv3xGw==}
     engines: {node: '>=12.16'}
 
-  '@stripe/stripe-js@7.9.0':
-    resolution: {integrity: sha512-ggs5k+/0FUJcIgNY08aZTqpBTtbExkJMYMLSMwyucrhtWexVOEY1KJmhBsxf+E/Q15f5rbwBpj+t0t2AW2oCsQ==}
+  '@stripe/stripe-js@8.6.4':
+    resolution: {integrity: sha512-ipBq9+YEt5i4FxotkwNlQDqXvt//9ts23XQ4zgwm7yOkU/k3ZHnNRnm7dR418r5nC455dVYEzP7eERUHLrIYhA==}
     engines: {node: '>=12.16'}
 
   '@swc/core-darwin-arm64@1.15.3':
@@ -14176,7 +14176,7 @@ snapshots:
 
   '@stripe/stripe-js@5.6.0': {}
 
-  '@stripe/stripe-js@7.9.0': {}
+  '@stripe/stripe-js@8.6.4': {}
 
   '@swc/core-darwin-arm64@1.15.3':
     optional: true
