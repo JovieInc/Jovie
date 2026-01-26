@@ -64,7 +64,9 @@ export async function forwardToTikTok(
           referrer: event.referrer,
         },
         user_agent: event.userAgent,
-        ip: event.ipHash, // Already hashed
+        // TikTok Events API requires raw IP address for user matching
+        // https://business-api.tiktok.com/portal/docs?id=1771101027431425
+        ...(event.clientIp && { ip: event.clientIp }),
       },
       properties: {
         content_type: 'profile',

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS "pixel_events" (
   "event_type" "pixel_event_type" NOT NULL,
   "event_data" jsonb DEFAULT '{}'::jsonb,
   "consent_given" boolean DEFAULT false NOT NULL,
+  "client_ip" text,
   "ip_hash" text,
   "user_agent" text,
   "forwarding_status" jsonb DEFAULT '{}'::jsonb,

@@ -93,9 +93,11 @@ export const pixelEvents = pgTable(
     // Consent tracking
     consentGiven: boolean('consent_given').notNull().default(false),
 
-    // Anonymized visitor info (for forwarding to ad platforms)
-    // IP is hashed, not stored raw
-    ipHash: text('ip_hash'),
+    // Visitor info for forwarding to ad platforms
+    // Raw IP is stored temporarily for ad platform matching (Facebook CAPI, TikTok Events API)
+    // IP hash is kept for analytics and deduplication
+    clientIp: text('client_ip'), // Raw IP for ad platform forwarding
+    ipHash: text('ip_hash'), // Hashed IP for analytics
     userAgent: text('user_agent'),
 
     // Forwarding status - tracks which platforms have received this event

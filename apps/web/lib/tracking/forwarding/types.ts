@@ -37,8 +37,10 @@ export interface NormalizedEvent {
   sourceUrl: string;
   referrer?: string;
 
-  // User data (hashed/anonymized)
-  ipHash: string;
+  // User data
+  // Raw IP is required for Facebook CAPI and TikTok Events API matching
+  clientIp?: string; // Raw IP for ad platform forwarding
+  ipHash: string; // Hashed IP for analytics/deduplication
   userAgent?: string;
 
   // UTM parameters
@@ -73,6 +75,7 @@ export function normalizeEvent(event: PixelEvent): NormalizedEvent {
     eventTime: Math.floor(event.createdAt.getTime() / 1000),
     sourceUrl: (eventData?.pageUrl as string) || '',
     referrer: (eventData?.referrer as string) || undefined,
+    clientIp: event.clientIp || undefined,
     ipHash: event.ipHash || '',
     userAgent: event.userAgent || undefined,
     utmSource: (eventData?.utmSource as string) || undefined,

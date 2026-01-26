@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
     // Get user agent
     const userAgent = request.headers.get('user-agent') || undefined;
 
-    // Hash the IP for privacy
+    // Store both raw IP (for ad platform forwarding) and hash (for analytics)
+    // Raw IP is required by Facebook CAPI and TikTok Events API for user matching
     const ipHash = hashIP(clientIP);
 
     // Build event data with UTM params and referrer
@@ -138,7 +139,8 @@ export async function POST(request: NextRequest) {
       eventType,
       eventData: enrichedEventData,
       consentGiven: consent,
-      ipHash,
+      clientIp: clientIP, // Raw IP for ad platform forwarding (Facebook CAPI, TikTok Events API)
+      ipHash, // Hashed IP for analytics
       userAgent,
       forwardingStatus: {},
       forwardAt: new Date(),

@@ -64,8 +64,9 @@ export async function forwardToFacebook(
           event_source_url: event.sourceUrl,
           action_source: 'website',
           user_data: {
-            // We only send hashed/anonymized data
-            client_ip_address: event.ipHash, // Already hashed
+            // Facebook CAPI requires raw IP address for user matching
+            // https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/customer-information-parameters
+            ...(event.clientIp && { client_ip_address: event.clientIp }),
             client_user_agent: event.userAgent,
           },
           custom_data: {
