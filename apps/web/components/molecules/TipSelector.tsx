@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 
 interface TipSelectorProps {
@@ -23,9 +23,13 @@ export function TipSelector({
 
   const selectedAmount = amounts[selectedIdx];
 
-  const handleContinue = () => {
+  const handleContinue = useCallback(() => {
     onContinue(selectedAmount);
-  };
+  }, [onContinue, selectedAmount]);
+
+  const handleAmountSelect = useCallback((idx: number) => {
+    setSelectedIdx(idx);
+  }, []);
 
   // Announce selection changes to screen readers
   useEffect(() => {
@@ -54,7 +58,8 @@ export function TipSelector({
             key={amount}
             amount={amount}
             isSelected={idx === selectedIdx}
-            onClick={() => setSelectedIdx(idx)}
+            onClick={handleAmountSelect}
+            index={idx}
           />
         ))}
       </div>

@@ -1,24 +1,31 @@
+import { memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AmountSelectorProps {
   amount: number;
   isSelected: boolean;
-  onClick: () => void;
+  onClick: (index: number) => void;
+  index: number;
   className?: string;
   disabled?: boolean;
 }
 
-export function AmountSelector({
+export const AmountSelector = memo(function AmountSelector({
   amount,
   isSelected,
   onClick,
+  index,
   className,
   disabled,
 }: AmountSelectorProps) {
+  const handleClick = useCallback(() => {
+    onClick(index);
+  }, [onClick, index]);
+
   return (
     <button
       type='button'
-      onClick={onClick}
+      onClick={handleClick}
       aria-pressed={isSelected}
       aria-label={`Select $${amount} tip amount`}
       disabled={disabled}
@@ -36,4 +43,4 @@ export function AmountSelector({
       <span aria-hidden>{'$' + amount}</span>
     </button>
   );
-}
+});
