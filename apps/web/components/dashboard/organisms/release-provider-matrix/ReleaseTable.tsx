@@ -221,34 +221,91 @@ export function ReleaseTable({
 
   // Context menu items for right-click
   const getContextMenuItems = useCallback(
-    (release: ReleaseViewModel): ContextMenuItemType[] => [
-      {
-        id: 'edit',
-        label: 'Edit links',
-        icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
-        onClick: () => onEdit(release),
-      },
-      {
-        id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void onCopy(
-            release.smartLinkPath,
-            `${release.title} smart link`,
-            `smart-link-copy-${release.id}`
-          );
+    (release: ReleaseViewModel): ContextMenuItemType[] => {
+      const items: ContextMenuItemType[] = [
+        {
+          id: 'edit',
+          label: 'Edit links',
+          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          onClick: () => onEdit(release),
         },
-      },
-      {
-        id: 'copy-release-id',
-        label: 'Copy release ID',
-        icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          navigator.clipboard.writeText(release.id);
+        {
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            );
+          },
         },
-      },
-    ],
+        { type: 'separator' },
+        {
+          id: 'copy-release-id',
+          label: 'Copy release ID',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.id);
+          },
+        },
+      ];
+
+      // Add UPC copy if available
+      if (release.upc) {
+        items.push({
+          id: 'copy-upc',
+          label: 'Copy UPC',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.upc!);
+          },
+        });
+      }
+
+      // Add ISRC copy if available
+      if (release.primaryIsrc) {
+        items.push({
+          id: 'copy-isrc',
+          label: 'Copy ISRC',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.primaryIsrc!);
+          },
+        });
+      }
+
+      // Add external link options for available providers
+      const externalProviders = release.providers.filter(
+        p =>
+          ['spotify', 'apple_music', 'youtube_music', 'deezer'].includes(
+            p.key
+          ) && p.url
+      );
+
+      if (externalProviders.length > 0) {
+        items.push({ type: 'separator' });
+        for (const provider of externalProviders) {
+          const providerLabels: Record<string, string> = {
+            spotify: 'Spotify',
+            apple_music: 'Apple Music',
+            youtube_music: 'YouTube Music',
+            deezer: 'Deezer',
+          };
+          items.push({
+            id: `open-${provider.key}`,
+            label: `Open in ${providerLabels[provider.key] || provider.key}`,
+            icon: <Icon name='ExternalLink' className='h-3.5 w-3.5' />,
+            onClick: () => {
+              window.open(provider.url!, '_blank', 'noopener,noreferrer');
+            },
+          });
+        }
+      }
+
+      return items;
+    },
     [onEdit, onCopy]
   );
 

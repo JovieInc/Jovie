@@ -208,7 +208,7 @@ export function StaticArtistPage({
         socialLinks={socialLinks}
         contacts={contacts}
         subtitle={subtitle}
-        showSocialBar={isPublicProfileMode ? false : mode !== 'listen'}
+        showSocialBar={mode !== 'listen'}
         showTipButton={isPublicProfileMode ? false : showTipButton}
         showBackButton={showBackButton}
         showFooter={showFooter}

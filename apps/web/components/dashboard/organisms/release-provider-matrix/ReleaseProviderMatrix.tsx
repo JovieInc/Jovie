@@ -25,7 +25,11 @@ import { cn } from '@/lib/utils';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
-import { ReleaseTableSubheader } from './ReleaseTableSubheader';
+import {
+  DEFAULT_RELEASE_FILTERS,
+  type ReleaseFilters,
+  ReleaseTableSubheader,
+} from './ReleaseTableSubheader';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -71,8 +75,43 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     resetToDefaults,
   } = useReleaseTablePreferences();
 
-  // Row selection
-  const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
+  // Filter state
+  const [filters, setFilters] = useState<ReleaseFilters>(
+    DEFAULT_RELEASE_FILTERS
+  );
+
+  // Apply filters to rows
+  const filteredRows = useMemo(() => {
+    return rows.filter(release => {
+      // Filter by release type
+      if (
+        filters.releaseTypes.length > 0 &&
+        !filters.releaseTypes.includes(release.releaseType)
+      ) {
+        return false;
+      }
+
+      // Filter by availability
+      if (filters.availability !== 'all') {
+        const providerKeys = Object.keys(providerConfig);
+        const hasAllProviders = providerKeys.every(key =>
+          release.providers.some(p => p.key === key && p.url)
+        );
+
+        if (filters.availability === 'complete' && !hasAllProviders) {
+          return false;
+        }
+        if (filters.availability === 'incomplete' && hasAllProviders) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [rows, filters, providerConfig]);
+
+  // Row selection - use filtered rows
+  const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);
   const { selectedIds, clearSelection, setSelection } = useRowSelection(rowIds);
 
   // Bulk actions
@@ -219,12 +258,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           {/* Sticky subheader - outside scroll container */}
           {showReleasesTable && (
             <ReleaseTableSubheader
-              releases={rows}
+              releases={filteredRows}
               selectedIds={selectedIds}
               columnVisibility={columnVisibility}
               onColumnVisibilityChange={onColumnVisibilityChange}
               availableColumns={availableColumns}
               onResetToDefaults={resetToDefaults}
+              filters={filters}
+              onFiltersChange={setFilters}
             />
           )}
 
@@ -260,7 +301,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {showReleasesTable && (
               <QueryErrorBoundary>
                 <ReleaseTable
-                  releases={rows}
+                  releases={filteredRows}
                   providerConfig={providerConfig}
                   artistName={artistName}
                   onCopy={handleCopy}
@@ -320,7 +361,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           {rows.length > 0 && (
             <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
-                {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
+                {filteredRows.length !== rows.length ? (
+                  <>
+                    {filteredRows.length} of {totalReleases}{' '}
+                    {totalReleases === 1 ? 'release' : 'releases'}
+                  </>
+                ) : (
+                  <>
+                    {totalReleases}{' '}
+                    {totalReleases === 1 ? 'release' : 'releases'}
+                  </>
+                )}
                 {totalOverrides > 0 && (
                   <span className='ml-1.5 text-tertiary-token'>
                     ({totalOverrides} manual{' '}
