@@ -7,6 +7,7 @@ import {
   type CountryOption,
 } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';
+import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
@@ -51,6 +52,7 @@ interface UseSubscriptionFormReturn {
   subscribedChannels: Partial<Record<NotificationChannel, boolean>>;
   openSubscription: () => void;
   registerInputFocus: (focusFn: (() => void) | null) => void;
+  hydrationStatus: 'idle' | 'checking' | 'done';
 }
 
 export function useSubscriptionForm({
@@ -59,6 +61,7 @@ export function useSubscriptionForm({
   const {
     state: notificationsState,
     setState: setNotificationsState,
+    hydrationStatus,
     notificationsEnabled,
     channel,
     setChannel,
@@ -224,6 +227,14 @@ export function useSubscriptionForm({
       setError(message);
       showError(NOTIFICATION_COPY.errors.subscribe);
 
+      // Track error in Sentry for monitoring
+      void captureError('Notification subscription failed', err, {
+        artistId: artist.id,
+        artistHandle: artist.handle,
+        channel,
+        source: 'profile_inline',
+      });
+
       track('notifications_subscribe_error', {
         error_type: 'submission_error',
         channel,
@@ -319,5 +330,6 @@ export function useSubscriptionForm({
     subscribedChannels,
     openSubscription,
     registerInputFocus,
+    hydrationStatus,
   };
 }

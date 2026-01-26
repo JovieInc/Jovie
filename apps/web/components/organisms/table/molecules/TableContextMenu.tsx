@@ -1,7 +1,7 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 
@@ -149,11 +149,12 @@ export function TableContextMenu({
   items,
   disabled = false,
 }: TableContextMenuProps) {
+  // Memoize conversion to prevent recalculation on every render
+  const convertedItems = useMemo(() => convertContextMenuItems(items), [items]);
+
   if (disabled || items.length === 0) {
     return <>{children}</>;
   }
-
-  const convertedItems = convertContextMenuItems(items);
 
   return (
     <TableActionMenu items={convertedItems} trigger='context'>

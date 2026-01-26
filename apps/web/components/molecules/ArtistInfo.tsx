@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArtistName } from '@/components/atoms/ArtistName';
 import { Avatar } from '@/components/atoms/Avatar';
 import { DEFAULT_PROFILE_TAGLINE } from '@/constants/app';
@@ -9,6 +10,8 @@ interface ArtistInfoProps {
   avatarSize?: 'sm' | 'md' | 'lg' | 'xl';
   nameSize?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  /** Whether avatar should link to profile root (useful on deep link routes) */
+  linkToProfile?: boolean;
 }
 
 export function ArtistInfo({
@@ -17,6 +20,7 @@ export function ArtistInfo({
   avatarSize = 'xl',
   nameSize = 'lg',
   className = '',
+  linkToProfile = true,
 }: ArtistInfoProps) {
   const resolvedSubtitle =
     subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
@@ -32,21 +36,35 @@ export function ArtistInfo({
     xl: 'display-2xl',
   } as const;
 
+  const avatarContent = (
+    <div className='rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40'>
+      <Avatar
+        src={artist.image_url || ''}
+        alt={artist.name}
+        name={artist.name}
+        size={avatarSizeMap[avatarSize]}
+        priority
+        verified={false}
+        className='ring-0 shadow-none'
+      />
+    </div>
+  );
+
   return (
     <div
       className={`flex flex-col items-center space-y-3 sm:space-y-4 text-center ${className}`}
     >
-      <div className='rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40'>
-        <Avatar
-          src={artist.image_url || ''}
-          alt={artist.name}
-          name={artist.name}
-          size={avatarSizeMap[avatarSize]}
-          priority
-          verified={false}
-          className='ring-0 shadow-none'
-        />
-      </div>
+      {linkToProfile ? (
+        <Link
+          href={`/${artist.handle}`}
+          className='transition-transform hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 rounded-full'
+          aria-label={`Go to ${artist.name}'s profile`}
+        >
+          {avatarContent}
+        </Link>
+      ) : (
+        avatarContent
+      )}
 
       <div className='space-y-1.5 sm:space-y-2 max-w-md'>
         <ArtistName

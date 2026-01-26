@@ -13,6 +13,7 @@ import * as schema from '../schema';
 import {
   getDb,
   getInternalDb,
+  getPoolMetrics,
   initializeDb,
   setInternalDb,
 } from './connection';
@@ -302,5 +303,6 @@ export function getDbConfig() {
       environment: env.NODE_ENV,
       hasUrl: !!env.DATABASE_URL,
     },
+    pool: getPoolMetrics(),
   };
 }
