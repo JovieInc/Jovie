@@ -44,11 +44,20 @@ const UPDATE_INTERVAL_MS = 60_000;
 
 export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
   const router = useRouter();
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>(() =>
-    getTimeLeft(releaseDate)
-  );
+  // Initialize with null to avoid hydration mismatch (server/client time differences)
+  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
 
   useEffect(() => {
+    // Compute initial time on client to avoid hydration mismatch
+    const initialTimeLeft = getTimeLeft(releaseDate);
+    setTimeLeft(initialTimeLeft);
+
+    // Check immediately in case release time passed during SSR/hydration
+    if (initialTimeLeft.total <= 0) {
+      router.refresh();
+      return;
+    }
+
     const timer = setInterval(() => {
       const newTimeLeft = getTimeLeft(releaseDate);
       setTimeLeft(newTimeLeft);
@@ -63,8 +72,8 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
     return () => clearInterval(timer);
   }, [releaseDate, router]);
 
-  // Don't render if release has passed
-  if (timeLeft.total <= 0) {
+  // Don't render until mounted or if release has passed
+  if (!timeLeft || timeLeft.total <= 0) {
     return null;
   }
 
