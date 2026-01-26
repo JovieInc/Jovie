@@ -12,6 +12,7 @@ import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-da
 import { env } from '@/lib/env';
 import { sendNotification } from '@/lib/notifications/service';
 import { logger } from '@/lib/utils/logger';
+import type { SenderContext } from '@/types/notifications';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -204,7 +205,8 @@ async function fetchStreamingLinks(releaseId: string) {
 async function sendEmailNotification(
   ctx: ProcessingContext,
   subscriber: { email: string },
-  emailData: { subject: string; text: string; html: string }
+  emailData: { subject: string; text: string; html: string },
+  senderContext: SenderContext
 ): Promise<ProcessResult> {
   const result = await sendNotification(
     {
@@ -214,6 +216,7 @@ async function sendEmailNotification(
       html: emailData.html,
       channels: ['email'],
       category: 'marketing',
+      senderContext,
     },
     { email: subscriber.email }
   );
@@ -292,9 +295,22 @@ async function processNotification(
     })),
   });
 
+  // Build sender context for "Artist Name via Jovie" emails
+  const senderContext: SenderContext = {
+    creatorProfileId: creator.id,
+    displayName: artistName,
+    emailType: 'release_notification',
+    referenceId: release.id,
+  };
+
   // Send notification based on channel
   if (subscriber.channel === 'email' && subscriber.email) {
-    return sendEmailNotification(ctx, { email: subscriber.email }, emailData);
+    return sendEmailNotification(
+      ctx,
+      { email: subscriber.email },
+      emailData,
+      senderContext
+    );
   }
 
   if (subscriber.channel === 'sms' && subscriber.phone) {

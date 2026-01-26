@@ -28,6 +28,8 @@ export * from './ingestion';
 export * from './links';
 // Creator Profiles
 export * from './profiles';
+// Sender (Email Quotas, Sending Reputation, Send Attribution)
+export * from './sender';
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
 export * from './suppression';
 // Tour (Tour Dates)
