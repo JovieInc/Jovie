@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, gte, inArray, lte, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   db,
@@ -71,31 +71,53 @@ export async function GET(request: Request) {
 
     let totalScheduled = 0;
 
+    // Batch fetch all subscribers for upcoming releases (eliminates N+1 query)
+    const creatorProfileIds = [
+      ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
+    ];
+
+    const allSubscribers = await db
+      .select({
+        id: notificationSubscriptions.id,
+        creatorProfileId: notificationSubscriptions.creatorProfileId,
+        channel: notificationSubscriptions.channel,
+        email: notificationSubscriptions.email,
+        phone: notificationSubscriptions.phone,
+        preferences: notificationSubscriptions.preferences,
+      })
+      .from(notificationSubscriptions)
+      .where(
+        and(
+          inArray(
+            notificationSubscriptions.creatorProfileId,
+            creatorProfileIds
+          ),
+          sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+          sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+        )
+      );
+
+    // Group subscribers by creatorProfileId for O(1) lookup
+    const subscribersByCreator = new Map<
+      string,
+      (typeof allSubscribers)[number][]
+    >();
+    for (const subscriber of allSubscribers) {
+      const existing = subscribersByCreator.get(subscriber.creatorProfileId);
+      if (existing) {
+        existing.push(subscriber);
+      } else {
+        subscribersByCreator.set(subscriber.creatorProfileId, [subscriber]);
+      }
+    }
+
     // Process each release
     for (const release of upcomingReleases) {
       if (!release.releaseDate) continue;
 
-      // Find subscribers for this creator with releaseDay preference enabled
-      const subscribers = await db
-        .select({
-          id: notificationSubscriptions.id,
-          creatorProfileId: notificationSubscriptions.creatorProfileId,
-          channel: notificationSubscriptions.channel,
-          email: notificationSubscriptions.email,
-          phone: notificationSubscriptions.phone,
-          preferences: notificationSubscriptions.preferences,
-        })
-        .from(notificationSubscriptions)
-        .where(
-          and(
-            eq(
-              notificationSubscriptions.creatorProfileId,
-              release.creatorProfileId
-            ),
-            sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-            sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
-          )
-        );
+      // Look up subscribers from the pre-fetched map
+      const subscribers =
+        subscribersByCreator.get(release.creatorProfileId) || [];
 
       for (const subscriber of subscribers) {
         // Create a unique dedup key to prevent duplicate notifications
