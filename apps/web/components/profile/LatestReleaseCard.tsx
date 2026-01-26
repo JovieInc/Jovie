@@ -1,3 +1,4 @@
+import { Music } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { DiscogRelease } from '@/lib/db/schema';
@@ -39,21 +40,11 @@ export function LatestReleaseCard({
           />
         ) : (
           <div className='flex h-full w-full items-center justify-center'>
-            <svg
+            <Music
               className='h-6 w-6 text-tertiary-token'
-              fill='none'
-              viewBox='0 0 24 24'
-              stroke='currentColor'
               strokeWidth={1.5}
               aria-label='Music note'
-              role='img'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                d='M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z'
-              />
-            </svg>
+            />
           </div>
         )}
       </div>
