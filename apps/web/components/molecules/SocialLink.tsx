@@ -14,16 +14,17 @@ interface SocialLinkProps {
 }
 
 function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
+  // Hooks must be called unconditionally (before any early returns)
+  const [hover, setHover] = useState(false);
+  const brandHex = useMemo(
+    () => getPlatformIcon(link.platform ?? '')?.hex,
+    [link.platform]
+  );
+
   // Guard against incomplete link data
   if (!link.platform || !link.url) {
     return null;
   }
-
-  const [hover, setHover] = useState(false);
-  const brandHex = useMemo(
-    () => getPlatformIcon(link.platform)?.hex,
-    [link.platform]
-  );
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     // Track analytics first

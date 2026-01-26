@@ -55,7 +55,7 @@ export interface CircuitBreakerStats {
  */
 function parseEnvNumber(envVar: string | undefined, fallback: number): number {
   if (!envVar) return fallback;
-  const parsed = parseInt(envVar, 10);
+  const parsed = Number.parseInt(envVar, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 

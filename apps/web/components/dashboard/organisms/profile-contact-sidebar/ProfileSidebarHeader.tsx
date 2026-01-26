@@ -107,7 +107,7 @@ export function ProfileSidebarHeader({
       icon: Copy,
       activeIcon: Check,
       isActive: isCopied,
-      onClick: handleCopyUrl,
+      onClick: () => void handleCopyUrl(),
     },
   ];
 
