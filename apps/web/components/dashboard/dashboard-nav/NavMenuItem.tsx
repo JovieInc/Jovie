@@ -81,9 +81,15 @@ export function NavMenuItem({
         <Link
           href={item.href}
           aria-current={isActive ? 'page' : undefined}
-          className='flex w-full min-w-0 items-center gap-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
+          className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
         >
-          <item.icon className='size-4' aria-hidden='true' />
+          {/* Fixed-width icon container for consistent alignment */}
+          <span
+            data-sidebar-icon
+            className='flex size-4 shrink-0 items-center justify-center'
+          >
+            <item.icon className='size-4' aria-hidden='true' />
+          </span>
           <span className='truncate group-data-[collapsible=icon]:hidden'>
             {item.name}
           </span>
