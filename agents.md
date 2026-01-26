@@ -165,6 +165,14 @@ Jovie/
 | Monorepo | Turborepo |
 | Runtime | Node.js 24 |
 
+### API Runtime
+
+All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge runtime.
+
+**Why:** The API relies on connection pooling (Neon), native bindings (Sharp), payment SDKs (Stripe), and long-duration cron jobs (60-300s)—none of which work on Edge.
+
+**Convention:** Only add `export const runtime = 'nodejs'` when documenting a specific constraint (e.g., Sharp, Stripe). Don't add it to every route as boilerplate.
+
 ---
 
 ## Code Quality Standards
