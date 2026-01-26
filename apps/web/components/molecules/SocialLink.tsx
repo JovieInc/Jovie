@@ -14,6 +14,11 @@ interface SocialLinkProps {
 }
 
 export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
+  // Guard against incomplete link data
+  if (!link.platform || !link.url) {
+    return null;
+  }
+
   const [hover, setHover] = useState(false);
   const brandHex = useMemo(
     () => getPlatformIcon(link.platform)?.hex,
