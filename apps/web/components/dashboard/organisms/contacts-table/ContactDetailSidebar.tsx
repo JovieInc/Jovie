@@ -143,9 +143,23 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     (territory: string) => {
       if (!contact) return;
       const exists = contact.territories.includes(territory);
-      const newTerritories = exists
-        ? contact.territories.filter(t => t !== territory)
-        : [...contact.territories, territory];
+
+      let newTerritories: string[];
+
+      if (territory === 'Worldwide') {
+        // Toggle Worldwide: if already selected, remove it; otherwise set it as the only territory
+        newTerritories = exists ? [] : ['Worldwide'];
+      } else if (exists) {
+        // Removing a non-Worldwide territory
+        newTerritories = contact.territories.filter(t => t !== territory);
+      } else {
+        // Adding a non-Worldwide territory: remove Worldwide if present
+        newTerritories = [
+          ...contact.territories.filter(t => t !== 'Worldwide'),
+          territory,
+        ];
+      }
+
       onUpdate({ territories: newTerritories });
       setTimeout(() => onSave(), 100);
     },
@@ -186,9 +200,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       <span className='text-tertiary-token italic'>{placeholder}</span>
     );
 
+    // Use consistent grid layout for both states to prevent layout shift
+    // Both states use h-8 (32px) height to match the input height
     if (isEditing) {
       return (
-        <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2'>
+        <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
           <Label className='text-xs text-secondary-token'>{label}</Label>
           <Input
             ref={inputRef}
@@ -204,16 +220,16 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     }
 
     return (
-      <DrawerPropertyRow
-        label={label}
-        value={
-          <span className='hover:text-primary-token transition-colors'>
-            {displayValue}
-          </span>
-        }
-        interactive
+      <button
+        type='button'
         onClick={() => startEditing(field)}
-      />
+        className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8 w-full text-left rounded-md -mx-2 px-2 hover:bg-surface-2 transition-colors cursor-pointer'
+      >
+        <span className='text-xs text-secondary-token'>{label}</span>
+        <span className='text-xs text-primary-token hover:text-primary-token transition-colors truncate'>
+          {displayValue}
+        </span>
+      </button>
     );
   };
 

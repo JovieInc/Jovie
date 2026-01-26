@@ -74,11 +74,10 @@ export function ContactDetailHeader({
   ];
 
   return (
-    <div className='flex items-center justify-between px-4 py-3 border-b border-subtle'>
-      <div>
-        <h2 className='text-sm font-medium text-primary-token'>{roleLabel}</h2>
-        <p className='text-xs text-tertiary-token'>Contact details</p>
-      </div>
+    <div className='flex items-center justify-between px-3 py-2'>
+      <p className='text-xs font-medium text-sidebar-foreground truncate'>
+        {roleLabel}
+      </p>
       <DrawerHeaderActions
         primaryActions={primaryActions}
         overflowActions={overflowActions}

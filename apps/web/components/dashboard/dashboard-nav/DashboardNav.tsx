@@ -42,7 +42,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
-  const tourDatesGate = useFeatureGate(STATSIG_FLAGS.TOUR_DATES);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -58,14 +57,14 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   // Memoize filtered items to prevent creating new arrays on every render
+  // Note: Tour dates is now always visible (unflagged)
   const primaryItems = useMemo(
     () =>
       primaryNavigation.filter(item => {
         if (item.id === 'contacts' && !contactsGate.value) return false;
-        if (item.id === 'tour-dates' && !tourDatesGate.value) return false;
         return true;
       }),
-    [contactsGate.value, tourDatesGate.value]
+    [contactsGate.value]
   );
 
   const secondaryItems = secondaryNavigation;
