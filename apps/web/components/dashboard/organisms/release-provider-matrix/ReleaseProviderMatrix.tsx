@@ -73,6 +73,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     availableColumns,
     onColumnVisibilityChange,
     resetToDefaults,
+    showTracks,
+    onShowTracksChange,
+    groupByYear,
+    onGroupByYearChange,
   } = useReleaseTablePreferences();
 
   // Filter state
@@ -96,28 +100,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
     return rows.filter(release => {
       // Filter by release type
-      if (
-        filters.releaseTypes.length > 0 &&
-        !filters.releaseTypes.includes(release.releaseType)
-      ) {
-        return false;
-      }
+      const matchesType =
+        filters.releaseTypes.length === 0 ||
+        filters.releaseTypes.includes(release.releaseType);
+
+      if (!matchesType) return false;
 
       // Filter by availability
-      if (filters.availability === 'all') {
-        return true;
-      }
+      if (filters.availability === 'all') return true;
 
       const hasAll = hasAllProviderUrls(release, providerKeys);
-
-      if (filters.availability === 'complete') {
-        return hasAll;
-      }
-      if (filters.availability === 'incomplete') {
-        return !hasAll;
-      }
-
-      return true;
+      return filters.availability === 'complete' ? hasAll : !hasAll;
     });
   }, [rows, filters, providerConfig, hasAllProviderUrls]);
 
@@ -277,11 +270,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
+              showTracks={showTracks}
+              onShowTracksChange={onShowTracksChange}
+              groupByYear={groupByYear}
+              onGroupByYearChange={onGroupByYearChange}
             />
           )}
 
           {/* Scrollable content area */}
-          <div className='flex-1 min-h-0 overflow-auto'>
+          <div className='flex-1 min-h-0 overflow-auto pb-4'>
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnected={handleArtistConnected}
@@ -325,6 +322,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
+                  showTracks={showTracks}
+                  groupByYear={groupByYear}
                 />
               </QueryErrorBoundary>
             )}
@@ -372,17 +371,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           {rows.length > 0 && (
             <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
-                {filteredRows.length !== rows.length ? (
-                  <>
-                    {filteredRows.length} of {totalReleases}{' '}
-                    {totalReleases === 1 ? 'release' : 'releases'}
-                  </>
-                ) : (
-                  <>
-                    {totalReleases}{' '}
-                    {totalReleases === 1 ? 'release' : 'releases'}
-                  </>
-                )}
+                {filteredRows.length !== rows.length
+                  ? `${filteredRows.length} of ${totalReleases}`
+                  : `${totalReleases}`}{' '}
+                {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
                   <span className='ml-1.5 text-tertiary-token'>
                     ({totalOverrides} manual{' '}

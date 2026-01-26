@@ -48,6 +48,50 @@ interface ReleaseTableSubheaderProps {
   filters: ReleaseFilters;
   /** Callback when filters change */
   onFiltersChange: (filters: ReleaseFilters) => void;
+  /** Whether to show expandable track rows */
+  showTracks?: boolean;
+  /** Callback when showTracks changes */
+  onShowTracksChange?: (show: boolean) => void;
+  /** Whether to group releases by year */
+  groupByYear?: boolean;
+  /** Callback when groupByYear changes */
+  onGroupByYearChange?: (group: boolean) => void;
+}
+
+/** Toggle switch component for display menu options */
+function ToggleSwitch({
+  label,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onToggle}
+      className='flex w-full items-center justify-between gap-2'
+    >
+      <span className='text-[11px] font-medium text-primary-token'>
+        {label}
+      </span>
+      <span
+        className={cn(
+          'flex h-4 w-7 items-center rounded-full p-0.5 transition-colors',
+          checked ? 'bg-primary' : 'bg-surface-3'
+        )}
+      >
+        <span
+          className={cn(
+            'h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
+            checked && 'translate-x-3'
+          )}
+        />
+      </span>
+    </button>
+  );
 }
 
 /**
@@ -55,17 +99,26 @@ interface ReleaseTableSubheaderProps {
  *
  * Features:
  * - Display properties as pill toggles (tightened spacing)
+ * - Show tracks toggle for expandable album rows
  */
 function LinearStyleDisplayMenu({
   columnVisibility,
   onColumnVisibilityChange,
   availableColumns,
   onResetToDefaults,
+  showTracks,
+  onShowTracksChange,
+  groupByYear,
+  onGroupByYearChange,
 }: {
   columnVisibility: Record<string, boolean>;
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   availableColumns: readonly { id: string; label: string }[];
   onResetToDefaults?: () => void;
+  showTracks?: boolean;
+  onShowTracksChange?: (show: boolean) => void;
+  groupByYear?: boolean;
+  onGroupByYearChange?: (group: boolean) => void;
 }) {
   return (
     <Popover>
@@ -82,6 +135,26 @@ function LinearStyleDisplayMenu({
         </PopoverTrigger>
       </TooltipShortcut>
       <PopoverContent align='end' className='w-56 p-0'>
+        {/* View options */}
+        {(onShowTracksChange || onGroupByYearChange) && (
+          <div className='border-b border-subtle px-2.5 py-2 space-y-2'>
+            {onShowTracksChange && (
+              <ToggleSwitch
+                label='Show tracks'
+                checked={showTracks ?? false}
+                onToggle={() => onShowTracksChange(!showTracks)}
+              />
+            )}
+            {onGroupByYearChange && (
+              <ToggleSwitch
+                label='Group by year'
+                checked={groupByYear ?? false}
+                onToggle={() => onGroupByYearChange(!groupByYear)}
+              />
+            )}
+          </div>
+        )}
+
         <div className='p-2.5'>
           <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
             Display properties
@@ -141,6 +214,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onResetToDefaults,
   filters,
   onFiltersChange,
+  showTracks,
+  onShowTracksChange,
+  groupByYear,
+  onGroupByYearChange,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
@@ -161,6 +238,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onColumnVisibilityChange={onColumnVisibilityChange}
           availableColumns={availableColumns}
           onResetToDefaults={onResetToDefaults}
+          showTracks={showTracks}
+          onShowTracksChange={onShowTracksChange}
+          groupByYear={groupByYear}
+          onGroupByYearChange={onGroupByYearChange}
         />
         <ExportCSVButton
           getData={() => getReleasesForExport(releases, selectedIds)}

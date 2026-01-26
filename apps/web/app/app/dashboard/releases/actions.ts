@@ -15,15 +15,21 @@ import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
+  getTracksForReleaseWithProviders,
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
+  type TrackWithProviders,
   upsertProviderLink,
 } from '@/lib/discography/queries';
 import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
 } from '@/lib/discography/spotify-import';
-import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type {
+  ProviderKey,
+  ReleaseViewModel,
+  TrackViewModel,
+} from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
@@ -459,4 +465,79 @@ export async function connectSpotifyArtist(params: {
     releases,
     artistName: params.artistName,
   };
+}
+
+/**
+ * Map track database data to view model
+ */
+function mapTrackToViewModel(
+  track: TrackWithProviders,
+  providerLabels: Record<ProviderKey, string>,
+  profileHandle: string,
+  releaseSlug: string
+): TrackViewModel {
+  return {
+    id: track.id,
+    releaseId: track.releaseId,
+    title: track.title,
+    trackNumber: track.trackNumber,
+    discNumber: track.discNumber,
+    durationMs: track.durationMs,
+    isrc: track.isrc,
+    isExplicit: track.isExplicit,
+    previewUrl: track.previewUrl,
+    providers: Object.entries(providerLabels)
+      .map(([key, label]) => {
+        const providerKey = key as ProviderKey;
+        const match = track.providerLinks.find(
+          link => link.providerId === providerKey
+        );
+        const url = match?.url ?? '';
+        const source: 'manual' | 'ingested' =
+          match?.sourceType === 'manual' ? 'manual' : 'ingested';
+        const updatedAt =
+          match?.updatedAt?.toISOString() ?? new Date().toISOString();
+
+        return {
+          key: providerKey,
+          label,
+          url,
+          source,
+          updatedAt,
+          path: url
+            ? buildSmartLinkPath(profileHandle, releaseSlug, providerKey)
+            : '',
+          isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
+        };
+      })
+      .filter(provider => provider.url !== ''),
+  };
+}
+
+/**
+ * Load tracks for a release (lazy loading for expandable rows)
+ */
+export async function loadTracksForRelease(params: {
+  releaseId: string;
+  releaseSlug: string;
+}): Promise<TrackViewModel[]> {
+  noStore();
+  const { userId } = await getCachedAuth();
+
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  const providerLabels = buildProviderLabels();
+  const tracks = await getTracksForReleaseWithProviders(params.releaseId);
+
+  return tracks.map(track =>
+    mapTrackToViewModel(
+      track,
+      providerLabels,
+      profile.handle,
+      params.releaseSlug
+    )
+  );
 }

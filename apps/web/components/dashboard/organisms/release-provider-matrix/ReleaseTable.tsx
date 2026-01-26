@@ -15,11 +15,14 @@ import {
   TABLE_ROW_HEIGHTS,
 } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { TrackRowsContainer } from './components';
+import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
 import {
   createActionsCellRenderer,
   createActionsHeaderRenderer,
   createAvailabilityCellRenderer,
+  createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createReleaseHeaderRenderer,
   createSelectCellRenderer,
@@ -29,6 +32,7 @@ import {
   renderGenresCell,
   renderIsrcCell,
   renderLabelCell,
+  renderMetricsCell,
   renderPopularityCell,
   renderReleaseDateCell,
   renderReleaseTypeCell,
@@ -67,6 +71,10 @@ interface ReleaseTableProps {
   rowHeight?: number;
   /** Callback when focused row changes via keyboard navigation */
   onFocusedRowChange?: (release: ReleaseViewModel) => void;
+  /** Whether to show expandable track rows for albums/EPs */
+  showTracks?: boolean;
+  /** Group releases by year with sticky headers */
+  groupByYear?: boolean;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -139,6 +147,14 @@ const STATIC_COLUMNS = {
     cell: renderGenresCell,
     size: 100,
   }),
+  // Combined metrics column - replaces individual small columns
+  metrics: columnHelper.display({
+    id: 'metrics',
+    // sr-only header for cleaner look
+    header: () => <span className='sr-only'>Metrics</span>,
+    cell: renderMetricsCell,
+    size: 180,
+  }),
 };
 
 /**
@@ -166,7 +182,17 @@ export function ReleaseTable({
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
   onFocusedRowChange,
+  showTracks = false,
+  groupByYear = false,
 }: ReleaseTableProps) {
+  // Track expansion state (only used when showTracks is enabled)
+  const {
+    expandedReleaseIds,
+    isExpanded,
+    isLoading: isLoadingTracks,
+    toggleExpansion,
+    getTracksForRelease,
+  } = useExpandedTracks();
   // Sorting with URL persistence and debouncing
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
     useSortingManager({ rowCount: releases.length });
@@ -183,10 +209,12 @@ export function ReleaseTable({
     if (externalSelectedIds === undefined) {
       return internalSelection.headerCheckboxState;
     }
+
     let visibleCount = 0;
     for (const id of selectedIds) {
       if (rowIdSet.has(id)) visibleCount++;
     }
+
     if (visibleCount === 0) return false;
     if (visibleCount === rowIds.length) return true;
     return 'indeterminate';
@@ -222,17 +250,21 @@ export function ReleaseTable({
   // Context menu items for right-click
   const getContextMenuItems = useCallback(
     (release: ReleaseViewModel): ContextMenuItemType[] => {
+      const menuIcon = (
+        name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink'
+      ) => <Icon name={name} className='h-3.5 w-3.5' />;
+
       const items: ContextMenuItemType[] = [
         {
           id: 'edit',
           label: 'Edit links',
-          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          icon: menuIcon('PencilLine'),
           onClick: () => onEdit(release),
         },
         {
           id: 'copy-smart-link',
           label: 'Copy smart link',
-          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
+          icon: menuIcon('Link2'),
           onClick: () => {
             void onCopy(
               release.smartLinkPath,
@@ -245,7 +277,7 @@ export function ReleaseTable({
         {
           id: 'copy-release-id',
           label: 'Copy release ID',
-          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          icon: menuIcon('Hash'),
           onClick: () => {
             navigator.clipboard.writeText(release.id);
           },
@@ -257,7 +289,7 @@ export function ReleaseTable({
         items.push({
           id: 'copy-upc',
           label: 'Copy UPC',
-          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          icon: menuIcon('Hash'),
           onClick: () => {
             navigator.clipboard.writeText(release.upc!);
           },
@@ -269,7 +301,7 @@ export function ReleaseTable({
         items.push({
           id: 'copy-isrc',
           label: 'Copy ISRC',
-          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          icon: menuIcon('Hash'),
           onClick: () => {
             navigator.clipboard.writeText(release.primaryIsrc!);
           },
@@ -277,26 +309,30 @@ export function ReleaseTable({
       }
 
       // Add external link options for available providers
+      const supportedProviders = [
+        'spotify',
+        'apple_music',
+        'youtube_music',
+        'deezer',
+      ];
+      const providerLabels: Record<string, string> = {
+        spotify: 'Spotify',
+        apple_music: 'Apple Music',
+        youtube_music: 'YouTube Music',
+        deezer: 'Deezer',
+      };
+
       const externalProviders = release.providers.filter(
-        p =>
-          ['spotify', 'apple_music', 'youtube_music', 'deezer'].includes(
-            p.key
-          ) && p.url
+        p => supportedProviders.includes(p.key) && p.url
       );
 
       if (externalProviders.length > 0) {
         items.push({ type: 'separator' });
         for (const provider of externalProviders) {
-          const providerLabels: Record<string, string> = {
-            spotify: 'Spotify',
-            apple_music: 'Apple Music',
-            youtube_music: 'YouTube Music',
-            deezer: 'Deezer',
-          };
           items.push({
             id: `open-${provider.key}`,
             label: `Open in ${providerLabels[provider.key] || provider.key}`,
-            icon: <Icon name='ExternalLink' className='h-3.5 w-3.5' />,
+            icon: menuIcon('ExternalLink'),
             onClick: () => {
               window.open(provider.url!, '_blank', 'noopener,noreferrer');
             },
@@ -312,11 +348,20 @@ export function ReleaseTable({
   // Stable callbacks for UnifiedTable props
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
   const getRowClassName = useCallback(
-    (row: ReleaseViewModel) =>
-      selectedIdsRef.current?.has(row.id)
-        ? 'group bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary'
-        : 'group hover:bg-(--color-cell-hover)',
-    [selectedIdsRef]
+    (row: ReleaseViewModel) => {
+      const isSelected = selectedIdsRef.current?.has(row.id);
+      const isRowExpanded = showTracks && isExpanded(row.id);
+
+      if (isSelected) {
+        return 'group bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary';
+      }
+      if (isRowExpanded) {
+        // Expanded parent row has slightly darker background (like Linear)
+        return 'group bg-surface-2/50 dark:bg-surface-2/30';
+      }
+      return 'group hover:bg-(--color-cell-hover)';
+    },
+    [selectedIdsRef, showTracks, isExpanded]
   );
 
   // Keyboard navigation callback - open sidebar for focused row
@@ -353,7 +398,14 @@ export function ReleaseTable({
         bulkActionsRef,
         onClearSelection
       ),
-      cell: createReleaseCellRenderer(artistName),
+      cell: showTracks
+        ? createExpandableReleaseCellRenderer(
+            artistName,
+            isExpanded,
+            isLoadingTracks,
+            toggleExpansion
+          )
+        : createReleaseCellRenderer(artistName),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: true,
@@ -387,6 +439,7 @@ export function ReleaseTable({
     });
 
     // Return all columns - TanStack Table handles visibility natively
+    // Uses combined metrics column for cleaner layout with sr-only header
     return [
       checkboxColumn,
       releaseColumn,
@@ -394,13 +447,10 @@ export function ReleaseTable({
       availabilityColumn,
       smartLinkColumn,
       STATIC_COLUMNS.releaseDate,
+      STATIC_COLUMNS.metrics, // Combined: tracks, duration, label
       STATIC_COLUMNS.popularity,
       STATIC_COLUMNS.isrc,
       STATIC_COLUMNS.upc,
-      STATIC_COLUMNS.label,
-      STATIC_COLUMNS.totalTracks,
-      STATIC_COLUMNS.duration,
-      STATIC_COLUMNS.genres,
       actionsColumn,
     ];
   }, [
@@ -415,6 +465,10 @@ export function ReleaseTable({
     selectedIdsRef,
     toggleSelect,
     toggleSelectAll,
+    showTracks,
+    isExpanded,
+    isLoadingTracks,
+    toggleExpansion,
   ]);
 
   // Transform columnVisibility to TanStack format (always show select, release, actions)
@@ -430,6 +484,63 @@ export function ReleaseTable({
 
   const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
 
+  // Check if any rows are expanded (affects virtualization)
+  const hasExpandedRows = useMemo(() => {
+    if (!showTracks) return false;
+    return releases.some(r => isExpanded(r.id));
+  }, [showTracks, releases, isExpanded]);
+
+  // When showTracks is enabled and rows are expanded, disable virtualization
+  // This allows dynamic row counts with track rows
+  const shouldVirtualize = !showTracks || !hasExpandedRows;
+
+  // Get all providers for track row rendering
+  const allProviders = useMemo(
+    () => Object.keys(providerConfig) as ProviderKey[],
+    [providerConfig]
+  );
+
+  // Year grouping configuration
+  const groupingConfig = useMemo(() => {
+    if (!groupByYear) return undefined;
+    return {
+      getGroupKey: (release: ReleaseViewModel) => {
+        if (!release.releaseDate) return 'Unknown';
+        return new Date(release.releaseDate).getFullYear().toString();
+      },
+      getGroupLabel: (year: string) => year,
+    };
+  }, [groupByYear]);
+
+  // Render expanded content for track rows
+  const renderExpandedContent = useCallback(
+    (release: ReleaseViewModel, columnCount: number) => {
+      if (!showTracks) return null;
+
+      const tracks = getTracksForRelease(release.id);
+      if (!tracks) return null;
+
+      return (
+        <TrackRowsContainer
+          tracks={tracks}
+          providerConfig={providerConfig}
+          allProviders={allProviders}
+          columnCount={columnCount}
+        />
+      );
+    },
+    [showTracks, getTracksForRelease, providerConfig, allProviders]
+  );
+
+  // Get expandable row ID (same as row ID for releases)
+  const getExpandableRowId = useCallback(
+    (release: ReleaseViewModel) => release.id,
+    []
+  );
+
+  // Only pass expanded IDs when showTracks is enabled
+  const expandedRowIds = showTracks ? expandedReleaseIds : undefined;
+
   return (
     <UnifiedTable
       data={releases}
@@ -441,13 +552,17 @@ export function ReleaseTable({
       onRowClick={onEdit}
       getRowId={getRowId}
       getRowClassName={getRowClassName}
-      enableVirtualization
+      enableVirtualization={shouldVirtualize && !groupByYear}
       rowHeight={rowHeight}
       minWidth={minWidth}
       className='text-[13px]'
       containerClassName='h-full'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
+      groupingConfig={groupingConfig}
+      expandedRowIds={expandedRowIds}
+      renderExpandedContent={showTracks ? renderExpandedContent : undefined}
+      getExpandableRowId={getExpandableRowId}
     />
   );
 }

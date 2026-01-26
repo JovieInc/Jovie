@@ -6,6 +6,7 @@ import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import { ExpandButton } from '@/components/dashboard/organisms/release-provider-matrix/components/ExpandButton';
 import {
   AvailabilityCell,
   PopularityCell,
@@ -165,6 +166,37 @@ export function createReleaseCellRenderer(artistName?: string | null) {
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
     return <ReleaseCell release={row.original} artistName={artistName} />;
+  };
+}
+
+/** Creates a cell renderer for the release column with expand button */
+export function createExpandableReleaseCellRenderer(
+  artistName: string | null | undefined,
+  isExpanded: (releaseId: string) => boolean,
+  isLoading: (releaseId: string) => boolean,
+  onToggleExpansion: (release: ReleaseViewModel) => void
+) {
+  return function ExpandableReleaseCellRenderer({
+    row,
+  }: CellContext<ReleaseViewModel, unknown>) {
+    const release = row.original;
+    const expanded = isExpanded(release.id);
+    const loading = isLoading(release.id);
+
+    return (
+      <div className='flex items-center gap-1'>
+        <ExpandButton
+          isExpanded={expanded}
+          isLoading={loading}
+          totalTracks={release.totalTracks}
+          onClick={e => {
+            e.stopPropagation();
+            onToggleExpansion(release);
+          }}
+        />
+        <ReleaseCell release={release} artistName={artistName} />
+      </div>
+    );
   };
 }
 
@@ -343,6 +375,48 @@ export function renderGenresCell({
         >
           +{remainingCount}
         </span>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Combined Metrics Cell (Linear-style compact layout)
+// ============================================================================
+
+/**
+ * Combined metrics cell that displays multiple small data points in a
+ * fixed-width layout to prevent layout shift. Includes: tracks, duration, label.
+ */
+export function renderMetricsCell({
+  row,
+}: CellContext<ReleaseViewModel, unknown>) {
+  const release = row.original;
+  const duration = release.totalDurationMs
+    ? formatDuration(release.totalDurationMs)
+    : null;
+
+  return (
+    <div className='flex items-center gap-3 text-xs text-secondary-token tabular-nums'>
+      {/* Tracks count - fixed width */}
+      <span className='w-8 text-right' title='Tracks'>
+        {release.totalTracks}
+      </span>
+
+      {/* Duration - fixed width */}
+      <span className='w-12 text-right' title='Duration'>
+        {duration ?? '—'}
+      </span>
+
+      {/* Label - truncated */}
+      {release.label && (
+        <TruncatedText
+          lines={1}
+          className='max-w-24 text-tertiary-token'
+          tooltipSide='top'
+        >
+          {release.label}
+        </TruncatedText>
       )}
     </div>
   );
