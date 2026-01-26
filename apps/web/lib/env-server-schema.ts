@@ -47,6 +47,9 @@ export const ServerEnvSchema = z.object({
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
 
+  // Bandsintown configuration
+  BANDSINTOWN_APP_ID: z.string().optional(),
+
   // Vercel Blob
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
 
@@ -144,6 +147,7 @@ export const ENV_KEYS = [
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
+  'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',

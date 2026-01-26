@@ -135,7 +135,7 @@ export function DisplayMenuDropdown({
       <DropdownMenuTrigger asChild>
         {trigger ?? defaultTrigger}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' className='w-56'>
+      <DropdownMenuContent align='end' className='w-72 p-3'>
         {/* View Mode Section */}
         {hasViewModeOptions && (
           <>
@@ -213,20 +213,35 @@ export function DisplayMenuDropdown({
         {/* Column Visibility Section */}
         {hasColumnOptions && (
           <>
-            <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {availableColumns.map(column => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  checked={columnVisibility?.[column.id] ?? true}
-                  onCheckedChange={(checked: boolean) =>
-                    onColumnVisibilityChange?.(column.id, checked)
-                  }
-                >
-                  {column.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
+            <div className='space-y-2 px-1'>
+              <h4 className='text-[13px] font-medium text-primary-token'>
+                List options
+              </h4>
+              <p className='text-xs text-secondary-token'>Display properties</p>
+
+              <div className='flex flex-wrap gap-1.5 pt-1'>
+                {availableColumns.map(column => {
+                  const isVisible = columnVisibility?.[column.id] ?? true;
+                  return (
+                    <button
+                      key={column.id}
+                      type='button'
+                      onClick={() =>
+                        onColumnVisibilityChange?.(column.id, !isVisible)
+                      }
+                      className={cn(
+                        'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                        isVisible
+                          ? 'bg-surface-2 text-primary-token'
+                          : 'text-secondary-token hover:text-primary-token'
+                      )}
+                    >
+                      {column.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <DropdownMenuSeparator />
           </>
         )}

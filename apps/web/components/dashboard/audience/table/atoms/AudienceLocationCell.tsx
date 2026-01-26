@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
 
 export interface AudienceLocationCellProps {
@@ -24,7 +25,7 @@ export function AudienceLocationCell({
         className='h-3.5 w-3.5 text-tertiary-token'
         aria-hidden='true'
       />
-      <span className='line-clamp-1'>{locationLabel || 'Unknown'}</span>
+      <TruncatedText lines={1}>{locationLabel || 'Unknown'}</TruncatedText>
     </div>
   );
 }

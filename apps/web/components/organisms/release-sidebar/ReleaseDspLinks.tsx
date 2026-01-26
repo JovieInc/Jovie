@@ -57,6 +57,8 @@ const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   beatport: null,
 };
 
+const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
+
 export function ReleaseDspLinks({
   release,
   providerConfig,
@@ -79,9 +81,11 @@ export function ReleaseDspLinks({
   ) as [ProviderKey, { label: string; accent: string }][];
 
   return (
-    <div className='space-y-2 px-3 py-2'>
+    <div className='space-y-3'>
       <div className='flex items-center justify-between'>
-        <Label className='text-xs text-sidebar-muted'>DSP Links</Label>
+        <span className='text-xs font-medium text-secondary-token'>
+          DSP Links
+        </span>
         {isEditable && availableProviders.length > 0 && (
           <Button
             type='button'
@@ -130,10 +134,9 @@ export function ReleaseDspLinks({
         </div>
       )}
 
-      {/* Empty state - editable: show add button */}
+      {/* Empty states */}
       {release.providers.length === 0 &&
-        isEditable &&
-        availableProviders.length > 0 && (
+        (isEditable && availableProviders.length > 0 ? (
           <button
             type='button'
             onClick={() => onSetIsAddingLink(true)}
@@ -141,17 +144,13 @@ export function ReleaseDspLinks({
           >
             + Add a DSP link
           </button>
-        )}
-
-      {/* Empty state - non-editable: show message */}
-      {release.providers.length === 0 &&
-        (!isEditable || availableProviders.length === 0) && (
+        ) : (
           <p className='text-xs text-sidebar-muted py-2'>No DSP links yet.</p>
-        )}
+        ))}
 
       {isEditable && isAddingLink && (
         <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border bg-sidebar-surface p-3'>
-          <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
+          <div className={FORM_ROW_CLASS}>
             <Label className='text-xs text-sidebar-muted'>Provider</Label>
             <Select
               value={selectedProvider ?? ''}
@@ -178,7 +177,7 @@ export function ReleaseDspLinks({
               </SelectContent>
             </Select>
           </div>
-          <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
+          <div className={FORM_ROW_CLASS}>
             <Label className='text-xs text-sidebar-muted'>URL</Label>
             <Input
               type='url'

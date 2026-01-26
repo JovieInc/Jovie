@@ -10,10 +10,32 @@ import {
 import { typography } from '../table.styles';
 
 /**
- * Convert platform name to title case
- * Examples: "instagram" -> "Instagram", "apple_music" -> "Apple Music"
+ * Display labels for platforms with special casing requirements
+ * These override the generic toTitleCase conversion
  */
-function toTitleCase(str: string): string {
+const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
+  youtube_music: 'YouTube Music',
+  youtubemusic: 'YouTube Music',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  linkedin: 'LinkedIn',
+  soundcloud: 'SoundCloud',
+  bandcamp: 'Bandcamp',
+  apple_music: 'Apple Music',
+  amazon_music: 'Amazon Music',
+};
+
+/**
+ * Convert platform name to display label
+ * Uses PLATFORM_DISPLAY_LABELS for special cases, falls back to title case
+ * Examples: "instagram" -> "Instagram", "youtube_music" -> "YouTube Music"
+ */
+function toDisplayLabel(str: string): string {
+  const lower = str.toLowerCase();
+  if (PLATFORM_DISPLAY_LABELS[lower]) {
+    return PLATFORM_DISPLAY_LABELS[lower];
+  }
+  // Fallback to title case for unknown platforms
   return str
     .split(/[_\s-]+/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -125,8 +147,8 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
           ? link.platformType.toLowerCase()
           : platformLower;
         const platformName = isGenericType
-          ? toTitleCase(link.platformType)
-          : toTitleCase(link.platform);
+          ? toDisplayLabel(link.platformType)
+          : toDisplayLabel(link.platform);
 
         // Distinguish between music platforms (show artist name) and social platforms (show username)
         const isMusicPlatform = [

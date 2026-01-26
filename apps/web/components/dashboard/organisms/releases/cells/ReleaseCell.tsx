@@ -1,9 +1,10 @@
 'use client';
 
-import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import Image from 'next/image';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 interface ReleaseCellProps {
@@ -24,29 +25,9 @@ export const ReleaseCell = memo(function ReleaseCell({
   release,
   artistName,
 }: ReleaseCellProps) {
-  const titleRef = useRef<HTMLSpanElement>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
-
   const manualOverrideCount = release.providers.filter(
     provider => provider.source === 'manual'
   ).length;
-
-  // Check if title is truncated
-  useEffect(() => {
-    const el = titleRef.current;
-    if (el) {
-      setIsTruncated(el.scrollWidth > el.clientWidth);
-    }
-  }, [release.title]);
-
-  const titleElement = (
-    <span
-      ref={titleRef}
-      className='line-clamp-1 text-sm font-semibold text-primary-token rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-    >
-      {release.title}
-    </span>
-  );
 
   return (
     <div className='flex items-center gap-3'>
@@ -74,16 +55,14 @@ export const ReleaseCell = memo(function ReleaseCell({
       {/* Title and metadata */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          {isTruncated ? (
-            <Tooltip>
-              <TooltipTrigger asChild>{titleElement}</TooltipTrigger>
-              <TooltipContent side='top' align='start'>
-                {release.title}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            titleElement
-          )}
+          <TruncatedText
+            lines={1}
+            className='text-sm font-semibold text-primary-token'
+            tooltipSide='top'
+            tooltipAlign='start'
+          >
+            {release.title}
+          </TruncatedText>
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
@@ -94,9 +73,12 @@ export const ReleaseCell = memo(function ReleaseCell({
           )}
         </div>
         {artistName && (
-          <div className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
+          <TruncatedText
+            lines={1}
+            className='mt-0.5 text-xs text-secondary-token'
+          >
             {artistName}
-          </div>
+          </TruncatedText>
         )}
       </div>
     </div>

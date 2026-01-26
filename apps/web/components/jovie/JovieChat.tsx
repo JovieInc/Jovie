@@ -194,22 +194,6 @@ export function JovieChat({ artistContext }: JovieChatProps) {
         // Empty state - centered content
         <div className='flex flex-1 flex-col items-center justify-center px-4'>
           <div className='w-full max-w-2xl space-y-8'>
-            {/* Header */}
-            <div className='text-center'>
-              <div className='mb-4 flex justify-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2'>
-                  <BrandLogo size={32} tone='auto' />
-                </div>
-              </div>
-              <h1 className='text-2xl font-semibold text-primary-token'>
-                Ask Jovie
-              </h1>
-              <p className='mt-2 text-secondary-token'>
-                Get personalized insights about your music career based on your
-                profile and analytics.
-              </p>
-            </div>
-
             {/* Error display */}
             {chatError && (
               <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>

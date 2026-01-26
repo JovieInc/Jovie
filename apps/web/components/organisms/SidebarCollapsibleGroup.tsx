@@ -38,17 +38,18 @@ export function SidebarCollapsibleGroup({
             onClick={() => setOpen(value => !value)}
             tooltip={tooltip}
             className={cn(
-              'justify-between font-semibold uppercase tracking-wide',
-              'text-sidebar-muted hover:text-sidebar-foreground'
+              'justify-between font-medium uppercase tracking-wider',
+              'text-sidebar-muted/70 hover:text-sidebar-foreground',
+              'h-7'
             )}
             aria-expanded={open}
           >
-            <span className='truncate group-data-[collapsible=icon]:hidden text-[11px]'>
+            <span className='truncate group-data-[collapsible=icon]:hidden text-[10px]'>
               {label}
             </span>
             <ChevronRight
               className={cn(
-                'h-4 w-4 shrink-0 transition-transform duration-200 ease-out',
+                'size-3.5 shrink-0 transition-transform duration-200 ease-out',
                 open ? 'rotate-90' : 'rotate-0'
               )}
               aria-hidden='true'

@@ -1,10 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Build extra HTTP headers for Vercel Deployment Protection bypass
+// Both headers are required for browser automation to work correctly
+// See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
 const extraHTTPHeaders: Record<string, string> = {};
 if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
   extraHTTPHeaders['x-vercel-protection-bypass'] =
     process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
 }
 
 // Smoke test optimization: faster timeouts for quick feedback

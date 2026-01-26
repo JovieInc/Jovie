@@ -1,16 +1,33 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { Copy, ExternalLink } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/atoms/Avatar/Avatar';
+import { getQrCodeUrl } from '@/components/atoms/QRCode';
+import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 export interface ProfileContactHeaderProps {
   displayName: string;
   username: string;
   avatarUrl: string | null;
   profilePath: string;
+}
+
+function generateVCard(
+  displayName: string,
+  username: string,
+  profileUrl: string
+): string {
+  return [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${displayName || username}`,
+    `URL:${profileUrl}`,
+    `NOTE:Jovie profile: @${username}`,
+    'END:VCARD',
+  ].join('\r\n');
 }
 
 export function ProfileContactHeader({
@@ -24,38 +41,89 @@ export function ProfileContactHeader({
 
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
-  const handleCopyUrl = useCallback(async () => {
+  // Compute URL once per render (no hook needed)
+  const profileUrl =
+    typeof window === 'undefined'
+      ? profilePath
+      : `${window.location.origin}${profilePath}`;
+
+  // Action handlers - defined inline, no useCallback needed
+  const handleCopyUrl = async () => {
     try {
-      const url = `${window.location.origin}${profilePath}`;
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(profileUrl);
       setIsCopied(true);
       toast.success('Profile URL copied');
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        setIsCopied(false);
-        timeoutRef.current = null;
-      }, 2000);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
     }
-  }, [profilePath]);
+  };
 
-  const handleOpenProfile = useCallback(() => {
+  const handleOpenProfile = () => {
     window.open(profilePath, '_blank', 'noopener,noreferrer');
-  }, [profilePath]);
+  };
+
+  const handleDownloadVCard = () => {
+    const blob = new Blob([generateVCard(displayName, username, profileUrl)], {
+      type: 'text/vcard',
+    });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `${username}.vcf`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+    toast.success('vCard downloaded');
+  };
+
+  const handleDownloadQRCode = () => {
+    const link = document.createElement('a');
+    link.href = getQrCodeUrl(profileUrl, 420);
+    link.download = `${username}-qr.png`;
+    link.click();
+    toast.success('QR code downloaded');
+  };
+
+  // Action arrays - computed inline, no useMemo needed
+  const primaryActions: DrawerHeaderAction[] = [
+    {
+      id: 'copy',
+      label: isCopied ? 'Copied!' : 'Copy profile link',
+      icon: Copy,
+      activeIcon: Check,
+      isActive: isCopied,
+      onClick: handleCopyUrl,
+    },
+  ];
+
+  const overflowActions: DrawerHeaderAction[] = [
+    {
+      id: 'open',
+      label: 'Open profile',
+      icon: ExternalLink,
+      onClick: handleOpenProfile,
+    },
+    {
+      id: 'vcard',
+      label: 'Download vCard',
+      icon: Contact,
+      onClick: handleDownloadVCard,
+    },
+    {
+      id: 'qr',
+      label: 'Download QR code',
+      icon: QrCode,
+      onClick: handleDownloadQRCode,
+    },
+  ];
 
   return (
     <div className='space-y-3'>
-      {/* Avatar and Name Row */}
       <div className='flex items-center gap-3'>
         <Avatar
           src={avatarUrl}
@@ -71,28 +139,10 @@ export function ProfileContactHeader({
             @{username}
           </div>
         </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className='flex gap-2'>
-        <Button
-          size='sm'
-          variant='secondary'
-          onClick={handleCopyUrl}
-          className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
-        >
-          <Copy className='h-3.5 w-3.5 mr-1.5' />
-          {isCopied ? 'Copied!' : 'Copy URL'}
-        </Button>
-        <Button
-          size='sm'
-          variant='secondary'
-          onClick={handleOpenProfile}
-          className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
-        >
-          <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
-          Open
-        </Button>
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
+        />
       </div>
     </div>
   );

@@ -63,26 +63,22 @@ const variantStyles: Record<
   }
 > = {
   default: {
-    iconWrapper:
-      'bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200 dark:bg-gray-900/60 dark:text-gray-400 dark:ring-gray-800',
+    iconWrapper: 'text-tertiary-token',
     heading: 'text-primary-token',
     description: 'text-tertiary-token',
   },
   search: {
-    iconWrapper:
-      'bg-sky-50 text-sky-600 ring-1 ring-inset ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/60',
+    iconWrapper: 'text-sky-600 dark:text-sky-300',
     heading: 'text-sky-800 dark:text-sky-200',
     description: 'text-sky-700/70 dark:text-sky-300/70',
   },
   error: {
-    iconWrapper:
-      'bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/50',
+    iconWrapper: 'text-rose-600 dark:text-rose-300',
     heading: 'text-rose-700 dark:text-rose-200',
     description: 'text-rose-600/70 dark:text-rose-300/70',
   },
   permission: {
-    iconWrapper:
-      'bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/50',
+    iconWrapper: 'text-amber-600 dark:text-amber-300',
     heading: 'text-amber-800 dark:text-amber-200',
     description: 'text-amber-700/70 dark:text-amber-300/70',
   },
@@ -118,7 +114,7 @@ export function EmptyState({
   action,
   secondaryAction,
   variant = 'default',
-  size = 'default',
+  size = 'sm',
   className,
   testId,
 }: EmptyStateProps) {
@@ -209,14 +205,12 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mb-4 flex h-12 w-12 items-center justify-center rounded-full',
+            'mb-4 flex h-10 w-10 items-center justify-center',
             styles.iconWrapper
           )}
           aria-hidden='true'
         >
-          <span className='flex h-8 w-8 items-center justify-center'>
-            {icon}
-          </span>
+          {icon}
         </div>
       )}
 
