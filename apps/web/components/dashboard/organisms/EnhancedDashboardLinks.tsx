@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { startTransition, useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { STATSIG_FLAGS } from '@/lib/flags';
@@ -165,15 +165,13 @@ export function EnhancedDashboardLinks({
 
   // Sync preview data
   useEffect(() => {
-    startTransition(() =>
-      setPreviewData({
-        username,
-        displayName,
-        avatarUrl: avatarUrl || null,
-        links: dashboardLinks,
-        profilePath,
-      })
-    );
+    setPreviewData({
+      username,
+      displayName,
+      avatarUrl: avatarUrl || null,
+      links: dashboardLinks,
+      profilePath,
+    });
   }, [
     avatarUrl,
     dashboardLinks,
@@ -189,7 +187,11 @@ export function EnhancedDashboardLinks({
   return (
     <div
       className={
-        useChatLayout ? 'flex h-full min-w-0 flex-col' : 'min-h-screen min-w-0'
+        useChatLayout
+          ? 'flex h-full min-w-0 flex-col'
+          : sidebarOpen
+            ? 'flex h-full min-w-0 flex-col'
+            : 'min-h-screen min-w-0'
       }
       data-testid='enhanced-dashboard-links'
     >
@@ -197,7 +199,9 @@ export function EnhancedDashboardLinks({
         className={
           useChatLayout
             ? 'flex min-w-0 flex-1 flex-col'
-            : 'w-full min-w-0 space-y-4'
+            : sidebarOpen
+              ? 'flex h-full min-w-0 flex-1 flex-col items-center justify-center'
+              : 'w-full min-w-0 space-y-4'
         }
       >
         {/* Profile editor section - hidden when sidebar is open */}

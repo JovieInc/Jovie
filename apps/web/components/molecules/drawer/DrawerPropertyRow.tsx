@@ -41,7 +41,7 @@ export function DrawerPropertyRow({
       style={gridStyle}
     >
       <div className='pt-0.5 text-xs text-secondary-token'>{label}</div>
-      <div className='min-w-0 text-sm text-primary-token'>{value}</div>
+      <div className='min-w-0 text-xs text-primary-token'>{value}</div>
     </Wrapper>
   );
 }

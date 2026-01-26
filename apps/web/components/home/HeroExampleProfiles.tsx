@@ -44,6 +44,7 @@ export async function HeroExampleProfiles() {
                     alt={creator.name}
                     width={56}
                     height={56}
+                    loading='lazy'
                     className='w-full h-full object-cover'
                   />
                 </div>

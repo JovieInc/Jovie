@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
@@ -13,7 +13,16 @@ interface SocialLinkProps {
   artistName: string;
 }
 
-export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
+export const SocialLink = memo(function SocialLink({
+  link,
+  handle,
+  artistName,
+}: SocialLinkProps) {
+  // Guard against incomplete link data
+  if (!link.platform || !link.url) {
+    return null;
+  }
+
   const [hover, setHover] = useState(false);
   const brandHex = useMemo(
     () => getPlatformIcon(link.platform)?.hex,
@@ -95,4 +104,4 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
       <SocialIcon platform={link.platform} className='h-4 w-4' />
     </a>
   );
-}
+});

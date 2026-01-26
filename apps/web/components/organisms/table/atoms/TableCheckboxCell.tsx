@@ -5,9 +5,9 @@ import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
-// Shared checkbox styling for consistent appearance
+// Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES =
-  'h-4 w-4 border-2 border-subtle rounded-[4px] data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white data-[state=indeterminate]:border-blue-600 data-[state=indeterminate]:bg-blue-600 data-[state=indeterminate]:text-white';
+  'h-4 w-4 border-2 border-subtle rounded-[4px] data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white';
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {

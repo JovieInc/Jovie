@@ -6,9 +6,12 @@
  */
 
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import { track } from '@/lib/analytics';
+import { queryKeys } from '@/lib/queries/keys';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
   areLinkItemsEqual,
@@ -118,6 +121,8 @@ export function useLinksPersistence({
   debounceMs = 500,
   onSyncSuggestions,
 }: UseLinksPersistenceOptions): UseLinksPersistenceReturn {
+  const queryClient = useQueryClient();
+
   // Split initial links into active and suggested
   const activeInitialLinks = useMemo(
     () => (initialLinks || []).filter(l => l.state !== 'suggested'),
@@ -276,6 +281,19 @@ export function useLinksPersistence({
           onSyncSuggestions?.();
         }
 
+        // Invalidate TanStack Query cache for consistency
+        if (profileId) {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.dashboard.socialLinks(profileId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.suggestions.list(profileId),
+          });
+        }
+
+        // Track analytics
+        track('dashboard_social_links_saved', { profileId });
+
         const now = new Date();
         toast.success(
           `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
@@ -289,7 +307,13 @@ export function useLinksPersistence({
         toast.error(message);
       }
     },
-    [profileId, suggestionsEnabled, onSyncSuggestions, linksVersion]
+    [
+      profileId,
+      suggestionsEnabled,
+      onSyncSuggestions,
+      linksVersion,
+      queryClient,
+    ]
   );
 
   // Enqueue a save, ensuring we never write older state after newer state

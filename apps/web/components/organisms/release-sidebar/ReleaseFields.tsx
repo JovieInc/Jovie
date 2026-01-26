@@ -3,11 +3,11 @@
 /**
  * ReleaseFields Component
  *
- * Editable/readonly fields for release title and date
+ * Read-only fields for release title and date display
  */
 
-import { Input, Label } from '@jovie/ui';
-
+import { Label } from '@jovie/ui';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -18,43 +18,36 @@ interface ReleaseFieldsProps {
   title: string;
   releaseDate: string | undefined;
   smartLinkPath: string;
-  isEditable: boolean;
-  onTitleChange: (value: string) => void;
 }
 
 export function ReleaseFields({
   title,
   releaseDate,
   smartLinkPath,
-  isEditable,
-  onTitleChange,
 }: ReleaseFieldsProps) {
   const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
 
   return (
     <div className='space-y-3'>
-      {/* Title field */}
-      {isEditable ? (
-        <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-          <Label className='text-xs text-secondary-token'>Title</Label>
-          <Input
-            value={title}
-            onChange={event => onTitleChange(event.target.value)}
-            placeholder='Release title'
-          />
-        </div>
-      ) : (
-        <DrawerPropertyRow
-          label='Title'
-          value={
-            title ? (
-              <span className='font-medium'>{title}</span>
-            ) : (
-              <span className='text-secondary-token italic'>Untitled</span>
-            )
-          }
-        />
-      )}
+      {/* Title field - always read-only, 2 lines max with tooltip */}
+      <DrawerPropertyRow
+        label='Title'
+        value={
+          title ? (
+            <TruncatedText
+              lines={2}
+              className='font-medium min-h-10'
+              tooltipSide='bottom'
+            >
+              {title}
+            </TruncatedText>
+          ) : (
+            <span className='text-secondary-token italic min-h-10'>
+              Untitled
+            </span>
+          )
+        }
+      />
 
       {/* Release date field (read-only) */}
       <DrawerPropertyRow

@@ -52,9 +52,7 @@ interface ReleaseTableProps {
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
-  onSync: () => void;
   isAddingUrl?: boolean;
-  isSyncing?: boolean;
   /** Selected release IDs (controlled from parent) */
   selectedIds?: Set<string>;
   /** Callback when selection changes */
@@ -67,6 +65,8 @@ interface ReleaseTableProps {
   columnVisibility?: Record<string, boolean>;
   /** Row height from density preference */
   rowHeight?: number;
+  /** Callback when focused row changes via keyboard navigation */
+  onFocusedRowChange?: (release: ReleaseViewModel) => void;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -158,15 +158,14 @@ export function ReleaseTable({
   onCopy,
   onEdit,
   onAddUrl,
-  onSync,
   isAddingUrl,
-  isSyncing,
   selectedIds: externalSelectedIds,
   onSelectionChange,
   bulkActions = [],
   onClearSelection,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  onFocusedRowChange,
 }: ReleaseTableProps) {
   // Sorting with URL persistence and debouncing
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
@@ -222,34 +221,91 @@ export function ReleaseTable({
 
   // Context menu items for right-click
   const getContextMenuItems = useCallback(
-    (release: ReleaseViewModel): ContextMenuItemType[] => [
-      {
-        id: 'edit',
-        label: 'Edit links',
-        icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
-        onClick: () => onEdit(release),
-      },
-      {
-        id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void onCopy(
-            release.smartLinkPath,
-            `${release.title} smart link`,
-            `smart-link-copy-${release.id}`
-          );
+    (release: ReleaseViewModel): ContextMenuItemType[] => {
+      const items: ContextMenuItemType[] = [
+        {
+          id: 'edit',
+          label: 'Edit links',
+          icon: <Icon name='PencilLine' className='h-3.5 w-3.5' />,
+          onClick: () => onEdit(release),
         },
-      },
-      {
-        id: 'copy-release-id',
-        label: 'Copy release ID',
-        icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
-        onClick: () => {
-          navigator.clipboard.writeText(release.id);
+        {
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+          icon: <Icon name='Link2' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            );
+          },
         },
-      },
-    ],
+        { type: 'separator' },
+        {
+          id: 'copy-release-id',
+          label: 'Copy release ID',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.id);
+          },
+        },
+      ];
+
+      // Add UPC copy if available
+      if (release.upc) {
+        items.push({
+          id: 'copy-upc',
+          label: 'Copy UPC',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.upc!);
+          },
+        });
+      }
+
+      // Add ISRC copy if available
+      if (release.primaryIsrc) {
+        items.push({
+          id: 'copy-isrc',
+          label: 'Copy ISRC',
+          icon: <Icon name='Hash' className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(release.primaryIsrc!);
+          },
+        });
+      }
+
+      // Add external link options for available providers
+      const externalProviders = release.providers.filter(
+        p =>
+          ['spotify', 'apple_music', 'youtube_music', 'deezer'].includes(
+            p.key
+          ) && p.url
+      );
+
+      if (externalProviders.length > 0) {
+        items.push({ type: 'separator' });
+        for (const provider of externalProviders) {
+          const providerLabels: Record<string, string> = {
+            spotify: 'Spotify',
+            apple_music: 'Apple Music',
+            youtube_music: 'YouTube Music',
+            deezer: 'Deezer',
+          };
+          items.push({
+            id: `open-${provider.key}`,
+            label: `Open in ${providerLabels[provider.key] || provider.key}`,
+            icon: <Icon name='ExternalLink' className='h-3.5 w-3.5' />,
+            onClick: () => {
+              window.open(provider.url!, '_blank', 'noopener,noreferrer');
+            },
+          });
+        }
+      }
+
+      return items;
+    },
     [onEdit, onCopy]
   );
 
@@ -258,9 +314,22 @@ export function ReleaseTable({
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) =>
       selectedIdsRef.current?.has(row.id)
-        ? 'group bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
-        : 'group hover:bg-surface-2/50',
+        ? 'group bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary'
+        : 'group hover:bg-(--color-cell-hover)',
     [selectedIdsRef]
+  );
+
+  // Keyboard navigation callback - open sidebar for focused row
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      // Guard against stale index when releases array changes
+      if (index < 0 || index >= releases.length) return;
+      const release = releases[index];
+      if (release && onFocusedRowChange) {
+        onFocusedRowChange(release);
+      }
+    },
+    [releases, onFocusedRowChange]
   );
 
   // Build column definitions (dynamic columns only)
@@ -311,17 +380,13 @@ export function ReleaseTable({
 
     const actionsColumn = columnHelper.display({
       id: 'actions',
-      header: createActionsHeaderRenderer(
-        selectedCountRef,
-        onClearSelection,
-        onSync,
-        isSyncing
-      ),
+      header: createActionsHeaderRenderer(selectedCountRef, onClearSelection),
       cell: createActionsCellRenderer(getContextMenuItems),
       size: 80,
     });
 
-    const allColumns = [
+    // Return all columns - TanStack Table handles visibility natively
+    return [
       checkboxColumn,
       releaseColumn,
       STATIC_COLUMNS.releaseType,
@@ -337,17 +402,6 @@ export function ReleaseTable({
       STATIC_COLUMNS.genres,
       actionsColumn,
     ];
-
-    // Filter columns based on visibility
-    if (!columnVisibility) return allColumns;
-
-    return allColumns.filter(col => {
-      const id = col.id;
-      if (!id) return true;
-      // Always show select, release, actions
-      if (id === 'select' || id === 'release' || id === 'actions') return true;
-      return columnVisibility[id] !== false;
-    });
   }, [
     providerConfig,
     artistName,
@@ -355,15 +409,23 @@ export function ReleaseTable({
     onAddUrl,
     isAddingUrl,
     onClearSelection,
-    isSyncing,
-    onSync,
     getContextMenuItems,
-    columnVisibility,
     headerCheckboxStateRef,
     selectedIdsRef,
     toggleSelect,
     toggleSelectAll,
   ]);
+
+  // Transform columnVisibility to TanStack format (always show select, release, actions)
+  const tanstackColumnVisibility = useMemo(() => {
+    if (!columnVisibility) return undefined;
+    return {
+      ...columnVisibility,
+      select: true,
+      release: true,
+      actions: true,
+    };
+  }, [columnVisibility]);
 
   const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
 
@@ -382,6 +444,9 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       className='text-[13px]'
+      containerClassName='h-full'
+      columnVisibility={tanstackColumnVisibility}
+      onFocusedRowChange={handleFocusedRowChange}
     />
   );
 }

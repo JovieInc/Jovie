@@ -33,24 +33,24 @@ export const TOGGLEABLE_COLUMNS = [
 /** Columns always visible (cannot be toggled off) */
 const ALWAYS_VISIBLE_COLUMNS = ['select', 'release', 'actions'];
 
-/** Default column visibility for desktop */
+/** Default column visibility for desktop - cleaner view with essential columns */
 const DEFAULT_DESKTOP_VISIBILITY: ColumnVisibility = {
-  releaseType: true,
-  availability: true,
-  smartLink: true,
-  releaseDate: true,
-  popularity: true,
-  upc: false,
-  primaryIsrc: true,
-  label: true,
-  totalTracks: true,
-  totalDurationMs: true,
-  genres: true,
+  releaseType: false, // Moved into release cell
+  availability: true, // Keep - actionable
+  smartLink: false, // Hide - accessible via context menu
+  releaseDate: true, // Keep - essential
+  popularity: true, // Keep - useful sorting indicator
+  upc: false, // Hide - accessible via context menu
+  primaryIsrc: false, // Hide - accessible via context menu
+  label: true, // Keep - useful grouping info
+  totalTracks: false, // Hide - not essential
+  totalDurationMs: false, // Hide - not essential
+  genres: false, // Hide - secondary info
 };
 
 /** Default column visibility for tablet (768-1024px) */
 const DEFAULT_TABLET_VISIBILITY: ColumnVisibility = {
-  releaseType: true,
+  releaseType: false,
   availability: true,
   smartLink: false,
   releaseDate: true,
@@ -58,7 +58,7 @@ const DEFAULT_TABLET_VISIBILITY: ColumnVisibility = {
   upc: false,
   primaryIsrc: false,
   label: false,
-  totalTracks: true,
+  totalTracks: false,
   totalDurationMs: false,
   genres: false,
 };

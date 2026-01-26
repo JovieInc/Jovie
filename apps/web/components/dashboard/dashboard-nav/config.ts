@@ -1,6 +1,8 @@
 import {
   Banknote,
   Bell,
+  CalendarDays,
+  Contact,
   Home,
   IdCard,
   MessageCircle,
@@ -46,6 +48,13 @@ export const primaryNavigation: NavItem[] = [
     description: 'Link out every provider with one smart link',
   },
   {
+    name: 'Tour Dates',
+    href: '/app/dashboard/tour-dates',
+    id: 'tour-dates',
+    icon: CalendarDays,
+    description: 'Sync and manage your tour dates',
+  },
+  {
     name: 'Audience',
     href: '/app/dashboard/audience',
     id: 'audience',
@@ -55,6 +64,13 @@ export const primaryNavigation: NavItem[] = [
 ];
 
 export const secondaryNavigation: NavItem[] = [
+  {
+    name: 'Contact',
+    href: '/app/contact',
+    id: 'contact_mode',
+    icon: Contact,
+    description: 'Quick access to your contacts',
+  },
   {
     name: 'Earnings',
     href: '/app/dashboard/earnings',

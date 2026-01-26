@@ -34,7 +34,23 @@ export interface SaveSocialLinksInput {
     url: string;
     sortOrder: number;
     isActive: boolean;
+    displayText?: string;
+    state?: string;
+    confidence?: number;
+    sourcePlatform?: string;
+    sourceType?: string;
+    evidence?: string;
   }>;
+  /** Expected version for optimistic locking */
+  expectedVersion?: number;
+}
+
+/**
+ * Response from save social links API.
+ */
+export interface SaveSocialLinksResponse {
+  success: boolean;
+  version?: number;
 }
 
 /**
@@ -60,13 +76,20 @@ async function fetchSocialLinks(
 
 /**
  * Save social links for a profile (batch PUT).
+ * Returns the new version number for optimistic locking.
  */
-async function saveSocialLinks(input: SaveSocialLinksInput): Promise<void> {
-  await fetchWithTimeout('/api/dashboard/social-links', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+async function saveSocialLinks(
+  input: SaveSocialLinksInput
+): Promise<SaveSocialLinksResponse> {
+  const response = await fetchWithTimeout<SaveSocialLinksResponse>(
+    '/api/dashboard/social-links',
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  );
+  return response;
 }
 
 /**

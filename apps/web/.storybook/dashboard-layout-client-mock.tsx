@@ -41,8 +41,13 @@ export default function DashboardLayoutClient({
     rightPanelWidth: null,
   });
 
+  const contextValue = React.useMemo(
+    () => ({ tableMeta, setTableMeta }),
+    [tableMeta]
+  );
+
   return (
-    <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
+    <TableMetaContext.Provider value={contextValue}>
       {children}
     </TableMetaContext.Provider>
   );
