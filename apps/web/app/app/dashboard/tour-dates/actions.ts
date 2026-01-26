@@ -103,6 +103,77 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
   };
 }
 
+/**
+ * Validate ticket URL (must be http or https)
+ */
+function validateTicketUrl(ticketUrl: string | undefined | null): void {
+  if (!ticketUrl) return;
+  try {
+    const url = new URL(ticketUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('Invalid ticket URL: must use http or https');
+    }
+  } catch {
+    throw new Error('Invalid ticket URL');
+  }
+}
+
+/**
+ * Upsert Bandsintown events into the database
+ */
+async function upsertBandsintownEvents(
+  profileId: string,
+  events: Awaited<ReturnType<typeof fetchBandsintownEvents>>
+): Promise<number> {
+  const now = new Date();
+  let synced = 0;
+
+  for (const event of events) {
+    await db
+      .insert(tourDates)
+      .values({
+        profileId,
+        externalId: event.externalId,
+        provider: 'bandsintown',
+        title: event.title,
+        startDate: event.startDate,
+        startTime: event.startTime,
+        venueName: event.venueName,
+        city: event.city,
+        region: event.region,
+        country: event.country,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        ticketUrl: event.ticketUrl,
+        ticketStatus: event.ticketStatus,
+        lastSyncedAt: now,
+        rawData: event.rawData,
+      })
+      .onConflictDoUpdate({
+        target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
+        set: {
+          title: event.title,
+          startDate: event.startDate,
+          startTime: event.startTime,
+          venueName: event.venueName,
+          city: event.city,
+          region: event.region,
+          country: event.country,
+          latitude: event.latitude,
+          longitude: event.longitude,
+          ticketUrl: event.ticketUrl,
+          ticketStatus: event.ticketStatus,
+          lastSyncedAt: now,
+          rawData: event.rawData,
+          updatedAt: now,
+        },
+      });
+    synced++;
+  }
+
+  return synced;
+}
+
 // ============================================================================
 // Server Actions
 // ============================================================================
@@ -231,52 +302,7 @@ export async function connectBandsintownArtist(params: {
 
   // Fetch and sync events
   const events = await fetchBandsintownEvents(params.artistName);
-  const now = new Date();
-
-  // Upsert events
-  let synced = 0;
-  for (const event of events) {
-    await db
-      .insert(tourDates)
-      .values({
-        profileId: profile.id,
-        externalId: event.externalId,
-        provider: 'bandsintown',
-        title: event.title,
-        startDate: event.startDate,
-        startTime: event.startTime,
-        venueName: event.venueName,
-        city: event.city,
-        region: event.region,
-        country: event.country,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        ticketUrl: event.ticketUrl,
-        ticketStatus: event.ticketStatus,
-        lastSyncedAt: now,
-        rawData: event.rawData,
-      })
-      .onConflictDoUpdate({
-        target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
-        set: {
-          title: event.title,
-          startDate: event.startDate,
-          startTime: event.startTime,
-          venueName: event.venueName,
-          city: event.city,
-          region: event.region,
-          country: event.country,
-          latitude: event.latitude,
-          longitude: event.longitude,
-          ticketUrl: event.ticketUrl,
-          ticketStatus: event.ticketStatus,
-          lastSyncedAt: now,
-          rawData: event.rawData,
-          updatedAt: now,
-        },
-      });
-    synced++;
-  }
+  const synced = await upsertBandsintownEvents(profile.id, events);
 
   void trackServerEvent('tour_dates_synced', {
     profileId: profile.id,
@@ -337,54 +363,9 @@ export async function syncFromBandsintown(): Promise<{
     };
   }
 
-  // Fetch events from Bandsintown
+  // Fetch events from Bandsintown and upsert
   const events = await fetchBandsintownEvents(profile.bandsintownArtistName);
-  const now = new Date();
-
-  // Upsert events
-  let synced = 0;
-  for (const event of events) {
-    await db
-      .insert(tourDates)
-      .values({
-        profileId: profile.id,
-        externalId: event.externalId,
-        provider: 'bandsintown',
-        title: event.title,
-        startDate: event.startDate,
-        startTime: event.startTime,
-        venueName: event.venueName,
-        city: event.city,
-        region: event.region,
-        country: event.country,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        ticketUrl: event.ticketUrl,
-        ticketStatus: event.ticketStatus,
-        lastSyncedAt: now,
-        rawData: event.rawData,
-      })
-      .onConflictDoUpdate({
-        target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
-        set: {
-          title: event.title,
-          startDate: event.startDate,
-          startTime: event.startTime,
-          venueName: event.venueName,
-          city: event.city,
-          region: event.region,
-          country: event.country,
-          latitude: event.latitude,
-          longitude: event.longitude,
-          ticketUrl: event.ticketUrl,
-          ticketStatus: event.ticketStatus,
-          lastSyncedAt: now,
-          rawData: event.rawData,
-          updatedAt: now,
-        },
-      });
-    synced++;
-  }
+  const synced = await upsertBandsintownEvents(profile.id, events);
 
   void trackServerEvent('tour_dates_synced', {
     profileId: profile.id,
@@ -431,16 +412,7 @@ export async function createTourDate(params: {
   }
 
   // Validate ticketUrl if provided
-  if (params.ticketUrl) {
-    try {
-      const url = new URL(params.ticketUrl);
-      if (!['http:', 'https:'].includes(url.protocol)) {
-        throw new Error('Invalid ticket URL: must use http or https');
-      }
-    } catch {
-      throw new Error('Invalid ticket URL');
-    }
-  }
+  validateTicketUrl(params.ticketUrl);
 
   const [created] = await db
     .insert(tourDates)
@@ -525,16 +497,7 @@ export async function updateTourDate(params: {
   if (params.region !== undefined) updateData.region = params.region;
   if (params.country !== undefined) updateData.country = params.country;
   if (params.ticketUrl !== undefined) {
-    if (params.ticketUrl) {
-      try {
-        const url = new URL(params.ticketUrl);
-        if (!['http:', 'https:'].includes(url.protocol)) {
-          throw new Error('Invalid ticket URL: must use http or https');
-        }
-      } catch {
-        throw new Error('Invalid ticket URL');
-      }
-    }
+    validateTicketUrl(params.ticketUrl);
     updateData.ticketUrl = params.ticketUrl;
   }
   if (params.ticketStatus !== undefined)

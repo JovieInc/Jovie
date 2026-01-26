@@ -108,12 +108,13 @@ export async function GET(
 }
 
 /**
- * Escape special characters for ICS format
+ * Escape special characters for ICS format per RFC 5545
  */
 function escapeIcsText(text: string): string {
   return text
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
+    .replace(/\r/g, '')
     .replace(/\n/g, '\\n');
 }

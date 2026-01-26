@@ -3,9 +3,10 @@
 import { Button } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import type {
-  BandsintownConnectionStatus,
-  TourDateViewModel,
+import {
+  type BandsintownConnectionStatus,
+  loadTourDates,
+  type TourDateViewModel,
 } from '@/app/app/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -42,8 +43,10 @@ export function TourDatesManager({
     try {
       const result = await syncMutation.mutateAsync();
       if (result.success) {
+        // Refresh local state with updated tour dates
+        const refreshed = await loadTourDates();
+        setTourDates(refreshed);
         toast.success(result.message);
-        // Query invalidation in onSuccess handles cache refresh
       } else {
         toast.error(result.message);
       }
@@ -65,6 +68,10 @@ export function TourDatesManager({
       await disconnectMutation.mutateAsync();
       setIsConnected(false);
       setTourDates(prev => prev.filter(td => td.provider !== 'bandsintown'));
+      // Clear selected tour date if it was from Bandsintown
+      setSelectedTourDate(prev =>
+        prev?.provider === 'bandsintown' ? null : prev
+      );
       toast.success('Disconnected from Bandsintown');
     } catch {
       toast.error('Failed to disconnect');
@@ -172,10 +179,7 @@ export function TourDatesManager({
             />
           ) : (
             <div className='flex flex-col items-center justify-center py-16 text-center'>
-              <Icon
-                name='CalendarX2'
-                className='h-12 w-12 text-tertiary-token'
-              />
+              <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
               <p className='mt-4 text-sm text-secondary-token'>
                 No tour dates found
               </p>
