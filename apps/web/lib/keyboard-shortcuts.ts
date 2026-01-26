@@ -6,6 +6,7 @@ import {
   IdCard,
   Keyboard,
   LogOut,
+  MessageCircle,
   Music,
   PanelLeft,
   Search,
@@ -150,6 +151,17 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     secondKey: 'e',
   },
   {
+    id: 'nav-chat',
+    label: 'Go to chat',
+    keys: 'G then T',
+    category: 'navigation',
+    icon: MessageCircle,
+    href: '/app/dashboard/chat',
+    isSequential: true,
+    firstKey: 'g',
+    secondKey: 't',
+  },
+  {
     id: 'nav-settings',
     label: 'Go to settings',
     keys: 'G then S',
@@ -182,6 +194,7 @@ export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,
   earnings: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-earnings')!,
+  chat: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-chat')!,
   account: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-settings')!,
 };
 
