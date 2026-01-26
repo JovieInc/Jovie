@@ -112,17 +112,21 @@ export function DashboardNav(_: DashboardNavProps) {
 
   return (
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
-      <SidebarGroup className='mb-1 space-y-1.5'>
-        <SidebarGroupContent className='space-y-1'>
-          {navSections.map(section => (
+      <SidebarGroup className='mb-1'>
+        <SidebarGroupContent className='space-y-3'>
+          {navSections.map((section, index) => (
             <div key={section.key} data-nav-section>
+              {/* Section divider for visual separation (except for first section) */}
+              {index > 0 && (
+                <div className='mb-1.5 border-t border-sidebar-border/50' />
+              )}
               {renderSection(section.items)}
             </div>
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
       {isAdmin && !isInSettings && (
-        <div className='mt-4'>
+        <div className='mt-3 pt-3 border-t border-sidebar-border/50'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>
