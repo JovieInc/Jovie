@@ -326,6 +326,19 @@ export const RATE_LIMITERS = {
     prefix: 'ai:chat',
     analytics: true,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Tour Date Operations
+  // ---------------------------------------------------------------------------
+
+  /** Bandsintown sync: 1 sync per 5 minutes per profile - conservative limit */
+  bandsintownSync: {
+    name: 'Bandsintown Sync',
+    limit: 1,
+    window: '5 m',
+    prefix: 'bandsintown:sync',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;
