@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import {
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
@@ -141,7 +142,12 @@ export function useReleaseProviderMatrix({
           toast.success('Link updated');
         },
         onError: error => {
-          console.error(error);
+          captureError('Failed to save provider override', error, {
+            context: 'release-mutation',
+            releaseId: editingRelease.id,
+            provider,
+            action: 'save-provider-override',
+          });
           toast.error('Failed to save override');
         },
       }
@@ -168,7 +174,12 @@ export function useReleaseProviderMatrix({
             );
           },
           onError: error => {
-            console.error(error);
+            captureError('Failed to add provider link', error, {
+              context: 'release-mutation',
+              releaseId,
+              provider,
+              action: 'add-provider-link',
+            });
             toast.error('Failed to add link');
           },
         }
@@ -196,13 +207,24 @@ export function useReleaseProviderMatrix({
           toast.success('Reverted to detected link');
         },
         onError: error => {
-          console.error(error);
+          captureError('Failed to reset provider link', error, {
+            context: 'release-mutation',
+            releaseId: editingRelease.id,
+            provider,
+            action: 'reset-provider-link',
+          });
           toast.error('Failed to reset link');
         },
       }
     );
   };
 
+  // Use ref for profileId to avoid recreation when it changes
+  const profileIdRef = useRef(profileId);
+  profileIdRef.current = profileId;
+
+  // CRITICAL: Use syncMutation.mutate directly (it's stable from TanStack Query)
+  // Don't depend on the whole syncMutation object which changes every render
   const handleSync = useCallback(() => {
     syncMutation.mutate(undefined, {
       onSuccess: result => {
@@ -214,11 +236,16 @@ export function useReleaseProviderMatrix({
         }
       },
       onError: error => {
-        console.error(error);
+        captureError('Failed to sync releases from Spotify', error, {
+          context: 'release-mutation',
+          profileId: profileIdRef.current,
+          action: 'sync-from-spotify',
+        });
         toast.error('Failed to sync from Spotify');
       },
     });
-  }, [syncMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
+  }, [syncMutation.mutate]);
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(

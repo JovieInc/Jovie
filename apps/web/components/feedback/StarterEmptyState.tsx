@@ -36,6 +36,11 @@ export function StarterEmptyState({
     const variant = action.variant ?? (isPrimary ? 'primary' : 'secondary');
     const baseClasses =
       'inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
+    const variantClasses =
+      variant === 'primary'
+        ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
+        : 'border border-subtle bg-surface-1 text-primary-token hover:bg-surface-2 focus-visible:ring-zinc-900 dark:border-zinc-700';
+    const classes = cn(baseClasses, variantClasses);
 
     if (action.href) {
       const isInternal = action.href.startsWith('/');
@@ -45,12 +50,7 @@ export function StarterEmptyState({
           <Link
             key={`${action.label}-${action.href}`}
             href={action.href}
-            className={cn(
-              baseClasses,
-              variant === 'primary'
-                ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-                : 'border border-subtle bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
-            )}
+            className={classes}
           >
             {action.label}
           </Link>
@@ -62,12 +62,7 @@ export function StarterEmptyState({
           key={`${action.label}-${action.href}`}
           href={action.href}
           onClick={action.onClick}
-          className={cn(
-            baseClasses,
-            variant === 'primary'
-              ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-              : 'border border-subtle bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
-          )}
+          className={classes}
         >
           {action.label}
         </a>
@@ -79,12 +74,7 @@ export function StarterEmptyState({
         key={action.label}
         type='button'
         onClick={action.onClick}
-        className={cn(
-          baseClasses,
-          variant === 'primary'
-            ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-            : 'border border-subtle bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
-        )}
+        className={classes}
       >
         {action.label}
       </button>
@@ -108,14 +98,12 @@ export function StarterEmptyState({
         </div>
         <div className='flex-1 space-y-2'>
           <div>
-            <p className='text-base font-semibold text-primary-token'>
-              {title}
-            </p>
-            <p className='text-sm text-secondary-token'>{description}</p>
+            <p className='text-xl font-semibold text-primary-token'>{title}</p>
+            <p className='text-sm text-tertiary-token'>{description}</p>
           </div>
 
           {(primaryAction || secondaryAction) && (
-            <div className='flex flex-wrap gap-2'>
+            <div className='flex flex-wrap gap-3'>
               {primaryAction ? renderAction(primaryAction, true) : null}
               {secondaryAction ? renderAction(secondaryAction, false) : null}
             </div>

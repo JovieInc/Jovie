@@ -83,11 +83,12 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
     : null;
 
   // Determine button label based on approval state
-  const approveButtonLabel = isApproved
-    ? 'Approved'
-    : isApproving
-      ? 'Approving…'
-      : 'Approve';
+  const getApproveButtonLabel = (): string => {
+    if (isApproved) return 'Approved';
+    if (isApproving) return 'Approving…';
+    return 'Approve';
+  };
+  const approveButtonLabel = getApproveButtonLabel();
 
   return (
     <div className='bg-surface-0 border border-subtle rounded-xl overflow-hidden'>

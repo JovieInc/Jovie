@@ -117,20 +117,40 @@ export { UnifiedTable } from './organisms/UnifiedTable';
 // =============================================================================
 
 export type {
+  UseRowKeyboardOptions,
+  UseRowKeyboardResult,
+} from './hooks/useRowKeyboard';
+export { useRowKeyboard } from './hooks/useRowKeyboard';
+export type {
   HeaderCheckboxState,
   UseRowSelectionResult,
 } from './hooks/useRowSelection';
 export { useRowSelection } from './hooks/useRowSelection';
 export type {
+  UseStableSelectionRefsOptions,
+  UseStableSelectionRefsResult,
+} from './hooks/useStableSelectionRefs';
+export { useStableSelectionRefs } from './hooks/useStableSelectionRefs';
+export type {
   UseTableKeyboardNavProps,
   UseTableKeyboardNavReturn,
 } from './hooks/useTableKeyboardNav';
 export { useTableKeyboardNav } from './hooks/useTableKeyboardNav';
+export type {
+  TableStateResult,
+  UseTableStateOptions,
+} from './hooks/useTableState';
+export { useTableState } from './hooks/useTableState';
 
 // =============================================================================
 // Utilities & Hooks
 // =============================================================================
 
+export type {
+  SelectionColumnOptions,
+  SelectionColumnRenderers,
+} from './utils/createSelectionColumnFactory';
+export { createSelectionColumnFactory } from './utils/createSelectionColumnFactory';
 export { useTableGrouping } from './utils/useTableGrouping';
 
 // =============================================================================

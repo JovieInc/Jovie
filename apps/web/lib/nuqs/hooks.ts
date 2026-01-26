@@ -306,6 +306,129 @@ export function useSearchQuery(
 }
 
 // ============================================================================
+// Release Table Sort Hook
+// ============================================================================
+
+/**
+ * Valid sort fields for the release table.
+ * These must match the column IDs in ReleaseTable.tsx
+ */
+export const releaseSortFields = [
+  'releaseDate',
+  'title',
+  'releaseType',
+  'popularity',
+  'primaryIsrc',
+  'upc',
+  'label',
+  'totalTracks',
+  'totalDurationMs',
+] as const;
+
+export type ReleaseSortField = (typeof releaseSortFields)[number];
+
+/**
+ * Release sort state from URL params.
+ */
+export interface ReleaseSortState {
+  sort: ReleaseSortField;
+  direction: 'asc' | 'desc';
+}
+
+/**
+ * Release sort actions for updating URL params.
+ */
+export interface ReleaseSortActions {
+  setSort: (field: ReleaseSortField) => void;
+  setDirection: (direction: 'asc' | 'desc') => void;
+  /** Set both field and direction at once - use when syncing from TanStack Table */
+  setSorting: (field: ReleaseSortField, direction: 'asc' | 'desc') => void;
+  toggleSort: (field: ReleaseSortField) => void;
+}
+
+/**
+ * Hook for managing release table sort state in URL params.
+ *
+ * This hook provides type-safe sorting for the ReleaseTable component,
+ * persisting sort state to the URL for shareable links and browser history.
+ *
+ * @example
+ * ```tsx
+ * function ReleaseTable() {
+ *   const [{ sort, direction }, { toggleSort }] = useReleaseSortParams();
+ *
+ *   // Convert to TanStack SortingState
+ *   const sorting = useMemo(() =>
+ *     [{ id: sort, desc: direction === 'desc' }],
+ *     [sort, direction]
+ *   );
+ *
+ *   return <UnifiedTable sorting={sorting} onSortingChange={...} />
+ * }
+ * ```
+ */
+export function useReleaseSortParams(): [ReleaseSortState, ReleaseSortActions] {
+  const [state, setQueryStates] = useQueryStates(
+    {
+      sort: parseAsStringLiteral(releaseSortFields).withDefault('releaseDate'),
+      direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault(
+        'desc'
+      ),
+    },
+    {
+      shallow: true,
+      history: 'push',
+    }
+  );
+
+  const setSort = useCallback(
+    (field: ReleaseSortField) => {
+      setQueryStates({ sort: field });
+    },
+    [setQueryStates]
+  );
+
+  const setDirection = useCallback(
+    (direction: 'asc' | 'desc') => {
+      setQueryStates({ direction });
+    },
+    [setQueryStates]
+  );
+
+  // Set both field and direction at once - avoids intermediate states
+  // Use this when syncing from TanStack Table's onSortingChange
+  const setSorting = useCallback(
+    (field: ReleaseSortField, direction: 'asc' | 'desc') => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (state.sort === field && state.direction === direction) return;
+      setQueryStates({ sort: field, direction });
+    },
+    [state.sort, state.direction, setQueryStates]
+  );
+
+  const toggleSort = useCallback(
+    (field: ReleaseSortField) => {
+      const isSameField = state.sort === field;
+      if (isSameField) {
+        // Toggle direction
+        setQueryStates({
+          direction: state.direction === 'asc' ? 'desc' : 'asc',
+        });
+      } else {
+        // New field, default to descending
+        setQueryStates({ sort: field, direction: 'desc' });
+      }
+    },
+    [state.sort, state.direction, setQueryStates]
+  );
+
+  return [
+    state as ReleaseSortState,
+    { setSort, setDirection, setSorting, toggleSort },
+  ];
+}
+
+// ============================================================================
 // Combined Table State Hook
 // ============================================================================
 
