@@ -124,6 +124,14 @@ export const ServerEnvSchema = z.object({
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
+
+  // Jovie Marketing Pixels (for retargeting Jovie visitors)
+  JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
+  JOVIE_FACEBOOK_ACCESS_TOKEN: z.string().optional(),
+  JOVIE_GOOGLE_MEASUREMENT_ID: z.string().optional(),
+  JOVIE_GOOGLE_API_SECRET: z.string().optional(),
+  JOVIE_TIKTOK_PIXEL_ID: z.string().optional(),
+  JOVIE_TIKTOK_ACCESS_TOKEN: z.string().optional(),
 });
 
 /**
@@ -189,4 +197,10 @@ export const ENV_KEYS = [
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
   'JOVIE_DEV_MEMORY_MONITOR',
+  'JOVIE_FACEBOOK_PIXEL_ID',
+  'JOVIE_FACEBOOK_ACCESS_TOKEN',
+  'JOVIE_GOOGLE_MEASUREMENT_ID',
+  'JOVIE_GOOGLE_API_SECRET',
+  'JOVIE_TIKTOK_PIXEL_ID',
+  'JOVIE_TIKTOK_ACCESS_TOKEN',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

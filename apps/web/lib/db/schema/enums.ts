@@ -282,3 +282,17 @@ export const senderStatusEnum = pgEnum('sender_status', [
   'suspended', // Sending blocked temporarily
   'banned', // Permanently blocked from sending
 ]);
+
+// Pixel Tracking Enums
+export const pixelEventTypeEnum = pgEnum('pixel_event_type', [
+  'page_view',
+  'link_click',
+  'form_submit',
+  'scroll_depth',
+]);
+
+export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [
+  'pending',
+  'sent',
+  'failed',
+]);

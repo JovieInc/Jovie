@@ -5,10 +5,17 @@ import { createMutationFn } from './fetch';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 
 export interface PixelSettingsInput {
-  facebookPixel: string;
-  googleAdsConversion: string;
-  tiktokPixel: string;
-  customPixel: string;
+  // Facebook Conversions API
+  facebookPixelId: string;
+  facebookAccessToken: string;
+  // Google Measurement Protocol
+  googleMeasurementId: string;
+  googleApiSecret: string;
+  // TikTok Events API
+  tiktokPixelId: string;
+  tiktokAccessToken: string;
+  // Master toggle
+  enabled: boolean;
 }
 
 export interface PixelSettingsResponse {
