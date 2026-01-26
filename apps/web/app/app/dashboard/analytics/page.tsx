@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { DashboardAnalytics } from '@/components/dashboard/dashboard-analytics';
+import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../actions';
 
@@ -34,18 +35,8 @@ export default async function AnalyticsPage() {
 
     console.error('Error loading analytics:', error);
 
-    // On actual error, show a simple error message
     return (
-      <div className='flex items-center justify-center'>
-        <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
-          <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
-            Something went wrong
-          </h1>
-          <p className='mb-4 text-secondary-token'>
-            Failed to load analytics. Please refresh the page.
-          </p>
-        </div>
-      </div>
+      <PageErrorState message='Failed to load analytics. Please refresh the page.' />
     );
   }
 }

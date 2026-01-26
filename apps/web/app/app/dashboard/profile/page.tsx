@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/LazyEnhancedDashboardLinks';
+import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardDataCached, getProfileSocialLinks } from '../actions';
 
@@ -40,18 +41,8 @@ export default async function ProfilePage() {
 
     console.error('Error loading profile:', error);
 
-    // On actual error, show a simple error message
     return (
-      <div className='flex items-center justify-center'>
-        <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
-          <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
-            Something went wrong
-          </h1>
-          <p className='mb-4 text-secondary-token'>
-            Failed to load profile data. Please refresh the page.
-          </p>
-        </div>
-      </div>
+      <PageErrorState message='Failed to load profile data. Please refresh the page.' />
     );
   }
 }
