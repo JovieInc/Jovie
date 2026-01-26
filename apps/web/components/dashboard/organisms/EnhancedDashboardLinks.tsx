@@ -189,7 +189,11 @@ export function EnhancedDashboardLinks({
   return (
     <div
       className={
-        useChatLayout ? 'flex h-full min-w-0 flex-col' : 'min-h-screen min-w-0'
+        useChatLayout
+          ? 'flex h-full min-w-0 flex-col'
+          : sidebarOpen
+            ? 'flex h-full min-w-0 flex-col'
+            : 'min-h-screen min-w-0'
       }
       data-testid='enhanced-dashboard-links'
     >
@@ -197,7 +201,9 @@ export function EnhancedDashboardLinks({
         className={
           useChatLayout
             ? 'flex min-w-0 flex-1 flex-col'
-            : 'w-full min-w-0 space-y-4'
+            : sidebarOpen
+              ? 'flex h-full min-w-0 flex-1 flex-col items-center justify-center'
+              : 'w-full min-w-0 space-y-4'
         }
       >
         {/* Profile editor section - hidden when sidebar is open */}

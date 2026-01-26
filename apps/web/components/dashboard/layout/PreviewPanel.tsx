@@ -4,10 +4,9 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { DrawerHeader } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
@@ -19,13 +18,16 @@ const CONTEXT_MENU_ITEM_CLASS =
 
 export function PreviewPanel() {
   const { isOpen, close, previewData } = usePreviewPanel();
+  const [copied, setCopied] = useState(false);
 
   const copyProfileUrl = useCallback(async () => {
     if (!previewData) return;
     try {
       const url = `${window.location.origin}${previewData.profilePath}`;
       await navigator.clipboard.writeText(url);
+      setCopied(true);
       toast.success('Profile URL copied');
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
     }
@@ -78,8 +80,34 @@ export function PreviewPanel() {
       className='bg-surface-1'
     >
       <div className='flex h-full flex-col'>
-        {/* Header */}
-        <DrawerHeader title='Live Preview' onClose={close} />
+        {/* Header with action buttons */}
+        <DrawerHeader
+          title='Live Preview'
+          onClose={close}
+          actions={
+            <div className='flex items-center gap-1'>
+              {/* Copy button */}
+              <button
+                type='button'
+                onClick={copyProfileUrl}
+                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors'
+                aria-label={copied ? 'Copied!' : 'Copy profile URL'}
+              >
+                <Copy className='h-3.5 w-3.5' aria-hidden='true' />
+              </button>
+              {/* Open button */}
+              <Link
+                href={profilePath}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors inline-flex items-center justify-center'
+                aria-label='Open profile in new tab'
+              >
+                <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
+              </Link>
+            </div>
+          }
+        />
 
         {/* Preview Content */}
         <div className='flex-1 min-h-0 overflow-y-auto p-4'>
@@ -93,6 +121,18 @@ export function PreviewPanel() {
                 className='h-full w-full'
               />
             </div>
+
+            {/* Hero CTA - View Jovie Profile */}
+            <Button asChild variant='primary' className='w-full max-w-[360px]'>
+              <Link
+                href={profilePath}
+                target='_blank'
+                rel='noopener noreferrer'
+              >
+                <ExternalLink className='h-4 w-4 mr-2' aria-hidden='true' />
+                View Jovie Profile
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -101,35 +141,10 @@ export function PreviewPanel() {
           <h3 className='text-[13px] font-medium text-primary-token mb-2'>
             Your Profile URL
           </h3>
-          <div className='flex flex-col gap-2'>
-            <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
-              {typeof window !== 'undefined'
-                ? `${window.location.origin}${profilePath}`
-                : 'Loading...'}
-            </div>
-            <div className='flex gap-2'>
-              <CopyToClipboardButton
-                relativePath={profilePath}
-                idleLabel='Copy'
-                successLabel='Copied!'
-                className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
-              />
-              <Button
-                asChild
-                size='sm'
-                variant='secondary'
-                className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
-              >
-                <Link
-                  href={profilePath}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  <ExternalLink className='h-4 w-4 mr-1.5' />
-                  Open Jovie Profile
-                </Link>
-              </Button>
-            </div>
+          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
+            {typeof window !== 'undefined'
+              ? `${window.location.origin}${profilePath}`
+              : 'Loading...'}
           </div>
           <p className='mt-2 text-xs text-secondary-token'>
             Share this link with your audience
