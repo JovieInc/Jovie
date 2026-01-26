@@ -20,14 +20,9 @@ export const TOGGLEABLE_COLUMNS = [
   { id: 'releaseType', label: 'Type' },
   { id: 'availability', label: 'Availability' },
   { id: 'smartLink', label: 'Smart Link' },
-  { id: 'releaseDate', label: 'Released' },
-  { id: 'popularity', label: 'Popularity' },
+  { id: 'stats', label: 'Stats' },
   { id: 'upc', label: 'UPC' },
   { id: 'primaryIsrc', label: 'ISRC' },
-  { id: 'label', label: 'Label' },
-  { id: 'totalTracks', label: 'Tracks' },
-  { id: 'totalDurationMs', label: 'Duration' },
-  { id: 'genres', label: 'Genre' },
 ] as const;
 
 /** Columns always visible (cannot be toggled off) */
@@ -36,31 +31,21 @@ const ALWAYS_VISIBLE_COLUMNS = ['select', 'release', 'actions'];
 /** Default column visibility for desktop - cleaner view with essential columns */
 const DEFAULT_DESKTOP_VISIBILITY: ColumnVisibility = {
   releaseType: false, // Moved into release cell
-  availability: true, // Keep - actionable
+  availability: false, // Hidden for now - accessible via context menu
   smartLink: false, // Hide - accessible via context menu
-  releaseDate: true, // Keep - essential
-  popularity: true, // Keep - useful sorting indicator
+  stats: true, // Combined: year, popularity icon, duration
   upc: false, // Hide - accessible via context menu
   primaryIsrc: false, // Hide - accessible via context menu
-  label: true, // Keep - useful grouping info
-  totalTracks: false, // Hide - not essential
-  totalDurationMs: false, // Hide - not essential
-  genres: false, // Hide - secondary info
 };
 
 /** Default column visibility for tablet (768-1024px) */
 const DEFAULT_TABLET_VISIBILITY: ColumnVisibility = {
   releaseType: false,
-  availability: true,
+  availability: false,
   smartLink: false,
-  releaseDate: true,
-  popularity: false,
+  stats: true,
   upc: false,
   primaryIsrc: false,
-  label: false,
-  totalTracks: false,
-  totalDurationMs: false,
-  genres: false,
 };
 
 /** Default column visibility for mobile (<768px) */
@@ -68,14 +53,9 @@ const DEFAULT_MOBILE_VISIBILITY: ColumnVisibility = {
   releaseType: false,
   availability: false,
   smartLink: false,
-  releaseDate: true,
-  popularity: false,
+  stats: true,
   upc: false,
   primaryIsrc: false,
-  label: false,
-  totalTracks: false,
-  totalDurationMs: false,
-  genres: false,
 };
 
 export interface ReleaseTablePreset {
@@ -88,6 +68,8 @@ interface StoredPreferences {
   columnVisibility: ColumnVisibility;
   density: Density;
   presets: ReleaseTablePreset[];
+  showTracks?: boolean;
+  groupByYear?: boolean;
 }
 
 function getDefaultVisibilityForBreakpoint(): ColumnVisibility {
@@ -136,14 +118,20 @@ export function useReleaseTablePreferences() {
   );
   const [density, setDensity] = useState<Density>('normal');
   const [presets, setPresets] = useState<ReleaseTablePreset[]>([]);
+  const [showTracks, setShowTracks] = useState(false);
+  const [groupByYear, setGroupByYear] = useState(false);
 
   // Load preferences from localStorage on mount
   useEffect(() => {
     const stored = loadPreferences();
     if (stored) {
-      setColumnVisibility(stored.columnVisibility);
+      // Merge stored visibility with defaults to pick up new columns
+      const defaults = getDefaultVisibilityForBreakpoint();
+      setColumnVisibility({ ...defaults, ...stored.columnVisibility });
       setDensity(stored.density);
       setPresets(stored.presets || []);
+      setShowTracks(stored.showTracks ?? false);
+      setGroupByYear(stored.groupByYear ?? false);
     }
     setIsLoaded(true);
   }, []);
@@ -151,8 +139,14 @@ export function useReleaseTablePreferences() {
   // Persist preferences when they change
   useEffect(() => {
     if (!isLoaded) return;
-    savePreferences({ columnVisibility, density, presets });
-  }, [columnVisibility, density, presets, isLoaded]);
+    savePreferences({
+      columnVisibility,
+      density,
+      presets,
+      showTracks,
+      groupByYear,
+    });
+  }, [columnVisibility, density, presets, showTracks, groupByYear, isLoaded]);
 
   const handleColumnVisibilityChange = useCallback(
     (columnId: string, visible: boolean) => {
@@ -168,9 +162,19 @@ export function useReleaseTablePreferences() {
     setDensity(newDensity);
   }, []);
 
+  const handleShowTracksChange = useCallback((show: boolean) => {
+    setShowTracks(show);
+  }, []);
+
+  const handleGroupByYearChange = useCallback((group: boolean) => {
+    setGroupByYear(group);
+  }, []);
+
   const resetToDefaults = useCallback(() => {
     setColumnVisibility(getDefaultVisibilityForBreakpoint());
     setDensity('normal');
+    setShowTracks(false);
+    setGroupByYear(false);
   }, []);
 
   const savePreset = useCallback(
@@ -217,10 +221,14 @@ export function useReleaseTablePreferences() {
     rowHeight,
     presets,
     isLoaded,
+    showTracks,
+    groupByYear,
 
     // Handlers
     onColumnVisibilityChange: handleColumnVisibilityChange,
     onDensityChange: handleDensityChange,
+    onShowTracksChange: handleShowTracksChange,
+    onGroupByYearChange: handleGroupByYearChange,
     resetToDefaults,
     savePreset,
     loadPreset,

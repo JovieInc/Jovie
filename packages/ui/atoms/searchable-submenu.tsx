@@ -575,6 +575,7 @@ export function SearchableList({
     <div
       className={cn('flex flex-col', className)}
       role='listbox'
+      tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
       {header}

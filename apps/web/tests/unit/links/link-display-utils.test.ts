@@ -10,20 +10,20 @@ import {
 describe('link-display-utils', () => {
   describe('labelFor', () => {
     it('should return correct labels for each section', () => {
-      expect(labelFor('social')).toBe('SOCIAL');
-      expect(labelFor('dsp')).toBe('MUSIC SERVICE');
-      expect(labelFor('earnings')).toBe('MONETIZATION');
-      expect(labelFor('custom')).toBe('CUSTOM');
+      expect(labelFor('social')).toBe('Social');
+      expect(labelFor('dsp')).toBe('Music service');
+      expect(labelFor('earnings')).toBe('Monetization');
+      expect(labelFor('custom')).toBe('Custom');
     });
 
-    it('should return CUSTOM for unknown sections', () => {
+    it('should return Custom for unknown sections', () => {
       // TypeScript would normally prevent this, but testing runtime behavior
-      expect(labelFor('unknown' as LinkSection)).toBe('CUSTOM');
+      expect(labelFor('unknown' as LinkSection)).toBe('Custom');
     });
 
-    it('should return CUSTOM for null-like values', () => {
-      expect(labelFor(null as unknown as LinkSection)).toBe('CUSTOM');
-      expect(labelFor(undefined as unknown as LinkSection)).toBe('CUSTOM');
+    it('should return Custom for null-like values', () => {
+      expect(labelFor(null as unknown as LinkSection)).toBe('Custom');
+      expect(labelFor(undefined as unknown as LinkSection)).toBe('Custom');
     });
   });
 
@@ -606,10 +606,10 @@ describe('link-display-utils', () => {
       const sections: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
       const labels = sections.map(labelFor);
       expect(labels).toEqual([
-        'SOCIAL',
-        'MUSIC SERVICE',
-        'MONETIZATION',
-        'CUSTOM',
+        'Social',
+        'Music service',
+        'Monetization',
+        'Custom',
       ]);
     });
   });

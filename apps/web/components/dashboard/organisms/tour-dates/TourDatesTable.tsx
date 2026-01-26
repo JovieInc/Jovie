@@ -49,19 +49,19 @@ function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'>
+        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400'>
+        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-xs font-medium text-error'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400'>
+        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-xs font-medium text-success'>
           On Sale
         </span>
       );
@@ -267,7 +267,7 @@ export function TourDatesTable({
         size: 80,
       }),
     ];
-  }, [onSync, isSyncing, getContextMenuItems, onEdit]);
+  }, [onSync, isSyncing, onEdit]);
 
   return (
     <UnifiedTable

@@ -165,8 +165,8 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         className={pillClassName}
         style={wrapperStyle}
         data-testid={testId}
-        role={isInteractive ? 'button' : undefined}
-        tabIndex={isInteractive ? 0 : undefined}
+        role={isInteractive ? 'button' : undefined} // NOSONAR S6848
+        tabIndex={isInteractive ? 0 : undefined} // NOSONAR S6827
         aria-label={ariaLabel}
       >
         <PillShimmer show={showShimmer} />

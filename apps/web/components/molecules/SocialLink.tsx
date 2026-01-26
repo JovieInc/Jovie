@@ -13,21 +13,18 @@ interface SocialLinkProps {
   artistName: string;
 }
 
-export const SocialLink = memo(function SocialLink({
-  link,
-  handle,
-  artistName,
-}: SocialLinkProps) {
+function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
+  // Hooks must be called unconditionally (before any early returns)
+  const [hover, setHover] = useState(false);
+  const brandHex = useMemo(
+    () => getPlatformIcon(link.platform ?? '')?.hex,
+    [link.platform]
+  );
+
   // Guard against incomplete link data
   if (!link.platform || !link.url) {
     return null;
   }
-
-  const [hover, setHover] = useState(false);
-  const brandHex = useMemo(
-    () => getPlatformIcon(link.platform)?.hex,
-    [link.platform]
-  );
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     // Track analytics first
@@ -104,4 +101,7 @@ export const SocialLink = memo(function SocialLink({
       <SocialIcon platform={link.platform} className='h-4 w-4' />
     </a>
   );
-});
+}
+
+export const SocialLink = memo(SocialLinkComponent);
+SocialLink.displayName = 'SocialLink';
