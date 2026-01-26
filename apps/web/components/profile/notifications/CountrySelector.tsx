@@ -142,7 +142,7 @@ export function CountrySelector({
       <PopoverContent
         align='start'
         sideOffset={4}
-        className='w-64 p-1 rounded-lg border border-subtle bg-surface-0 shadow-lg'
+        className='w-64 p-1.5 rounded-xl border border-subtle bg-surface-3 shadow-[0_4px_24px_rgba(0,0,0,0.2)]'
       >
         <div className='max-h-64 overflow-y-auto py-1'>
           {COUNTRY_OPTIONS.map(option => (
