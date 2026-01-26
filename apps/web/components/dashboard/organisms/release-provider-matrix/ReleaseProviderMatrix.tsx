@@ -80,8 +80,20 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
+  // Check if release has all provider URLs configured
+  const hasAllProviderUrls = useCallback(
+    (release: ReleaseViewModel, providerKeys: string[]): boolean => {
+      return providerKeys.every(key =>
+        release.providers.some(p => p.key === key && p.url)
+      );
+    },
+    []
+  );
+
   // Apply filters to rows
   const filteredRows = useMemo(() => {
+    const providerKeys = Object.keys(providerConfig);
+
     return rows.filter(release => {
       // Filter by release type
       if (
@@ -92,23 +104,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       }
 
       // Filter by availability
-      if (filters.availability !== 'all') {
-        const providerKeys = Object.keys(providerConfig);
-        const hasAllProviders = providerKeys.every(key =>
-          release.providers.some(p => p.key === key && p.url)
-        );
+      if (filters.availability === 'all') {
+        return true;
+      }
 
-        if (filters.availability === 'complete' && !hasAllProviders) {
-          return false;
-        }
-        if (filters.availability === 'incomplete' && hasAllProviders) {
-          return false;
-        }
+      const hasAll = hasAllProviderUrls(release, providerKeys);
+
+      if (filters.availability === 'complete') {
+        return hasAll;
+      }
+      if (filters.availability === 'incomplete') {
+        return !hasAll;
       }
 
       return true;
     });
-  }, [rows, filters, providerConfig]);
+  }, [rows, filters, providerConfig, hasAllProviderUrls]);
 
   // Row selection - use filtered rows
   const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);

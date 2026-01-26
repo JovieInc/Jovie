@@ -41,6 +41,42 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Calculate exponential backoff delay
+ */
+function getRetryDelay(attempt: number): number {
+  return BASE_DELAY_MS * Math.pow(2, attempt);
+}
+
+/**
+ * Check if an error should not be retried
+ */
+function isNonRetryableError(error: unknown): boolean {
+  if (error instanceof DOMException) return true;
+  if (error instanceof Error && error.message.includes('not found'))
+    return true;
+  return false;
+}
+
+/**
+ * Check if response status indicates a retryable error
+ */
+function isRetryableStatus(status: number): boolean {
+  return status >= 500;
+}
+
+/**
+ * Log retry attempt to Sentry
+ */
+function logRetryAttempt(status: number, attempt: number, delay: number): void {
+  Sentry.addBreadcrumb({
+    category: 'bandsintown',
+    message: `Retrying after ${status}`,
+    level: 'warning',
+    data: { attempt, delay },
+  });
+}
+
+/**
  * Parse latitude/longitude strings to numbers
  */
 function parseCoordinate(value: string | undefined): number | null {
@@ -114,6 +150,63 @@ class BandsintownClient {
   }
 
   /**
+   * Build the full API URL with app_id
+   */
+  private buildUrl(endpoint: string, appId: string): string {
+    const url = `${BANDSINTOWN_API_BASE}${endpoint}`;
+    const separator = endpoint.includes('?') ? '&' : '?';
+    return `${url}${separator}app_id=${encodeURIComponent(appId)}`;
+  }
+
+  /**
+   * Handle non-OK response status codes
+   * Returns true if should retry, throws otherwise
+   */
+  private async handleErrorResponse(
+    response: Response,
+    attempt: number
+  ): Promise<boolean> {
+    // Don't retry 404s - artist not found
+    if (response.status === 404) {
+      throw new Error('Artist not found on Bandsintown');
+    }
+
+    // Retry server errors if attempts remain
+    if (isRetryableStatus(response.status) && attempt < MAX_RETRIES) {
+      const delay = getRetryDelay(attempt);
+      logRetryAttempt(response.status, attempt, delay);
+      await sleep(delay);
+      return true;
+    }
+
+    throw new Error(`Bandsintown API error: ${response.status}`);
+  }
+
+  /**
+   * Handle caught errors during fetch
+   * Returns true if should retry, throws otherwise
+   */
+  private async handleFetchError(
+    error: unknown,
+    attempt: number
+  ): Promise<{ shouldRetry: boolean; lastError: Error }> {
+    const lastError = error instanceof Error ? error : new Error(String(error));
+
+    if (isNonRetryableError(error)) {
+      throw lastError;
+    }
+
+    // Retry on network errors if attempts remain
+    if (attempt < MAX_RETRIES) {
+      const delay = getRetryDelay(attempt);
+      await sleep(delay);
+      return { shouldRetry: true, lastError };
+    }
+
+    return { shouldRetry: false, lastError };
+  }
+
+  /**
    * Make a request to the Bandsintown API with retry logic
    */
   private async request<T>(endpoint: string): Promise<T> {
@@ -123,62 +216,27 @@ class BandsintownClient {
       throw new Error('Bandsintown not configured');
     }
 
-    const url = `${BANDSINTOWN_API_BASE}${endpoint}`;
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const fullUrl = `${url}${separator}app_id=${encodeURIComponent(config.appId)}`;
-
+    const fullUrl = this.buildUrl(endpoint, config.appId);
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const response = await fetch(fullUrl, {
           method: 'GET',
-          headers: {
-            Accept: 'application/json',
-          },
+          headers: { Accept: 'application/json' },
           signal: AbortSignal.timeout(BANDSINTOWN_DEFAULT_TIMEOUT_MS),
         });
 
         if (!response.ok) {
-          // Don't retry 404s - artist not found
-          if (response.status === 404) {
-            throw new Error(`Artist not found on Bandsintown`);
-          }
-
-          // Retry server errors
-          if (response.status >= 500 && attempt < MAX_RETRIES) {
-            const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-            Sentry.addBreadcrumb({
-              category: 'bandsintown',
-              message: `Retrying after ${response.status}`,
-              level: 'warning',
-              data: { attempt, delay },
-            });
-            await sleep(delay);
-            continue;
-          }
-
-          throw new Error(`Bandsintown API error: ${response.status}`);
+          const shouldRetry = await this.handleErrorResponse(response, attempt);
+          if (shouldRetry) continue;
         }
 
         return (await response.json()) as T;
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        // Don't retry abort/timeout errors or known failures
-        if (
-          error instanceof DOMException ||
-          lastError.message.includes('not found')
-        ) {
-          throw lastError;
-        }
-
-        // Retry on network errors
-        if (attempt < MAX_RETRIES) {
-          const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-          await sleep(delay);
-          continue;
-        }
+        const result = await this.handleFetchError(error, attempt);
+        lastError = result.lastError;
+        if (result.shouldRetry) continue;
       }
     }
 
