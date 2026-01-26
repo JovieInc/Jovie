@@ -88,35 +88,35 @@ const STATIC_COLUMNS = {
     id: 'releaseDate',
     header: 'Released',
     cell: renderReleaseDateCell,
-    size: 70,
+    size: 80,
     enableSorting: true,
   }),
   popularity: columnHelper.accessor('spotifyPopularity', {
     id: 'popularity',
     header: 'Popularity',
     cell: renderPopularityCell,
-    size: 80,
+    size: 70,
     enableSorting: true,
   }),
   isrc: columnHelper.accessor('primaryIsrc', {
     id: 'primaryIsrc',
     header: 'ISRC',
     cell: renderIsrcCell,
-    size: 120,
+    size: 100,
     enableSorting: true,
   }),
   upc: columnHelper.accessor('upc', {
     id: 'upc',
     header: 'UPC',
     cell: renderUpcCell,
-    size: 130,
+    size: 110,
     enableSorting: true,
   }),
   label: columnHelper.accessor('label', {
     id: 'label',
     header: 'Label',
     cell: renderLabelCell,
-    size: 150,
+    size: 120,
     enableSorting: true,
   }),
   totalTracks: columnHelper.accessor('totalTracks', {
@@ -130,14 +130,14 @@ const STATIC_COLUMNS = {
     id: 'totalDurationMs',
     header: 'Duration',
     cell: renderDurationCell,
-    size: 80,
+    size: 70,
     enableSorting: true,
   }),
   genres: columnHelper.accessor('genres', {
     id: 'genres',
     header: 'Genre',
     cell: renderGenresCell,
-    size: 120,
+    size: 100,
   }),
 };
 
@@ -354,7 +354,8 @@ export function ReleaseTable({
         onClearSelection
       ),
       cell: createReleaseCellRenderer(artistName),
-      size: 280,
+      minSize: 200,
+      size: 9999, // Large value to make it flex and fill available space
       enableSorting: true,
     });
 
@@ -375,14 +376,14 @@ export function ReleaseTable({
       id: 'smartLink',
       header: 'Smart link',
       cell: createSmartLinkCellRenderer(onCopy),
-      size: 180,
+      size: 160,
     });
 
     const actionsColumn = columnHelper.display({
       id: 'actions',
       header: createActionsHeaderRenderer(selectedCountRef, onClearSelection),
       cell: createActionsCellRenderer(getContextMenuItems),
-      size: 80,
+      size: 56,
     });
 
     // Return all columns - TanStack Table handles visibility natively

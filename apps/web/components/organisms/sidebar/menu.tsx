@@ -119,6 +119,7 @@ SidebarMenuButtonInner.displayName = 'SidebarMenuButton';
 
 // Wrap with React.memo to prevent unnecessary re-renders when props haven't changed
 export const SidebarMenuButton = React.memo(SidebarMenuButtonInner);
+SidebarMenuButton.displayName = 'SidebarMenuButton';
 
 export const SidebarMenuActions = React.forwardRef<
   HTMLDivElement,
