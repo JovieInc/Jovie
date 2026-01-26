@@ -347,9 +347,10 @@ export function ReleaseFilterDropdown({
                               handleToggle(option.id);
                             }}
                             className={cn(
-                              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-medium outline-none',
+                              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-medium',
                               'transition-colors duration-150 ease-out',
                               'text-secondary-token hover:bg-white/5 hover:text-primary-token',
+                              'focus-visible:bg-white/5 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40',
                               selected && 'text-primary-token'
                             )}
                           >
@@ -405,9 +406,10 @@ export function ReleaseFilterDropdown({
                                 handleToggle(option.id);
                               }}
                               className={cn(
-                                'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-medium outline-none',
+                                'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-medium',
                                 'transition-colors duration-150 ease-out',
                                 'text-secondary-token hover:bg-white/5 hover:text-primary-token',
+                                'focus-visible:bg-white/5 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40',
                                 selected && 'text-primary-token'
                               )}
                             >

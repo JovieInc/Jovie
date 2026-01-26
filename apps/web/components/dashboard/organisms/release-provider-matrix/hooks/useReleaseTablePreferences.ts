@@ -133,7 +133,9 @@ export function useReleaseTablePreferences() {
   useEffect(() => {
     const stored = loadPreferences();
     if (stored) {
-      setColumnVisibility(stored.columnVisibility);
+      // Merge stored visibility with defaults to pick up new columns
+      const defaults = getDefaultVisibilityForBreakpoint();
+      setColumnVisibility({ ...defaults, ...stored.columnVisibility });
       setDensity(stored.density);
       setPresets(stored.presets || []);
       setShowTracks(stored.showTracks ?? false);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useRef, useState, useTransition } from 'react';
 import { loadTracksForRelease } from '@/app/app/dashboard/releases/actions';
 import type { ReleaseViewModel, TrackViewModel } from '@/lib/discography/types';
 
@@ -44,6 +44,10 @@ export function useExpandedTracks(): UseExpandedTracksResult {
   );
   const [, startTransition] = useTransition();
 
+  // Ref to track loading state for race condition prevention
+  // This allows us to check if user collapsed during fetch
+  const loadingReleaseIdsRef = useRef<Set<string>>(new Set());
+
   const isExpanded = useCallback(
     (releaseId: string) => expandedReleaseIds.has(releaseId),
     [expandedReleaseIds]
@@ -63,8 +67,18 @@ export function useExpandedTracks(): UseExpandedTracksResult {
     async (release: ReleaseViewModel) => {
       const releaseId = release.id;
 
-      // If already expanded, collapse
-      if (expandedReleaseIds.has(releaseId)) {
+      // If already expanded or loading, collapse and cancel pending expansion
+      if (
+        expandedReleaseIds.has(releaseId) ||
+        loadingReleaseIdsRef.current.has(releaseId)
+      ) {
+        // Remove from loading ref (cancels pending expansion)
+        loadingReleaseIdsRef.current.delete(releaseId);
+        setLoadingReleaseIds(prev => {
+          const next = new Set(prev);
+          next.delete(releaseId);
+          return next;
+        });
         setExpandedReleaseIds(prev => {
           const next = new Set(prev);
           next.delete(releaseId);
@@ -79,7 +93,8 @@ export function useExpandedTracks(): UseExpandedTracksResult {
         return;
       }
 
-      // Mark as loading
+      // Mark as loading (both state and ref)
+      loadingReleaseIdsRef.current.add(releaseId);
       setLoadingReleaseIds(prev => new Set(prev).add(releaseId));
 
       try {
@@ -89,22 +104,26 @@ export function useExpandedTracks(): UseExpandedTracksResult {
           releaseSlug: release.slug,
         });
 
-        // Cache the tracks
-        startTransition(() => {
-          setTracksByReleaseId(prev => {
-            const next = new Map(prev);
-            next.set(releaseId, tracks);
-            return next;
-          });
+        // Only expand if still in loading state (user didn't collapse during load)
+        if (loadingReleaseIdsRef.current.has(releaseId)) {
+          // Cache the tracks
+          startTransition(() => {
+            setTracksByReleaseId(prev => {
+              const next = new Map(prev);
+              next.set(releaseId, tracks);
+              return next;
+            });
 
-          // Expand the release
-          setExpandedReleaseIds(prev => new Set(prev).add(releaseId));
-        });
+            // Expand the release
+            setExpandedReleaseIds(prev => new Set(prev).add(releaseId));
+          });
+        }
       } catch (error) {
         console.error('Failed to load tracks for release:', releaseId, error);
         // Could show a toast here
       } finally {
-        // Clear loading state
+        // Clear loading state (both state and ref)
+        loadingReleaseIdsRef.current.delete(releaseId);
         setLoadingReleaseIds(prev => {
           const next = new Set(prev);
           next.delete(releaseId);

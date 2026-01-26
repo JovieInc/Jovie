@@ -40,7 +40,9 @@ export function useReleaseFilterCounts(
       byType[release.releaseType]++;
 
       // Count by availability - check if all providers have URLs
-      const hasAllProviders = release.providers.every(p => p.url);
+      // Releases with no providers are considered incomplete
+      const hasAllProviders =
+        release.providers.length > 0 && release.providers.every(p => p.url);
       if (hasAllProviders) {
         complete++;
       } else {

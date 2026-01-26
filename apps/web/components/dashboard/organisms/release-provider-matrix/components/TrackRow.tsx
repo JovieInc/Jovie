@@ -21,6 +21,8 @@ interface TrackRowProps {
   allProviders: ProviderKey[];
   /** Number of visible columns (for proper spacing) */
   columnCount: number;
+  /** Column visibility state from TanStack table */
+  columnVisibility?: Record<string, boolean>;
 }
 
 /**
@@ -38,7 +40,10 @@ export const TrackRow = memo(function TrackRow({
   providerConfig,
   allProviders,
   columnCount,
+  columnVisibility,
 }: TrackRowProps) {
+  // Helper to check if a column is visible
+  const isVisible = (id: string) => columnVisibility?.[id] !== false;
   // Format track number with disc number if multi-disc
   const trackLabel =
     track.discNumber > 1
@@ -67,112 +72,120 @@ export const TrackRow = memo(function TrackRow({
 
   return (
     <tr className='group bg-surface-1/50 hover:bg-surface-1 border-l-2 border-l-transparent'>
-      {/* 1. Spacer for checkbox column */}
-      <td className='w-14' />
+      {/* 1. Spacer for checkbox column (always visible) */}
+      {isVisible('select') && <td className='w-14' />}
 
-      {/* 2. Track info - spans the release column width */}
-      <td className='py-2 pr-4'>
-        <div className='flex items-center gap-3 pl-8'>
-          {/* Track number */}
-          <span className='w-8 shrink-0 text-right text-xs tabular-nums text-tertiary-token'>
-            {trackLabel}.
-          </span>
+      {/* 2. Track info - spans the release column width (always visible) */}
+      {isVisible('release') && (
+        <td className='py-2 pr-4'>
+          <div className='flex items-center gap-3 pl-8'>
+            {/* Track number */}
+            <span className='w-8 shrink-0 text-right text-xs tabular-nums text-tertiary-token'>
+              {trackLabel}.
+            </span>
 
-          {/* Track title with explicit badge */}
-          <div className='min-w-0 flex-1'>
-            <div className='flex items-center gap-2'>
-              <TruncatedText
-                lines={1}
-                className='text-sm text-primary-token'
-                tooltipSide='top'
-                tooltipAlign='start'
-              >
-                {track.title}
-              </TruncatedText>
-              {track.isExplicit && (
-                <Badge
-                  variant='secondary'
-                  className='shrink-0 bg-surface-2 px-1 py-0 text-[10px] text-tertiary-token'
+            {/* Track title with explicit badge */}
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-center gap-2'>
+                <TruncatedText
+                  lines={1}
+                  className='text-sm text-primary-token'
+                  tooltipSide='top'
+                  tooltipAlign='start'
                 >
-                  E
-                </Badge>
-              )}
+                  {track.title}
+                </TruncatedText>
+                {track.isExplicit && (
+                  <Badge
+                    variant='secondary'
+                    className='shrink-0 bg-surface-2 px-1 py-0 text-[10px] text-tertiary-token'
+                  >
+                    E
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </td>
+        </td>
+      )}
 
       {/* 3. Type column spacer */}
-      <td />
+      {isVisible('releaseType') && <td />}
 
       {/* 4. Availability - compact provider dots */}
-      <td className='py-2'>
-        <div className='flex items-center gap-2'>
-          {linkedProviders.length > 0 ? (
-            <>
-              <div className='flex -space-x-1'>
-                {linkedProviders.slice(0, 4).map(providerKey => {
-                  const config = providerConfig[providerKey];
-                  const dspId = PROVIDER_TO_DSP[providerKey];
+      {isVisible('availability') && (
+        <td className='py-2'>
+          <div className='flex items-center gap-2'>
+            {linkedProviders.length > 0 ? (
+              <>
+                <div className='flex -space-x-1'>
+                  {linkedProviders.slice(0, 4).map(providerKey => {
+                    const config = providerConfig[providerKey];
+                    const dspId = PROVIDER_TO_DSP[providerKey];
 
-                  return (
-                    <div
-                      key={providerKey}
-                      className='relative flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-1'
-                      title={config.label}
-                    >
-                      {dspId ? (
-                        <DspProviderIcon provider={dspId} size='sm' />
-                      ) : (
-                        <span
-                          className='h-2 w-2 rounded-full'
-                          style={{ backgroundColor: config.accent }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <span className='text-xs text-tertiary-token'>
-                {availableCount}/{allProviders.length}
-              </span>
-            </>
+                    return (
+                      <div
+                        key={providerKey}
+                        className='relative flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-1'
+                        title={config.label}
+                      >
+                        {dspId ? (
+                          <DspProviderIcon provider={dspId} size='sm' />
+                        ) : (
+                          <span
+                            className='h-2 w-2 rounded-full'
+                            style={{ backgroundColor: config.accent }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <span className='text-xs text-tertiary-token'>
+                  {availableCount}/{allProviders.length}
+                </span>
+              </>
+            ) : (
+              <span className='text-xs text-tertiary-token'>—</span>
+            )}
+          </div>
+        </td>
+      )}
+
+      {/* 5. Smart link spacer */}
+      {isVisible('smartLink') && <td />}
+
+      {/* 6. Release date spacer */}
+      {isVisible('releaseDate') && <td />}
+
+      {/* 7. Metrics - only duration for tracks */}
+      {isVisible('metrics') && (
+        <td className='py-2'>
+          {track.durationMs ? (
+            <span className='text-xs text-secondary-token tabular-nums'>
+              {formatDuration(track.durationMs)}
+            </span>
           ) : (
             <span className='text-xs text-tertiary-token'>—</span>
           )}
-        </div>
-      </td>
-
-      {/* 5. Smart link spacer */}
-      <td />
-
-      {/* 6. Release date spacer */}
-      <td />
-
-      {/* 7. Metrics - only duration for tracks */}
-      <td className='py-2'>
-        {track.durationMs ? (
-          <span className='text-xs text-secondary-token tabular-nums'>
-            {formatDuration(track.durationMs)}
-          </span>
-        ) : (
-          <span className='text-xs text-tertiary-token'>—</span>
-        )}
-      </td>
+        </td>
+      )}
 
       {/* 8. Popularity spacer */}
-      <td />
+      {isVisible('popularity') && <td />}
 
       {/* 9. ISRC */}
-      <td className='py-2'>
-        <CopyableMonospaceCell value={track.isrc} label='ISRC' />
-      </td>
+      {isVisible('primaryIsrc') && (
+        <td className='py-2'>
+          <CopyableMonospaceCell value={track.isrc} label='ISRC' />
+        </td>
+      )}
 
       {/* 10. UPC spacer */}
-      <td />
+      {isVisible('upc') && <td />}
 
-      {/* 11. Actions spacer */}
-      <td />
+      {/* 11. Actions spacer (always visible) */}
+      {isVisible('actions') && <td />}
     </tr>
   );
 });
@@ -185,6 +198,8 @@ interface TrackRowsContainerProps {
   providerConfig: Record<ProviderKey, ProviderConfig>;
   allProviders: ProviderKey[];
   columnCount: number;
+  /** Column visibility state from TanStack table */
+  columnVisibility?: Record<string, boolean>;
 }
 
 export const TrackRowsContainer = memo(function TrackRowsContainer({
@@ -192,6 +207,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
   providerConfig,
   allProviders,
   columnCount,
+  columnVisibility,
 }: TrackRowsContainerProps) {
   if (tracks.length === 0) {
     return (
@@ -218,6 +234,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
           providerConfig={providerConfig}
           allProviders={allProviders}
           columnCount={columnCount}
+          columnVisibility={columnVisibility}
         />
       ))}
     </>

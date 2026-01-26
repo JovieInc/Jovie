@@ -71,8 +71,10 @@ function ToggleSwitch({
   return (
     <button
       type='button'
+      role='switch'
+      aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2'
+      className='flex w-full items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 rounded'
     >
       <span className='text-[11px] font-medium text-primary-token'>
         {label}

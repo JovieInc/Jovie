@@ -529,6 +529,13 @@ export async function loadTracksForRelease(params: {
   }
 
   const profile = await requireProfile();
+
+  // Verify the release belongs to the user's profile
+  const release = await getReleaseById(params.releaseId);
+  if (!release || release.creatorProfileId !== profile.id) {
+    throw new Error('Release not found');
+  }
+
   const providerLabels = buildProviderLabels();
   const tracks = await getTracksForReleaseWithProviders(params.releaseId);
 

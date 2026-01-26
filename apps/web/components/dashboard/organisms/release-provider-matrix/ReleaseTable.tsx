@@ -309,16 +309,16 @@ export function ReleaseTable({
       }
 
       // Add external link options for available providers
-      const supportedProviders = [
+      const supportedProviders: ProviderKey[] = [
         'spotify',
         'apple_music',
-        'youtube_music',
+        'youtube',
         'deezer',
       ];
-      const providerLabels: Record<string, string> = {
+      const providerLabels: Partial<Record<ProviderKey, string>> = {
         spotify: 'Spotify',
         apple_music: 'Apple Music',
-        youtube_music: 'YouTube Music',
+        youtube: 'YouTube Music',
         deezer: 'Deezer',
       };
 
@@ -526,10 +526,17 @@ export function ReleaseTable({
           providerConfig={providerConfig}
           allProviders={allProviders}
           columnCount={columnCount}
+          columnVisibility={tanstackColumnVisibility}
         />
       );
     },
-    [showTracks, getTracksForRelease, providerConfig, allProviders]
+    [
+      showTracks,
+      getTracksForRelease,
+      providerConfig,
+      allProviders,
+      tanstackColumnVisibility,
+    ]
   );
 
   // Get expandable row ID (same as row ID for releases)

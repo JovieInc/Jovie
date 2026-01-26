@@ -52,13 +52,13 @@ export const ExpandButton = memo(function ExpandButton({
       {isLoading ? (
         <Icon
           name='Loader2'
-          className='h-3.5 w-3.5 animate-spin'
+          className='h-4 w-4 animate-spin'
           aria-hidden='true'
         />
       ) : (
         <Icon
           name={isExpanded ? 'ChevronDown' : 'ChevronRight'}
-          className='h-3.5 w-3.5'
+          className='h-4 w-4'
           aria-hidden='true'
         />
       )}
