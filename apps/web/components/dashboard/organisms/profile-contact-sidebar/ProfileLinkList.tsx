@@ -1,38 +1,20 @@
 'use client';
 
-import { Copy, ExternalLink } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { Check, Copy, ExternalLink, Plus, X } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/dashboard/PreviewPanelContext';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+import { cn } from '@/lib/utils';
 import type { CategoryOption } from './ProfileLinkCategorySelector';
 
 export interface ProfileLinkListProps {
   links: PreviewPanelLink[];
   selectedCategory: CategoryOption;
-}
-
-function compactUrlDisplay(platform: string, url: string): string {
-  try {
-    const parsed = new URL(url);
-    const pathname = parsed.pathname.replaceAll(/(?:^\/+)|(?:\/+$)/g, '');
-    if (pathname) {
-      // Show handle/username if it looks like one
-      if (pathname.startsWith('@')) {
-        return pathname;
-      }
-      // For short paths, show as @handle style
-      if (!pathname.includes('/') && pathname.length < 30) {
-        return `@${pathname}`;
-      }
-    }
-    // Fallback to hostname
-    return parsed.hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
+  onAddLink?: (category: LinkSection) => void;
+  onRemoveLink?: (linkId: string) => void;
 }
 
 function getLinkSection(platform: string): LinkSection {
@@ -40,15 +22,38 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
-interface LinkItemProps {
-  link: PreviewPanelLink;
+const ACTION_BUTTON_CLASS =
+  'p-1.5 rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+
+const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
+
+const SECTION_LABELS: Record<LinkSection, string> = {
+  social: 'Social',
+  dsp: 'Music',
+  earnings: 'Earnings',
+  custom: 'Web',
+};
+
+function formatPlatformName(platform: string): string {
+  // Capitalize first letter and handle common abbreviations
+  if (platform.toLowerCase() === 'dsp') return 'DSP';
+  return platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
 }
 
-function LinkItem({ link }: LinkItemProps) {
+interface LinkItemProps {
+  link: PreviewPanelLink;
+  onRemove?: (linkId: string) => void;
+}
+
+function LinkItem({ link, onRemove }: LinkItemProps) {
+  const [copied, setCopied] = useState(false);
+
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(link.url);
+      setCopied(true);
       toast.success('Link copied');
+      setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error('Failed to copy');
     }
@@ -58,35 +63,94 @@ function LinkItem({ link }: LinkItemProps) {
     window.open(link.url, '_blank', 'noopener,noreferrer');
   }, [link.url]);
 
+  const handleRemove = useCallback(() => {
+    onRemove?.(link.id);
+  }, [link.id, onRemove]);
+
+  const platformName = formatPlatformName(link.platform);
+
+  // Get platform brand color
+  const iconMeta = getPlatformIcon(link.platform);
+  const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
+
   return (
-    <div className='group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-surface-2/40 transition-colors'>
-      <div className='flex-1 min-w-0'>
-        <PlatformPill
-          platformIcon={link.platform}
-          platformName={link.title}
-          primaryText={compactUrlDisplay(link.platform, link.url)}
-          collapsed={false}
-          tone={link.isVisible ? 'default' : 'faded'}
-        />
-      </div>
-      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'>
-        <button
-          type='button'
-          onClick={handleCopy}
-          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
-          aria-label='Copy link'
+    <div
+      className={cn(
+        'flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors ease-out hover:bg-surface-2',
+        !link.isVisible && 'opacity-60'
+      )}
+    >
+      {/* Left: Icon + Platform Name */}
+      <div className='flex items-center gap-3 min-w-0'>
+        <span
+          className='shrink-0'
+          style={brandColor ? { color: brandColor } : undefined}
         >
-          <Copy className='h-3.5 w-3.5' />
-        </button>
+          <SocialIcon platform={link.platform} className='h-5 w-5' />
+        </span>
+        <span className='text-sm font-medium text-primary-token truncate'>
+          {platformName}
+        </span>
+      </div>
+
+      {/* Right: Actions (always visible) */}
+      <div className='flex items-center gap-1 shrink-0'>
         <button
           type='button'
           onClick={handleOpen}
-          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
-          aria-label='Open in new tab'
+          className={ACTION_BUTTON_CLASS}
+          aria-label={`Open ${link.title}`}
         >
-          <ExternalLink className='h-3.5 w-3.5' />
+          <ExternalLink className='h-4 w-4' aria-hidden='true' />
         </button>
+        <button
+          type='button'
+          onClick={handleCopy}
+          className={ACTION_BUTTON_CLASS}
+          aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
+        >
+          {copied ? (
+            <Check className='h-4 w-4 text-success' aria-hidden='true' />
+          ) : (
+            <Copy className='h-4 w-4' aria-hidden='true' />
+          )}
+        </button>
+        {onRemove && (
+          <button
+            type='button'
+            onClick={handleRemove}
+            className={ACTION_BUTTON_CLASS}
+            aria-label={`Remove ${link.title}`}
+          >
+            <X className='h-4 w-4' aria-hidden='true' />
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+interface SectionHeaderProps {
+  section: LinkSection;
+  onAdd?: (section: LinkSection) => void;
+}
+
+function SectionHeader({ section, onAdd }: SectionHeaderProps) {
+  return (
+    <div className='flex items-center justify-between mb-2'>
+      <h4 className='text-xs font-medium text-secondary-token'>
+        {SECTION_LABELS[section]} links
+      </h4>
+      {onAdd && (
+        <button
+          type='button'
+          onClick={() => onAdd(section)}
+          className='p-1 rounded hover:bg-surface-2 text-secondary-token hover:text-primary-token transition-colors'
+          aria-label={`Add ${SECTION_LABELS[section]} link`}
+        >
+          <Plus className='h-4 w-4' />
+        </button>
+      )}
     </div>
   );
 }
@@ -94,6 +158,8 @@ function LinkItem({ link }: LinkItemProps) {
 export function ProfileLinkList({
   links,
   selectedCategory,
+  onAddLink,
+  onRemoveLink,
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -130,11 +196,38 @@ export function ProfileLinkList({
     );
   }
 
+  // When viewing a specific category, show section header
+  if (selectedCategory !== 'all') {
+    return (
+      <div className='space-y-3'>
+        <SectionHeader section={selectedCategory} onAdd={onAddLink} />
+        <div className='space-y-2'>
+          {filteredLinks.map(link => (
+            <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // When viewing all, group by section
   return (
-    <div className='space-y-0.5'>
-      {filteredLinks.map(link => (
-        <LinkItem key={link.id} link={link} />
-      ))}
+    <div className='space-y-6'>
+      {SECTION_ORDER.map(section => {
+        const sectionLinks = groupedLinks[section];
+        if (sectionLinks.length === 0) return null;
+
+        return (
+          <div key={section} className='space-y-3'>
+            <SectionHeader section={section} onAdd={onAddLink} />
+            <div className='space-y-2'>
+              {sectionLinks.map(link => (
+                <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

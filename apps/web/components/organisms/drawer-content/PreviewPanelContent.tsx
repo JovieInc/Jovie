@@ -1,10 +1,19 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { ExternalLink, X } from 'lucide-react';
+import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  MoreVertical,
+  QrCode,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
+import { useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 
@@ -27,19 +36,131 @@ export function PreviewPanelContent() {
   }
 
   const { username, displayName, avatarUrl, links, profilePath } = previewData;
+  const profileUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${profilePath}`
+      : profilePath;
+
+  const handleCopyUrl = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      toast.success('Profile URL copied');
+    } catch {
+      toast.error('Failed to copy');
+    }
+  }, [profileUrl]);
+
+  const handleDownloadQr = useCallback(async () => {
+    try {
+      const qrUrl = getQrCodeUrl(profileUrl, 512);
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${username || 'jovie'}-qr-code.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('QR code downloaded');
+    } catch {
+      toast.error('Failed to download QR code');
+    }
+  }, [profileUrl, username]);
+
+  const handleDownloadVcard = useCallback(() => {
+    try {
+      const vcard = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `FN:${displayName || username}`,
+        `URL:${profileUrl}`,
+        'END:VCARD',
+      ].join('\n');
+
+      const blob = new Blob([vcard], { type: 'text/vcard' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${username || 'jovie'}.vcf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('vCard downloaded');
+    } catch {
+      toast.error('Failed to download vCard');
+    }
+  }, [displayName, username, profileUrl]);
+
+  const actionMenuItems = useMemo<CommonDropdownItem[]>(
+    () => [
+      {
+        type: 'action',
+        id: 'copy-url',
+        label: 'Copy Jovie Profile URL',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: handleCopyUrl,
+      },
+      {
+        type: 'action',
+        id: 'download-qr',
+        label: 'Download QR Code',
+        icon: <QrCode className='h-4 w-4' />,
+        onClick: handleDownloadQr,
+      },
+      {
+        type: 'action',
+        id: 'download-vcard',
+        label: 'Download vCard',
+        icon: <Download className='h-4 w-4' />,
+        onClick: handleDownloadVcard,
+      },
+    ],
+    [handleCopyUrl, handleDownloadQr, handleDownloadVcard]
+  );
 
   return (
     <div className='h-full flex flex-col'>
-      {/* Header */}
+      {/* Header with action buttons */}
       <div className='flex h-12 items-center justify-between border-b border-subtle bg-surface-2/95 px-4 shrink-0 backdrop-blur-sm'>
         <h2 className='text-[13px] font-medium text-primary-token'>
           Live Preview
         </h2>
-        <DashboardHeaderActionButton
-          ariaLabel='Close preview'
-          onClick={close}
-          icon={<X className='h-4 w-4' aria-hidden='true' />}
-        />
+        <div className='flex items-center gap-1'>
+          {/* Action menu */}
+          <CommonDropdown
+            variant='dropdown'
+            items={actionMenuItems}
+            trigger={
+              <button
+                type='button'
+                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out'
+                aria-label='Profile actions'
+              >
+                <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
+              </button>
+            }
+            align='end'
+          />
+          {/* Open button */}
+          <Link
+            href={profilePath}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out inline-flex items-center justify-center'
+            aria-label='Open profile in new tab'
+          >
+            <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
+          </Link>
+          {/* Close button */}
+          <DashboardHeaderActionButton
+            ariaLabel='Close preview'
+            onClick={close}
+            icon={<X className='h-4 w-4' aria-hidden='true' />}
+          />
+        </div>
       </div>
 
       {/* Preview Content */}
@@ -54,6 +175,14 @@ export function PreviewPanelContent() {
               className='h-full w-full'
             />
           </div>
+
+          {/* Hero CTA - View Jovie Profile */}
+          <Button asChild variant='primary' className='w-full max-w-[360px]'>
+            <Link href={profilePath} target='_blank' rel='noopener noreferrer'>
+              <ExternalLink className='h-4 w-4 mr-2' aria-hidden='true' />
+              View Jovie Profile
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -62,35 +191,10 @@ export function PreviewPanelContent() {
         <h3 className='text-[13px] font-medium text-primary-token mb-2'>
           Your Profile URL
         </h3>
-        <div className='flex flex-col gap-2'>
-          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
-            {typeof window !== 'undefined'
-              ? `${window.location.origin}${profilePath}`
-              : 'Loading...'}
-          </div>
-          <div className='flex gap-2'>
-            <CopyToClipboardButton
-              relativePath={profilePath}
-              idleLabel='Copy'
-              successLabel='Copied!'
-              className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
-            />
-            <Button
-              asChild
-              size='sm'
-              variant='secondary'
-              className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
-            >
-              <Link
-                href={profilePath}
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <ExternalLink className='h-4 w-4 mr-1.5' />
-                Open Jovie Profile
-              </Link>
-            </Button>
-          </div>
+        <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
+          {typeof window !== 'undefined'
+            ? `${window.location.origin}${profilePath}`
+            : 'Loading...'}
         </div>
         <p className='mt-2 text-xs text-secondary-token'>
           Share this link with your audience

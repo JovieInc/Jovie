@@ -2,7 +2,9 @@ import { Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { Icon } from '@/components/atoms/Icon';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AvailabilityCell,
@@ -126,43 +128,30 @@ export function createReleaseHeaderRenderer(
  */
 export function createActionsHeaderRenderer(
   selectedCountRef: RefObject<number>,
-  onClearSelection: (() => void) | undefined,
-  onSync: () => void,
-  isSyncing: boolean | undefined
+  onClearSelection: (() => void) | undefined
 ) {
   return function ActionsHeader() {
     const selectedCount = selectedCountRef.current ?? 0;
-    return (
-      <div className='flex items-center justify-end gap-1'>
-        {selectedCount > 0 ? (
-          onClearSelection && (
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={onClearSelection}
-              className='h-7 gap-1 text-xs'
-            >
-              <Icon name='X' className='h-3.5 w-3.5' />
-              Clear
-            </Button>
-          )
-        ) : (
+
+    // Show clear button only when items are selected
+    if (selectedCount > 0 && onClearSelection) {
+      return (
+        <div className='flex items-center justify-end'>
           <Button
             variant='ghost'
             size='sm'
-            onClick={onSync}
-            disabled={isSyncing}
+            onClick={onClearSelection}
             className='h-7 gap-1 text-xs'
           >
-            <Icon
-              name={isSyncing ? 'Loader2' : 'RefreshCw'}
-              className={isSyncing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'}
-            />
-            Sync
+            <Icon name='X' className='h-3.5 w-3.5' />
+            Clear
           </Button>
-        )}
-      </div>
-    );
+        </div>
+      );
+    }
+
+    // Empty header when no selection
+    return null;
   };
 }
 
@@ -250,7 +239,7 @@ export function renderReleaseDateCell({
       tooltipFormatOptions={DATE_TOOLTIP_FORMAT_OPTIONS}
     />
   ) : (
-    <span className='text-xs text-tertiary-token'>—</span>
+    <EmptyCell tooltip='No release date' />
   );
 }
 
@@ -291,17 +280,17 @@ export function renderUpcCell({
   return <CopyableMonospaceCell value={getValue()} label='UPC' />;
 }
 
-/** Renders the label cell with truncation */
+/** Renders the label cell with truncation and tooltip */
 export function renderLabelCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
   const label = getValue();
-  if (!label) return <span className='text-tertiary-token'>—</span>;
+  if (!label) return <EmptyCell />;
 
   return (
-    <span className='truncate text-xs text-secondary-token' title={label}>
+    <TruncatedText lines={1} className='text-xs text-secondary-token'>
       {label}
-    </span>
+    </TruncatedText>
   );
 }
 
@@ -321,7 +310,7 @@ export function renderDurationCell({
   getValue,
 }: CellContext<ReleaseViewModel, number | null | undefined>) {
   const durationMs = getValue();
-  if (!durationMs) return <span className='text-tertiary-token'>—</span>;
+  if (!durationMs) return <EmptyCell />;
 
   return (
     <span className='text-xs text-secondary-token tabular-nums'>
@@ -336,7 +325,7 @@ export function renderGenresCell({
 }: CellContext<ReleaseViewModel, string[] | undefined>) {
   const genres = getValue();
   if (!genres || genres.length === 0) {
-    return <span className='text-tertiary-token'>—</span>;
+    return <EmptyCell />;
   }
 
   const firstGenre = genres[0];
@@ -344,15 +333,12 @@ export function renderGenresCell({
 
   return (
     <div className='flex items-center gap-1'>
-      <span
-        className='truncate text-xs text-secondary-token'
-        title={firstGenre}
-      >
+      <TruncatedText lines={1} className='text-xs text-secondary-token'>
         {firstGenre}
-      </span>
+      </TruncatedText>
       {remainingCount > 0 && (
         <span
-          className='inline-flex min-w-[24px] items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
+          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
           title={genres.slice(1).join(', ')}
         >
           +{remainingCount}
