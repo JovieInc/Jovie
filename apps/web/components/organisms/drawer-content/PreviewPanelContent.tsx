@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
@@ -26,31 +26,29 @@ import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview'
 export function PreviewPanelContent() {
   const { close, previewData } = usePreviewPanel();
 
-  // Don't render anything until we have preview data
-  if (!previewData) {
-    return (
-      <div className='flex h-full items-center justify-center p-6'>
-        <p className='text-secondary-token'>No profile to preview</p>
-      </div>
-    );
-  }
+  // Compute values from preview data (safe to compute even when null)
+  const username = previewData?.username ?? '';
+  const displayName = previewData?.displayName ?? '';
+  const avatarUrl = previewData?.avatarUrl ?? null;
+  const links = previewData?.links ?? [];
+  const profilePath = previewData?.profilePath ?? '';
 
-  const { username, displayName, avatarUrl, links, profilePath } = previewData;
   const profileUrl =
-    typeof window !== 'undefined'
+    typeof window !== 'undefined' && profilePath
       ? `${window.location.origin}${profilePath}`
       : profilePath;
 
-  const handleCopyUrl = useCallback(async () => {
+  // Action handlers - defined inline, no useCallback needed for simple handlers
+  const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(profileUrl);
       toast.success('Profile URL copied');
     } catch {
       toast.error('Failed to copy');
     }
-  }, [profileUrl]);
+  };
 
-  const handleDownloadQr = useCallback(async () => {
+  const handleDownloadQr = async () => {
     try {
       const qrUrl = getQrCodeUrl(profileUrl, 512);
       const response = await fetch(qrUrl);
@@ -67,9 +65,9 @@ export function PreviewPanelContent() {
     } catch {
       toast.error('Failed to download QR code');
     }
-  }, [profileUrl, username]);
+  };
 
-  const handleDownloadVcard = useCallback(() => {
+  const handleDownloadVcard = () => {
     try {
       const vcard = [
         'BEGIN:VCARD',
@@ -92,8 +90,9 @@ export function PreviewPanelContent() {
     } catch {
       toast.error('Failed to download vCard');
     }
-  }, [displayName, username, profileUrl]);
+  };
 
+  // Memoize action menu items - must be called before early return
   const actionMenuItems = useMemo<CommonDropdownItem[]>(
     () => [
       {
@@ -118,8 +117,18 @@ export function PreviewPanelContent() {
         onClick: handleDownloadVcard,
       },
     ],
-    [handleCopyUrl, handleDownloadQr, handleDownloadVcard]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers use stable values
+    [profileUrl, username, displayName]
   );
+
+  // Early return AFTER all hooks
+  if (!previewData) {
+    return (
+      <div className='flex h-full items-center justify-center p-6'>
+        <p className='text-secondary-token'>No profile to preview</p>
+      </div>
+    );
+  }
 
   return (
     <div className='h-full flex flex-col'>
