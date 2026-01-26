@@ -273,3 +273,12 @@ export const contentSlugTypeEnum = pgEnum('content_slug_type', [
   'release',
   'track',
 ]);
+
+// Sender Reputation Enums
+export const senderStatusEnum = pgEnum('sender_status', [
+  'good', // Normal sending allowed
+  'warning', // High bounce/complaint rate, close to threshold
+  'probation', // Reduced limits, under review
+  'suspended', // Sending blocked temporarily
+  'banned', // Permanently blocked from sending
+]);

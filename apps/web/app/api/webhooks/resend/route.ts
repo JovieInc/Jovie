@@ -28,6 +28,12 @@ import { webhookEvents } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
+  getCreatorByMessageId,
+  recordBounce,
+  recordComplaint,
+  recordDelivery as recordReputationDelivery,
+} from '@/lib/notifications/reputation';
+import {
   addSuppression,
   logDelivery,
   type SuppressionReason,
@@ -196,6 +202,9 @@ async function processBounceOrComplaint(
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       : undefined;
 
+  // Look up which creator sent this email (for reputation tracking)
+  const creatorProfileId = await getCreatorByMessageId(data.email_id);
+
   // Add all recipients to suppression list in parallel
   const suppressionResults = await Promise.all(
     emails.map(email =>
@@ -230,6 +239,35 @@ async function processBounceOrComplaint(
     }
   }
 
+  // Attribute bounce/complaint to the sending creator's reputation
+  if (creatorProfileId) {
+    if (type === 'email.bounced') {
+      const reputationResult = await recordBounce(creatorProfileId);
+      if (reputationResult.statusChanged) {
+        logger.warn(
+          `[Resend Webhook] Creator reputation changed to ${reputationResult.newStatus}`,
+          {
+            creatorProfileId,
+            bounceRate: reputationResult.metrics.bounceRate,
+            eventId,
+          }
+        );
+      }
+    } else if (type === 'email.complained') {
+      const reputationResult = await recordComplaint(creatorProfileId);
+      if (reputationResult.statusChanged) {
+        logger.warn(
+          `[Resend Webhook] Creator reputation changed to ${reputationResult.newStatus}`,
+          {
+            creatorProfileId,
+            complaintRate: reputationResult.metrics.complaintRate,
+            eventId,
+          }
+        );
+      }
+    }
+  }
+
   // Log all delivery outcomes in parallel
   await Promise.all(
     emails.map(email =>
@@ -243,6 +281,7 @@ async function processBounceOrComplaint(
           eventType: type,
           bounceCode: data.bounce?.diagnostic_code,
           complaintType,
+          ...(creatorProfileId && { creatorProfileId }),
         },
       })
     )
@@ -255,6 +294,14 @@ async function processBounceOrComplaint(
 async function processDelivered(event: ResendWebhookPayload): Promise<void> {
   const { data } = event;
 
+  // Look up which creator sent this email (for reputation tracking)
+  const creatorProfileId = await getCreatorByMessageId(data.email_id);
+
+  // Track delivery in creator's reputation if attributed
+  if (creatorProfileId) {
+    await recordReputationDelivery(creatorProfileId);
+  }
+
   // Log all deliveries in parallel
   await Promise.all(
     data.to.map(email =>
@@ -263,6 +310,9 @@ async function processDelivered(event: ResendWebhookPayload): Promise<void> {
         recipientEmail: email,
         status: 'delivered',
         providerMessageId: data.email_id,
+        ...(creatorProfileId && {
+          metadata: { creatorProfileId },
+        }),
       })
     )
   );
