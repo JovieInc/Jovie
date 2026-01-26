@@ -111,7 +111,19 @@ export async function GET(request: Request) {
       }
     }
 
-    // Process each release
+    // Collect all notification values first to enable batch inserts
+    const notificationValues: Array<{
+      creatorProfileId: string;
+      releaseId: string;
+      notificationSubscriptionId: string;
+      notificationType: 'release_day';
+      scheduledFor: Date;
+      status: 'pending';
+      dedupKey: string;
+      metadata: { releaseTitle: string | null; channel: string };
+    }> = [];
+
+    // Process each release and collect notification values
     for (const release of upcomingReleases) {
       if (!release.releaseDate) continue;
 
@@ -123,47 +135,50 @@ export async function GET(request: Request) {
         // Create a unique dedup key to prevent duplicate notifications
         const dedupKey = `release_day:${release.id}:${subscriber.id}`;
 
-        // Insert notification entry
-        // Use onConflictDoUpdate to handle rescheduled releases:
-        // - If the notification exists and was cancelled (e.g., release date changed),
-        //   update it back to pending with the new scheduledFor date
-        // - If it's already pending/sending/sent, keep the existing record
-        const inserted = await db
-          .insert(fanReleaseNotifications)
-          .values({
-            creatorProfileId: release.creatorProfileId,
-            releaseId: release.id,
-            notificationSubscriptionId: subscriber.id,
-            notificationType: 'release_day',
-            scheduledFor: release.releaseDate,
-            status: 'pending',
-            dedupKey,
-            metadata: {
-              releaseTitle: release.title,
-              channel: subscriber.channel,
-            },
-          })
-          .onConflictDoUpdate({
-            target: fanReleaseNotifications.dedupKey,
-            set: {
-              scheduledFor: release.releaseDate,
-              status: 'pending',
-              error: null,
-              updatedAt: now,
-            },
-            // Update if cancelled OR pending (to handle rescheduled releases)
-            // Don't touch sent/sending notifications
-            setWhere: inArray(fanReleaseNotifications.status, [
-              'cancelled',
-              'pending',
-            ]),
-          })
-          .returning({ id: fanReleaseNotifications.id });
-
-        if (inserted.length > 0) {
-          totalScheduled++;
-        }
+        notificationValues.push({
+          creatorProfileId: release.creatorProfileId,
+          releaseId: release.id,
+          notificationSubscriptionId: subscriber.id,
+          notificationType: 'release_day',
+          scheduledFor: release.releaseDate,
+          status: 'pending',
+          dedupKey,
+          metadata: {
+            releaseTitle: release.title,
+            channel: subscriber.channel,
+          },
+        });
       }
+    }
+
+    // Batch insert notifications in chunks of 500 to avoid query size limits
+    // Use onConflictDoUpdate to handle rescheduled releases:
+    // - If the notification exists and was cancelled/pending, update it with the new scheduledFor date
+    // - Don't touch sent/sending notifications
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < notificationValues.length; i += BATCH_SIZE) {
+      const batch = notificationValues.slice(i, i + BATCH_SIZE);
+      const inserted = await db
+        .insert(fanReleaseNotifications)
+        .values(batch)
+        .onConflictDoUpdate({
+          target: fanReleaseNotifications.dedupKey,
+          set: {
+            scheduledFor: sql`EXCLUDED.scheduled_for`,
+            status: 'pending',
+            error: null,
+            updatedAt: now,
+          },
+          // Update if cancelled OR pending (to handle rescheduled releases)
+          // Don't touch sent/sending notifications
+          setWhere: inArray(fanReleaseNotifications.status, [
+            'cancelled',
+            'pending',
+          ]),
+        })
+        .returning({ id: fanReleaseNotifications.id });
+
+      totalScheduled += inserted.length;
     }
 
     logger.info(
