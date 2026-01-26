@@ -1,8 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Wallet } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { Check, Wallet, X } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { Input } from '@/components/atoms/Input';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
@@ -50,22 +50,47 @@ const StatCard = memo(function StatCard({
 interface VenmoConnectedBadgeProps {
   venmoHandle: string;
   onEdit: () => void;
+  onDisconnect: () => void;
 }
 
 const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
   venmoHandle,
   onEdit,
+  onDisconnect,
 }: VenmoConnectedBadgeProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <div className='flex flex-wrap items-center gap-3 rounded-xl bg-surface-1 px-4 py-2.5'>
-      <Wallet className='h-4 w-4 text-accent-token' />
-      <span className='rounded-full bg-accent/10 px-2.5 py-0.5 text-sm font-medium text-accent-token'>
-        {venmoHandle}
-      </span>
-      <span className='text-sm text-secondary-token'>Connected</span>
-      <Button onClick={onEdit} variant='ghost' size='sm' className='h-8 px-2'>
-        Edit
-      </Button>
+    <div className='flex flex-wrap items-center gap-3'>
+      {/* Venmo handle pill with edit on click */}
+      <button
+        type='button'
+        onClick={onEdit}
+        className='inline-flex items-center gap-2 rounded-full bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent-token transition-colors hover:bg-accent/20'
+      >
+        <Wallet className='h-4 w-4' />@{venmoHandle}
+      </button>
+
+      {/* Connected pill with hover disconnect */}
+      <button
+        type='button'
+        onClick={onDisconnect}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className='group inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-xs font-medium transition-colors hover:border-error/50 hover:bg-error/10 hover:text-error'
+      >
+        {isHovered ? (
+          <>
+            <X className='h-3.5 w-3.5' />
+            <span>Disconnect</span>
+          </>
+        ) : (
+          <>
+            <Check className='h-3.5 w-3.5 text-success' />
+            <span className='text-secondary-token'>Connected</span>
+          </>
+        )}
+      </button>
     </div>
   );
 });
@@ -143,7 +168,7 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
     <div className='space-y-4'>
       <SectionHeader
         title='Venmo Handle'
-        description='Your handle will appear on your profile so fans can tip you directly.'
+        description='Connect your Venmo to receive tips from fans.'
         right={<Wallet className='h-6 w-6 text-accent' />}
         className='pb-1'
       />
@@ -170,8 +195,7 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
               />
             </div>
             <p className='mt-1.5 text-xs text-tertiary-token'>
-              Your handle will be shown on your public profile and fans can tip
-              you directly via Venmo.
+              Shown on your public profile.
             </p>
           </div>
           <div className='flex gap-3'>
@@ -213,7 +237,7 @@ const TipLinkSection = memo(function TipLinkSection({
     <div className='space-y-4'>
       <SectionHeader
         title='Share your tip link'
-        description='Send fans directly to your profile so they can tip instantly.'
+        description='Direct fans to your tip page.'
         className='pb-1'
       />
       <div>
@@ -229,11 +253,7 @@ const TipLinkSection = memo(function TipLinkSection({
             />
           </div>
           <p className='text-xs text-secondary-token'>
-            Fans can visit{' '}
-            <strong className='font-semibold'>
-              {PROFILE_URL.replace('https://', '')}/{displayHandle}/tip
-            </strong>{' '}
-            or scan the QR code below to tip you instantly.
+            Share this link or use the QR code below.
           </p>
         </div>
       </div>
@@ -256,7 +276,7 @@ const QRCodeSection = memo(function QRCodeSection({
     <div className='space-y-4'>
       <SectionHeader
         title='Downloadable QR'
-        description='Perfect for merch tables, receipts, or posters.'
+        description='Print for merch, receipts, or posters.'
         className='pb-1'
       />
       <div>
@@ -281,7 +301,7 @@ const QRCodeSection = memo(function QRCodeSection({
               </a>
             </Button>
             <p className='text-xs text-secondary-token'>
-              Keep this on receipts or merch so fans can tip fast.
+              Scans open your tip page instantly.
             </p>
           </div>
         </div>
@@ -307,6 +327,7 @@ export function DashboardTipping() {
     hasVenmoHandle,
     handleSaveVenmo,
     handleCancel,
+    handleDisconnect,
   } = useDashboardTipping();
 
   // Memoize URL calculations
@@ -357,8 +378,9 @@ export function DashboardTipping() {
             />
           ) : (
             <VenmoConnectedBadge
-              venmoHandle={artist.venmo_handle ?? ''}
+              venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
               onEdit={() => setIsEditing(true)}
+              onDisconnect={handleDisconnect}
             />
           ))}
       </div>

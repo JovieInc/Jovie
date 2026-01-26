@@ -238,7 +238,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showImportingState && (
-              <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+              <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
                 <div className='flex h-16 w-16 items-center justify-center rounded-full bg-[#1DB954]/10'>
                   <Icon
                     name='Loader2'
@@ -279,7 +279,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
-              <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+              <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
                 <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
                   <Icon
                     name='Disc3'

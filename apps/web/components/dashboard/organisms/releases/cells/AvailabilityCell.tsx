@@ -83,11 +83,14 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const availableCount = release.providers.filter(p => p.url).length;
   const totalCount = allProviders.length;
 
-  // Memoize sliced providers for compact display
-  const compactProviders = useMemo(
-    () => allProviders.slice(0, 4),
-    [allProviders]
-  );
+  // Memoize linked providers for compact display (only show providers with URLs)
+  const compactProviders = useMemo(() => {
+    const linked = allProviders.filter(key => {
+      const provider = providerMap.get(key);
+      return provider?.url;
+    });
+    return linked.slice(0, 4);
+  }, [allProviders, providerMap]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -210,7 +213,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 <div
                   key={providerKey}
                   className={cn(
-                    'relative flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface-1',
+                    'relative flex h-5 w-5 items-center justify-center rounded-full border border-subtle',
                     status === 'missing' ? 'bg-surface-2' : 'bg-surface-1'
                   )}
                 >

@@ -19,4 +19,5 @@ export interface UseDashboardTippingReturn {
   hasVenmoHandle: boolean;
   handleSaveVenmo: () => Promise<void>;
   handleCancel: () => void;
+  handleDisconnect: () => Promise<void>;
 }

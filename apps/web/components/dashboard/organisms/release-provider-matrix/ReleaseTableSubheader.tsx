@@ -1,6 +1,12 @@
 'use client';
 
-import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  TooltipShortcut,
+} from '@jovie/ui';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ExportCSVButton } from '@/components/organisms/table';
@@ -47,16 +53,18 @@ function LinearStyleDisplayMenu({
 }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant='ghost'
-          size='sm'
-          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
-        >
-          <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
-          Display
-        </Button>
-      </PopoverTrigger>
+      <TooltipShortcut label='Display' shortcut='⇧V' side='bottom'>
+        <PopoverTrigger asChild>
+          <Button
+            variant='ghost'
+            size='sm'
+            className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
+          >
+            <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
+            Display
+          </Button>
+        </PopoverTrigger>
+      </TooltipShortcut>
       <PopoverContent align='end' className='w-56 p-0'>
         <div className='p-2.5'>
           <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
@@ -120,21 +128,23 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-1.5'>
       {/* Left: Filter button (disabled until filtering is implemented) */}
-      <Button
-        variant='ghost'
-        size='sm'
-        disabled
-        aria-label='Filter releases (coming soon)'
-        className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token disabled:opacity-50 disabled:cursor-not-allowed'
-      >
-        <Icon name='Filter' className='h-3.5 w-3.5' />
-        Filter
-        {activeFilterCount > 0 && (
-          <span className='ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white'>
-            {activeFilterCount}
-          </span>
-        )}
-      </Button>
+      <TooltipShortcut label='Filter' shortcut='F' side='bottom'>
+        <Button
+          variant='ghost'
+          size='sm'
+          disabled
+          aria-label='Filter releases (coming soon)'
+          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token disabled:opacity-50 disabled:cursor-not-allowed'
+        >
+          <Icon name='Filter' className='h-3.5 w-3.5' />
+          Filter
+          {activeFilterCount > 0 && (
+            <span className='ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white'>
+              {activeFilterCount}
+            </span>
+          )}
+        </Button>
+      </TooltipShortcut>
 
       {/* Right: Display + Export */}
       <div className='flex items-center gap-2'>
