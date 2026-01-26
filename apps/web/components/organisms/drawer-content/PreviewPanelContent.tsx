@@ -1,11 +1,19 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { Copy, ExternalLink, X } from 'lucide-react';
+import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  MoreVertical,
+  QrCode,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
+import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 
@@ -17,7 +25,6 @@ import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview'
  */
 export function PreviewPanelContent() {
   const { close, previewData } = usePreviewPanel();
-  const [copied, setCopied] = useState(false);
 
   // Don't render anything until we have preview data
   if (!previewData) {
@@ -29,18 +36,90 @@ export function PreviewPanelContent() {
   }
 
   const { username, displayName, avatarUrl, links, profilePath } = previewData;
+  const profileUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${profilePath}`
+      : profilePath;
 
-  const handleCopy = async () => {
+  const handleCopyUrl = useCallback(async () => {
     try {
-      const url = `${window.location.origin}${profilePath}`;
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
+      await navigator.clipboard.writeText(profileUrl);
       toast.success('Profile URL copied');
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
     }
-  };
+  }, [profileUrl]);
+
+  const handleDownloadQr = useCallback(async () => {
+    try {
+      const qrUrl = getQrCodeUrl(profileUrl, 512);
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${username || 'jovie'}-qr-code.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('QR code downloaded');
+    } catch {
+      toast.error('Failed to download QR code');
+    }
+  }, [profileUrl, username]);
+
+  const handleDownloadVcard = useCallback(() => {
+    try {
+      const vcard = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `FN:${displayName || username}`,
+        `URL:${profileUrl}`,
+        'END:VCARD',
+      ].join('\n');
+
+      const blob = new Blob([vcard], { type: 'text/vcard' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${username || 'jovie'}.vcf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('vCard downloaded');
+    } catch {
+      toast.error('Failed to download vCard');
+    }
+  }, [displayName, username, profileUrl]);
+
+  const actionMenuItems = useMemo<CommonDropdownItem[]>(
+    () => [
+      {
+        type: 'action',
+        id: 'copy-url',
+        label: 'Copy Jovie Profile URL',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: handleCopyUrl,
+      },
+      {
+        type: 'action',
+        id: 'download-qr',
+        label: 'Download QR Code',
+        icon: <QrCode className='h-4 w-4' />,
+        onClick: handleDownloadQr,
+      },
+      {
+        type: 'action',
+        id: 'download-vcard',
+        label: 'Download vCard',
+        icon: <Download className='h-4 w-4' />,
+        onClick: handleDownloadVcard,
+      },
+    ],
+    [handleCopyUrl, handleDownloadQr, handleDownloadVcard]
+  );
 
   return (
     <div className='h-full flex flex-col'>
@@ -50,21 +129,27 @@ export function PreviewPanelContent() {
           Live Preview
         </h2>
         <div className='flex items-center gap-1'>
-          {/* Copy button */}
-          <button
-            type='button'
-            onClick={handleCopy}
-            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors'
-            aria-label={copied ? 'Copied!' : 'Copy profile URL'}
-          >
-            <Copy className='h-3.5 w-3.5' aria-hidden='true' />
-          </button>
+          {/* Action menu */}
+          <CommonDropdown
+            variant='dropdown'
+            items={actionMenuItems}
+            trigger={
+              <button
+                type='button'
+                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out'
+                aria-label='Profile actions'
+              >
+                <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
+              </button>
+            }
+            align='end'
+          />
           {/* Open button */}
           <Link
             href={profilePath}
             target='_blank'
             rel='noopener noreferrer'
-            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors inline-flex items-center justify-center'
+            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out inline-flex items-center justify-center'
             aria-label='Open profile in new tab'
           >
             <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />

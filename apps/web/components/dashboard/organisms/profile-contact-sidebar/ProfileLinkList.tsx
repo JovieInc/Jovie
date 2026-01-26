@@ -1,12 +1,13 @@
 'use client';
 
-import { Copy, ExternalLink } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { Check, Copy, ExternalLink } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/dashboard/PreviewPanelContext';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+import { cn } from '@/lib/utils';
 import type { CategoryOption } from './ProfileLinkCategorySelector';
 
 export interface ProfileLinkListProps {
@@ -40,15 +41,22 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
+const ACTION_BUTTON_CLASS =
+  'p-1 rounded hover:bg-surface-2 text-tertiary-token hover:text-primary-token transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+
 interface LinkItemProps {
   link: PreviewPanelLink;
 }
 
 function LinkItem({ link }: LinkItemProps) {
+  const [copied, setCopied] = useState(false);
+
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(link.url);
+      setCopied(true);
       toast.success('Link copied');
+      setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error('Failed to copy');
     }
@@ -58,33 +66,53 @@ function LinkItem({ link }: LinkItemProps) {
     window.open(link.url, '_blank', 'noopener,noreferrer');
   }, [link.url]);
 
+  const displayText = compactUrlDisplay(link.platform, link.url);
+
+  // Get platform brand color
+  const iconMeta = getPlatformIcon(link.platform);
+  const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
+
   return (
-    <div className='group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-surface-2/40 transition-colors'>
-      <div className='flex-1 min-w-0'>
-        <PlatformPill
-          platformIcon={link.platform}
-          platformName={link.title}
-          primaryText={compactUrlDisplay(link.platform, link.url)}
-          collapsed={false}
-          tone={link.isVisible ? 'default' : 'faded'}
-        />
-      </div>
-      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'>
-        <button
-          type='button'
-          onClick={handleCopy}
-          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
-          aria-label='Copy link'
+    <div
+      className={cn(
+        'group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-surface-2/40 transition-colors ease-out',
+        !link.isVisible && 'opacity-60'
+      )}
+    >
+      {/* Left: Icon + Label */}
+      <div className='flex items-center gap-2 min-w-0'>
+        <span
+          className='shrink-0'
+          style={brandColor ? { color: brandColor } : undefined}
         >
-          <Copy className='h-3.5 w-3.5' />
-        </button>
+          <SocialIcon platform={link.platform} className='h-4 w-4' />
+        </span>
+        <span className='text-sm text-primary-token truncate'>
+          {displayText}
+        </span>
+      </div>
+
+      {/* Right: Actions (visible on hover) */}
+      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ease-out shrink-0'>
         <button
           type='button'
           onClick={handleOpen}
-          className='p-1.5 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1'
-          aria-label='Open in new tab'
+          className={ACTION_BUTTON_CLASS}
+          aria-label={`Open ${link.title}`}
         >
-          <ExternalLink className='h-3.5 w-3.5' />
+          <ExternalLink className='h-4 w-4' aria-hidden='true' />
+        </button>
+        <button
+          type='button'
+          onClick={handleCopy}
+          className={ACTION_BUTTON_CLASS}
+          aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
+        >
+          {copied ? (
+            <Check className='h-4 w-4 text-success' aria-hidden='true' />
+          ) : (
+            <Copy className='h-4 w-4' aria-hidden='true' />
+          )}
         </button>
       </div>
     </div>
