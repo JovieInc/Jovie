@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, ExternalLink } from 'lucide-react';
+import { Check, Copy, ExternalLink, Plus, X } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/dashboard/PreviewPanelContext';
@@ -13,27 +13,8 @@ import type { CategoryOption } from './ProfileLinkCategorySelector';
 export interface ProfileLinkListProps {
   links: PreviewPanelLink[];
   selectedCategory: CategoryOption;
-}
-
-function compactUrlDisplay(platform: string, url: string): string {
-  try {
-    const parsed = new URL(url);
-    const pathname = parsed.pathname.replaceAll(/(?:^\/+)|(?:\/+$)/g, '');
-    if (pathname) {
-      // Show handle/username if it looks like one
-      if (pathname.startsWith('@')) {
-        return pathname;
-      }
-      // For short paths, show as @handle style
-      if (!pathname.includes('/') && pathname.length < 30) {
-        return `@${pathname}`;
-      }
-    }
-    // Fallback to hostname
-    return parsed.hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
+  onAddLink?: (category: LinkSection) => void;
+  onRemoveLink?: (linkId: string) => void;
 }
 
 function getLinkSection(platform: string): LinkSection {
@@ -42,13 +23,29 @@ function getLinkSection(platform: string): LinkSection {
 }
 
 const ACTION_BUTTON_CLASS =
-  'p-1 rounded hover:bg-surface-2 text-tertiary-token hover:text-primary-token transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+  'p-1.5 rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+
+const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
+
+const SECTION_LABELS: Record<LinkSection, string> = {
+  social: 'Social',
+  dsp: 'Music',
+  earnings: 'Earnings',
+  custom: 'Web',
+};
+
+function formatPlatformName(platform: string): string {
+  // Capitalize first letter and handle common abbreviations
+  if (platform.toLowerCase() === 'dsp') return 'DSP';
+  return platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
+}
 
 interface LinkItemProps {
   link: PreviewPanelLink;
+  onRemove?: (linkId: string) => void;
 }
 
-function LinkItem({ link }: LinkItemProps) {
+function LinkItem({ link, onRemove }: LinkItemProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -66,7 +63,11 @@ function LinkItem({ link }: LinkItemProps) {
     window.open(link.url, '_blank', 'noopener,noreferrer');
   }, [link.url]);
 
-  const displayText = compactUrlDisplay(link.platform, link.url);
+  const handleRemove = useCallback(() => {
+    onRemove?.(link.id);
+  }, [link.id, onRemove]);
+
+  const platformName = formatPlatformName(link.platform);
 
   // Get platform brand color
   const iconMeta = getPlatformIcon(link.platform);
@@ -75,25 +76,25 @@ function LinkItem({ link }: LinkItemProps) {
   return (
     <div
       className={cn(
-        'group flex items-center justify-between rounded-md py-1.5 px-1 -mx-1 hover:bg-surface-2/40 transition-colors ease-out',
+        'flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors ease-out hover:bg-surface-2',
         !link.isVisible && 'opacity-60'
       )}
     >
-      {/* Left: Icon + Label */}
-      <div className='flex items-center gap-2 min-w-0'>
+      {/* Left: Icon + Platform Name */}
+      <div className='flex items-center gap-3 min-w-0'>
         <span
           className='shrink-0'
           style={brandColor ? { color: brandColor } : undefined}
         >
-          <SocialIcon platform={link.platform} className='h-4 w-4' />
+          <SocialIcon platform={link.platform} className='h-5 w-5' />
         </span>
-        <span className='text-sm text-primary-token truncate'>
-          {displayText}
+        <span className='text-sm font-medium text-primary-token truncate'>
+          {platformName}
         </span>
       </div>
 
-      {/* Right: Actions (visible on hover) */}
-      <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ease-out shrink-0'>
+      {/* Right: Actions (always visible) */}
+      <div className='flex items-center gap-1 shrink-0'>
         <button
           type='button'
           onClick={handleOpen}
@@ -114,7 +115,42 @@ function LinkItem({ link }: LinkItemProps) {
             <Copy className='h-4 w-4' aria-hidden='true' />
           )}
         </button>
+        {onRemove && (
+          <button
+            type='button'
+            onClick={handleRemove}
+            className={ACTION_BUTTON_CLASS}
+            aria-label={`Remove ${link.title}`}
+          >
+            <X className='h-4 w-4' aria-hidden='true' />
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+interface SectionHeaderProps {
+  section: LinkSection;
+  onAdd?: (section: LinkSection) => void;
+}
+
+function SectionHeader({ section, onAdd }: SectionHeaderProps) {
+  return (
+    <div className='flex items-center justify-between mb-2'>
+      <h4 className='text-xs font-medium text-secondary-token'>
+        {SECTION_LABELS[section]} links
+      </h4>
+      {onAdd && (
+        <button
+          type='button'
+          onClick={() => onAdd(section)}
+          className='p-1 rounded hover:bg-surface-2 text-secondary-token hover:text-primary-token transition-colors'
+          aria-label={`Add ${SECTION_LABELS[section]} link`}
+        >
+          <Plus className='h-4 w-4' />
+        </button>
+      )}
     </div>
   );
 }
@@ -122,6 +158,8 @@ function LinkItem({ link }: LinkItemProps) {
 export function ProfileLinkList({
   links,
   selectedCategory,
+  onAddLink,
+  onRemoveLink,
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -158,11 +196,38 @@ export function ProfileLinkList({
     );
   }
 
+  // When viewing a specific category, show section header
+  if (selectedCategory !== 'all') {
+    return (
+      <div className='space-y-3'>
+        <SectionHeader section={selectedCategory} onAdd={onAddLink} />
+        <div className='space-y-2'>
+          {filteredLinks.map(link => (
+            <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // When viewing all, group by section
   return (
-    <div className='space-y-0.5'>
-      {filteredLinks.map(link => (
-        <LinkItem key={link.id} link={link} />
-      ))}
+    <div className='space-y-6'>
+      {SECTION_ORDER.map(section => {
+        const sectionLinks = groupedLinks[section];
+        if (sectionLinks.length === 0) return null;
+
+        return (
+          <div key={section} className='space-y-3'>
+            <SectionHeader section={section} onAdd={onAddLink} />
+            <div className='space-y-2'>
+              {sectionLinks.map(link => (
+                <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
