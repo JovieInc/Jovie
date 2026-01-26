@@ -1,13 +1,20 @@
-import { EMAIL_REPLY_TO } from '@/lib/notifications/config';
+import {
+  EMAIL_FROM_ADDRESS,
+  EMAIL_REPLY_TO,
+  NOTIFICATIONS_BRAND_NAME,
+} from '@/lib/notifications/config';
 import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { checkQuota, incrementQuota } from '@/lib/notifications/quota';
+import { checkReputation, recordSend } from '@/lib/notifications/reputation';
 import {
   isEmailSuppressed,
   logDelivery,
 } from '@/lib/notifications/suppression';
+import { logger } from '@/lib/utils/logger';
 import type {
   EmailProvider,
   NotificationChannelResult,
@@ -15,6 +22,7 @@ import type {
   NotificationDispatchResult,
   NotificationMessage,
   NotificationTarget,
+  SenderContext,
 } from '@/types/notifications';
 
 let emailProvider: EmailProvider = new ResendEmailProvider();
@@ -34,6 +42,75 @@ const buildSkippedResult = (
   detail,
 });
 
+const buildErrorResult = (
+  channel: NotificationDeliveryChannel,
+  error: string
+): NotificationChannelResult => ({
+  channel,
+  status: 'error',
+  error,
+});
+
+/**
+ * Build the "From" address with dynamic sender name.
+ * Implements the Laylo pattern: "Artist Name via Jovie <notifications@notify.jov.ie>"
+ */
+function buildFromAddress(senderContext?: SenderContext): string {
+  if (!senderContext?.displayName) {
+    return `${NOTIFICATIONS_BRAND_NAME} <${EMAIL_FROM_ADDRESS}>`;
+  }
+
+  // Sanitize display name (remove quotes and angle brackets)
+  const sanitizedName = senderContext.displayName
+    .replace(/["<>]/g, '')
+    .trim()
+    .slice(0, 64); // Limit length
+
+  return `${sanitizedName} via ${NOTIFICATIONS_BRAND_NAME} <${EMAIL_FROM_ADDRESS}>`;
+}
+
+/**
+ * Check sender quota and reputation before sending
+ */
+async function checkSenderEligibility(
+  senderContext: SenderContext
+): Promise<{ eligible: boolean; reason?: string }> {
+  const { creatorProfileId } = senderContext;
+
+  // Check reputation first (more serious)
+  const reputationCheck = await checkReputation(creatorProfileId);
+  if (!reputationCheck.canSend) {
+    logger.warn('[notifications] Send blocked by reputation', {
+      creatorProfileId,
+      status: reputationCheck.status,
+      reason: reputationCheck.reason,
+    });
+    return {
+      eligible: false,
+      reason: reputationCheck.reason ?? 'Sending blocked due to reputation',
+    };
+  }
+
+  // Check quota
+  const quotaCheck = await checkQuota(creatorProfileId);
+  if (!quotaCheck.allowed) {
+    logger.info('[notifications] Send blocked by quota', {
+      creatorProfileId,
+      reason: quotaCheck.reason,
+      remaining: quotaCheck.remaining,
+    });
+    return {
+      eligible: false,
+      reason:
+        quotaCheck.reason === 'daily_limit'
+          ? 'Daily email limit reached'
+          : 'Monthly email limit reached',
+    };
+  }
+
+  return { eligible: true };
+}
+
 /**
  * Handle sending a notification via email channel
  */
@@ -43,9 +120,29 @@ async function handleEmailChannel(
   preferences: Awaited<ReturnType<typeof getNotificationPreferences>>
 ): Promise<NotificationChannelResult> {
   const to = target.email ?? preferences.email ?? null;
+  const senderContext = message.senderContext;
 
   if (!to) {
     return buildSkippedResult('email', 'No email available');
+  }
+
+  // Check sender eligibility if sending on behalf of a creator
+  if (senderContext) {
+    const eligibility = await checkSenderEligibility(senderContext);
+    if (!eligibility.eligible) {
+      await logDelivery({
+        channel: 'email',
+        recipientEmail: to,
+        status: 'failed',
+        errorMessage: eligibility.reason,
+        metadata: {
+          notificationId: message.id,
+          creatorProfileId: senderContext.creatorProfileId,
+          blockedReason: eligibility.reason,
+        },
+      });
+      return buildErrorResult('email', eligibility.reason ?? 'Send blocked');
+    }
   }
 
   // Check global suppression list (bounces, complaints, etc.)
@@ -59,6 +156,9 @@ async function handleEmailChannel(
       metadata: {
         suppressionReason: suppressionCheck.reason,
         notificationId: message.id,
+        ...(senderContext && {
+          creatorProfileId: senderContext.creatorProfileId,
+        }),
       },
     });
     return buildSkippedResult('email', detail);
@@ -72,32 +172,68 @@ async function handleEmailChannel(
     return buildSkippedResult('email', 'Marketing emails are disabled');
   }
 
+  // Build dynamic from address
+  const fromAddress = message.from ?? buildFromAddress(senderContext);
+
+  // Determine reply-to (sender's email takes precedence)
+  const replyTo =
+    message.replyTo ?? senderContext?.replyToEmail ?? EMAIL_REPLY_TO;
+
   const emailResult = await emailProvider.sendEmail({
     to,
     subject: message.subject,
     text: message.text,
     html: message.html,
-    replyTo: message.replyTo ?? EMAIL_REPLY_TO,
+    replyTo,
     headers: message.headers,
-    from: message.from,
+    from: fromAddress,
   });
 
-  // Log delivery for tracking
+  // Handle post-send tracking
   if (emailResult.status === 'sent') {
+    const providerMessageId = emailResult.detail;
+
+    // Log delivery
     await logDelivery({
       channel: 'email',
       recipientEmail: to,
       status: 'sent',
-      providerMessageId: emailResult.detail,
-      metadata: { notificationId: message.id },
+      providerMessageId,
+      metadata: {
+        notificationId: message.id,
+        ...(senderContext && {
+          creatorProfileId: senderContext.creatorProfileId,
+          emailType: senderContext.emailType,
+        }),
+      },
     });
+
+    // Track quota and reputation for sender
+    if (senderContext && providerMessageId) {
+      // Increment quota counter
+      await incrementQuota(senderContext.creatorProfileId);
+
+      // Record send for reputation tracking and webhook attribution
+      await recordSend(
+        senderContext.creatorProfileId,
+        providerMessageId,
+        to,
+        senderContext.emailType,
+        senderContext.referenceId
+      );
+    }
   } else if (emailResult.status === 'error') {
     await logDelivery({
       channel: 'email',
       recipientEmail: to,
       status: 'failed',
       errorMessage: emailResult.error,
-      metadata: { notificationId: message.id },
+      metadata: {
+        notificationId: message.id,
+        ...(senderContext && {
+          creatorProfileId: senderContext.creatorProfileId,
+        }),
+      },
     });
   }
 
