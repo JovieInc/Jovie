@@ -182,6 +182,74 @@ function getSuppressionReason(
 }
 
 /**
+ * Log suppression results for all emails
+ */
+function logSuppressionResults(
+  suppressionResults: Array<{
+    email: string;
+    result: { success: boolean; error?: string; alreadyExists?: boolean };
+  }>,
+  eventId: string,
+  reason: SuppressionReason
+): void {
+  for (const { email, result } of suppressionResults) {
+    const emailMasked = `${email.slice(0, 3)}***@***`;
+    if (!result.success) {
+      logger.error(`[Resend Webhook] Failed to add suppression`, {
+        error: result.error,
+        eventId,
+        reason,
+        emailMasked,
+      });
+    } else if (!result.alreadyExists) {
+      logger.info(`[Resend Webhook] Added suppression`, {
+        reason,
+        eventId,
+        emailMasked,
+      });
+    }
+  }
+}
+
+/**
+ * Update creator reputation based on bounce or complaint
+ */
+async function updateCreatorReputation(
+  type: ResendEventType,
+  creatorProfileId: string,
+  eventId: string
+): Promise<void> {
+  if (type === 'email.bounced') {
+    const reputationResult = await recordBounce(creatorProfileId);
+    if (reputationResult.statusChanged) {
+      logger.warn(
+        `[Resend Webhook] Creator reputation changed to ${reputationResult.newStatus}`,
+        {
+          creatorProfileId,
+          bounceRate: reputationResult.metrics.bounceRate,
+          eventId,
+        }
+      );
+    }
+    return;
+  }
+
+  if (type === 'email.complained') {
+    const reputationResult = await recordComplaint(creatorProfileId);
+    if (reputationResult.statusChanged) {
+      logger.warn(
+        `[Resend Webhook] Creator reputation changed to ${reputationResult.newStatus}`,
+        {
+          creatorProfileId,
+          complaintRate: reputationResult.metrics.complaintRate,
+          eventId,
+        }
+      );
+    }
+  }
+}
+
+/**
  * Process a bounce or complaint event
  */
 async function processBounceOrComplaint(
@@ -220,52 +288,11 @@ async function processBounceOrComplaint(
     )
   );
 
-  // Log suppression results
-  for (const { email, result } of suppressionResults) {
-    if (!result.success) {
-      const emailMasked = `${email.slice(0, 3)}***@***`;
-      logger.error(`[Resend Webhook] Failed to add suppression`, {
-        error: result.error,
-        eventId,
-        reason,
-        emailMasked,
-      });
-    } else if (!result.alreadyExists) {
-      logger.info(`[Resend Webhook] Added suppression`, {
-        reason,
-        eventId,
-        emailMasked: `${email.slice(0, 3)}***@***`,
-      });
-    }
-  }
+  logSuppressionResults(suppressionResults, eventId, reason);
 
   // Attribute bounce/complaint to the sending creator's reputation
   if (creatorProfileId) {
-    if (type === 'email.bounced') {
-      const reputationResult = await recordBounce(creatorProfileId);
-      if (reputationResult.statusChanged) {
-        logger.warn(
-          `[Resend Webhook] Creator reputation changed to ${reputationResult.newStatus}`,
-          {
-            creatorProfileId,
-            bounceRate: reputationResult.metrics.bounceRate,
-            eventId,
-          }
-        );
-      }
-    } else if (type === 'email.complained') {
-      const reputationResult = await recordComplaint(creatorProfileId);
-      if (reputationResult.statusChanged) {
-        logger.warn(
-          `[Resend Webhook] Creator reputation changed to ${reputationResult.newStatus}`,
-          {
-            creatorProfileId,
-            complaintRate: reputationResult.metrics.complaintRate,
-            eventId,
-          }
-        );
-      }
-    }
+    await updateCreatorReputation(type, creatorProfileId, eventId);
   }
 
   // Log all delivery outcomes in parallel
