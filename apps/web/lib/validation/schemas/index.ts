@@ -251,6 +251,21 @@ export {
 } from './ingestion';
 
 // =============================================================================
+// Pixel Tracking Schemas
+// =============================================================================
+
+export {
+  // Types
+  type PixelEventData,
+  type PixelEventPayload,
+  type PixelEventType,
+  // Schema instances
+  pixelEventDataSchema,
+  pixelEventPayloadSchema,
+  pixelEventTypeSchema,
+} from './pixels';
+
+// =============================================================================
 // Namespace Exports
 // =============================================================================
 
@@ -274,6 +289,7 @@ import * as media from './media';
 import * as notifications from './notifications';
 import * as onboarding from './onboarding';
 import * as payments from './payments';
+import * as pixels from './pixels';
 
 export {
   base,
@@ -286,4 +302,5 @@ export {
   notifications,
   onboarding,
   ingestion,
+  pixels,
 };

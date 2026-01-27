@@ -26,6 +26,8 @@ export * from './enums';
 export * from './ingestion';
 // Links (Social, Wrapped, Signed)
 export * from './links';
+// Pixel Tracking (Events, Creator Configs)
+export * from './pixels';
 // Creator Profiles
 export * from './profiles';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
