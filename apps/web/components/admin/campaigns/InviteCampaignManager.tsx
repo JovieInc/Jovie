@@ -1,12 +1,24 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  Input,
+} from '@jovie/ui';
 import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
   type SendCampaignInvitesResponse,
   useCampaignPreviewQuery,
+  useCampaignStatsQuery,
   useSendCampaignInvitesMutation,
 } from '@/lib/queries/useCampaignInvites';
 
@@ -22,6 +34,9 @@ const DEFAULT_THROTTLING: ThrottlingConfig = {
   maxPerHour: 30,
 };
 
+/** Threshold for showing confirmation modal */
+const LARGE_BATCH_THRESHOLD = 25;
+
 export function InviteCampaignManager() {
   const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
   const [limit, setLimit] = useState(20);
@@ -29,6 +44,7 @@ export function InviteCampaignManager() {
     useState<ThrottlingConfig>(DEFAULT_THROTTLING);
   const [sendResult, setSendResult] =
     useState<SendCampaignInvitesResponse | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // TanStack Query for preview data
   const {
@@ -41,6 +57,9 @@ export function InviteCampaignManager() {
     limit,
   });
 
+  // TanStack Query for campaign stats
+  const { data: stats, isLoading: isLoadingStats } = useCampaignStatsQuery();
+
   // TanStack Query mutation for sending invites
   const sendInvitesMutation = useSendCampaignInvitesMutation();
 
@@ -48,7 +67,19 @@ export function InviteCampaignManager() {
     refetchPreview();
   };
 
-  const handleSendInvites = async () => {
+  const handleSendClick = () => {
+    if (!preview || preview.sample.withEmails === 0) return;
+
+    // Show confirmation for large batches
+    if (preview.sample.withEmails >= LARGE_BATCH_THRESHOLD) {
+      setShowConfirmModal(true);
+    } else {
+      handleConfirmSend();
+    }
+  };
+
+  const handleConfirmSend = async () => {
+    setShowConfirmModal(false);
     if (!preview || preview.sample.withEmails === 0) return;
 
     setSendResult(null);
@@ -77,8 +108,132 @@ export function InviteCampaignManager() {
   const error =
     previewError?.message ?? (sendInvitesMutation.error?.message || null);
 
+  const hasActiveJobs =
+    (stats?.jobQueue?.pending ?? 0) > 0 ||
+    (stats?.jobQueue?.processing ?? 0) > 0;
+
   return (
     <div className='space-y-8'>
+      {/* Campaign Results Dashboard */}
+      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+        <div className='flex items-center justify-between mb-4'>
+          <h2 className='text-lg font-semibold text-primary-token'>
+            Campaign Results
+          </h2>
+          {isLoadingStats && (
+            <Icon
+              name='Loader2'
+              className='h-4 w-4 animate-spin text-secondary-token'
+            />
+          )}
+        </div>
+
+        {stats && (
+          <div className='grid gap-4 md:grid-cols-3 lg:grid-cols-6'>
+            <div className='rounded-lg bg-surface-2 px-4 py-3'>
+              <p className='text-2xl font-bold text-primary-token'>
+                {stats.campaign.total}
+              </p>
+              <p className='text-xs text-secondary-token'>Total Invites</p>
+            </div>
+            <div className='rounded-lg bg-surface-2 px-4 py-3'>
+              <p className='text-2xl font-bold text-amber-600'>
+                {stats.campaign.pending}
+              </p>
+              <p className='text-xs text-secondary-token'>Pending</p>
+            </div>
+            <div className='rounded-lg bg-surface-2 px-4 py-3'>
+              <p className='text-2xl font-bold text-blue-600'>
+                {stats.campaign.sending}
+              </p>
+              <p className='text-xs text-secondary-token'>Sending</p>
+            </div>
+            <div className='rounded-lg bg-surface-2 px-4 py-3'>
+              <p className='text-2xl font-bold text-green-600'>
+                {stats.campaign.sent}
+              </p>
+              <p className='text-xs text-secondary-token'>Sent</p>
+            </div>
+            <div className='rounded-lg bg-surface-2 px-4 py-3'>
+              <p className='text-2xl font-bold text-destructive'>
+                {stats.campaign.failed}
+              </p>
+              <p className='text-xs text-secondary-token'>Failed</p>
+            </div>
+            <div className='rounded-lg bg-surface-2 px-4 py-3'>
+              <p className='text-2xl font-bold text-purple-600'>
+                {stats.campaign.claimed}
+              </p>
+              <p className='text-xs text-secondary-token'>Claimed</p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Job Queue Status */}
+      {stats?.jobQueue && hasActiveJobs && (
+        <section className='rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-6'>
+          <div className='flex items-center gap-2 mb-4'>
+            <Icon
+              name='Loader2'
+              className='h-5 w-5 animate-spin text-blue-600'
+            />
+            <h2 className='text-lg font-semibold text-blue-700 dark:text-blue-300'>
+              Job Queue Active
+            </h2>
+          </div>
+
+          <div className='grid gap-4 md:grid-cols-4'>
+            <div>
+              <p className='text-2xl font-bold text-blue-700 dark:text-blue-300'>
+                {stats.jobQueue.pending}
+              </p>
+              <p className='text-xs text-blue-600 dark:text-blue-400'>
+                Jobs Pending
+              </p>
+            </div>
+            <div>
+              <p className='text-2xl font-bold text-blue-700 dark:text-blue-300'>
+                {stats.jobQueue.processing}
+              </p>
+              <p className='text-xs text-blue-600 dark:text-blue-400'>
+                Processing
+              </p>
+            </div>
+            <div>
+              <p className='text-2xl font-bold text-green-600'>
+                {stats.jobQueue.succeeded}
+              </p>
+              <p className='text-xs text-blue-600 dark:text-blue-400'>
+                Succeeded
+              </p>
+            </div>
+            <div>
+              <p className='text-2xl font-bold text-blue-700 dark:text-blue-300'>
+                ~{stats.jobQueue.estimatedMinutesRemaining} min
+              </p>
+              <p className='text-xs text-blue-600 dark:text-blue-400'>
+                Est. Remaining
+              </p>
+            </div>
+          </div>
+
+          {stats.jobQueue.nextRunAt && (
+            <p className='mt-4 text-xs text-blue-600 dark:text-blue-400'>
+              Next job scheduled:{' '}
+              {new Date(stats.jobQueue.nextRunAt).toLocaleTimeString(
+                undefined,
+                {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                }
+              )}
+            </p>
+          )}
+        </section>
+      )}
+
       {/* Targeting Section */}
       <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
@@ -356,7 +511,7 @@ export function InviteCampaignManager() {
         <div className='flex items-center gap-4'>
           <Button
             variant='primary'
-            onClick={handleSendInvites}
+            onClick={handleSendClick}
             disabled={
               sendInvitesMutation.isPending ||
               !preview ||
@@ -386,6 +541,49 @@ export function InviteCampaignManager() {
           </p>
         </div>
       </section>
+
+      {/* Confirmation Modal for Large Batches */}
+      <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Large Batch Send</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to send{' '}
+              <span className='font-semibold'>
+                {preview?.sample.withEmails ?? 0}
+              </span>{' '}
+              invite emails. This will take approximately{' '}
+              <span className='font-semibold'>
+                {preview
+                  ? Math.ceil(
+                      (preview.sample.withEmails * avgDelaySeconds) / 60
+                    )
+                  : 0}{' '}
+                minutes
+              </span>{' '}
+              to complete.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='mt-4 rounded-lg bg-amber-500/10 px-4 py-3'>
+            <div className='flex items-start gap-2'>
+              <Icon
+                name='AlertTriangle'
+                className='h-4 w-4 text-amber-600 mt-0.5'
+              />
+              <p className='text-xs text-amber-700 dark:text-amber-400'>
+                This action cannot be undone. Emails will be queued and sent
+                gradually to avoid spam filters.
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant='primary' onClick={handleConfirmSend}>
+              Confirm Send
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

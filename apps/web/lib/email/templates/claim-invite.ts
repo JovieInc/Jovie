@@ -6,6 +6,7 @@
 
 import { APP_NAME } from '@/constants/app';
 import { getAppUrl, getProfileUrl, PROFILE_URL } from '@/constants/domains';
+import { buildClaimInviteUnsubscribeUrl } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '../utils';
 
 export interface ClaimInviteTemplateData {
@@ -19,6 +20,8 @@ export interface ClaimInviteTemplateData {
   avatarUrl?: string | null;
   /** Optional fit score for personalization */
   fitScore?: number | null;
+  /** Recipient email address (used for unsubscribe link) */
+  recipientEmail?: string;
 }
 
 /**
@@ -46,9 +49,16 @@ export function getClaimInviteSubject(_data: ClaimInviteTemplateData): string {
  * Generate plain text email body
  */
 export function getClaimInviteText(data: ClaimInviteTemplateData): string {
-  const { creatorName, username, claimToken } = data;
+  const { creatorName, username, claimToken, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
   const previewUrl = buildPreviewUrl(username);
+  const unsubscribeUrl = recipientEmail
+    ? buildClaimInviteUnsubscribeUrl(recipientEmail)
+    : null;
+
+  const unsubscribeSection = unsubscribeUrl
+    ? `\n\nDon't want to receive these emails? Unsubscribe: ${unsubscribeUrl}`
+    : '';
 
   return `Hey ${creatorName},
 
@@ -74,16 +84,19 @@ Questions? Just reply to this email.
 
 ---
 You received this because we created a profile for you based on your public music presence.
-If this wasn't you, you can ignore this email.`;
+If this wasn't you, you can ignore this email.${unsubscribeSection}`;
 }
 
 /**
  * Generate HTML email body
  */
 export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
-  const { creatorName, username, claimToken, avatarUrl } = data;
+  const { creatorName, username, claimToken, avatarUrl, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
   const previewUrl = buildPreviewUrl(username);
+  const unsubscribeUrl = recipientEmail
+    ? buildClaimInviteUnsubscribeUrl(recipientEmail)
+    : null;
 
   // Escape user-provided values to prevent XSS
   const safeCreatorName = escapeHtml(creatorName);
@@ -95,6 +108,17 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
       <div style="text-align: center; margin-bottom: 24px;">
         <img src="${safeAvatarUrl}" alt="${safeCreatorName}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
       </div>
+    `
+    : '';
+
+  // Escape unsubscribe URL for safe HTML attribute insertion
+  const safeUnsubscribeUrl = unsubscribeUrl ? escapeHtml(unsubscribeUrl) : null;
+
+  const unsubscribeSection = safeUnsubscribeUrl
+    ? `
+              <p style="margin: 12px 0 0; font-size: 11px; color: #bbb; text-align: center;">
+                <a href="${safeUnsubscribeUrl}" style="color: #999; text-decoration: underline;">Unsubscribe from these emails</a>
+              </p>
     `
     : '';
 
@@ -179,6 +203,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
                 You received this because we created a profile for you based on your public music presence.
                 <br>If this wasn't you, you can ignore this email.
               </p>
+              ${unsubscribeSection}
             </td>
           </tr>
         </table>

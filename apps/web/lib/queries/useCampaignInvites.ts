@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const MINUTE = 60 * 1000;
+const SECONDS = 1000;
 
 // Types
 interface EligibleProfile {
@@ -42,11 +43,37 @@ export interface SendCampaignInvitesResponse {
   error?: string;
 }
 
+export interface CampaignStats {
+  total: number;
+  pending: number;
+  sending: number;
+  sent: number;
+  failed: number;
+  claimed: number;
+}
+
+export interface JobQueueStats {
+  pending: number;
+  processing: number;
+  succeeded: number;
+  failed: number;
+  nextRunAt: string | null;
+  estimatedMinutesRemaining: number;
+}
+
+export interface CampaignStatsResponse {
+  ok: boolean;
+  campaign: CampaignStats;
+  jobQueue: JobQueueStats;
+  updatedAt: string;
+}
+
 // Query keys
 export const campaignQueryKeys = {
   all: ['campaign-invites'] as const,
   preview: (threshold: number, limit: number) =>
     [...campaignQueryKeys.all, 'preview', { threshold, limit }] as const,
+  stats: () => [...campaignQueryKeys.all, 'stats'] as const,
 };
 
 /**
@@ -143,8 +170,54 @@ export function useSendCampaignInvitesMutation() {
   return useMutation({
     mutationFn: sendCampaignInvites,
     onSettled: () => {
-      // Invalidate preview queries to refetch after sending
+      // Invalidate preview and stats queries to refetch after sending
       queryClient.invalidateQueries({ queryKey: campaignQueryKeys.all });
+    },
+  });
+}
+
+/**
+ * Query function for fetching campaign stats.
+ */
+async function fetchCampaignStats(): Promise<CampaignStatsResponse> {
+  const response = await fetch('/api/admin/creator-invite/bulk/stats');
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error ?? 'Failed to fetch campaign stats');
+  }
+
+  return data;
+}
+
+/**
+ * TanStack Query hook for fetching campaign statistics.
+ * Polls every 30 seconds when there are pending jobs.
+ *
+ * @example
+ * const { data: stats, isLoading } = useCampaignStatsQuery();
+ * console.log(stats?.campaign.sent); // Number of sent invites
+ * console.log(stats?.jobQueue.pending); // Pending jobs in queue
+ */
+export function useCampaignStatsQuery({
+  enabled = true,
+}: {
+  enabled?: boolean;
+} = {}) {
+  return useQuery({
+    queryKey: campaignQueryKeys.stats(),
+    queryFn: fetchCampaignStats,
+    enabled,
+    staleTime: 30 * SECONDS,
+    gcTime: 5 * MINUTE,
+    refetchInterval: query => {
+      // Poll every 30 seconds if there are pending/processing jobs
+      const data = query.state.data;
+      if (data?.jobQueue.pending || data?.jobQueue.processing) {
+        return 30 * SECONDS;
+      }
+      return false;
     },
   });
 }

@@ -14,6 +14,7 @@ import {
   getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -155,6 +156,32 @@ export async function processSendClaimInviteJob(
     throw new Error(`Profile has no claim token: ${profile.id}`);
   }
 
+  // Check if the email is suppressed (user unsubscribed or bounced)
+  const suppressionCheck = await isEmailSuppressed(invite.email);
+  if (suppressionCheck.suppressed) {
+    await tx
+      .update(creatorClaimInvites)
+      .set({
+        status: 'sent', // Mark as sent to avoid retrying
+        error: `Email suppressed: ${suppressionCheck.reason}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorClaimInvites.id, invite.id));
+
+    logger.info('Claim invite skipped due to email suppression', {
+      inviteId: invite.id,
+      emailDomain: invite.email.split('@')[1], // Log domain only for PII protection
+      reason: suppressionCheck.reason,
+    });
+
+    return {
+      inviteId: invite.id,
+      email: invite.email,
+      status: 'skipped',
+      detail: `Email suppressed: ${suppressionCheck.reason}`,
+    };
+  }
+
   // Mark as sending
   await tx
     .update(creatorClaimInvites)
@@ -171,6 +198,7 @@ export async function processSendClaimInviteJob(
     claimToken: profile.claimToken,
     avatarUrl: profile.avatarUrl,
     fitScore: profile.fitScore,
+    recipientEmail: invite.email,
   };
 
   const emailContent = getClaimInviteEmail(templateData);
@@ -199,7 +227,7 @@ export async function processSendClaimInviteJob(
 
     logger.info('Claim invite email sent', {
       inviteId: invite.id,
-      email: invite.email,
+      emailDomain: invite.email.split('@')[1], // Log domain only for PII protection
       profileUsername: profile.username,
       resendId: result.detail,
     });
