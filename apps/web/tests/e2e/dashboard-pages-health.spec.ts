@@ -65,12 +65,19 @@ function hasAdminCredentials(): boolean {
 
 /**
  * Get admin credentials (admin-specific or fallback to regular)
+ * Supports passwordless Clerk test emails (containing +clerk_test)
  */
 function getAdminCredentials(): { username: string; password: string } {
   const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
   const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
 
-  if (adminUsername.length > 0 && adminPassword.length > 0) {
+  // Allow passwordless auth for Clerk test emails
+  const isClerkTestEmail = adminUsername.includes('+clerk_test');
+
+  if (
+    adminUsername.length > 0 &&
+    (adminPassword.length > 0 || isClerkTestEmail)
+  ) {
     return { username: adminUsername, password: adminPassword };
   }
 
@@ -291,11 +298,15 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
         ) {
           // This might be a redirect to onboarding, home, etc.
           // Count as pass if it's a valid redirect destination
-          // Use exact path matching to avoid false positives from '/' matching everything
           const validRedirectDestinations = ['/onboarding', '/app/'];
+          // Parse URL to check origin for root path redirect safety
+          const parsedUrl = new URL(currentUrl);
+          const expectedOrigin = new URL(page.url()).origin;
+          const isSameOriginRoot =
+            parsedUrl.origin === expectedOrigin && parsedUrl.pathname === '/';
           const isValidRedirect =
             validRedirectDestinations.some(dest => currentUrl.includes(dest)) ||
-            currentUrl.endsWith('/');
+            isSameOriginRoot;
 
           if (isValidRedirect) {
             results.push({
@@ -564,11 +575,15 @@ test.describe('Admin Pages Health Check @smoke', () => {
         ) {
           // This might be a redirect to onboarding, home, etc.
           // Count as pass if it's a valid redirect destination
-          // Use exact path matching to avoid false positives from '/' matching everything
           const validRedirectDestinations = ['/onboarding', '/app/'];
+          // Parse URL to check origin for root path redirect safety
+          const parsedUrl = new URL(currentUrl);
+          const expectedOrigin = new URL(page.url()).origin;
+          const isSameOriginRoot =
+            parsedUrl.origin === expectedOrigin && parsedUrl.pathname === '/';
           const isValidRedirect =
             validRedirectDestinations.some(dest => currentUrl.includes(dest)) ||
-            currentUrl.endsWith('/');
+            isSameOriginRoot;
 
           if (isValidRedirect) {
             results.push({
