@@ -29,6 +29,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
+import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types';
 
@@ -83,10 +84,6 @@ function getBasePath(mode: BreadcrumbMode): string {
   if (mode === 'admin') return '/app/admin';
   if (mode === 'settings') return '/app/settings';
   return '/app/dashboard';
-}
-
-function toTitleCase(s: string): string {
-  return s.replaceAll('-', ' ').replaceAll(/\b\w/g, ch => ch.toUpperCase());
 }
 
 import {
@@ -200,7 +197,10 @@ export default function DashboardLayoutClient({
       subs.forEach((seg, i) => {
         acc += `/${seg}`;
         const isLast = i === subs.length - 1;
-        items.push({ label: toTitleCase(seg), href: isLast ? undefined : acc });
+        items.push({
+          label: getBreadcrumbLabel(seg),
+          href: isLast ? undefined : acc,
+        });
       });
     }
     return items;
