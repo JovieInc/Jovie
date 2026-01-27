@@ -37,17 +37,19 @@ export function DrawerHeaderActions({
   // Ensure max 2 primary actions
   const displayActions = primaryActions.slice(0, 2);
 
-  // Convert overflow actions to menu items
-  const menuItems: TableActionMenuItem[] = overflowActions.map(action => ({
-    id: action.id,
-    label: action.label,
-    icon: action.icon,
-    onClick:
-      action.onClick ||
-      (action.href
-        ? () => window.open(action.href, '_blank', 'noopener,noreferrer')
-        : () => {}),
-  }));
+  // Convert overflow actions to menu items with defensive filtering
+  const menuItems: TableActionMenuItem[] = overflowActions
+    .filter(action => action && action.id && action.label)
+    .map(action => ({
+      id: action.id,
+      label: action.label,
+      icon: action.icon,
+      onClick:
+        action.onClick ||
+        (action.href
+          ? () => window.open(action.href, '_blank', 'noopener,noreferrer')
+          : () => {}),
+    }));
 
   return (
     <div className='flex items-center gap-1'>

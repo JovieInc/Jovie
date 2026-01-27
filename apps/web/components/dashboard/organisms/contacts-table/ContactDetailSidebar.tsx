@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
@@ -248,7 +249,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         onDelete={onDelete}
       />
 
-      <div className='flex-1 overflow-auto px-4 py-4 space-y-6'>
+      <div className='flex-1 overflow-auto px-3 py-3 space-y-5'>
         {/* Role Section */}
         <DrawerSection title='Role'>
           <div className='space-y-2'>
@@ -260,7 +261,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               <SelectContent>
                 {CONTACT_ROLE_OPTIONS.map(option => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    <div className='flex items-center gap-2'>
+                      <Icon
+                        name={option.iconName}
+                        className='h-3.5 w-3.5 text-tertiary-token'
+                      />
+                      <span>{option.label}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
