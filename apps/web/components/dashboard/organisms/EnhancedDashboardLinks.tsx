@@ -184,26 +184,28 @@ export function EnhancedDashboardLinks({
   // Determine if we should use chat layout (sidebar closed with links)
   const useChatLayout = !sidebarOpen && links.length > 0;
 
+  // Determine container class based on layout state
+  const getContainerClass = (): string => {
+    if (useChatLayout || sidebarOpen) {
+      return 'flex h-full min-w-0 flex-col';
+    }
+    return 'min-h-screen min-w-0';
+  };
+
+  // Determine inner wrapper class based on layout state
+  const getInnerClass = (): string => {
+    if (useChatLayout) {
+      return 'flex min-w-0 flex-1 flex-col';
+    }
+    if (sidebarOpen) {
+      return 'flex h-full min-w-0 flex-1 flex-col items-center justify-center';
+    }
+    return 'w-full min-w-0 space-y-4';
+  };
+
   return (
-    <div
-      className={
-        useChatLayout
-          ? 'flex h-full min-w-0 flex-col'
-          : sidebarOpen
-            ? 'flex h-full min-w-0 flex-col'
-            : 'min-h-screen min-w-0'
-      }
-      data-testid='enhanced-dashboard-links'
-    >
-      <div
-        className={
-          useChatLayout
-            ? 'flex min-w-0 flex-1 flex-col'
-            : sidebarOpen
-              ? 'flex h-full min-w-0 flex-1 flex-col items-center justify-center'
-              : 'w-full min-w-0 space-y-4'
-        }
-      >
+    <div className={getContainerClass()} data-testid='enhanced-dashboard-links'>
+      <div className={getInnerClass()}>
         {/* Profile editor section - hidden when sidebar is open */}
         {!sidebarOpen && profileId && artist && (
           <ProfileEditorSection
