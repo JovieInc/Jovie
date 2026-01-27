@@ -1,18 +1,31 @@
 import { expect, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
 
 test.describe('Releases dashboard', () => {
-  test.beforeEach(async ({ page }) => {
+  // Skip entire suite if Clerk auth fails during beforeEach
+  test.beforeEach(async ({ page }, testInfo) => {
     const hasCredentials =
       process.env.E2E_CLERK_USER_USERNAME &&
       process.env.E2E_CLERK_USER_PASSWORD;
 
     if (!hasCredentials) {
-      test.skip();
+      testInfo.skip();
       return;
     }
 
-    await signInUser(page);
+    try {
+      await signInUser(page);
+    } catch (error) {
+      // Skip test if Clerk fails to load (e.g., CDN issues)
+      if (error instanceof ClerkTestError && error.code === 'CLERK_NOT_READY') {
+        console.warn(
+          `⚠ Skipping ${testInfo.title}: Clerk failed to initialize`
+        );
+        testInfo.skip();
+        return;
+      }
+      throw error;
+    }
   });
 
   test('copies a smart link and follows the redirect @smoke', async ({
