@@ -29,9 +29,7 @@ export function FeatureList({ features, title }: FeatureListProps) {
 
   return (
     <div className='mt-8'>
-      <h3 className='text-lg font-semibold text-gray-900 dark:text-white mb-4'>
-        {title}
-      </h3>
+      <h3 className='text-lg font-semibold text-primary-token mb-4'>{title}</h3>
       <motion.ul
         className='space-y-3'
         variants={container}
@@ -45,7 +43,7 @@ export function FeatureList({ features, title }: FeatureListProps) {
             variants={item}
           >
             <svg
-              className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5'
+              className='h-5 w-5 flex-shrink-0 text-success mt-0.5'
               fill='none'
               viewBox='0 0 24 24'
               stroke='currentColor'
@@ -58,7 +56,7 @@ export function FeatureList({ features, title }: FeatureListProps) {
                 d='M5 13l4 4L19 7'
               />
             </svg>
-            <span className='ml-3 text-base text-gray-700 dark:text-gray-300'>
+            <span className='ml-3 text-base text-secondary-token'>
               {feature.title}
             </span>
           </motion.li>
