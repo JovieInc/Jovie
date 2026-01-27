@@ -11,25 +11,26 @@ const FREE_FEATURES = [
   'Smart deep links (/listen, /tip, etc.)',
   'Clean dark/light mode',
   'App deep links (no browser friction)',
-  'Conversion-focused analytics',
-  'Unique Jovie handle (yourname)',
+  'Basic analytics (7 days)',
+  'Contact capture (100 contacts)',
+  'Jovie branding on profile',
 ] as const;
 
 const PRO_FEATURES = [
-  'Everything in Free',
-  'No Jovie branding - Your profile, your brand',
-  'Capture any identifier - Email, phone, or Spotify',
-  "Remember your fans across visits - See who's new, who's back",
-  'Segment new vs. returning listeners - Understand your audience',
-  "See what's working - Simple reports, clear insights",
+  'Everything in Free, plus:',
+  'Remove Jovie branding',
+  'Full analytics (90 days)',
+  'Unlimited contacts + export',
+  'Geographic & device insights',
+  'Priority support',
 ] as const;
 
 const GROWTH_FEATURES = [
-  'Everything in Pro',
-  'Automated follow-ups - Playlist adds, drop reminders',
-  'Test what converts - A/B headlines and offers',
-  'Retarget your fans on Meta - Stay top of mind',
-  "Smart suggestions - We'll tell you what to do next",
+  'Everything in Pro, plus:',
+  'Automated follow-ups',
+  'A/B testing for headlines & offers',
+  'Meta retargeting (Facebook/Instagram)',
+  'Smart optimization suggestions',
 ] as const;
 
 // FAQ data for objection handling
@@ -47,7 +48,7 @@ const FAQ_ITEMS = [
   {
     question: 'Do you offer annual billing?',
     answer:
-      'Yes! Save 17% with annual billing. Pay $390/year for Pro (instead of $468) or $990/year for Growth (instead of $1,188).',
+      'Yes! Save 2 months with annual billing. Pay $348/year for Pro (instead of $468) or $948/year for Growth (instead of $1,188).',
   },
   {
     question: 'Is my data secure?',
@@ -173,8 +174,8 @@ export default function PricingPage() {
               Turn listeners into superfans.
             </h1>
             <p className='mt-6 text-lg text-secondary-token max-w-2xl mx-auto'>
-              The link-in-bio built for musicians. Own your audience data, automate
-              fan engagement, and grow your career.
+              The link-in-bio built for musicians. Own your audience data,
+              automate fan engagement, and grow your career.
             </p>
           </div>
 
@@ -246,7 +247,7 @@ export default function PricingPage() {
                   <span className='ml-2 text-tertiary-token'>/month</span>
                 </div>
                 <p className='text-xs text-success mb-6'>
-                  or $390/year (save 17%)
+                  or $348/year (save 2 months)
                 </p>
                 <Link
                   href='/waitlist?plan=pro'
@@ -269,9 +270,12 @@ export default function PricingPage() {
 
               {/* Growth Tier */}
               <div className='rounded-xl border border-subtle bg-surface-1 p-8 flex flex-col'>
-                <div className='mb-4'>
+                <div className='mb-4 flex items-center gap-2'>
                   <span className='text-xs font-medium uppercase tracking-wide text-tertiary-token'>
                     Growth
+                  </span>
+                  <span className='text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'>
+                    Coming Soon
                   </span>
                 </div>
                 <p className='text-sm text-secondary-token mb-4'>
@@ -287,7 +291,7 @@ export default function PricingPage() {
                   <span className='ml-2 text-tertiary-token'>/month</span>
                 </div>
                 <p className='text-xs text-success mb-6'>
-                  or $990/year (save 17%)
+                  or $948/year (save 2 months)
                 </p>
                 <Link
                   href='/waitlist?plan=growth'
@@ -306,58 +310,6 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
-            </div>
-
-            {/* Optional Add-on - Full Width */}
-            <div className='group mt-6 rounded-xl border border-subtle bg-surface-1 p-6 transition-all hover:border-default hover:shadow-sm'>
-              <div className='flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6'>
-                <div className='flex-1'>
-                  <div className='inline-flex items-center gap-2 mb-3'>
-                    <span className='text-[10px] font-semibold uppercase tracking-wider text-quaternary-token'>
-                      Optional Add-on
-                    </span>
-                    <span className='h-px flex-1 bg-gradient-to-r from-[var(--color-border-subtle)] to-transparent' />
-                  </div>
-                  <h3 className='text-base font-semibold text-primary-token mb-2'>
-                    Remove Jovie branding
-                  </h3>
-                  <p className='text-sm text-secondary-token mb-3'>
-                    Give your fans a fully custom, professional experience
-                    without any third-party branding.
-                  </p>
-                  <div className='flex items-baseline gap-2'>
-                    <span className='text-2xl font-semibold text-primary-token'>
-                      $5
-                    </span>
-                    <span className='text-sm text-tertiary-token'>/mo</span>
-                    <span className='text-sm text-quaternary-token'>or</span>
-                    <span className='text-lg font-medium text-secondary-token'>
-                      $50
-                    </span>
-                    <span className='text-sm text-tertiary-token'>/year</span>
-                  </div>
-                </div>
-                <Link
-                  href='/waitlist?plan=branding'
-                  className='inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-btn-primary text-btn-primary-foreground text-sm font-medium hover:opacity-90 transition-all shadow-sm hover:shadow group-hover:scale-[1.02]'
-                >
-                  <span>Learn more</span>
-                  <svg
-                    className='w-4 h-4'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    aria-hidden='true'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M9 5l7 7-7 7'
-                    />
-                  </svg>
-                </Link>
               </div>
             </div>
 
