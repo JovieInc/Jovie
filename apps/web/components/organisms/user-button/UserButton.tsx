@@ -26,7 +26,7 @@ interface BuildDropdownItemsParams {
   displayName: string;
   userInitials: string;
   formattedUsername: string | null;
-  SIDEBAR_ITEM_CLASS: string;
+  MENU_ITEM_CLASS: string;
   handleProfile: () => void;
   handleSettings: () => void;
   handleManageBilling: () => void;
@@ -43,7 +43,7 @@ function buildDropdownItems({
   displayName,
   userInitials,
   formattedUsername,
-  SIDEBAR_ITEM_CLASS,
+  MENU_ITEM_CLASS,
   handleProfile,
   handleSettings,
   handleManageBilling,
@@ -61,7 +61,7 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleProfile}
-          className='w-full cursor-pointer rounded-lg px-2 py-2 hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
+          className='w-full cursor-pointer rounded-lg px-2 py-2 hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-3'
         >
           <div className='flex w-full items-center gap-3'>
             <Avatar
@@ -73,7 +73,7 @@ function buildDropdownItems({
             />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-sm font-medium text-sidebar-foreground'>
+                <span className='truncate text-sm font-medium text-primary-token'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
@@ -88,14 +88,14 @@ function buildDropdownItems({
                 )}
               </div>
               {formattedUsername && (
-                <p className='truncate text-xs text-sidebar-muted mt-0.5'>
+                <p className='truncate text-xs text-tertiary-token mt-0.5'>
                   {formattedUsername}
                 </p>
               )}
             </div>
             <Icon
               name='ExternalLink'
-              className='h-4 w-4 shrink-0 text-sidebar-muted'
+              className='h-4 w-4 shrink-0 text-tertiary-token'
               aria-hidden='true'
             />
           </div>
@@ -110,11 +110,11 @@ function buildDropdownItems({
       icon: (
         <Icon
           name='Settings'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
       onClick: handleSettings,
-      className: SIDEBAR_ITEM_CLASS,
+      className: MENU_ITEM_CLASS,
     },
   ];
 
@@ -127,11 +127,11 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleOpenShortcuts}
-          className={SIDEBAR_ITEM_CLASS}
+          className={MENU_ITEM_CLASS}
         >
           <Icon
             name='Keyboard'
-            className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+            className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
           />
           <span className='flex-1 text-left'>Keyboard shortcuts</span>
           <span className='flex items-center gap-0.5 ml-auto'>
@@ -165,13 +165,13 @@ function buildDropdownItems({
       icon: (
         <Icon
           name='CreditCard'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
       onClick: handleManageBilling,
       disabled: loading.manageBilling,
       className: cn(
-        SIDEBAR_ITEM_CLASS,
+        MENU_ITEM_CLASS,
         'disabled:cursor-not-allowed disabled:opacity-70'
       ),
     });
@@ -183,13 +183,13 @@ function buildDropdownItems({
       icon: (
         <Icon
           name='Sparkles'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
       onClick: handleUpgrade,
       disabled: loading.upgrade,
       className: cn(
-        SIDEBAR_ITEM_CLASS,
+        MENU_ITEM_CLASS,
         'disabled:cursor-not-allowed disabled:opacity-70'
       ),
     });
@@ -204,11 +204,11 @@ function buildDropdownItems({
       icon: (
         <Icon
           name='MessageSquare'
-          className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
       onClick: () => setIsFeedbackOpen(true),
-      className: SIDEBAR_ITEM_CLASS,
+      className: MENU_ITEM_CLASS,
     },
     { type: 'custom', id: 'spacer-2', render: () => <div className='h-2' /> },
     {
@@ -219,7 +219,7 @@ function buildDropdownItems({
       onClick: handleSignOut,
       disabled: loading.signOut,
       className:
-        'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 data-[highlighted]:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60',
+        'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive/10 data-[highlighted]:bg-destructive/10 focus-visible:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1 focus-visible:ring-offset-surface-3 disabled:cursor-not-allowed disabled:opacity-60',
     }
   );
 
@@ -300,12 +300,12 @@ export function UserButton({
     );
   }
 
-  // Sidebar-specific class overrides for CommonDropdown
-  const SIDEBAR_CONTENT_CLASS =
-    'w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-sidebar-border bg-sidebar-surface p-2 font-sans text-[13px] leading-[18px] text-sidebar-foreground shadow-md backdrop-blur-none';
+  // Menu styling using standard design tokens
+  const MENU_CONTENT_CLASS =
+    'w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-subtle bg-surface-3 p-2 font-sans text-[13px] leading-[18px] text-primary-token shadow-[0_4px_24px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]';
 
-  const SIDEBAR_ITEM_CLASS =
-    'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover data-[highlighted]:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40';
+  const MENU_ITEM_CLASS =
+    'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-secondary-token transition-colors hover:bg-white/5 hover:text-primary-token data-[highlighted]:bg-white/5 data-[highlighted]:text-primary-token focus-visible:bg-white/5 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-3';
 
   const dropdownItems = buildDropdownItems({
     billingStatus,
@@ -314,7 +314,7 @@ export function UserButton({
     displayName,
     userInitials,
     formattedUsername,
-    SIDEBAR_ITEM_CLASS,
+    MENU_ITEM_CLASS,
     handleProfile,
     handleSettings,
     handleManageBilling,
@@ -374,7 +374,7 @@ export function UserButton({
         align='end'
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName={SIDEBAR_CONTENT_CLASS}
+        contentClassName={MENU_CONTENT_CLASS}
       />
       <FeedbackModal
         isOpen={isFeedbackOpen}

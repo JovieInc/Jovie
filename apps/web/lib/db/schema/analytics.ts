@@ -73,6 +73,13 @@ export const audienceMembers = pgTable(
     retentionIdx: index('audience_members_retention_idx')
       .on(table.lastSeenAt)
       .where(sql`type = 'anonymous' AND email IS NULL AND phone IS NULL`),
+    // Performance indexes for dashboard analytics subquery optimization (JOV-520)
+    fingerprintLookupIdx: index('idx_audience_members_fingerprint')
+      .on(table.creatorProfileId, table.fingerprint)
+      .where(sql`fingerprint IS NOT NULL`),
+    emailLookupIdx: index('idx_audience_members_email')
+      .on(table.creatorProfileId, table.email)
+      .where(sql`email IS NOT NULL`),
   })
 );
 
@@ -120,6 +127,11 @@ export const clickEvents = pgTable(
       table.linkType,
       table.createdAt
     ),
+    // Performance index: non-bot clicks for dashboard analytics (JOV-520)
+    // Partial index avoids full table scans when filtering is_bot = false OR is_bot IS NULL
+    nonBotClicksIdx: index('idx_click_events_non_bot')
+      .on(table.creatorProfileId, table.createdAt)
+      .where(sql`is_bot = false OR is_bot IS NULL`),
   })
 );
 

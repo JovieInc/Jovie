@@ -127,54 +127,51 @@ export const ContactsTable = memo(function ContactsTable({
           Manage bookings, management, and press contacts for {artistName}
         </p>
 
-        <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
-          {/* Scrollable content area */}
-          <div className='flex-1 min-h-0 overflow-auto'>
-            {isEmpty ? (
-              <EmptyState
-                icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
-                heading='No contacts yet'
-                description='Add bookings, management, and press contacts so fans and industry know who to reach.'
-                action={{
-                  label: 'Add bookings contact',
-                  onClick: () => onAddContact('bookings'),
-                }}
-                secondaryAction={{
-                  label: 'Add management contact',
-                  onClick: () => onAddContact('management'),
-                }}
-              />
-            ) : (
-              <UnifiedTable
-                data={contacts}
-                columns={columns}
-                isLoading={false}
-                getRowId={contact => contact.id}
-                minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                className='text-[13px]'
-                getRowClassName={getRowClassName}
-                onRowClick={handleRowClick}
-              />
-            )}
-          </div>
-
-          {/* Footer - only show when not empty */}
-          {!isEmpty && (
-            <div className='shrink-0 flex items-center justify-between border-t border-subtle bg-surface-1 px-4 py-2'>
-              <span className='text-xs text-secondary-token tracking-wide'>
-                {contacts.length}{' '}
-                {contacts.length === 1 ? 'contact' : 'contacts'}
-              </span>
-              <Button
-                variant='secondary'
-                size='sm'
-                onClick={() => onAddContact()}
-              >
-                Add contact
-              </Button>
-            </div>
+        {/* Scrollable content area */}
+        <div className='flex-1 min-h-0 overflow-auto'>
+          {isEmpty ? (
+            <EmptyState
+              icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
+              heading='No contacts yet'
+              description='Add bookings, management, and press contacts so fans and industry know who to reach.'
+              action={{
+                label: 'Add bookings contact',
+                onClick: () => onAddContact('bookings'),
+              }}
+              secondaryAction={{
+                label: 'Add management contact',
+                onClick: () => onAddContact('management'),
+              }}
+            />
+          ) : (
+            <UnifiedTable
+              data={contacts}
+              columns={columns}
+              isLoading={false}
+              getRowId={contact => contact.id}
+              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+              className='text-[13px]'
+              getRowClassName={getRowClassName}
+              onRowClick={handleRowClick}
+            />
           )}
         </div>
+
+        {/* Footer - only show when not empty */}
+        {!isEmpty && (
+          <div className='shrink-0 flex items-center justify-between border-t border-subtle px-4 py-2'>
+            <span className='text-xs text-secondary-token tracking-wide'>
+              {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
+            </span>
+            <Button
+              variant='secondary'
+              size='sm'
+              onClick={() => onAddContact()}
+            >
+              Add contact
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Right sidebar */}

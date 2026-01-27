@@ -1,28 +1,37 @@
+import type { IconName } from '@/components/atoms/Icon';
 import type { ContactRole } from '@/types/contacts';
 
 export const CONTACT_ROLE_OPTIONS: Array<{
   value: ContactRole;
   label: string;
+  iconName: IconName;
   subjectTemplate?: string;
 }> = [
   {
     value: 'bookings',
     label: 'Bookings / Touring',
+    iconName: 'Briefcase',
     subjectTemplate: 'Booking - {artist}',
   },
   {
     value: 'management',
     label: 'Management',
+    iconName: 'Users',
     subjectTemplate: 'Management - {artist}',
   },
   {
     value: 'press_pr',
     label: 'Press / PR',
+    iconName: 'Newspaper',
     subjectTemplate: 'Press - {artist}',
   },
-  { value: 'brand_partnerships', label: 'Brand partnerships' },
-  { value: 'fan_general', label: 'Fan contact / General' },
-  { value: 'other', label: 'Other' },
+  {
+    value: 'brand_partnerships',
+    label: 'Brand partnerships',
+    iconName: 'Handshake',
+  },
+  { value: 'fan_general', label: 'Fan contact / General', iconName: 'Heart' },
+  { value: 'other', label: 'Other', iconName: 'Ellipsis' },
 ];
 
 export const CONTACT_TERRITORY_PRESETS: string[] = [
