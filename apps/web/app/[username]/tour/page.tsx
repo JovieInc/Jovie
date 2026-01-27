@@ -7,12 +7,7 @@ import { loadUpcomingTourDates } from '@/app/app/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { PROFILE_URL } from '@/constants/app';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
 import { TourDateCard } from './TourDateCard';
-
-// Feature flag check timeout to avoid blocking render
-const FLAG_CHECK_TIMEOUT_MS = 100;
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -65,27 +60,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 /**
- * Non-blocking feature flag check with timeout.
- * Returns false if the check takes too long, avoiding render delays.
- */
-async function checkTourDatesEnabled(clerkId: string | null): Promise<boolean> {
-  if (!clerkId) return false;
-
-  try {
-    const result = await Promise.race([
-      checkGateForUser(STATSIG_FLAGS.TOUR_DATES, { userID: clerkId }),
-      new Promise<false>(resolve =>
-        setTimeout(() => resolve(false), FLAG_CHECK_TIMEOUT_MS)
-      ),
-    ]);
-    return result;
-  } catch {
-    // Fail closed - don't show tour dates if flag check fails
-    return false;
-  }
-}
-
-/**
  * Format the tour dates count message
  */
 function formatTourDatesCount(count: number): string {
@@ -101,15 +75,6 @@ export default async function TourPage({ params }: Props) {
   const profile = await getCachedProfile(username);
 
   if (!profile || !profile.isPublic) {
-    notFound();
-  }
-
-  // Check if tour dates feature is enabled for this creator
-  const creatorClerkId =
-    typeof profile.userClerkId === 'string' ? profile.userClerkId : null;
-  const isTourDatesEnabled = await checkTourDatesEnabled(creatorClerkId);
-
-  if (!isTourDatesEnabled) {
     notFound();
   }
 
