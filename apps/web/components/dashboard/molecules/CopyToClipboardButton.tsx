@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
+import { PROFILE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 export interface CopyToClipboardButtonProps {
   relativePath: string; // e.g. '/artist-handle'
@@ -56,11 +56,12 @@ export function CopyToClipboardButton({
 }: CopyToClipboardButtonProps) {
   const { copy, status, isSuccess, isError } = useClipboard({
     onSuccess: onCopySuccess,
-    onError: onCopyError ? () => onCopyError() : undefined,
+    onError: onCopyError,
   });
 
   const handleCopy = () => {
-    const url = `${getBaseUrl()}${relativePath}`;
+    // Profile URLs should always use PROFILE_URL to ensure correct domain
+    const url = `${PROFILE_URL}${relativePath}`;
     copy(url);
   };
 

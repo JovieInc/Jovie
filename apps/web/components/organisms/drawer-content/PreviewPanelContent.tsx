@@ -9,13 +9,13 @@ import {
   QrCode,
   X,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
+import { PROFILE_URL } from '@/constants/domains';
 
 /**
  * PreviewPanelContent - Profile preview drawer content
@@ -33,10 +33,8 @@ export function PreviewPanelContent() {
   const links = previewData?.links ?? [];
   const profilePath = previewData?.profilePath ?? '';
 
-  const profileUrl =
-    typeof window !== 'undefined' && profilePath
-      ? `${window.location.origin}${profilePath}`
-      : profilePath;
+  // Use PROFILE_URL to ensure profile links always point to the profile domain
+  const profileUrl = profilePath ? `${PROFILE_URL}${profilePath}` : '';
 
   // Action handlers - defined inline, no useCallback needed for simple handlers
   const handleCopyUrl = async () => {
@@ -154,15 +152,15 @@ export function PreviewPanelContent() {
             align='end'
           />
           {/* Open button */}
-          <Link
-            href={profilePath}
+          <a
+            href={profileUrl}
             target='_blank'
             rel='noopener noreferrer'
             className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out inline-flex items-center justify-center'
             aria-label='Open profile in new tab'
           >
             <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
-          </Link>
+          </a>
           {/* Close button */}
           <DashboardHeaderActionButton
             ariaLabel='Close preview'
@@ -187,10 +185,10 @@ export function PreviewPanelContent() {
 
           {/* Hero CTA - View Jovie Profile */}
           <Button asChild variant='primary' className='w-full max-w-[360px]'>
-            <Link href={profilePath} target='_blank' rel='noopener noreferrer'>
+            <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
               <ExternalLink className='h-4 w-4 mr-2' aria-hidden='true' />
               View Jovie Profile
-            </Link>
+            </a>
           </Button>
         </div>
       </div>
@@ -201,9 +199,7 @@ export function PreviewPanelContent() {
           Your Profile URL
         </h3>
         <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
-          {typeof window !== 'undefined'
-            ? `${window.location.origin}${profilePath}`
-            : 'Loading...'}
+          {profileUrl || 'Loading...'}
         </div>
         <p className='mt-2 text-xs text-secondary-token'>
           Share this link with your audience

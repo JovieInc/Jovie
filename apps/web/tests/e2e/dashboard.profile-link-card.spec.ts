@@ -165,25 +165,10 @@ test.describe('ProfileLinkCard E2E Tests', () => {
 
     expect(displayedUrl).toBeTruthy();
 
-    // Verify the URL contains the correct domain for the current environment
-    const currentOrigin = await page.evaluate(() => window.location.origin);
-
-    if (
-      currentOrigin.includes('localhost') ||
-      currentOrigin.includes('127.0.0.1')
-    ) {
-      // Local development
-      expect(displayedUrl).toContain(currentOrigin);
-    } else if (
-      currentOrigin.includes('preview') ||
-      currentOrigin.includes('vercel.app')
-    ) {
-      // Preview environment
-      expect(displayedUrl).toContain(currentOrigin);
-    } else {
-      // Should fallback to production domain or use NEXT_PUBLIC_APP_URL
-      expect(displayedUrl).toMatch(/^https:\/\/.+\..+\//);
-    }
+    // Verify the URL follows a valid profile URL format
+    // Profile URLs now use PROFILE_URL (not the current origin) to ensure correct domain
+    // regardless of which subdomain (app.jov.ie vs jov.ie) the dashboard is served from
+    expect(displayedUrl).toMatch(/^https?:\/\/.+\/.+$/);
   });
 
   test('No flaky window/tab handling - uses context.pages', async ({

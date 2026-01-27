@@ -16,8 +16,17 @@ const PRODUCTION_HOSTNAMES = ['jov.ie', 'meetjovie.com'];
 const PREVIEW_HOSTNAMES = ['main.jov.ie', 'main.meetjovie.com'];
 
 /**
- * Dynamically get the correct base URL for the current environment
- * This ensures profile links work correctly in local, preview, and production environments
+ * Dynamically get the base URL for the current browser origin.
+ *
+ * IMPORTANT: This function returns the current window origin, which is NOT
+ * correct for profile links when running on a subdomain (e.g., app.jov.ie).
+ *
+ * For profile-related URLs (profile links, QR codes, vCards, etc.), use
+ * PROFILE_URL from '@/constants/domains' instead. PROFILE_URL always points
+ * to the correct profile domain regardless of which subdomain you're on.
+ *
+ * Use getBaseUrl() only when you need the current origin for same-origin
+ * operations (API calls, internal navigation, etc.).
  */
 export function getBaseUrl(): string {
   // If we have NEXT_PUBLIC_APP_URL from env, use that first

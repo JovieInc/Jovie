@@ -14,6 +14,10 @@ export function DashboardDataProvider({
   value,
   children,
 }: DashboardDataProviderProps) {
+  // Debug: track isAdmin value changes in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[DashboardDataProvider] isAdmin:', value.isAdmin);
+  }
   return (
     <DashboardDataContext.Provider value={value}>
       {children}

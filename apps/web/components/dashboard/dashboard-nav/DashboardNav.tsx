@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
@@ -42,6 +42,13 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+
+  // Debug: track isAdmin changes in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DashboardNav] isAdmin changed:', isAdmin);
+    }
+  }, [isAdmin]);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
