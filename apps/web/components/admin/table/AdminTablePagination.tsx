@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import {
+  Button,
   Select,
   SelectContent,
   SelectItem,

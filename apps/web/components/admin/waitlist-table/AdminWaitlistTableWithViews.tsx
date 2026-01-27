@@ -23,11 +23,11 @@ import {
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { useUpdateWaitlistStatusMutation } from '@/lib/queries/useWaitlistMutations';
+import { AdminTablePagination } from '../table/AdminTablePagination';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import { usePagination } from './usePagination';
-import { AdminTablePagination } from '../table/AdminTablePagination';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
 
 const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';

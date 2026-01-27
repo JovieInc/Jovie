@@ -8,9 +8,9 @@ import {
   getNextSort,
   type SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
+import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
