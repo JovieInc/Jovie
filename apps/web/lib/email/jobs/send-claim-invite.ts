@@ -170,7 +170,7 @@ export async function processSendClaimInviteJob(
 
     logger.info('Claim invite skipped due to email suppression', {
       inviteId: invite.id,
-      email: invite.email,
+      emailDomain: invite.email.split('@')[1], // Log domain only for PII protection
       reason: suppressionCheck.reason,
     });
 

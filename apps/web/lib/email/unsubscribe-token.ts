@@ -11,11 +11,12 @@ import { env } from '@/lib/env';
 /**
  * Secret key for signing unsubscribe tokens.
  * Derived from the RESEND_API_KEY to avoid adding a new env variable.
+ * Returns null if RESEND_API_KEY is not set.
  */
-function getUnsubscribeSecret(): string {
+function getUnsubscribeSecret(): string | null {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error('RESEND_API_KEY is required to sign unsubscribe tokens');
+    return null;
   }
   return createHash('sha256').update(apiKey).digest('hex').slice(0, 32);
 }
@@ -23,10 +24,14 @@ function getUnsubscribeSecret(): string {
 /**
  * Generate an unsubscribe token for an email address.
  * Token = base64url(email).hmac(email)
+ * Returns null if RESEND_API_KEY is not configured.
  */
-export function generateUnsubscribeToken(email: string): string {
-  const normalizedEmail = email.toLowerCase().trim();
+export function generateUnsubscribeToken(email: string): string | null {
   const secret = getUnsubscribeSecret();
+  if (!secret) {
+    return null;
+  }
+  const normalizedEmail = email.toLowerCase().trim();
   const hmac = createHmac('sha256', secret)
     .update(normalizedEmail)
     .digest('hex')
@@ -48,6 +53,8 @@ export function verifyUnsubscribeToken(token: string): string | null {
     if (!email.includes('@')) return null;
 
     const secret = getUnsubscribeSecret();
+    if (!secret) return null;
+
     const expectedHmac = createHmac('sha256', secret)
       .update(email)
       .digest('hex')
@@ -72,8 +79,12 @@ export function verifyUnsubscribeToken(token: string): string | null {
 
 /**
  * Build a full unsubscribe URL for claim invite emails.
+ * Returns null if RESEND_API_KEY is not configured.
  */
-export function buildClaimInviteUnsubscribeUrl(email: string): string {
+export function buildClaimInviteUnsubscribeUrl(email: string): string | null {
   const token = generateUnsubscribeToken(email);
+  if (!token) {
+    return null;
+  }
   return `${APP_URL}/api/unsubscribe/claim-invites?token=${encodeURIComponent(token)}`;
 }
