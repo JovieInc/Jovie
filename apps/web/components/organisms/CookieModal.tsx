@@ -78,7 +78,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           return (
             <div
               key={category.id}
-              className='flex items-start justify-between gap-4 border-b border-subtle py-3 last:border-0'
+              className='flex items-start justify-between gap-4 border-b border-subtle py-4 last:border-0'
             >
               <div className='min-w-0 flex-1 space-y-1'>
                 <span
