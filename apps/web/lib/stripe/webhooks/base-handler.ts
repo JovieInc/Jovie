@@ -248,6 +248,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
     const result = await updateUserBillingStatus({
       clerkUserId: userId,
       isPro: true,
+      plan, // Pass the plan type (pro/growth) from price ID
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: subscription.id,
       stripeEventId,
@@ -255,7 +256,6 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       eventType,
       source: 'webhook',
       metadata: {
-        plan,
         priceId,
         subscriptionStatus: subscription.status,
       },
