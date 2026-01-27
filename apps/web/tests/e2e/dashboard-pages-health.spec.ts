@@ -20,27 +20,42 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Check if Clerk credentials are available for authenticated tests
+ * Supports passwordless Clerk test emails (containing +clerk_test)
  */
 function hasClerkCredentials(): boolean {
   const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
   const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
   const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
 
-  return username.length > 0 && password.length > 0 && clerkSetupSuccess;
+  // Allow passwordless auth for Clerk test emails
+  const isClerkTestEmail = username.includes('+clerk_test');
+
+  return (
+    username.length > 0 &&
+    (password.length > 0 || isClerkTestEmail) &&
+    clerkSetupSuccess
+  );
 }
 
 /**
  * Check if admin Clerk credentials are available.
  * Falls back to regular credentials if admin-specific ones aren't set.
+ * Supports passwordless Clerk test emails (containing +clerk_test)
  */
 function hasAdminCredentials(): boolean {
   const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
   const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
   const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
 
+  // Allow passwordless auth for Clerk test emails
+  const isClerkTestEmail = adminUsername.includes('+clerk_test');
+
   // Use admin-specific credentials if available, otherwise fall back to regular user
   // (assuming the regular test user might have admin access)
-  if (adminUsername.length > 0 && adminPassword.length > 0) {
+  if (
+    adminUsername.length > 0 &&
+    (adminPassword.length > 0 || isClerkTestEmail)
+  ) {
     return clerkSetupSuccess;
   }
 
@@ -276,10 +291,11 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
         ) {
           // This might be a redirect to onboarding, home, etc.
           // Count as pass if it's a valid redirect destination
-          const validRedirectDestinations = ['/onboarding', '/app', '/'];
-          const isValidRedirect = validRedirectDestinations.some(dest =>
-            currentUrl.includes(dest)
-          );
+          // Use exact path matching to avoid false positives from '/' matching everything
+          const validRedirectDestinations = ['/onboarding', '/app/'];
+          const isValidRedirect =
+            validRedirectDestinations.some(dest => currentUrl.includes(dest)) ||
+            currentUrl.endsWith('/');
 
           if (isValidRedirect) {
             results.push({
@@ -548,10 +564,11 @@ test.describe('Admin Pages Health Check @smoke', () => {
         ) {
           // This might be a redirect to onboarding, home, etc.
           // Count as pass if it's a valid redirect destination
-          const validRedirectDestinations = ['/onboarding', '/app', '/'];
-          const isValidRedirect = validRedirectDestinations.some(dest =>
-            currentUrl.includes(dest)
-          );
+          // Use exact path matching to avoid false positives from '/' matching everything
+          const validRedirectDestinations = ['/onboarding', '/app/'];
+          const isValidRedirect =
+            validRedirectDestinations.some(dest => currentUrl.includes(dest)) ||
+            currentUrl.endsWith('/');
 
           if (isValidRedirect) {
             results.push({

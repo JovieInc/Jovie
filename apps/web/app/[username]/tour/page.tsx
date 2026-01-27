@@ -85,6 +85,17 @@ async function checkTourDatesEnabled(clerkId: string | null): Promise<boolean> {
   }
 }
 
+/**
+ * Format the tour dates count message
+ */
+function formatTourDatesCount(count: number): string {
+  if (count === 0) {
+    return 'No upcoming shows';
+  }
+  const showWord = count === 1 ? 'show' : 'shows';
+  return `${count} upcoming ${showWord}`;
+}
+
 export default async function TourPage({ params }: Props) {
   const { username } = await params;
   const profile = await getCachedProfile(username);
@@ -129,9 +140,7 @@ export default async function TourPage({ params }: Props) {
             {artistName} Tour Dates
           </h1>
           <p className='mt-1 text-secondary-token'>
-            {tourDates.length > 0
-              ? `${tourDates.length} upcoming ${tourDates.length === 1 ? 'show' : 'shows'}`
-              : 'No upcoming shows'}
+            {formatTourDatesCount(tourDates.length)}
           </p>
         </div>
 

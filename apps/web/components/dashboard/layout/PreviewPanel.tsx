@@ -50,7 +50,7 @@ export function PreviewPanel() {
       a.download = `${previewData.username || 'jovie'}-qr-code.png`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       toast.success('QR code downloaded');
     } catch {
@@ -76,7 +76,7 @@ export function PreviewPanel() {
       a.download = `${previewData.username || 'jovie'}.vcf`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       toast.success('vCard downloaded');
     } catch {

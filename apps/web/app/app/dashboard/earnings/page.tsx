@@ -13,7 +13,7 @@ export default async function EarningsPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/signin?redirect_url=/app/dashboard/earnings');
+    redirect('/sign-in?redirect_url=/app/dashboard/earnings');
   }
 
   try {

@@ -58,12 +58,16 @@ function HighlightedName({
   // since the string content is static and reordering never occurs
   return (
     <span className='font-medium'>
-      {name.split('').map((char, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: Static string, no reordering
-        <span key={i} className={matchSet.has(i) ? 'text-accent' : undefined}>
-          {char}
-        </span>
-      ))}
+      {name.split('').map(
+        (
+          char,
+          i // NOSONAR S6479: Index key is safe - static string with no reordering
+        ) => (
+          <span key={i} className={matchSet.has(i) ? 'text-accent' : undefined}>
+            {char}
+          </span>
+        )
+      )}
     </span>
   );
 }

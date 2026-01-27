@@ -11,7 +11,7 @@ export default async function SettingsBrandingPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/settings/branding');
+    redirect('/sign-in?redirect_url=/app/settings/branding');
   }
 
   const dashboardData = await getDashboardDataCached();

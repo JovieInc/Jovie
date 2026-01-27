@@ -34,11 +34,6 @@ export type UTMPlaceholder =
   | '{{ad_name}}';
 
 /**
- * UTM parameter value - can be a static string or include placeholders
- */
-export type UTMParamValue = string;
-
-/**
  * A single UTM preset configuration
  */
 export interface UTMPreset {

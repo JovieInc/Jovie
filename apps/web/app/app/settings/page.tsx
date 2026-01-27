@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/settings');
+    redirect('/sign-in?redirect_url=/app/settings');
   }
 
   try {
