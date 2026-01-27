@@ -82,8 +82,8 @@ export function StarterEmptyState({
   };
 
   return (
-    // NOSONAR S6819: role="status" is correct for state announcements; <output> is for form calculation results
-    <div
+    // role="status" is correct for state announcements; <output> is for form calculation results
+    <div // NOSONAR S6819
       role='status'
       aria-live='polite'
       data-testid={testId ?? 'app-empty-state'}

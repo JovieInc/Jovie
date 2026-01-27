@@ -258,7 +258,7 @@ class BandsintownClient {
       );
 
       // Bandsintown returns an error object if artist not found
-      if (!artist || !artist.id) {
+      if (!artist?.id) {
         return null;
       }
 

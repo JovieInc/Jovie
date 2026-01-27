@@ -47,8 +47,8 @@ export function TipSelector({
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-      {/* NOSONAR S6819: role="group" is appropriate for button groups; <fieldset> has styling constraints */}
-      <div
+      {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
+      <div // NOSONAR S6819
         className='grid grid-cols-3 gap-3'
         role='group'
         aria-label='Tip amount options'

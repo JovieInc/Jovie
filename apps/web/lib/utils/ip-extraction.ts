@@ -39,8 +39,8 @@
  * Validate if a string is a valid IPv4 or IPv6 address
  */
 export function isValidIP(ip: string): boolean {
-  // NOSONAR S5843: Complexity required to properly validate IPv4 octet ranges (0-255)
-  const ipv4Regex =
+  // Complexity required to properly validate IPv4 octet ranges (0-255)
+  const ipv4Regex = // NOSONAR S5843
     /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   if (ipv4Regex.test(ip)) {
     return true;
