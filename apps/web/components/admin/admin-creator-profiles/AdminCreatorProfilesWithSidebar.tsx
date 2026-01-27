@@ -8,9 +8,9 @@ import {
   getNextSort,
   type SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
-import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
+import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
@@ -291,17 +291,21 @@ export function AdminCreatorProfilesWithSidebar({
               />
             }
             footer={
-              <AdminCreatorsFooter
+              <AdminTablePagination
                 page={page}
                 totalPages={totalPages}
                 from={from}
                 to={to}
                 total={total}
-                pageSize={pageSize}
                 canPrev={canPrev}
                 canNext={canNext}
                 prevHref={prevHref}
                 nextHref={nextHref}
+                pageSize={pageSize}
+                onPageSizeChange={nextPageSize => {
+                  router.push(buildHref({ page: 1, pageSize: nextPageSize }));
+                }}
+                entityLabel='profiles'
               />
             }
           >
