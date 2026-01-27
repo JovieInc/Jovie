@@ -1,4 +1,4 @@
-import { Check, Shield, Zap, Users } from 'lucide-react';
+import { Check, Shield, Zap } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
@@ -166,14 +166,6 @@ export default function PricingPage() {
         <div className='py-20 sm:py-28'>
           {/* Header */}
           <div className='text-center mb-16'>
-            {/* Social proof badge */}
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-1 border border-subtle mb-8'>
-              <Users className='w-4 h-4 text-success' />
-              <span className='text-sm text-secondary-token'>
-                Join 2,400+ artists already on the waitlist
-              </span>
-            </div>
-
             <h1
               className='text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-primary-token leading-[1.1]'
               style={{ fontSynthesisWeight: 'none' }}
