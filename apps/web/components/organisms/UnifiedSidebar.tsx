@@ -184,7 +184,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         )}
       >
         <SidebarHeader className='relative pb-0'>
-          <div className='group/toggle flex items-center gap-2 px-2 py-1'>
+          <div className='group/toggle flex items-center gap-2 pr-2 py-1'>
             {/* Logo/Header Area - varies by section */}
             {isInSettings ? (
               // Settings: Back button to dashboard
