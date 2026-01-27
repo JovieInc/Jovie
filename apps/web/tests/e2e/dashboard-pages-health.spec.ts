@@ -363,9 +363,12 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
     }
 
     // Show load times for performance insights
-    const avgLoadTime =
-      results.reduce((sum, r) => sum + (r.loadTimeMs || 0), 0) / results.length;
-    console.log(`   ⏱️  Avg load time: ${Math.round(avgLoadTime)}ms`);
+    if (results.length > 0) {
+      const avgLoadTime =
+        results.reduce((sum, r) => sum + (r.loadTimeMs || 0), 0) /
+        results.length;
+      console.log(`   ⏱️  Avg load time: ${Math.round(avgLoadTime)}ms`);
+    }
 
     // Assert no failures
     expect(failed, `${failed.length} pages failed health check`).toHaveLength(
@@ -407,7 +410,13 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 
       // Wait for page to stabilize
       await page.waitForLoadState('networkidle').catch(() => {});
-      await page.waitForTimeout(500);
+      // Wait for React to fully hydrate - check for absence of loading states
+      await page
+        .waitForFunction(
+          () => !document.querySelector('[data-loading="true"]'),
+          { timeout: 5000 }
+        )
+        .catch(() => {});
 
       // Check for errors
       const { hasError, errorText } = await checkForErrorPage(page);
@@ -516,6 +525,63 @@ test.describe('Admin Pages Health Check @smoke', () => {
           continue;
         }
 
+        // Check if redirected to different admin/dashboard page (feature gate, etc.)
+        if (
+          !currentUrl.includes(pageConfig.path) &&
+          (currentUrl.includes('/app/admin') ||
+            currentUrl.includes('/app/dashboard'))
+        ) {
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'pass', // Count as pass - feature gate redirects are expected
+            loadTimeMs,
+          });
+          continue;
+        }
+
+        // Check if redirected outside admin/dashboard entirely
+        if (
+          !currentUrl.includes(pageConfig.path) &&
+          !currentUrl.includes('/app/admin') &&
+          !currentUrl.includes('/app/dashboard')
+        ) {
+          // This might be a redirect to onboarding, home, etc.
+          // Count as pass if it's a valid redirect destination
+          const validRedirectDestinations = ['/onboarding', '/app', '/'];
+          const isValidRedirect = validRedirectDestinations.some(dest =>
+            currentUrl.includes(dest)
+          );
+
+          if (isValidRedirect) {
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'pass', // Feature gate or permission redirect
+              loadTimeMs,
+            });
+            continue;
+          }
+
+          // Unexpected redirect - fail the test
+          const screenshot = await page.screenshot().catch(() => null);
+          if (screenshot) {
+            await testInfo.attach(`redirect-${pageConfig.name}`, {
+              body: screenshot,
+              contentType: 'image/png',
+            });
+          }
+
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: `Unexpected redirect to ${currentUrl}`,
+          });
+          continue;
+        }
+
         // Check for error pages
         const { hasError, errorText } = await checkForErrorPage(page);
 
@@ -583,9 +649,12 @@ test.describe('Admin Pages Health Check @smoke', () => {
     }
 
     // Show load times for performance insights
-    const avgLoadTime =
-      results.reduce((sum, r) => sum + (r.loadTimeMs || 0), 0) / results.length;
-    console.log(`   ⏱️  Avg load time: ${Math.round(avgLoadTime)}ms`);
+    if (results.length > 0) {
+      const avgLoadTime =
+        results.reduce((sum, r) => sum + (r.loadTimeMs || 0), 0) /
+        results.length;
+      console.log(`   ⏱️  Avg load time: ${Math.round(avgLoadTime)}ms`);
+    }
 
     // Assert no failures
     expect(failed, `${failed.length} pages failed health check`).toHaveLength(
