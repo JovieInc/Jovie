@@ -13,14 +13,25 @@ test.describe('Releases dashboard', () => {
       return;
     }
 
+    // Skip if Clerk setup wasn't successful (no real Clerk keys)
+    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+      console.warn(
+        `⚠ Skipping ${testInfo.title}: Clerk testing setup was not successful`
+      );
+      testInfo.skip();
+      return;
+    }
+
     try {
       await signInUser(page);
     } catch (error) {
-      // Skip test if Clerk fails to load (e.g., CDN issues)
-      if (error instanceof ClerkTestError && error.code === 'CLERK_NOT_READY') {
-        console.warn(
-          `⚠ Skipping ${testInfo.title}: Clerk failed to initialize`
-        );
+      // Skip test if Clerk fails to load (e.g., CDN issues or setup issues)
+      if (
+        error instanceof ClerkTestError &&
+        (error.code === 'CLERK_NOT_READY' ||
+          error.code === 'CLERK_SETUP_FAILED')
+      ) {
+        console.warn(`⚠ Skipping ${testInfo.title}: ${error.message}`);
         testInfo.skip();
         return;
       }
