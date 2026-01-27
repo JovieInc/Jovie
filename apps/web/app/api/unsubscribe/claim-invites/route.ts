@@ -162,6 +162,18 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Escape special HTML characters to prevent XSS.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Render a simple HTML page for unsubscribe flow.
  */
 function renderHtmlPage(options: {
@@ -178,10 +190,15 @@ function renderHtmlPage(options: {
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>`
     : `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
 
+  // Escape user-provided values to prevent XSS
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeToken = token ? escapeHtml(token) : '';
+
   const formHtml = showForm
     ? `
     <form method="POST" style="margin-top: 24px;">
-      <input type="hidden" name="token" value="${token}" />
+      <input type="hidden" name="token" value="${safeToken}" />
       <button type="submit" style="padding: 12px 24px; background-color: #000; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;">
         Unsubscribe
       </button>
@@ -195,7 +212,7 @@ function renderHtmlPage(options: {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - Jovie</title>
+  <title>${safeTitle} - Jovie</title>
   <style>
     body {
       margin: 0;
@@ -235,8 +252,8 @@ function renderHtmlPage(options: {
 <body>
   <div class="container">
     ${icon}
-    <h1>${title}</h1>
-    <p>${message}</p>
+    <h1>${safeTitle}</h1>
+    <p>${safeMessage}</p>
     ${formHtml}
   </div>
 </body>

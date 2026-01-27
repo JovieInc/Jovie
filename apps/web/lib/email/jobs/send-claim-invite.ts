@@ -227,7 +227,7 @@ export async function processSendClaimInviteJob(
 
     logger.info('Claim invite email sent', {
       inviteId: invite.id,
-      email: invite.email,
+      emailDomain: invite.email.split('@')[1], // Log domain only for PII protection
       profileUsername: profile.username,
       resendId: result.detail,
     });
