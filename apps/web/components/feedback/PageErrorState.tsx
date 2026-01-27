@@ -1,3 +1,5 @@
+'use client';
+
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 interface PageErrorStateProps {
@@ -34,13 +36,14 @@ export function PageErrorState({
           {title}
         </h1>
         <p className='mb-4 text-secondary-token'>{message}</p>
-        <a
-          href='.'
+        <button
+          type='button'
+          onClick={() => window.location.reload()}
           className='inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors'
         >
           <RefreshCcw className='h-4 w-4' aria-hidden='true' />
           Refresh page
-        </a>
+        </button>
       </div>
     </div>
   );

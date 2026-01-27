@@ -114,12 +114,11 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
     ? DASHBOARD_TABS
     : DASHBOARD_TABS.filter(tab => tab.id !== 'contacts');
 
-  const visibleMoreItems = MORE_MENU_ITEMS.filter(item => {
-    if (item.id === 'tour-dates' && !tourDatesGate.value) return false;
-    return true;
-  });
+  const visibleMoreItems = MORE_MENU_ITEMS.filter(
+    item => item.id !== 'tour-dates' || tourDatesGate.value
+  );
 
-  const isMoreActive = MORE_MENU_ITEMS.some(
+  const isMoreActive = visibleMoreItems.some(
     item => pathname === item.href || pathname.startsWith(`${item.href}/`)
   );
 
@@ -180,8 +179,7 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
           <nav className='grid gap-1 py-4' aria-label='Additional navigation'>
             {visibleMoreItems.map(item => {
               const isActive =
-                pathname === item.href ||
-                pathname.startsWith(`${item.href}/`);
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
               return (
                 <Link
