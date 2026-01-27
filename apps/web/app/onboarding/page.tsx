@@ -55,7 +55,7 @@ export default async function OnboardingPage({
       });
     }
     console.warn('[onboarding] Missing clerkUserId, redirecting to signin');
-    redirect('/signin?redirect_url=/onboarding');
+    redirect('/sign-in?redirect_url=/onboarding');
   }
 
   const user = await currentUser();
@@ -117,7 +117,7 @@ export default async function OnboardingPage({
       showFormTitle={false}
       logoSpinDelayMs={10000}
       showLogoutButton
-      logoutRedirectUrl='/signin'
+      logoutRedirectUrl='/sign-in'
     >
       <div className='relative min-h-[500px]'>
         {/* Unified onboarding form */}

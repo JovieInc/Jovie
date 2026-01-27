@@ -10,7 +10,7 @@ export default async function AdminLayout({
   const entitlements = await getCurrentUserEntitlements();
 
   if (!entitlements.isAuthenticated || !entitlements.userId) {
-    redirect('/signin?redirect_url=/app/admin');
+    redirect('/sign-in?redirect_url=/app/admin');
   }
 
   if (!entitlements.isAdmin) {

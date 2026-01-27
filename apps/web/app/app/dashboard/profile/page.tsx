@@ -13,7 +13,7 @@ export default async function ProfilePage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/signin?redirect_url=/app/dashboard/profile');
+    redirect('/sign-in?redirect_url=/app/dashboard/profile');
   }
 
   try {

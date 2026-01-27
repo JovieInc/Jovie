@@ -11,7 +11,7 @@ export default async function SettingsAdPixelsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/settings/ad-pixels');
+    redirect('/sign-in?redirect_url=/app/settings/ad-pixels');
   }
 
   const dashboardData = await getDashboardDataCached();

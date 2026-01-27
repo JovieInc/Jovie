@@ -11,7 +11,7 @@ export default async function SettingsNotificationsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/settings/notifications');
+    redirect('/sign-in?redirect_url=/app/settings/notifications');
   }
 
   const dashboardData = await getDashboardDataCached();
