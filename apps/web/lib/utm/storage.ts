@@ -215,8 +215,8 @@ function pruneUsageData(data: UTMUsageData): UTMUsageData {
     return data;
   }
 
-  // Sort by score and keep top records
-  const sortedRecords = records.sort(
+  // Sort by score and keep top records (spread to avoid mutating original)
+  const sortedRecords = [...records].sort(
     (a, b) => calculateScore(b) - calculateScore(a)
   );
   const keptRecords = sortedRecords.slice(0, MAX_RECORDS);
