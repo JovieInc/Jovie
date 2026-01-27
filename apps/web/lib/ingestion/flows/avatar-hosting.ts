@@ -98,7 +98,23 @@ export async function copyAvatarToBlob(
       throw new Error(`Unsupported content type: ${contentType}`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
+    if (response.bodyUsed) {
+      throw new Error('Response body has already been consumed');
+    }
+
+    let arrayBuffer: ArrayBuffer;
+    try {
+      arrayBuffer = await response.arrayBuffer();
+    } catch (error) {
+      if (
+        error instanceof TypeError &&
+        error.message.includes('detached ArrayBuffer')
+      ) {
+        throw new Error('Response body was detached before reading');
+      }
+      throw error;
+    }
+
     if (arrayBuffer.byteLength > AVATAR_MAX_FILE_SIZE_BYTES) {
       throw new Error('Avatar exceeds max size');
     }
