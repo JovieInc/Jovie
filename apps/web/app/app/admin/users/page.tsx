@@ -30,7 +30,6 @@ const AdminUsersTableUnified = dynamic(
         <TableSkeleton rows={10} columns={4} />
       </div>
     ),
-    ssr: false,
   }
 );
 

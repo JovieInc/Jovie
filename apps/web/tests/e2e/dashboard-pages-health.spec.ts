@@ -29,6 +29,42 @@ function hasClerkCredentials(): boolean {
   return username.length > 0 && password.length > 0 && clerkSetupSuccess;
 }
 
+/**
+ * Check if admin Clerk credentials are available.
+ * Falls back to regular credentials if admin-specific ones aren't set.
+ */
+function hasAdminCredentials(): boolean {
+  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
+  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
+  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
+
+  // Use admin-specific credentials if available, otherwise fall back to regular user
+  // (assuming the regular test user might have admin access)
+  if (adminUsername.length > 0 && adminPassword.length > 0) {
+    return clerkSetupSuccess;
+  }
+
+  // Fall back to regular credentials
+  return hasClerkCredentials();
+}
+
+/**
+ * Get admin credentials (admin-specific or fallback to regular)
+ */
+function getAdminCredentials(): { username: string; password: string } {
+  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
+  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
+
+  if (adminUsername.length > 0 && adminPassword.length > 0) {
+    return { username: adminUsername, password: adminPassword };
+  }
+
+  return {
+    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
+    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
+  };
+}
+
 /** Error text patterns that indicate a failed page */
 const ERROR_TEXT_PATTERNS = [
   'application error',
@@ -125,6 +161,22 @@ const DASHBOARD_PAGES = [
   { path: '/app/dashboard/earnings', name: 'Earnings' },
   { path: '/app/dashboard/profile', name: 'Profile' },
   { path: '/app/dashboard/releases', name: 'Releases' },
+] as const;
+
+/**
+ * Admin pages to test
+ *
+ * These pages require admin privileges. Tests will be skipped if:
+ * - No admin credentials configured (E2E_CLERK_ADMIN_USERNAME/PASSWORD)
+ * - Test user doesn't have admin access (404 response)
+ */
+const ADMIN_PAGES = [
+  { path: '/app/admin', name: 'Admin Dashboard' },
+  { path: '/app/admin/activity', name: 'Admin Activity' },
+  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
+  { path: '/app/admin/creators', name: 'Admin Creators' },
+  { path: '/app/admin/users', name: 'Admin Users' },
+  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
 ] as const;
 
 test.describe('Dashboard Pages Health Check @smoke', () => {
@@ -369,4 +421,165 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
       });
     });
   }
+});
+
+test.describe('Admin Pages Health Check @smoke', () => {
+  test.beforeEach(async ({ page }) => {
+    // Skip if no admin credentials configured
+    if (!hasAdminCredentials()) {
+      console.log('⚠ Skipping admin health tests - no credentials');
+      console.log(
+        '  Set E2E_CLERK_ADMIN_USERNAME/PASSWORD or E2E_CLERK_USER_USERNAME/PASSWORD'
+      );
+      test.skip();
+      return;
+    }
+
+    // Set up Clerk testing token and sign in with admin credentials
+    await setupClerkTestingToken({ page });
+
+    const { username, password } = getAdminCredentials();
+
+    try {
+      await signInUser(page, { username, password });
+    } catch (error) {
+      console.error('Failed to sign in admin user:', error);
+      test.skip();
+    }
+  });
+
+  /**
+   * Primary admin health check - tests all admin pages in sequence
+   *
+   * Admin pages require isAdmin entitlement. If the test user doesn't have
+   * admin access, the pages will return 404 and the test will skip.
+   */
+  test('All admin pages load without errors', async ({ page }, testInfo) => {
+    test.setTimeout(120_000); // 2 minutes for 6 admin pages
+
+    const results: PageHealthResult[] = [];
+    let hasAdminAccess = true;
+
+    for (const pageConfig of ADMIN_PAGES) {
+      const startTime = Date.now();
+
+      try {
+        // Navigate to the page
+        const response = await page.goto(pageConfig.path, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+
+        // Wait for React hydration
+        await waitForHydration(page);
+
+        // Allow page to stabilize
+        await Promise.race([
+          page.waitForLoadState('networkidle'),
+          page.waitForTimeout(5000),
+        ]).catch(() => {});
+
+        const loadTimeMs = Date.now() - startTime;
+        const currentUrl = page.url();
+
+        // Check for 404 (user not admin)
+        if (response?.status() === 404) {
+          console.log(
+            '⚠ Test user does not have admin access - skipping admin tests'
+          );
+          hasAdminAccess = false;
+          break;
+        }
+
+        // Check for auth redirect (session expired)
+        if (currentUrl.includes('/signin') || currentUrl.includes('/sign-in')) {
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'redirect',
+            loadTimeMs,
+            error: 'Session expired - redirected to auth',
+          });
+          // Re-authenticate and continue
+          const { username, password } = getAdminCredentials();
+          await signInUser(page, { username, password });
+          continue;
+        }
+
+        // Check for error pages
+        const { hasError, errorText } = await checkForErrorPage(page);
+
+        if (hasError) {
+          // Capture screenshot for debugging
+          const screenshot = await page.screenshot().catch(() => null);
+          if (screenshot) {
+            await testInfo.attach(`error-${pageConfig.name}`, {
+              body: screenshot,
+              contentType: 'image/png',
+            });
+          }
+
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: errorText,
+          });
+        } else {
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'pass',
+            loadTimeMs,
+          });
+        }
+      } catch (error) {
+        results.push({
+          path: pageConfig.path,
+          name: pageConfig.name,
+          status: 'fail',
+          loadTimeMs: Date.now() - startTime,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Skip if user doesn't have admin access
+    if (!hasAdminAccess) {
+      test.skip();
+      return;
+    }
+
+    // Attach detailed results for debugging
+    await testInfo.attach('admin-health-results', {
+      body: JSON.stringify(results, null, 2),
+      contentType: 'application/json',
+    });
+
+    // Log summary
+    const passed = results.filter(r => r.status === 'pass');
+    const failed = results.filter(r => r.status === 'fail');
+    const redirected = results.filter(r => r.status === 'redirect');
+
+    console.log('\n📊 Admin Health Summary:');
+    console.log(`   ✅ Passed: ${passed.length}/${ADMIN_PAGES.length}`);
+    if (failed.length > 0) {
+      console.log(`   ❌ Failed: ${failed.length}`);
+      failed.forEach(f => console.log(`      - ${f.name}: ${f.error}`));
+    }
+    if (redirected.length > 0) {
+      console.log(`   🔄 Redirected: ${redirected.length}`);
+    }
+
+    // Show load times for performance insights
+    const avgLoadTime =
+      results.reduce((sum, r) => sum + (r.loadTimeMs || 0), 0) / results.length;
+    console.log(`   ⏱️  Avg load time: ${Math.round(avgLoadTime)}ms`);
+
+    // Assert no failures
+    expect(failed, `${failed.length} pages failed health check`).toHaveLength(
+      0
+    );
+  });
 });

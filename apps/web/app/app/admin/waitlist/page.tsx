@@ -34,7 +34,6 @@ const AdminWaitlistTableWithViews = dynamic(
         <TableSkeleton rows={10} columns={5} />
       </div>
     ),
-    ssr: false,
   }
 );
 
