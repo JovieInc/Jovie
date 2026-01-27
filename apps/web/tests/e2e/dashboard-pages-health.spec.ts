@@ -212,7 +212,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test('All dashboard pages load without errors', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000); // 2 minutes for 8 content pages
+    test.setTimeout(120_000); // 2 minutes for 7 content pages
 
     const results: PageHealthResult[] = [];
 
@@ -290,6 +290,16 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             });
             continue;
           }
+
+          // Unexpected redirect - fail the test
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: `Unexpected redirect to ${currentUrl}`,
+          });
+          continue;
         }
 
         // Check for error pages
