@@ -11,7 +11,7 @@ export default async function AppRootPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/');
+    redirect('/sign-in?redirect_url=/');
   }
 
   return (

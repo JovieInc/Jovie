@@ -14,7 +14,7 @@ export default async function ContactsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/dashboard/contacts');
+    redirect('/sign-in?redirect_url=/app/dashboard/contacts');
   }
 
   try {

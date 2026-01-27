@@ -26,7 +26,7 @@ export default async function AudiencePage({
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/signin?redirect_url=/app/dashboard/audience');
+    redirect('/sign-in?redirect_url=/app/dashboard/audience');
   }
 
   try {

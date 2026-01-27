@@ -9,7 +9,7 @@ export default async function UserCreationFailedPage() {
 
   // If somehow resolved, redirect to dashboard
   if (!userId) {
-    redirect('/signin');
+    redirect('/sign-in');
   }
 
   return (

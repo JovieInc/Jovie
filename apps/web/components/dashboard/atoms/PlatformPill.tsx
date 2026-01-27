@@ -156,7 +156,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     const ariaLabel = getAriaLabel();
 
     return (
-      // NOSONAR S6819: Dynamic role for conditional interactivity; native <button> can't contain complex pill layout
+      // NOSONAR S6819 S6848: Dynamic role for conditional interactivity; native <button> can't contain complex pill layout
       <div
         ref={ref}
         onClick={isInteractive ? onClick : undefined}
@@ -165,8 +165,8 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         className={pillClassName}
         style={wrapperStyle}
         data-testid={testId}
-        role={isInteractive ? 'button' : undefined} // NOSONAR S6848
-        tabIndex={isInteractive ? 0 : undefined} // NOSONAR S6827
+        role={isInteractive ? 'button' : undefined}
+        tabIndex={isInteractive ? 0 : undefined}
         aria-label={ariaLabel}
       >
         <PillShimmer show={showShimmer} />

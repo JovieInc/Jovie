@@ -193,7 +193,7 @@ export const AvatarUploadable = React.memo(
         : computedProgress;
 
     return (
-      // NOSONAR S6819: Dynamic role for complex file upload component; native <button> can't contain Avatar and handle drag-drop
+      // NOSONAR S6819 S6848: Dynamic role for complex file upload component; native <button> can't contain Avatar and handle drag-drop
       <div
         ref={mergedRef}
         className={cn(
@@ -207,8 +207,8 @@ export const AvatarUploadable = React.memo(
         onDrop={canUpload ? handleDrop : undefined}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        tabIndex={isInteractive ? 0 : undefined} // NOSONAR S6827
-        role={isInteractive ? 'button' : 'presentation'} // NOSONAR S6848
+        tabIndex={isInteractive ? 0 : undefined}
+        role={isInteractive ? 'button' : 'presentation'}
         aria-label={isInteractive ? 'Upload profile photo' : undefined}
         aria-busy={isUploading || undefined}
       >

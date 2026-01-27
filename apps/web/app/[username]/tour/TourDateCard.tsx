@@ -84,23 +84,22 @@ export function TourDateCard({ tourDate }: TourDateCardProps) {
 
           {/* Actions */}
           <div className='mt-3 flex items-center gap-2'>
-            {tourDate.ticketUrl && !isCancelled && (
+            {tourDate.ticketUrl && !isCancelled && !isSoldOut && (
               <a
-                href={isSoldOut ? undefined : tourDate.ticketUrl}
+                href={tourDate.ticketUrl}
                 target='_blank'
                 rel='noopener noreferrer'
-                aria-disabled={isSoldOut}
-                tabIndex={isSoldOut ? -1 : undefined}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                  isSoldOut
-                    ? 'pointer-events-none bg-surface-2 text-tertiary-token'
-                    : 'bg-accent text-white hover:bg-accent/90'
-                )}
+                className='inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90'
               >
                 <Icon name='Ticket' className='h-4 w-4' />
-                {isSoldOut ? 'Sold Out' : 'Get Tickets'}
+                Get Tickets
               </a>
+            )}
+            {tourDate.ticketUrl && !isCancelled && isSoldOut && (
+              <span className='inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-medium text-tertiary-token'>
+                <Icon name='Ticket' className='h-4 w-4' />
+                Sold Out
+              </span>
             )}
             <button
               type='button'

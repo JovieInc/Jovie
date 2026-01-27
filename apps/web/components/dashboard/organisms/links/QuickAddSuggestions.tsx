@@ -111,7 +111,7 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
       data-testid='quick-add-suggestions'
     >
       {/* Left fade gradient */}
-      <div className='pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-linear-to-r from-(--color-bg-surface-0) to-transparent' />
+      <div className='pointer-events-none absolute left-0 top-0 z-10 h-full w-4 bg-linear-to-r from-(--color-bg-surface-0) to-transparent' />
 
       {/* Scrollable container */}
       <div className='flex items-center gap-2 overflow-x-auto scrollbar-hide px-1'>
@@ -130,7 +130,7 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
       </div>
 
       {/* Right fade gradient */}
-      <div className='pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-linear-to-l from-(--color-bg-surface-0) to-transparent' />
+      <div className='pointer-events-none absolute right-0 top-0 z-10 h-full w-4 bg-linear-to-l from-(--color-bg-surface-0) to-transparent' />
     </section>
   );
 });

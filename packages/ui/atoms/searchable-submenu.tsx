@@ -382,15 +382,18 @@ export function SearchableSubmenu({
             role='listbox'
             className='flex-1 overflow-y-auto overflow-x-hidden p-1.5 pt-0'
           >
-            {isLoading ? (
+            {isLoading && (
               <div className='flex items-center justify-center py-8'>
                 <Loader2 className='h-5 w-5 animate-spin text-tertiary-token' />
               </div>
-            ) : !hasResults ? (
+            )}
+            {!isLoading && !hasResults && (
               <div className='py-8 text-center text-sm text-tertiary-token'>
                 {emptyMessage}
               </div>
-            ) : (
+            )}
+            {!isLoading &&
+              hasResults &&
               filteredSections.map((section, sectionIndex) => (
                 <div key={section.id}>
                   {sectionIndex > 0 && (
@@ -457,8 +460,7 @@ export function SearchableSubmenu({
                     );
                   })}
                 </div>
-              ))
-            )}
+              ))}
           </div>
 
           {/* Footer (e.g., "Create Custom..." link) */}

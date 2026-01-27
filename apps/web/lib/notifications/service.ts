@@ -112,6 +112,65 @@ async function checkSenderEligibility(
 }
 
 /**
+ * Handle successful email send tracking
+ */
+async function handleEmailSent(
+  to: string,
+  providerMessageId: string | undefined,
+  message: NotificationMessage,
+  senderContext: SenderContext | undefined
+): Promise<void> {
+  await logDelivery({
+    channel: 'email',
+    recipientEmail: to,
+    status: 'sent',
+    providerMessageId,
+    metadata: {
+      notificationId: message.id,
+      ...(senderContext && {
+        creatorProfileId: senderContext.creatorProfileId,
+        emailType: senderContext.emailType,
+      }),
+    },
+  });
+
+  // Track quota and reputation for sender
+  if (senderContext && providerMessageId) {
+    await incrementQuota(senderContext.creatorProfileId);
+    await recordSend(
+      senderContext.creatorProfileId,
+      providerMessageId,
+      to,
+      senderContext.emailType,
+      senderContext.referenceId
+    );
+  }
+}
+
+/**
+ * Handle failed email send tracking
+ */
+async function handleEmailError(
+  to: string,
+  errorMessage: string | undefined,
+  message: NotificationMessage,
+  senderContext: SenderContext | undefined
+): Promise<void> {
+  await logDelivery({
+    channel: 'email',
+    recipientEmail: to,
+    status: 'failed',
+    errorMessage,
+    metadata: {
+      notificationId: message.id,
+      ...(senderContext && {
+        creatorProfileId: senderContext.creatorProfileId,
+      }),
+    },
+  });
+}
+
+/**
  * Handle sending a notification via email channel
  */
 async function handleEmailChannel(
@@ -172,10 +231,8 @@ async function handleEmailChannel(
     return buildSkippedResult('email', 'Marketing emails are disabled');
   }
 
-  // Build dynamic from address
+  // Build dynamic from address and reply-to
   const fromAddress = message.from ?? buildFromAddress(senderContext);
-
-  // Determine reply-to (sender's email takes precedence)
   const replyTo =
     message.replyTo ?? senderContext?.replyToEmail ?? EMAIL_REPLY_TO;
 
@@ -191,50 +248,9 @@ async function handleEmailChannel(
 
   // Handle post-send tracking
   if (emailResult.status === 'sent') {
-    const providerMessageId = emailResult.detail;
-
-    // Log delivery
-    await logDelivery({
-      channel: 'email',
-      recipientEmail: to,
-      status: 'sent',
-      providerMessageId,
-      metadata: {
-        notificationId: message.id,
-        ...(senderContext && {
-          creatorProfileId: senderContext.creatorProfileId,
-          emailType: senderContext.emailType,
-        }),
-      },
-    });
-
-    // Track quota and reputation for sender
-    if (senderContext && providerMessageId) {
-      // Increment quota counter
-      await incrementQuota(senderContext.creatorProfileId);
-
-      // Record send for reputation tracking and webhook attribution
-      await recordSend(
-        senderContext.creatorProfileId,
-        providerMessageId,
-        to,
-        senderContext.emailType,
-        senderContext.referenceId
-      );
-    }
+    await handleEmailSent(to, emailResult.detail, message, senderContext);
   } else if (emailResult.status === 'error') {
-    await logDelivery({
-      channel: 'email',
-      recipientEmail: to,
-      status: 'failed',
-      errorMessage: emailResult.error,
-      metadata: {
-        notificationId: message.id,
-        ...(senderContext && {
-          creatorProfileId: senderContext.creatorProfileId,
-        }),
-      },
-    });
+    await handleEmailError(to, emailResult.error, message, senderContext);
   }
 
   return emailResult;

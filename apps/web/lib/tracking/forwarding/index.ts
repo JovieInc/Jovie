@@ -33,6 +33,52 @@ export type {
   PlatformConfig,
 } from './types';
 
+type Platform = 'facebook' | 'google' | 'tiktok';
+type JoviePlatform = 'jovie_facebook' | 'jovie_google' | 'jovie_tiktok';
+
+const platformForwarders: Record<
+  Platform,
+  (
+    event: ReturnType<typeof normalizeEvent>,
+    config: PlatformConfig
+  ) => Promise<ForwardingResult>
+> = {
+  facebook: forwardToFacebook,
+  google: forwardToGoogle,
+  tiktok: forwardToTikTok,
+};
+
+const joviePlatformMap: Record<Platform, JoviePlatform> = {
+  facebook: 'jovie_facebook',
+  google: 'jovie_google',
+  tiktok: 'jovie_tiktok',
+};
+
+/**
+ * Forward event to all configured platforms
+ */
+async function forwardToPlatforms(
+  normalizedEvent: ReturnType<typeof normalizeEvent>,
+  configs: Partial<Record<Platform, PlatformConfig | null>>,
+  isJovie = false
+): Promise<ForwardingResult[]> {
+  const results: ForwardingResult[] = [];
+
+  for (const [platform, config] of Object.entries(configs) as [
+    Platform,
+    PlatformConfig | null,
+  ][]) {
+    if (config) {
+      const forwarder = platformForwarders[platform];
+      const result = await forwarder(normalizedEvent, config);
+      const platformName = isJovie ? joviePlatformMap[platform] : platform;
+      results.push({ ...result, platform: platformName });
+    }
+  }
+
+  return results;
+}
+
 /**
  * Get Jovie's own pixel configs from environment
  */
@@ -70,12 +116,108 @@ function getJoviePixelConfigs(): {
 }
 
 /**
+ * Mark event as skipped in the database
+ */
+async function markEventSkipped(
+  eventId: string,
+  reason: string
+): Promise<void> {
+  const skippedStatus: PixelForwardingStatus = {
+    skipped: {
+      status: 'skipped',
+      sentAt: new Date().toISOString(),
+      error: reason,
+    },
+  };
+
+  await db
+    .update(pixelEvents)
+    .set({ forwardingStatus: skippedStatus })
+    .where(eq(pixelEvents.id, eventId));
+}
+
+/**
+ * Forward event to Jovie's own pixels
+ */
+async function forwardToJoviePixels(
+  normalizedEvent: ReturnType<typeof normalizeEvent>
+): Promise<ForwardingResult[]> {
+  const jovieConfigs = getJoviePixelConfigs();
+  return forwardToPlatforms(normalizedEvent, jovieConfigs, true);
+}
+
+/**
+ * Forward event to creator's configured pixels
+ */
+async function forwardToCreatorPixels(
+  normalizedEvent: ReturnType<typeof normalizeEvent>,
+  profileId: string
+): Promise<ForwardingResult[]> {
+  const [creatorConfig] = await db
+    .select()
+    .from(creatorPixels)
+    .where(eq(creatorPixels.profileId, profileId))
+    .limit(1);
+
+  if (!creatorConfig?.enabled) {
+    return [];
+  }
+
+  // Decrypt access tokens (guard against null values)
+  const decryptedConfig = {
+    ...creatorConfig,
+    facebookAccessToken: creatorConfig.facebookAccessToken
+      ? decryptPII(creatorConfig.facebookAccessToken)
+      : null,
+    googleApiSecret: creatorConfig.googleApiSecret
+      ? decryptPII(creatorConfig.googleApiSecret)
+      : null,
+    tiktokAccessToken: creatorConfig.tiktokAccessToken
+      ? decryptPII(creatorConfig.tiktokAccessToken)
+      : null,
+  };
+
+  const platformConfigs = extractPlatformConfigs(
+    decryptedConfig as typeof creatorConfig
+  );
+
+  return forwardToPlatforms(normalizedEvent, platformConfigs);
+}
+
+/**
+ * Build forwarding status from results
+ */
+function buildForwardingStatus(
+  results: ForwardingResult[]
+): PixelForwardingStatus {
+  const forwardingStatus: PixelForwardingStatus = {};
+
+  if (results.length === 0) {
+    forwardingStatus['skipped'] = {
+      status: 'skipped',
+      sentAt: new Date().toISOString(),
+      error: 'no_platforms_configured',
+    };
+    return forwardingStatus;
+  }
+
+  for (const result of results) {
+    forwardingStatus[result.platform] = {
+      status: result.success ? 'sent' : 'failed',
+      sentAt: new Date().toISOString(),
+      ...(result.error && { error: result.error }),
+    };
+  }
+
+  return forwardingStatus;
+}
+
+/**
  * Forward a single event to all configured platforms
  */
 export async function forwardEvent(
   event: PixelEvent
 ): Promise<ForwardingResult[]> {
-  const results: ForwardingResult[] = [];
   const normalizedEvent = normalizeEvent(event);
 
   // Only forward if consent was given - mark as skipped to prevent retries
@@ -83,116 +225,20 @@ export async function forwardEvent(
     logger.info('[Pixel Forwarding] Skipping event without consent', {
       eventId: event.id,
     });
-
-    // Mark event as skipped so cron doesn't keep retrying
-    const skippedStatus: PixelForwardingStatus = {
-      skipped: {
-        status: 'skipped',
-        sentAt: new Date().toISOString(),
-        error: 'consent_not_given',
-      },
-    };
-
-    await db
-      .update(pixelEvents)
-      .set({ forwardingStatus: skippedStatus })
-      .where(eq(pixelEvents.id, event.id));
-
-    return results;
+    await markEventSkipped(event.id, 'consent_not_given');
+    return [];
   }
 
-  // 1. Forward to Jovie's own pixels (marketing Jovie)
-  const jovieConfigs = getJoviePixelConfigs();
-
-  if (jovieConfigs.facebook) {
-    const result = await forwardToFacebook(
-      normalizedEvent,
-      jovieConfigs.facebook
-    );
-    results.push({ ...result, platform: 'jovie_facebook' });
-  }
-
-  if (jovieConfigs.google) {
-    const result = await forwardToGoogle(normalizedEvent, jovieConfigs.google);
-    results.push({ ...result, platform: 'jovie_google' });
-  }
-
-  if (jovieConfigs.tiktok) {
-    const result = await forwardToTikTok(normalizedEvent, jovieConfigs.tiktok);
-    results.push({ ...result, platform: 'jovie_tiktok' });
-  }
-
-  // 2. Forward to creator's pixels (if configured)
-  const [creatorConfig] = await db
-    .select()
-    .from(creatorPixels)
-    .where(eq(creatorPixels.profileId, event.profileId))
-    .limit(1);
-
-  if (creatorConfig && creatorConfig.enabled) {
-    // Decrypt access tokens (guard against null values)
-    const decryptedConfig = {
-      ...creatorConfig,
-      facebookAccessToken: creatorConfig.facebookAccessToken
-        ? decryptPII(creatorConfig.facebookAccessToken)
-        : null,
-      googleApiSecret: creatorConfig.googleApiSecret
-        ? decryptPII(creatorConfig.googleApiSecret)
-        : null,
-      tiktokAccessToken: creatorConfig.tiktokAccessToken
-        ? decryptPII(creatorConfig.tiktokAccessToken)
-        : null,
-    };
-
-    const platformConfigs = extractPlatformConfigs(
-      decryptedConfig as typeof creatorConfig
-    );
-
-    if (platformConfigs.facebook) {
-      const result = await forwardToFacebook(
-        normalizedEvent,
-        platformConfigs.facebook
-      );
-      results.push(result);
-    }
-
-    if (platformConfigs.google) {
-      const result = await forwardToGoogle(
-        normalizedEvent,
-        platformConfigs.google
-      );
-      results.push(result);
-    }
-
-    if (platformConfigs.tiktok) {
-      const result = await forwardToTikTok(
-        normalizedEvent,
-        platformConfigs.tiktok
-      );
-      results.push(result);
-    }
-  }
+  // Forward to all configured platforms
+  const jovieResults = await forwardToJoviePixels(normalizedEvent);
+  const creatorResults = await forwardToCreatorPixels(
+    normalizedEvent,
+    event.profileId
+  );
+  const results = [...jovieResults, ...creatorResults];
 
   // Update event with forwarding status
-  const forwardingStatus: PixelForwardingStatus = {};
-
-  // If no platforms configured, mark as skipped to prevent endless retries
-  if (results.length === 0) {
-    forwardingStatus['skipped'] = {
-      status: 'skipped',
-      sentAt: new Date().toISOString(),
-      error: 'no_platforms_configured',
-    };
-  } else {
-    for (const result of results) {
-      forwardingStatus[result.platform] = {
-        status: result.success ? 'sent' : 'failed',
-        sentAt: new Date().toISOString(),
-        ...(result.error && { error: result.error }),
-      };
-    }
-  }
-
+  const forwardingStatus = buildForwardingStatus(results);
   await db
     .update(pixelEvents)
     .set({ forwardingStatus })

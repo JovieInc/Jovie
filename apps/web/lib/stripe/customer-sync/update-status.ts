@@ -28,6 +28,52 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
+ * Check if event is stale compared to last processed event
+ */
+function isEventStale(
+  eventTimestamp: Date | undefined,
+  lastEventAt: Date | null | undefined
+): boolean {
+  if (!eventTimestamp || !lastEventAt) return false;
+  return eventTimestamp <= lastEventAt;
+}
+
+/**
+ * Prepare update data for billing status change
+ */
+function prepareUpdateData(
+  options: UpdateBillingStatusOptions,
+  effectivePlan: string
+): Partial<typeof users.$inferInsert> {
+  const {
+    isPro,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    stripeEventTimestamp,
+  } = options;
+
+  const updateData: Partial<typeof users.$inferInsert> = {
+    isPro,
+    plan: effectivePlan,
+    billingUpdatedAt: new Date(),
+  };
+
+  if (stripeCustomerId) {
+    updateData.stripeCustomerId = stripeCustomerId;
+  }
+
+  if (stripeSubscriptionId !== undefined) {
+    updateData.stripeSubscriptionId = stripeSubscriptionId;
+  }
+
+  if (stripeEventTimestamp) {
+    updateData.lastBillingEventAt = stripeEventTimestamp;
+  }
+
+  return updateData;
+}
+
+/**
  * Update user's billing status in the database.
  *
  * This function uses fetchUserBillingData internally with BILLING_FIELDS_STATUS
@@ -83,11 +129,9 @@ export async function updateUserBillingStatus(
     metadata = {},
   } = options;
 
-  // Determine the plan to set: use provided plan, or default based on isPro
   const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
 
   try {
-    // First, get the current user state using consolidated query function
     const userResult = await fetchUserBillingData({
       clerkUserId,
       fields: BILLING_FIELDS_STATUS,
@@ -100,34 +144,15 @@ export async function updateUserBillingStatus(
     const currentUser = userResult.data;
 
     // Event ordering: Skip if this event is older than the last processed event
-    if (stripeEventTimestamp && currentUser.lastBillingEventAt) {
-      if (stripeEventTimestamp <= currentUser.lastBillingEventAt) {
-        return {
-          success: true,
-          skipped: true,
-          reason: 'Event is older than last processed event',
-        };
-      }
+    if (isEventStale(stripeEventTimestamp, currentUser.lastBillingEventAt)) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'Event is older than last processed event',
+      };
     }
 
-    // Prepare update data
-    const updateData: Partial<typeof users.$inferInsert> = {
-      isPro: isPro,
-      plan: effectivePlan,
-      billingUpdatedAt: new Date(),
-    };
-
-    if (stripeCustomerId) {
-      updateData.stripeCustomerId = stripeCustomerId;
-    }
-
-    if (stripeSubscriptionId !== undefined) {
-      updateData.stripeSubscriptionId = stripeSubscriptionId;
-    }
-
-    if (stripeEventTimestamp) {
-      updateData.lastBillingEventAt = stripeEventTimestamp;
-    }
+    const updateData = prepareUpdateData(options, effectivePlan);
 
     // Prepare previous state for audit log
     const previousState = {
@@ -164,8 +189,6 @@ export async function updateUserBillingStatus(
       .returning({ id: users.id, billingVersion: users.billingVersion });
 
     if (result.length === 0) {
-      // Optimistic lock failed - concurrent update detected
-      // Retry once with fresh data
       return await retryUpdateWithFreshData(options);
     }
 
@@ -185,7 +208,6 @@ export async function updateUserBillingStatus(
         },
       });
     } catch (auditError) {
-      // Audit log failure shouldn't fail the main operation
       await captureWarning('Failed to write billing audit log', auditError, {
         userId: currentUser.id,
         eventType,
@@ -224,7 +246,7 @@ async function retryUpdateWithFreshData(
   retryCount = 0
 ): Promise<UpdateBillingStatusResult> {
   const MAX_RETRIES = 3;
-  const BASE_DELAY_MS = 50; // Start with 50ms delay
+  const BASE_DELAY_MS = 50;
 
   const {
     clerkUserId,
@@ -239,18 +261,16 @@ async function retryUpdateWithFreshData(
     metadata = {},
   } = options;
 
-  // Determine the plan to set: use provided plan, or default based on isPro
   const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
 
   try {
     // Add jittered exponential backoff before retry
     if (retryCount > 0) {
       const backoffMs = BASE_DELAY_MS * Math.pow(2, retryCount - 1);
-      const jitter = Math.random() * backoffMs * 0.5; // Add up to 50% jitter
+      const jitter = Math.random() * backoffMs * 0.5;
       await delay(backoffMs + jitter);
     }
 
-    // Get fresh user state using consolidated query function
     const freshUserResult = await fetchUserBillingData({
       clerkUserId,
       fields: BILLING_FIELDS_STATUS,
@@ -266,36 +286,16 @@ async function retryUpdateWithFreshData(
     const freshUser = freshUserResult.data;
 
     // Re-check event ordering with fresh data
-    if (stripeEventTimestamp && freshUser.lastBillingEventAt) {
-      if (stripeEventTimestamp <= freshUser.lastBillingEventAt) {
-        return {
-          success: true,
-          skipped: true,
-          reason: 'Event is older than last processed event (on retry)',
-        };
-      }
+    if (isEventStale(stripeEventTimestamp, freshUser.lastBillingEventAt)) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'Event is older than last processed event (on retry)',
+      };
     }
 
-    // Prepare update data
-    const updateData: Partial<typeof users.$inferInsert> = {
-      isPro: isPro,
-      plan: effectivePlan,
-      billingUpdatedAt: new Date(),
-    };
+    const updateData = prepareUpdateData(options, effectivePlan);
 
-    if (stripeCustomerId) {
-      updateData.stripeCustomerId = stripeCustomerId;
-    }
-
-    if (stripeSubscriptionId !== undefined) {
-      updateData.stripeSubscriptionId = stripeSubscriptionId;
-    }
-
-    if (stripeEventTimestamp) {
-      updateData.lastBillingEventAt = stripeEventTimestamp;
-    }
-
-    // Retry with new version
     const result = await db
       .update(users)
       .set({
@@ -311,12 +311,10 @@ async function retryUpdateWithFreshData(
       .returning({ id: users.id, billingVersion: users.billingVersion });
 
     if (result.length === 0) {
-      // Still failing - retry with backoff up to MAX_RETRIES
       if (retryCount < MAX_RETRIES) {
         return retryUpdateWithFreshData(options, retryCount + 1);
       }
 
-      // Max retries exceeded - log and fail
       await captureWarning(
         `Optimistic lock failed after ${MAX_RETRIES + 1} attempts - high contention`,
         undefined,
