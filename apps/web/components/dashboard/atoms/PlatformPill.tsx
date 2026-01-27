@@ -155,20 +155,49 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
     }
     const ariaLabel = getAriaLabel();
 
+    const baseProps = {
+      title: getPillTitle(collapsed, platformName, primaryText),
+      className: pillClassName,
+      style: wrapperStyle,
+      'data-testid': testId,
+      'aria-label': ariaLabel,
+    };
+
+    if (isInteractive) {
+      return (
+        // NOSONAR S6819 S6848: Dynamic role for conditional interactivity; native <button> can't contain complex pill layout
+        <div
+          ref={ref}
+          {...baseProps}
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+          role='button'
+          tabIndex={0}
+        >
+          <PillShimmer show={showShimmer} />
+          <PillIcon platformIcon={platformIcon} style={iconChipStyle} />
+
+          {collapsed ? (
+            <CollapsedContent
+              defaultExpanded={defaultExpanded}
+              primaryText={primaryText}
+            />
+          ) : (
+            <ExpandedContent
+              primaryText={primaryText}
+              secondaryText={secondaryText}
+              badgeText={badgeText}
+              suffix={suffix}
+            />
+          )}
+
+          <TrailingContent collapsed={collapsed}>{trailing}</TrailingContent>
+        </div>
+      );
+    }
+
     return (
-      // NOSONAR S6819 S6848: Dynamic role for conditional interactivity; native <button> can't contain complex pill layout
-      <div
-        ref={ref}
-        onClick={isInteractive ? onClick : undefined}
-        onKeyDown={handleKeyDown}
-        title={getPillTitle(collapsed, platformName, primaryText)}
-        className={pillClassName}
-        style={wrapperStyle}
-        data-testid={testId}
-        role={isInteractive ? 'button' : undefined}
-        tabIndex={isInteractive ? 0 : undefined}
-        aria-label={ariaLabel}
-      >
+      <div ref={ref} {...baseProps}>
         <PillShimmer show={showShimmer} />
         <PillIcon platformIcon={platformIcon} style={iconChipStyle} />
 

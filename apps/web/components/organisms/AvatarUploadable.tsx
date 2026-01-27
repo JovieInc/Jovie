@@ -192,26 +192,21 @@ export const AvatarUploadable = React.memo(
         ? 100
         : computedProgress;
 
-    return (
-      // NOSONAR S6819 S6848: Dynamic role for complex file upload component; native <button> can't contain Avatar and handle drag-drop
-      <div
-        ref={mergedRef}
-        className={cn(
-          'relative group/avatar outline-none',
-          isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
-          className
-        )}
-        onDragEnter={canUpload ? handleDragEnter : undefined}
-        onDragLeave={canUpload ? handleDragLeave : undefined}
-        onDragOver={canUpload ? handleDragOver : undefined}
-        onDrop={canUpload ? handleDrop : undefined}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        tabIndex={isInteractive ? 0 : undefined}
-        role={isInteractive ? 'button' : 'presentation'}
-        aria-label={isInteractive ? 'Upload profile photo' : undefined}
-        aria-busy={isUploading || undefined}
-      >
+    const baseProps = {
+      className: cn(
+        'relative group/avatar outline-none',
+        isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
+        className
+      ),
+      onDragEnter: canUpload ? handleDragEnter : undefined,
+      onDragLeave: canUpload ? handleDragLeave : undefined,
+      onDragOver: canUpload ? handleDragOver : undefined,
+      onDrop: canUpload ? handleDrop : undefined,
+      'aria-busy': isUploading || undefined,
+    };
+
+    const content = (
+      <>
         <Avatar
           src={previewUrl ?? src}
           className={cn(
@@ -255,6 +250,29 @@ export const AvatarUploadable = React.memo(
           progress={computedProgress}
           status={uploadStatus}
         />
+      </>
+    );
+
+    if (isInteractive) {
+      return (
+        // NOSONAR S6819 S6848: Dynamic role for complex file upload component; native <button> can't contain Avatar and handle drag-drop
+        <div
+          ref={mergedRef}
+          {...baseProps}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role='button'
+          aria-label='Upload profile photo'
+        >
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <div ref={mergedRef} {...baseProps}>
+        {content}
       </div>
     );
   })

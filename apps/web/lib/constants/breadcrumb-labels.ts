@@ -45,5 +45,5 @@ export function getBreadcrumbLabel(segment: string): string {
     return BREADCRUMB_LABELS[segment];
   }
   // Fallback: convert "some-route" to "Some route" (sentence case)
-  return segment.replace(/-/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return segment.replaceAll(/-/g, ' ').replace(/^\w/, c => c.toUpperCase());
 }

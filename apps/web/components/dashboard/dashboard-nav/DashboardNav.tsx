@@ -112,7 +112,9 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
-    (items: NavItem[]) => <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>,
+    (items: NavItem[]) => (
+      <SidebarMenu>{items.map(item => renderNavItem(item))}</SidebarMenu>
+    ),
     [renderNavItem]
   );
 
