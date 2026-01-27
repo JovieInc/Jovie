@@ -17,7 +17,11 @@ export function DashboardErrorFallback({
   const router = useRouter();
 
   return (
-    <div className='flex flex-col items-center justify-center gap-6 p-8 text-center min-h-[500px]'>
+    <div
+      role='alert'
+      aria-live='assertive'
+      className='flex flex-col items-center justify-center gap-6 p-8 text-center min-h-[500px]'
+    >
       <div className='w-full max-w-lg space-y-6'>
         <div className='flex justify-center'>
           <div className='rounded-full bg-destructive/10 p-4'>

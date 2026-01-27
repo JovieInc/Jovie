@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy } from 'lucide-react';
+import { ClipboardList, Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -28,6 +28,7 @@ import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import { usePagination } from './usePagination';
 import { AdminTablePagination } from '../table/AdminTablePagination';
+import { TableEmptyState } from '../table/TableEmptyState';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
 
 const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';
@@ -275,12 +276,11 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               onItemMove={handleItemMove}
               cardHeight={200}
               emptyState={
-                <div className='text-center text-secondary-token'>
-                  <p className='text-sm font-medium'>No waitlist entries</p>
-                  <p className='text-xs text-tertiary-token mt-1'>
-                    Entries will appear here when added
-                  </p>
-                </div>
+                <TableEmptyState
+                  icon={ClipboardList}
+                  heading='No waitlist entries'
+                  description='Entries will appear here when added'
+                />
               }
             />
           )

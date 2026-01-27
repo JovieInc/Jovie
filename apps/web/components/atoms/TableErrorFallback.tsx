@@ -16,6 +16,7 @@ export function TableErrorFallback({
   return (
     <div
       role='alert'
+      aria-live='assertive'
       className='flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[400px]'
     >
       <div className='w-full max-w-md space-y-4'>

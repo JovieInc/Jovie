@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
+import { TableEmptyState } from '@/components/admin/table/TableEmptyState';
 import {
   type ContextMenuItemType,
   UnifiedTable,
@@ -241,15 +242,11 @@ export function AdminWaitlistTableUnified({
       isLoading={false}
       getContextMenuItems={createContextMenuItems}
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-          <ClipboardList className='h-6 w-6' />
-          <div>
-            <div className='font-medium'>No waitlist entries</div>
-            <div className='text-xs'>
-              New waitlist signups will appear here.
-            </div>
-          </div>
-        </div>
+        <TableEmptyState
+          icon={ClipboardList}
+          heading='No waitlist entries'
+          description='New waitlist signups will appear here.'
+        />
       }
       getRowId={row => row.id}
       getRowClassName={getRowClassName}

@@ -5,6 +5,7 @@ import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
+import { TableEmptyState } from '@/components/admin/table/TableEmptyState';
 import { UnifiedTable } from '@/components/organisms/table';
 import type {
   AdminActivityItem,
@@ -125,15 +126,11 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
             columns={columns}
             isLoading={false}
             emptyState={
-              <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                <Activity className='h-6 w-6' />
-                <div>
-                  <div className='font-medium'>No recent activity</div>
-                  <div className='text-xs'>
-                    Activity from the last 7 days will appear here.
-                  </div>
-                </div>
-              </div>
+              <TableEmptyState
+                icon={Activity}
+                heading='No recent activity'
+                description='Activity from the last 7 days will appear here.'
+              />
             }
             getRowId={row => row.id}
             enableVirtualization={true}

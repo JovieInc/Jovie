@@ -8,6 +8,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { TableEmptyState } from '@/components/admin/table/TableEmptyState';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
@@ -362,15 +363,11 @@ export function AdminCreatorProfilesUnified({
               columns={columns}
               isLoading={false}
               emptyState={
-                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                  <UserCircle2 className='h-6 w-6' />
-                  <div>
-                    <div className='font-medium'>No creator profiles found</div>
-                    <div className='text-xs'>
-                      Creator profiles will appear here once created.
-                    </div>
-                  </div>
-                </div>
+                <TableEmptyState
+                  icon={UserCircle2}
+                  heading='No creator profiles found'
+                  description='Creator profiles will appear here once created.'
+                />
               }
               rowSelection={rowSelection}
               onRowSelectionChange={handleRowSelectionChange}
