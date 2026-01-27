@@ -8,6 +8,7 @@ import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import { ConsentBanner, JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
@@ -15,7 +16,11 @@ import {
   incrementProfileViews,
   isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
-import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
+import type {
+  CreatorContact as DbCreatorContact,
+  DiscogRelease,
+} from '@/lib/db/schema';
+import { getLatestReleaseForProfile } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
@@ -126,6 +131,7 @@ const fetchProfileAndLinks = async (
   creatorIsPro: boolean;
   creatorClerkId: string | null;
   genres: string[] | null;
+  latestRelease: DiscogRelease | null;
   status: 'ok' | 'not_found' | 'error';
 }> => {
   try {
@@ -139,6 +145,7 @@ const fetchProfileAndLinks = async (
         creatorIsPro: false,
         creatorClerkId: null,
         genres: null,
+        latestRelease: null,
         status: 'not_found',
       };
     }
@@ -192,6 +199,9 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
 
+    // Fetch latest release for the profile
+    const latestRelease = await getLatestReleaseForProfile(result.id);
+
     return {
       profile,
       links,
@@ -199,6 +209,7 @@ const fetchProfileAndLinks = async (
       creatorIsPro,
       creatorClerkId,
       genres: result.genres ?? null,
+      latestRelease,
       status: 'ok',
     };
   } catch (error) {
@@ -210,6 +221,7 @@ const fetchProfileAndLinks = async (
       creatorIsPro: false,
       creatorClerkId: null,
       genres: null,
+      latestRelease: null,
       status: 'error',
     };
   }
@@ -308,6 +320,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     status,
     creatorIsPro,
     creatorClerkId,
+    latestRelease,
   } = await getProfileAndLinks(normalizedUsername, {
     forceNoStore: Boolean(claimTokenParam),
   });
@@ -411,6 +424,9 @@ export default async function ArtistPage({ params, searchParams }: Props) {
       />
 
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      {/* Server-side pixel tracking */}
+      <JoviePixel profileId={profile.id} />
+      <ConsentBanner />
       {showClaimBanner && (
         <ClaimBanner
           claimToken={claimTokenParam!}
@@ -427,6 +443,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         showTipButton={showTipButton}
         showBackButton={showBackButton}
         enableDynamicEngagement={dynamicEnabled}
+        latestRelease={latestRelease}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>
@@ -557,10 +574,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export const revalidate = 3600; // 1 hour
 
 // Pre-render top profiles at build time for instant TTFB
-// Featured and claimed profiles are prioritized
+// Featured and claimed profiles are prioritized, ordered by view count
+// Expanded to 250 profiles (from 100) for better coverage of high-traffic pages
 export async function generateStaticParams(): Promise<{ username: string }[]> {
   try {
-    const profiles = await getTopProfilesForStaticGeneration(100);
+    const profiles = await getTopProfilesForStaticGeneration(250);
     return profiles;
   } catch (error) {
     console.error('[generateStaticParams] Failed to fetch profiles:', error);

@@ -17,6 +17,12 @@ export type AnalyticsReferrerRow = {
   count: number;
 };
 
+export type AnalyticsLinkRow = {
+  id: string;
+  url: string;
+  clicks: number;
+};
+
 export type DashboardAnalyticsResponse = {
   profile_views: number;
   unique_users?: number;
@@ -28,6 +34,7 @@ export type DashboardAnalyticsResponse = {
   top_cities: AnalyticsCityRow[];
   top_countries: AnalyticsCountryRow[];
   top_referrers: AnalyticsReferrerRow[];
+  top_links?: AnalyticsLinkRow[];
   total_clicks?: number;
   spotify_clicks?: number;
   social_clicks?: number;

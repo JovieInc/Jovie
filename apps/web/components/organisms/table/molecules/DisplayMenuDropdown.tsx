@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { LayoutGrid, LayoutList, Settings2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 export type ViewMode = 'list' | 'board';
@@ -21,6 +21,39 @@ export type Density = 'compact' | 'normal' | 'comfortable';
 export interface ColumnVisibility {
   [columnId: string]: boolean;
 }
+
+interface ColumnToggleButtonProps {
+  columnId: string;
+  label: string;
+  isVisible: boolean;
+  onToggle: (columnId: string, visible: boolean) => void;
+}
+
+const ColumnToggleButton = memo(function ColumnToggleButton({
+  columnId,
+  label,
+  isVisible,
+  onToggle,
+}: ColumnToggleButtonProps) {
+  const handleClick = useCallback(() => {
+    onToggle(columnId, !isVisible);
+  }, [onToggle, columnId, isVisible]);
+
+  return (
+    <button
+      type='button'
+      onClick={handleClick}
+      className={cn(
+        'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
+        isVisible
+          ? 'bg-surface-2 text-primary-token'
+          : 'text-secondary-token hover:text-primary-token'
+      )}
+    >
+      {label}
+    </button>
+  );
+});
 
 export interface DisplayMenuDropdownProps {
   /**
@@ -135,7 +168,7 @@ export function DisplayMenuDropdown({
       <DropdownMenuTrigger asChild>
         {trigger ?? defaultTrigger}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' className='w-56'>
+      <DropdownMenuContent align='end' className='w-72 p-3'>
         {/* View Mode Section */}
         {hasViewModeOptions && (
           <>
@@ -213,20 +246,24 @@ export function DisplayMenuDropdown({
         {/* Column Visibility Section */}
         {hasColumnOptions && (
           <>
-            <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {availableColumns.map(column => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  checked={columnVisibility?.[column.id] ?? true}
-                  onCheckedChange={(checked: boolean) =>
-                    onColumnVisibilityChange?.(column.id, checked)
-                  }
-                >
-                  {column.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
+            <div className='space-y-2 px-1'>
+              <h4 className='text-[13px] font-medium text-primary-token'>
+                List options
+              </h4>
+              <p className='text-xs text-secondary-token'>Display properties</p>
+
+              <div className='flex flex-wrap gap-1.5 pt-1'>
+                {availableColumns.map(column => (
+                  <ColumnToggleButton
+                    key={column.id}
+                    columnId={column.id}
+                    label={column.label}
+                    isVisible={columnVisibility?.[column.id] ?? true}
+                    onToggle={onColumnVisibilityChange!}
+                  />
+                ))}
+              </div>
+            </div>
             <DropdownMenuSeparator />
           </>
         )}

@@ -24,18 +24,6 @@ export interface ClaimInviteTemplateData {
 }
 
 /**
- * Escape HTML special characters to prevent XSS in email templates.
- */
-function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-/**
  * Build the claim URL with token
  */
 export function buildClaimUrl(username: string, claimToken: string): string {

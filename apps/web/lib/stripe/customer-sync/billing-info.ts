@@ -29,6 +29,7 @@ export async function getUserBillingInfo(): Promise<{
     email: string;
     isAdmin: boolean;
     isPro: boolean;
+    plan: string;
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
     billingVersion: number;
@@ -54,6 +55,7 @@ export async function getUserBillingInfo(): Promise<{
   // - Ensure email is never null (use empty string)
   // - Ensure isPro is never null (use false)
   // - Ensure isAdmin is never null (use false)
+  // - Ensure plan is never null (use 'free')
   // - Ensure billingVersion is never null (use 1)
   const data = result.data;
   return {
@@ -63,6 +65,7 @@ export async function getUserBillingInfo(): Promise<{
       email: data.email || '',
       isAdmin: data.isAdmin ?? false,
       isPro: data.isPro || false,
+      plan: data.plan || 'free',
       stripeCustomerId: data.stripeCustomerId,
       stripeSubscriptionId: data.stripeSubscriptionId,
       billingVersion: data.billingVersion ?? 1,

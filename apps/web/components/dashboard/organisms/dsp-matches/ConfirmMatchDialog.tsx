@@ -86,11 +86,8 @@ export function ConfirmMatchDialog({
   return (
     <Dialog open={open} onClose={onClose} size='md'>
       <DialogTitle className='flex items-center gap-3'>
-        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-green-500/10'>
-          <Icon
-            name='Link2'
-            className='h-4 w-4 text-green-600 dark:text-green-400'
-          />
+        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-success-subtle'>
+          <Icon name='Link2' className='h-4 w-4 text-success' />
         </div>
         <span>Confirm artist match</span>
       </DialogTitle>

@@ -1,13 +1,53 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
   type FormErrors,
   PRIMARY_GOAL_OPTIONS,
   type PrimaryGoal,
 } from './types';
+
+interface GoalButtonProps {
+  value: PrimaryGoal;
+  label: string;
+  isSelected: boolean;
+  isTabStop: boolean;
+  isSubmitting: boolean;
+  onSelect: (goal: PrimaryGoal) => void;
+  onButtonRef: (el: HTMLButtonElement | null) => void;
+}
+
+const GoalButton = memo(function GoalButton({
+  value,
+  label,
+  isSelected,
+  isTabStop,
+  isSubmitting,
+  onSelect,
+  onButtonRef,
+}: GoalButtonProps) {
+  const handleClick = useCallback(() => {
+    onSelect(value);
+  }, [onSelect, value]);
+
+  return (
+    <Button
+      ref={onButtonRef}
+      type='button'
+      role='radio'
+      aria-checked={isSelected}
+      tabIndex={isTabStop ? 0 : -1}
+      onClick={handleClick}
+      variant={isSelected ? 'primary' : 'secondary'}
+      className='w-full h-11 justify-center rounded-[6px] text-[13px] leading-5'
+      disabled={isSubmitting}
+    >
+      {label}
+    </Button>
+  );
+});
 
 interface WaitlistPrimaryGoalStepProps {
   primaryGoal: PrimaryGoal | null;
@@ -44,6 +84,15 @@ export function WaitlistPrimaryGoalStep({
     button?.focus();
   }, [isHydrating, selectedIndex]);
 
+  // Create stable ref callbacks for each button
+  const createRefCallback = useCallback(
+    (index: number) => (el: HTMLButtonElement | null) => {
+      buttonRefs.current[index] = el;
+      setButtonRef(index, el);
+    },
+    [setButtonRef]
+  );
+
   return (
     <>
       <div className={FORM_LAYOUT.headerSection}>
@@ -70,23 +119,16 @@ export function WaitlistPrimaryGoalStep({
           const isTabStop = primaryGoal ? isSelected : index === 0;
 
           return (
-            <Button
+            <GoalButton
               key={option.value}
-              ref={el => {
-                buttonRefs.current[index] = el;
-                setButtonRef(index, el);
-              }}
-              type='button'
-              role='radio'
-              aria-checked={isSelected}
-              tabIndex={isTabStop ? 0 : -1}
-              onClick={() => onSelect(option.value)}
-              variant={isSelected ? 'primary' : 'secondary'}
-              className='w-full h-11 justify-center rounded-[6px] text-[13px] leading-5'
-              disabled={isSubmitting}
-            >
-              {option.label}
-            </Button>
+              value={option.value}
+              label={option.label}
+              isSelected={isSelected}
+              isTabStop={isTabStop}
+              isSubmitting={isSubmitting}
+              onSelect={onSelect}
+              onButtonRef={createRefCallback(index)}
+            />
           );
         })}
       </div>

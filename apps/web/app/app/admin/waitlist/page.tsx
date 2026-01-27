@@ -1,14 +1,42 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
 
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
-import { AdminWaitlistTableWithViews } from '@/components/admin/waitlist-table/AdminWaitlistTableWithViews';
+import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
 import { adminWaitlistSearchParams } from '@/lib/nuqs';
+
+const AdminWaitlistTableWithViews = dynamic(
+  () =>
+    import(
+      '@/components/admin/waitlist-table/AdminWaitlistTableWithViews'
+    ).then(mod => ({
+      default: mod.AdminWaitlistTableWithViews,
+    })),
+  {
+    loading: () => (
+      <div className='p-6 space-y-6'>
+        <div className='flex items-center justify-between'>
+          <div className='space-y-2'>
+            <div className='h-8 w-32 skeleton rounded-md' />
+            <div className='h-4 w-48 skeleton rounded-md' />
+          </div>
+          <div className='flex gap-2'>
+            <div className='h-10 w-32 skeleton rounded-md' />
+            <div className='h-10 w-24 skeleton rounded-md' />
+          </div>
+        </div>
+        <TableSkeleton rows={10} columns={5} />
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 export const metadata: Metadata = {
   title: 'Waitlist | Admin',

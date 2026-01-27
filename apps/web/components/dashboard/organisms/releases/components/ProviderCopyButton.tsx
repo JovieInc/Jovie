@@ -25,7 +25,12 @@ export function ProviderCopyButton({
   onCopy,
 }: Readonly<ProviderCopyButtonProps>) {
   // Determine button label based on state
-  const buttonLabel = isCopied ? 'Copied!' : isManual ? 'Custom' : 'Detected';
+  const getButtonLabel = (): string => {
+    if (isCopied) return 'Copied!';
+    if (isManual) return 'Custom';
+    return 'Detected';
+  };
+  const buttonLabel = getButtonLabel();
 
   return (
     <button

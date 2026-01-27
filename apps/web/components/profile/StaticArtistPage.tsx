@@ -1,8 +1,10 @@
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
+import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
+import type { DiscogRelease } from '@/lib/db/schema';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
@@ -70,6 +72,7 @@ interface StaticArtistPageProps {
   primaryAction?: PrimaryAction;
   spotifyPreferred?: boolean;
   enableDynamicEngagement?: boolean;
+  latestRelease?: DiscogRelease | null;
 }
 
 function renderContent(
@@ -193,6 +196,7 @@ export function StaticArtistPage({
   autoOpenCapture,
   primaryAction = 'subscribe',
   enableDynamicEngagement = false,
+  latestRelease,
 }: StaticArtistPageProps) {
   const isPublicProfileMode = mode === 'profile';
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
@@ -204,7 +208,7 @@ export function StaticArtistPage({
         socialLinks={socialLinks}
         contacts={contacts}
         subtitle={subtitle}
-        showSocialBar={isPublicProfileMode ? false : mode !== 'listen'}
+        showSocialBar={mode !== 'listen'}
         showTipButton={isPublicProfileMode ? false : showTipButton}
         showBackButton={showBackButton}
         showFooter={showFooter}
@@ -212,13 +216,21 @@ export function StaticArtistPage({
       >
         <div>
           {mode === 'profile' ? (
-            <div data-testid='primary-cta'>
-              <ProfilePrimaryCTA
-                artist={artist}
-                socialLinks={socialLinks}
-                autoOpenCapture={resolvedAutoOpenCapture}
-                showCapture
-              />
+            <div className='space-y-4'>
+              <div data-testid='primary-cta'>
+                <ProfilePrimaryCTA
+                  artist={artist}
+                  socialLinks={socialLinks}
+                  autoOpenCapture={resolvedAutoOpenCapture}
+                  showCapture
+                />
+              </div>
+              {latestRelease && (
+                <LatestReleaseCard
+                  release={latestRelease}
+                  artistHandle={artist.handle}
+                />
+              )}
             </div>
           ) : (
             renderContent(

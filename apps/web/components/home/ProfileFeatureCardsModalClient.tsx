@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogBody,
@@ -34,6 +34,14 @@ export function ProfileFeatureCardsModalClient({
     return features.find(feature => feature.id === activeId) ?? null;
   }, [activeId, features]);
 
+  const handleFeatureClick = useCallback((id: FeatureId) => {
+    setActiveId(id);
+  }, []);
+
+  const handleCloseDialog = useCallback(() => {
+    setActiveId(null);
+  }, []);
+
   return (
     <>
       <div className='grid gap-4 sm:gap-6 md:grid-cols-3'>
@@ -43,7 +51,7 @@ export function ProfileFeatureCardsModalClient({
             type='button'
             aria-haspopup='dialog'
             aria-expanded={activeId === feature.id}
-            onClick={() => setActiveId(feature.id)}
+            onClick={() => handleFeatureClick(feature.id)}
             className='group rounded-3xl border border-subtle bg-surface-1 overflow-hidden text-left focus-ring-themed'
           >
             <div className='relative flex min-h-[240px] flex-col justify-end gap-4 p-6 sm:p-7 cursor-pointer select-none'>
@@ -88,11 +96,7 @@ export function ProfileFeatureCardsModalClient({
         ))}
       </div>
 
-      <Dialog
-        open={activeId !== null}
-        onClose={() => setActiveId(null)}
-        size='3xl'
-      >
+      <Dialog open={activeId !== null} onClose={handleCloseDialog} size='3xl'>
         {active ? (
           <div className='space-y-5'>
             <div className='relative aspect-video overflow-hidden rounded-2xl border border-subtle bg-surface-1'>

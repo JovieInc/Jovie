@@ -22,10 +22,15 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
+import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
-import { ReleaseTableSubheader } from './ReleaseTableSubheader';
+import {
+  DEFAULT_RELEASE_FILTERS,
+  type ReleaseFilters,
+  ReleaseTableSubheader,
+} from './ReleaseTableSubheader';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -62,19 +67,52 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
-  // Table display preferences (column visibility, density)
+  // Table display preferences (column visibility)
   const {
     columnVisibility,
-    density,
     rowHeight,
     availableColumns,
     onColumnVisibilityChange,
-    onDensityChange,
     resetToDefaults,
+    showTracks,
+    onShowTracksChange,
+    groupByYear,
+    onGroupByYearChange,
   } = useReleaseTablePreferences();
 
-  // Row selection
-  const rowIds = useMemo(() => rows.map(r => r.id), [rows]);
+  // Filter state
+  const [filters, setFilters] = useState<ReleaseFilters>(
+    DEFAULT_RELEASE_FILTERS
+  );
+
+  // Apply filters to rows
+  const filteredRows = useMemo(() => {
+    return rows.filter(release => {
+      // Filter by release type
+      const matchesType =
+        filters.releaseTypes.length === 0 ||
+        filters.releaseTypes.includes(release.releaseType);
+
+      if (!matchesType) return false;
+
+      // Filter by popularity level
+      if (filters.popularity.length > 0) {
+        const level = getPopularityLevel(release.spotifyPopularity);
+        if (!level || !filters.popularity.includes(level)) return false;
+      }
+
+      // Filter by label
+      if (filters.labels.length > 0) {
+        if (!release.label || !filters.labels.includes(release.label))
+          return false;
+      }
+
+      return true;
+    });
+  }, [rows, filters]);
+
+  // Row selection - use filtered rows
+  const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);
   const { selectedIds, clearSelection, setSelection } = useRowSelection(rowIds);
 
   // Bulk actions
@@ -167,17 +205,28 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         type='button'
         onClick={handleSync}
         disabled={isSyncing}
-        className='group inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 px-2.5 py-1 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
+        className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
         aria-label={
           isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
         }
       >
         <SocialIcon platform='spotify' className='h-3 w-3' />
         <span>{artistName}</span>
+        {/* Status dot - visible when not hovered/syncing */}
+        <span
+          className={cn(
+            'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
+            'group-hover:opacity-0 group-focus-visible:opacity-0',
+            isSyncing && 'opacity-0'
+          )}
+          aria-hidden='true'
+        />
+        {/* Refresh icon - visible on hover or when syncing */}
         <Icon
           name={isSyncing ? 'Loader2' : 'RefreshCw'}
           className={cn(
-            'h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+            'absolute right-2 h-3 w-3 opacity-0 transition-opacity duration-150',
+            'group-hover:opacity-100 group-focus-visible:opacity-100',
             isSyncing && 'animate-spin opacity-100'
           )}
           aria-hidden='true'
@@ -207,8 +256,26 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
         <div className='flex-1 min-h-0 flex flex-col bg-base'>
+          {/* Sticky subheader - outside scroll container */}
+          {showReleasesTable && (
+            <ReleaseTableSubheader
+              releases={filteredRows}
+              selectedIds={selectedIds}
+              columnVisibility={columnVisibility}
+              onColumnVisibilityChange={onColumnVisibilityChange}
+              availableColumns={availableColumns}
+              onResetToDefaults={resetToDefaults}
+              filters={filters}
+              onFiltersChange={setFilters}
+              showTracks={showTracks}
+              onShowTracksChange={onShowTracksChange}
+              groupByYear={groupByYear}
+              onGroupByYearChange={onGroupByYearChange}
+            />
+          )}
+
           {/* Scrollable content area */}
-          <div className='flex-1 min-h-0 overflow-auto'>
+          <div className='flex-1 min-h-0 overflow-auto pb-4'>
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnected={handleArtistConnected}
@@ -217,7 +284,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showImportingState && (
-              <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+              <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
                 <div className='flex h-16 w-16 items-center justify-center rounded-full bg-[#1DB954]/10'>
                   <Icon
                     name='Loader2'
@@ -237,42 +304,30 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {showReleasesTable && (
-              <>
-                {/* Subheader with Filter, Display, Export */}
-                <ReleaseTableSubheader
-                  releases={rows}
+              <QueryErrorBoundary>
+                <ReleaseTable
+                  releases={filteredRows}
+                  providerConfig={providerConfig}
+                  artistName={artistName}
+                  onCopy={handleCopy}
+                  onEdit={openEditor}
+                  onAddUrl={handleAddUrl}
+                  isAddingUrl={isSaving}
                   selectedIds={selectedIds}
+                  onSelectionChange={setSelection}
+                  bulkActions={bulkActions}
+                  onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
-                  onColumnVisibilityChange={onColumnVisibilityChange}
-                  availableColumns={availableColumns}
-                  density={density}
-                  onDensityChange={onDensityChange}
+                  rowHeight={rowHeight}
+                  showTracks={showTracks}
+                  groupByYear={groupByYear}
                 />
-                <QueryErrorBoundary>
-                  <ReleaseTable
-                    releases={rows}
-                    providerConfig={providerConfig}
-                    artistName={artistName}
-                    onCopy={handleCopy}
-                    onEdit={openEditor}
-                    onAddUrl={handleAddUrl}
-                    onSync={handleSync}
-                    isAddingUrl={isSaving}
-                    isSyncing={isSyncing}
-                    selectedIds={selectedIds}
-                    onSelectionChange={setSelection}
-                    bulkActions={bulkActions}
-                    onClearSelection={clearSelection}
-                    columnVisibility={columnVisibility}
-                    rowHeight={rowHeight}
-                  />
-                </QueryErrorBoundary>
-              </>
+              </QueryErrorBoundary>
             )}
 
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
-              <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+              <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
                 <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
                   <Icon
                     name='Disc3'
@@ -313,7 +368,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           {rows.length > 0 && (
             <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
-                {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
+                {filteredRows.length !== rows.length
+                  ? `${filteredRows.length} of ${totalReleases}`
+                  : `${totalReleases}`}{' '}
+                {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
                   <span className='ml-1.5 text-tertiary-token'>
                     ({totalOverrides} manual{' '}
@@ -324,7 +382,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <button
                 type='button'
                 onClick={resetToDefaults}
-                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
+                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2'
               >
                 Reset display
               </button>

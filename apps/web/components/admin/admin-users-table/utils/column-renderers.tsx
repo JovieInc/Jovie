@@ -1,6 +1,8 @@
 import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
+import { EmptyCell } from '@/components/atoms/EmptyCell';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
@@ -11,19 +13,31 @@ import {
 import type { AdminUserRow } from '@/lib/admin/users';
 
 /**
- * Renders the name cell with name and email
+ * Renders the name cell with name and email (truncated with tooltip)
  */
 export function renderNameCell({
   getValue,
   row,
 }: CellContext<AdminUserRow, string | null>) {
   const user = row.original;
+  const name = getValue();
+
   return (
-    <div>
-      <div className='font-semibold text-primary-token'>
-        {getValue() ?? 'User'}
-      </div>
-      <div className='text-xs text-secondary-token'>{user.email ?? '—'}</div>
+    <div className='min-w-0'>
+      {name ? (
+        <TruncatedText lines={1} className='font-semibold text-primary-token'>
+          {name}
+        </TruncatedText>
+      ) : (
+        <span className='font-semibold text-primary-token'>User</span>
+      )}
+      {user.email ? (
+        <TruncatedText lines={1} className='text-xs text-secondary-token'>
+          {user.email}
+        </TruncatedText>
+      ) : (
+        <EmptyCell />
+      )}
     </div>
   );
 }

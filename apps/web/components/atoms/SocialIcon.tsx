@@ -48,6 +48,8 @@ const platformMap: Record<string, SimpleIcon> = {
   x: siX,
   tiktok: siTiktok,
   youtube: siYoutube,
+  youtube_music: siYoutube,
+  youtubemusic: siYoutube,
   facebook: siFacebook,
   spotify: siSpotify,
   apple: siApplemusic,

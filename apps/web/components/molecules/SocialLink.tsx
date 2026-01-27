@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
@@ -13,12 +13,18 @@ interface SocialLinkProps {
   artistName: string;
 }
 
-export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
+function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
+  // Hooks must be called unconditionally (before any early returns)
   const [hover, setHover] = useState(false);
   const brandHex = useMemo(
-    () => getPlatformIcon(link.platform)?.hex,
+    () => getPlatformIcon(link.platform ?? '')?.hex,
     [link.platform]
   );
+
+  // Guard against incomplete link data
+  if (!link.platform || !link.url) {
+    return null;
+  }
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     // Track analytics first
@@ -96,3 +102,6 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
     </a>
   );
 }
+
+export const SocialLink = memo(SocialLinkComponent);
+SocialLink.displayName = 'SocialLink';

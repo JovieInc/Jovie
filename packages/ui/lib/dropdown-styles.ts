@@ -9,12 +9,12 @@
  * - CommonDropdown
  *
  * Design tokens used:
- * - Border radius: rounded-xl (12px)
- * - Content padding: p-1.5 (6px)
- * - Item padding: px-3 py-2.5 (12px horizontal, 10px vertical)
- * - Font size: text-sm (14px)
+ * - Border radius: rounded-lg (8px)
+ * - Content padding: p-0.5 (2px)
+ * - Item padding: px-2 py-1 (8px horizontal, 4px vertical)
+ * - Font size: text-[12.5px] (12.5px) - compact Geist style
  * - Background: bg-surface-3 (darker, elevated)
- * - Border: subtle white border (border-white/5)
+ * - Border: border-subtle (semantic token)
  * - Transition: duration-150 ease-out
  */
 
@@ -46,7 +46,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses design token (--color-border-default) for consistency across themes
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-default bg-surface-3 p-1.5 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-surface-3 p-0.5 text-primary-token';
 
 /**
  * Shadow effect for elevated appearance
@@ -143,7 +143,7 @@ export const popoverContentClasses = [
 export const selectContentClasses = [
   'relative z-50',
   SELECT_MAX_HEIGHT,
-  'min-w-[8rem] overflow-hidden rounded-xl border border-default bg-surface-3 text-primary-token',
+  'min-w-[8rem] overflow-hidden rounded-lg border border-subtle bg-surface-3 p-0.5 text-primary-token',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -160,13 +160,14 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm outline-none ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
   'text-secondary-token hover:bg-white/5 hover:text-primary-token ' +
   'data-highlighted:bg-white/5 data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-3) ' +
-  '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token';
+  '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
+  'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
 
 /**
  * Destructive variant for menu items (delete, remove actions)
@@ -180,7 +181,7 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-lg py-2.5 pl-10 pr-3 text-sm outline-none ' +
+  'relative flex cursor-default select-none items-center rounded-md py-1 pl-8 pr-2 text-[12.5px] font-medium leading-[16px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
   'text-secondary-token hover:bg-white/5 hover:text-primary-token ' +
   'data-highlighted:bg-white/5 data-highlighted:text-primary-token ' +
@@ -191,7 +192,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
  * Select item base (uses focus-visible:bg-accent for keyboard navigation)
  */
 export const SELECT_ITEM_BASE =
-  'relative flex w-full cursor-default select-none items-center rounded-lg py-2.5 pl-10 pr-3 text-sm outline-none ' +
+  'relative flex w-full cursor-default select-none items-center rounded-md py-1 pl-8 pr-2 text-[12.5px] font-medium leading-[16px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
   'text-secondary-token ' +
   'focus-visible:bg-white/5 focus-visible:text-primary-token ' +
@@ -205,7 +206,7 @@ export const SELECT_ITEM_BASE =
  * Menu label styles (group headers)
  */
 export const MENU_LABEL_BASE =
-  'px-3 py-1 text-xs font-semibold uppercase tracking-wide text-tertiary-token/80';
+  'px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token/80';
 
 /**
  * Menu separator styles
@@ -256,4 +257,4 @@ export const subMenuContentClasses = [
 /**
  * Select viewport padding
  */
-export const SELECT_VIEWPORT_BASE = 'p-2';
+export const SELECT_VIEWPORT_BASE = 'p-0.5';

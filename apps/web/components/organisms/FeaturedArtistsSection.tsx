@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { SectionHeading } from '@/components/atoms/SectionHeading';
 import { ArtistCard } from '@/components/molecules/ArtistCard';
 
@@ -19,7 +20,7 @@ export interface FeaturedCreatorsSectionProps {
   showNames?: boolean;
 }
 
-export function FeaturedCreatorsSection({
+export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
   creators,
   title = 'Featured Creators',
   className = '',
@@ -90,7 +91,7 @@ export function FeaturedCreatorsSection({
       </div>
     </section>
   );
-}
+});
 
 // Export both names for compatibility during transition
 export const FeaturedArtistsSection = FeaturedCreatorsSection;

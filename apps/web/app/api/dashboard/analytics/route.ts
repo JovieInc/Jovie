@@ -108,6 +108,7 @@ export async function GET(request: Request) {
                 top_cities: analytics.top_cities ?? [],
                 top_countries: analytics.top_countries ?? [],
                 top_referrers: analytics.top_referrers ?? [],
+                top_links: analytics.top_links ?? [],
               } as const;
               return payload;
             })();
@@ -153,6 +154,7 @@ export async function GET(request: Request) {
           top_cities: [],
           top_countries: [],
           top_referrers: [],
+          top_links: [],
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );

@@ -55,7 +55,7 @@ export const GroupHeader = React.forwardRef<
       )}
     >
       <td colSpan={colSpan}>
-        <div className='flex items-center gap-2 px-4 py-2'>
+        <div className='flex items-center gap-2 pl-5 pr-4 py-2'>
           <span className={typography.groupHeader}>
             {label} <span className='text-secondary-token'>({count})</span>
           </span>

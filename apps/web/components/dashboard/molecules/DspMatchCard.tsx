@@ -88,8 +88,8 @@ export function DspMatchCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-subtle bg-surface-1 p-4',
-        'transition-shadow hover:shadow-sm',
+        'rounded-xl border border-subtle bg-surface-1 p-4 shadow-sm',
+        'transition-shadow hover:shadow-md',
         className
       )}
     >

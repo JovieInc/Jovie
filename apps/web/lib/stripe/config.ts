@@ -3,13 +3,18 @@
  *
  * This file contains the centralized mapping of Stripe price IDs to internal plan names.
  * Only used on the server side for security.
+ *
+ * Pricing Tiers:
+ * - Free: $0 (no Stripe subscription)
+ * - Pro: $39/mo or $348/yr (save 2 months)
+ * - Growth: $99/mo or $948/yr (save 2 months) - Coming soon
  */
 
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 // Plan types supported by the application
-export type PlanType = 'standard';
+export type PlanType = 'free' | 'pro' | 'growth';
 
 // Price mapping interface
 interface PriceMapping {
@@ -21,40 +26,67 @@ interface PriceMapping {
   description: string;
 }
 
+// Plan feature limits
+export const PLAN_LIMITS = {
+  free: {
+    analyticsRetentionDays: 7,
+    contactsLimit: 100,
+    canExportContacts: false,
+    canRemoveBranding: false,
+    canAccessAdvancedAnalytics: false,
+  },
+  pro: {
+    analyticsRetentionDays: 90,
+    contactsLimit: null, // unlimited
+    canExportContacts: true,
+    canRemoveBranding: true,
+    canAccessAdvancedAnalytics: true,
+  },
+  growth: {
+    analyticsRetentionDays: 365,
+    contactsLimit: null, // unlimited
+    canExportContacts: true,
+    canRemoveBranding: true,
+    canAccessAdvancedAnalytics: true,
+  },
+} as const;
+
 // Current active price mappings
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
+    // Pro tier pricing
     {
-      priceId: env.STRIPE_PRICE_INTRO_MONTHLY || '',
-      plan: 'standard',
-      amount: 500,
+      priceId: env.STRIPE_PRICE_PRO_MONTHLY || '',
+      plan: 'pro',
+      amount: 3900, // $39/mo
       currency: 'usd',
       interval: 'month',
-      description: 'Intro Monthly',
+      description: 'Pro Monthly',
     },
     {
-      priceId: env.STRIPE_PRICE_INTRO_YEARLY || '',
-      plan: 'standard',
-      amount: 5000,
+      priceId: env.STRIPE_PRICE_PRO_YEARLY || '',
+      plan: 'pro',
+      amount: 34800, // $348/yr (save 2 months)
       currency: 'usd',
       interval: 'year',
-      description: 'Intro Yearly',
+      description: 'Pro Yearly',
     },
+    // Growth tier pricing (coming soon)
     {
-      priceId: env.STRIPE_PRICE_STANDARD_MONTHLY || '',
-      plan: 'standard',
-      amount: 500,
+      priceId: env.STRIPE_PRICE_GROWTH_MONTHLY || '',
+      plan: 'growth',
+      amount: 9900, // $99/mo
       currency: 'usd',
       interval: 'month',
-      description: 'Standard Monthly',
+      description: 'Growth Monthly',
     },
     {
-      priceId: env.STRIPE_PRICE_STANDARD_YEARLY || '',
-      plan: 'standard',
-      amount: 5000,
+      priceId: env.STRIPE_PRICE_GROWTH_YEARLY || '',
+      plan: 'growth',
+      amount: 94800, // $948/yr (save 2 months)
       currency: 'usd',
       interval: 'year',
-      description: 'Standard Yearly',
+      description: 'Growth Yearly',
     },
   ];
 
@@ -104,15 +136,23 @@ export function getAvailablePricing() {
  * Check if a user should have pro features based on their plan
  */
 export function isProPlan(plan: string | null): boolean {
-  return plan === 'standard';
+  return plan === 'pro' || plan === 'growth';
 }
 
 /**
- * Check if a plan has advanced features (only full 'pro' plan)
+ * Check if a plan has advanced/growth features
  */
-export function hasAdvancedFeatures(_plan: string | null): boolean {
-  void _plan;
-  return false;
+export function hasAdvancedFeatures(plan: string | null): boolean {
+  return plan === 'growth';
+}
+
+/**
+ * Get plan limits for a given plan type
+ */
+export function getPlanLimits(plan: string | null) {
+  if (plan === 'growth') return PLAN_LIMITS.growth;
+  if (plan === 'pro') return PLAN_LIMITS.pro;
+  return PLAN_LIMITS.free;
 }
 
 /**
@@ -120,8 +160,10 @@ export function hasAdvancedFeatures(_plan: string | null): boolean {
  */
 export function getPlanDisplayName(plan: string | null): string {
   switch (plan) {
-    case 'standard':
-      return 'Standard';
+    case 'growth':
+      return 'Growth';
+    case 'pro':
+      return 'Pro';
     default:
       return 'Free';
   }

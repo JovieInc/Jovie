@@ -207,8 +207,8 @@ export const AvatarUploadable = React.memo(
         onDrop={canUpload ? handleDrop : undefined}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        tabIndex={isInteractive ? 0 : undefined}
-        role={isInteractive ? 'button' : 'presentation'}
+        tabIndex={isInteractive ? 0 : undefined} // NOSONAR S6827
+        role={isInteractive ? 'button' : 'presentation'} // NOSONAR S6848
         aria-label={isInteractive ? 'Upload profile photo' : undefined}
         aria-busy={isUploading || undefined}
       >

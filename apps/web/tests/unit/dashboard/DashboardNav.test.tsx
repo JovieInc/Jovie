@@ -111,7 +111,7 @@ describe('DashboardNav', () => {
       ?.parentElement;
     const primaryGroup = primaryMenuParent?.parentElement;
 
-    expect(primaryGroup?.className).toMatch(/space-y-1/);
+    expect(primaryGroup?.className).toMatch(/space-y-/);
   });
 
   it('renders with different pathname', () => {

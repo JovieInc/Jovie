@@ -3,15 +3,6 @@
 import dynamic from 'next/dynamic';
 import React from 'react';
 
-// Lazy load non-critical providers to reduce initial bundle size
-const TooltipProvider = dynamic(
-  () => import('@jovie/ui').then(mod => ({ default: mod.TooltipProvider })),
-  {
-    ssr: false,
-    loading: () => null,
-  }
-);
-
 const ToastProvider = dynamic(
   () => import('./ToastProvider').then(mod => ({ default: mod.ToastProvider })),
   {
@@ -47,11 +38,9 @@ export function LazyProviders({
   enableAnalytics = true,
 }: LazyProvidersProps) {
   return (
-    <TooltipProvider delayDuration={1200}>
-      <ToastProvider>
-        {children}
-        {enableAnalytics ? <Analytics /> : null}
-      </ToastProvider>
-    </TooltipProvider>
+    <ToastProvider>
+      {children}
+      {enableAnalytics ? <Analytics /> : null}
+    </ToastProvider>
   );
 }

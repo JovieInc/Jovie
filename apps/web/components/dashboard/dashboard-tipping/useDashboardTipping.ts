@@ -92,6 +92,30 @@ export function useDashboardTipping(): UseDashboardTippingReturn {
     setIsEditing(false);
   }, [artist]);
 
+  const handleDisconnect = useCallback(async () => {
+    if (!artist) return;
+
+    try {
+      await updateVenmoMutation.mutateAsync({
+        venmo_handle: null,
+      });
+
+      // Update local state for immediate UI feedback
+      const updatedArtist = { ...artist, venmo_handle: undefined };
+      setArtist(updatedArtist);
+      setVenmoHandle('');
+      setIsEditing(false);
+      toast.success('Venmo disconnected');
+
+      // Refresh server data to ensure consistency
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to disconnect Venmo';
+      toast.error(message);
+    }
+  }, [artist, updateVenmoMutation, router]);
+
   return {
     artist,
     venmoHandle,
@@ -103,5 +127,6 @@ export function useDashboardTipping(): UseDashboardTippingReturn {
     hasVenmoHandle,
     handleSaveVenmo,
     handleCancel,
+    handleDisconnect,
   };
 }
