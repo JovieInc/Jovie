@@ -22,8 +22,8 @@ export function DashboardOverviewToolbar({
 
   return (
     <div className='flex items-center justify-end gap-2'>
-      {/* NOSONAR S6819: role="group" is appropriate for button groups; <fieldset> has styling constraints */}
-      <div
+      {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
+      <div // NOSONAR S6819
         role='group'
         aria-label='Dashboard window'
         className='inline-flex rounded-full border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/5 dark:ring-white/10 backdrop-blur-sm'

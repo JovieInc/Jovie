@@ -39,8 +39,8 @@ export function ProfileLinkCategorySelector({
   }
 
   return (
-    // NOSONAR S6819: role="group" is appropriate for segmented controls; <fieldset> has styling constraints
-    <div
+    // role="group" is appropriate for segmented controls; <fieldset> has styling constraints
+    <div // NOSONAR S6819
       role='group'
       aria-label='Link categories'
       className='relative inline-flex w-full rounded-lg bg-surface-1 p-0.5'

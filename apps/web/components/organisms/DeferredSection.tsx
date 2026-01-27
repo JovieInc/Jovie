@@ -61,8 +61,8 @@ export function DeferredSection({
       {shouldRender ? (
         children
       ) : (
-        // NOSONAR S6819: role="presentation" correctly hides placeholder skeleton from screen readers
-        <div
+        // role="presentation" correctly hides placeholder skeleton from screen readers
+        <div // NOSONAR S6819
           aria-hidden='true'
           role='presentation'
           className={cn(

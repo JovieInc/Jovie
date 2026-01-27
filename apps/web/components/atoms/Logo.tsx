@@ -90,8 +90,8 @@ export function Logo({
   };
 
   const wordmark = (wordmarkClassName?: string, testId?: string) => (
-    // NOSONAR S6819: SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
-    <svg
+    // SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
+    <svg // NOSONAR S6819
       xmlns='http://www.w3.org/2000/svg'
       xmlnsXlink='http://www.w3.org/1999/xlink'
       viewBox='0 0 136 39'

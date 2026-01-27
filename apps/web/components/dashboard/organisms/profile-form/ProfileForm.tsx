@@ -159,8 +159,8 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       </Button>
 
       {success && (
-        // NOSONAR S6819: role="status" is correct for success announcements; <output> is for form calculation results
-        <div
+        // role="status" is correct for success announcements; <output> is for form calculation results
+        <div // NOSONAR S6819
           className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'
           role='status'
           aria-live='polite'

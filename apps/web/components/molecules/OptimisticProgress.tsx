@@ -113,8 +113,12 @@ export function OptimisticProgress({
   };
 
   return (
-    // NOSONAR S6819: role="status" is correct for progress announcements; <output> is for form results
-    <div className='space-y-3' aria-live='polite' role='status'>
+    // role="status" is correct for progress announcements; <output> is for form results
+    <div // NOSONAR S6819
+      className='space-y-3'
+      aria-live='polite'
+      role='status'
+    >
       {/* Progress bar */}
       <div className='space-y-2'>
         <div className='flex justify-between text-sm text-gray-600 dark:text-gray-400'>
@@ -122,8 +126,8 @@ export function OptimisticProgress({
           <span>{Math.round(state.progress)}%</span>
         </div>
         <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden'>
-          {/* NOSONAR S6819: Custom progress bar with gradient styling; native <progress> can't be styled this way */}
-          <div
+          {/* Custom progress bar with gradient styling; native <progress> can't be styled this way */}
+          <div // NOSONAR S6819
             className='bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-100 ease-out'
             style={{ width: `${state.progress}%` }}
             role='progressbar'
@@ -134,7 +138,6 @@ export function OptimisticProgress({
           />
         </div>
       </div>
-
       {/* Step indicators */}
       <div className='flex justify-between'>
         {steps.map((step, index) => (
@@ -149,7 +152,6 @@ export function OptimisticProgress({
           </div>
         ))}
       </div>
-
       {/* Completion indicator */}
       {state.isComplete && (
         <div className='flex items-center justify-center space-x-2 text-green-600 dark:text-green-400 text-sm font-medium'>
