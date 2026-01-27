@@ -42,14 +42,23 @@ export function getBandsintownAppId(): string {
 
 /**
  * Get Bandsintown configuration with availability check.
+ * Supports user-provided API key with fallback to environment variable.
  */
-export function getBandsintownConfig(): {
+export function getBandsintownConfig(userApiKey?: string | null): {
   appId: string;
   isConfigured: boolean;
+  source: 'user' | 'env' | 'none';
 } {
-  const appId = getBandsintownAppId();
-  return {
-    appId,
-    isConfigured: !!appId,
-  };
+  // Prefer user-provided API key
+  if (userApiKey) {
+    return { appId: userApiKey, isConfigured: true, source: 'user' };
+  }
+
+  // Fallback to environment variable
+  const envAppId = getBandsintownAppId();
+  if (envAppId) {
+    return { appId: envAppId, isConfigured: true, source: 'env' };
+  }
+
+  return { appId: '', isConfigured: false, source: 'none' };
 }

@@ -209,8 +209,11 @@ class BandsintownClient {
   /**
    * Make a request to the Bandsintown API with retry logic
    */
-  private async request<T>(endpoint: string): Promise<T> {
-    const config = getBandsintownConfig();
+  private async request<T>(
+    endpoint: string,
+    apiKey?: string | null
+  ): Promise<T> {
+    const config = getBandsintownConfig(apiKey);
 
     if (!config.isConfigured) {
       throw new Error('Bandsintown not configured');
@@ -246,17 +249,22 @@ class BandsintownClient {
   /**
    * Verify an artist exists on Bandsintown
    */
-  async verifyArtist(artistName: string): Promise<BandsintownArtist | null> {
-    if (!this.isAvailable()) {
+  async verifyArtist(
+    artistName: string,
+    apiKey?: string | null
+  ): Promise<BandsintownArtist | null> {
+    const config = getBandsintownConfig(apiKey);
+    if (!config.isConfigured) {
       captureWarning(
-        '[Bandsintown] BANDSINTOWN_APP_ID not configured. Set this environment variable to enable tour date sync. See .env.example for setup instructions.'
+        '[Bandsintown] No API key configured. User must provide their own Bandsintown API key.'
       );
       return null;
     }
 
     try {
       const artist = await this.request<BandsintownArtist>(
-        `/artists/${encodeURIComponent(artistName)}`
+        `/artists/${encodeURIComponent(artistName)}`,
+        apiKey
       );
 
       // Bandsintown returns an error object if artist not found
@@ -277,10 +285,14 @@ class BandsintownClient {
   /**
    * Fetch upcoming events for an artist
    */
-  async getArtistEvents(artistName: string): Promise<SanitizedEvent[]> {
-    if (!this.isAvailable()) {
+  async getArtistEvents(
+    artistName: string,
+    apiKey?: string | null
+  ): Promise<SanitizedEvent[]> {
+    const config = getBandsintownConfig(apiKey);
+    if (!config.isConfigured) {
       captureWarning(
-        '[Bandsintown] BANDSINTOWN_APP_ID not configured - returning empty results. Set this environment variable to enable tour date sync. See .env.example for setup instructions.'
+        '[Bandsintown] No API key configured - returning empty results. User must provide their own Bandsintown API key.'
       );
       return [];
     }
@@ -292,7 +304,8 @@ class BandsintownClient {
 
         try {
           const events = await this.request<BandsintownEvent[]>(
-            `/artists/${encodeURIComponent(artistName)}/events`
+            `/artists/${encodeURIComponent(artistName)}/events`,
+            apiKey
           );
 
           // Bandsintown returns empty array if no events
@@ -344,16 +357,18 @@ export function isBandsintownAvailable(): boolean {
  * Verify an artist exists on Bandsintown
  */
 export async function verifyBandsintownArtist(
-  artistName: string
+  artistName: string,
+  apiKey?: string | null
 ): Promise<BandsintownArtist | null> {
-  return bandsintownClient.verifyArtist(artistName);
+  return bandsintownClient.verifyArtist(artistName, apiKey);
 }
 
 /**
  * Fetch tour dates for an artist from Bandsintown
  */
 export async function fetchBandsintownEvents(
-  artistName: string
+  artistName: string,
+  apiKey?: string | null
 ): Promise<SanitizedEvent[]> {
-  return bandsintownClient.getArtistEvents(artistName);
+  return bandsintownClient.getArtistEvents(artistName, apiKey);
 }
