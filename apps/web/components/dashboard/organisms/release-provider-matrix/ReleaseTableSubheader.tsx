@@ -36,6 +36,9 @@ export const DEFAULT_RELEASE_FILTERS: ReleaseFilters = {
   labels: [],
 };
 
+/** Release view filter type */
+export type ReleaseView = 'all' | 'singles' | 'albums';
+
 interface ReleaseTableSubheaderProps {
   /** All releases for export */
   releases: ReleaseViewModel[];
@@ -61,6 +64,48 @@ interface ReleaseTableSubheaderProps {
   groupByYear?: boolean;
   /** Callback when groupByYear changes */
   onGroupByYearChange?: (group: boolean) => void;
+  /** Current release view filter */
+  releaseView?: ReleaseView;
+  /** Callback when release view changes */
+  onReleaseViewChange?: (view: ReleaseView) => void;
+}
+
+/** Options for release view segmented control */
+const RELEASE_VIEW_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'singles', label: 'Singles' },
+  { value: 'albums', label: 'Albums' },
+] as const;
+
+/** Segmented control for release type filter */
+function ReleaseViewSegmentedControl({
+  value,
+  onChange,
+}: {
+  value: ReleaseView;
+  onChange: (value: ReleaseView) => void;
+}) {
+  return (
+    <fieldset className='inline-flex rounded-lg bg-surface-1 p-0.5 border-0'>
+      <legend className='sr-only'>Release type filter</legend>
+      {RELEASE_VIEW_OPTIONS.map(option => (
+        <button
+          key={option.value}
+          type='button'
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          className={cn(
+            'h-7 px-3 text-xs font-medium rounded-md transition-colors',
+            value === option.value
+              ? 'bg-surface-2 text-primary-token shadow-sm'
+              : 'text-secondary-token hover:text-primary-token'
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </fieldset>
+  );
 }
 
 /** Toggle switch component for display menu options */
@@ -229,18 +274,28 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onShowTracksChange,
   groupByYear,
   onGroupByYearChange,
+  releaseView = 'all',
+  onReleaseViewChange,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-1.5'>
-      {/* Left: Filter dropdown */}
-      <ReleaseFilterDropdown
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-        counts={counts}
-      />
+      {/* Left: Release view toggle + Filter dropdown */}
+      <div className='flex items-center gap-2'>
+        {onReleaseViewChange && (
+          <ReleaseViewSegmentedControl
+            value={releaseView}
+            onChange={onReleaseViewChange}
+          />
+        )}
+        <ReleaseFilterDropdown
+          filters={filters}
+          onFiltersChange={onFiltersChange}
+          counts={counts}
+        />
+      </div>
 
       {/* Right: Display + Export */}
       <div className='flex items-center gap-2'>

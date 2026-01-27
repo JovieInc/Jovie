@@ -248,7 +248,9 @@ class BandsintownClient {
    */
   async verifyArtist(artistName: string): Promise<BandsintownArtist | null> {
     if (!this.isAvailable()) {
-      captureWarning('[Bandsintown] Not configured');
+      captureWarning(
+        '[Bandsintown] BANDSINTOWN_APP_ID not configured. Set this environment variable to enable tour date sync. See .env.example for setup instructions.'
+      );
       return null;
     }
 
@@ -277,7 +279,9 @@ class BandsintownClient {
    */
   async getArtistEvents(artistName: string): Promise<SanitizedEvent[]> {
     if (!this.isAvailable()) {
-      captureWarning('[Bandsintown] Not configured - returning empty results');
+      captureWarning(
+        '[Bandsintown] BANDSINTOWN_APP_ID not configured - returning empty results. Set this environment variable to enable tour date sync. See .env.example for setup instructions.'
+      );
       return [];
     }
 

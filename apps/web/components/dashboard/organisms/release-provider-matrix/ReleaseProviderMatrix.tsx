@@ -30,6 +30,7 @@ import {
   DEFAULT_RELEASE_FILTERS,
   type ReleaseFilters,
   ReleaseTableSubheader,
+  type ReleaseView,
 } from './ReleaseTableSubheader';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
@@ -85,10 +86,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
+  // Release view filter state (All / Singles / Albums)
+  const [releaseView, setReleaseView] = useState<ReleaseView>('all');
+
   // Apply filters to rows
   const filteredRows = useMemo(() => {
     return rows.filter(release => {
-      // Filter by release type
+      // Quick filter by release view (Singles/Albums toggle)
+      if (releaseView === 'singles' && release.releaseType !== 'single') {
+        return false;
+      }
+      // Albums includes: album, ep, compilation (everything that's not a single)
+      if (releaseView === 'albums' && release.releaseType === 'single') {
+        return false;
+      }
+
+      // Filter by release type (from advanced filters)
       const matchesType =
         filters.releaseTypes.length === 0 ||
         filters.releaseTypes.includes(release.releaseType);
@@ -109,7 +122,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
       return true;
     });
-  }, [rows, filters]);
+  }, [rows, filters, releaseView]);
 
   // Row selection - use filtered rows
   const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);
@@ -271,6 +284,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onShowTracksChange={onShowTracksChange}
               groupByYear={groupByYear}
               onGroupByYearChange={onGroupByYearChange}
+              releaseView={releaseView}
+              onReleaseViewChange={setReleaseView}
             />
           )}
 

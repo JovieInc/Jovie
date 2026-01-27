@@ -229,7 +229,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                     isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
                   }
                   className={cn(
-                    'h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                    'h-8 w-8 shrink-0 rounded-md border border-transparent bg-transparent text-primary-token/80 dark:text-secondary-token transition-colors hover:border-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive',
                     'group-data-[state=closed]:hidden'
                   )}
                 />
