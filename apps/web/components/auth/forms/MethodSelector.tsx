@@ -5,8 +5,6 @@ import * as React from 'react';
 import { useMemo } from 'react';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AuthMethod, LoadingState } from '@/lib/auth/types';
-import { useFeatureGate } from '@/lib/flags/client';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import {
   AuthButton,
   AuthGoogleIcon,
@@ -68,18 +66,14 @@ export function MethodSelector({
   mode,
   error,
 }: MethodSelectorProps) {
-  const spotifyOnlyGate = useFeatureGate(STATSIG_FLAGS.AUTH_SPOTIFY_ONLY);
-
   // Order methods with last used first
   const orderedMethods = useMemo((): AuthMethod[] => {
-    const base: AuthMethod[] = spotifyOnlyGate.value
-      ? ['spotify']
-      : ['google', 'email', 'spotify'];
+    const base: AuthMethod[] = ['google', 'email', 'spotify'];
 
     if (!lastMethod) return base;
     if (!base.includes(lastMethod)) return base;
     return [lastMethod, ...base.filter(method => method !== lastMethod)];
-  }, [lastMethod, spotifyOnlyGate.value]);
+  }, [lastMethod]);
 
   const isGoogleLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'google';

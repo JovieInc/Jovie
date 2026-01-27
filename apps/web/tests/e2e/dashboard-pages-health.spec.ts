@@ -173,7 +173,6 @@ async function checkForErrorPage(page: Page): Promise<{
  * - /app/dashboard/overview -> redirects to /app/dashboard -> /
  * - /app/dashboard/links -> redirects to /app/dashboard/profile
  * - /app/dashboard/tipping -> redirects to /app/dashboard/earnings
- * - /app/dashboard/tour-dates -> feature-gated, redirects if not enabled
  */
 const DASHBOARD_PAGES = [
   { path: '/app/dashboard/analytics', name: 'Analytics' },
@@ -183,6 +182,7 @@ const DASHBOARD_PAGES = [
   { path: '/app/dashboard/earnings', name: 'Earnings' },
   { path: '/app/dashboard/profile', name: 'Profile' },
   { path: '/app/dashboard/releases', name: 'Releases' },
+  { path: '/app/dashboard/tour-dates', name: 'Tour Dates' },
 ] as const;
 
 /**
