@@ -33,8 +33,8 @@ export function LoadingSpinner({
   const toneClass = toneClasses[tone];
 
   return (
-    // NOSONAR S6819: role="status" is correct for live announcements; <output> is for form calculation results
-    <span
+    // role="status" is correct for live announcements; <output> is for form calculation results
+    <span // NOSONAR S6819
       role='status'
       aria-label={label}
       data-testid='spinner'
