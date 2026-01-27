@@ -15,6 +15,31 @@ export class ClerkTestError extends Error {
 }
 
 /**
+ * Polls until Clerk is ready, with configurable timeout.
+ * Returns true if Clerk initialized, false if timeout exceeded.
+ */
+async function waitForClerkReady(
+  page: Page,
+  { timeout = 30000, pollInterval = 500 } = {}
+): Promise<boolean> {
+  const maxAttempts = Math.ceil(timeout / pollInterval);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const isReady = await page
+      .evaluate(() => {
+        // @ts-expect-error - Clerk is attached to window at runtime
+        return !!(window.Clerk && window.Clerk.isReady());
+      })
+      .catch(() => false);
+
+    if (isReady) return true;
+    await page.waitForTimeout(pollInterval);
+  }
+
+  return false;
+}
+
+/**
  * Creates or reuses a Clerk test user session for the given email.
  *
  * Assumes the page has already loaded the app and Clerk has been initialized.
@@ -98,13 +123,15 @@ export async function signInUser(
   // Initialize app and Clerk on the page
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  await page.waitForFunction(
-    () => {
-      // @ts-expect-error - Clerk is attached to window at runtime
-      return window.Clerk && window.Clerk.isReady();
-    },
-    { timeout: 10000 }
-  );
+  // Wait for Clerk to be ready with retry logic for CDN issues
+  const clerkReady = await waitForClerkReady(page, { timeout: 30000 });
+
+  if (!clerkReady) {
+    throw new ClerkTestError(
+      'Clerk failed to initialize. This may be due to network issues loading Clerk JS from CDN.',
+      'CLERK_NOT_READY'
+    );
+  }
 
   // Prefer the official Clerk testing helper.
   // If the identifier is an email, use token-based sign-in.
