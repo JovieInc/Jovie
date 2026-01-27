@@ -1,0 +1,3 @@
+CREATE INDEX IF NOT EXISTS "idx_audience_members_fingerprint" ON "audience_members" USING btree ("creator_profile_id","fingerprint") WHERE fingerprint IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_audience_members_email" ON "audience_members" USING btree ("creator_profile_id","email") WHERE email IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_click_events_non_bot" ON "click_events" USING btree ("creator_profile_id","created_at") WHERE is_bot = false OR is_bot IS NULL;
