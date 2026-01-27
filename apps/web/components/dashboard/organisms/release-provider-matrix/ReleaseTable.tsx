@@ -19,7 +19,6 @@ import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
 import {
-  createAvailabilityCellRenderer,
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createReleaseHeaderRenderer,
@@ -28,12 +27,10 @@ import {
   createSmartLinkCellRenderer,
   renderDurationCell,
   renderGenresCell,
-  renderIsrcCell,
   renderLabelCell,
   renderMetricsCell,
   renderPopularityCell,
   renderReleaseDateCell,
-  renderReleaseTypeCell,
   renderStatsCell,
   renderTotalTracksCell,
   renderUpcCell,
@@ -82,15 +79,9 @@ const columnHelper = createColumnHelper<ReleaseViewModel>();
 // Static Column Definitions (Module Level)
 // ============================================================================
 // These don't depend on props/state and are defined once at module load
+// Note: releaseType, availability, and ISRC columns have been moved to ReleaseSidebar drawer only
 
 const STATIC_COLUMNS = {
-  releaseType: columnHelper.accessor('releaseType', {
-    id: 'releaseType',
-    header: 'Type',
-    cell: renderReleaseTypeCell,
-    size: 80,
-    enableSorting: true,
-  }),
   releaseDate: columnHelper.accessor('releaseDate', {
     id: 'releaseDate',
     header: 'Released',
@@ -103,13 +94,6 @@ const STATIC_COLUMNS = {
     header: 'Popularity',
     cell: renderPopularityCell,
     size: 70,
-    enableSorting: true,
-  }),
-  isrc: columnHelper.accessor('primaryIsrc', {
-    id: 'primaryIsrc',
-    header: 'ISRC',
-    cell: renderIsrcCell,
-    size: 100,
     enableSorting: true,
   }),
   upc: columnHelper.accessor('upc', {
@@ -159,7 +143,7 @@ const STATIC_COLUMNS = {
     id: 'stats',
     header: () => <span className='sr-only'>Stats</span>,
     cell: renderStatsCell,
-    size: 100, // Compact: ~40px year + 16px icon + 44px duration
+    size: 100, // Compact: ~40px year + 16px icon + duration
   }),
 };
 
@@ -385,8 +369,6 @@ export function ReleaseTable({
 
   // Build column definitions (dynamic columns only)
   const columns = useMemo(() => {
-    const allProviders = Object.keys(providerConfig) as ProviderKey[];
-
     const checkboxColumn = columnHelper.display({
       id: 'select',
       header: createSelectHeaderRenderer(
@@ -417,19 +399,6 @@ export function ReleaseTable({
       enableSorting: true,
     });
 
-    const availabilityColumn = columnHelper.display({
-      id: 'availability',
-      header: 'Availability',
-      cell: createAvailabilityCellRenderer(
-        allProviders,
-        providerConfig,
-        onCopy,
-        onAddUrl,
-        isAddingUrl
-      ),
-      size: 120,
-    });
-
     const smartLinkColumn = columnHelper.display({
       id: 'smartLink',
       header: 'Smart link',
@@ -440,22 +409,17 @@ export function ReleaseTable({
     // Return all columns - TanStack Table handles visibility natively
     // Uses combined stats column for cleaner layout: year + popularity icon + duration
     // Actions are now handled via context menu (right-click) only
+    // Note: releaseType, availability, and ISRC columns moved to ReleaseSidebar drawer only
     return [
       checkboxColumn,
       releaseColumn,
-      STATIC_COLUMNS.releaseType,
-      availabilityColumn,
       smartLinkColumn,
       STATIC_COLUMNS.stats, // Combined: year, popularity icon, duration
-      STATIC_COLUMNS.isrc,
       STATIC_COLUMNS.upc,
     ];
   }, [
-    providerConfig,
     artistName,
     onCopy,
-    onAddUrl,
-    isAddingUrl,
     onClearSelection,
     headerCheckboxStateRef,
     selectedIdsRef,

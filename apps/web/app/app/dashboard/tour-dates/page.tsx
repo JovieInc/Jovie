@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation';
 import { TourDatesManager } from '@/components/dashboard/organisms/tour-dates';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
 import { getDashboardData } from '../actions';
 import { checkBandsintownConnection, loadTourDates } from './actions';
 
@@ -19,15 +17,6 @@ export default async function TourDatesPage() {
 
   if (!userId) {
     redirect('/sign-in?redirect_url=/app/dashboard/tour-dates');
-  }
-
-  // Check feature gate - redirect if not enabled
-  const isTourDatesEnabled = await checkGateForUser(STATSIG_FLAGS.TOUR_DATES, {
-    userID: userId,
-  });
-
-  if (!isTourDatesEnabled) {
-    redirect('/app/dashboard');
   }
 
   const dashboardData = await getDashboardData();

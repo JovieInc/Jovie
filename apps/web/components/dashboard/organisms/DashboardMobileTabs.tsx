@@ -108,17 +108,12 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
-  const tourDatesGate = useFeatureGate(STATSIG_FLAGS.TOUR_DATES);
 
   const visibleTabs = contactsGate.value
     ? DASHBOARD_TABS
     : DASHBOARD_TABS.filter(tab => tab.id !== 'contacts');
 
-  const visibleMoreItems = MORE_MENU_ITEMS.filter(
-    item => item.id !== 'tour-dates' || tourDatesGate.value
-  );
-
-  const isMoreActive = visibleMoreItems.some(
+  const isMoreActive = MORE_MENU_ITEMS.some(
     item => pathname === item.href || pathname.startsWith(`${item.href}/`)
   );
 
@@ -177,7 +172,7 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
             <SheetTitle>More</SheetTitle>
           </SheetHeader>
           <nav className='grid gap-1 py-4' aria-label='Additional navigation'>
-            {visibleMoreItems.map(item => {
+            {MORE_MENU_ITEMS.map(item => {
               const isActive =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;

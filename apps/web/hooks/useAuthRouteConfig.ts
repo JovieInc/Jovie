@@ -9,6 +9,7 @@ import {
   settingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
+import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthRouteConfig {
@@ -67,29 +68,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     // Get the last part of the path for the current page
     const lastPart = parts[parts.length - 1];
 
-    // Map path segments to readable labels
-    const labelMap: Record<string, string> = {
-      app: 'Dashboard',
-      dashboard: 'Dashboard',
-      admin: 'Overview',
-      settings: 'Account',
-      profile: 'Profile',
-      contacts: 'Contacts',
-      releases: 'Releases',
-      audience: 'Audience',
-      earnings: 'Earnings',
-      waitlist: 'Waitlist',
-      creators: 'Creators',
-      users: 'Users',
-      activity: 'Activity',
-      appearance: 'Appearance',
-      notifications: 'Notifications',
-      branding: 'Branding',
-      'ad-pixels': 'Ad Pixels',
-      billing: 'Billing',
-    };
-
-    const label = labelMap[lastPart] || lastPart;
+    // Use centralized label map with sentence case
+    const label = getBreadcrumbLabel(lastPart);
 
     return [
       {
