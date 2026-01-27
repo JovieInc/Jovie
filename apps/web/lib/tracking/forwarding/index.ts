@@ -33,6 +33,52 @@ export type {
   PlatformConfig,
 } from './types';
 
+type Platform = 'facebook' | 'google' | 'tiktok';
+type JoviePlatform = 'jovie_facebook' | 'jovie_google' | 'jovie_tiktok';
+
+const platformForwarders: Record<
+  Platform,
+  (
+    event: ReturnType<typeof normalizeEvent>,
+    config: PlatformConfig
+  ) => Promise<ForwardingResult>
+> = {
+  facebook: forwardToFacebook,
+  google: forwardToGoogle,
+  tiktok: forwardToTikTok,
+};
+
+const joviePlatformMap: Record<Platform, JoviePlatform> = {
+  facebook: 'jovie_facebook',
+  google: 'jovie_google',
+  tiktok: 'jovie_tiktok',
+};
+
+/**
+ * Forward event to all configured platforms
+ */
+async function forwardToPlatforms(
+  normalizedEvent: ReturnType<typeof normalizeEvent>,
+  configs: Partial<Record<Platform, PlatformConfig | null>>,
+  isJovie = false
+): Promise<ForwardingResult[]> {
+  const results: ForwardingResult[] = [];
+
+  for (const [platform, config] of Object.entries(configs) as [
+    Platform,
+    PlatformConfig | null,
+  ][]) {
+    if (config) {
+      const forwarder = platformForwarders[platform];
+      const result = await forwarder(normalizedEvent, config);
+      const platformName = isJovie ? joviePlatformMap[platform] : platform;
+      results.push({ ...result, platform: platformName });
+    }
+  }
+
+  return results;
+}
+
 /**
  * Get Jovie's own pixel configs from environment
  */
@@ -96,28 +142,8 @@ async function markEventSkipped(
 async function forwardToJoviePixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>
 ): Promise<ForwardingResult[]> {
-  const results: ForwardingResult[] = [];
   const jovieConfigs = getJoviePixelConfigs();
-
-  if (jovieConfigs.facebook) {
-    const result = await forwardToFacebook(
-      normalizedEvent,
-      jovieConfigs.facebook
-    );
-    results.push({ ...result, platform: 'jovie_facebook' });
-  }
-
-  if (jovieConfigs.google) {
-    const result = await forwardToGoogle(normalizedEvent, jovieConfigs.google);
-    results.push({ ...result, platform: 'jovie_google' });
-  }
-
-  if (jovieConfigs.tiktok) {
-    const result = await forwardToTikTok(normalizedEvent, jovieConfigs.tiktok);
-    results.push({ ...result, platform: 'jovie_tiktok' });
-  }
-
-  return results;
+  return forwardToPlatforms(normalizedEvent, jovieConfigs, true);
 }
 
 /**
@@ -127,8 +153,6 @@ async function forwardToCreatorPixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   profileId: string
 ): Promise<ForwardingResult[]> {
-  const results: ForwardingResult[] = [];
-
   const [creatorConfig] = await db
     .select()
     .from(creatorPixels)
@@ -136,7 +160,7 @@ async function forwardToCreatorPixels(
     .limit(1);
 
   if (!creatorConfig?.enabled) {
-    return results;
+    return [];
   }
 
   // Decrypt access tokens (guard against null values)
@@ -157,31 +181,7 @@ async function forwardToCreatorPixels(
     decryptedConfig as typeof creatorConfig
   );
 
-  if (platformConfigs.facebook) {
-    const result = await forwardToFacebook(
-      normalizedEvent,
-      platformConfigs.facebook
-    );
-    results.push(result);
-  }
-
-  if (platformConfigs.google) {
-    const result = await forwardToGoogle(
-      normalizedEvent,
-      platformConfigs.google
-    );
-    results.push(result);
-  }
-
-  if (platformConfigs.tiktok) {
-    const result = await forwardToTikTok(
-      normalizedEvent,
-      platformConfigs.tiktok
-    );
-    results.push(result);
-  }
-
-  return results;
+  return forwardToPlatforms(normalizedEvent, platformConfigs);
 }
 
 /**
