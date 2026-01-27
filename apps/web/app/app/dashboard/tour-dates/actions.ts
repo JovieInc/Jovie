@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { creatorProfiles, type TourDate, tourDates } from '@/lib/db/schema';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import { getDashboardData } from '../actions';
 
 // ============================================================================
@@ -44,6 +45,7 @@ export interface BandsintownConnectionStatus {
   connected: boolean;
   artistName: string | null;
   lastSyncedAt: string | null;
+  hasApiKey: boolean;
 }
 
 // ============================================================================
@@ -53,6 +55,7 @@ export interface BandsintownConnectionStatus {
 async function requireProfile(): Promise<{
   id: string;
   bandsintownArtistName: string | null;
+  bandsintownApiKey: string | null;
   handle: string;
 }> {
   const data = await getDashboardData();
@@ -65,9 +68,12 @@ async function requireProfile(): Promise<{
     throw new Error('Missing creator profile');
   }
 
-  // Get bandsintownArtistName from database
+  // Get bandsintown fields from database
   const [profile] = await db
-    .select({ bandsintownArtistName: creatorProfiles.bandsintownArtistName })
+    .select({
+      bandsintownArtistName: creatorProfiles.bandsintownArtistName,
+      bandsintownApiKey: creatorProfiles.bandsintownApiKey,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, data.selectedProfile.id))
     .limit(1);
@@ -75,6 +81,7 @@ async function requireProfile(): Promise<{
   return {
     id: data.selectedProfile.id,
     bandsintownArtistName: profile?.bandsintownArtistName ?? null,
+    bandsintownApiKey: profile?.bandsintownApiKey ?? null,
     handle:
       data.selectedProfile.usernameNormalized ?? data.selectedProfile.username,
   };
@@ -229,7 +236,12 @@ export async function checkBandsintownConnection(): Promise<BandsintownConnectio
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    return { connected: false, artistName: null, lastSyncedAt: null };
+    return {
+      connected: false,
+      artistName: null,
+      lastSyncedAt: null,
+      hasApiKey: false,
+    };
   }
 
   try {
@@ -252,12 +264,95 @@ export async function checkBandsintownConnection(): Promise<BandsintownConnectio
       connected: !!profile.bandsintownArtistName,
       artistName: profile.bandsintownArtistName,
       lastSyncedAt: lastSynced?.lastSyncedAt?.toISOString() ?? null,
+      hasApiKey: !!profile.bandsintownApiKey,
     };
   } catch (error) {
     // Re-throw redirect errors to allow onboarding flows to work
     if (isRedirectError(error)) throw error;
-    return { connected: false, artistName: null, lastSyncedAt: null };
+    return {
+      connected: false,
+      artistName: null,
+      lastSyncedAt: null,
+      hasApiKey: false,
+    };
   }
+}
+
+/**
+ * Save user's Bandsintown API key (encrypted)
+ */
+export async function saveBandsintownApiKey(params: {
+  apiKey: string;
+}): Promise<{ success: boolean; message: string }> {
+  noStore();
+  const { userId } = await getCachedAuth();
+
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Basic validation
+  const trimmedKey = params.apiKey.trim();
+  if (trimmedKey.length < 10) {
+    return {
+      success: false,
+      message: 'API key appears to be too short. Please check and try again.',
+    };
+  }
+
+  // Encrypt and store the API key
+  const encryptedKey = encryptPII(trimmedKey);
+
+  await db
+    .update(creatorProfiles)
+    .set({
+      bandsintownApiKey: encryptedKey,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  void trackServerEvent('bandsintown_api_key_saved', {
+    profileId: profile.id,
+  });
+
+  revalidatePath('/app/dashboard/tour-dates');
+
+  return {
+    success: true,
+    message: 'API key saved successfully.',
+  };
+}
+
+/**
+ * Remove user's Bandsintown API key
+ */
+export async function removeBandsintownApiKey(): Promise<{ success: boolean }> {
+  noStore();
+  const { userId } = await getCachedAuth();
+
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  await db
+    .update(creatorProfiles)
+    .set({
+      bandsintownApiKey: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  void trackServerEvent('bandsintown_api_key_removed', {
+    profileId: profile.id,
+  });
+
+  revalidatePath('/app/dashboard/tour-dates');
+
+  return { success: true };
 }
 
 /**
@@ -280,8 +375,11 @@ export async function connectBandsintownArtist(params: {
 
   const profile = await requireProfile();
 
+  // Decrypt user's API key if available
+  const apiKey = decryptPII(profile.bandsintownApiKey);
+
   // Verify artist exists on Bandsintown
-  const artist = await verifyBandsintownArtist(params.artistName);
+  const artist = await verifyBandsintownArtist(params.artistName, apiKey);
 
   if (!artist) {
     return {
@@ -302,7 +400,7 @@ export async function connectBandsintownArtist(params: {
     .where(eq(creatorProfiles.id, profile.id));
 
   // Fetch and sync events
-  const events = await fetchBandsintownEvents(params.artistName);
+  const events = await fetchBandsintownEvents(params.artistName, apiKey);
   const synced = await upsertBandsintownEvents(profile.id, events);
 
   void trackServerEvent('tour_dates_synced', {
@@ -364,8 +462,14 @@ export async function syncFromBandsintown(): Promise<{
     };
   }
 
+  // Decrypt user's API key if available
+  const apiKey = decryptPII(profile.bandsintownApiKey);
+
   // Fetch events from Bandsintown and upsert
-  const events = await fetchBandsintownEvents(profile.bandsintownArtistName);
+  const events = await fetchBandsintownEvents(
+    profile.bandsintownArtistName,
+    apiKey
+  );
   const synced = await upsertBandsintownEvents(profile.id, events);
 
   void trackServerEvent('tour_dates_synced', {

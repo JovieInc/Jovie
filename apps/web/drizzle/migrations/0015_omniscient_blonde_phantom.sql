@@ -1,0 +1,1 @@
+ALTER TABLE "creator_profiles" ADD COLUMN "bandsintown_api_key" text;
