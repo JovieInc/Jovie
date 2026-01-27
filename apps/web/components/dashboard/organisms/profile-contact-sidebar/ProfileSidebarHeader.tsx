@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { PROFILE_URL } from '@/constants/domains';
 
 interface ProfileSidebarHeaderProps {
   username: string;
@@ -50,11 +51,8 @@ export function ProfileSidebarHeader({
     };
   }, []);
 
-  // Compute URL once per render
-  const profileUrl =
-    typeof window === 'undefined'
-      ? profilePath
-      : `${window.location.origin}${profilePath}`;
+  // Use PROFILE_URL to ensure profile links always point to the profile domain
+  const profileUrl = `${PROFILE_URL}${profilePath}`;
 
   const handleCopyUrl = async () => {
     try {
@@ -69,7 +67,7 @@ export function ProfileSidebarHeader({
   };
 
   const handleOpenProfile = () => {
-    window.open(profilePath, '_blank', 'noopener,noreferrer');
+    window.open(profileUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownloadVCard = () => {

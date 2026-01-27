@@ -1,14 +1,13 @@
 'use client';
 
 import { Copy, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
 import {
   SidebarMenuAction,
   SidebarMenuActions,
 } from '@/components/organisms/Sidebar';
+import { PROFILE_URL } from '@/constants/domains';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { copyToClipboard } from './utils';
 
 interface ProfileMenuActionsProps {
@@ -19,10 +18,10 @@ export function ProfileMenuActions({
   publicProfileHref,
 }: ProfileMenuActionsProps) {
   const notifications = useNotifications();
+  const profileUrl = `${PROFILE_URL}${publicProfileHref}`;
 
   async function handleCopyProfileUrl() {
-    const url = `${getBaseUrl()}${publicProfileHref}`;
-    const success = await copyToClipboard(url);
+    const success = await copyToClipboard(profileUrl);
     const status = success ? 'success' : 'error';
 
     if (success) {
@@ -44,14 +43,14 @@ export function ProfileMenuActions({
         <Copy aria-hidden='true' className='size-4' />
       </SidebarMenuAction>
       <SidebarMenuAction asChild>
-        <Link
-          href={publicProfileHref}
+        <a
+          href={profileUrl}
           target='_blank'
           rel='noopener noreferrer'
           aria-label='Open public profile in a new tab'
         >
           <ExternalLink aria-hidden='true' className='size-4' />
-        </Link>
+        </a>
       </SidebarMenuAction>
     </SidebarMenuActions>
   );
