@@ -103,7 +103,7 @@ async function getTrackSummariesForReleases(
         'total_duration_ms'
       ),
       primaryIsrc:
-        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}))[1]`.as(
+        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
     })
