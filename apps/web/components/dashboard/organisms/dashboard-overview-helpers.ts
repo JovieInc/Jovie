@@ -36,6 +36,7 @@ export function getTaskLabelClass(isComplete: boolean): string {
 /**
  * Get the indicator content (checkmark or number).
  */
+// NOSONAR S2301: Simple ternary utility function - splitting into two methods would be over-engineering
 export function getTaskIndicatorContent(
   isComplete: boolean,
   stepNumber: number
