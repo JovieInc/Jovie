@@ -33,6 +33,13 @@ const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for routing decis
 export async function getUserState(
   clerkUserId: string
 ): Promise<ProxyUserState> {
+  if (!clerkUserId) {
+    captureWarning(
+      '[proxy-state] getUserState called with missing clerkUserId'
+    );
+    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+  }
+
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
   const redis = getRedis();
 
