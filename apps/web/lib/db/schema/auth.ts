@@ -27,6 +27,7 @@ export const users = pgTable(
 
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
+    plan: text('plan').default('free'), // 'free' | 'pro' | 'growth'
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
     billingUpdatedAt: timestamp('billing_updated_at'),

@@ -11,25 +11,26 @@ const FREE_FEATURES = [
   'Smart deep links (/listen, /tip, etc.)',
   'Clean dark/light mode',
   'App deep links (no browser friction)',
-  'Conversion-focused analytics',
-  'Unique Jovie handle (yourname)',
+  'Basic analytics (7 days)',
+  'Contact capture (100 contacts)',
+  'Jovie branding on profile',
 ] as const;
 
 const PRO_FEATURES = [
-  'Everything in Free',
-  'No Jovie branding - Your profile, your brand',
-  'Capture any identifier - Email, phone, or Spotify',
-  "Remember your fans across visits - See who's new, who's back",
-  'Segment new vs. returning listeners - Understand your audience',
-  "See what's working - Simple reports, clear insights",
+  'Everything in Free, plus:',
+  'Remove Jovie branding',
+  'Full analytics (90 days)',
+  'Unlimited contacts + export',
+  'Geographic & device insights',
+  'Priority support',
 ] as const;
 
 const GROWTH_FEATURES = [
-  'Everything in Pro',
-  'Automated follow-ups - Playlist adds, drop reminders',
-  'Test what converts - A/B headlines and offers',
-  'Retarget your fans on Meta - Stay top of mind',
-  "Smart suggestions - We'll tell you what to do next",
+  'Everything in Pro, plus:',
+  'Automated follow-ups',
+  'A/B testing for headlines & offers',
+  'Meta retargeting (Facebook/Instagram)',
+  'Smart optimization suggestions',
 ] as const;
 
 // SEO Metadata
@@ -198,15 +199,18 @@ export default function PricingPage() {
 
               {/* Pro Tier */}
               <div className='rounded-xl border-2 border-neutral-900 dark:border-white bg-neutral-50 dark:bg-neutral-800/50 p-8 flex flex-col relative'>
-                <div className='mb-4'>
+                <div className='mb-4 flex items-center gap-2'>
                   <span className='text-xs font-medium uppercase tracking-wide text-neutral-900 dark:text-white'>
                     Pro
+                  </span>
+                  <span className='text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'>
+                    Most Popular
                   </span>
                 </div>
                 <p className='text-sm text-neutral-600 dark:text-neutral-400 mb-4'>
                   Your identity. Your data.
                 </p>
-                <div className='flex items-baseline mb-6'>
+                <div className='flex items-baseline mb-2'>
                   <span
                     className='text-4xl font-semibold text-neutral-900 dark:text-white'
                     style={{ fontSynthesisWeight: 'none' }}
@@ -217,6 +221,9 @@ export default function PricingPage() {
                     /month
                   </span>
                 </div>
+                <p className='text-xs text-neutral-500 dark:text-neutral-400 mb-6'>
+                  or $348/year (save 2 months)
+                </p>
                 <Link
                   href='/waitlist?plan=pro'
                   className='block w-full h-10 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium text-center leading-10 hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors mb-6'
@@ -238,15 +245,18 @@ export default function PricingPage() {
 
               {/* Growth Tier */}
               <div className='rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 flex flex-col'>
-                <div className='mb-4'>
+                <div className='mb-4 flex items-center gap-2'>
                   <span className='text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400'>
                     Growth
+                  </span>
+                  <span className='text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'>
+                    Coming Soon
                   </span>
                 </div>
                 <p className='text-sm text-neutral-600 dark:text-neutral-400 mb-4'>
                   Automate. Retarget. Scale.
                 </p>
-                <div className='flex items-baseline mb-6'>
+                <div className='flex items-baseline mb-2'>
                   <span
                     className='text-4xl font-semibold text-neutral-900 dark:text-white'
                     style={{ fontSynthesisWeight: 'none' }}
@@ -257,6 +267,9 @@ export default function PricingPage() {
                     /month
                   </span>
                 </div>
+                <p className='text-xs text-neutral-500 dark:text-neutral-400 mb-6'>
+                  or $948/year (save 2 months)
+                </p>
                 <Link
                   href='/waitlist?plan=growth'
                   className='block w-full h-10 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm font-medium text-center leading-10 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors mb-6'
@@ -274,64 +287,6 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
-            </div>
-
-            {/* Optional Add-on - Full Width */}
-            <div className='group mt-6 rounded-xl border border-neutral-200/60 dark:border-neutral-800/60 bg-linear-to-b from-white to-neutral-50/30 dark:from-neutral-900 dark:to-neutral-900/50 p-6 transition-all hover:border-neutral-300/80 dark:hover:border-neutral-700/80 hover:shadow-sm'>
-              <div className='flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6'>
-                <div className='flex-1'>
-                  <div className='inline-flex items-center gap-2 mb-3'>
-                    <span className='text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500'>
-                      Optional Add-on
-                    </span>
-                    <span className='h-px flex-1 bg-linear-to-r from-neutral-200 to-transparent dark:from-neutral-800'></span>
-                  </div>
-                  <h3 className='text-base font-semibold text-neutral-900 dark:text-white mb-2'>
-                    Remove Jovie branding
-                  </h3>
-                  <p className='text-sm text-neutral-600 dark:text-neutral-400 mb-3'>
-                    Give your fans a fully custom, professional experience
-                    without any third-party branding.
-                  </p>
-                  <div className='flex items-baseline gap-2'>
-                    <span className='text-2xl font-semibold text-neutral-900 dark:text-white'>
-                      $5
-                    </span>
-                    <span className='text-sm text-neutral-500 dark:text-neutral-400'>
-                      /mo
-                    </span>
-                    <span className='text-sm text-neutral-400 dark:text-neutral-500'>
-                      or
-                    </span>
-                    <span className='text-lg font-medium text-neutral-700 dark:text-neutral-300'>
-                      $50
-                    </span>
-                    <span className='text-sm text-neutral-500 dark:text-neutral-400'>
-                      /year
-                    </span>
-                  </div>
-                </div>
-                <Link
-                  href='/waitlist?plan=branding'
-                  className='inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all shadow-sm hover:shadow group-hover:scale-[1.02]'
-                >
-                  <span>Learn more</span>
-                  <svg
-                    className='w-4 h-4'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    aria-hidden='true'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M9 5l7 7-7 7'
-                    />
-                  </svg>
-                </Link>
               </div>
             </div>
 

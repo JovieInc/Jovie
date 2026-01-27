@@ -20,6 +20,8 @@ export interface UserBillingFields {
   isAdmin: boolean;
   /** Whether the user has an active Pro subscription */
   isPro: boolean | null;
+  /** The user's current plan: 'free' | 'pro' | 'growth' */
+  plan: string | null;
   /** Stripe customer ID for billing operations */
   stripeCustomerId: string | null;
   /** Active Stripe subscription ID */
@@ -69,6 +71,7 @@ export const BILLING_FIELDS_FULL = [
   'email',
   'isAdmin',
   'isPro',
+  'plan',
   'stripeCustomerId',
   'stripeSubscriptionId',
   'billingVersion',
@@ -83,6 +86,7 @@ export const BILLING_FIELDS_FULL = [
 export const BILLING_FIELDS_STATUS = [
   'id',
   'isPro',
+  'plan',
   'stripeCustomerId',
   'stripeSubscriptionId',
   'billingVersion',
@@ -184,6 +188,7 @@ export interface FetchUserBillingDataWithAuthResult<
 export interface UpdateBillingStatusOptions {
   clerkUserId: string;
   isPro: boolean;
+  plan?: string; // 'free' | 'pro' | 'growth'
   stripeCustomerId?: string;
   stripeSubscriptionId?: string | null;
   stripeEventId?: string;
@@ -222,6 +227,7 @@ export function buildSelectObject<T extends readonly UserBillingFieldKey[]>(
     email: users.email,
     isAdmin: users.isAdmin,
     isPro: users.isPro,
+    plan: users.plan,
     stripeCustomerId: users.stripeCustomerId,
     stripeSubscriptionId: users.stripeSubscriptionId,
     billingVersion: users.billingVersion,

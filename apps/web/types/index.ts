@@ -280,12 +280,22 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
   );
 }
 
+export type UserPlan = 'free' | 'pro' | 'growth';
+
 export interface UserEntitlements {
   userId: string | null;
   email: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  isPro: boolean;
-  hasAdvancedFeatures: boolean;
+  // Plan info
+  plan: UserPlan;
+  isPro: boolean; // true for pro or growth
+  hasAdvancedFeatures: boolean; // true for growth only
+  // Feature gates
   canRemoveBranding: boolean;
+  canExportContacts: boolean;
+  canAccessAdvancedAnalytics: boolean;
+  // Limits
+  analyticsRetentionDays: number;
+  contactsLimit: number | null; // null = unlimited
 }

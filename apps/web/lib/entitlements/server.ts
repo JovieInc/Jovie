@@ -3,21 +3,33 @@ import 'server-only';
 import { isAdmin } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
+import {
+  getPlanLimits,
+  hasAdvancedFeatures,
+  isProPlan,
+} from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
-import type { UserEntitlements } from '@/types';
+import type { UserEntitlements, UserPlan } from '@/types';
+
+const FREE_ENTITLEMENTS: UserEntitlements = {
+  userId: null,
+  email: null,
+  isAuthenticated: false,
+  isAdmin: false,
+  plan: 'free',
+  isPro: false,
+  hasAdvancedFeatures: false,
+  canRemoveBranding: false,
+  canExportContacts: false,
+  canAccessAdvancedAnalytics: false,
+  analyticsRetentionDays: 7,
+  contactsLimit: 100,
+};
 
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    return {
-      userId: null,
-      email: null,
-      isAuthenticated: false,
-      isAdmin: false,
-      isPro: false,
-      hasAdvancedFeatures: false,
-      canRemoveBranding: false,
-    };
+    return FREE_ENTITLEMENTS;
   }
 
   const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
@@ -30,27 +42,39 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
 
   if (!billing.success || !billing.data) {
     return {
+      ...FREE_ENTITLEMENTS,
       userId,
       email: clerkEmail,
       isAuthenticated: true,
       isAdmin: adminStatus,
-      isPro: false,
-      hasAdvancedFeatures: false,
-      canRemoveBranding: false,
     };
   }
 
-  const { email: emailFromDb, isPro } = billing.data;
+  const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
   const effectiveEmail = emailFromDb || clerkEmail;
-  const pro = isPro ?? false;
+
+  // Determine plan from billing data
+  // isPro in DB means they have an active subscription
+  // dbPlan contains the actual plan type if available
+  let plan: UserPlan = 'free';
+  if (isPro) {
+    plan = (dbPlan as UserPlan) || 'pro';
+  }
+
+  const limits = getPlanLimits(plan);
 
   return {
     userId,
     email: effectiveEmail,
     isAuthenticated: true,
     isAdmin: adminStatus,
-    isPro: pro,
-    hasAdvancedFeatures: pro,
-    canRemoveBranding: pro,
+    plan,
+    isPro: isProPlan(plan),
+    hasAdvancedFeatures: hasAdvancedFeatures(plan),
+    canRemoveBranding: limits.canRemoveBranding,
+    canExportContacts: limits.canExportContacts,
+    canAccessAdvancedAnalytics: limits.canAccessAdvancedAnalytics,
+    analyticsRetentionDays: limits.analyticsRetentionDays,
+    contactsLimit: limits.contactsLimit,
   };
 }
