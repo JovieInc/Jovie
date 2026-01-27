@@ -30,8 +30,8 @@ export function StatusBadge({
   dynamic = false,
 }: StatusBadgeProps) {
   return (
-    // NOSONAR S6819: role="status" is correct for live announcements; <output> is for form calculation results
-    <div
+    // role="status" is correct for live announcements; <output> is for form calculation results
+    <div // NOSONAR S6819
       role={dynamic ? 'status' : undefined}
       className={cn(
         'inline-flex items-center gap-2 rounded-full border font-medium',

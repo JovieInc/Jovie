@@ -8,8 +8,8 @@ import { Container } from '@/components/site/Container';
 
 export function ProfileSkeleton() {
   return (
-    // NOSONAR S6819: role="status" is correct for loading states; <output> is for form calculation results
-    <div
+    // role="status" is correct for loading states; <output> is for form calculation results
+    <div // NOSONAR S6819
       className='min-h-screen bg-base text-primary-token transition-colors duration-200 relative overflow-hidden'
       role='status'
       aria-busy='true'

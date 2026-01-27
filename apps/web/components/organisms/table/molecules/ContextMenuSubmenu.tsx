@@ -56,8 +56,8 @@ export function ContextMenuSubmenu({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    // NOSONAR S6819: role="presentation" correctly hides wrapper; button inside is the interactive element
-    <div
+    // role="presentation" correctly hides wrapper; button inside is the interactive element
+    <div // NOSONAR S6819
       className='relative'
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}

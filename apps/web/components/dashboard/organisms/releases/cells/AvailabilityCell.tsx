@@ -280,7 +280,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 <div className='flex items-center gap-2'>
                   {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
-                    <span
+                    <span // NOSONAR S6819 - status indicator needs role="img"
                       className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'
                       role='img'
                       aria-label={`${config.label}: not linked`}
@@ -288,7 +288,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                       <span className='h-1 w-1 rounded-full bg-tertiary-token' />
                     </span>
                   ) : (
-                    <span
+                    <span // NOSONAR S6819 - status indicator needs role="img"
                       className={cn(
                         'relative h-2.5 w-2.5 rounded-full',
                         status === 'manual' && 'ring-2 ring-amber-400/30'
