@@ -69,3 +69,23 @@ export interface ReleaseViewModel {
   primaryIsrc?: string | null;
   genres?: string[];
 }
+
+/** Track view model for display in expandable release rows */
+export interface TrackViewModel {
+  id: string;
+  releaseId: string;
+  title: string;
+  trackNumber: number;
+  discNumber: number;
+  durationMs: number | null;
+  isrc: string | null;
+  isExplicit: boolean;
+  previewUrl: string | null;
+  providers: Array<
+    ProviderLink & {
+      label: string;
+      path: string;
+      isPrimary: boolean;
+    }
+  >;
+}

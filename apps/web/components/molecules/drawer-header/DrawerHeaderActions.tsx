@@ -42,7 +42,11 @@ export function DrawerHeaderActions({
     id: action.id,
     label: action.label,
     icon: action.icon,
-    onClick: action.onClick || (() => {}),
+    onClick:
+      action.onClick ||
+      (action.href
+        ? () => window.open(action.href, '_blank', 'noopener,noreferrer')
+        : () => {}),
   }));
 
   return (

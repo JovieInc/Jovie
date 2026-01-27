@@ -24,6 +24,8 @@ vi.mock('@/lib/notifications/providers/resend', () => ({
 }));
 
 vi.mock('@/lib/notifications/config', () => ({
+  NOTIFICATIONS_BRAND_NAME: 'Jovie',
+  EMAIL_FROM_ADDRESS: 'notifications@notify.jov.ie',
   EMAIL_REPLY_TO: 'reply@example.com',
 }));
 

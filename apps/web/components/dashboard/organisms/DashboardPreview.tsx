@@ -1,13 +1,13 @@
 'use client';
 
-import { useSession } from '@clerk/nextjs';
 import Link from 'next/link';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { StatusBarMock } from '@/components/dashboard/molecules/StatusBarMock';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PROFILE_URL } from '@/constants/domains';
-import type { Artist, LegacySocialLink, SocialLink } from '@/types/db';
+import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 interface DashboardPreviewProps {
   artist: Artist;
@@ -18,47 +18,25 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   artist,
   socialLinksOverride,
 }) => {
-  const { session } = useSession();
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
+  // Fetch links via TanStack Query (skip if override provided)
+  const { data: socialLinks = [] } = useDashboardSocialLinksQuery(artist.id);
 
-  // Initialize links from database
-  useEffect(() => {
-    if (socialLinksOverride) return; // use override instead of fetching
-
-    const fetchLinks = async () => {
-      if (!session || !artist.id) return;
-
-      try {
-        const res = await fetch(
-          `/api/dashboard/social-links?profileId=${encodeURIComponent(artist.id)}`,
-          { cache: 'no-store' }
-        );
-        if (!res.ok) throw new Error(`Failed to fetch links (${res.status})`);
-        const json: { links: SocialLink[] } = await res.json();
-
-        setSocialLinks(json.links || []);
-      } catch (error) {
-        console.error('Error fetching links:', error);
-      }
-    };
-
-    fetchLinks();
-  }, [session, artist.id, socialLinksOverride]);
+  // DSP platforms excluded from social link preview (shown separately)
+  const DSP_PLATFORMS = new Set([
+    'spotify',
+    'apple_music',
+    'youtube_music',
+    'soundcloud',
+    'bandcamp',
+    'tidal',
+    'deezer',
+  ]);
 
   // Convert social links to LegacySocialLink format for preview
   const previewSocialLinks = useMemo((): LegacySocialLink[] => {
     if (socialLinksOverride) return socialLinksOverride;
     return socialLinks
-      .filter(
-        link =>
-          link.platform !== 'spotify' &&
-          link.platform !== 'apple_music' &&
-          link.platform !== 'youtube_music' &&
-          link.platform !== 'soundcloud' &&
-          link.platform !== 'bandcamp' &&
-          link.platform !== 'tidal' &&
-          link.platform !== 'deezer'
-      )
+      .filter(link => !DSP_PLATFORMS.has(link.platform))
       .map(link => ({
         id: link.id,
         artist_id: artist.id,

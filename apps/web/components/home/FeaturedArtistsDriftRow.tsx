@@ -114,6 +114,8 @@ export function FeaturedArtistsDriftRow({
                   src={creator.src}
                   alt={creator.alt || creator.name}
                   fill
+                  sizes='(max-width: 640px) 96px, (max-width: 768px) 112px, 128px'
+                  loading='lazy'
                   className='object-cover'
                 />
               </div>

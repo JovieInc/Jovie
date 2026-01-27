@@ -81,7 +81,7 @@ function ButtonContent({
   return (
     <span
       className={cn(
-        'inline-flex items-center',
+        'inline-flex items-center gap-1.5',
         loading ? 'opacity-0' : 'opacity-100'
       )}
     >

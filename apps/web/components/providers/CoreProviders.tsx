@@ -1,5 +1,6 @@
 'use client';
 
+import { TooltipProvider } from '@jovie/ui';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
@@ -156,9 +157,11 @@ function CoreProvidersInner({
         storageKey='jovie-theme'
       >
         <ThemeKeyboardShortcut />
-        <LazyProviders enableAnalytics={enableAnalytics}>
-          {children}
-        </LazyProviders>
+        <TooltipProvider delayDuration={1200}>
+          <LazyProviders enableAnalytics={enableAnalytics}>
+            {children}
+          </LazyProviders>
+        </TooltipProvider>
       </ThemeProvider>
     </PacerProvider>
   );

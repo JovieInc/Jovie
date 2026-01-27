@@ -42,7 +42,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
-  const tourDatesGate = useFeatureGate(STATSIG_FLAGS.TOUR_DATES);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -58,14 +57,14 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   // Memoize filtered items to prevent creating new arrays on every render
+  // Note: Tour dates is now always visible (unflagged)
   const primaryItems = useMemo(
     () =>
       primaryNavigation.filter(item => {
         if (item.id === 'contacts' && !contactsGate.value) return false;
-        if (item.id === 'tour-dates' && !tourDatesGate.value) return false;
         return true;
       }),
-    [contactsGate.value, tourDatesGate.value]
+    [contactsGate.value]
   );
 
   const secondaryItems = secondaryNavigation;
@@ -112,17 +111,21 @@ export function DashboardNav(_: DashboardNavProps) {
 
   return (
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
-      <SidebarGroup className='mb-1 space-y-1.5'>
-        <SidebarGroupContent className='space-y-1'>
-          {navSections.map(section => (
+      <SidebarGroup className='mb-1'>
+        <SidebarGroupContent className='space-y-3'>
+          {navSections.map((section, index) => (
             <div key={section.key} data-nav-section>
+              {/* Section divider for visual separation (except for first section) */}
+              {index > 0 && (
+                <div className='mb-1.5 border-t border-sidebar-border/50' />
+              )}
               {renderSection(section.items)}
             </div>
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
       {isAdmin && !isInSettings && (
-        <div className='mt-4'>
+        <div className='mt-3 pt-3 border-t border-sidebar-border/50'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>

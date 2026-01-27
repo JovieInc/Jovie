@@ -16,7 +16,7 @@ import { redis } from '@/lib/redis';
  * where sidebar and layout might see different values).
  */
 const REDIS_CACHE_TTL_SECONDS = 60; // 1 minute (reduced from 5 for faster revocation)
-const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute fallback
+const MEMORY_CACHE_TTL_MS = 15 * 1000; // 15 seconds - shorter for multi-instance consistency
 const REDIS_KEY_PREFIX = 'admin:role:';
 const MAX_FALLBACK_CACHE_SIZE = 100; // Max users to cache in memory
 

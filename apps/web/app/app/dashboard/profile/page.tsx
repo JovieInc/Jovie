@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/LazyEnhancedDashboardLinks';
+import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardDataCached, getProfileSocialLinks } from '../actions';
 
 // Revalidate every minute for settings data
@@ -32,26 +34,11 @@ export default async function ProfilePage() {
     // Pass server-fetched data to lazy-loaded client component
     return <LazyEnhancedDashboardLinks initialLinks={initialLinks} />;
   } catch (error) {
-    // Check if this is a Next.js redirect error (which is expected)
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      // Re-throw redirect errors so they work properly
-      throw error;
-    }
-
+    throwIfRedirect(error);
     console.error('Error loading profile:', error);
 
-    // On actual error, show a simple error message
     return (
-      <div className='flex items-center justify-center'>
-        <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
-          <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
-            Something went wrong
-          </h1>
-          <p className='mb-4 text-secondary-token'>
-            Failed to load profile data. Please refresh the page.
-          </p>
-        </div>
-      </div>
+      <PageErrorState message='Failed to load profile data. Please refresh the page.' />
     );
   }
 }

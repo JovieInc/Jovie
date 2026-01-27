@@ -73,6 +73,7 @@ export async function updateUserBillingStatus(
   const {
     clerkUserId,
     isPro,
+    plan,
     stripeCustomerId,
     stripeSubscriptionId,
     stripeEventId,
@@ -81,6 +82,9 @@ export async function updateUserBillingStatus(
     source = 'webhook',
     metadata = {},
   } = options;
+
+  // Determine the plan to set: use provided plan, or default based on isPro
+  const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
 
   try {
     // First, get the current user state using consolidated query function
@@ -109,6 +113,7 @@ export async function updateUserBillingStatus(
     // Prepare update data
     const updateData: Partial<typeof users.$inferInsert> = {
       isPro: isPro,
+      plan: effectivePlan,
       billingUpdatedAt: new Date(),
     };
 
@@ -127,6 +132,7 @@ export async function updateUserBillingStatus(
     // Prepare previous state for audit log
     const previousState = {
       isPro: currentUser.isPro,
+      plan: currentUser.plan,
       stripeCustomerId: currentUser.stripeCustomerId,
       stripeSubscriptionId: currentUser.stripeSubscriptionId,
     };
@@ -134,6 +140,7 @@ export async function updateUserBillingStatus(
     // Prepare new state for audit log
     const newState = {
       isPro,
+      plan: effectivePlan,
       stripeCustomerId: stripeCustomerId ?? currentUser.stripeCustomerId,
       stripeSubscriptionId:
         stripeSubscriptionId !== undefined
@@ -222,6 +229,7 @@ async function retryUpdateWithFreshData(
   const {
     clerkUserId,
     isPro,
+    plan,
     stripeCustomerId,
     stripeSubscriptionId,
     stripeEventId,
@@ -230,6 +238,9 @@ async function retryUpdateWithFreshData(
     source = 'webhook',
     metadata = {},
   } = options;
+
+  // Determine the plan to set: use provided plan, or default based on isPro
+  const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
 
   try {
     // Add jittered exponential backoff before retry
@@ -268,6 +279,7 @@ async function retryUpdateWithFreshData(
     // Prepare update data
     const updateData: Partial<typeof users.$inferInsert> = {
       isPro: isPro,
+      plan: effectivePlan,
       billingUpdatedAt: new Date(),
     };
 
@@ -323,11 +335,13 @@ async function retryUpdateWithFreshData(
         eventType,
         previousState: {
           isPro: freshUser.isPro,
+          plan: freshUser.plan,
           stripeCustomerId: freshUser.stripeCustomerId,
           stripeSubscriptionId: freshUser.stripeSubscriptionId,
         },
         newState: {
           isPro,
+          plan: effectivePlan,
           stripeCustomerId: stripeCustomerId ?? freshUser.stripeCustomerId,
           stripeSubscriptionId:
             stripeSubscriptionId !== undefined

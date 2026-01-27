@@ -73,7 +73,13 @@ const parseResponseJson = async <T>(
 ): Promise<NotificationApiResponse<T> | null> => {
   try {
     return (await response.json()) as NotificationApiResponse<T>;
-  } catch {
+  } catch (error) {
+    console.error('[notifications] JSON parse failed:', {
+      status: response.status,
+      url: response.url,
+      contentType: response.headers.get('content-type'),
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return null;
   }
 };

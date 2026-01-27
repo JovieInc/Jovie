@@ -1,15 +1,40 @@
 'use client';
 
-import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  TooltipShortcut,
+} from '@jovie/ui';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ExportCSVButton } from '@/components/organisms/table';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
+import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
+import { ReleaseFilterDropdown } from './ReleaseFilterDropdown';
 import {
   getReleasesForExport,
   RELEASES_CSV_COLUMNS,
 } from './utils/exportReleases';
+
+/** Popularity level for filtering */
+export type PopularityLevel = 'low' | 'med' | 'high';
+
+/** Filter state for releases table */
+export interface ReleaseFilters {
+  releaseTypes: ReleaseType[];
+  popularity: PopularityLevel[];
+  labels: string[];
+}
+
+/** Default filter state */
+export const DEFAULT_RELEASE_FILTERS: ReleaseFilters = {
+  releaseTypes: [],
+  popularity: [],
+  labels: [],
+};
 
 interface ReleaseTableSubheaderProps {
   /** All releases for export */
@@ -24,8 +49,56 @@ interface ReleaseTableSubheaderProps {
   availableColumns: readonly { id: string; label: string }[];
   /** Callback to reset display settings to defaults */
   onResetToDefaults?: () => void;
-  /** Active filter count for badge (0 = no filters) */
-  activeFilterCount?: number;
+  /** Current filter state */
+  filters: ReleaseFilters;
+  /** Callback when filters change */
+  onFiltersChange: (filters: ReleaseFilters) => void;
+  /** Whether to show expandable track rows */
+  showTracks?: boolean;
+  /** Callback when showTracks changes */
+  onShowTracksChange?: (show: boolean) => void;
+  /** Whether to group releases by year */
+  groupByYear?: boolean;
+  /** Callback when groupByYear changes */
+  onGroupByYearChange?: (group: boolean) => void;
+}
+
+/** Toggle switch component for display menu options */
+function ToggleSwitch({
+  label,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      role='switch'
+      aria-checked={checked}
+      onClick={onToggle}
+      className='flex w-full items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 rounded'
+    >
+      <span className='text-[11px] font-medium text-primary-token'>
+        {label}
+      </span>
+      <span
+        className={cn(
+          'flex h-4 w-7 items-center rounded-full p-0.5 transition-colors',
+          checked ? 'bg-primary' : 'bg-surface-3'
+        )}
+      >
+        <span
+          className={cn(
+            'h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
+            checked && 'translate-x-3'
+          )}
+        />
+      </span>
+    </button>
+  );
 }
 
 /**
@@ -33,31 +106,63 @@ interface ReleaseTableSubheaderProps {
  *
  * Features:
  * - Display properties as pill toggles (tightened spacing)
+ * - Show tracks toggle for expandable album rows
  */
 function LinearStyleDisplayMenu({
   columnVisibility,
   onColumnVisibilityChange,
   availableColumns,
   onResetToDefaults,
+  showTracks,
+  onShowTracksChange,
+  groupByYear,
+  onGroupByYearChange,
 }: {
   columnVisibility: Record<string, boolean>;
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   availableColumns: readonly { id: string; label: string }[];
   onResetToDefaults?: () => void;
+  showTracks?: boolean;
+  onShowTracksChange?: (show: boolean) => void;
+  groupByYear?: boolean;
+  onGroupByYearChange?: (group: boolean) => void;
 }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant='ghost'
-          size='sm'
-          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
-        >
-          <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
-          Display
-        </Button>
-      </PopoverTrigger>
+      <TooltipShortcut label='Display' shortcut='⇧V' side='bottom'>
+        <PopoverTrigger asChild>
+          <Button
+            variant='ghost'
+            size='sm'
+            className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+          >
+            <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
+            Display
+          </Button>
+        </PopoverTrigger>
+      </TooltipShortcut>
       <PopoverContent align='end' className='w-56 p-0'>
+        {/* View options */}
+        {(onShowTracksChange || onGroupByYearChange) && (
+          <div className='border-b border-subtle px-2.5 py-2 space-y-2'>
+            {onShowTracksChange && (
+              <ToggleSwitch
+                label='Show tracks'
+                checked={showTracks ?? false}
+                onToggle={() => onShowTracksChange(!showTracks)}
+              />
+            )}
+            {onGroupByYearChange && (
+              <ToggleSwitch
+                label='Group by year'
+                checked={groupByYear ?? false}
+                onToggle={() => onGroupByYearChange(!groupByYear)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Column visibility toggles - temporarily disabled for refinement
         <div className='p-2.5'>
           <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
             Display properties
@@ -85,6 +190,8 @@ function LinearStyleDisplayMenu({
             })}
           </div>
         </div>
+        */}
+        {/* Reset to defaults - temporarily disabled with column visibility toggles
         {onResetToDefaults && (
           <div className='border-t border-subtle px-2.5 py-2'>
             <button
@@ -96,6 +203,7 @@ function LinearStyleDisplayMenu({
             </button>
           </div>
         )}
+        */}
       </PopoverContent>
     </Popover>
   );
@@ -115,26 +223,24 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onColumnVisibilityChange,
   availableColumns,
   onResetToDefaults,
-  activeFilterCount = 0,
+  filters,
+  onFiltersChange,
+  showTracks,
+  onShowTracksChange,
+  groupByYear,
+  onGroupByYearChange,
 }: ReleaseTableSubheaderProps) {
+  // Compute filter counts for displaying badges
+  const counts = useReleaseFilterCounts(releases);
+
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-1.5'>
-      {/* Left: Filter button (disabled until filtering is implemented) */}
-      <Button
-        variant='ghost'
-        size='sm'
-        disabled
-        aria-label='Filter releases (coming soon)'
-        className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token disabled:opacity-50 disabled:cursor-not-allowed'
-      >
-        <Icon name='Filter' className='h-3.5 w-3.5' />
-        Filter
-        {activeFilterCount > 0 && (
-          <span className='ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white'>
-            {activeFilterCount}
-          </span>
-        )}
-      </Button>
+      {/* Left: Filter dropdown */}
+      <ReleaseFilterDropdown
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+        counts={counts}
+      />
 
       {/* Right: Display + Export */}
       <div className='flex items-center gap-2'>
@@ -143,6 +249,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onColumnVisibilityChange={onColumnVisibilityChange}
           availableColumns={availableColumns}
           onResetToDefaults={onResetToDefaults}
+          showTracks={showTracks}
+          onShowTracksChange={onShowTracksChange}
+          groupByYear={groupByYear}
+          onGroupByYearChange={onGroupByYearChange}
         />
         <ExportCSVButton
           getData={() => getReleasesForExport(releases, selectedIds)}

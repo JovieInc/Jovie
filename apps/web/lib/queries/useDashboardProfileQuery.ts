@@ -27,7 +27,7 @@ interface UpdateProfileInput {
 }
 
 interface UpdateVenmoInput {
-  venmo_handle: string;
+  venmo_handle: string | null;
 }
 
 // Use shared mutation helper for consistent error handling

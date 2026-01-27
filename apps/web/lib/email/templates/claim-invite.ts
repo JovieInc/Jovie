@@ -6,6 +6,7 @@
 
 import { APP_NAME } from '@/constants/app';
 import { getAppUrl, getProfileUrl, PROFILE_URL } from '@/constants/domains';
+import { escapeHtml } from '../utils';
 
 export interface ClaimInviteTemplateData {
   /** Creator's display name or username */
@@ -18,18 +19,6 @@ export interface ClaimInviteTemplateData {
   avatarUrl?: string | null;
   /** Optional fit score for personalization */
   fitScore?: number | null;
-}
-
-/**
- * Escape HTML special characters to prevent XSS in email templates.
- */
-function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 /**

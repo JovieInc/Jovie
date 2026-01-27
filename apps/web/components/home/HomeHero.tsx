@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { HeroSection } from '@/components/organisms/HeroSection';
 import { FEATURE_FLAGS, useFeatureFlagWithLoading } from '@/lib/analytics';
 import { ClaimHandleForm } from './ClaimHandleForm';
@@ -37,7 +37,9 @@ function getHeroContent(loading: boolean, showClaimHandle: boolean): ReactNode {
   return <GetStartedContent />;
 }
 
-export function HomeHero({ subtitle }: Readonly<{ subtitle?: ReactNode }>) {
+export const HomeHero = memo(function HomeHero({
+  subtitle,
+}: Readonly<{ subtitle?: ReactNode }>) {
   const { enabled: showClaimHandle, loading } = useFeatureFlagWithLoading(
     FEATURE_FLAGS.CLAIM_HANDLE,
     false
@@ -62,4 +64,4 @@ export function HomeHero({ subtitle }: Readonly<{ subtitle?: ReactNode }>) {
       {content}
     </HeroSection>
   );
-}
+});

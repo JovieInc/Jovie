@@ -23,6 +23,27 @@ export interface NotificationTarget {
   preferredChannel?: NotificationDeliveryChannel;
 }
 
+/**
+ * Context about the sender (creator) for emails sent on their behalf.
+ * Implements the "Laylo pattern" where emails appear from "Artist Name via Jovie".
+ */
+export interface SenderContext {
+  /** Creator profile ID for quota/reputation tracking */
+  creatorProfileId: string;
+  /** Display name to show in "From" field (e.g., "Artist Name via Jovie") */
+  displayName: string;
+  /** Optional reply-to email for the creator */
+  replyToEmail?: string;
+  /** Type of email for attribution tracking */
+  emailType:
+    | 'release_notification'
+    | 'claim_invite'
+    | 'marketing'
+    | 'transactional';
+  /** Optional reference ID for the specific entity (release ID, etc.) */
+  referenceId?: string;
+}
+
 export interface NotificationMessage {
   id?: string;
   dedupKey?: string;
@@ -38,6 +59,8 @@ export interface NotificationMessage {
   metadata?: Record<string, unknown>;
   respectUserPreferences?: boolean;
   dismissible?: boolean;
+  /** Sender context for emails sent on behalf of a creator */
+  senderContext?: SenderContext;
 }
 
 export interface NotificationChannelResult {

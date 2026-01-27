@@ -92,11 +92,11 @@ function initializePoolIfNeeded(
         // - Increased max for higher concurrency under load
         // - Added min to keep connections warm (reduces cold start latency)
         // - Reduced idle timeout since Neon connections are cheap to recreate
-        // - Connection timeout allows for Neon cold start (can take 10-15s)
+        // - Connection timeout of 25s accommodates worst-case Neon cold starts (can exceed 15s)
         max: isProduction ? 15 : 3, // Increased from 10 for higher concurrency
         min: isProduction ? 2 : 1, // Keep minimum connections warm
         idleTimeoutMillis: 20000, // 20s idle timeout (reduced from 30s - Neon connections are cheap)
-        connectionTimeoutMillis: 15000, // 15s connection timeout (allows for Neon cold start)
+        connectionTimeoutMillis: 25000, // 25s connection timeout (accommodates worst-case Neon cold start)
         statement_timeout: 15000, // 15s max query execution time
         query_timeout: 15000, // 15s max query time (includes network latency)
         allowExitOnIdle: !isProduction, // Allow clean shutdown in dev

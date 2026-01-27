@@ -2,6 +2,9 @@
   "name": "@jovie/ui",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "main": "./index.ts",
   "types": "./index.ts",
   "exports": {

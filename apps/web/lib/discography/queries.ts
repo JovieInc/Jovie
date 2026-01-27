@@ -103,7 +103,7 @@ async function getTrackSummariesForReleases(
         'total_duration_ms'
       ),
       primaryIsrc:
-        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}))[1]`.as(
+        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
     })
@@ -119,6 +119,26 @@ async function getTrackSummariesForReleases(
     });
   }
   return summaryMap;
+}
+
+/**
+ * Get the latest release for a creator profile (by release date, most recent first)
+ */
+export async function getLatestReleaseForProfile(
+  creatorProfileId: string
+): Promise<DiscogRelease | null> {
+  if (!(await hasDiscogReleasesTable())) {
+    return null;
+  }
+
+  const [release] = await db
+    .select()
+    .from(discogReleases)
+    .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(1);
+
+  return release ?? null;
 }
 
 /**
@@ -518,4 +538,84 @@ export async function getTracksForRelease(
     .from(discogTracks)
     .where(eq(discogTracks.releaseId, releaseId))
     .orderBy(discogTracks.discNumber, discogTracks.trackNumber);
+}
+
+/** Track with provider links for expandable rows */
+export interface TrackWithProviders {
+  id: string;
+  releaseId: string;
+  creatorProfileId: string;
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber: number;
+  durationMs: number | null;
+  isExplicit: boolean;
+  isrc: string | null;
+  previewUrl: string | null;
+  providerLinks: DbProviderLink[];
+}
+
+/**
+ * Get tracks for a release with their provider links
+ * Used for expandable release rows in the releases table
+ */
+export async function getTracksForReleaseWithProviders(
+  releaseId: string
+): Promise<TrackWithProviders[]> {
+  if (!(await hasDiscogTracksTable())) {
+    return [];
+  }
+
+  // Fetch tracks
+  const tracks = await db
+    .select()
+    .from(discogTracks)
+    .where(eq(discogTracks.releaseId, releaseId))
+    .orderBy(discogTracks.discNumber, discogTracks.trackNumber);
+
+  if (tracks.length === 0) {
+    return [];
+  }
+
+  // Fetch provider links for all tracks
+  const trackIds = tracks.map(t => t.id);
+  let trackProviderLinks: DbProviderLink[] = [];
+
+  if (await hasProviderLinksTable()) {
+    trackProviderLinks = await db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'track'),
+          inArray(providerLinks.trackId, trackIds)
+        )
+      );
+  }
+
+  // Group links by track ID
+  const linksByTrack = new Map<string, DbProviderLink[]>();
+  for (const link of trackProviderLinks) {
+    if (!link.trackId) continue;
+    const existing = linksByTrack.get(link.trackId) ?? [];
+    existing.push(link);
+    linksByTrack.set(link.trackId, existing);
+  }
+
+  // Combine tracks with their links
+  return tracks.map(track => ({
+    id: track.id,
+    releaseId: track.releaseId,
+    creatorProfileId: track.creatorProfileId,
+    title: track.title,
+    slug: track.slug,
+    trackNumber: track.trackNumber,
+    discNumber: track.discNumber,
+    durationMs: track.durationMs,
+    isExplicit: track.isExplicit,
+    isrc: track.isrc,
+    previewUrl: track.previewUrl,
+    providerLinks: linksByTrack.get(track.id) ?? [],
+  }));
 }

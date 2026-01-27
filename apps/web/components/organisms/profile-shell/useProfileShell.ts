@@ -124,6 +124,8 @@ export function useProfileShell({
   const socialNetworkLinks = socialLinks.filter(
     link =>
       link.is_visible !== false &&
+      link.platform &&
+      link.url &&
       SOCIAL_NETWORK_PLATFORMS.includes(
         link.platform.toLowerCase() as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
       )

@@ -2,6 +2,7 @@
 
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ChevronDown } from 'lucide-react';
+import { memo, useCallback } from 'react';
 
 export interface CountryOption {
   code: string;
@@ -69,6 +70,40 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
   { code: 'EG', dialCode: '+20', flag: '🇪🇬', label: 'Egypt' },
 ];
 
+interface CountryOptionButtonProps {
+  option: CountryOption;
+  isSelected: boolean;
+  onSelect: (option: CountryOption) => void;
+}
+
+const CountryOptionButton = memo(function CountryOptionButton({
+  option,
+  isSelected,
+  onSelect,
+}: CountryOptionButtonProps) {
+  const handleClick = useCallback(() => {
+    onSelect(option);
+  }, [onSelect, option]);
+
+  return (
+    <button
+      type='button'
+      onClick={handleClick}
+      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+        isSelected
+          ? 'bg-surface-2 text-primary-token'
+          : 'text-primary-token hover:bg-surface-1'
+      }`}
+      style={{ fontSynthesisWeight: 'none' }}
+    >
+      <span className='text-base'>{option.flag}</span>
+      <span className='flex-1 text-left'>{option.label}</span>
+      <span className='text-tertiary-token'>{option.dialCode}</span>
+      {isSelected && <Check className='w-4 h-4 text-primary-token' />}
+    </button>
+  );
+});
+
 interface CountrySelectorProps {
   country: CountryOption;
   isOpen: boolean;
@@ -82,6 +117,14 @@ export function CountrySelector({
   onOpenChange,
   onSelect,
 }: CountrySelectorProps) {
+  const handleSelect = useCallback(
+    (option: CountryOption) => {
+      onSelect(option);
+      onOpenChange(false);
+    },
+    [onSelect, onOpenChange]
+  );
+
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
@@ -99,31 +142,16 @@ export function CountrySelector({
       <PopoverContent
         align='start'
         sideOffset={4}
-        className='w-64 p-1 rounded-lg border border-subtle bg-surface-0 shadow-lg'
+        className='w-64 p-1.5 rounded-xl border border-subtle bg-surface-3 shadow-[0_4px_24px_rgba(0,0,0,0.2)]'
       >
         <div className='max-h-64 overflow-y-auto py-1'>
           {COUNTRY_OPTIONS.map(option => (
-            <button
+            <CountryOptionButton
               key={option.code}
-              type='button'
-              onClick={() => {
-                onSelect(option);
-                onOpenChange(false);
-              }}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
-                country.code === option.code
-                  ? 'bg-surface-2 text-primary-token'
-                  : 'text-primary-token hover:bg-surface-1'
-              }`}
-              style={{ fontSynthesisWeight: 'none' }}
-            >
-              <span className='text-base'>{option.flag}</span>
-              <span className='flex-1 text-left'>{option.label}</span>
-              <span className='text-tertiary-token'>{option.dialCode}</span>
-              {country.code === option.code && (
-                <Check className='w-4 h-4 text-primary-token' />
-              )}
-            </button>
+              option={option}
+              isSelected={country.code === option.code}
+              onSelect={handleSelect}
+            />
           ))}
         </div>
       </PopoverContent>

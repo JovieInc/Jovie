@@ -225,34 +225,29 @@ export async function getUserAnalytics(
   clerkUserId: string,
   range: TimeRange = '30d'
 ) {
-  // Map Clerk user ID to internal users.id (UUID)
-  const found = await db
-    .select({ id: users.id })
+  // Single JOIN query to get user and profile in one round-trip
+  const result = await db
+    .select({
+      creatorProfileId: creatorProfiles.id,
+      profileViews: creatorProfiles.profileViews,
+    })
     .from(users)
+    .innerJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
-  const appUserId = found?.[0]?.id;
-  if (!appUserId) {
-    throw new Error('User not found for Clerk ID');
+  const row = result[0];
+  if (!row) {
+    throw new Error('User or creator profile not found for Clerk ID');
   }
 
-  // First get the creator profile for this internal user id
-  const creatorProfile = await db.query.creatorProfiles.findFirst({
-    where: (profiles, { eq }) => eq(profiles.userId, appUserId),
-  });
-
-  if (!creatorProfile) {
-    throw new Error('Creator profile not found');
-  }
-
-  const analytics = await getAnalyticsData(creatorProfile.id, range);
+  const analytics = await getAnalyticsData(row.creatorProfileId, range);
 
   return {
     ...analytics,
     // Profile page visits increment creator_profiles.profile_views.
     // The click_events table tracks link clicks; it is not a reliable proxy for views.
-    profileViewsInRange: creatorProfile.profileViews ?? 0,
+    profileViewsInRange: row.profileViews ?? 0,
   };
 }
 
@@ -342,6 +337,11 @@ export async function getUserDashboardAnalytics(
           listen_clicks: string | number | null;
           subscribers: string | number | null;
           identified_users: string | number | null;
+          top_links: JsonArray<{
+            id: string | null;
+            url: string | null;
+            clicks: number;
+          }>;
         }>(
           drizzleSql`
             with base_events as (
@@ -383,6 +383,14 @@ export async function getUserDashboardAnalytics(
               order by count desc
               limit 5
             ),
+            top_links as (
+              select link_id as id, link_type as url, count(*) as clicks
+              from ranged_events
+              where link_id is not null
+              group by link_id, link_type
+              order by clicks desc
+              limit 5
+            ),
             notification_recent as (
               select 1
               from ${notificationSubscriptions}
@@ -414,7 +422,8 @@ export async function getUserDashboardAnalytics(
               (select count(*) from audience_identified) as identified_users,
               coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
               coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
-              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers,
+              coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
             ;
           `
         )
@@ -444,6 +453,15 @@ export async function getUserDashboardAnalytics(
     ).map(row => ({
       referrer: (row.referrer ?? '') as string,
       count: Number(row.count),
+    })),
+    top_links: parseJsonArray<{
+      id: string | null;
+      url: string | null;
+      clicks: number;
+    }>(aggregates?.top_links ?? []).map(row => ({
+      id: row.id ?? 'unknown',
+      url: row.url ?? '',
+      clicks: Number(row.clicks),
     })),
   };
 

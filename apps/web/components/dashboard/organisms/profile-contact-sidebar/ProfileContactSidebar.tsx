@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
-import { DrawerHeader } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import {
@@ -10,6 +9,7 @@ import {
   ProfileLinkCategorySelector,
 } from './ProfileLinkCategorySelector';
 import { getCategoryCounts, ProfileLinkList } from './ProfileLinkList';
+import { ProfileSidebarHeader } from './ProfileSidebarHeader';
 
 const SIDEBAR_WIDTH = 320;
 
@@ -65,20 +65,21 @@ export function ProfileContactSidebar() {
     >
       <div className='flex h-full flex-col'>
         {/* Header */}
-        <DrawerHeader title='Profile' onClose={close} />
+        <ProfileSidebarHeader
+          username={username}
+          displayName={displayName}
+          profilePath={profilePath}
+          onClose={close}
+        />
 
         {/* Content */}
-        <div className='flex-1 min-h-0 overflow-y-auto p-4 space-y-4'>
-          {/* Contact Header with Avatar, Name, Actions */}
+        <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-6'>
+          {/* Contact Header with Avatar, Name */}
           <ProfileContactHeader
             displayName={displayName}
             username={username}
             avatarUrl={avatarUrl}
-            profilePath={profilePath}
           />
-
-          {/* Divider */}
-          <div className='border-t border-subtle' />
 
           {/* Category Selector */}
           <ProfileLinkCategorySelector

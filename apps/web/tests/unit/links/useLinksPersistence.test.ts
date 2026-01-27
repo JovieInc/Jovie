@@ -17,6 +17,27 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
+vi.mock('@/lib/queries/keys', () => ({
+  queryKeys: {
+    dashboard: {
+      socialLinks: (id: string) => ['dashboard', 'social-links', id],
+    },
+    suggestions: {
+      list: (id: string) => ['suggestions', 'list', id],
+    },
+  },
+}));
+
 vi.mock('@/lib/utils', () => ({
   cn: (...inputs: Array<string | undefined | null | false>) =>
     inputs.filter(Boolean).join(' '),

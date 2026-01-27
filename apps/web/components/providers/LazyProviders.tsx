@@ -1,6 +1,5 @@
 'use client';
 
-import { TooltipProvider } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import React from 'react';
 
@@ -39,11 +38,9 @@ export function LazyProviders({
   enableAnalytics = true,
 }: LazyProvidersProps) {
   return (
-    <TooltipProvider delayDuration={1200}>
-      <ToastProvider>
-        {children}
-        {enableAnalytics ? <Analytics /> : null}
-      </ToastProvider>
-    </TooltipProvider>
+    <ToastProvider>
+      {children}
+      {enableAnalytics ? <Analytics /> : null}
+    </ToastProvider>
   );
 }

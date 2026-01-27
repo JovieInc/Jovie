@@ -58,13 +58,13 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
 
-  // Stripe price IDs for introductory pricing
-  STRIPE_PRICE_INTRO_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_INTRO_YEARLY: z.string().optional(),
+  // Stripe price IDs for Pro tier ($39/mo, $348/yr)
+  STRIPE_PRICE_PRO_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_PRO_YEARLY: z.string().optional(),
 
-  // Stripe price IDs for standard pricing (inactive)
-  STRIPE_PRICE_STANDARD_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_STANDARD_YEARLY: z.string().optional(),
+  // Stripe price IDs for Growth tier ($99/mo, $948/yr)
+  STRIPE_PRICE_GROWTH_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_GROWTH_YEARLY: z.string().optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // Statsig server-side
@@ -124,6 +124,14 @@ export const ServerEnvSchema = z.object({
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
+
+  // Jovie Marketing Pixels (for retargeting Jovie visitors)
+  JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
+  JOVIE_FACEBOOK_ACCESS_TOKEN: z.string().optional(),
+  JOVIE_GOOGLE_MEASUREMENT_ID: z.string().optional(),
+  JOVIE_GOOGLE_API_SECRET: z.string().optional(),
+  JOVIE_TIKTOK_PIXEL_ID: z.string().optional(),
+  JOVIE_TIKTOK_ACCESS_TOKEN: z.string().optional(),
 });
 
 /**
@@ -152,10 +160,10 @@ export const ENV_KEYS = [
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_TIP_WEBHOOK_SECRET',
-  'STRIPE_PRICE_INTRO_MONTHLY',
-  'STRIPE_PRICE_INTRO_YEARLY',
-  'STRIPE_PRICE_STANDARD_MONTHLY',
-  'STRIPE_PRICE_STANDARD_YEARLY',
+  'STRIPE_PRICE_PRO_MONTHLY',
+  'STRIPE_PRICE_PRO_YEARLY',
+  'STRIPE_PRICE_GROWTH_MONTHLY',
+  'STRIPE_PRICE_GROWTH_YEARLY',
   'INGESTION_CRON_SECRET',
   'STATSIG_SERVER_API_KEY',
   'URL_ENCRYPTION_KEY',
@@ -189,4 +197,10 @@ export const ENV_KEYS = [
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
   'JOVIE_DEV_MEMORY_MONITOR',
+  'JOVIE_FACEBOOK_PIXEL_ID',
+  'JOVIE_FACEBOOK_ACCESS_TOKEN',
+  'JOVIE_GOOGLE_MEASUREMENT_ID',
+  'JOVIE_GOOGLE_API_SECRET',
+  'JOVIE_TIKTOK_PIXEL_ID',
+  'JOVIE_TIKTOK_ACCESS_TOKEN',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

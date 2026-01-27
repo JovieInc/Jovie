@@ -10,6 +10,8 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 interface ReleaseCellProps {
   release: ReleaseViewModel;
   artistName?: string | null;
+  /** Whether to show release type inline (when type column is hidden) */
+  showType?: boolean;
 }
 
 /**
@@ -24,6 +26,7 @@ interface ReleaseCellProps {
 export const ReleaseCell = memo(function ReleaseCell({
   release,
   artistName,
+  showType = true,
 }: ReleaseCellProps) {
   const manualOverrideCount = release.providers.filter(
     provider => provider.source === 'manual'
@@ -63,10 +66,15 @@ export const ReleaseCell = memo(function ReleaseCell({
           >
             {release.title}
           </TruncatedText>
+          {showType && release.releaseType && (
+            <span className='shrink-0 text-[10px] uppercase tracking-wide text-tertiary-token'>
+              {release.releaseType}
+            </span>
+          )}
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
-              className='shrink-0 border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
+              className='shrink-0 border border-warning bg-warning-subtle text-[10px] text-warning-foreground'
             >
               {manualOverrideCount} edited
             </Badge>

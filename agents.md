@@ -105,6 +105,23 @@ refactor(api): simplify user endpoint logic
 docs(readme): update setup instructions
 ```
 
+### 5. Scan for Similar Bugs
+
+When you discover and fix a bug:
+
+1. **Identify the pattern** - What caused the bug? (wrong import, missing null check, incorrect type, etc.)
+2. **Search for siblings** - Use grep/glob to find the same pattern in related files
+3. **Fix all instances** - Don't leave the same bug lurking elsewhere
+
+**Example:** If you fix a missing `'use client'` directive in `Button.tsx`, search for other components with the same hook usage pattern that might also be missing it.
+
+```bash
+# Find similar patterns to what you just fixed
+grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
+```
+
+**Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
+
 ---
 
 ## Pre-PR Checklist (required before opening any PR)
@@ -147,6 +164,14 @@ Jovie/
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
 | Runtime | Node.js 24 |
+
+### API Runtime
+
+All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge runtime.
+
+**Why:** The API relies on connection pooling (Neon), native bindings (Sharp), payment SDKs (Stripe), and long-duration cron jobs (60-300s)—none of which work on Edge.
+
+**Convention:** Only add `export const runtime = 'nodejs'` when documenting a specific constraint (e.g., Sharp, Stripe). Don't add it to every route as boilerplate.
 
 ---
 
