@@ -14,6 +14,7 @@ import {
   getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -153,6 +154,32 @@ export async function processSendClaimInviteJob(
       .where(eq(creatorClaimInvites.id, invite.id));
 
     throw new Error(`Profile has no claim token: ${profile.id}`);
+  }
+
+  // Check if the email is suppressed (user unsubscribed or bounced)
+  const suppressionCheck = await isEmailSuppressed(invite.email);
+  if (suppressionCheck.suppressed) {
+    await tx
+      .update(creatorClaimInvites)
+      .set({
+        status: 'sent', // Mark as sent to avoid retrying
+        error: `Email suppressed: ${suppressionCheck.reason}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorClaimInvites.id, invite.id));
+
+    logger.info('Claim invite skipped due to email suppression', {
+      inviteId: invite.id,
+      email: invite.email,
+      reason: suppressionCheck.reason,
+    });
+
+    return {
+      inviteId: invite.id,
+      email: invite.email,
+      status: 'skipped',
+      detail: `Email suppressed: ${suppressionCheck.reason}`,
+    };
   }
 
   // Mark as sending

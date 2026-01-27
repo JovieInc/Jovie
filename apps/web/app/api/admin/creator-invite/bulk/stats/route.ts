@@ -107,9 +107,11 @@ export async function GET() {
       }
     }
 
-    // Count claimed profiles that were invited
+    // Count claimed profiles that were invited (distinct to avoid counting duplicates)
     const [claimedResult] = await db
-      .select({ count: count() })
+      .select({
+        count: sql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
+      })
       .from(creatorClaimInvites)
       .innerJoin(
         creatorProfiles,
@@ -171,11 +173,13 @@ export async function GET() {
 
     if (nextJobResult?.runAt) {
       jobQueueStats.nextRunAt = nextJobResult.runAt.toISOString();
+    }
 
-      // Calculate estimated time remaining based on pending jobs
-      // Assume ~75 seconds average per job (midpoint of 30-120 second range)
-      const avgSecondsPerJob = 75;
-      const pendingJobs = jobQueueStats.pending + jobQueueStats.processing;
+    // Calculate estimated time remaining based on pending + processing jobs
+    // Assume ~75 seconds average per job (midpoint of 30-120 second range)
+    const avgSecondsPerJob = 75;
+    const pendingJobs = jobQueueStats.pending + jobQueueStats.processing;
+    if (pendingJobs > 0) {
       jobQueueStats.estimatedMinutesRemaining = Math.ceil(
         (pendingJobs * avgSecondsPerJob) / 60
       );

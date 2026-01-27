@@ -13,10 +13,11 @@ import { env } from '@/lib/env';
  * Derived from the RESEND_API_KEY to avoid adding a new env variable.
  */
 function getUnsubscribeSecret(): string {
-  return createHash('sha256')
-    .update(env.RESEND_API_KEY ?? 'fallback-secret')
-    .digest('hex')
-    .slice(0, 32);
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is required to sign unsubscribe tokens');
+  }
+  return createHash('sha256').update(apiKey).digest('hex').slice(0, 32);
 }
 
 /**

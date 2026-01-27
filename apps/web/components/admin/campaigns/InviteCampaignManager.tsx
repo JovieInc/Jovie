@@ -108,7 +108,9 @@ export function InviteCampaignManager() {
   const error =
     previewError?.message ?? (sendInvitesMutation.error?.message || null);
 
-  const hasActiveJobs = stats?.jobQueue?.pending || stats?.jobQueue?.processing;
+  const hasActiveJobs =
+    (stats?.jobQueue?.pending ?? 0) > 0 ||
+    (stats?.jobQueue?.processing ?? 0) > 0;
 
   return (
     <div className='space-y-8'>
@@ -219,7 +221,14 @@ export function InviteCampaignManager() {
           {stats.jobQueue.nextRunAt && (
             <p className='mt-4 text-xs text-blue-600 dark:text-blue-400'>
               Next job scheduled:{' '}
-              {new Date(stats.jobQueue.nextRunAt).toLocaleTimeString()}
+              {new Date(stats.jobQueue.nextRunAt).toLocaleTimeString(
+                undefined,
+                {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                }
+              )}
             </p>
           )}
         </section>
