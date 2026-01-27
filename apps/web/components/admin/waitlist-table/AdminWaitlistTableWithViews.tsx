@@ -27,8 +27,8 @@ import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import { usePagination } from './usePagination';
+import { AdminTablePagination } from '../table/AdminTablePagination';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
-import { WaitlistTablePagination } from './WaitlistTablePagination';
 
 const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';
 const GROUPING_STORAGE_KEY = 'waitlist-grouping-enabled';
@@ -240,13 +240,17 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         }
         footer={
           viewMode === 'list' ? (
-            <WaitlistTablePagination
+            <AdminTablePagination
               page={page}
               totalPages={totalPages}
+              from={from}
+              to={to}
+              total={total}
               canPrev={canPrev}
               canNext={canNext}
               prevHref={prevHref}
               nextHref={nextHref}
+              entityLabel='entries'
             />
           ) : null
         }

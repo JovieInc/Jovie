@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/LazyEnhancedDashboardLinks';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardDataCached, getProfileSocialLinks } from '../actions';
 
 // Revalidate every minute for settings data
@@ -33,12 +34,7 @@ export default async function ProfilePage() {
     // Pass server-fetched data to lazy-loaded client component
     return <LazyEnhancedDashboardLinks initialLinks={initialLinks} />;
   } catch (error) {
-    // Check if this is a Next.js redirect error (which is expected)
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      // Re-throw redirect errors so they work properly
-      throw error;
-    }
-
+    throwIfRedirect(error);
     console.error('Error loading profile:', error);
 
     return (

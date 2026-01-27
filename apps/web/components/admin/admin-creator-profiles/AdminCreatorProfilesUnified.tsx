@@ -5,7 +5,7 @@ import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { AdminCreatorsFooter } from '@/components/admin/table/AdminCreatorsFooter';
+import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
@@ -111,6 +111,7 @@ export function AdminCreatorProfilesUnified({
     prevHref,
     nextHref,
     clearHref,
+    buildHref,
   } = useAdminTablePaginationLinks({
     basePath,
     page,
@@ -337,17 +338,21 @@ export function AdminCreatorProfilesUnified({
             />
           }
           footer={
-            <AdminCreatorsFooter
+            <AdminTablePagination
               page={page}
               totalPages={totalPages}
               from={from}
               to={to}
               total={total}
-              pageSize={pageSize}
               canPrev={canPrev}
               canNext={canNext}
               prevHref={prevHref}
               nextHref={nextHref}
+              pageSize={pageSize}
+              onPageSizeChange={nextPageSize => {
+                router.push(buildHref({ page: 1, pageSize: nextPageSize }));
+              }}
+              entityLabel='profiles'
             />
           }
         >

@@ -5,6 +5,7 @@ import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { audienceSearchParams } from '@/lib/nuqs';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
   trimTrailingSlashes,
@@ -73,12 +74,7 @@ export default async function AudiencePage({
       />
     );
   } catch (error) {
-    // Check if this is a Next.js redirect error (which is expected)
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      // Re-throw redirect errors so they work properly
-      throw error;
-    }
-
+    throwIfRedirect(error);
     console.error('Error loading audience data:', error);
 
     return (

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { DashboardAnalytics } from '@/components/dashboard/dashboard-analytics';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
 // User-specific page - always render fresh
@@ -27,12 +28,7 @@ export default async function AnalyticsPage() {
     // Render analytics dashboard
     return <DashboardAnalytics />;
   } catch (error) {
-    // Check if this is a Next.js redirect error (which is expected)
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      // Re-throw redirect errors so they work properly
-      throw error;
-    }
-
+    throwIfRedirect(error);
     console.error('Error loading analytics:', error);
 
     return (

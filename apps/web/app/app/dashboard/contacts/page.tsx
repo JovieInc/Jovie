@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { ContactsManager } from '@/components/dashboard/organisms/ContactsManager';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardDataCached } from '../actions';
 import { getProfileContactsForOwner } from './actions';
@@ -42,10 +43,7 @@ export default async function ContactsPage() {
       />
     );
   } catch (error) {
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      throw error;
-    }
-
+    throwIfRedirect(error);
     console.error('Error loading contacts:', error);
 
     return (
