@@ -69,11 +69,24 @@ async function readResponseArrayBuffer(
   response: Response,
   maxBytes: number
 ): Promise<Buffer> {
-  const arrayBuffer = await response.arrayBuffer();
-  if (arrayBuffer.byteLength > maxBytes) {
-    throw new Error('Response too large');
+  if (response.bodyUsed) {
+    throw new Error('Response body has already been consumed');
   }
-  return Buffer.from(arrayBuffer);
+  try {
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > maxBytes) {
+      throw new Error('Response too large');
+    }
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    if (
+      error instanceof TypeError &&
+      error.message.includes('detached ArrayBuffer')
+    ) {
+      throw new Error('Response body was detached before reading');
+    }
+    throw error;
+  }
 }
 
 /**

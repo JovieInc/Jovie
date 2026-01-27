@@ -55,7 +55,23 @@ async function fetchAvatarImage(imageUrl: string): Promise<{
     throw new Error(`Invalid content type: ${contentType}`);
   }
 
-  const buffer = await source.arrayBuffer();
+  if (source.bodyUsed) {
+    throw new Error('Response body has already been consumed');
+  }
+
+  let buffer: ArrayBuffer;
+  try {
+    buffer = await source.arrayBuffer();
+  } catch (error) {
+    if (
+      error instanceof TypeError &&
+      error.message.includes('detached ArrayBuffer')
+    ) {
+      throw new Error('Response body was detached before reading');
+    }
+    throw error;
+  }
+
   return { buffer, contentType };
 }
 
