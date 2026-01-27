@@ -539,3 +539,83 @@ export async function getTracksForRelease(
     .where(eq(discogTracks.releaseId, releaseId))
     .orderBy(discogTracks.discNumber, discogTracks.trackNumber);
 }
+
+/** Track with provider links for expandable rows */
+export interface TrackWithProviders {
+  id: string;
+  releaseId: string;
+  creatorProfileId: string;
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber: number;
+  durationMs: number | null;
+  isExplicit: boolean;
+  isrc: string | null;
+  previewUrl: string | null;
+  providerLinks: DbProviderLink[];
+}
+
+/**
+ * Get tracks for a release with their provider links
+ * Used for expandable release rows in the releases table
+ */
+export async function getTracksForReleaseWithProviders(
+  releaseId: string
+): Promise<TrackWithProviders[]> {
+  if (!(await hasDiscogTracksTable())) {
+    return [];
+  }
+
+  // Fetch tracks
+  const tracks = await db
+    .select()
+    .from(discogTracks)
+    .where(eq(discogTracks.releaseId, releaseId))
+    .orderBy(discogTracks.discNumber, discogTracks.trackNumber);
+
+  if (tracks.length === 0) {
+    return [];
+  }
+
+  // Fetch provider links for all tracks
+  const trackIds = tracks.map(t => t.id);
+  let trackProviderLinks: DbProviderLink[] = [];
+
+  if (await hasProviderLinksTable()) {
+    trackProviderLinks = await db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'track'),
+          inArray(providerLinks.trackId, trackIds)
+        )
+      );
+  }
+
+  // Group links by track ID
+  const linksByTrack = new Map<string, DbProviderLink[]>();
+  for (const link of trackProviderLinks) {
+    if (!link.trackId) continue;
+    const existing = linksByTrack.get(link.trackId) ?? [];
+    existing.push(link);
+    linksByTrack.set(link.trackId, existing);
+  }
+
+  // Combine tracks with their links
+  return tracks.map(track => ({
+    id: track.id,
+    releaseId: track.releaseId,
+    creatorProfileId: track.creatorProfileId,
+    title: track.title,
+    slug: track.slug,
+    trackNumber: track.trackNumber,
+    discNumber: track.discNumber,
+    durationMs: track.durationMs,
+    isExplicit: track.isExplicit,
+    isrc: track.isrc,
+    previewUrl: track.previewUrl,
+    providerLinks: linksByTrack.get(track.id) ?? [],
+  }));
+}

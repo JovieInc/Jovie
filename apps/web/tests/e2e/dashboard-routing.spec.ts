@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 test.describe('Dashboard Routing', () => {
   test.beforeEach(async ({ page }) => {
@@ -101,5 +102,68 @@ test.describe('Dashboard Routing', () => {
     // Go forward to links
     await page.goForward();
     await expect(page).toHaveURL('/app/dashboard/profile');
+  });
+
+  /**
+   * Smoke test: Validate multiple dashboard routes render content
+   * Catches production issues where pages load but content fails to render
+   */
+  test('all dashboard routes render content @smoke', async ({ page }) => {
+    const routes = [
+      { path: '/app/dashboard/profile', content: /profile|links/i },
+      { path: '/app/dashboard/earnings', content: /earnings|tips/i },
+      { path: '/app/dashboard/releases', content: /releases/i },
+      { path: '/app/dashboard/audience', content: /audience/i },
+    ];
+
+    for (const { path, content } of routes) {
+      await page.goto(path, { timeout: SMOKE_TIMEOUTS.NAVIGATION });
+      await waitForHydration(page);
+      await expect(
+        page.locator('main').getByText(content).first(),
+        `Route ${path} should render content matching ${content}`
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    }
+  });
+
+  /**
+   * Smoke test: Validate lazy-loaded components hydrate without errors
+   * Catches hydration mismatches from ssr: false components
+   */
+  test('lazy components hydrate without errors @smoke', async ({ page }) => {
+    const hydrationErrors: string[] = [];
+
+    page.on('console', msg => {
+      const text = msg.text();
+      // Look for specific React hydration mismatch errors
+      if (
+        text.includes('Hydration failed') ||
+        text.includes('Text content did not match') ||
+        text.includes('did not match. Server:')
+      ) {
+        hydrationErrors.push(text);
+      }
+    });
+
+    // Profile page has LazyEnhancedDashboardLinks (ssr: false)
+    await page.goto('/app/dashboard/profile', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await page.waitForLoadState('networkidle');
+
+    // Wait for skeleton/loading states to disappear
+    await page
+      .waitForFunction(
+        () => !document.querySelector('[data-loading="true"], .skeleton'),
+        { timeout: 15_000 }
+      )
+      .catch(() => {
+        // Continue if no skeletons found
+      });
+
+    expect(
+      hydrationErrors,
+      `Hydration errors detected: ${hydrationErrors.join(', ')}`
+    ).toHaveLength(0);
   });
 });

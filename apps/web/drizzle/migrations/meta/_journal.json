@@ -85,6 +85,20 @@
       "when": 1769200000000,
       "tag": "0011_add_tour_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1769462356718,
+      "tag": "0012_sender-quotas-reputation",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1769500000000,
+      "tag": "0013_add_pixel_tracking",
+      "breakpoints": true
     }
   ]
 }

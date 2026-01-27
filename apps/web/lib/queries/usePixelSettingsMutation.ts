@@ -5,10 +5,17 @@ import { createMutationFn } from './fetch';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 
 export interface PixelSettingsInput {
-  facebookPixel: string;
-  googleAdsConversion: string;
-  tiktokPixel: string;
-  customPixel: string;
+  // Facebook Conversions API
+  facebookPixelId: string;
+  facebookAccessToken: string;
+  // Google Measurement Protocol
+  googleMeasurementId: string;
+  googleApiSecret: string;
+  // TikTok Events API
+  tiktokPixelId: string;
+  tiktokAccessToken: string;
+  // Master toggle
+  enabled: boolean;
 }
 
 export interface PixelSettingsResponse {
@@ -27,10 +34,13 @@ const updatePixelSettings = createMutationFn<
  * const { mutate: savePixels, isPending } = usePixelSettingsMutation();
  *
  * savePixels({
- *   facebookPixel: '123',
- *   googleAdsConversion: 'AW-123',
- *   tiktokPixel: 'ABC123',
- *   customPixel: '',
+ *   facebookPixelId: '123456789012345',
+ *   facebookAccessToken: 'EAAxxxxxxx...',
+ *   googleMeasurementId: 'G-XXXXXXXXXX',
+ *   googleApiSecret: 'xxxxxxxxxx',
+ *   tiktokPixelId: 'CXXXXXXXXXX',
+ *   tiktokAccessToken: 'xxxxxxxxxx',
+ *   enabled: true,
  * });
  */
 export function usePixelSettingsMutation() {

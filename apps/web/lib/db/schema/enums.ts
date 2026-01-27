@@ -273,3 +273,26 @@ export const contentSlugTypeEnum = pgEnum('content_slug_type', [
   'release',
   'track',
 ]);
+
+// Sender Reputation Enums
+export const senderStatusEnum = pgEnum('sender_status', [
+  'good', // Normal sending allowed
+  'warning', // High bounce/complaint rate, close to threshold
+  'probation', // Reduced limits, under review
+  'suspended', // Sending blocked temporarily
+  'banned', // Permanently blocked from sending
+]);
+
+// Pixel Tracking Enums
+export const pixelEventTypeEnum = pgEnum('pixel_event_type', [
+  'page_view',
+  'link_click',
+  'form_submit',
+  'scroll_depth',
+]);
+
+export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [
+  'pending',
+  'sent',
+  'failed',
+]);

@@ -208,6 +208,28 @@ export interface UnifiedTableProps<TData> {
    * Column visibility change handler
    */
   onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
+
+  /**
+   * Set of expanded row IDs for expandable rows.
+   * When provided with renderExpandedContent, enables row expansion.
+   */
+  expandedRowIds?: Set<string>;
+
+  /**
+   * Renders content to display below an expanded row.
+   * Return null to show nothing, or React nodes for the expanded content.
+   * The content is rendered as additional <tr> elements.
+   * @param row - The row data
+   * @param columnCount - Number of columns for proper spanning
+   */
+  renderExpandedContent?: (row: TData, columnCount: number) => React.ReactNode;
+
+  /**
+   * Callback to get the row ID for expansion tracking.
+   * Required when using expandedRowIds.
+   * Falls back to getRowId if not provided.
+   */
+  getExpandableRowId?: (row: TData) => string;
 }
 
 /**
@@ -406,6 +428,9 @@ export function UnifiedTable<TData>({
   enablePinning = false,
   columnVisibility,
   onColumnVisibilityChange,
+  expandedRowIds,
+  renderExpandedContent,
+  getExpandableRowId,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
@@ -430,9 +455,14 @@ export function UnifiedTable<TData>({
   const shouldEnableKeyboardNav =
     enableKeyboardNavigation ?? Boolean(onRowClick);
 
+  // Check if any rows are expanded
+  const hasExpandedRows = expandedRowIds && expandedRowIds.size > 0;
+
   // Auto-enable virtualization for 20+ rows
+  // Disable virtualization when rows are expanded (dynamic heights)
   const shouldVirtualize =
-    enableVirtualization ?? (data.length >= 20 && !isLoading);
+    (enableVirtualization ?? (data.length >= 20 && !isLoading)) &&
+    !hasExpandedRows;
 
   // Initialize TanStack Table
   // Memoize row model factories to prevent recreation
@@ -727,17 +757,41 @@ export function UnifiedTable<TData>({
                     />
                   );
 
+                  // Check if row is expanded and has expanded content
+                  const rowId = getExpandableRowId
+                    ? getExpandableRowId(rowData)
+                    : getRowId
+                      ? getRowId(rowData)
+                      : row.id;
+                  const isExpanded = expandedRowIds?.has(rowId);
+                  const expandedContent =
+                    isExpanded && renderExpandedContent
+                      ? renderExpandedContent(rowData, columns.length)
+                      : null;
+
                   // Wrap with context menu if provided
-                  if (getContextMenuItems) {
-                    const contextMenuItems = getContextMenuItems(rowData);
+                  const wrappedRowElement = getContextMenuItems ? (
+                    <TableContextMenu
+                      key={row.id}
+                      items={getContextMenuItems(rowData)}
+                    >
+                      {rowElement}
+                    </TableContextMenu>
+                  ) : (
+                    rowElement
+                  );
+
+                  // If expanded, render both row and expanded content
+                  if (expandedContent) {
                     return (
-                      <TableContextMenu key={row.id} items={contextMenuItems}>
-                        {rowElement}
-                      </TableContextMenu>
+                      <React.Fragment key={row.id}>
+                        {wrappedRowElement}
+                        {expandedContent}
+                      </React.Fragment>
                     );
                   }
 
-                  return rowElement;
+                  return wrappedRowElement;
                 }}
               />
             );
@@ -839,17 +893,41 @@ export function UnifiedTable<TData>({
               />
             );
 
+            // Check if row is expanded and has expanded content
+            const rowId = getExpandableRowId
+              ? getExpandableRowId(rowData)
+              : getRowId
+                ? getRowId(rowData)
+                : row.id;
+            const isExpanded = expandedRowIds?.has(rowId);
+            const expandedContent =
+              isExpanded && renderExpandedContent
+                ? renderExpandedContent(rowData, columnCount)
+                : null;
+
             // Wrap with context menu if provided
-            if (getContextMenuItems) {
-              const contextMenuItems = getContextMenuItems(rowData);
+            const wrappedRowElement = getContextMenuItems ? (
+              <TableContextMenu
+                key={row.id}
+                items={getContextMenuItems(rowData)}
+              >
+                {rowElement}
+              </TableContextMenu>
+            ) : (
+              rowElement
+            );
+
+            // If expanded, render both row and expanded content
+            if (expandedContent) {
               return (
-                <TableContextMenu key={row.id} items={contextMenuItems}>
-                  {rowElement}
-                </TableContextMenu>
+                <React.Fragment key={row.id}>
+                  {wrappedRowElement}
+                  {expandedContent}
+                </React.Fragment>
               );
             }
 
-            return rowElement;
+            return wrappedRowElement;
           })}
 
           {/* Bottom padding for virtualization */}

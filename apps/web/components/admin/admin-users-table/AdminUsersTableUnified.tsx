@@ -6,10 +6,10 @@ import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
-  AdminPageSizeSelect,
   type ContextMenuItemType,
   ExportCSVButton,
   TableBulkActionsToolbar,
@@ -303,37 +303,22 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
           </>
         }
         footer={
-          <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs text-secondary-token'>
-            <div className='flex items-center gap-2'>
-              <span>
-                Page {page} of {totalPages}
-              </span>
-              <span className='text-tertiary-token'>
-                {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()}
-              </span>
-            </div>
-            <div className='flex items-center gap-3'>
-              <AdminPageSizeSelect
-                initialPageSize={pageSize}
-                onPageSizeChange={nextPageSize => {
-                  router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-                }}
-              />
-              <div className='flex items-center gap-2'>
-                <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                  <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                    Previous
-                  </Link>
-                </Button>
-                <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                  <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                    Next
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </div>
+          <AdminTablePagination
+            page={page}
+            totalPages={totalPages}
+            from={from}
+            to={to}
+            total={total}
+            canPrev={canPrev}
+            canNext={canNext}
+            prevHref={prevHref}
+            nextHref={nextHref}
+            pageSize={pageSize}
+            onPageSizeChange={nextPageSize => {
+              router.push(buildHref({ page: 1, pageSize: nextPageSize }));
+            }}
+            entityLabel='users'
+          />
         }
       >
         {() => (
