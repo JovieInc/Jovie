@@ -7,6 +7,7 @@
 import { APP_NAME } from '@/constants/app';
 import { getAppUrl, getProfileUrl, PROFILE_URL } from '@/constants/domains';
 import { buildClaimInviteUnsubscribeUrl } from '@/lib/email/unsubscribe-token';
+import { escapeHtml } from '../utils';
 
 export interface ClaimInviteTemplateData {
   /** Creator's display name or username */
@@ -110,10 +111,13 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
     `
     : '';
 
-  const unsubscribeSection = unsubscribeUrl
+  // Escape unsubscribe URL for safe HTML attribute insertion
+  const safeUnsubscribeUrl = unsubscribeUrl ? escapeHtml(unsubscribeUrl) : null;
+
+  const unsubscribeSection = safeUnsubscribeUrl
     ? `
               <p style="margin: 12px 0 0; font-size: 11px; color: #bbb; text-align: center;">
-                <a href="${unsubscribeUrl}" style="color: #999; text-decoration: underline;">Unsubscribe from these emails</a>
+                <a href="${safeUnsubscribeUrl}" style="color: #999; text-decoration: underline;">Unsubscribe from these emails</a>
               </p>
     `
     : '';
