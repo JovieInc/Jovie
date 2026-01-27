@@ -8,6 +8,8 @@ import {
   createTourDate,
   deleteTourDate,
   disconnectBandsintown,
+  removeBandsintownApiKey,
+  saveBandsintownApiKey,
   syncFromBandsintown,
   updateTourDate,
 } from '@/app/app/dashboard/tour-dates/actions';
@@ -124,6 +126,38 @@ export function useDeleteTourDateMutation(profileId: string) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.tourDates.list(profileId),
+      });
+    },
+  });
+}
+
+/**
+ * Save Bandsintown API key mutation
+ */
+export function useSaveBandsintownApiKeyMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveBandsintownApiKey,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tourDates.connection(profileId),
+      });
+    },
+  });
+}
+
+/**
+ * Remove Bandsintown API key mutation
+ */
+export function useRemoveBandsintownApiKeyMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: removeBandsintownApiKey,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tourDates.connection(profileId),
       });
     },
   });

@@ -34,6 +34,7 @@ export function TourDatesManager({
   const [selectedTourDate, setSelectedTourDate] =
     useState<TourDateViewModel | null>(null);
   const [isConnected, setIsConnected] = useState(connectionStatus.connected);
+  const [hasApiKey, setHasApiKey] = useState(connectionStatus.hasApiKey);
 
   const syncMutation = useSyncFromBandsintownMutation(profileId);
   const disconnectMutation = useDisconnectBandsintownMutation(profileId);
@@ -108,12 +109,18 @@ export function TourDatesManager({
     setIsConnected(true);
   }, []);
 
+  const handleApiKeySaved = useCallback(() => {
+    setHasApiKey(true);
+  }, []);
+
   // Show empty state if no tour dates and not connected
   if (tourDates.length === 0 && !isConnected) {
     return (
       <TourDatesEmptyState
         profileId={profileId}
+        hasApiKey={hasApiKey}
         onConnected={handleConnected}
+        onApiKeySaved={handleApiKeySaved}
       />
     );
   }
