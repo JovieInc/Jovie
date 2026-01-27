@@ -15,31 +15,6 @@ export class ClerkTestError extends Error {
 }
 
 /**
- * Polls until Clerk is ready, with configurable timeout.
- * Returns true if Clerk initialized, false if timeout exceeded.
- */
-async function waitForClerkReady(
-  page: Page,
-  { timeout = 30000, pollInterval = 500 } = {}
-): Promise<boolean> {
-  const maxAttempts = Math.ceil(timeout / pollInterval);
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const isReady = await page
-      .evaluate(() => {
-        // @ts-expect-error - Clerk is attached to window at runtime
-        return !!(window.Clerk && window.Clerk.isReady());
-      })
-      .catch(() => false);
-
-    if (isReady) return true;
-    await page.waitForTimeout(pollInterval);
-  }
-
-  return false;
-}
-
-/**
  * Creates or reuses a Clerk test user session for the given email.
  *
  * Assumes the page has already loaded the app and Clerk has been initialized.
@@ -92,8 +67,14 @@ export async function createOrReuseTestUserSession(page: Page, email: string) {
 }
 
 /**
- * Authenticates a user in Clerk for E2E tests
- * This function handles the complete sign-in flow
+ * Authenticates a user in Clerk for E2E tests.
+ *
+ * Key requirements for Clerk testing:
+ * 1. clerkSetup() must be called in global-setup.ts first
+ * 2. Navigate to a page with ClerkProvider (e.g., /signin, NOT /)
+ * 3. Use password strategy for real test users, or email_code for +clerk_test emails
+ *
+ * @see https://clerk.com/docs/testing/playwright/test-helpers
  */
 export async function signInUser(
   page: Page,
@@ -117,46 +98,74 @@ export async function signInUser(
     );
   }
 
-  // Set up Clerk testing token to bypass bot protection
+  // Set up Clerk testing token BEFORE navigation
+  // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
 
-  // Initialize app and Clerk on the page
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // Navigate to a page that loads ClerkProvider
+  // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does
+  await page.goto('/signin', { waitUntil: 'domcontentloaded' });
 
-  // Wait for Clerk to be ready with retry logic for CDN issues
-  const clerkReady = await waitForClerkReady(page, { timeout: 30000 });
+  // Wait briefly for the page to settle and Clerk JS to start loading
+  await page.waitForTimeout(1000);
 
-  if (!clerkReady) {
-    throw new ClerkTestError(
-      'Clerk failed to initialize. This may be due to network issues loading Clerk JS from CDN.',
-      'CLERK_NOT_READY'
-    );
-  }
-
-  // Prefer the official Clerk testing helper.
-  // If the identifier is an email, use token-based sign-in.
-  if (username.includes('@')) {
-    await clerk.signIn({ page, emailAddress: username });
-  } else {
-    if (!password) {
+  try {
+    // Use the official Clerk testing helper
+    // For testing with a real test user that has a password, use password strategy
+    if (password) {
+      // Password authentication works with any identifier (email or username)
+      await clerk.signIn({
+        page,
+        signInParams: { strategy: 'password', identifier: username, password },
+      });
+    } else if (username.includes('+clerk_test')) {
+      // For test emails with +clerk_test suffix, use email_code strategy
+      // The testing token bypasses the actual email verification
+      await clerk.signIn({
+        page,
+        signInParams: {
+          strategy: 'email_code',
+          identifier: username,
+        },
+      });
+    } else {
       throw new ClerkTestError(
-        'E2E_CLERK_USER_PASSWORD is required when signing in with a non-email identifier.',
+        'E2E_CLERK_USER_PASSWORD is required for non-test email addresses. ' +
+          'Either provide a password or use an email with +clerk_test suffix.',
         'MISSING_CREDENTIALS'
       );
     }
+  } catch (error) {
+    // Check if Clerk JS even loaded
+    const clerkLoaded = await page
+      .evaluate(() => {
+        return typeof (window as { Clerk?: unknown }).Clerk !== 'undefined';
+      })
+      .catch(() => false);
 
-    await clerk.signIn({
-      page,
-      signInParams: { strategy: 'password', identifier: username, password },
-    });
+    if (!clerkLoaded) {
+      throw new ClerkTestError(
+        'Clerk failed to initialize. This may be due to network issues loading Clerk JS from CDN.',
+        'CLERK_NOT_READY'
+      );
+    }
+
+    // Re-throw the original error if Clerk was loaded but signIn failed
+    throw error;
   }
 
-  // Verify we're authenticated by checking for user button or dashboard
-  await expect(
-    page.locator(
-      '[data-clerk-element="userButton"], [data-testid="user-menu"], text="Dashboard"'
-    )
-  ).toBeVisible({ timeout: 10000 });
+  // After sign-in, navigate to the dashboard to verify authentication
+  // The signin page doesn't automatically redirect in test mode
+  await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
+
+  // Verify we're authenticated by checking for dashboard elements
+  const userButton = page.locator('[data-clerk-element="userButton"]');
+  const userMenu = page.locator('[data-testid="user-menu"]');
+  const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
+
+  await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
+    timeout: 15000,
+  });
 
   return page;
 }
