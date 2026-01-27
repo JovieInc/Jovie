@@ -41,6 +41,10 @@ function makeTempId(): string {
 /**
  * Toggle a territory for a contact with input sanitization.
  * Extracted to reduce nesting depth in handleToggleTerritory.
+ *
+ * Special handling for "Worldwide":
+ * - When Worldwide is selected, all other territories are removed
+ * - When any other territory is selected while Worldwide is active, Worldwide is removed
  */
 function toggleTerritoryForContact(
   contact: EditableContact,
@@ -48,9 +52,22 @@ function toggleTerritoryForContact(
   profileId: string
 ): EditableContact {
   const exists = contact.territories.includes(territory);
-  const nextTerritories = exists
-    ? contact.territories.filter(t => t !== territory)
-    : [...contact.territories, territory];
+
+  let nextTerritories: string[];
+
+  if (territory === 'Worldwide') {
+    // Toggle Worldwide: if already selected, remove it; otherwise set it as the only territory
+    nextTerritories = exists ? [] : ['Worldwide'];
+  } else if (exists) {
+    // Removing a non-Worldwide territory
+    nextTerritories = contact.territories.filter(t => t !== territory);
+  } else {
+    // Adding a non-Worldwide territory: remove Worldwide if present
+    nextTerritories = [
+      ...contact.territories.filter(t => t !== 'Worldwide'),
+      territory,
+    ];
+  }
 
   try {
     const sanitized = sanitizeContactInput({

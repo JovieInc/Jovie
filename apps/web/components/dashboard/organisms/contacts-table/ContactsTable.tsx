@@ -2,11 +2,14 @@
 
 import { Button } from '@jovie/ui';
 import { UserPlus } from 'lucide-react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { UnifiedTable } from '@/components/organisms/table';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
@@ -32,6 +35,48 @@ export const ContactsTable = memo(function ContactsTable({
     useState<EditableContact | null>(null);
 
   const columns = useMemo(() => createContactColumns(), []);
+
+  const isSidebarOpen = Boolean(selectedContact);
+
+  // Connect to tableMeta for drawer toggle button
+  const { setTableMeta } = useTableMeta();
+
+  // Use ref to avoid infinite loop - contacts array reference changes each render
+  const contactsRef = useRef(contacts);
+  contactsRef.current = contacts;
+
+  useEffect(() => {
+    // Toggle function: close if open, open first contact if closed
+    const toggle = () => {
+      if (selectedContact) {
+        setSelectedContact(null);
+      } else if (contactsRef.current.length > 0) {
+        setSelectedContact(contactsRef.current[0]);
+      }
+    };
+
+    setTableMeta({
+      rowCount: contacts.length,
+      toggle: contacts.length > 0 ? toggle : null,
+      rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [selectedContact, contacts.length, isSidebarOpen]);
+
+  // Set header actions (drawer toggle on right)
+  const { setHeaderActions } = useHeaderActions();
+
+  // Memoize drawer toggle to avoid creating new JSX on every render
+  const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
+
+  useEffect(() => {
+    setHeaderActions(drawerToggle);
+
+    return () => {
+      setHeaderActions(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
+  }, [drawerToggle]);
 
   const handleRowClick = useCallback((contact: EditableContact) => {
     setSelectedContact(contact);
