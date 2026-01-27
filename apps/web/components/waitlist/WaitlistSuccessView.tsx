@@ -9,7 +9,7 @@ export function WaitlistSuccessView() {
       showLogo={false}
       showFooterPrompt={false}
       showLogoutButton
-      logoutRedirectUrl='/signin'
+      logoutRedirectUrl='/sign-in'
       formTitleClassName='text-lg font-medium text-primary-token mb-4 text-center'
     >
       <p className='text-sm text-secondary-token text-center'>

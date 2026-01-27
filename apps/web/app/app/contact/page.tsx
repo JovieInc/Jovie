@@ -12,7 +12,7 @@ export default async function ContactPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/contact');
+    redirect('/sign-in?redirect_url=/app/contact');
   }
 
   const dashboardData = await getDashboardDataCached();

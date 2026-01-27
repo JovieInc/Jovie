@@ -443,7 +443,7 @@ export default function WaitlistPage() {
       showFooterPrompt={false}
       showLogo={false}
       showLogoutButton
-      logoutRedirectUrl='/signin'
+      logoutRedirectUrl='/sign-in'
     >
       <div className='w-full'>
         <form onSubmit={handleSubmit} className='space-y-4'>

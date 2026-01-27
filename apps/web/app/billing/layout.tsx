@@ -11,7 +11,7 @@ export default async function BillingLayout({
   // Ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
-    redirect('/signin');
+    redirect('/sign-in');
   }
 
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

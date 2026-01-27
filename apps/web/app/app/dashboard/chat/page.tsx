@@ -12,7 +12,7 @@ export default async function ChatPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/signin?redirect_url=/app/dashboard/chat');
+    redirect('/sign-in?redirect_url=/app/dashboard/chat');
   }
 
   const dashboardData = await getDashboardDataCached();

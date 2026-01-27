@@ -52,7 +52,7 @@ async function getAppUserId(): Promise<string> {
         });
       }
       console.warn('[app-layout] Missing clerkUserId, redirecting to signin');
-      redirect('/signin?redirect_url=/app/dashboard');
+      redirect('/sign-in?redirect_url=/app/dashboard');
     }
 
     // proxy.ts already ensured user is ACTIVE, just return userId
