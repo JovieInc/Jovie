@@ -31,7 +31,7 @@ export interface UseAvatarUploadReturn {
   handleDragLeave: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent) => void;
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  containerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
 export function useAvatarUpload({
@@ -48,7 +48,7 @@ export function useAvatarUpload({
   const [uploadStatus, setUploadStatus] = useState<AvatarUploadStatus>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLButtonElement>(null);
   const statusResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );

@@ -137,7 +137,7 @@ export function SearchableSubmenu({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const searchId = useId();
   const listId = useId();
 
@@ -273,7 +273,7 @@ export function SearchableSubmenu({
 
   // Track item refs for scrolling
   const setItemRef = useCallback(
-    (index: number) => (el: HTMLDivElement | null) => {
+    (index: number) => (el: HTMLButtonElement | null) => {
       if (el) {
         itemRefs.current.set(index, el);
       } else {
@@ -376,11 +376,40 @@ export function SearchableSubmenu({
             </div>
           </div>
 
+          <select
+            id={listId}
+            className='sr-only'
+            size={Math.min(flatItems.length, 8) || 1}
+            aria-label={`${triggerLabel} results`}
+            value={flatItems[highlightedIndex]?.id ?? ''}
+            onChange={event => {
+              const selectedItem = flatItems.find(
+                item => item.id === event.target.value
+              );
+              if (selectedItem) {
+                handleSelectItem(selectedItem);
+              }
+            }}
+          >
+            <option value='' disabled>
+              Select an item
+            </option>
+            {filteredSections.map(section => (
+              <optgroup key={section.id} label={section.label}>
+                {section.items.map(item => (
+                  <option key={item.id} id={`item-${item.id}`} value={item.id}>
+                    {item.label}
+                    {item.description ? ` — ${item.description}` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+
           {/* Scrollable Content */}
           <div
-            id={listId}
-            role='listbox'
             className='flex-1 overflow-y-auto overflow-x-hidden p-1.5 pt-0'
+            aria-hidden='true'
           >
             {isLoading && (
               <div className='flex items-center justify-center py-8'>
@@ -409,24 +438,16 @@ export function SearchableSubmenu({
                     const isHighlighted = currentIndex === highlightedIndex;
 
                     return (
-                      <div
+                      <button
                         key={item.id}
-                        id={`item-${item.id}`}
                         ref={setItemRef(currentIndex)}
-                        role='option'
+                        type='button'
                         tabIndex={-1}
-                        aria-selected={isHighlighted}
-                        aria-disabled={item.disabled}
                         data-highlighted={isHighlighted || undefined}
                         data-disabled={item.disabled || undefined}
                         onClick={() => handleSelectItem(item)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleSelectItem(item);
-                          }
-                        }}
                         onMouseEnter={() => setHighlightedIndex(currentIndex)}
+                        disabled={item.disabled}
                         className={cn(
                           MENU_ITEM_BASE,
                           'cursor-pointer',
@@ -456,7 +477,7 @@ export function SearchableSubmenu({
                             {item.shortcut}
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -516,7 +537,8 @@ export function SearchableList({
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const listId = useId();
 
   const filteredItems = useMemo(() => {
     return items.filter(item => filterFn(item, searchQuery));
@@ -564,7 +586,7 @@ export function SearchableList({
   );
 
   const setItemRef = useCallback(
-    (index: number) => (el: HTMLDivElement | null) => {
+    (index: number) => (el: HTMLButtonElement | null) => {
       if (el) {
         itemRefs.current.set(index, el);
       } else {
@@ -575,12 +597,7 @@ export function SearchableList({
   );
 
   return (
-    <div
-      className={cn('flex flex-col', className)}
-      role='listbox'
-      tabIndex={-1}
-      onKeyDown={handleKeyDown}
-    >
+    <div className={cn('flex flex-col', className)} tabIndex={-1}>
       {header}
 
       {/* Search Input */}
@@ -592,6 +609,7 @@ export function SearchableList({
           placeholder={searchPlaceholder}
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
           className={cn(
             'w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-3 text-sm',
             'text-primary-token placeholder:text-tertiary-token',
@@ -600,31 +618,50 @@ export function SearchableList({
         />
       </div>
 
+      <select
+        id={listId}
+        className='sr-only'
+        size={Math.min(filteredItems.length, 8) || 1}
+        aria-label='Search results'
+        value={filteredItems[highlightedIndex]?.id ?? ''}
+        onChange={event => {
+          const selectedItem = filteredItems.find(
+            item => item.id === event.target.value
+          );
+          if (selectedItem && !selectedItem.disabled) {
+            onSelect(selectedItem);
+          }
+        }}
+      >
+        <option value='' disabled>
+          Select an item
+        </option>
+        {filteredItems.map(item => (
+          <option key={item.id} id={`item-${item.id}`} value={item.id}>
+            {item.label}
+            {item.description ? ` — ${item.description}` : ''}
+          </option>
+        ))}
+      </select>
+
       {/* Items */}
-      <div className='flex-1 overflow-y-auto p-1.5 pt-0'>
+      <div className='flex-1 overflow-y-auto p-1.5 pt-0' aria-hidden='true'>
         {filteredItems.length === 0 ? (
           <div className='py-8 text-center text-sm text-tertiary-token'>
             {emptyMessage}
           </div>
         ) : (
           filteredItems.map((item, index) => (
-            <div
+            <button
               key={item.id}
               ref={setItemRef(index)}
-              role='option'
-              tabIndex={-1}
-              aria-selected={index === highlightedIndex}
-              aria-disabled={item.disabled}
               data-highlighted={index === highlightedIndex || undefined}
               data-disabled={item.disabled || undefined}
               onClick={() => !item.disabled && onSelect(item)}
-              onKeyDown={e => {
-                if ((e.key === 'Enter' || e.key === ' ') && !item.disabled) {
-                  e.preventDefault();
-                  onSelect(item);
-                }
-              }}
               onMouseEnter={() => setHighlightedIndex(index)}
+              type='button'
+              tabIndex={-1}
+              disabled={item.disabled}
               className={cn(
                 MENU_ITEM_BASE,
                 'cursor-pointer',
@@ -649,7 +686,7 @@ export function SearchableList({
                   {item.badge}
                 </span>
               )}
-            </div>
+            </button>
           ))
         )}
       </div>

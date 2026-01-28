@@ -144,7 +144,7 @@ function KanbanColumn<TData>({
   cardHeight,
   enableVirtualization,
 }: KanbanColumnProps<TData>) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLFieldSetElement>(null);
   const itemGap = 12; // 0.75rem to match `space-y-3` / `pb-3`
 
   const rowVirtualizer = useVirtualizer({
@@ -192,15 +192,13 @@ function KanbanColumn<TData>({
       </div>
 
       {/* Column Content */}
-      {/* NOSONAR S6819: role="group" is appropriate for kanban columns; <fieldset> has styling constraints */}
-      <div
+      <fieldset
         ref={containerRef}
-        className='flex-1 overflow-y-auto p-3'
+        className='flex-1 overflow-y-auto p-3 m-0 min-w-0 border-0'
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        role='group'
-        aria-label={`${column.title} column items`}
       >
+        <legend className='sr-only'>{`${column.title} column items`}</legend>
         {(() => {
           if (column.items.length === 0) {
             return (
@@ -281,7 +279,7 @@ function KanbanColumn<TData>({
             </ul>
           );
         })()}
-      </div>
+      </fieldset>
     </div>
   );
 }

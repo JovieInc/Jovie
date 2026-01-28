@@ -85,179 +85,164 @@ function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
  * - Feature flag controlled
  */
 export const AvatarUploadable = React.memo(
-  forwardRef<HTMLDivElement, AvatarUploadableProps>(function AvatarUploadable(
-    {
-      src,
-      uploadable = false,
-      onUpload,
-      progress = 0,
-      onError,
-      onSuccess,
-      onRetryableError,
-      maxFileSize = DEFAULT_MAX_FILE_SIZE,
-      acceptedTypes = DEFAULT_ACCEPTED_TYPES,
-      showHoverOverlay = true,
-      className,
-      ...avatarProps
-    },
-    forwardedRef
-  ) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const {
-      isDragOver,
-      isUploading,
-      uploadStatus,
-      uploadProgress,
-      previewUrl,
-      handleFileUpload,
-      handleDragEnter,
-      handleDragLeave,
-      handleDragOver,
-      handleDrop,
-      containerRef,
-    } = useAvatarUpload({
-      src,
-      onUpload,
-      onError,
-      onSuccess,
-      onRetryableError,
-      maxFileSize,
-      acceptedTypes,
-    });
-
-    const mergedRef = useMemo(
-      () => mergeRefs<HTMLDivElement>(containerRef, forwardedRef),
-      [containerRef, forwardedRef]
-    );
-
-    const avatarSize = avatarProps.size || 'md';
-    const numericSize = SIZE_MAP[avatarSize];
-    const acceptedTypeList = useMemo(
-      () => acceptedTypes.join(','),
-      [acceptedTypes]
-    );
-
-    const handleFileSelect = useCallback(
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-          handleFileUpload(file);
-        }
+  forwardRef<HTMLButtonElement, AvatarUploadableProps>(
+    function AvatarUploadable(
+      {
+        src,
+        uploadable = false,
+        onUpload,
+        progress = 0,
+        onError,
+        onSuccess,
+        onRetryableError,
+        maxFileSize = DEFAULT_MAX_FILE_SIZE,
+        acceptedTypes = DEFAULT_ACCEPTED_TYPES,
+        showHoverOverlay = true,
+        className,
+        ...avatarProps
       },
-      [handleFileUpload]
-    );
+      forwardedRef
+    ) {
+      const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleClick = useCallback(() => {
-      if (uploadable && onUpload && !isUploading) {
-        fileInputRef.current?.click();
-      }
-    }, [uploadable, onUpload, isUploading]);
+      const {
+        isDragOver,
+        isUploading,
+        uploadStatus,
+        uploadProgress,
+        previewUrl,
+        handleFileUpload,
+        handleDragEnter,
+        handleDragLeave,
+        handleDragOver,
+        handleDrop,
+        containerRef,
+      } = useAvatarUpload({
+        src,
+        onUpload,
+        onError,
+        onSuccess,
+        onRetryableError,
+        maxFileSize,
+        acceptedTypes,
+      });
 
-    const handleKeyDown = useCallback(
-      (e: React.KeyboardEvent) => {
-        if (
-          uploadable &&
-          onUpload &&
-          !isUploading &&
-          (e.key === 'Enter' || e.key === ' ')
-        ) {
-          e.preventDefault();
+      const mergedRef = useMemo(
+        () => mergeRefs<HTMLButtonElement>(containerRef, forwardedRef),
+        [containerRef, forwardedRef]
+      );
+
+      const avatarSize = avatarProps.size || 'md';
+      const numericSize = SIZE_MAP[avatarSize];
+      const acceptedTypeList = useMemo(
+        () => acceptedTypes.join(','),
+        [acceptedTypes]
+      );
+
+      const handleFileSelect = useCallback(
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            handleFileUpload(file);
+          }
+        },
+        [handleFileUpload]
+      );
+
+      const handleClick = useCallback(() => {
+        if (uploadable && onUpload && !isUploading) {
           fileInputRef.current?.click();
         }
-      },
-      [uploadable, onUpload, isUploading]
-    );
+      }, [uploadable, onUpload, isUploading]);
 
-    const computedProgress = useMemo(() => {
-      // Prefer internal upload progress when we manage the upload lifecycle
-      if (isUploading || uploadStatus !== 'idle') {
-        return uploadProgress;
-      }
-      return progress;
-    }, [isUploading, progress, uploadProgress, uploadStatus]);
+      const computedProgress = useMemo(() => {
+        // Prefer internal upload progress when we manage the upload lifecycle
+        if (isUploading || uploadStatus !== 'idle') {
+          return uploadProgress;
+        }
+        return progress;
+      }, [isUploading, progress, uploadProgress, uploadStatus]);
 
-    useEffect(() => {
-      if (isUploading && computedProgress > 0) {
-        track('avatar_upload_progress', { progress: computedProgress });
-      }
-    }, [computedProgress, isUploading]);
+      useEffect(() => {
+        if (isUploading && computedProgress > 0) {
+          track('avatar_upload_progress', { progress: computedProgress });
+        }
+      }, [computedProgress, isUploading]);
 
-    const canUpload = uploadable && Boolean(onUpload);
-    const isInteractive = canUpload && !isUploading;
-    const showProgress =
-      isUploading || uploadStatus === 'success' || uploadStatus === 'error';
-    const currentProgress =
-      uploadStatus === 'success' || uploadStatus === 'error'
-        ? 100
-        : computedProgress;
+      const canUpload = uploadable && Boolean(onUpload);
+      const isInteractive = canUpload && !isUploading;
+      const showProgress =
+        isUploading || uploadStatus === 'success' || uploadStatus === 'error';
+      const currentProgress =
+        uploadStatus === 'success' || uploadStatus === 'error'
+          ? 100
+          : computedProgress;
 
-    return (
-      // NOSONAR S6819 S6848: Dynamic role for complex file upload component; native <button> can't contain Avatar and handle drag-drop
-      <div
-        ref={mergedRef}
-        className={cn(
-          'relative group/avatar outline-none',
-          isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
-          className
-        )}
-        onDragEnter={canUpload ? handleDragEnter : undefined}
-        onDragLeave={canUpload ? handleDragLeave : undefined}
-        onDragOver={canUpload ? handleDragOver : undefined}
-        onDrop={canUpload ? handleDrop : undefined}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        tabIndex={isInteractive ? 0 : undefined}
-        role={isInteractive ? 'button' : 'presentation'}
-        aria-label={isInteractive ? 'Upload profile photo' : undefined}
-        aria-busy={isUploading || undefined}
-      >
-        <Avatar
-          src={previewUrl ?? src}
-          className={cn(
-            'transition-all duration-200 ease-out',
-            isInteractive &&
-              'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
-            isDragOver && 'scale-105',
-            isUploading && 'opacity-80'
+      return (
+        <>
+          <button
+            ref={mergedRef}
+            type='button'
+            className={cn(
+              'relative group/avatar outline-none',
+              isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
+              className
+            )}
+            onDragEnter={canUpload ? handleDragEnter : undefined}
+            onDragLeave={canUpload ? handleDragLeave : undefined}
+            onDragOver={canUpload ? handleDragOver : undefined}
+            onDrop={canUpload ? handleDrop : undefined}
+            onClick={handleClick}
+            aria-label={isInteractive ? 'Upload profile photo' : undefined}
+            aria-busy={isUploading || undefined}
+            disabled={!isInteractive}
+          >
+            <Avatar
+              src={previewUrl ?? src}
+              className={cn(
+                'transition-all duration-200 ease-out',
+                isInteractive &&
+                  'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
+                isDragOver && 'scale-105',
+                isUploading && 'opacity-80'
+              )}
+              {...avatarProps}
+            />
+
+            {isInteractive && showHoverOverlay && !isDragOver && (
+              <AvatarUploadOverlay iconSize={numericSize * 0.3} />
+            )}
+
+            {isDragOver && (
+              <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
+            )}
+
+            {showProgress && (
+              <AvatarProgressRing
+                progress={Math.min(100, Math.max(0, currentProgress))}
+                size={numericSize}
+                status={uploadStatus}
+              />
+            )}
+            <AvatarUploadAnnouncer
+              progress={computedProgress}
+              status={uploadStatus}
+            />
+          </button>
+          {canUpload && (
+            <input
+              ref={fileInputRef}
+              type='file'
+              accept={acceptedTypeList}
+              onChange={handleFileSelect}
+              className='sr-only'
+              aria-label='Choose profile photo file'
+            />
           )}
-          {...avatarProps}
-        />
-
-        {isInteractive && showHoverOverlay && !isDragOver && (
-          <AvatarUploadOverlay iconSize={numericSize * 0.3} />
-        )}
-
-        {isDragOver && (
-          <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
-        )}
-
-        {showProgress && (
-          <AvatarProgressRing
-            progress={Math.min(100, Math.max(0, currentProgress))}
-            size={numericSize}
-            status={uploadStatus}
-          />
-        )}
-
-        {canUpload && (
-          <input
-            ref={fileInputRef}
-            type='file'
-            accept={acceptedTypeList}
-            onChange={handleFileSelect}
-            className='sr-only'
-            aria-label='Choose profile photo file'
-          />
-        )}
-
-        <AvatarUploadAnnouncer
-          progress={computedProgress}
-          status={uploadStatus}
-        />
-      </div>
-    );
-  })
+        </>
+      );
+    }
+  )
 );
 
 AvatarUploadable.displayName = 'AvatarUploadable';

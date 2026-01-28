@@ -98,11 +98,8 @@ function PlatformSuggestionItem({
   const isDark = isBrandDark(iconHex);
 
   return (
-    // NOSONAR S6819: Custom option with icon and rich content; native <option> can't render this
     <button
-      id={optionId}
-      role='option'
-      aria-selected={active}
+      data-option-id={optionId}
       type='button'
       className={cn(
         'flex w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
@@ -224,6 +221,13 @@ export const UniversalLinkInput = forwardRef<
       if (!groupedSuggestions) return platformSuggestions;
       return groupedSuggestions.flatMap(group => group.options);
     }, [groupedSuggestions, platformSuggestions]);
+    const suggestionIndexById = useMemo(
+      () =>
+        new Map(
+          flatSuggestions.map((suggestion, index) => [suggestion.id, index])
+        ),
+      [flatSuggestions]
+    );
 
     // FloatingPortal for auto-suggest dropdown to escape overflow containers
     const { refs, floatingStyles } = useFloating({
@@ -288,70 +292,120 @@ export const UniversalLinkInput = forwardRef<
         />
 
         {shouldShowAutosuggest ? (
-          // NOSONAR S6819: Custom autocomplete requires ARIA listbox pattern; native <select> can't support search or custom styling
-          <FloatingPortal>
-            <div
-              ref={refs.setFloating}
-              style={floatingStyles}
+          <>
+            <select
               id={autosuggestListId}
-              role='listbox'
+              className='sr-only'
+              size={Math.max(Math.min(flatSuggestions.length, 8), 1)}
               aria-label='Platform suggestions'
-              tabIndex={-1}
-              className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
-              onMouseDown={event => {
-                event.preventDefault();
+              value={
+                activeSuggestionIndex >= 0 &&
+                flatSuggestions[activeSuggestionIndex]
+                  ? flatSuggestions[activeSuggestionIndex].id
+                  : ''
+              }
+              onChange={event => {
+                const selectedOption = flatSuggestions.find(
+                  option => option.id === event.target.value
+                );
+                if (selectedOption) {
+                  commitPlatformSelection(selectedOption);
+                }
               }}
             >
+              <option value='' disabled>
+                Select a platform
+              </option>
               {groupedSuggestions
-                ? // Grouped view for short queries (popular platforms by category)
-                  groupedSuggestions.map((group, groupIndex) => {
-                    const groupStartIndex = flatSuggestions.findIndex(
-                      opt => opt.id === group.options[0]?.id
-                    );
-                    return (
-                      <div key={group.category}>
-                        {/* Divider between categories (not before first) */}
-                        {groupIndex > 0 && (
-                          <div className='mx-3 my-1 border-t border-default' />
-                        )}
-                        <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
-                          {group.label}
+                ? groupedSuggestions.map(group => (
+                    <optgroup key={group.category} label={group.label}>
+                      {group.options.map(option => {
+                        const optionIndex =
+                          suggestionIndexById.get(option.id) ?? 0;
+                        return (
+                          <option
+                            key={option.id}
+                            id={`${autosuggestListId}-option-${optionIndex}`}
+                            value={option.id}
+                          >
+                            {option.name} — {option.hint}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  ))
+                : platformSuggestions.map((option, index) => (
+                    <option
+                      key={option.id}
+                      id={`${autosuggestListId}-option-${index}`}
+                      value={option.id}
+                    >
+                      {option.name} — {option.hint}
+                    </option>
+                  ))}
+            </select>
+            <FloatingPortal>
+              <div
+                ref={refs.setFloating}
+                style={floatingStyles}
+                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
+                onMouseDown={event => {
+                  event.preventDefault();
+                }}
+                aria-hidden='true'
+              >
+                {groupedSuggestions
+                  ? // Grouped view for short queries (popular platforms by category)
+                    groupedSuggestions.map((group, groupIndex) => {
+                      const groupStartIndex = flatSuggestions.findIndex(
+                        opt => opt.id === group.options[0]?.id
+                      );
+                      return (
+                        <div key={group.category}>
+                          {/* Divider between categories (not before first) */}
+                          {groupIndex > 0 && (
+                            <div className='mx-3 my-1 border-t border-default' />
+                          )}
+                          <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                            {group.label}
+                          </div>
+                          {group.options.map((option, indexInGroup) => {
+                            const globalIndex = groupStartIndex + indexInGroup;
+                            const active =
+                              globalIndex === activeSuggestionIndex;
+                            return (
+                              <PlatformSuggestionItem
+                                key={option.id}
+                                option={option}
+                                active={active}
+                                optionId={`${autosuggestListId}-option-${globalIndex}`}
+                                onMouseEnter={() =>
+                                  setActiveSuggestionIndex(globalIndex)
+                                }
+                                onClick={() => commitPlatformSelection(option)}
+                              />
+                            );
+                          })}
                         </div>
-                        {group.options.map((option, indexInGroup) => {
-                          const globalIndex = groupStartIndex + indexInGroup;
-                          const active = globalIndex === activeSuggestionIndex;
-                          return (
-                            <PlatformSuggestionItem
-                              key={option.id}
-                              option={option}
-                              active={active}
-                              optionId={`${autosuggestListId}-option-${globalIndex}`}
-                              onMouseEnter={() =>
-                                setActiveSuggestionIndex(globalIndex)
-                              }
-                              onClick={() => commitPlatformSelection(option)}
-                            />
-                          );
-                        })}
-                      </div>
-                    );
-                  })
-                : // Flat view for longer queries (fuzzy matched results)
-                  platformSuggestions.map((option, index) => {
-                    const active = index === activeSuggestionIndex;
-                    return (
-                      <PlatformSuggestionItem
-                        key={option.id}
-                        option={option}
-                        active={active}
-                        optionId={`${autosuggestListId}-option-${index}`}
-                        onMouseEnter={() => setActiveSuggestionIndex(index)}
-                        onClick={() => commitPlatformSelection(option)}
-                      />
-                    );
-                  })}
-            </div>
-          </FloatingPortal>
+                      );
+                    })
+                  : // Flat view for longer queries (fuzzy matched results)
+                    platformSuggestions.map((option, index) => {
+                      const active = index === activeSuggestionIndex;
+                      return (
+                        <PlatformSuggestionItem
+                          key={option.id}
+                          option={option}
+                          active={active}
+                          optionId={`${autosuggestListId}-option-${index}`}
+                          onMouseEnter={() => setActiveSuggestionIndex(index)}
+                          onClick={() => commitPlatformSelection(option)}
+                        />
+                      );
+                    })}
+              </div>
+            </FloatingPortal>
+          </>
         ) : null}
 
         {/* Multi-link paste dialog */}
