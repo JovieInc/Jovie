@@ -78,42 +78,6 @@ function getDashboardUrl(hostname: string): string {
   return '/';
 }
 
-const EU_EEA_UK = [
-  'AT',
-  'BE',
-  'BG',
-  'HR',
-  'CY',
-  'CZ',
-  'DK',
-  'EE',
-  'FI',
-  'FR',
-  'DE',
-  'GR',
-  'HU',
-  'IS',
-  'IE',
-  'IT',
-  'LV',
-  'LI',
-  'LT',
-  'LU',
-  'MT',
-  'NL',
-  'NO',
-  'PL',
-  'PT',
-  'RO',
-  'SK',
-  'SI',
-  'ES',
-  'SE',
-  'GB',
-];
-const US_STATES = ['CA', 'CO', 'VA', 'CT', 'UT'];
-const CA_PROVINCES = ['QC'];
-
 const CLERK_SENSITIVE_PATTERNS = [
   'dummy',
   'mock',
@@ -144,26 +108,54 @@ const generateNonce = () => {
 };
 
 async function handleRequest(req: NextRequest, userId: string | null) {
-  await ensureSentry();
   try {
     // Start performance timing
     const startTime = Date.now();
 
-    const nonce = generateNonce();
     const requestHeaders = new Headers(req.headers);
-    requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
-    const contentSecurityPolicy = buildContentSecurityPolicy({ nonce });
-    // Compute CSP report URI once and pass to report-only builder
-    const cspReportUri = getCspReportUri();
-    const contentSecurityPolicyReportOnly =
-      buildContentSecurityPolicyReportOnly({
-        nonce,
-        reportUri: cspReportUri,
-      });
 
     // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
     const isSensitiveAPI = pathname.startsWith('/api/link/');
+
+    // Only generate a per-request CSP nonce for app/protected routes.
+    // Marketing pages are intended to be statically cached and should not
+    // depend on request-specific headers.
+    const needsNonce =
+      pathname.startsWith('/api/') ||
+      pathname === '/app' ||
+      pathname.startsWith('/app/') ||
+      pathname === '/admin' ||
+      pathname.startsWith('/admin/') ||
+      pathname === '/onboarding' ||
+      pathname.startsWith('/onboarding/') ||
+      pathname === '/settings' ||
+      pathname.startsWith('/settings/') ||
+      pathname === '/billing' ||
+      pathname.startsWith('/billing/') ||
+      pathname === '/account' ||
+      pathname.startsWith('/account/') ||
+      pathname === '/waitlist' ||
+      pathname.startsWith('/waitlist/');
+
+    const nonce = needsNonce ? generateNonce() : null;
+    if (nonce) {
+      await ensureSentry();
+      requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
+    }
+
+    const contentSecurityPolicy = nonce
+      ? buildContentSecurityPolicy({ nonce })
+      : null;
+
+    // Compute CSP report URI once and pass to report-only builder
+    const cspReportUri = nonce ? getCspReportUri() : null;
+    const contentSecurityPolicyReportOnly = nonce
+      ? buildContentSecurityPolicyReportOnly({
+          nonce,
+          reportUri: cspReportUri,
+        })
+      : null;
 
     // Block Sentry example pages in production (dev-only testing routes)
     if (
@@ -287,25 +279,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         }
       }
     }
-
-    // Safely access geo information
-    let country = '';
-    let region = '';
-    try {
-      const geo = (req as { geo?: { country?: string; region?: string } }).geo;
-      if (geo && typeof geo === 'object') {
-        country = geo.country || '';
-        region = geo.region || '';
-      }
-    } catch {
-      // Ignore geo errors
-    }
-
-    let showBanner = false;
-    if (EU_EEA_UK.includes(country)) showBanner = true;
-    else if (country === 'US' && US_STATES.includes(region)) showBanner = true;
-    else if (country === 'CA' && CA_PROVINCES.includes(region))
-      showBanner = true;
 
     let res: NextResponse;
 
@@ -478,10 +451,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
     }
 
-    if (showBanner) {
-      res.headers.set('x-show-cookie-banner', '1');
-    }
-
     if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
       res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
         httpOnly: true,
@@ -505,7 +474,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Add performance monitoring headers
     const duration = Date.now() - startTime;
     res.headers.set('Server-Timing', `middleware;dur=${duration}`);
-    res.headers.set('Content-Security-Policy', contentSecurityPolicy);
+    if (contentSecurityPolicy) {
+      res.headers.set('Content-Security-Policy', contentSecurityPolicy);
+    }
 
     // Add CSP violation reporting headers (report-only mode)
     if (contentSecurityPolicyReportOnly && cspReportUri) {

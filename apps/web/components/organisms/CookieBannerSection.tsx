@@ -22,8 +22,22 @@ export interface CookieBannerSectionProps {
 export function CookieBannerSection({
   showBanner = true,
 }: CookieBannerSectionProps) {
-  const [visible, setVisible] = useState(showBanner);
+  const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
+
+  useEffect(() => {
+    if (!showBanner) {
+      setVisible(false);
+      return;
+    }
+
+    try {
+      const existing = localStorage.getItem('jv_cc');
+      setVisible(!existing);
+    } catch {
+      setVisible(true);
+    }
+  }, [showBanner]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !window.JVConsent) {
@@ -54,6 +68,11 @@ export function CookieBannerSection({
   const acceptAll = async () => {
     const consent = { essential: true, analytics: true, marketing: true };
     await saveConsent(consent);
+    try {
+      localStorage.setItem('jv_cc', JSON.stringify(consent));
+    } catch {
+      // ignore
+    }
     window.JVConsent?._emit(consent);
     setVisible(false);
   };
@@ -61,6 +80,11 @@ export function CookieBannerSection({
   const reject = async () => {
     const consent = { essential: true, analytics: false, marketing: false };
     await saveConsent(consent);
+    try {
+      localStorage.setItem('jv_cc', JSON.stringify(consent));
+    } catch {
+      // ignore
+    }
     window.JVConsent?._emit(consent);
     setVisible(false);
   };
@@ -89,6 +113,11 @@ export function CookieBannerSection({
           open={customize}
           onClose={() => setCustomize(false)}
           onSave={c => {
+            try {
+              localStorage.setItem('jv_cc', JSON.stringify(c));
+            } catch {
+              // ignore
+            }
             window.JVConsent?._emit(c);
             setVisible(false);
           }}

@@ -62,9 +62,16 @@ export function useDashboardAnalyticsQuery({
   staleTime = 5000,
   enabled = true,
 }: DashboardAnalyticsOptions = {}) {
+  // Normalize analytics requests to a shared cache key so parallel views
+  // (overview cards + analytics page) reuse the same in-flight request.
+  const cacheRange = range;
+  const requestView: DashboardAnalyticsView =
+    view === 'traffic' ? 'full' : view;
+
   return useQuery({
-    queryKey: queryKeys.dashboard.analytics(view, range),
-    queryFn: ({ signal }) => fetchDashboardAnalytics(range, view, signal),
+    queryKey: queryKeys.dashboard.analytics(cacheRange),
+    queryFn: ({ signal }) =>
+      fetchDashboardAnalytics(cacheRange, requestView, signal),
     staleTime,
     gcTime: 30 * 60 * 1000, // 30 minutes
     retry: 3,
