@@ -39,27 +39,48 @@
  * Validate if a string is a valid IPv4 or IPv6 address
  */
 export function isValidIP(ip: string): boolean {
-  // Complexity required to properly validate IPv4 octet ranges (0-255)
-  const ipv4Regex = // NOSONAR S5843
-    /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  if (ipv4Regex.test(ip)) {
-    return true;
+  return isValidIPv4(ip) || isValidIPv6(ip);
+}
+
+function isValidIPv4(ip: string): boolean {
+  if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+    return false;
   }
 
-  // IPv6 validation (simplified - covers most common formats)
-  const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  if (ipv6Regex.test(ip)) {
-    return true;
+  const octets = ip.split('.');
+  return octets.every(octet => {
+    const value = Number.parseInt(octet, 10);
+    return Number.isInteger(value) && value >= 0 && value <= 255;
+  });
+}
+
+function isValidIPv6(ip: string): boolean {
+  if (!/^[0-9a-fA-F:]+$/.test(ip)) {
+    return false;
   }
 
-  // IPv6 compressed format (with ::)
-  const ipv6CompressedRegex =
-    /^((?:[0-9a-fA-F]{1,4}:)*)::((?:[0-9a-fA-F]{1,4}:)*)([0-9a-fA-F]{1,4})?$/;
-  if (ipv6CompressedRegex.test(ip)) {
-    return true;
+  const doubleColonIndex = ip.indexOf('::');
+  if (doubleColonIndex !== -1 && doubleColonIndex !== ip.lastIndexOf('::')) {
+    return false;
   }
 
-  return false;
+  const parts = ip.split('::');
+  const left = parts[0]?.split(':').filter(Boolean) ?? [];
+  const right = parts[1]?.split(':').filter(Boolean) ?? [];
+
+  if (!left.every(isValidIPv6Segment) || !right.every(isValidIPv6Segment)) {
+    return false;
+  }
+
+  if (parts.length === 1) {
+    return left.length === 8;
+  }
+
+  return left.length + right.length < 8;
+}
+
+function isValidIPv6Segment(segment: string): boolean {
+  return /^[0-9a-fA-F]{1,4}$/.test(segment);
 }
 
 /**
