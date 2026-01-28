@@ -13,7 +13,7 @@ import { type DbType, db, type TransactionType } from './index';
 
 /** Escape single quotes for SQL string literals */
 function escapeSql(value: string): string {
-  return value.replace(/'/g, "''");
+  return value.replaceAll("'", "''");
 }
 
 // Maximum batch size to prevent memory issues and timeout
