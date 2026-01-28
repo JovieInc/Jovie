@@ -188,6 +188,7 @@ export const AvatarUploadable = React.memo(
               isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
               className
             )}
+            tabIndex={isInteractive ? 0 : -1}
             onDragEnter={canUpload ? handleDragEnter : undefined}
             onDragLeave={canUpload ? handleDragLeave : undefined}
             onDragOver={canUpload ? handleDragOver : undefined}

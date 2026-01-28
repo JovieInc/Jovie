@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { memo, type ReactNode } from 'react';
+import { memo, type ReactNode, useMemo } from 'react';
 import { HeroSection } from '@/components/organisms/HeroSection';
 import { FEATURE_FLAGS, useFeatureFlagWithLoading } from '@/lib/analytics';
 import { ClaimHandleForm } from './ClaimHandleForm';
@@ -46,7 +46,18 @@ export const HomeHero = memo(function HomeHero({
   );
 
   const defaultSubtitle = subtitle ?? 'Your Jovie profile, ready in seconds.';
-  const content = getHeroContent(loading, showClaimHandle);
+  const content = useMemo(
+    () => getHeroContent(loading, showClaimHandle),
+    [loading, showClaimHandle]
+  );
+  const trustIndicators = useMemo(
+    () => (
+      <p className='text-xs text-gray-400 dark:text-white/40 font-medium'>
+        Trusted by 10,000+ artists worldwide
+      </p>
+    ),
+    []
+  );
 
   return (
     <HeroSection
@@ -55,11 +66,7 @@ export const HomeHero = memo(function HomeHero({
       gradientVariant='primary'
       subtitle={defaultSubtitle}
       supportingText='Go live in 60 seconds • Free forever'
-      trustIndicators={
-        <p className='text-xs text-gray-400 dark:text-white/40 font-medium'>
-          Trusted by 10,000+ artists worldwide
-        </p>
-      }
+      trustIndicators={trustIndicators}
     >
       {content}
     </HeroSection>
