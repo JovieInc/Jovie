@@ -71,20 +71,14 @@ const WITH_INLINE_PATTERN = /\bwith\b/gi;
  * Pattern to match "with" credits
  * Matches: "(with X)", "with X"
  */
-const WITH_PATTERN =
-  /(?:[([]\s*\bwith\b\s+([^)\]]+?)\s*[)\]])|(?:\bwith\s+([^()[\]]+))/gi;
+const VS_SEPARATOR_PATTERN = /\s+(?:vs\.?|versus)\s+/i;
+const AND_SEPARATOR_PATTERN = /\s+(?:&|and|x)\s+/i;
 
 /**
  * Pattern to match "vs" credits in artist names
  * Matches: "X vs Y", "X vs. Y", "X versus Y"
  */
-const VS_PATTERN = /\s+(?:vs\.?|versus)\s+/i;
-
-/**
- * Pattern to match "&", "and", "x" between artist names
- * Note: "x" is tricky - only match when surrounded by spaces to avoid false positives
- */
-const AND_PATTERN = /\s+(?:&|and|\s+x\s+)\s+/i;
+const BRACKET_BOUNDARY_PATTERN = /[()[\]]/;
 
 // ============================================================================
 // Utility Functions
@@ -153,7 +147,30 @@ function getInlineFeaturedSegments(title: string): string[] {
   ) {
     const startIndex = match.index + match[0].length;
     const remaining = titleWithoutBrackets.slice(startIndex);
-    const boundaryIndex = remaining.search(/[()[\]]/);
+    const boundaryIndex = remaining.search(BRACKET_BOUNDARY_PATTERN);
+    const rawSegment =
+      boundaryIndex === -1 ? remaining : remaining.slice(0, boundaryIndex);
+    const cleaned = rawSegment.replace(/^[.\-–:]\s*/, '').trim();
+
+    if (cleaned) {
+      segments.push(cleaned);
+    }
+  }
+
+  return segments;
+}
+
+function getInlineWithSegments(title: string): string[] {
+  const segments: string[] = [];
+  BRACKET_SEGMENT_PATTERN.lastIndex = 0;
+  const titleWithoutBrackets = title.replace(BRACKET_SEGMENT_PATTERN, ' ');
+
+  WITH_INLINE_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = WITH_INLINE_PATTERN.exec(titleWithoutBrackets)) !== null) {
+    const startIndex = match.index + match[0].length;
+    const remaining = titleWithoutBrackets.slice(startIndex);
+    const boundaryIndex = remaining.search(BRACKET_BOUNDARY_PATTERN);
     const rawSegment =
       boundaryIndex === -1 ? remaining : remaining.slice(0, boundaryIndex);
     const cleaned = rawSegment.replace(/^[.\-–:]\s*/, '').trim();
@@ -197,7 +214,7 @@ function stripInlineCredits(title: string, keywordPattern: RegExp): string {
     const startIndex = match.index;
     const afterStart = startIndex + match[0].length;
     const remaining = title.slice(afterStart);
-    const boundaryIndex = remaining.search(/[()[\]]/);
+    const boundaryIndex = remaining.search(BRACKET_BOUNDARY_PATTERN);
     const endIndex =
       boundaryIndex === -1 ? title.length : afterStart + boundaryIndex;
 
@@ -357,15 +374,25 @@ export function extractFeatured(title: string): ParsedArtistCredit[] {
  */
 export function extractWith(title: string): ParsedArtistCredit[] {
   const withArtists: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
 
-  WITH_PATTERN.lastIndex = 0;
+  const bracketedSegments = getBracketedSegments(title);
+  const inlineSegments = getInlineWithSegments(title);
+  const allSegments = [
+    ...bracketedSegments
+      .map(segment => segment.trim())
+      .filter(segment => WITH_KEYWORD_PATTERN.test(segment))
+      .map(segment =>
+        segment
+          .replace(WITH_KEYWORD_PATTERN, '')
+          .replace(/^[.\-–:]\s*/, '')
+          .trim()
+      )
+      .filter(Boolean),
+    ...inlineSegments,
+  ];
 
-  while ((match = WITH_PATTERN.exec(title)) !== null) {
-    const withPart = match[1] ?? match[2];
-    if (!withPart) continue;
-
+  for (const withPart of allSegments) {
     const artistNames = splitByConjunction(withPart);
 
     for (const artistName of artistNames) {
@@ -401,19 +428,19 @@ export function splitByConjunction(artistString: string): string[] {
 
 // Helper to split "vs" pattern in artist name
 function splitVsName(name: string): string[] | null {
-  if (!VS_PATTERN.test(name)) return null;
+  if (!VS_SEPARATOR_PATTERN.test(name)) return null;
   return name
-    .split(VS_PATTERN)
+    .split(VS_SEPARATOR_PATTERN)
     .map(p => p.trim())
     .filter(Boolean);
 }
 
 // Helper to split conjunction pattern in artist name
 function splitMainConjunctionName(name: string): string[] | null {
-  if (!AND_PATTERN.test(name)) return null;
+  if (!AND_SEPARATOR_PATTERN.test(name)) return null;
 
   const parts = name
-    .split(AND_PATTERN)
+    .split(AND_SEPARATOR_PATTERN)
     .map(p => p.trim())
     .filter(Boolean);
 

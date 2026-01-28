@@ -39,10 +39,14 @@
  * Validate if a string is a valid IPv4 or IPv6 address
  */
 export function isValidIP(ip: string): boolean {
-  const ipv4BasicPattern = /^\d{1,3}(?:\.\d{1,3}){3}$/;
-  if (ipv4BasicPattern.test(ip)) {
-    const octets = ip.split('.');
+  const ipv4AllowedPattern = /^[0-9.]+$/;
+  const octets = ip.split('.');
+
+  if (ipv4AllowedPattern.test(ip) && octets.length === 4) {
     const isValidIPv4 = octets.every(octet => {
+      if (!octet || octet.length > 3) {
+        return false;
+      }
       const value = Number(octet);
       return Number.isInteger(value) && value >= 0 && value <= 255;
     });
@@ -56,7 +60,12 @@ export function isValidIP(ip: string): boolean {
 }
 
 function isValidIPv6(ip: string): boolean {
+  const ipv6AllowedPattern = /^[0-9a-fA-F:]+$/;
   const segmentPattern = /^[0-9a-fA-F]{1,4}$/;
+
+  if (!ipv6AllowedPattern.test(ip)) {
+    return false;
+  }
 
   if (ip.includes('::')) {
     if (ip.indexOf('::') !== ip.lastIndexOf('::')) {
