@@ -758,16 +758,21 @@ export function UnifiedTable<TData>({
                   );
 
                   // Check if row is expanded and has expanded content
-                  const rowId = getExpandableRowId
-                    ? getExpandableRowId(rowData)
-                    : getRowId
-                      ? getRowId(rowData)
-                      : row.id;
+                  let rowId = row.id;
+                  if (getRowId) {
+                    rowId = getRowId(rowData);
+                  }
+                  if (getExpandableRowId) {
+                    rowId = getExpandableRowId(rowData);
+                  }
                   const isExpanded = expandedRowIds?.has(rowId);
-                  const expandedContent =
-                    isExpanded && renderExpandedContent
-                      ? renderExpandedContent(rowData, columns.length)
-                      : null;
+                  let expandedContent: React.ReactNode = null;
+                  if (isExpanded && renderExpandedContent) {
+                    expandedContent = renderExpandedContent(
+                      rowData,
+                      columns.length
+                    );
+                  }
 
                   // Wrap with context menu if provided
                   const wrappedRowElement = getContextMenuItems ? (
@@ -894,16 +899,18 @@ export function UnifiedTable<TData>({
             );
 
             // Check if row is expanded and has expanded content
-            const rowId = getExpandableRowId
-              ? getExpandableRowId(rowData)
-              : getRowId
-                ? getRowId(rowData)
-                : row.id;
+            let rowId = row.id;
+            if (getRowId) {
+              rowId = getRowId(rowData);
+            }
+            if (getExpandableRowId) {
+              rowId = getExpandableRowId(rowData);
+            }
             const isExpanded = expandedRowIds?.has(rowId);
-            const expandedContent =
-              isExpanded && renderExpandedContent
-                ? renderExpandedContent(rowData, columnCount)
-                : null;
+            let expandedContent: React.ReactNode = null;
+            if (isExpanded && renderExpandedContent) {
+              expandedContent = renderExpandedContent(rowData, columnCount);
+            }
 
             // Wrap with context menu if provided
             const wrappedRowElement = getContextMenuItems ? (
