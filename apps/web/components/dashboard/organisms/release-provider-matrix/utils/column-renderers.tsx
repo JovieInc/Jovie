@@ -436,29 +436,19 @@ export function renderStatsCell({
   row,
 }: CellContext<ReleaseViewModel, unknown>) {
   const release = row.original;
-
-  // Extract year from release date
   const year = release.releaseDate
     ? new Date(release.releaseDate).getFullYear()
     : null;
 
-  // Format duration
-  const duration = release.totalDurationMs
-    ? formatDuration(release.totalDurationMs)
-    : null;
-
   return (
     <div className='flex items-center gap-2 text-xs text-secondary-token tabular-nums'>
-      {/* Year - fixed width, right aligned */}
-      <span className='w-10 text-right'>{year ?? '—'}</span>
-
-      {/* Popularity icon - compact bars */}
+      {/* Popularity icon first */}
       <div className='w-4 flex justify-center'>
         <PopularityIcon popularity={release.spotifyPopularity} />
       </div>
 
-      {/* Duration - fixed width, right aligned */}
-      <span className='w-12 text-right'>{duration ?? '—'}</span>
+      {/* Year - fixed width, right aligned */}
+      <span className='w-10 text-right'>{year ?? '—'}</span>
     </div>
   );
 }

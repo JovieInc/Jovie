@@ -76,8 +76,7 @@ export function useContactSave({
       return updatedContact;
     },
     onSuccess: async (updatedContact, contact) => {
-      const toastId = toast.loading('Saving contact...');
-      toast.success('Contact saved', { id: toastId });
+      toast.success('Contact saved', { id: 'admin-contact-save' });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.creators.socialLinks(contact.id ?? ''),
       });
@@ -96,7 +95,8 @@ export function useContactSave({
 
   const saveContact = useCallback(
     async (contact: Contact): Promise<boolean> => {
-      const toastId = toast.loading('Saving contact...');
+      const toastId = 'admin-contact-save';
+      toast.loading('Saving contact...', { id: toastId });
       try {
         const updatedContact = await mutateAsync(contact);
         toast.success('Contact saved', { id: toastId });

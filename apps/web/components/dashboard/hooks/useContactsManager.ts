@@ -255,7 +255,7 @@ export function useContactsManager({
           return next;
         });
 
-        toast.success('Contact saved');
+        toast.success('Contact saved', { id: 'contact-save' });
         track(
           isNewContact
             ? 'contacts_contact_created'

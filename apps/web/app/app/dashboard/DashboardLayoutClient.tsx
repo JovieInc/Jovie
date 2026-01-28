@@ -137,14 +137,19 @@ export default function DashboardLayoutClient({
       pathname?.startsWith('/app/dashboard/profile') ?? false;
     const isAudienceRoute =
       pathname?.startsWith('/app/dashboard/audience') ?? false;
+    const isContactsRoute =
+      pathname?.startsWith('/app/dashboard/contacts') ?? false;
     const isFullWidthRoute =
       pathname?.startsWith('/app/admin/creators') ||
       pathname?.startsWith('/app/admin/users') ||
       pathname?.startsWith('/app/admin/waitlist') ||
       isAudienceRoute ||
+      isContactsRoute ||
       pathname?.startsWith('/app/dashboard/releases');
     const isContactTableRoute =
-      pathname?.startsWith('/app/admin/creators') || isAudienceRoute;
+      pathname?.startsWith('/app/admin/creators') ||
+      isAudienceRoute ||
+      isContactsRoute;
 
     return {
       isAppDashboardRoute,
@@ -152,6 +157,7 @@ export default function DashboardLayoutClient({
       isAdminRoute,
       isProfileRoute,
       isAudienceRoute,
+      isContactsRoute,
       isFullWidthRoute,
       isContactTableRoute,
     };

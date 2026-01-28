@@ -179,14 +179,17 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+            className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
             Display
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent align='end' className='w-56 p-0'>
+      <PopoverContent
+        align='end'
+        className='w-56 p-0 rounded-lg border border-subtle bg-white dark:bg-surface-2 shadow-lg'
+      >
         {/* View options */}
         {(onShowTracksChange || onGroupByYearChange) && (
           <div className='border-b border-subtle px-2.5 py-2 space-y-2'>
@@ -281,20 +284,20 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-base px-4 py-1.5'>
-      {/* Left: Release view toggle + Filter dropdown */}
+    <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-1.5'>
+      {/* Left: Filter first, then release view toggle */}
       <div className='flex items-center gap-2'>
+        <ReleaseFilterDropdown
+          filters={filters}
+          onFiltersChange={onFiltersChange}
+          counts={counts}
+        />
         {onReleaseViewChange && (
           <ReleaseViewSegmentedControl
             value={releaseView}
             onChange={onReleaseViewChange}
           />
         )}
-        <ReleaseFilterDropdown
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          counts={counts}
-        />
       </div>
 
       {/* Right: Display + Export */}
@@ -316,7 +319,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label={selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'}
           variant='ghost'
           size='sm'
-          className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2/50 hover:text-primary-token'
+          className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
         />
       </div>
     </div>

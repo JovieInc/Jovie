@@ -46,7 +46,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses design token (--color-border-default) for consistency across themes
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-surface-3 p-0.5 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-white dark:bg-surface-3 p-0.5 text-primary-token';
 
 /**
  * Shadow effect for elevated appearance
@@ -143,7 +143,7 @@ export const popoverContentClasses = [
 export const selectContentClasses = [
   'relative z-50',
   SELECT_MAX_HEIGHT,
-  'min-w-[8rem] overflow-hidden rounded-lg border border-subtle bg-surface-3 p-0.5 text-primary-token',
+  'min-w-[8rem] overflow-hidden rounded-lg border border-subtle bg-white dark:bg-surface-3 p-0.5 text-primary-token',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -160,14 +160,14 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] outline-none ' +
+  'relative flex cursor-default select-none items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-secondary-token hover:bg-white/5 hover:text-primary-token ' +
-  'data-highlighted:bg-white/5 data-highlighted:text-primary-token ' +
+  'text-[#1f1f1f] hover:bg-[#f2f2f2] dark:hover:bg-white/5 hover:text-[#1f1f1f] ' +
+  'data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-white/5 data-highlighted:text-[#1f1f1f] ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
-  'focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-3) ' +
-  '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
-  'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
+  'focus-ring-themed focus-visible:ring-offset-0 ' +
+  '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-neutral-500 ' +
+  'hover:[&_svg]:text-neutral-600 data-highlighted:[&_svg]:text-neutral-600';
 
 /**
  * Destructive variant for menu items (delete, remove actions)
@@ -181,12 +181,12 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-md py-1 pl-8 pr-2 text-[12.5px] font-medium leading-[16px] outline-none ' +
+  'relative flex cursor-default select-none items-center rounded-lg py-2 pl-9 pr-3 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-secondary-token hover:bg-white/5 hover:text-primary-token ' +
-  'data-highlighted:bg-white/5 data-highlighted:text-primary-token ' +
+  'text-[#1f1f1f] hover:bg-[#f2f2f2] dark:hover:bg-white/5 hover:text-[#1f1f1f] ' +
+  'data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-white/5 data-highlighted:text-[#1f1f1f] ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
-  'focus-ring-themed focus-visible:ring-offset-(--color-bg-surface-3)';
+  'focus-ring-themed focus-visible:ring-offset-0';
 
 /**
  * Select item base (uses focus-visible:bg-accent for keyboard navigation)
@@ -212,14 +212,13 @@ export const MENU_LABEL_BASE =
  * Menu separator styles
  * Uses design token for border consistency
  */
-export const MENU_SEPARATOR_BASE =
-  '-mx-0.5 my-1 h-px bg-(--color-border-default)';
+export const MENU_SEPARATOR_BASE = '-mx-0.5 my-1 h-px bg-[#e5e5e5]';
 
 /**
  * Keyboard shortcut indicator styles
  */
 export const MENU_SHORTCUT_BASE =
-  'ml-auto text-[10px] tracking-[0.35em] text-tertiary-token/70';
+  'ml-auto text-[12px] tracking-normal text-neutral-500';
 
 // ============================================================================
 // TRIGGER STYLES

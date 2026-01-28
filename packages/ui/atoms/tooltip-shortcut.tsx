@@ -28,15 +28,6 @@ export interface TooltipShortcutProps {
 /**
  * A tooltip wrapper that displays a label with an optional keyboard shortcut.
  * Uses the centralized Kbd component with tooltip variant for consistent styling.
- *
- * @example
- * ```tsx
- * <TooltipShortcut label="Toggle sidebar" shortcut="⌘/Ctrl B" side="right">
- *   <Button variant="ghost" size="icon">
- *     <PanelLeft />
- *   </Button>
- * </TooltipShortcut>
- * ```
  */
 export function TooltipShortcut({
   label,
@@ -48,8 +39,10 @@ export function TooltipShortcut({
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side={side}>
-        <span>{label}</span>
-        {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
+        <div className='inline-flex items-center gap-2'>
+          <span>{label}</span>
+          {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
+        </div>
       </TooltipContent>
     </Tooltip>
   );

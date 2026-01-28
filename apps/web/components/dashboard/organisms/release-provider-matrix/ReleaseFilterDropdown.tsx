@@ -95,7 +95,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-surface-3 p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-white dark:bg-surface-2 p-2 pb-1'>
       <div className='relative'>
         <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
@@ -417,8 +417,7 @@ export function ReleaseFilterDropdown({
             <Button
               variant='ghost'
               size='sm'
-              aria-label='Filter releases'
-              className='h-7 gap-1.5 text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+              className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
             >
               <Icon name='Filter' className='h-3.5 w-3.5' />
               Filter
@@ -435,7 +434,7 @@ export function ReleaseFilterDropdown({
               DROPDOWN_SHADOW,
               DROPDOWN_TRANSITIONS,
               DROPDOWN_SLIDE_ANIMATIONS,
-              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
+              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col bg-white dark:bg-surface-2'
             )}
             onCloseAutoFocus={e => e.preventDefault()}
           >
