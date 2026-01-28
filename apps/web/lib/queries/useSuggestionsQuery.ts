@@ -27,6 +27,12 @@ const POLLING_CONFIG = {
   backoffMultiplier: 1.5,
   /** Number of unchanged responses before backing off */
   stableCountThreshold: 3,
+  /** Initial error backoff interval in ms */
+  errorInitialInterval: 4000,
+  /** Maximum error backoff interval in ms */
+  errorMaxInterval: 60000,
+  /** Multiplier for error backoff */
+  errorBackoffMultiplier: 2,
 } as const;
 
 async function fetchSuggestions(
@@ -72,6 +78,8 @@ export interface UseSuggestionsQueryOptions {
   refetchInterval?: number | false | 'adaptive';
   /** Force fast polling mode (resets backoff). Useful after user actions. */
   fastPolling?: boolean;
+  /** Override polling behavior when external conditions pause polling. */
+  pollingEnabled?: boolean;
   /** Optional initial data to seed the cache and skip the first fetch. */
   initialData?: SuggestionsQueryResult;
 }
@@ -109,17 +117,27 @@ export function useSuggestionsQuery({
   enabled = true,
   refetchInterval = 'adaptive',
   fastPolling = false,
+  pollingEnabled = true,
   initialData,
 }: UseSuggestionsQueryOptions) {
   // Track consecutive unchanged responses for backoff
   const stableCountRef = useRef(0);
   const currentIntervalRef = useRef<number>(POLLING_CONFIG.initialInterval);
   const lastVersionRef = useRef<number | null>(null);
+  const errorCountRef = useRef(0);
+  const currentErrorIntervalRef = useRef<number>(
+    POLLING_CONFIG.errorInitialInterval
+  );
+  const lastErrorUpdatedAtRef = useRef(0);
+  const lastDataUpdatedAtRef = useRef(0);
 
   // Reset backoff when fast polling is requested
   if (fastPolling) {
     stableCountRef.current = 0;
     currentIntervalRef.current = POLLING_CONFIG.initialInterval;
+    errorCountRef.current = 0;
+    currentErrorIntervalRef.current = POLLING_CONFIG.errorInitialInterval;
+    lastErrorUpdatedAtRef.current = 0;
   }
 
   // Calculate adaptive interval based on data stability
@@ -156,9 +174,6 @@ export function useSuggestionsQuery({
     []
   );
 
-  const isDocumentVisible = () =>
-    typeof document === 'undefined' || document.visibilityState === 'visible';
-
   return useQuery<SuggestionsQueryResult>({
     queryKey: queryKeys.suggestions.list(profileId ?? ''),
     queryFn: ({ signal }) => fetchSuggestions(profileId!, signal),
@@ -166,11 +181,42 @@ export function useSuggestionsQuery({
     initialData,
     select: data => ({ links: data.links, maxVersion: data.maxVersion }),
     refetchInterval: query => {
-      if (!isDocumentVisible()) return false;
-      if (refetchInterval === 'adaptive') {
-        return getAdaptiveInterval(query.state.data);
+      if (!pollingEnabled) return false;
+
+      const errorUpdatedAt = query.state.errorUpdatedAt ?? 0;
+      const dataUpdatedAt = query.state.dataUpdatedAt ?? 0;
+
+      if (errorUpdatedAt > lastErrorUpdatedAtRef.current) {
+        errorCountRef.current += 1;
+        currentErrorIntervalRef.current = Math.min(
+          currentErrorIntervalRef.current *
+            POLLING_CONFIG.errorBackoffMultiplier,
+          POLLING_CONFIG.errorMaxInterval
+        );
+        lastErrorUpdatedAtRef.current = errorUpdatedAt;
       }
-      return typeof refetchInterval === 'number' ? refetchInterval : false;
+
+      if (
+        dataUpdatedAt > lastDataUpdatedAtRef.current &&
+        dataUpdatedAt > lastErrorUpdatedAtRef.current
+      ) {
+        errorCountRef.current = 0;
+        currentErrorIntervalRef.current = POLLING_CONFIG.errorInitialInterval;
+        lastDataUpdatedAtRef.current = dataUpdatedAt;
+      }
+
+      const baseInterval =
+        refetchInterval === 'adaptive'
+          ? getAdaptiveInterval(query.state.data)
+          : typeof refetchInterval === 'number'
+            ? refetchInterval
+            : false;
+
+      if (baseInterval === false) return false;
+      if (errorCountRef.current > 0) {
+        return Math.max(baseInterval, currentErrorIntervalRef.current);
+      }
+      return baseInterval;
     },
     // Don't refetch on window focus since we're already polling
     refetchOnWindowFocus: false,
