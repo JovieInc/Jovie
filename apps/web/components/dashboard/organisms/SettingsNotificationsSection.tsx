@@ -27,7 +27,7 @@ export function SettingsNotificationsSection() {
         description='Receive updates about new features, tips, and promotional offers from Jovie.'
         checked={marketingEmails}
         onCheckedChange={enabled => {
-          handleMarketingToggle(enabled);
+          void handleMarketingToggle(enabled);
         }}
         disabled={isPending}
         ariaLabel='Toggle marketing emails'

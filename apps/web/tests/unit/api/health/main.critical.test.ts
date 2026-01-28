@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockCheckRateLimit = vi.hoisted(() => vi.fn());
-const mockGetRateLimitStatus = vi.hoisted(() => vi.fn());
+const mockHealthLimiterGetStatus = vi.hoisted(() => vi.fn());
+const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/utils/rate-limit', () => ({
-  checkRateLimit: mockCheckRateLimit,
-  createRateLimitHeaders: vi.fn().mockReturnValue({}),
+vi.mock('@/lib/rate-limit', () => ({
+  healthLimiter: {
+    getStatus: mockHealthLimiterGetStatus,
+    limit: mockHealthLimiterLimit,
+  },
+  createRateLimitHeadersFromStatus: vi.fn().mockReturnValue({}),
   getClientIP: vi.fn().mockReturnValue('127.0.0.1'),
-  getRateLimitStatus: mockGetRateLimitStatus,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -31,16 +33,24 @@ describe('@critical GET /api/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockCheckRateLimit.mockReturnValue(false);
-    mockGetRateLimitStatus.mockReturnValue({
+    mockHealthLimiterGetStatus.mockReturnValue({
+      blocked: false,
       limit: 30,
       remaining: 29,
       resetTime: Date.now() + 60000,
+      retryAfterSeconds: 0,
     });
+    mockHealthLimiterLimit.mockResolvedValue({ success: true });
   });
 
   it('returns 429 when rate limited', async () => {
-    mockCheckRateLimit.mockReturnValue(true);
+    mockHealthLimiterGetStatus.mockReturnValue({
+      blocked: true,
+      limit: 30,
+      remaining: 0,
+      resetTime: Date.now() + 60000,
+      retryAfterSeconds: 60,
+    });
 
     const { GET } = await import('@/app/api/health/route');
     const request = new Request('http://localhost/api/health');

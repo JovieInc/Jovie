@@ -28,7 +28,8 @@ export function HeaderNav({
   hidePricingLink = false,
   containerSize = 'lg',
 }: HeaderNavProps = {}) {
-  // Note: _sticky prop reserved for future use
+  // Note: sticky prop reserved for future use
+  void _sticky;
   return (
     <header
       data-testid='header-nav'

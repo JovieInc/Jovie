@@ -188,7 +188,7 @@ export function useWaitlistColumns({
                 variant='secondary'
                 disabled={isApproved || isApproving}
                 onClick={() => {
-                  Promise.resolve(onApprove(entry.id)).catch(() => {});
+                  void onApprove(entry.id);
                 }}
               >
                 {(() => {

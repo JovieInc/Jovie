@@ -7,11 +7,10 @@ import { creatorProfiles } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
-  checkRateLimit,
-  createRateLimitHeaders,
+  createRateLimitHeadersFromStatus,
   getClientIP,
-  getRateLimitStatus,
-} from '@/lib/utils/rate-limit';
+  healthLimiter,
+} from '@/lib/rate-limit';
 
 /**
  * Health check endpoint for uptime monitoring and deployment verification.
@@ -24,24 +23,26 @@ import {
 export async function GET(request: Request) {
   // Rate limit check (30 req/60s for health endpoints)
   const clientIP = getClientIP(request);
-  const isRateLimited = checkRateLimit(clientIP, true);
+  const rateLimitStatus = healthLimiter.getStatus(clientIP);
 
-  if (isRateLimited) {
-    const status = getRateLimitStatus(clientIP, true);
+  if (rateLimitStatus.blocked) {
     return NextResponse.json(
       {
         error: 'Too many requests',
-        retryAfter: Math.ceil((status.resetTime - Date.now()) / 1000),
+        retryAfter: rateLimitStatus.retryAfterSeconds,
       },
       {
         status: 429,
         headers: {
           ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(status),
+          ...createRateLimitHeadersFromStatus(rateLimitStatus),
         },
       }
     );
   }
+
+  // Trigger rate limit counter increment (fire-and-forget)
+  void healthLimiter.limit(clientIP);
 
   // Minimal response - only status and timestamp (no environment details)
   const summary: Record<string, unknown> = {

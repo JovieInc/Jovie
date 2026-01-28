@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { redis } from '@/lib/redis';
+import { getRedis } from '@/lib/redis';
 
 /**
  * GET /api/health/redis
@@ -11,6 +11,8 @@ import { redis } from '@/lib/redis';
  * - 503: Redis is unavailable or not configured
  */
 export async function GET() {
+  const redis = getRedis();
+
   if (!redis) {
     return NextResponse.json(
       { status: 'unavailable', error: 'Redis not configured' },

@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import { checkDbHealth, validateDbConnection } from '@/lib/db';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
+import {
+  createRateLimitHeadersFromStatus,
+  getClientIP,
+  healthLimiter,
+  type RateLimitStatus,
+} from '@/lib/rate-limit';
 import { validateDatabaseEnvironment } from '@/lib/startup/environment-validator';
 import { logger } from '@/lib/utils/logger';
-import {
-  checkRateLimit,
-  createRateLimitHeaders,
-  getClientIP,
-  getRateLimitStatus,
-} from '@/lib/utils/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -168,7 +168,7 @@ function summarizeStatuses(statuses: CheckStatus[]) {
 
 function buildRateLimitedResponse(
   now: string,
-  rateLimitStatus: ReturnType<typeof getRateLimitStatus>
+  rateLimitStatus: RateLimitStatus
 ) {
   return NextResponse.json(
     {
@@ -189,7 +189,7 @@ function buildRateLimitedResponse(
       status: 429,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeaders(rateLimitStatus),
+        ...createRateLimitHeadersFromStatus(rateLimitStatus),
       },
     }
   );
@@ -199,7 +199,7 @@ function buildErrorResponse(
   now: string,
   errorMessage: string,
   totalLatency: number,
-  rateLimitStatus: ReturnType<typeof getRateLimitStatus>
+  rateLimitStatus: RateLimitStatus
 ) {
   const errorResponse: ComprehensiveHealthResponse = {
     service: 'comprehensive',
@@ -254,7 +254,7 @@ function buildErrorResponse(
     headers: {
       ...HEALTH_CHECK_CONFIG.cacheHeaders,
       'X-Health-Check-Duration': totalLatency.toString(),
-      ...createRateLimitHeaders(rateLimitStatus),
+      ...createRateLimitHeadersFromStatus(rateLimitStatus),
     },
   });
 }
@@ -264,12 +264,14 @@ export async function GET(request: Request) {
   const startTime = Date.now();
 
   const clientIP = getClientIP(request);
-  const isRateLimited = checkRateLimit(clientIP, true);
-  const rateLimitStatus = getRateLimitStatus(clientIP, true);
+  const rateLimitStatus = healthLimiter.getStatus(clientIP);
 
-  if (isRateLimited) {
+  if (rateLimitStatus.blocked) {
     return buildRateLimitedResponse(now, rateLimitStatus);
   }
+
+  // Trigger rate limit counter increment (fire-and-forget)
+  void healthLimiter.limit(clientIP);
 
   try {
     logger.info('[HEALTH] Running comprehensive health check...');
@@ -342,7 +344,7 @@ export async function GET(request: Request) {
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
         'X-Health-Check-Duration': totalLatency.toString(),
-        ...createRateLimitHeaders(rateLimitStatus),
+        ...createRateLimitHeadersFromStatus(rateLimitStatus),
       },
     });
   } catch (error) {

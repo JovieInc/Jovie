@@ -19,7 +19,7 @@ export function TourDateCard({
   tourDate,
   isNearYou = false,
   distanceKm,
-}: TourDateCardProps) {
+}: Readonly<TourDateCardProps>) {
   const date = new Date(tourDate.startDate);
   const location = [tourDate.city, tourDate.region, tourDate.country]
     .filter(Boolean)

@@ -7,9 +7,9 @@ import { Header } from '@/components/site/Header';
 
 export default function LegalLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className='flex min-h-screen flex-col bg-white dark:bg-[#0a0a0b]'>
       <Header hideNav />
