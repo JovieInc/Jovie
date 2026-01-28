@@ -49,9 +49,10 @@ export function getBandsintownConfig(userApiKey?: string | null): {
   isConfigured: boolean;
   source: 'user' | 'env' | 'none';
 } {
-  // Prefer user-provided API key
-  if (userApiKey) {
-    return { appId: userApiKey, isConfigured: true, source: 'user' };
+  // Prefer user-provided API key (trimmed to avoid whitespace issues)
+  const trimmedUserKey = userApiKey?.trim();
+  if (trimmedUserKey) {
+    return { appId: trimmedUserKey, isConfigured: true, source: 'user' };
   }
 
   // Fallback to environment variable

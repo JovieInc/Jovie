@@ -338,10 +338,13 @@ export async function removeBandsintownApiKey(): Promise<{ success: boolean }> {
 
   const profile = await requireProfile();
 
+  // Clear both API key and artist name to fully disconnect
+  // This ensures the connection status is correctly reported as disconnected
   await db
     .update(creatorProfiles)
     .set({
       bandsintownApiKey: null,
+      bandsintownArtistName: null,
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profile.id));
