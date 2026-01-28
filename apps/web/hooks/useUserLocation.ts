@@ -103,7 +103,21 @@ function getCachedLocation(): UserLocation | null {
     const cached = sessionStorage.getItem(LOCATION_CACHE_KEY);
     if (!cached) return null;
 
-    return JSON.parse(cached) as UserLocation;
+    const parsed: unknown = JSON.parse(cached);
+
+    // Validate cached data structure before use
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'latitude' in parsed &&
+      'longitude' in parsed &&
+      typeof (parsed as UserLocation).latitude === 'number' &&
+      typeof (parsed as UserLocation).longitude === 'number'
+    ) {
+      return parsed as UserLocation;
+    }
+
+    return null;
   } catch {
     return null;
   }

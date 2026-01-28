@@ -27,7 +27,7 @@ interface TourDateWithDistance extends TourDateViewModel {
 export function TourDatesList({ tourDates }: TourDatesListProps) {
   const { location, isLoading } = useUserLocation();
 
-  const sortedDates = useMemo((): TourDateWithDistance[] => {
+  const { sortedDates, nearbyCount } = useMemo(() => {
     // Calculate distances for all dates
     const datesWithDistance: TourDateWithDistance[] = tourDates.map(
       tourDate => {
@@ -56,7 +56,7 @@ export function TourDatesList({ tourDates }: TourDatesListProps) {
 
     // If we don't have user location, keep chronological order
     if (!location) {
-      return datesWithDistance;
+      return { sortedDates: datesWithDistance, nearbyCount: 0 };
     }
 
     // Separate "near you" dates from others
@@ -75,11 +75,11 @@ export function TourDatesList({ tourDates }: TourDatesListProps) {
     nearbyDates.sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
 
     // Other dates remain in chronological order (already sorted by server)
-    return [...nearbyDates, ...otherDates];
+    return {
+      sortedDates: [...nearbyDates, ...otherDates],
+      nearbyCount: nearbyDates.length,
+    };
   }, [tourDates, location]);
-
-  // Count nearby shows for the section header
-  const nearbyCount = sortedDates.filter(d => d.isNearYou).length;
 
   return (
     <div className='space-y-4'>
