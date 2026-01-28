@@ -36,7 +36,7 @@ async function runEnvironmentValidationWithRetry() {
   const { runStartupEnvironmentValidation } = await import(
     '@/lib/startup/environment-validator'
   );
-  
+
   // First attempt
   let result = await runStartupEnvironmentValidation();
 
@@ -44,14 +44,16 @@ async function runEnvironmentValidationWithRetry() {
   // This handles race conditions on Vercel cold starts where env vars
   // may not be fully loaded during the first register() call
   if (result && result.critical.length > 0) {
-    console.log('[STARTUP] Critical issues detected, retrying after 100ms delay...');
-    
+    console.log(
+      '[STARTUP] Critical issues detected, retrying after 100ms delay...'
+    );
+
     // Wait for environment to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     // Retry validation
     result = await runStartupEnvironmentValidation();
-    
+
     if (result && result.critical.length > 0) {
       console.warn('[STARTUP] Critical issues persist after retry');
     } else {
