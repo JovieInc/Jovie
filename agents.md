@@ -122,6 +122,14 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
+### 6. Homepage Optimization Guardrails (Marketing)
+
+- The marketing homepage **must stay static/ISR**: no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` pages/layouts.
+- `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
+- Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
+- Homepage “See It In Action” must not hit the database during SSR; use cached data or static fallbacks.
+- Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
+
 ---
 
 ## Pre-PR Checklist (required before opening any PR)
