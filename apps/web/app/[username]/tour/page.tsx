@@ -74,7 +74,7 @@ export default async function TourPage({ params }: Props) {
   const { username } = await params;
   const profile = await getCachedProfile(username);
 
-  if (!profile || !profile.isPublic) {
+  if (!profile?.isPublic) {
     notFound();
   }
 
