@@ -15,10 +15,9 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 
 export async function GET(
   request: NextRequest,
-  _context: { params: Promise<{}> }
+  _context: { params: Promise<Record<string, never>> }
 ) {
   try {
-    void _context;
     const url = new URL(request.url);
     const username = url.searchParams.get('username');
     if (!username) {

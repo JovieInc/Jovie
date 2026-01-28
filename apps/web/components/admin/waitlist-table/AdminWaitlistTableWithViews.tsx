@@ -169,7 +169,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
       <WaitlistKanbanCard
         entry={entry}
         approveStatus={approveStatuses[entry.id]}
-        onApprove={() => void approveEntry(entry.id)}
+        onApprove={() => {
+          approveEntry(entry.id).catch(() => {});
+        }}
       />
     ),
     [approveStatuses, approveEntry]

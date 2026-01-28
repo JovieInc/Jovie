@@ -14,7 +14,7 @@ export function usePendingPreview({ onAdd }: UsePendingPreviewProps) {
 
   const handleAddPendingPreview = useCallback(
     (link: DetectedLink) => {
-      void onAdd(link);
+      Promise.resolve(onAdd(link)).catch(() => {});
       setPendingPreview(null);
       setClearSignal(c => c + 1);
     },

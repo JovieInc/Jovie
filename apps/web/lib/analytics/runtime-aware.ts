@@ -40,10 +40,9 @@ function getRuntime(): 'nodejs' | 'edge' | 'unknown' {
 export async function trackEvent(
   event: string,
   properties?: Record<string, unknown>,
-  distinctId?: string
+  _distinctId?: string
 ): Promise<void> {
   try {
-    void distinctId;
     const runtime = getRuntime();
 
     // Add runtime information to properties
