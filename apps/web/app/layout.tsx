@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
+import Script from 'next/script';
 import React from 'react';
 import { CoreProviders } from '@/components/providers/CoreProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -156,7 +157,9 @@ export default async function RootLayout({
 
   const headContent = (
     <head>
-      <script
+      <Script
+        id='theme-class'
+        strategy='beforeInteractive'
         nonce={nonce}
         suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for theme script injection
@@ -212,8 +215,10 @@ export default async function RootLayout({
       />
 
       {/* Structured Data for Organization */}
-      <script
+      <Script
+        id='organization-schema'
         type='application/ld+json'
+        strategy='afterInteractive'
         nonce={nonce}
         suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
