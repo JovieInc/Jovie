@@ -62,7 +62,7 @@ function buildFromAddress(senderContext?: SenderContext): string {
 
   // Sanitize display name (remove quotes and angle brackets)
   const sanitizedName = senderContext.displayName
-    .replace(/["<>]/g, '')
+    .replaceAll(/["<>]/g, '')
     .trim()
     .slice(0, 64); // Limit length
 
