@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import type { TocEntry as DocsTocEntry, MarkdownDocument } from '@/types/docs';
 

@@ -758,11 +758,10 @@ export function UnifiedTable<TData>({
                   );
 
                   // Check if row is expanded and has expanded content
-                  const rowId = getExpandableRowId
-                    ? getExpandableRowId(rowData)
-                    : getRowId
-                      ? getRowId(rowData)
-                      : row.id;
+                  const rowId =
+                    getExpandableRowId?.(rowData) ??
+                    getRowId?.(rowData) ??
+                    row.id;
                   const isExpanded = expandedRowIds?.has(rowId);
                   const expandedContent =
                     isExpanded && renderExpandedContent

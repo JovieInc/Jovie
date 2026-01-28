@@ -220,14 +220,12 @@ function CreatorProfileTableRowComponent({
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        {/* NOSONAR S6819: role="presentation" correctly hides wrapper; checkbox inside is the interactive element */}
         <div
           className='relative flex h-5 w-5 items-center justify-center'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
             handleActivationKeyDown(event, e => e.stopPropagation())
           }
-          role='presentation'
         >
           <span
             className={cn(

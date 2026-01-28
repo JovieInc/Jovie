@@ -60,7 +60,7 @@ export default function WaitlistPage() {
   );
 
   const primaryGoalButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const socialPlatformButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const socialPlatformButtonRefs = useRef<Array<HTMLInputElement | null>>([]);
   const primarySocialUrlInputRef = useRef<HTMLInputElement | null>(null);
   const spotifyUrlInputRef = useRef<HTMLInputElement | null>(null);
 

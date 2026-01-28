@@ -4,7 +4,7 @@
  * Schemas for /api/dashboard/profile routes.
  */
 
-import { Buffer } from 'buffer';
+import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 

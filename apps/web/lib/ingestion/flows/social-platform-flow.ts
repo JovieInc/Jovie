@@ -7,7 +7,7 @@
  * Extracted to reduce cognitive complexity of the creator-ingest route.
  */
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import type { DbType } from '@/lib/db';

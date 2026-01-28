@@ -87,7 +87,7 @@ const ENCODED_CONTROL_PATTERN = /%(0a|0d|09|00)/i;
 /**
  * Reserved TikTok paths that shouldn't be prefixed with @
  */
-const TIKTOK_RESERVED_PATHS = [
+const TIKTOK_RESERVED_PATHS = new Set([
   'for',
   'following',
   'live',
@@ -95,7 +95,7 @@ const TIKTOK_RESERVED_PATHS = [
   'search',
   'discover',
   'trending',
-];
+]);
 
 /**
  * Check if a URL contains dangerous schemes or encoded control characters
@@ -157,7 +157,7 @@ function normalizeTikTokPath(parsedUrl: URL): void {
   if (
     pathParts.length > 0 &&
     !pathParts[0].startsWith('@') &&
-    !TIKTOK_RESERVED_PATHS.includes(pathParts[0].toLowerCase()) &&
+    !TIKTOK_RESERVED_PATHS.has(pathParts[0].toLowerCase()) &&
     /^[a-zA-Z0-9._]+$/.test(pathParts[0])
   ) {
     pathParts[0] = '@' + pathParts[0];

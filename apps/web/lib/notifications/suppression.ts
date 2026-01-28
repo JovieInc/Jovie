@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { and, count, eq, gt, isNotNull, isNull, lt, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';

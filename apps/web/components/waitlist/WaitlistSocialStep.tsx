@@ -20,7 +20,7 @@ interface WaitlistSocialStepProps {
   onPlatformKeyDown: (e: React.KeyboardEvent) => void;
   onUrlChange: (value: string) => void;
   onNext: () => void;
-  setPlatformButtonRef: (index: number, el: HTMLButtonElement | null) => void;
+  setPlatformButtonRef: (index: number, el: HTMLInputElement | null) => void;
   setUrlInputRef: (el: HTMLInputElement | null) => void;
 }
 
@@ -37,7 +37,7 @@ export function WaitlistSocialStep({
   setPlatformButtonRef,
   setUrlInputRef,
 }: WaitlistSocialStepProps) {
-  const platformButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const platformButtonRefs = useRef<Array<HTMLInputElement | null>>([]);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedPlatformIndex = SOCIAL_PLATFORM_OPTIONS.findIndex(
@@ -65,37 +65,40 @@ export function WaitlistSocialStep({
         <h1 className={FORM_LAYOUT.title}>Where do fans find you?</h1>
       </div>
 
-      <div
+      <fieldset
         className='flex items-center justify-center gap-2'
-        role='radiogroup'
-        aria-label='Social platform'
-        tabIndex={0}
         onKeyDown={onPlatformKeyDown}
+        disabled={isSubmitting}
       >
-        {SOCIAL_PLATFORM_OPTIONS.map((option, index) => (
-          // NOSONAR S6819: Custom pill-style radio buttons; native input[type=radio] can't be styled this way
-          <button
-            key={option.value}
-            ref={el => {
-              platformButtonRefs.current[index] = el;
-              setPlatformButtonRef(index, el);
-            }}
-            type='button'
-            role='radio'
-            aria-checked={socialPlatform === option.value}
-            tabIndex={socialPlatform === option.value ? 0 : -1}
-            onClick={() => onPlatformSelect(option.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] ${
-              socialPlatform === option.value
-                ? 'bg-[#1e2025] text-[#e3e4e6] border-[#2c2e33]'
-                : 'bg-transparent text-[#6b6f76] dark:text-[#969799] border-[#d7d9de] dark:border-[#2c2e33] hover:bg-[#f0f0f0] dark:hover:bg-[#1e2025]'
-            }`}
-            disabled={isSubmitting}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+        <legend className='sr-only'>Social platform</legend>
+        {SOCIAL_PLATFORM_OPTIONS.map((option, index) => {
+          const isSelected = socialPlatform === option.value;
+          return (
+            <label
+              key={option.value}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909] ${
+                isSelected
+                  ? 'bg-[#1e2025] text-[#e3e4e6] border-[#2c2e33]'
+                  : 'bg-transparent text-[#6b6f76] dark:text-[#969799] border-[#d7d9de] dark:border-[#2c2e33] hover:bg-[#f0f0f0] dark:hover:bg-[#1e2025]'
+              }`}
+            >
+              <input
+                ref={el => {
+                  platformButtonRefs.current[index] = el;
+                  setPlatformButtonRef(index, el);
+                }}
+                type='radio'
+                name='social-platform'
+                value={option.value}
+                checked={isSelected}
+                onChange={() => onPlatformSelect(option.value)}
+                className='sr-only'
+              />
+              {option.label}
+            </label>
+          );
+        })}
+      </fieldset>
 
       <div>
         {socialPlatform === 'other' ? (

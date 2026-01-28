@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanTrackTitle,
   extractRemixers,
+  extractWith,
   isRemix,
   normalizeArtistName,
   parseArtistCredits,
@@ -135,6 +136,45 @@ describe('artist-parser', () => {
         extractRemixers('Song (Daft Punk Remix)').map(r => r.name)
       ).toEqual(['Daft Punk']);
       expect(extractRemixers('Song (Remix)')).toEqual([]);
+    });
+
+    it('extracts remixers from "Remixed by" credits', () => {
+      expect(
+        extractRemixers('Song (Remixed by Skrillex)').map(r => r.name)
+      ).toEqual(['Skrillex']);
+    });
+  });
+
+  describe('extractFeatured', () => {
+    it('extracts bracketed and inline featured credits', () => {
+      expect(
+        parseArtistCredits('Song (feat. Artist B)', [{ id: '1', name: 'A' }])
+          .filter(credit => credit.role === 'featured_artist')
+          .map(credit => credit.name)
+      ).toEqual(['Artist B']);
+
+      expect(
+        parseArtistCredits('Song feat. Artist C', [{ id: '1', name: 'A' }])
+          .filter(credit => credit.role === 'featured_artist')
+          .map(credit => credit.name)
+      ).toEqual(['Artist C']);
+    });
+  });
+
+  describe('extractWith', () => {
+    it('extracts bracketed and inline "with" credits', () => {
+      expect(extractWith('Song (with Artist B)').map(r => r.name)).toEqual([
+        'Artist B',
+      ]);
+      expect(extractWith('Song with Artist C').map(r => r.name)).toEqual([
+        'Artist C',
+      ]);
+    });
+
+    it('splits multiple "with" artists by conjunctions', () => {
+      expect(
+        extractWith('Song (with Artist B & Artist C)').map(r => r.name)
+      ).toEqual(['Artist B', 'Artist C']);
     });
   });
 

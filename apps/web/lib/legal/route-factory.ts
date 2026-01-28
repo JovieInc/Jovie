@@ -1,6 +1,6 @@
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { NextResponse } from 'next/server';
-import path from 'path';
 import { remark } from 'remark';
 import html from 'remark-html';
 import { captureError } from '@/lib/error-tracking';

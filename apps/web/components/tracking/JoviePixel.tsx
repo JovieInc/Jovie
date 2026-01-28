@@ -109,11 +109,10 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
 
       const link = e.target.closest('a[data-track-link]');
 
-      if (link) {
-        const linkId = link.getAttribute('data-link-id');
+      if (link instanceof HTMLAnchorElement) {
+        const linkId = link.dataset.linkId;
         const linkUrl = link.getAttribute('href');
-        const linkTitle =
-          link.getAttribute('data-link-title') || link.textContent;
+        const linkTitle = link.dataset.linkTitle ?? link.textContent;
 
         sendEvent('link_click', {
           linkId,
@@ -135,8 +134,8 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
       if (!(e.target instanceof HTMLFormElement)) return;
 
       const form = e.target;
-      if (form.hasAttribute('data-track-form')) {
-        const formType = form.getAttribute('data-form-type') || 'unknown';
+      if (form.dataset.trackForm !== undefined) {
+        const formType = form.dataset.formType ?? 'unknown';
 
         sendEvent('form_submit', {
           formType,
