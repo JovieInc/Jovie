@@ -13,10 +13,15 @@
  * 4. Invalidate billing cache
  */
 
+import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
+import { db } from '@/lib/db';
+import { creatorProfiles, users } from '@/lib/db/schema';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import type {
@@ -138,9 +143,43 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
+    // Send Slack notification for new subscription (fire-and-forget)
+    if (result.success && result.isActive && result.plan) {
+      this.sendUpgradeNotification(userId, result.plan).catch(err => {
+        logger.warn('[subscription-handler] Slack notification failed', err);
+      });
+    }
+
     await invalidateBillingCache();
 
     return result;
+  }
+
+  /**
+   * Send a Slack notification for a subscription upgrade.
+   * Fetches user name from database and sends notification.
+   *
+   * @private
+   */
+  private async sendUpgradeNotification(
+    clerkUserId: string,
+    plan: string
+  ): Promise<void> {
+    // Fetch user's display name from database
+    const [userData] = await db
+      .select({
+        email: users.email,
+        displayName: creatorProfiles.displayName,
+      })
+      .from(users)
+      .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    const displayName = userData?.displayName ?? userData?.email ?? 'A user';
+    const planName = plan === 'growth' ? 'Growth' : 'Pro';
+
+    await notifySlackUpgrade(displayName, planName);
   }
 
   /**

@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { db, type TransactionType, waitlistEntries } from '@/lib/db';
 import { creatorProfiles, users, waitlistInvites } from '@/lib/db/schema';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
+import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -453,6 +454,11 @@ export async function POST(request: Request) {
         logger.error('Waitlist API transaction error', txError);
         throw txError;
       }
+    });
+
+    // Send Slack notification for new waitlist entry (fire-and-forget)
+    notifySlackWaitlist(fullName, email).catch(err => {
+      logger.warn('[waitlist] Slack notification failed', err);
     });
 
     return successResponse({ status: 'new' });
