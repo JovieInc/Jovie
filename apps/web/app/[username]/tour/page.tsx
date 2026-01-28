@@ -70,7 +70,7 @@ function formatTourDatesCount(count: number): string {
   return `${count} upcoming ${showWord}`;
 }
 
-export default async function TourPage({ params }: Props) {
+export default async function TourPage({ params }: Readonly<Props>) {
   const { username } = await params;
   const profile = await getCachedProfile(username);
 

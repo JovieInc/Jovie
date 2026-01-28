@@ -24,7 +24,7 @@ interface TourDateWithDistance extends TourDateViewModel {
  * - Sorting is memoized and only recalculated when location/dates change
  * - Haversine calculation is O(n) with ~microseconds per venue
  */
-export function TourDatesList({ tourDates }: TourDatesListProps) {
+export function TourDatesList({ tourDates }: Readonly<TourDatesListProps>) {
   const { location, isLoading, error } = useUserLocation();
 
   const { sortedDates, nearbyCount } = useMemo(() => {

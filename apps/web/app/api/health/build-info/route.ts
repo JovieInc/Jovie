@@ -19,8 +19,8 @@ export function GET() {
       commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7),
       environment: process.env.VERCEL_ENV,
     });
-  } catch (_error) {
-    // Fallback if BUILD_ID not available
+  } catch {
+    // Fallback if BUILD_ID not available (file may not exist in development)
     return NextResponse.json({
       buildId: 'unknown',
       deployedAt: Date.now(),

@@ -5,9 +5,9 @@ import { publicEnv } from '@/lib/env-public';
 
 export default async function AccountLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   // Ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {

@@ -5,7 +5,7 @@ import { invalidateAvatarCache } from '@/lib/cache';
 import { creatorProfiles, eq, profilePhotos } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { buildSeoFilename } from '@/lib/images/config';
-import { avatarUploadRateLimit } from '@/lib/rate-limit';
+import { avatarUploadLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import {
   AVIF_MIME_TYPE,
@@ -71,35 +71,26 @@ export async function POST(request: NextRequest) {
 
     return await runWithSession(async (tx, userIdFromSession) => {
       // Rate limiting - 3 uploads per minute per user
-      if (avatarUploadRateLimit) {
-        const rateLimitResult =
-          await avatarUploadRateLimit.limit(userIdFromSession);
-        if (!rateLimitResult.success) {
-          const retryAfter = Math.round(
-            (rateLimitResult.reset - Date.now()) / 1000
-          );
-          return errorResponse(
-            'Too many upload attempts. Please wait before trying again.',
-            UPLOAD_ERROR_CODES.RATE_LIMITED,
-            429,
-            {
-              retryable: true,
-              retryAfter,
-              headers: {
-                'Retry-After': retryAfter.toString(),
-                'X-RateLimit-Limit': rateLimitResult.limit.toString(),
-                'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-                'X-RateLimit-Reset': new Date(
-                  rateLimitResult.reset
-                ).toISOString(),
-              },
-            }
-          );
-        }
-      } else if (process.env.NODE_ENV === 'production') {
-        logger.warn(
-          '[upload] Rate limiting disabled - Redis not configured. User:',
-          userIdFromSession.slice(0, 10) + '...'
+      const rateLimitResult =
+        await avatarUploadLimiter.limit(userIdFromSession);
+      if (!rateLimitResult.success) {
+        const retryAfter = Math.round(
+          (rateLimitResult.reset.getTime() - Date.now()) / 1000
+        );
+        return errorResponse(
+          'Too many upload attempts. Please wait before trying again.',
+          UPLOAD_ERROR_CODES.RATE_LIMITED,
+          429,
+          {
+            retryable: true,
+            retryAfter,
+            headers: {
+              'Retry-After': retryAfter.toString(),
+              'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+              'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+              'X-RateLimit-Reset': rateLimitResult.reset.toISOString(),
+            },
+          }
         );
       }
 

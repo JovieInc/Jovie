@@ -11,14 +11,11 @@ import {
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { publicClickLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { encryptIP } from '@/lib/utils/pii-encryption';
-import {
-  checkPublicRateLimit,
-  getPublicRateLimitStatus,
-} from '@/lib/utils/rate-limit';
 import { clickSchema } from '@/lib/validation/schemas';
 import {
   createFingerprint,
@@ -112,21 +109,24 @@ export async function POST(request: NextRequest) {
     const clientIP = extractClientIP(request.headers);
 
     // Public rate limiting check (per-IP)
-    if (checkPublicRateLimit(clientIP, 'click')) {
-      const status = getPublicRateLimitStatus(clientIP, 'click');
+    const rateLimitStatus = publicClickLimiter.getStatus(clientIP);
+    if (rateLimitStatus.blocked) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         {
           status: 429,
           headers: {
             ...NO_STORE_HEADERS,
-            'Retry-After': String(status.retryAfterSeconds),
-            'X-RateLimit-Limit': String(status.limit),
-            'X-RateLimit-Remaining': String(status.remaining),
+            'Retry-After': String(rateLimitStatus.retryAfterSeconds),
+            'X-RateLimit-Limit': String(rateLimitStatus.limit),
+            'X-RateLimit-Remaining': String(rateLimitStatus.remaining),
           },
         }
       );
     }
+
+    // Trigger rate limit counter increment (fire-and-forget)
+    void publicClickLimiter.limit(clientIP);
 
     // Bot detection - detect but continue to record with isBot flag
     const botDetection = detectBot(request, '/api/audience/click');

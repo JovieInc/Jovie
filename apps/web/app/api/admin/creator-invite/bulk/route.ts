@@ -9,7 +9,6 @@ import {
   bulkInviteSchema,
   calculateEffectiveLimit,
   calculateEstimatedTiming,
-  fetchEligibleProfilesForPreview,
   fetchProfilesByFitScore,
   fetchProfilesById,
   getEligibleProfileCount,
@@ -271,7 +270,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const { fitScoreThreshold, limit } = parsePreviewParams(searchParams);
 
-    const eligibleProfiles = await fetchEligibleProfilesForPreview(
+    const eligibleProfiles = await fetchProfilesByFitScore(
       fitScoreThreshold,
       limit
     );
