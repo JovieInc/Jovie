@@ -61,23 +61,26 @@ export interface SpotifyArtistInput {
  * Matches: "(X Remix)", "[X Remix]", "(Remixed by X)", "(X Mix)"
  * NOSONAR S5843: Complex pattern required to parse multiple remix credit formats per music industry standards
  */
-const REMIX_PATTERN =
-  /[([]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[)\]]/gi;
+const BRACKET_CONTENT_PATTERN = /[([]\s*([^\])]+?)\s*[)\]]/gi;
+const REMIX_BY_PATTERN = /^(?:remixed\s+by|remix\s+by)\s+(.+)$/i;
+const REMIX_SUFFIX_PATTERN =
+  /^(.+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip)$/i;
 
 /**
  * Pattern to match featured artists in track titles
  * Matches: "(feat. X)", "(ft. X)", "(featuring X)", "feat. X", "ft. X"
  * NOSONAR S5843: Complex pattern required to parse multiple featuring credit formats per music industry standards
  */
-const FEATURED_PATTERN =
-  /(?:[([]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+))/gi;
+const FEATURED_BRACKET_PATTERN =
+  /[([]\s*(?:feat\.?|ft\.?|featuring)\s+([^\])]+?)\s*[)\]]/gi;
+const FEATURED_INLINE_PATTERN = /\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+)/gi;
 
 /**
  * Pattern to match "with" credits
  * Matches: "(with X)", "with X"
  */
-const WITH_PATTERN =
-  /(?:[([]\s*\bwith\b\s+([^)\]]+?)\s*[)\]])|(?:\bwith\s+([^()[\]]+))/gi;
+const WITH_BRACKET_PATTERN = /[([]\s*\bwith\b\s+([^\])]+?)\s*[)\]]/gi;
+const WITH_INLINE_PATTERN = /\bwith\s+([^()[\]]+)/gi;
 
 /**
  * Pattern to match "vs" credits in artist names
@@ -116,6 +119,25 @@ export function normalizeArtistName(name: string): string {
  */
 function cleanArtistName(name: string): string {
   return name.replaceAll(/\s+/g, ' ').trim();
+}
+
+function isRemixBracketContent(content: string): boolean {
+  const trimmed = content.trim();
+  return (
+    REMIX_BY_PATTERN.test(trimmed) ||
+    REMIX_SUFFIX_PATTERN.test(trimmed) ||
+    trimmed.toLowerCase() === 'remix'
+  );
+}
+
+function removeBracketedSegments(
+  title: string,
+  predicate: (content: string) => boolean
+): string {
+  BRACKET_CONTENT_PATTERN.lastIndex = 0;
+  return title.replace(BRACKET_CONTENT_PATTERN, (match, content: string) =>
+    predicate(content) ? '' : match
+  );
 }
 
 /**
@@ -170,14 +192,18 @@ function appendUniqueCredits(
  */
 export function extractRemixers(title: string): ParsedArtistCredit[] {
   const remixers: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
 
-  // Reset regex state
-  REMIX_PATTERN.lastIndex = 0;
+  BRACKET_CONTENT_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
 
-  while ((match = REMIX_PATTERN.exec(title)) !== null) {
-    const remixerPart = match[1] ?? match[2];
+  while ((match = BRACKET_CONTENT_PATTERN.exec(title)) !== null) {
+    const bracketContent = match[1]?.trim();
+    if (!bracketContent) continue;
+
+    const remixedByMatch = bracketContent.match(REMIX_BY_PATTERN);
+    const remixerSuffixMatch = bracketContent.match(REMIX_SUFFIX_PATTERN);
+    const remixerPart = remixedByMatch?.[1] ?? remixerSuffixMatch?.[1];
     if (!remixerPart) continue;
 
     // Check if this is just "Remix" without an artist
@@ -218,16 +244,23 @@ export function extractRemixers(title: string): ParsedArtistCredit[] {
  */
 export function extractFeatured(title: string): ParsedArtistCredit[] {
   const featured: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
 
-  FEATURED_PATTERN.lastIndex = 0;
+  FEATURED_BRACKET_PATTERN.lastIndex = 0;
+  FEATURED_INLINE_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
 
-  while ((match = FEATURED_PATTERN.exec(title)) !== null) {
-    const featuredPart = match[1] ?? match[2];
-    if (!featuredPart) continue;
+  const featuredParts: string[] = [];
+  while ((match = FEATURED_BRACKET_PATTERN.exec(title)) !== null) {
+    const featuredPart = match[1]?.trim();
+    if (featuredPart) featuredParts.push(featuredPart);
+  }
+  while ((match = FEATURED_INLINE_PATTERN.exec(title)) !== null) {
+    const featuredPart = match[1]?.trim();
+    if (featuredPart) featuredParts.push(featuredPart);
+  }
 
-    // Handle multiple featured artists
+  for (const featuredPart of featuredParts) {
     const artistNames = splitByConjunction(featuredPart);
 
     for (const artistName of artistNames) {
@@ -251,15 +284,23 @@ export function extractFeatured(title: string): ParsedArtistCredit[] {
  */
 export function extractWith(title: string): ParsedArtistCredit[] {
   const withArtists: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
 
-  WITH_PATTERN.lastIndex = 0;
+  WITH_BRACKET_PATTERN.lastIndex = 0;
+  WITH_INLINE_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
 
-  while ((match = WITH_PATTERN.exec(title)) !== null) {
-    const withPart = match[1] ?? match[2];
-    if (!withPart) continue;
+  const withParts: string[] = [];
+  while ((match = WITH_BRACKET_PATTERN.exec(title)) !== null) {
+    const withPart = match[1]?.trim();
+    if (withPart) withParts.push(withPart);
+  }
+  while ((match = WITH_INLINE_PATTERN.exec(title)) !== null) {
+    const withPart = match[1]?.trim();
+    if (withPart) withParts.push(withPart);
+  }
 
+  for (const withPart of withParts) {
     const artistNames = splitByConjunction(withPart);
 
     for (const artistName of artistNames) {
@@ -507,16 +548,13 @@ export function isRemix(title: string): boolean {
  */
 export function cleanTrackTitle(title: string): string {
   return (
-    title
+    removeBracketedSegments(title, isRemixBracketContent)
       // Remove featured credits
-      .replaceAll(
-        /[([]?\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+[^)\]]+[)\]]?/gi,
-        ''
-      )
-      // Remove remix credits
-      .replaceAll(REMIX_PATTERN, '')
+      .replaceAll(FEATURED_BRACKET_PATTERN, '')
+      .replaceAll(FEATURED_INLINE_PATTERN, '')
       // Remove "with" credits
-      .replaceAll(/[([]?\s*with\s+[^)\]]+[)\]]?/gi, '')
+      .replaceAll(WITH_BRACKET_PATTERN, '')
+      .replaceAll(WITH_INLINE_PATTERN, '')
       // Clean up whitespace and trailing punctuation
       .replaceAll(/\s+/g, ' ')
       .replace(/\s*[-–]\s*$/, '')
