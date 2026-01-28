@@ -39,7 +39,7 @@ export function DrawerHeaderActions({
 
   // Convert overflow actions to menu items with defensive filtering
   const menuItems: TableActionMenuItem[] = overflowActions
-    .filter(action => action && action.id && action.label)
+    .filter(action => action?.id && action?.label)
     .map(action => ({
       id: action.id,
       label: action.label,

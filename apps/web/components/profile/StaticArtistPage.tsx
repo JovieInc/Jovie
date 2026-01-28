@@ -26,7 +26,7 @@ const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
   ];
 
 const TIP_AMOUNTS = [3, 5, 7];
-const ALLOWED_VENMO_HOSTS = ['venmo.com', 'www.venmo.com'];
+const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 
 function mapSocialPlatformToDSPKey(platform: string): string | null {
   const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
@@ -48,7 +48,7 @@ function extractVenmoUsername(url: string | null): string | null {
   if (!url) return null;
   try {
     const u = new URL(url);
-    if (ALLOWED_VENMO_HOSTS.includes(u.hostname)) {
+    if (ALLOWED_VENMO_HOSTS.has(u.hostname)) {
       const parts = u.pathname.split('/').filter(Boolean);
       if (parts[0] === 'u' && parts[1]) return parts[1];
       if (parts[0]) return parts[0];

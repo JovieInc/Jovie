@@ -21,17 +21,17 @@ const PRIVATE_IP_PATTERNS = [
 ];
 
 // Blocked hostnames
-const BLOCKED_HOSTNAMES = [
+const BLOCKED_HOSTNAMES = new Set([
   'localhost',
   'localhost.localdomain',
   'local',
   'broadcasthost',
   'ip6-localhost',
   'ip6-loopback',
-];
+]);
 
 // Dangerous protocols that should never be allowed
-const DANGEROUS_PROTOCOLS = [
+const DANGEROUS_PROTOCOLS = new Set([
   'javascript:',
   'data:',
   'vbscript:',
@@ -39,7 +39,7 @@ const DANGEROUS_PROTOCOLS = [
   'ftp:',
   'about:',
   'blob:',
-];
+]);
 
 /**
  * Maximum URL length to prevent DoS attacks via extremely long URLs.
@@ -89,7 +89,7 @@ function isPrivateHostname(hostname: string): boolean {
   const lower = hostname.toLowerCase();
 
   // Check blocked hostnames
-  if (BLOCKED_HOSTNAMES.includes(lower)) {
+  if (BLOCKED_HOSTNAMES.has(lower)) {
     return true;
   }
 
@@ -143,7 +143,10 @@ const INTERNAL_DOMAIN_SUFFIXES = [
 /**
  * Cloud metadata endpoints to block (SSRF protection).
  */
-const METADATA_PATTERNS = ['169.254.169.254', 'metadata.google.internal'];
+const METADATA_PATTERNS = new Set([
+  '169.254.169.254',
+  'metadata.google.internal',
+]);
 
 /**
  * Validation rule with check function and error message.
@@ -159,7 +162,7 @@ type ValidationRule = {
  */
 const URL_VALIDATION_RULES: ValidationRule[] = [
   {
-    check: (_, protocol) => DANGEROUS_PROTOCOLS.includes(protocol),
+    check: (_, protocol) => DANGEROUS_PROTOCOLS.has(protocol),
     error: protocol =>
       `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
   },
@@ -178,7 +181,7 @@ const URL_VALIDATION_RULES: ValidationRule[] = [
     error: 'URLs pointing to internal domains are not allowed',
   },
   {
-    check: hostname => METADATA_PATTERNS.includes(hostname),
+    check: hostname => METADATA_PATTERNS.has(hostname),
     error: 'URLs pointing to cloud metadata endpoints are not allowed',
   },
 ];
