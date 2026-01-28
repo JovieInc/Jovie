@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
-import { useVersionMismatchNotification } from '@/lib/hooks/useVersionMismatchNotification';
 import { PacerProvider } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { logger } from '@/lib/utils/logger';
@@ -80,11 +79,6 @@ function CoreProvidersInner({
   enableAnalytics: boolean;
   initialThemeMode: ThemeMode;
 }) {
-  // Monitor for version mismatches and show notification when detected
-  // These hooks require QueryClient context, so they must be called
-  // from a component rendered inside QueryProvider
-  useVersionMismatchNotification();
-
   // Handle chunk load errors gracefully (common with version mismatches)
   useChunkErrorHandler();
 
