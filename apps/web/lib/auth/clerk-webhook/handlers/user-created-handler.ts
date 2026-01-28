@@ -11,6 +11,7 @@
 
 import { clerkClient } from '@clerk/nextjs/server';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
+import { notifySlackSignup } from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
 import type {
   ClerkEventType,
@@ -61,6 +62,13 @@ async function handleUserCreated(
     }
 
     logger.info(`Post-signup processing completed for user ${user.id}`);
+
+    // Send Slack notification for new signup (fire-and-forget)
+    const displayName = fullName || user.username || 'A new user';
+    const primaryEmail = user.email_addresses?.[0]?.email_address;
+    notifySlackSignup(displayName, primaryEmail).catch(err => {
+      logger.warn('[user-created] Slack notification failed', err);
+    });
 
     return {
       success: true,
