@@ -73,7 +73,7 @@ export function VerificationStatusToggle({
     (event: React.MouseEvent) => {
       event.stopPropagation();
       if (!isLoading) {
-        void onToggle();
+        Promise.resolve(onToggle()).catch(() => {});
       }
     },
     [isLoading, onToggle]
@@ -85,7 +85,7 @@ export function VerificationStatusToggle({
         event.preventDefault();
         event.stopPropagation();
         if (!isLoading) {
-          void onToggle();
+          Promise.resolve(onToggle()).catch(() => {});
         }
       }
     },

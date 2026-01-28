@@ -72,11 +72,11 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
   const handleEdit = useCallback(() => onEdit(release), [onEdit, release]);
 
   const handleCopySmartLink = useCallback(() => {
-    void handleCopyWithFeedback(
+    handleCopyWithFeedback(
       release.smartLinkPath,
       `${release.title} smart link`,
       `action-copy-${release.id}`
-    );
+    ).catch(() => {});
   }, [
     handleCopyWithFeedback,
     release.smartLinkPath,
@@ -200,13 +200,13 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
               size='sm'
               data-testid={smartLinkTestId}
               data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-              onClick={() =>
-                void handleCopyWithFeedback(
+              onClick={() => {
+                handleCopyWithFeedback(
                   release.smartLinkPath,
                   `${release.title} smart link`,
                   smartLinkTestId
-                )
-              }
+                ).catch(() => {});
+              }}
               className={cn(
                 'inline-flex items-center text-xs transition-colors',
                 isCopied &&
