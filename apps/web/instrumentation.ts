@@ -27,6 +27,41 @@ function shouldReportToSentry(issues: string[]): boolean {
   return trulyBlockingIssues.length > 0;
 }
 
+/**
+ * Run environment validation with retry logic for cold starts.
+ * On Vercel cold starts, environment variables may not be immediately available,
+ * so we retry once after a small delay to allow for initialization.
+ */
+async function runEnvironmentValidationWithRetry() {
+  const { runStartupEnvironmentValidation } = await import(
+    '@/lib/startup/environment-validator'
+  );
+  
+  // First attempt
+  let result = await runStartupEnvironmentValidation();
+
+  // If we have critical issues, retry once after a short delay
+  // This handles race conditions on Vercel cold starts where env vars
+  // may not be fully loaded during the first register() call
+  if (result && result.critical.length > 0) {
+    console.log('[STARTUP] Critical issues detected, retrying after 100ms delay...');
+    
+    // Wait for environment to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Retry validation
+    result = await runStartupEnvironmentValidation();
+    
+    if (result && result.critical.length > 0) {
+      console.warn('[STARTUP] Critical issues persist after retry');
+    } else {
+      console.log('[STARTUP] Retry successful - environment now valid');
+    }
+  }
+
+  return result;
+}
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./sentry.server.config');
@@ -34,10 +69,7 @@ export async function register() {
     // Run environment validation at startup to detect issues early
     // This catches build-time vs runtime environment differences on Vercel
     try {
-      const { runStartupEnvironmentValidation } = await import(
-        '@/lib/startup/environment-validator'
-      );
-      const result = await runStartupEnvironmentValidation();
+      const result = await runEnvironmentValidationWithRetry();
 
       if (result && result.critical.length > 0) {
         // Only report to Sentry if the issues are truly blocking in production
