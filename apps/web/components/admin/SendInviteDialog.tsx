@@ -102,6 +102,7 @@ export function SendInviteDialog({
                 alt={profile.displayName || profile.username}
                 width={40}
                 height={40}
+                sizes='40px'
                 className='rounded-full object-cover'
                 unoptimized={profile.avatarUrl.includes('i.scdn.co')}
               />
