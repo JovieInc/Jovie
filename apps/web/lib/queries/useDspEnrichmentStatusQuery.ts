@@ -86,11 +86,11 @@ export interface UseDspEnrichmentStatusQueryOptions {
 const DEFAULT_POLLING_INTERVAL_MS = 5000;
 
 /** Active phases that should trigger polling */
-const ACTIVE_PHASES: EnrichmentPhase[] = [
+const ACTIVE_PHASES = new Set<EnrichmentPhase>([
   'discovering',
   'matching',
   'enriching',
-];
+]);
 
 // ============================================================================
 // Fetch Function
@@ -160,7 +160,7 @@ export function useDspEnrichmentStatusQuery({
       if (!status) return false;
 
       // Poll only during active phases
-      if (ACTIVE_PHASES.includes(status.overallPhase)) {
+      if (ACTIVE_PHASES.has(status.overallPhase)) {
         return DEFAULT_POLLING_INTERVAL_MS;
       }
 
@@ -184,7 +184,7 @@ export function isEnrichmentInProgress(
   status: EnrichmentStatus | undefined
 ): boolean {
   if (!status) return false;
-  return ACTIVE_PHASES.includes(status.overallPhase);
+  return ACTIVE_PHASES.has(status.overallPhase);
 }
 
 /**

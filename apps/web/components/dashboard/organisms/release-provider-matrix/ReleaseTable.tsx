@@ -74,6 +74,12 @@ interface ReleaseTableProps {
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
+const SUPPORTED_PROVIDERS = new Set<ProviderKey>([
+  'spotify',
+  'apple_music',
+  'youtube',
+  'deezer',
+]);
 
 // ============================================================================
 // Static Column Definitions (Module Level)
@@ -299,12 +305,6 @@ export function ReleaseTable({
       }
 
       // Add external link options for available providers
-      const supportedProviders: ProviderKey[] = [
-        'spotify',
-        'apple_music',
-        'youtube',
-        'deezer',
-      ];
       const providerLabels: Partial<Record<ProviderKey, string>> = {
         spotify: 'Spotify',
         apple_music: 'Apple Music',
@@ -313,7 +313,7 @@ export function ReleaseTable({
       };
 
       const externalProviders = release.providers.filter(
-        p => supportedProviders.includes(p.key) && p.url
+        p => SUPPORTED_PROVIDERS.has(p.key) && p.url
       );
 
       if (externalProviders.length > 0) {

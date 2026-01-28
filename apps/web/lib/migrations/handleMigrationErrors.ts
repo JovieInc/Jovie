@@ -11,7 +11,7 @@ type MigrationErrorHandlingResult = {
   error?: string;
 };
 
-const MIGRATION_ERROR_CODES = ['42703', '42P01', '42P02'];
+const MIGRATION_ERROR_CODES = new Set(['42703', '42P01', '42P02']);
 
 function extractMigrationErrorDetails(error: unknown): {
   code?: string;
@@ -66,9 +66,7 @@ export function handleMigrationErrors(
   context: MigrationErrorContext
 ): MigrationErrorHandlingResult {
   const { code, message } = extractMigrationErrorDetails(error);
-  const hasMigrationErrorCode = code
-    ? MIGRATION_ERROR_CODES.includes(code)
-    : false;
+  const hasMigrationErrorCode = code ? MIGRATION_ERROR_CODES.has(code) : false;
 
   switch (context.operation) {
     case 'creator_profiles': {
