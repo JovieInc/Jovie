@@ -134,7 +134,7 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
       if (!(e.target instanceof HTMLFormElement)) return;
 
       const form = e.target;
-      if (form.hasAttribute('data-track-form')) {
+      if (form.dataset.trackForm !== undefined) {
         const formType = form.dataset.formType ?? 'unknown';
 
         sendEvent('form_submit', {
