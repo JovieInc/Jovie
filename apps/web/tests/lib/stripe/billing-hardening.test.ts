@@ -419,6 +419,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       });
       expect(values.newState).toEqual({
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_new',
         stripeSubscriptionId: 'sub_new',
       });

@@ -86,7 +86,9 @@ describe('AvatarUploadable - Upload Mode', () => {
     const container = screen.getByRole('button');
     expect(container).toBeInTheDocument();
     expect(container).toHaveAttribute('aria-label', 'Upload profile photo');
-    expect(container).toHaveAttribute('tabIndex', '0');
+    // Button elements are focusable by default (implicit tabIndex=0)
+    expect(container).not.toHaveAttribute('tabIndex', '-1');
+    expect(container).not.toBeDisabled();
   });
 
   it('shows file input for upload', () => {

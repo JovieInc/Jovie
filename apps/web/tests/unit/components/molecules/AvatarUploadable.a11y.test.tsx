@@ -100,6 +100,9 @@ describe('AvatarUploadable - Accessibility', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('tabIndex', '0');
+    // Button elements are focusable by default (implicit tabIndex=0)
+    // Check that it's not explicitly removed from tab order
+    expect(button).not.toHaveAttribute('tabIndex', '-1');
+    expect(button).not.toBeDisabled();
   });
 });

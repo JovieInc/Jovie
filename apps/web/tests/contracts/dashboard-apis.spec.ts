@@ -85,7 +85,7 @@ vi.mock('@/lib/db/queries/analytics', () => ({
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  dashboardLinksRateLimit: {
+  dashboardLinksLimiter: {
     limit: (...args: any[]) => mockDashboardLinksRateLimit(...args),
   },
   createRateLimitHeaders: () => ({}),
@@ -541,6 +541,7 @@ describe('Dashboard API contracts', () => {
               usernameNormalized: 'artist',
               avatarUrl: null,
               avatarLockedByUser: false,
+              displayNameLocked: false,
               userId: 'user_internal',
             },
           ],
