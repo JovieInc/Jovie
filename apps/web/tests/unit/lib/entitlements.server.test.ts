@@ -1,21 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
-const { mockAuth } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+const { mockCachedAuth, mockCachedCurrentUser } = vi.hoisted(() => ({
+  mockCachedAuth: vi.fn(),
+  mockCachedCurrentUser: vi.fn(),
 }));
 
 const { mockGetUserBillingInfo } = vi.hoisted(() => ({
   mockGetUserBillingInfo: vi.fn(),
 }));
 
-const { mockCurrentUser } = vi.hoisted(() => ({
-  mockCurrentUser: vi.fn(),
-}));
-
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
-  currentUser: mockCurrentUser,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockCachedAuth,
+  getCachedCurrentUser: mockCachedCurrentUser,
 }));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
@@ -24,8 +21,8 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 
 describe('getCurrentUserEntitlements', () => {
   it('returns anonymous entitlements when not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
-    mockCurrentUser.mockResolvedValue(null);
+    mockCachedAuth.mockResolvedValue({ userId: null });
+    mockCachedCurrentUser.mockResolvedValue(null);
 
     const entitlements = await getCurrentUserEntitlements();
 
@@ -34,15 +31,20 @@ describe('getCurrentUserEntitlements', () => {
       email: null,
       isAuthenticated: false,
       isAdmin: false,
+      plan: 'free',
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
+      canExportContacts: false,
+      canAccessAdvancedAnalytics: false,
+      analyticsRetentionDays: 7,
+      contactsLimit: 100,
     });
   });
 
   it('returns basic entitlements when authenticated but billing lookup fails', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockCurrentUser.mockResolvedValue({
+    mockCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'basic@example.com' },
     });
     mockGetUserBillingInfo.mockResolvedValue({
@@ -57,15 +59,20 @@ describe('getCurrentUserEntitlements', () => {
       email: 'basic@example.com',
       isAuthenticated: true,
       isAdmin: false,
+      plan: 'free',
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
+      canExportContacts: false,
+      canAccessAdvancedAnalytics: false,
+      analyticsRetentionDays: 7,
+      contactsLimit: 100,
     });
   });
 
   it('maps billing data for a free user', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_free' });
-    mockCurrentUser.mockResolvedValue({
+    mockCachedAuth.mockResolvedValue({ userId: 'user_free' });
+    mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'free@example.com' },
     });
     mockGetUserBillingInfo.mockResolvedValue({
@@ -75,6 +82,7 @@ describe('getCurrentUserEntitlements', () => {
         email: 'free@example.com',
         isAdmin: false,
         isPro: false,
+        plan: 'free',
         stripeCustomerId: null,
         stripeSubscriptionId: null,
       },
@@ -87,15 +95,20 @@ describe('getCurrentUserEntitlements', () => {
       email: 'free@example.com',
       isAuthenticated: true,
       isAdmin: false,
+      plan: 'free',
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
+      canExportContacts: false,
+      canAccessAdvancedAnalytics: false,
+      analyticsRetentionDays: 7,
+      contactsLimit: 100,
     });
   });
 
   it('maps billing data for a pro user', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_pro' });
-    mockCurrentUser.mockResolvedValue({
+    mockCachedAuth.mockResolvedValue({ userId: 'user_pro' });
+    mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'pro@example.com' },
     });
     mockGetUserBillingInfo.mockResolvedValue({
@@ -105,6 +118,7 @@ describe('getCurrentUserEntitlements', () => {
         email: 'pro@example.com',
         isAdmin: false,
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_123',
         stripeSubscriptionId: 'sub_123',
       },
@@ -112,14 +126,20 @@ describe('getCurrentUserEntitlements', () => {
 
     const entitlements = await getCurrentUserEntitlements();
 
+    // Note: hasAdvancedFeatures is only true for 'growth' plan, not 'pro'
     expect(entitlements).toEqual({
       userId: 'user_pro',
       email: 'pro@example.com',
       isAuthenticated: true,
       isAdmin: false,
+      plan: 'pro',
       isPro: true,
-      hasAdvancedFeatures: true,
+      hasAdvancedFeatures: false,
       canRemoveBranding: true,
+      canExportContacts: true,
+      canAccessAdvancedAnalytics: true,
+      analyticsRetentionDays: 90,
+      contactsLimit: null,
     });
   });
 });

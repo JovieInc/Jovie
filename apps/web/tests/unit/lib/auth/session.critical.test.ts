@@ -86,7 +86,8 @@ describe('@critical session.ts', () => {
       const result = await setupDbSession('user_provided_123');
 
       expect(result.userId).toBe('user_provided_123');
-      expect(mockDbExecute).toHaveBeenCalledTimes(2);
+      // Combined into single query for performance
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
     });
 
     it('uses getCachedAuth when no clerkUserId provided', async () => {

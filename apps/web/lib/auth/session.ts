@@ -48,13 +48,10 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 export async function setupDbSession(clerkUserId?: string) {
   const userId = await resolveClerkUserId(clerkUserId);
 
-  // Set the session variable for RLS
+  // Set the session variables for RLS in a single query
   // Using sql.raw with validated input to prevent SQL injection
   await db.execute(
-    drizzleSql`SELECT set_config('app.user_id', ${userId}, true)`
-  );
-  await db.execute(
-    drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`
+    drizzleSql`SELECT set_config('app.user_id', ${userId}, true), set_config('app.clerk_user_id', ${userId}, true)`
   );
 
   return { userId };
@@ -117,11 +114,9 @@ export async function withDbSessionTx<T>(
 
     // Important: SET LOCAL must be inside the transaction to take effect.
     // In unit tests, drizzleSql may be mocked without .raw; guard accordingly.
+    // Combined into single query for performance (saves one DB round trip)
     await tx.execute(
-      drizzleSql`SELECT set_config('app.user_id', ${userId}, true)`
-    );
-    await tx.execute(
-      drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`
+      drizzleSql`SELECT set_config('app.user_id', ${userId}, true), set_config('app.clerk_user_id', ${userId}, true)`
     );
     // Transaction client now properly typed with neon-serverless driver
     return await operation(tx, userId);
