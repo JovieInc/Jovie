@@ -57,20 +57,25 @@ export interface SpotifyArtistInput {
 // ============================================================================
 
 /**
- * Pattern to match remix credits in track titles
- * Matches: "(X Remix)", "[X Remix]", "(Remixed by X)", "(X Mix)"
- * NOSONAR S5843: Complex pattern required to parse multiple remix credit formats per music industry standards
+ * Pattern to capture bracketed credits in track titles
+ * Matches: "(...)" and "[...]"
  */
-const REMIX_PATTERN =
-  /[([]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[)\]]/gi;
+const BRACKETED_CREDIT_PATTERN = /[([]\s*([^[\])]+?)\s*[)\]]/g;
 
 /**
- * Pattern to match featured artists in track titles
- * Matches: "(feat. X)", "(ft. X)", "(featuring X)", "feat. X", "ft. X"
- * NOSONAR S5843: Complex pattern required to parse multiple featuring credit formats per music industry standards
+ * Pattern to identify featured credits in track titles
+ * Matches: "feat.", "ft.", "featuring"
  */
-const FEATURED_PATTERN =
-  /(?:[([]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+))/gi;
+const FEATURED_MARKER_PATTERN = /\b(?:feat\.?|ft\.?|featuring)\b/i;
+const WITH_MARKER_PATTERN = /\bwith\b/i;
+
+/**
+ * Pattern to identify remix credits in track titles
+ * Matches: "remixed by", "remix", "rmx", "mix", "edit", "bootleg", "rework"
+ */
+const REMIXED_BY_PATTERN = /\b(?:remixed|remix)\s+by\b/i;
+const REMIX_KEYWORD_PATTERN =
+  /\b(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip)\b/i;
 
 /**
  * Pattern to match "with" credits
@@ -131,6 +136,122 @@ function getBestImageUrl(
   return sorted[0]?.url;
 }
 
+type BracketedCredit = {
+  content: string;
+  start: number;
+  end: number;
+};
+
+function getBracketedCredits(title: string): BracketedCredit[] {
+  const credits: BracketedCredit[] = [];
+  BRACKETED_CREDIT_PATTERN.lastIndex = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = BRACKETED_CREDIT_PATTERN.exec(title)) !== null) {
+    const content = match[1]?.trim();
+    if (!content) continue;
+    const start = match.index;
+    credits.push({
+      content,
+      start,
+      end: start + match[0].length,
+    });
+  }
+
+  return credits;
+}
+
+function isRemixSegment(segment: string): boolean {
+  if (REMIXED_BY_PATTERN.test(segment)) return true;
+
+  const keywordMatch = segment.match(REMIX_KEYWORD_PATTERN);
+  if (keywordMatch?.index == null || keywordMatch.index === 0) {
+    return false;
+  }
+
+  return keywordMatch.index > 0;
+}
+
+function extractRemixerName(segment: string): string | null {
+  if (REMIXED_BY_PATTERN.test(segment)) {
+    const name = segment.replace(REMIXED_BY_PATTERN, '').trim();
+    return name.length > 0 ? name : null;
+  }
+
+  const keywordMatch = segment.match(REMIX_KEYWORD_PATTERN);
+  if (keywordMatch?.index == null || keywordMatch.index === 0) {
+    return null;
+  }
+
+  const name = segment.slice(0, keywordMatch.index).trim();
+  return name.length > 0 ? name : null;
+}
+
+function extractFeaturedPartFromSegment(segment: string): string | null {
+  const markerMatch = segment.match(FEATURED_MARKER_PATTERN);
+  if (markerMatch?.index == null) {
+    return null;
+  }
+
+  const startIndex = markerMatch.index + markerMatch[0].length;
+  const rawPart = segment.slice(startIndex).trim();
+  const cleaned = rawPart.replace(/^[\s.:,-]+/, '').trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+function extractInlineFeaturedPart(
+  title: string,
+  bracketedCredits: BracketedCredit[]
+): Array<{ part: string; index: number }> {
+  const results: Array<{ part: string; index: number }> = [];
+  const markerPattern = new RegExp(FEATURED_MARKER_PATTERN.source, 'gi');
+
+  let match: RegExpExecArray | null;
+  while ((match = markerPattern.exec(title)) !== null) {
+    const matchIndex = match.index ?? 0;
+    const isInsideBracket = bracketedCredits.some(
+      credit => matchIndex >= credit.start && matchIndex <= credit.end
+    );
+    if (isInsideBracket) continue;
+
+    const afterMarker = title.slice(matchIndex + match[0].length);
+    const bracketIndex = afterMarker.search(/[[(]/);
+    const rawPart =
+      bracketIndex >= 0 ? afterMarker.slice(0, bracketIndex) : afterMarker;
+    const cleaned = rawPart.replace(/^[\s.:,-]+/, '').trim();
+    if (!cleaned) continue;
+
+    results.push({ part: cleaned, index: matchIndex });
+  }
+
+  return results;
+}
+
+function stripBracketedCredits(
+  title: string,
+  shouldStrip: (segment: string) => boolean
+): string {
+  return title.replace(BRACKETED_CREDIT_PATTERN, (match, segment: string) =>
+    shouldStrip(segment) ? '' : match
+  );
+}
+
+function removeInlineCredits(title: string, markerPattern: RegExp): string {
+  let nextTitle = title;
+  let match: RegExpExecArray | null;
+  const pattern = new RegExp(markerPattern.source, 'i');
+
+  while ((match = pattern.exec(nextTitle)) !== null) {
+    const before = nextTitle.slice(0, match.index);
+    const after = nextTitle.slice(match.index + match[0].length);
+    const bracketIndex = after.search(/[[(]/);
+    const remainder = bracketIndex >= 0 ? after.slice(bracketIndex) : '';
+    nextTitle = `${before}${remainder}`;
+  }
+
+  return nextTitle;
+}
+
 function appendUniqueCredits(
   existingCredits: ParsedArtistCredit[],
   nextCredits: ParsedArtistCredit[],
@@ -170,15 +291,14 @@ function appendUniqueCredits(
  */
 export function extractRemixers(title: string): ParsedArtistCredit[] {
   const remixers: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
+  const bracketedCredits = getBracketedCredits(title);
 
-  // Reset regex state
-  REMIX_PATTERN.lastIndex = 0;
-
-  while ((match = REMIX_PATTERN.exec(title)) !== null) {
-    const remixerPart = match[1] ?? match[2];
-    if (!remixerPart) continue;
+  for (const credit of bracketedCredits) {
+    const remixerPart = extractRemixerName(credit.content);
+    if (!remixerPart) {
+      continue;
+    }
 
     // Check if this is just "Remix" without an artist
     const cleanedPart = cleanArtistName(remixerPart);
@@ -218,17 +338,25 @@ export function extractRemixers(title: string): ParsedArtistCredit[] {
  */
 export function extractFeatured(title: string): ParsedArtistCredit[] {
   const featured: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
+  const bracketedCredits = getBracketedCredits(title);
+  const featuredParts: Array<{ part: string; index: number }> = [];
 
-  FEATURED_PATTERN.lastIndex = 0;
-
-  while ((match = FEATURED_PATTERN.exec(title)) !== null) {
-    const featuredPart = match[1] ?? match[2];
+  for (const credit of bracketedCredits) {
+    const featuredPart = extractFeaturedPartFromSegment(credit.content);
     if (!featuredPart) continue;
+    featuredParts.push({ part: featuredPart, index: credit.start });
+  }
 
+  for (const inlinePart of extractInlineFeaturedPart(title, bracketedCredits)) {
+    featuredParts.push(inlinePart);
+  }
+
+  featuredParts.sort((a, b) => a.index - b.index);
+
+  for (const featuredPart of featuredParts) {
     // Handle multiple featured artists
-    const artistNames = splitByConjunction(featuredPart);
+    const artistNames = splitByConjunction(featuredPart.part);
 
     for (const artistName of artistNames) {
       if (artistName.trim()) {
@@ -481,18 +609,10 @@ export function parseArtistCredits(
  */
 export function isRemix(title: string): boolean {
   const lowerTitle = title.toLowerCase();
-
-  const bracketPatterns = [
-    /[([].*remix.*[)\]]/i,
-    /[([].*rmx.*[)\]]/i,
-    /[([].*rework.*[)\]]/i,
-    /[([].*bootleg.*[)\]]/i,
-    /[([].*edit.*[)\]]/i,
-    /[([].*flip.*[)\]]/i,
-  ];
+  const bracketedCredits = getBracketedCredits(title);
 
   return (
-    bracketPatterns.some(pattern => pattern.test(title)) ||
+    bracketedCredits.some(credit => isRemixSegment(credit.content)) ||
     lowerTitle.includes('remix') ||
     lowerTitle.includes('remixed by')
   );
@@ -506,20 +626,24 @@ export function isRemix(title: string): boolean {
  * // Returns: "Song"
  */
 export function cleanTrackTitle(title: string): string {
-  return (
-    title
-      // Remove featured credits
-      .replaceAll(
-        /[([]?\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+[^)\]]+[)\]]?/gi,
-        ''
-      )
-      // Remove remix credits
-      .replaceAll(REMIX_PATTERN, '')
-      // Remove "with" credits
-      .replaceAll(/[([]?\s*with\s+[^)\]]+[)\]]?/gi, '')
-      // Clean up whitespace and trailing punctuation
-      .replaceAll(/\s+/g, ' ')
-      .replace(/\s*[-–]\s*$/, '')
-      .trim()
+  const withoutFeatured = stripBracketedCredits(title, segment =>
+    FEATURED_MARKER_PATTERN.test(segment)
   );
+  const withoutRemix = stripBracketedCredits(withoutFeatured, isRemixSegment);
+  const withoutWith = stripBracketedCredits(withoutRemix, segment =>
+    WITH_MARKER_PATTERN.test(segment)
+  );
+  const withoutInlineFeatured = removeInlineCredits(
+    withoutWith,
+    FEATURED_MARKER_PATTERN
+  );
+  const withoutInlineWith = removeInlineCredits(
+    withoutInlineFeatured,
+    WITH_MARKER_PATTERN
+  );
+
+  return withoutInlineWith
+    .replaceAll(/\s+/g, ' ')
+    .replace(/\s*[-–]\s*$/, '')
+    .trim();
 }

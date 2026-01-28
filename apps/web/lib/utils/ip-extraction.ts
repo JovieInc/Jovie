@@ -39,27 +39,59 @@
  * Validate if a string is a valid IPv4 or IPv6 address
  */
 export function isValidIP(ip: string): boolean {
-  // Complexity required to properly validate IPv4 octet ranges (0-255)
-  const ipv4Regex = // NOSONAR S5843
-    /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  if (ipv4Regex.test(ip)) {
-    return true;
+  const ipv4Pattern = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+  if (ipv4Pattern.test(ip)) {
+    const octets = ip.split('.');
+    const isValidOctets = octets.every(octet => {
+      const value = Number(octet);
+      return Number.isInteger(value) && value >= 0 && value <= 255;
+    });
+    if (isValidOctets) {
+      return true;
+    }
   }
 
-  // IPv6 validation (simplified - covers most common formats)
-  const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  if (ipv6Regex.test(ip)) {
-    return true;
-  }
-
-  // IPv6 compressed format (with ::)
-  const ipv6CompressedRegex =
-    /^((?:[0-9a-fA-F]{1,4}:)*)::((?:[0-9a-fA-F]{1,4}:)*)([0-9a-fA-F]{1,4})?$/;
-  if (ipv6CompressedRegex.test(ip)) {
+  if (isValidIPv6(ip)) {
     return true;
   }
 
   return false;
+}
+
+function isValidIPv6(ip: string): boolean {
+  if (!/^[0-9a-fA-F:.]+$/.test(ip)) {
+    return false;
+  }
+
+  if (ip.includes(':::')) {
+    return false;
+  }
+
+  const doubleColonMatches = ip.match(/::/g) ?? [];
+  if (doubleColonMatches.length > 1) {
+    return false;
+  }
+
+  const [left, right] = ip.split('::');
+  if (left?.endsWith(':') || right?.startsWith(':')) {
+    return false;
+  }
+
+  const leftParts = left ? left.split(':').filter(Boolean) : [];
+  const rightParts = right ? right.split(':').filter(Boolean) : [];
+  const isValidPart = (part: string): boolean =>
+    /^[0-9a-fA-F]{1,4}$/.test(part);
+
+  if (!leftParts.every(isValidPart) || !rightParts.every(isValidPart)) {
+    return false;
+  }
+
+  const totalParts = leftParts.length + rightParts.length;
+  if (doubleColonMatches.length === 0) {
+    return totalParts === 8;
+  }
+
+  return totalParts < 8;
 }
 
 /**

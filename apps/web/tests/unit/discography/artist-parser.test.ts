@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanTrackTitle,
+  extractFeatured,
   extractRemixers,
   isRemix,
   normalizeArtistName,
@@ -135,6 +136,20 @@ describe('artist-parser', () => {
         extractRemixers('Song (Daft Punk Remix)').map(r => r.name)
       ).toEqual(['Daft Punk']);
       expect(extractRemixers('Song (Remix)')).toEqual([]);
+    });
+  });
+
+  describe('extractFeatured', () => {
+    it('extracts bracketed featured credits', () => {
+      expect(
+        extractFeatured('Song (featuring Artist B)').map(r => r.name)
+      ).toEqual(['Artist B']);
+    });
+
+    it('extracts inline and bracketed featured credits in order', () => {
+      expect(
+        extractFeatured('Song feat. Artist B [feat. Artist C]').map(r => r.name)
+      ).toEqual(['Artist B', 'Artist C']);
     });
   });
 
