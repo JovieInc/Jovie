@@ -136,6 +136,28 @@ describe('artist-parser', () => {
       ).toEqual(['Daft Punk']);
       expect(extractRemixers('Song (Remix)')).toEqual([]);
     });
+
+    it('extracts remixers from "Remixed by" credits', () => {
+      expect(
+        extractRemixers('Song (Remixed by Skrillex)').map(r => r.name)
+      ).toEqual(['Skrillex']);
+    });
+  });
+
+  describe('extractFeatured', () => {
+    it('extracts bracketed and inline featured credits', () => {
+      expect(
+        parseArtistCredits('Song (feat. Artist B)', [{ id: '1', name: 'A' }])
+          .filter(credit => credit.role === 'featured_artist')
+          .map(credit => credit.name)
+      ).toEqual(['Artist B']);
+
+      expect(
+        parseArtistCredits('Song feat. Artist C', [{ id: '1', name: 'A' }])
+          .filter(credit => credit.role === 'featured_artist')
+          .map(credit => credit.name)
+      ).toEqual(['Artist C']);
+    });
   });
 
   describe('isRemix', () => {
