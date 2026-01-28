@@ -62,7 +62,8 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
   }
 
   return (
-    <div
+    <dialog
+      open
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50',
         'bg-surface-0/95 backdrop-blur-sm border-t border-subtle',
@@ -70,7 +71,6 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
         'animate-in slide-in-from-bottom-4 duration-300',
         className
       )}
-      role='dialog'
       aria-label='Cookie consent'
     >
       <div className='max-w-screen-lg mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3'>
@@ -110,6 +110,6 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           </Button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

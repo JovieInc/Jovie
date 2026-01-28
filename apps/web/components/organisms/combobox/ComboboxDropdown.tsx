@@ -36,19 +36,23 @@ export const ComboboxDropdown = forwardRef<
       {(() => {
         if (isLoading && query.length > 0) {
           return (
-            // NOSONAR S6819: role="status" is correct for loading announcements; <output> is for form results
-            <div className='px-4 py-3 text-sm text-gray-500' role='status'>
+            <output
+              className='px-4 py-3 text-sm text-gray-500'
+              aria-live='polite'
+            >
               <div className='flex items-center space-x-2'>
                 <LoadingSpinner size='sm' className='text-gray-500' />
                 <span>Searching artists...</span>
               </div>
-            </div>
+            </output>
           );
         }
         if (showNoResults) {
           return (
-            // NOSONAR S6819: role="status" is correct for state announcements; <output> is for form results
-            <div className='px-4 py-4 text-sm text-gray-500' role='status'>
+            <output
+              className='px-4 py-4 text-sm text-gray-500'
+              aria-live='polite'
+            >
               <p className='mb-2'>No artists found for &quot;{query}&quot;</p>
               <p className='text-xs text-gray-400'>
                 Can&apos;t find your artist?{' '}
@@ -61,7 +65,7 @@ export const ComboboxDropdown = forwardRef<
                   Verify your Spotify artist profile
                 </a>
               </p>
-            </div>
+            </output>
           );
         }
         return filteredOptions.map((option, index) => (

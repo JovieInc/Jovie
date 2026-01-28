@@ -30,7 +30,7 @@ export function AvatarUpload({
   onUploadError,
   className,
 }: AvatarUploadProps) {
-  const uploadableRef = useRef<HTMLDivElement>(null);
+  const uploadableRef = useRef<HTMLButtonElement>(null);
   const [lastError, setLastError] = useState<string | null>(null);
 
   // Note: We don't use mutation callbacks here because AvatarUploadable

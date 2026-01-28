@@ -221,14 +221,9 @@ export function OnboardingHandleStep({
               </div>
             </div>
 
-            {/* NOSONAR S6819: role="status" is correct for validation feedback; <output> is for form calculation results */}
-            <div
-              className={FORM_LAYOUT.errorContainer}
-              role='status'
-              aria-live='polite'
-            >
+            <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
               {renderValidationStatus()}
-            </div>
+            </output>
           </div>
 
           <AuthButton
@@ -244,14 +239,9 @@ export function OnboardingHandleStep({
           </AuthButton>
         </form>
 
-        {/* NOSONAR S6819: role="status" is correct for error feedback; <output> is for form calculation results */}
-        <div
-          className={FORM_LAYOUT.footerHint}
-          role='status'
-          aria-live='polite'
-        >
+        <output className={FORM_LAYOUT.footerHint} aria-live='polite'>
           {stateError ?? null}
-        </div>
+        </output>
       </div>
     </div>
   );

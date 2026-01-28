@@ -96,10 +96,9 @@ export function CopyToClipboardButton({
         )}
       </Button>
 
-      {/* NOSONAR S6819: role="status" is correct for live announcements; <output> is for form results */}
-      <span className='sr-only' aria-live='polite' role='status'>
+      <output className='sr-only' aria-live='polite'>
         {getStatusMessage(status)}
-      </span>
+      </output>
     </div>
   );
 }

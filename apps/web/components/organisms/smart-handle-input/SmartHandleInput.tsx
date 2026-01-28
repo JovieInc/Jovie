@@ -128,15 +128,13 @@ export function SmartHandleInput({
       </div>
 
       {/* Status message */}
-      {/* NOSONAR S6819: role="status" is correct for validation feedback; <output> is for form results */}
-      <div
+      <output
         className={`text-xs min-h-5 transition-all duration-300 ${getStatusClass()}`}
         id={statusId}
-        role='status'
         aria-live='polite'
       >
         {statusMessage || '\u00A0'}
-      </div>
+      </output>
 
       {/* Username suggestions */}
       {formatHints && (

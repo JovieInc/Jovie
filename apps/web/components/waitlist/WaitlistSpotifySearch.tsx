@@ -323,6 +323,48 @@ export function WaitlistSpotifySearch({
           className='absolute z-50 w-full mt-1 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] shadow-lg overflow-hidden'
           style={{ top: '100%' }}
         >
+          <select
+            id='spotify-search-results'
+            className='sr-only'
+            size={Math.min(totalItems, 6)}
+            aria-label='Spotify artist results'
+            value={
+              activeIndex === manualAddIndex
+                ? '__manual__'
+                : (results[activeIndex]?.id ?? '')
+            }
+            onChange={event => {
+              if (event.target.value === '__manual__') {
+                handleManualAddClick();
+                return;
+              }
+              const selectedArtist = results.find(
+                artist => artist.id === event.target.value
+              );
+              if (selectedArtist) {
+                handleArtistSelect(selectedArtist);
+              }
+            }}
+          >
+            <option value='' disabled>
+              Select an artist
+            </option>
+            {results.map((artist, index) => (
+              <option
+                key={artist.id}
+                id={`spotify-result-${index}`}
+                value={artist.id}
+              >
+                {artist.name}
+                {artist.followers
+                  ? ` — ${formatFollowers(artist.followers)}`
+                  : ''}
+              </option>
+            ))}
+            <option id={`spotify-result-${manualAddIndex}`} value='__manual__'>
+              Manually add URL
+            </option>
+          </select>
           {/* Loading skeleton */}
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
@@ -356,22 +398,16 @@ export function WaitlistSpotifySearch({
           )}
 
           {/* Artist results */}
-          {/* NOSONAR S6819: Custom autocomplete requires ARIA listbox pattern; native <select> can't support search or custom styling */}
           {results.length > 0 && (
             <div
               ref={resultsListRef}
-              id='spotify-search-results'
-              role='listbox'
               className='max-h-64 overflow-y-auto'
+              aria-hidden='true'
             >
-              {/* NOSONAR S6819: Custom option with rich content; native <option> can't render images */}
               {results.map((artist, index) => (
                 <div
                   key={artist.id}
-                  id={`spotify-result-${index}`}
-                  role='option'
                   tabIndex={-1}
-                  aria-selected={index === activeIndex}
                   className={cn(
                     'flex items-center gap-3 p-3 cursor-pointer transition-colors',
                     index === activeIndex
@@ -437,12 +473,8 @@ export function WaitlistSpotifySearch({
           )}
 
           {/* Always-visible "Manually add URL" option */}
-          {/* NOSONAR S6819: Custom option with icon; native <option> can't render custom content */}
           <div
-            role='option'
-            id={`spotify-result-${manualAddIndex}`}
             tabIndex={-1}
-            aria-selected={activeIndex === manualAddIndex}
             className={cn(
               'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-[#d7d9de] dark:border-[#2c2e33]',
               activeIndex === manualAddIndex
