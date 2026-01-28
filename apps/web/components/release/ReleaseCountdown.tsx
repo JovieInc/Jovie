@@ -65,6 +65,7 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
       // When countdown ends, refresh the page to show released content
       // This ensures users see the correct UI state without manual refresh
       if (newTimeLeft.total <= 0) {
+        clearInterval(timer);
         router.refresh();
       }
     }, UPDATE_INTERVAL_MS);
