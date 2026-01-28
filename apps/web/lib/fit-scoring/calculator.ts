@@ -19,7 +19,7 @@
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 
 /** Current version of the scoring algorithm */
-export const FIT_SCORE_VERSION = 1;
+export const FIT_SCORE_VERSION = 2;
 
 /** Point values for each scoring criterion */
 export const SCORE_WEIGHTS = {
@@ -31,6 +31,10 @@ export const SCORE_WEIGHTS = {
   RELEASE_RECENCY_6MO: 10,
   RELEASE_RECENCY_1YR: 5,
   GENRE_MATCH: 5,
+  // Alternative platform bonuses (for non-Spotify profiles)
+  HAS_ALTERNATIVE_DSP: 10, // Apple Music, SoundCloud, etc.
+  MULTI_DSP_PRESENCE: 5, // Present on 3+ streaming platforms
+  HAS_CONTACT_EMAIL: 5, // Contact email available (easier outreach)
 } as const;
 
 const SPOTIFY_POPULARITY_THRESHOLDS = [
@@ -129,6 +133,14 @@ export interface FitScoreInput {
   genres?: string[] | null;
   /** Most recent release date */
   latestReleaseDate?: Date | null;
+  /** Whether we have a contact email for outreach */
+  hasContactEmail?: boolean;
+  /** Whether the profile has Apple Music presence */
+  hasAppleMusicId?: boolean;
+  /** Whether the profile has SoundCloud presence */
+  hasSoundCloudId?: boolean;
+  /** Number of DSP platforms linked */
+  dspPlatformCount?: number;
 }
 
 /**
@@ -150,6 +162,9 @@ function createInitialBreakdown(now: Date): FitScoreBreakdown {
     spotifyPopularity: 0,
     releaseRecency: 0,
     genreMatch: 0,
+    hasAlternativeDsp: 0,
+    multiDspPresence: 0,
+    hasContactEmail: 0,
     meta: {
       calculatedAt: now.toISOString(),
       version: FIT_SCORE_VERSION,
@@ -214,7 +229,10 @@ function getFitScoreTotal(breakdown: FitScoreBreakdown) {
     breakdown.hasSpotify +
     breakdown.spotifyPopularity +
     breakdown.releaseRecency +
-    breakdown.genreMatch
+    breakdown.genreMatch +
+    (breakdown.hasAlternativeDsp ?? 0) +
+    (breakdown.multiDspPresence ?? 0) +
+    (breakdown.hasContactEmail ?? 0)
   );
 }
 
@@ -274,8 +292,31 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
     breakdown.meta!.matchedGenres = matchedGenres;
   }
 
-  // Calculate total score
-  const score = getFitScoreTotal(breakdown);
+  // 8. Alternative DSP presence (+10) - helps non-Spotify profiles score higher
+  // Only awarded if no Spotify to avoid double-counting
+  const alternativePlatforms: string[] = [];
+  if (input.hasAppleMusicId) alternativePlatforms.push('apple_music');
+  if (input.hasSoundCloudId) alternativePlatforms.push('soundcloud');
+
+  if (!input.hasSpotifyId && alternativePlatforms.length > 0) {
+    breakdown.hasAlternativeDsp = SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP;
+    breakdown.meta!.alternativeDspPlatforms = alternativePlatforms;
+  }
+
+  // 9. Multi-DSP presence (+5) - present on 3+ streaming platforms
+  const dspCount = input.dspPlatformCount ?? 0;
+  if (dspCount >= 3) {
+    breakdown.multiDspPresence = SCORE_WEIGHTS.MULTI_DSP_PRESENCE;
+    breakdown.meta!.dspPlatformCount = dspCount;
+  }
+
+  // 10. Has contact email (+5) - easier outreach
+  if (input.hasContactEmail) {
+    breakdown.hasContactEmail = SCORE_WEIGHTS.HAS_CONTACT_EMAIL;
+  }
+
+  // Calculate total score (capped at 100)
+  const score = Math.min(100, getFitScoreTotal(breakdown));
 
   return { score, breakdown };
 }

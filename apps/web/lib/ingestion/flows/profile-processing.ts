@@ -7,7 +7,10 @@
  * Extracted to reduce cognitive complexity of the creator-ingest route.
  */
 
+import { eq } from 'drizzle-orm';
+
 import type { DbType } from '@/lib/db';
+import { creatorContacts } from '@/lib/db/schema';
 import {
   calculateAndStoreFitScore,
   updatePaidTierScore,
@@ -39,6 +42,10 @@ export interface ExtractionData {
   avatarUrl?: string | null;
   hasPaidTier?: boolean | null;
   displayName?: string | null;
+  /** Contact email extracted from bio or content */
+  contactEmail?: string | null;
+  /** Bio/description text from the profile */
+  bio?: string | null;
 }
 
 /**
@@ -118,5 +125,66 @@ export async function processProfileExtraction(
     });
   }
 
+  // Store extracted contact email if found
+  if (extraction.contactEmail) {
+    try {
+      await storeContactEmail(tx, profile.id, extraction.contactEmail);
+    } catch (contactError) {
+      logger.warn('Contact email storage failed', {
+        profileId: profile.id,
+        error:
+          contactError instanceof Error
+            ? contactError.message
+            : 'Unknown error',
+      });
+    }
+  }
+
   return { mergeError };
+}
+
+/**
+ * Store an extracted contact email for a profile.
+ * Creates a new contact record if one doesn't exist.
+ */
+async function storeContactEmail(
+  tx: DbType,
+  profileId: string,
+  email: string
+): Promise<void> {
+  // Check if we already have a contact with this email
+  const [existingContact] = await tx
+    .select({ id: creatorContacts.id })
+    .from(creatorContacts)
+    .where(eq(creatorContacts.creatorProfileId, profileId))
+    .limit(1);
+
+  if (existingContact) {
+    // Update existing contact with email if it doesn't have one
+    await tx
+      .update(creatorContacts)
+      .set({
+        email,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorContacts.id, existingContact.id));
+
+    logger.info('Updated contact with extracted email', {
+      profileId,
+      contactId: existingContact.id,
+    });
+  } else {
+    // Create new contact
+    await tx.insert(creatorContacts).values({
+      creatorProfileId: profileId,
+      email,
+      role: 'fan_general', // Default role for extracted contacts
+      isActive: true,
+      sortOrder: 0,
+    });
+
+    logger.info('Created contact from extracted email', {
+      profileId,
+    });
+  }
 }

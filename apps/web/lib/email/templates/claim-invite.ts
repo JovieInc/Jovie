@@ -6,6 +6,11 @@
 
 import { APP_NAME } from '@/constants/app';
 import { getAppUrl, getProfileUrl, PROFILE_URL } from '@/constants/domains';
+import {
+  buildClickTrackingUrl,
+  buildOpenTrackingUrl,
+  type TrackingTokenPayload,
+} from '@/lib/email/tracking';
 import { buildClaimInviteUnsubscribeUrl } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '../utils';
 
@@ -22,6 +27,10 @@ export interface ClaimInviteTemplateData {
   fitScore?: number | null;
   /** Recipient email address (used for unsubscribe link) */
   recipientEmail?: string;
+  /** Invite ID for tracking (optional, enables tracking when provided) */
+  inviteId?: string;
+  /** Provider message ID for tracking attribution */
+  providerMessageId?: string;
 }
 
 /**
@@ -88,6 +97,37 @@ If this wasn't you, you can ignore this email.${unsubscribeSection}`;
 }
 
 /**
+ * Build tracking payload for this email
+ */
+function buildTrackingPayload(
+  data: ClaimInviteTemplateData
+): TrackingTokenPayload | null {
+  if (!data.inviteId || !data.recipientEmail) {
+    return null;
+  }
+  return {
+    emailType: 'claim_invite',
+    referenceId: data.inviteId,
+    email: data.recipientEmail,
+    messageId: data.providerMessageId,
+  };
+}
+
+/**
+ * Wrap a URL with click tracking if tracking is enabled
+ */
+function wrapWithClickTracking(
+  url: string,
+  trackingPayload: TrackingTokenPayload | null,
+  linkId?: string
+): string {
+  if (!trackingPayload) {
+    return url;
+  }
+  return buildClickTrackingUrl(trackingPayload, url, linkId) ?? url;
+}
+
+/**
  * Generate HTML email body
  */
 export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
@@ -96,6 +136,26 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
   const previewUrl = buildPreviewUrl(username);
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
+    : null;
+
+  // Build tracking payload
+  const trackingPayload = buildTrackingPayload(data);
+
+  // Wrap URLs with click tracking
+  const trackedClaimUrl = wrapWithClickTracking(
+    claimUrl,
+    trackingPayload,
+    'claim_cta'
+  );
+  const trackedPreviewUrl = wrapWithClickTracking(
+    previewUrl,
+    trackingPayload,
+    'preview'
+  );
+
+  // Generate open tracking pixel
+  const openTrackingPixel = trackingPayload
+    ? buildOpenTrackingUrl(trackingPayload)
     : null;
 
   // Escape user-provided values to prevent XSS
@@ -164,14 +224,14 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
               <!-- Profile Preview Card -->
               <div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
                 <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Your profile URL:</p>
-                <a href="${previewUrl}" style="font-size: 18px; font-weight: 600; color: #000; text-decoration: none;">
+                <a href="${trackedPreviewUrl}" style="font-size: 18px; font-weight: 600; color: #000; text-decoration: none;">
                   ${PROFILE_URL}/${safeUsername}
                 </a>
               </div>
 
               <!-- CTA Button -->
               <div style="text-align: center; margin-bottom: 24px;">
-                <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                <a href="${trackedClaimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
                   Claim Your Profile
                 </a>
               </div>
@@ -210,6 +270,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
       </td>
     </tr>
   </table>
+  ${openTrackingPixel ? `<img src="${escapeHtml(openTrackingPixel)}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />` : ''}
 </body>
 </html>
 `;

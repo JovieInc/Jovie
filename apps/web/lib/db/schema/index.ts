@@ -20,6 +20,8 @@ export * from './billing';
 export * from './content';
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export * from './dsp-enrichment';
+// Email Engagement (Opens, Clicks, Drip Campaigns)
+export * from './email-engagement';
 // Enums
 export * from './enums';
 // Ingestion
