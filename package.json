@@ -21,8 +21,10 @@
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.3",
       "vite": "^6.3.5",
-      "drizzle-orm": "0.45.0",
-      "jsdom": "26.1.0"
+      "drizzle-orm": "0.45.1",
+      "jsdom": "26.1.0",
+      "react": "19.2.4",
+      "react-dom": "19.2.4"
     }
   },
   "scripts": {
