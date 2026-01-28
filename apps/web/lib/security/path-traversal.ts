@@ -5,7 +5,7 @@
  * Use these utilities to validate file paths before reading/writing files.
  */
 
-import path from 'path';
+import path from 'node:path';
 
 /**
  * Matches C0 control characters (U+0000-U+001F) and C1 control characters (U+0080-U+009F).
