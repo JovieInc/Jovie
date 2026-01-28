@@ -35,6 +35,7 @@ export function BrandLogo({
           alt={alt}
           width={size}
           height={size}
+          sizes={`${size}px`}
           priority={priority}
           aria-hidden={ariaHidden}
           style={style}
@@ -45,6 +46,7 @@ export function BrandLogo({
           alt={alt}
           width={size}
           height={size}
+          sizes={`${size}px`}
           priority={priority}
           aria-hidden={ariaHidden}
           style={style}
@@ -68,6 +70,7 @@ export function BrandLogo({
       alt={alt}
       width={size}
       height={size}
+      sizes={`${size}px`}
       priority={priority}
       aria-hidden={ariaHidden}
       style={style}

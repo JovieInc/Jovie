@@ -20,6 +20,38 @@ export interface FeaturedCreatorsSectionProps {
   showNames?: boolean;
 }
 
+const areCreatorsEqual = (
+  previous: FeaturedCreatorsSectionProps,
+  next: FeaturedCreatorsSectionProps
+) => {
+  if (previous.title !== next.title) return false;
+  if (previous.className !== next.className) return false;
+  if (previous.showTitle !== next.showTitle) return false;
+  if (previous.showNames !== next.showNames) return false;
+
+  const prevCreators = previous.creators;
+  const nextCreators = next.creators;
+
+  if (prevCreators === nextCreators) return true;
+  if (prevCreators.length !== nextCreators.length) return false;
+
+  for (let index = 0; index < prevCreators.length; index += 1) {
+    const prev = prevCreators[index];
+    const current = nextCreators[index];
+    if (
+      prev.id !== current.id ||
+      prev.handle !== current.handle ||
+      prev.name !== current.name ||
+      prev.src !== current.src ||
+      prev.alt !== current.alt
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
   creators,
   title = 'Featured Creators',
@@ -91,7 +123,7 @@ export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
       </div>
     </section>
   );
-});
+}, areCreatorsEqual);
 
 // Export both names for compatibility during transition
 export const FeaturedArtistsSection = FeaturedCreatorsSection;
