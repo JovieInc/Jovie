@@ -39,27 +39,50 @@
  * Validate if a string is a valid IPv4 or IPv6 address
  */
 export function isValidIP(ip: string): boolean {
-  // Complexity required to properly validate IPv4 octet ranges (0-255)
-  const ipv4Regex = // NOSONAR S5843
-    /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  if (ipv4Regex.test(ip)) {
-    return true;
+  const ipv4BasicPattern = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+  if (ipv4BasicPattern.test(ip)) {
+    const octets = ip.split('.');
+    const isValidIPv4 = octets.every(octet => {
+      const value = Number(octet);
+      return Number.isInteger(value) && value >= 0 && value <= 255;
+    });
+
+    if (isValidIPv4) {
+      return true;
+    }
   }
 
-  // IPv6 validation (simplified - covers most common formats)
-  const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  if (ipv6Regex.test(ip)) {
-    return true;
+  return isValidIPv6(ip);
+}
+
+function isValidIPv6(ip: string): boolean {
+  const segmentPattern = /^[0-9a-fA-F]{1,4}$/;
+
+  if (ip.includes('::')) {
+    if (ip.indexOf('::') !== ip.lastIndexOf('::')) {
+      return false;
+    }
+
+    const [left, right] = ip.split('::');
+    const leftParts = left ? left.split(':') : [];
+    const rightParts = right ? right.split(':') : [];
+
+    if (
+      leftParts.some(part => !segmentPattern.test(part)) ||
+      rightParts.some(part => !segmentPattern.test(part))
+    ) {
+      return false;
+    }
+
+    return leftParts.length + rightParts.length < 8;
   }
 
-  // IPv6 compressed format (with ::)
-  const ipv6CompressedRegex =
-    /^((?:[0-9a-fA-F]{1,4}:)*)::((?:[0-9a-fA-F]{1,4}:)*)([0-9a-fA-F]{1,4})?$/;
-  if (ipv6CompressedRegex.test(ip)) {
-    return true;
+  const parts = ip.split(':');
+  if (parts.length !== 8) {
+    return false;
   }
 
-  return false;
+  return parts.every(part => segmentPattern.test(part));
 }
 
 /**
