@@ -160,7 +160,7 @@ export const creatorProfiles = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
-    featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_with_name')
+    featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_query')
       .on(
         table.isPublic,
         table.isFeatured,

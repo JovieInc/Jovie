@@ -18,7 +18,7 @@ import ws from 'ws';
 // Configure WebSocket for Node.js
 neonConfig.webSocketConstructor = ws;
 
-const INDEX_NAME = 'idx_creator_profiles_featured_with_name';
+const INDEX_NAME = 'idx_creator_profiles_featured_query';
 const TABLE_NAME = 'creator_profiles';
 
 interface IndexInfo {
