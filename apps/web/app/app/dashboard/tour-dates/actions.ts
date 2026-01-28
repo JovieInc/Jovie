@@ -688,26 +688,30 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
 
   const profile = await requireProfile();
 
-  // Clear the Bandsintown artist name
-  await db
-    .update(creatorProfiles)
-    .set({
-      bandsintownArtistName: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+  try {
+    // Clear the Bandsintown artist name
+    await db
+      .update(creatorProfiles)
+      .set({
+        bandsintownArtistName: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
 
-  // Optionally delete synced events (keep manual ones)
-  await db
-    .delete(tourDates)
-    .where(
-      and(
-        eq(tourDates.profileId, profile.id),
-        eq(tourDates.provider, 'bandsintown')
-      )
-    );
+    // Optionally delete synced events (keep manual ones)
+    await db
+      .delete(tourDates)
+      .where(
+        and(
+          eq(tourDates.profileId, profile.id),
+          eq(tourDates.provider, 'bandsintown')
+        )
+      );
 
-  revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath('/app/dashboard/tour-dates');
 
-  return { success: true };
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
 }
