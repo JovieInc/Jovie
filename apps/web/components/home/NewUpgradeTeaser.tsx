@@ -1,5 +1,3 @@
-'use client';
-
 import { Button } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';

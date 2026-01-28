@@ -1,5 +1,3 @@
-'use client';
-
 import { Container } from '@/components/site/Container';
 
 // Geist Design System colors
