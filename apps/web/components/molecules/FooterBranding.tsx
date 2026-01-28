@@ -14,13 +14,12 @@ interface FooterBrandingProps {
 
 export function FooterBranding({
   artistHandle,
-  variant = 'light',
+  variant: _variant = 'light',
   className = '',
   showCTA = true,
   size = 'md',
   mark = 'wordmark',
 }: FooterBrandingProps) {
-  void variant;
   const signUpLink = artistHandle
     ? `/waitlist?utm_source=profile&utm_artist=${artistHandle}`
     : '/waitlist';

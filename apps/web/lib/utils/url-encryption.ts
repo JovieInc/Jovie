@@ -46,8 +46,7 @@ export function encryptUrl(url: string): EncryptionResult {
 /**
  * Decrypts a URL from storage
  */
-export function decryptUrl(encryptionResult: EncryptionResult): string {
-  void encryptionResult;
+export function decryptUrl(_encryptionResult: EncryptionResult): string {
   throw new Error(
     '[url-encryption] decryptUrl is server-only. Import from @/lib/utils/url-encryption.server'
   );

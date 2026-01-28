@@ -121,7 +121,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
       if (surfacedKeysRef.current.has(key)) return;
 
       surfacedKeysRef.current.add(key);
-      void track(
+      track(
         'link_suggestion_surfaced',
         buildSuggestionEventProperties(suggestion, profileId)
       );
@@ -145,7 +145,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
   const handleAccept = useCallback(
     (suggestion: SuggestedLink) => {
       // Track acceptance with detailed properties
-      void track('dashboard_link_suggestion_accept', {
+      track('dashboard_link_suggestion_accept', {
         platform: suggestion.platform.id,
         sourcePlatform: suggestion.sourcePlatform ?? undefined,
         sourceType: suggestion.sourceType ?? undefined,
@@ -158,14 +158,16 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
       // Also track the post-acceptance event
       if (result instanceof Promise) {
-        void result.then(() => {
-          void track(
-            'link_suggestion_accepted',
-            buildSuggestionEventProperties(suggestion, profileId)
-          );
-        });
+        result
+          .then(() => {
+            track(
+              'link_suggestion_accepted',
+              buildSuggestionEventProperties(suggestion, profileId)
+            );
+          })
+          .catch(() => {});
       } else {
-        void track(
+        track(
           'link_suggestion_accepted',
           buildSuggestionEventProperties(suggestion, profileId)
         );
@@ -183,7 +185,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
       event.stopPropagation();
 
       // Track dismissal with detailed properties
-      void track('dashboard_link_suggestion_dismiss', {
+      track('dashboard_link_suggestion_dismiss', {
         platform: suggestion.platform.id,
         sourcePlatform: suggestion.sourcePlatform ?? undefined,
         sourceType: suggestion.sourceType ?? undefined,
@@ -196,14 +198,16 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
       // Also track the post-dismissal event
       if (result instanceof Promise) {
-        void result.then(() => {
-          void track(
-            'link_suggestion_dismissed',
-            buildSuggestionEventProperties(suggestion, profileId)
-          );
-        });
+        result
+          .then(() => {
+            track(
+              'link_suggestion_dismissed',
+              buildSuggestionEventProperties(suggestion, profileId)
+            );
+          })
+          .catch(() => {});
       } else {
-        void track(
+        track(
           'link_suggestion_dismissed',
           buildSuggestionEventProperties(suggestion, profileId)
         );

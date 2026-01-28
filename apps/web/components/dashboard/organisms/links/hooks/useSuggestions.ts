@@ -212,7 +212,7 @@ export function useSuggestions<T extends SuggestedLink = SuggestedLink>({
         return;
       }
       surfacedSuggestionKeysRef.current.add(key);
-      void track(
+      track(
         'link_suggestion_surfaced',
         buildSuggestionEventProperties(suggestion, profileId)
       );
@@ -226,7 +226,7 @@ export function useSuggestions<T extends SuggestedLink = SuggestedLink>({
   const handleAccept = useCallback(
     async (suggestion: T): Promise<DetectedLink | null> => {
       // Track acceptance initiation with detailed properties
-      void track('dashboard_link_suggestion_accept', {
+      track('dashboard_link_suggestion_accept', {
         platform: suggestion.platform.id,
         sourcePlatform: suggestion.sourcePlatform ?? undefined,
         sourceType: suggestion.sourceType ?? undefined,
@@ -248,7 +248,7 @@ export function useSuggestions<T extends SuggestedLink = SuggestedLink>({
 
       // Track successful acceptance
       if (accepted) {
-        void track(
+        track(
           'link_suggestion_accepted',
           buildSuggestionEventProperties(suggestion, profileId)
         );
@@ -266,7 +266,7 @@ export function useSuggestions<T extends SuggestedLink = SuggestedLink>({
   const handleDismiss = useCallback(
     async (suggestion: T): Promise<void> => {
       // Track dismissal initiation with detailed properties
-      void track('dashboard_link_suggestion_dismiss', {
+      track('dashboard_link_suggestion_dismiss', {
         platform: suggestion.platform.id,
         sourcePlatform: suggestion.sourcePlatform ?? undefined,
         sourceType: suggestion.sourceType ?? undefined,
@@ -285,7 +285,7 @@ export function useSuggestions<T extends SuggestedLink = SuggestedLink>({
       );
 
       // Track successful dismissal
-      void track(
+      track(
         'link_suggestion_dismissed',
         buildSuggestionEventProperties(suggestion, profileId)
       );
