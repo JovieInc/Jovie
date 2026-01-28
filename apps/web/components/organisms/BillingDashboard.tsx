@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -40,9 +40,17 @@ export const BillingDashboard = memo(function BillingDashboard() {
   }, [pricingQuery.data]);
 
   // Refresh handler for error state
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.billing.all });
-  };
+  }, [queryClient]);
+
+  const errorActions = useMemo(
+    () => [
+      { label: 'Retry', onClick: handleRefresh },
+      { label: 'Contact support', href: '/support' },
+    ],
+    [handleRefresh]
+  );
 
   if (isLoading) {
     return (
@@ -59,10 +67,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
       <ErrorBanner
         title='Billing is temporarily unavailable'
         description='We could not load your billing details. Please retry or visit the portal once the connection is restored.'
-        actions={[
-          { label: 'Retry', onClick: handleRefresh },
-          { label: 'Contact support', href: '/support' },
-        ]}
+        actions={errorActions}
         testId='billing-error-state'
       />
     );
