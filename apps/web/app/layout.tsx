@@ -9,12 +9,9 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
-import { headers } from 'next/headers';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
-import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
-import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
 
 // Configure Inter Variable font from local file (no external network requests)
@@ -142,42 +139,17 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await ensureSentry();
-  // Check if cookie banner should be shown
-  const headersList = await headers();
-  const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';
-  const nonce = headersList.get(SCRIPT_NONCE_HEADER) ?? undefined;
   const shouldInjectToolbar = env.NODE_ENV === 'development';
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   const headContent = (
     <head>
-      <Script
-        id='theme-class'
-        strategy='beforeInteractive'
-        nonce={nonce}
-        suppressHydrationWarning
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for theme script injection
-        dangerouslySetInnerHTML={{
-          __html: `
-(function() {
-  try {
-    var ls = localStorage.getItem('jovie-theme');
-    var mql = window.matchMedia('(prefers-color-scheme: dark)');
-    var systemPref = mql.matches ? 'dark' : 'light';
-    var pref = (ls && ls !== 'system') ? ls : systemPref;
-    var root = document.documentElement;
-    if (pref === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
-  } catch (e) { /* Theme detection failed - defaults will apply */ }
-})();
-`,
-        }}
-      />
+      <script src='/theme-init.js' />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}
@@ -219,7 +191,6 @@ export default async function RootLayout({
         id='organization-schema'
         type='application/ld+json'
         strategy='afterInteractive'
-        nonce={nonce}
         suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
@@ -301,7 +272,7 @@ export default async function RootLayout({
         </a>
         <CoreProviders>{children}</CoreProviders>
 
-        <CookieBannerSection showBanner={showCookieBanner} />
+        <CookieBannerSection />
         {shouldInjectToolbar && <VercelToolbar />}
       </body>
     </html>

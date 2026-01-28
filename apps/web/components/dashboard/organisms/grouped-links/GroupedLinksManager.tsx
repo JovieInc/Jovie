@@ -88,6 +88,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   // Refs
   const containerRef = useRef<HTMLDivElement | null>(null);
   const linkInputRef = useRef<UniversalLinkInputRef | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Pending preview management
   const {
@@ -259,7 +260,11 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
       data-testid='grouped-links-manager'
     >
       {/* Scrollable links area */}
-      <div className='flex-1 overflow-y-auto px-4 py-6'>
+      <section
+        ref={scrollContainerRef}
+        className='flex-1 overflow-y-auto px-4 py-6'
+        aria-label='Links list'
+      >
         <div className='mx-auto max-w-2xl'>
           <ChatStyleLinkList
             links={links}
@@ -279,9 +284,10 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
             onAddPendingPreview={handleAddPendingPreview}
             onCancelPendingPreview={handleCancelPendingPreview}
             onHint={setHint}
+            scrollContainerRef={scrollContainerRef}
           />
         </div>
-      </div>
+      </section>
 
       {/* Input at bottom */}
       <div className='border-t border-subtle bg-base px-4 py-4'>

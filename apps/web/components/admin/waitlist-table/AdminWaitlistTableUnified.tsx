@@ -254,6 +254,8 @@ export function AdminWaitlistTableUnified({
       getRowId={row => row.id}
       getRowClassName={getRowClassName}
       enableVirtualization={true}
+      rowHeight={56}
+      overscan={6}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
       className='text-[13px]'
       rowSelection={rowSelection}
