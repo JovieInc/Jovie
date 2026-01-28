@@ -11,10 +11,7 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { ConsentBanner, JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import {
-  getCreatorProfileWithLinks,
-  incrementProfileViews,
-} from '@/lib/db/queries';
+import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
@@ -346,14 +343,9 @@ export default async function ArtistPage({
     );
   }
 
-  if (!profile) {
+  if (!profile?.is_public) {
     notFound();
   }
-
-  // Track profile view (fire-and-forget, non-blocking)
-  incrementProfileViews(normalizedUsername).catch(() => {
-    // Fail silently, don't block page render
-  });
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles, pixelEvents } from '@/lib/db/schema';
+import { incrementProfileViews } from '@/lib/services/profile';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -94,7 +95,11 @@ export async function POST(request: NextRequest) {
 
     // Validate profile exists and is public
     const [profile] = await db
-      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
+      .select({
+        id: creatorProfiles.id,
+        isPublic: creatorProfiles.isPublic,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -145,6 +150,12 @@ export async function POST(request: NextRequest) {
       forwardingStatus: {},
       forwardAt: new Date(),
     });
+
+    if (eventType === 'page_view') {
+      incrementProfileViews(profile.usernameNormalized).catch(() => {
+        // Fail silently - pixel ingestion must not depend on view counting
+      });
+    }
 
     // Return success
     // The forwarding happens asynchronously via cron job
