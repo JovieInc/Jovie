@@ -31,7 +31,7 @@ export function TourDateCard({
   const handleAddToCalendar = () => {
     // Generate ICS file URL - use direct navigation for reliable download
     const icsUrl = `/api/calendar/${tourDate.id}`;
-    window.location.href = icsUrl;
+    globalThis.location.href = icsUrl;
   };
 
   return (
