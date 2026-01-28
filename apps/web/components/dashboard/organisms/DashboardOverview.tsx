@@ -6,10 +6,14 @@ import { DashboardOverviewControlsProvider } from '@/components/dashboard/organi
 import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/organisms/DashboardOverviewHeaderToolbarClient';
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
 import {
-  getTaskContainerClass,
-  getTaskIndicatorClass,
-  getTaskIndicatorContent,
-  getTaskLabelClass,
+  getCompletedTaskContainerClass,
+  getCompletedTaskIndicatorClass,
+  getCompletedTaskIndicatorContent,
+  getCompletedTaskLabelClass,
+  getIncompleteTaskContainerClass,
+  getIncompleteTaskIndicatorClass,
+  getIncompleteTaskIndicatorContent,
+  getIncompleteTaskLabelClass,
 } from '@/components/dashboard/organisms/dashboard-overview-helpers';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { PROFILE_URL } from '@/constants/app';
@@ -140,12 +144,32 @@ export function DashboardOverview({
             </div>
 
             <ul className='space-y-1'>
-              <li className={getTaskContainerClass(isHandleClaimed)}>
-                <span className={getTaskIndicatorClass(isHandleClaimed)}>
-                  {getTaskIndicatorContent(isHandleClaimed, 1)}
+              <li
+                className={
+                  isHandleClaimed
+                    ? getCompletedTaskContainerClass()
+                    : getIncompleteTaskContainerClass()
+                }
+              >
+                <span
+                  className={
+                    isHandleClaimed
+                      ? getCompletedTaskIndicatorClass()
+                      : getIncompleteTaskIndicatorClass()
+                  }
+                >
+                  {isHandleClaimed
+                    ? getCompletedTaskIndicatorContent()
+                    : getIncompleteTaskIndicatorContent(1)}
                 </span>
                 <div className='flex-1 min-w-0'>
-                  <p className={getTaskLabelClass(isHandleClaimed)}>
+                  <p
+                    className={
+                      isHandleClaimed
+                        ? getCompletedTaskLabelClass()
+                        : getIncompleteTaskLabelClass()
+                    }
+                  >
                     Claim your handle
                   </p>
                 </div>
@@ -159,12 +183,32 @@ export function DashboardOverview({
                 )}
               </li>
 
-              <li className={getTaskContainerClass(hasMusicLink)}>
-                <span className={getTaskIndicatorClass(hasMusicLink)}>
-                  {getTaskIndicatorContent(hasMusicLink, 2)}
+              <li
+                className={
+                  hasMusicLink
+                    ? getCompletedTaskContainerClass()
+                    : getIncompleteTaskContainerClass()
+                }
+              >
+                <span
+                  className={
+                    hasMusicLink
+                      ? getCompletedTaskIndicatorClass()
+                      : getIncompleteTaskIndicatorClass()
+                  }
+                >
+                  {hasMusicLink
+                    ? getCompletedTaskIndicatorContent()
+                    : getIncompleteTaskIndicatorContent(2)}
                 </span>
                 <div className='flex-1 min-w-0'>
-                  <p className={getTaskLabelClass(hasMusicLink)}>
+                  <p
+                    className={
+                      hasMusicLink
+                        ? getCompletedTaskLabelClass()
+                        : getIncompleteTaskLabelClass()
+                    }
+                  >
                     Add a music link
                   </p>
                 </div>
@@ -178,12 +222,32 @@ export function DashboardOverview({
                 )}
               </li>
 
-              <li className={getTaskContainerClass(hasSocialLinks)}>
-                <span className={getTaskIndicatorClass(hasSocialLinks)}>
-                  {getTaskIndicatorContent(hasSocialLinks, 3)}
+              <li
+                className={
+                  hasSocialLinks
+                    ? getCompletedTaskContainerClass()
+                    : getIncompleteTaskContainerClass()
+                }
+              >
+                <span
+                  className={
+                    hasSocialLinks
+                      ? getCompletedTaskIndicatorClass()
+                      : getIncompleteTaskIndicatorClass()
+                  }
+                >
+                  {hasSocialLinks
+                    ? getCompletedTaskIndicatorContent()
+                    : getIncompleteTaskIndicatorContent(3)}
                 </span>
                 <div className='flex-1 min-w-0'>
-                  <p className={getTaskLabelClass(hasSocialLinks)}>
+                  <p
+                    className={
+                      hasSocialLinks
+                        ? getCompletedTaskLabelClass()
+                        : getIncompleteTaskLabelClass()
+                    }
+                  >
                     Add social links
                   </p>
                 </div>
