@@ -103,7 +103,7 @@ export function useReleaseProviderMatrix({
       prev.map(row => (row.id === updated.id ? { ...updated } : row))
     );
     setEditingRelease(current =>
-      current && current.id === updated.id ? { ...updated } : current
+      current?.id === updated.id ? { ...updated } : current
     );
   };
 
