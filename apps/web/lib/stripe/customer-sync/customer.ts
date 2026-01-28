@@ -5,8 +5,8 @@
  */
 
 import 'server-only';
-import { auth } from '@clerk/nextjs/server';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
@@ -45,7 +45,7 @@ export async function ensureStripeCustomer(): Promise<{
   error?: string;
 }> {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return { success: false, error: 'User not authenticated' };
     }

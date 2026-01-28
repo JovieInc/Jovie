@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { isAdmin } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import {
@@ -35,9 +34,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
   const clerkEmail = clerkIdentity.email;
 
-  // Check admin status from database (cached)
-  const adminStatus = await isAdmin(userId);
-
+  // Get billing info which includes isAdmin (avoids redundant DB query)
   const billing = await getUserBillingInfo();
 
   if (!billing.success || !billing.data) {
@@ -46,11 +43,17 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
       userId,
       email: clerkEmail,
       isAuthenticated: true,
-      isAdmin: adminStatus,
+      isAdmin: false,
     };
   }
 
-  const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
+  // Extract isAdmin from billing data (already fetched, no separate query needed)
+  const {
+    email: emailFromDb,
+    isPro,
+    plan: dbPlan,
+    isAdmin: adminStatus,
+  } = billing.data;
   const effectiveEmail = emailFromDb || clerkEmail;
 
   // Determine plan from billing data

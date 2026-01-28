@@ -61,6 +61,27 @@ import {
   UserState,
 } from '@/lib/auth/gate';
 
+// Helper to create mock for the single JOIN query used by resolveUserState
+// Now uses a single query with LEFT JOIN for user + profile
+const createJoinQueryMock = (result: unknown[]) => ({
+  from: vi.fn().mockReturnValue({
+    leftJoin: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(result),
+      }),
+    }),
+  }),
+});
+
+// Helper to create mock for simple queries (waitlist)
+const createSimpleQueryMock = (result: unknown[]) => ({
+  from: vi.fn().mockReturnValue({
+    where: vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue(result),
+    }),
+  }),
+});
+
 describe('gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -99,22 +120,20 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      // Mock DB user with deletedAt set
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'db-user-123',
-                userStatus: 'active',
-                isAdmin: false,
-                isPro: false,
-                deletedAt: new Date(),
-              },
-            ]),
-          }),
-        }),
-      });
+      // Mock JOIN query returning user with deletedAt set (no profile)
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'test@example.com',
+            userStatus: 'active',
+            isAdmin: false,
+            isPro: false,
+            deletedAt: new Date(),
+            profileId: null,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -128,21 +147,19 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'db-user-123',
-                userStatus: 'banned',
-                isAdmin: false,
-                isPro: false,
-                deletedAt: null,
-              },
-            ]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'test@example.com',
+            userStatus: 'banned',
+            isAdmin: false,
+            isPro: false,
+            deletedAt: null,
+            profileId: null,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -156,21 +173,19 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'db-user-123',
-                userStatus: 'suspended',
-                isAdmin: false,
-                isPro: false,
-                deletedAt: null,
-              },
-            ]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'test@example.com',
+            userStatus: 'suspended',
+            isAdmin: false,
+            isPro: false,
+            deletedAt: null,
+            profileId: null,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -184,31 +199,26 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      // First call: get DB user
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'db-user-123',
-                  userStatus: 'active',
-                  isAdmin: false,
-                  isPro: false,
-                  deletedAt: null,
-                },
-              ]),
-            }),
-          }),
-        })
-        // Second call: get profile (none found)
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        });
+      // Single JOIN query: user exists but no profile (profileId is null)
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'test@example.com',
+            userStatus: 'active',
+            isAdmin: false,
+            isPro: false,
+            deletedAt: null,
+            profileId: null,
+            profileUsername: null,
+            profileUsernameNormalized: null,
+            profileDisplayName: null,
+            profileIsPublic: null,
+            profileOnboardingCompletedAt: null,
+            profileIsClaimed: null,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -223,41 +233,26 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      // First call: get DB user
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'db-user-123',
-                  userStatus: 'active',
-                  isAdmin: false,
-                  isPro: false,
-                  deletedAt: null,
-                },
-              ]),
-            }),
-          }),
-        })
-        // Second call: get incomplete profile
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'profile-123',
-                  username: null, // Missing username
-                  usernameNormalized: null,
-                  displayName: 'Test User',
-                  isPublic: true,
-                  onboardingCompletedAt: null,
-                  isClaimed: true,
-                },
-              ]),
-            }),
-          }),
-        });
+      // Single JOIN query: user with incomplete profile (missing username)
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'test@example.com',
+            userStatus: 'active',
+            isAdmin: false,
+            isPro: false,
+            deletedAt: null,
+            profileId: 'profile-123',
+            profileUsername: null, // Missing username
+            profileUsernameNormalized: null,
+            profileDisplayName: 'Test User',
+            profileIsPublic: true,
+            profileOnboardingCompletedAt: null,
+            profileIsClaimed: true,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -271,41 +266,26 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      // First call: get DB user
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'db-user-123',
-                  userStatus: 'active',
-                  isAdmin: false,
-                  isPro: true,
-                  deletedAt: null,
-                },
-              ]),
-            }),
-          }),
-        })
-        // Second call: get complete profile
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'profile-123',
-                  username: 'testuser',
-                  usernameNormalized: 'testuser',
-                  displayName: 'Test User',
-                  isPublic: true,
-                  onboardingCompletedAt: new Date(),
-                  isClaimed: true,
-                },
-              ]),
-            }),
-          }),
-        });
+      // Single JOIN query: user with complete profile
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'test@example.com',
+            userStatus: 'active',
+            isAdmin: false,
+            isPro: true,
+            deletedAt: null,
+            profileId: 'profile-123',
+            profileUsername: 'testuser',
+            profileUsernameNormalized: 'testuser',
+            profileDisplayName: 'Test User',
+            profileIsPublic: true,
+            profileOnboardingCompletedAt: new Date(),
+            profileIsClaimed: true,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -321,41 +301,26 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'admin@example.com' }],
       });
 
-      // First call: get DB user (admin)
-      mockDbSelect
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'db-user-123',
-                  userStatus: 'active',
-                  isAdmin: true,
-                  isPro: true,
-                  deletedAt: null,
-                },
-              ]),
-            }),
-          }),
-        })
-        // Second call: get complete profile
-        .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'profile-123',
-                  username: 'admin',
-                  usernameNormalized: 'admin',
-                  displayName: 'Admin User',
-                  isPublic: true,
-                  onboardingCompletedAt: new Date(),
-                  isClaimed: true,
-                },
-              ]),
-            }),
-          }),
-        });
+      // Single JOIN query: admin user with complete profile
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'db-user-123',
+            email: 'admin@example.com',
+            userStatus: 'active',
+            isAdmin: true,
+            isPro: true,
+            deletedAt: null,
+            profileId: 'profile-123',
+            profileUsername: 'admin',
+            profileUsernameNormalized: 'admin',
+            profileDisplayName: 'Admin User',
+            profileIsPublic: true,
+            profileOnboardingCompletedAt: new Date(),
+            profileIsClaimed: true,
+          },
+        ])
+      );
 
       const result = await resolveUserState();
 
@@ -370,14 +335,8 @@ describe('gate.ts', () => {
         emailAddresses: [{ emailAddress: 'test@example.com' }],
       });
 
-      // No DB user found
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      // No DB user found (JOIN query returns empty)
+      mockDbSelect.mockReturnValue(createJoinQueryMock([]));
 
       const result = await resolveUserState({ createDbUserIfMissing: false });
 
@@ -445,13 +404,7 @@ describe('gate.ts', () => {
 
   describe('getWaitlistAccess', () => {
     it('returns null status when no waitlist entry exists', async () => {
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(createSimpleQueryMock([]));
 
       const result = await getWaitlistAccess('test@example.com');
 
@@ -460,18 +413,14 @@ describe('gate.ts', () => {
     });
 
     it('returns entry data when waitlist entry exists', async () => {
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'waitlist-123',
-                status: 'claimed',
-              },
-            ]),
-          }),
-        }),
-      });
+      mockDbSelect.mockReturnValue(
+        createSimpleQueryMock([
+          {
+            id: 'waitlist-123',
+            status: 'claimed',
+          },
+        ])
+      );
 
       const result = await getWaitlistAccess('Test@Example.com');
 

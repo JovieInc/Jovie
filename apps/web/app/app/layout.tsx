@@ -12,7 +12,6 @@ import { env } from '@/lib/env-server';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
-  prefetchDashboardData,
   setSidebarCollapsed,
 } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
@@ -68,18 +67,15 @@ export default async function AppShellLayout({
 }) {
   // NO MORE AUTH GATE - proxy.ts already routed us correctly!
   // If we're rendering this layout, user is ACTIVE and can access the app.
-  const authPromise = getAppUserId();
-  prefetchDashboardData();
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   try {
-    // Get user ID for Statsig and dashboard data
-    const userId = await authPromise;
-
-    // Get dashboard data - auth gate already validated access, so this is safe
-    // No need to double-check onboarding here as resolveUserState() already did it
-    // This prevents redirect loops caused by stale cached data
-    const dashboardData = await getDashboardDataCached();
+    // Parallelize auth and dashboard data fetching for better performance
+    // Both share getCachedAuth() via React's cache(), so the auth call is deduplicated
+    const [userId, dashboardData] = await Promise.all([
+      getAppUserId(),
+      getDashboardDataCached(),
+    ]);
 
     return (
       <ClientProviders publishableKey={publishableKey} skipCoreProviders>

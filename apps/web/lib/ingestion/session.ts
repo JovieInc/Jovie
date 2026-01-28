@@ -21,11 +21,9 @@ export async function withSystemIngestionSession<T>(
           : drizzleSql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`;
       await tx.execute(isolationSql);
     }
+    // Combined into single query for performance (saves one DB round trip)
     await tx.execute(
-      drizzleSql`SELECT set_config('app.user_id', ${SYSTEM_INGESTION_USER}, true)`
-    );
-    await tx.execute(
-      drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
+      drizzleSql`SELECT set_config('app.user_id', ${SYSTEM_INGESTION_USER}, true), set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
     );
 
     return operation(tx);
