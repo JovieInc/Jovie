@@ -57,20 +57,23 @@ export interface SpotifyArtistInput {
 // ============================================================================
 
 /**
- * Pattern to match remix credits in track titles
+ * Patterns to match remix credits in track titles
  * Matches: "(X Remix)", "[X Remix]", "(Remixed by X)", "(X Mix)"
- * NOSONAR S5843: Complex pattern required to parse multiple remix credit formats per music industry standards
  */
-const REMIX_PATTERN =
-  /[([]\s*(?:(?:remixed\s+by|remix\s+by)\s+([^)\]]+?)|([^)\]]+?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip))\s*[)\]]/gi;
+const BRACKET_CONTENT_PATTERN = /[([]\s*([^)\]]+?)\s*[)\]]/g;
+const BRACKET_SEGMENT_PATTERN = /[([]\s*[^)\]]+?\s*[)\]]/g;
+const REMIX_KEYWORD_PATTERN =
+  /\b(remix|rmx|mix|edit|bootleg|rework|flip|version|vip)\b/i;
+const REMIXED_BY_PATTERN = /\b(remixed\s+by|remix\s+by)\b/i;
+const REMIX_SUFFIX_PATTERN =
+  /^(.*?)\s+(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip)\b/i;
 
 /**
- * Pattern to match featured artists in track titles
+ * Patterns to match featured artists in track titles
  * Matches: "(feat. X)", "(ft. X)", "(featuring X)", "feat. X", "ft. X"
- * NOSONAR S5843: Complex pattern required to parse multiple featuring credit formats per music industry standards
  */
-const FEATURED_PATTERN =
-  /(?:[([]\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+([^)\]]+?)\s*[)\]])|(?:\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+))/gi;
+const FEATURED_KEYWORD_PATTERN = /\b(?:feat\.?|ft\.?|featuring)(?:\b|\s)/i;
+const FEATURED_INLINE_PATTERN = /\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+)/gi;
 
 /**
  * Pattern to match "with" credits
@@ -116,6 +119,12 @@ export function normalizeArtistName(name: string): string {
  */
 function cleanArtistName(name: string): string {
   return name.replaceAll(/\s+/g, ' ').trim();
+}
+
+function getBracketContents(value: string): string[] {
+  return Array.from(value.matchAll(BRACKET_CONTENT_PATTERN), match =>
+    (match[1] ?? '').trim()
+  ).filter(Boolean);
 }
 
 /**
@@ -170,14 +179,19 @@ function appendUniqueCredits(
  */
 export function extractRemixers(title: string): ParsedArtistCredit[] {
   const remixers: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
   let position = 0;
 
-  // Reset regex state
-  REMIX_PATTERN.lastIndex = 0;
+  for (const segment of getBracketContents(title)) {
+    const trimmedSegment = segment.trim();
+    let remixerPart: string | null = null;
 
-  while ((match = REMIX_PATTERN.exec(title)) !== null) {
-    const remixerPart = match[1] ?? match[2];
+    if (REMIXED_BY_PATTERN.test(trimmedSegment)) {
+      remixerPart = trimmedSegment.replace(REMIXED_BY_PATTERN, '').trim();
+    } else {
+      const suffixMatch = trimmedSegment.match(REMIX_SUFFIX_PATTERN);
+      remixerPart = suffixMatch?.[1]?.trim() ?? null;
+    }
+
     if (!remixerPart) continue;
 
     // Check if this is just "Remix" without an artist
@@ -218,20 +232,43 @@ export function extractRemixers(title: string): ParsedArtistCredit[] {
  */
 export function extractFeatured(title: string): ParsedArtistCredit[] {
   const featured: ParsedArtistCredit[] = [];
-  let match: RegExpExecArray | null;
+  const seen = new Set<string>();
   let position = 0;
 
-  FEATURED_PATTERN.lastIndex = 0;
-
-  while ((match = FEATURED_PATTERN.exec(title)) !== null) {
-    const featuredPart = match[1] ?? match[2];
+  for (const segment of getBracketContents(title)) {
+    if (!FEATURED_KEYWORD_PATTERN.test(segment)) continue;
+    const match = segment.match(/\b(?:feat\.?|ft\.?|featuring)\s+(.+)/i);
+    const featuredPart = match?.[1]?.trim();
     if (!featuredPart) continue;
 
     // Handle multiple featured artists
     const artistNames = splitByConjunction(featuredPart);
 
     for (const artistName of artistNames) {
-      if (artistName.trim()) {
+      const normalized = normalizeArtistName(artistName);
+      if (artistName.trim() && !seen.has(normalized)) {
+        seen.add(normalized);
+        featured.push({
+          name: cleanArtistName(artistName),
+          role: 'featured_artist',
+          joinPhrase: featured.length === 0 ? ' feat. ' : ' & ',
+          position: position++,
+          isPrimary: false,
+        });
+      }
+    }
+  }
+
+  const titleWithoutBrackets = title.replaceAll(BRACKET_SEGMENT_PATTERN, '');
+  for (const match of titleWithoutBrackets.matchAll(FEATURED_INLINE_PATTERN)) {
+    const featuredPart = match[1]?.trim();
+    if (!featuredPart) continue;
+
+    const artistNames = splitByConjunction(featuredPart);
+    for (const artistName of artistNames) {
+      const normalized = normalizeArtistName(artistName);
+      if (artistName.trim() && !seen.has(normalized)) {
+        seen.add(normalized);
         featured.push({
           name: cleanArtistName(artistName),
           role: 'featured_artist',
@@ -508,15 +545,22 @@ export function isRemix(title: string): boolean {
 export function cleanTrackTitle(title: string): string {
   return (
     title
-      // Remove featured credits
-      .replaceAll(
-        /[([]?\s*(?:\bfeat\.?|\bft\.?|\bfeaturing\b)\s+[^)\]]+[)\]]?/gi,
-        ''
-      )
-      // Remove remix credits
-      .replaceAll(REMIX_PATTERN, '')
-      // Remove "with" credits
-      .replaceAll(/[([]?\s*with\s+[^)\]]+[)\]]?/gi, '')
+      .replaceAll(BRACKET_SEGMENT_PATTERN, segment => {
+        const inner = segment.replace(/^[([]\s*/, '').replace(/\s*[)\]]$/, '');
+        if (
+          FEATURED_KEYWORD_PATTERN.test(inner) ||
+          REMIX_KEYWORD_PATTERN.test(inner) ||
+          REMIXED_BY_PATTERN.test(inner) ||
+          /\bwith\b/i.test(inner)
+        ) {
+          return '';
+        }
+        return segment;
+      })
+      // Remove inline featured credits
+      .replaceAll(FEATURED_INLINE_PATTERN, '')
+      // Remove inline "with" credits
+      .replaceAll(/\bwith\b\s+[^()[\]]+/gi, '')
       // Clean up whitespace and trailing punctuation
       .replaceAll(/\s+/g, ' ')
       .replace(/\s*[-–]\s*$/, '')
