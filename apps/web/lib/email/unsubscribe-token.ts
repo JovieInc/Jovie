@@ -4,7 +4,7 @@
  * Functions for generating and verifying unsubscribe tokens for email templates.
  */
 
-import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { APP_URL } from '@/constants/domains';
 import { env } from '@/lib/env';
 

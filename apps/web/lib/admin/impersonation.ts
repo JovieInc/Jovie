@@ -15,7 +15,7 @@ import 'server-only';
  * - Real admin identity always tracked alongside effective user
  */
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
