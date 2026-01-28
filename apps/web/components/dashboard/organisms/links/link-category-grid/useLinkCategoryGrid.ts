@@ -57,25 +57,38 @@ export function useLinkCategoryGrid<T extends DetectedLink>({
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
-  const sortedGroups = useMemo(() => {
-    const sorted: Record<LinkSection, T[]> = {
-      social: [],
-      dsp: [],
-      earnings: [],
-      custom: [],
-    };
+  const sortByPopularity = useCallback(
+    (a: T, b: T) =>
+      popularityIndex(a.platform.id) - popularityIndex(b.platform.id),
+    []
+  );
 
-    (['social', 'dsp', 'earnings', 'custom'] as const).forEach(section => {
-      sorted[section] = groups[section]
-        .slice()
-        .sort(
-          (a, b) =>
-            popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
-        );
-    });
+  const sortedSocial = useMemo(
+    () => groups.social.slice().sort(sortByPopularity),
+    [groups.social, sortByPopularity]
+  );
+  const sortedDsp = useMemo(
+    () => groups.dsp.slice().sort(sortByPopularity),
+    [groups.dsp, sortByPopularity]
+  );
+  const sortedEarnings = useMemo(
+    () => groups.earnings.slice().sort(sortByPopularity),
+    [groups.earnings, sortByPopularity]
+  );
+  const sortedCustom = useMemo(
+    () => groups.custom.slice().sort(sortByPopularity),
+    [groups.custom, sortByPopularity]
+  );
 
-    return sorted;
-  }, [groups]);
+  const sortedGroups = useMemo(
+    () => ({
+      social: sortedSocial,
+      dsp: sortedDsp,
+      earnings: sortedEarnings,
+      custom: sortedCustom,
+    }),
+    [sortedCustom, sortedDsp, sortedEarnings, sortedSocial]
+  );
 
   const mapIdToIndex = useMemo(() => {
     const m = new Map<string, number>();
