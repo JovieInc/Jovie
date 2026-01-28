@@ -25,7 +25,7 @@ interface TourDateWithDistance extends TourDateViewModel {
  * - Haversine calculation is O(n) with ~microseconds per venue
  */
 export function TourDatesList({ tourDates }: TourDatesListProps) {
-  const { location, isLoading } = useUserLocation();
+  const { location, isLoading, error } = useUserLocation();
 
   const { sortedDates, nearbyCount } = useMemo(() => {
     // Calculate distances for all dates
@@ -86,6 +86,11 @@ export function TourDatesList({ tourDates }: TourDatesListProps) {
       {nearbyCount > 0 && !isLoading && (
         <p className='text-sm text-secondary-token'>
           {nearbyCount} {nearbyCount === 1 ? 'show' : 'shows'} near you
+        </p>
+      )}
+      {error && !isLoading && nearbyCount === 0 && (
+        <p className='text-sm text-tertiary-token'>
+          Location unavailable — showing dates in chronological order
         </p>
       )}
       {sortedDates.map(tourDate => (
