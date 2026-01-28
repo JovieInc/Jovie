@@ -6,7 +6,7 @@
  * Compliance: GDPR, CCPA
  */
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { env, isTestEnv } from '@/lib/env-server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 

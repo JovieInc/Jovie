@@ -1,6 +1,6 @@
-import { promises as fs } from 'fs';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import { toString } from 'mdast-util-to-string';
-import path from 'path';
 import { cache } from 'react';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
