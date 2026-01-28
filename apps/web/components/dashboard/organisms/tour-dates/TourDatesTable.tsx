@@ -5,7 +5,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -31,7 +31,7 @@ interface TourDatesTableProps {
 
 const columnHelper = createColumnHelper<TourDateViewModel>();
 
-function StatusBadge({
+const StatusBadge = memo(function StatusBadge({
   status,
   isPastDate,
 }: {
@@ -66,7 +66,153 @@ function StatusBadge({
         </span>
       );
   }
-}
+});
+
+const DateCell = memo(function DateCell({
+  startDate,
+  startTime,
+}: {
+  startDate: string;
+  startTime: string | null;
+}) {
+  return (
+    <div className='flex flex-col'>
+      <span className='font-medium text-primary-token'>
+        {formatShortDate(startDate)}
+      </span>
+      {startTime && (
+        <span className='text-xs text-tertiary-token'>{startTime}</span>
+      )}
+    </div>
+  );
+});
+
+const VenueCell = memo(function VenueCell({
+  venueName,
+}: {
+  venueName: string;
+}) {
+  return <span className='text-primary-token truncate'>{venueName}</span>;
+});
+
+const LocationCell = memo(function LocationCell({
+  city,
+  region,
+  country,
+}: {
+  city: string;
+  region: string | null;
+  country: string;
+}) {
+  const location = [city, region, country].filter(Boolean).join(', ');
+  return <span className='text-secondary-token truncate'>{location}</span>;
+});
+
+const StatusCell = memo(function StatusCell({
+  ticketStatus,
+  startDate,
+}: {
+  ticketStatus: TourDateViewModel['ticketStatus'];
+  startDate: string;
+}) {
+  const past = isPastDate(new Date(startDate));
+  return <StatusBadge status={ticketStatus} isPastDate={past} />;
+});
+
+const TicketsCell = memo(function TicketsCell({
+  ticketUrl,
+}: {
+  ticketUrl: string | null;
+}) {
+  if (!ticketUrl) {
+    return <span className='text-tertiary-token'>-</span>;
+  }
+  return (
+    <a
+      href={ticketUrl}
+      target='_blank'
+      rel='noopener noreferrer'
+      className='inline-flex items-center gap-1 text-accent hover:underline'
+      onClick={event => event.stopPropagation()}
+    >
+      <Icon name='Ticket' className='h-4 w-4' />
+      <span className='text-sm'>Buy</span>
+    </a>
+  );
+});
+
+const SourceCell = memo(function SourceCell({
+  provider,
+}: {
+  provider: TourDateViewModel['provider'];
+}) {
+  return (
+    <span
+      className={cn(
+        'text-xs',
+        provider === 'bandsintown'
+          ? 'text-teal-600 dark:text-teal-400'
+          : 'text-tertiary-token'
+      )}
+    >
+      {provider === 'bandsintown' ? 'Bandsintown' : 'Manual'}
+    </span>
+  );
+});
+
+const ActionsHeader = memo(function ActionsHeader({
+  onSync,
+  isSyncing,
+}: {
+  onSync?: () => void;
+  isSyncing?: boolean;
+}) {
+  return (
+    <div className='flex items-center justify-end gap-2'>
+      {onSync && (
+        <button
+          type='button'
+          onClick={event => {
+            event.stopPropagation();
+            onSync();
+          }}
+          disabled={isSyncing}
+          className='inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-secondary-token hover:bg-surface-2 disabled:opacity-50'
+        >
+          <Icon
+            name='RefreshCw'
+            className={cn('h-4 w-4', isSyncing && 'animate-spin')}
+          />
+          Sync
+        </button>
+      )}
+    </div>
+  );
+});
+
+const ActionsCell = memo(function ActionsCell({
+  tourDate,
+  onEdit,
+}: {
+  tourDate: TourDateViewModel;
+  onEdit: (tourDate: TourDateViewModel) => void;
+}) {
+  return (
+    <div className='flex items-center justify-end'>
+      <button
+        type='button'
+        aria-label={`Edit ${tourDate.venueName} tour date`}
+        onClick={event => {
+          event.stopPropagation();
+          onEdit(tourDate);
+        }}
+        className='rounded p-1 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+      >
+        <Icon name='MoreHorizontal' className='h-4 w-4' />
+      </button>
+    </div>
+  );
+});
 
 export function TourDatesTable({
   tourDates,
@@ -121,21 +267,12 @@ export function TourDatesTable({
       columnHelper.accessor('startDate', {
         id: 'startDate',
         header: 'Date',
-        cell: info => {
-          const tourDate = info.row.original;
-          return (
-            <div className='flex flex-col'>
-              <span className='font-medium text-primary-token'>
-                {formatShortDate(info.getValue())}
-              </span>
-              {tourDate.startTime && (
-                <span className='text-xs text-tertiary-token'>
-                  {tourDate.startTime}
-                </span>
-              )}
-            </div>
-          );
-        },
+        cell: info => (
+          <DateCell
+            startDate={info.getValue()}
+            startTime={info.row.original.startTime}
+          />
+        ),
         size: 120,
         enableSorting: true,
       }),
@@ -144,9 +281,7 @@ export function TourDatesTable({
       columnHelper.accessor('venueName', {
         id: 'venue',
         header: 'Venue',
-        cell: info => (
-          <span className='text-primary-token truncate'>{info.getValue()}</span>
-        ),
+        cell: info => <VenueCell venueName={info.getValue()} />,
         size: 200,
         enableSorting: true,
       }),
@@ -155,13 +290,13 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'location',
         header: 'Location',
-        cell: ({ row }) => {
-          const { city, region, country } = row.original;
-          const location = [city, region, country].filter(Boolean).join(', ');
-          return (
-            <span className='text-secondary-token truncate'>{location}</span>
-          );
-        },
+        cell: ({ row }) => (
+          <LocationCell
+            city={row.original.city}
+            region={row.original.region}
+            country={row.original.country}
+          />
+        ),
         size: 180,
       }),
 
@@ -169,11 +304,12 @@ export function TourDatesTable({
       columnHelper.accessor('ticketStatus', {
         id: 'status',
         header: 'Status',
-        cell: info => {
-          const tourDate = info.row.original;
-          const past = isPastDate(new Date(tourDate.startDate));
-          return <StatusBadge status={info.getValue()} isPastDate={past} />;
-        },
+        cell: info => (
+          <StatusCell
+            ticketStatus={info.getValue()}
+            startDate={info.row.original.startDate}
+          />
+        ),
         size: 100,
       }),
 
@@ -181,24 +317,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'tickets',
         header: 'Tickets',
-        cell: ({ row }) => {
-          const tourDate = row.original;
-          if (!tourDate.ticketUrl) {
-            return <span className='text-tertiary-token'>-</span>;
-          }
-          return (
-            <a
-              href={tourDate.ticketUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='inline-flex items-center gap-1 text-accent hover:underline'
-              onClick={e => e.stopPropagation()}
-            >
-              <Icon name='Ticket' className='h-4 w-4' />
-              <span className='text-sm'>Buy</span>
-            </a>
-          );
-        },
+        cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />,
         size: 80,
       }),
 
@@ -206,66 +325,17 @@ export function TourDatesTable({
       columnHelper.accessor('provider', {
         id: 'source',
         header: 'Source',
-        cell: info => {
-          const provider = info.getValue();
-          return (
-            <span
-              className={cn(
-                'text-xs',
-                provider === 'bandsintown'
-                  ? 'text-teal-600 dark:text-teal-400'
-                  : 'text-tertiary-token'
-              )}
-            >
-              {provider === 'bandsintown' ? 'Bandsintown' : 'Manual'}
-            </span>
-          );
-        },
+        cell: info => <SourceCell provider={info.getValue()} />,
         size: 100,
       }),
 
       // Actions column
       columnHelper.display({
         id: 'actions',
-        header: () => (
-          <div className='flex items-center justify-end gap-2'>
-            {onSync && (
-              <button
-                type='button'
-                onClick={e => {
-                  e.stopPropagation();
-                  onSync();
-                }}
-                disabled={isSyncing}
-                className='inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-secondary-token hover:bg-surface-2 disabled:opacity-50'
-              >
-                <Icon
-                  name='RefreshCw'
-                  className={cn('h-4 w-4', isSyncing && 'animate-spin')}
-                />
-                Sync
-              </button>
-            )}
-          </div>
+        header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />,
+        cell: ({ row }) => (
+          <ActionsCell tourDate={row.original} onEdit={onEdit} />
         ),
-        cell: ({ row }) => {
-          const tourDate = row.original;
-          return (
-            <div className='flex items-center justify-end'>
-              <button
-                type='button'
-                aria-label={`Edit ${tourDate.venueName} tour date`}
-                onClick={e => {
-                  e.stopPropagation();
-                  onEdit(tourDate);
-                }}
-                className='rounded p-1 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-              >
-                <Icon name='MoreHorizontal' className='h-4 w-4' />
-              </button>
-            </div>
-          );
-        },
         size: 80,
       }),
     ];
