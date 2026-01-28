@@ -146,16 +146,25 @@ const SourceCell = memo(function SourceCell({
 }: {
   provider: TourDateViewModel['provider'];
 }) {
+  const label =
+    provider === 'bandsintown'
+      ? 'Bandsintown'
+      : provider === 'songkick'
+        ? 'Songkick'
+        : 'Manual';
+
   return (
     <span
       className={cn(
         'text-xs',
         provider === 'bandsintown'
           ? 'text-teal-600 dark:text-teal-400'
-          : 'text-tertiary-token'
+          : provider === 'songkick'
+            ? 'text-pink-600 dark:text-pink-400'
+            : 'text-tertiary-token'
       )}
     >
-      {provider === 'bandsintown' ? 'Bandsintown' : 'Manual'}
+      {label}
     </span>
   );
 });
