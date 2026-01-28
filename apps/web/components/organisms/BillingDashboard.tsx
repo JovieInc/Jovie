@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -16,6 +16,7 @@ import {
 export const BillingDashboard = memo(function BillingDashboard() {
   const { error: notifyError } = useNotifications();
   const queryClient = useQueryClient();
+  const notifyErrorRef = useRef(notifyError);
 
   const billingQuery = useBillingStatusQuery();
   const pricingQuery = usePricingOptionsQuery();
@@ -23,12 +24,16 @@ export const BillingDashboard = memo(function BillingDashboard() {
   const isLoading = billingQuery.isLoading || pricingQuery.isLoading;
   const hasError = Boolean(billingQuery.error || pricingQuery.error);
 
+  useEffect(() => {
+    notifyErrorRef.current = notifyError;
+  }, [notifyError]);
+
   // Show error notification when queries fail
   useEffect(() => {
     if (hasError && !isLoading) {
-      notifyError('Billing is temporarily unavailable.');
+      notifyErrorRef.current('Billing is temporarily unavailable.');
     }
-  }, [hasError, isLoading, notifyError]);
+  }, [hasError, isLoading]);
 
   const defaultPriceId = useMemo(() => {
     const pricingData = pricingQuery.data;
