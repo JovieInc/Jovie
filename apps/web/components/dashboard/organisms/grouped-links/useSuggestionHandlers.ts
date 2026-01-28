@@ -1,13 +1,10 @@
 import { useCallback } from 'react';
-import {
-  canonicalIdentity,
-  type DetectedLink,
-} from '@/lib/utils/platform-detection';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { SuggestedLink } from '../links/hooks';
 import { sectionOf } from '../links/utils';
 
 interface UseSuggestionHandlersProps<T extends DetectedLink> {
-  links: T[];
+  existingNormalizedUrlPlatforms: Map<string, Set<string>>;
   setLinks: React.Dispatch<React.SetStateAction<T[]>>;
   insertLinkWithSectionOrdering: (prev: T[], link: T) => T[];
   onLinkAdded?: (links: T[]) => void;
@@ -18,7 +15,7 @@ interface UseSuggestionHandlersProps<T extends DetectedLink> {
 }
 
 export function useSuggestionHandlers<T extends DetectedLink>({
-  links,
+  existingNormalizedUrlPlatforms,
   setLinks,
   insertLinkWithSectionOrdering,
   onLinkAdded,
@@ -40,17 +37,13 @@ export function useSuggestionHandlers<T extends DetectedLink>({
             category: normalizedCategory,
           },
         } as T;
-        const acceptedIdentity = canonicalIdentity({
-          platform: (nextLink as DetectedLink).platform,
-          normalizedUrl: (nextLink as DetectedLink).normalizedUrl,
-        });
-        const hasDuplicate = links.some(
-          existing =>
-            canonicalIdentity({
-              platform: (existing as DetectedLink).platform,
-              normalizedUrl: (existing as DetectedLink).normalizedUrl,
-            }) === acceptedIdentity
-        );
+        const normalizedUrl = (nextLink as DetectedLink).normalizedUrl;
+        const platformId = (nextLink as DetectedLink).platform.id;
+        const hasDuplicate = normalizedUrl
+          ? (existingNormalizedUrlPlatforms
+              .get(normalizedUrl)
+              ?.has(platformId) ?? false)
+          : false;
         if (!hasDuplicate) {
           setLinks(prev => insertLinkWithSectionOrdering(prev, nextLink));
         }
@@ -59,7 +52,7 @@ export function useSuggestionHandlers<T extends DetectedLink>({
     },
     [
       handleAcceptSuggestionFromHook,
-      links,
+      existingNormalizedUrlPlatforms,
       setLinks,
       insertLinkWithSectionOrdering,
       onLinkAdded,

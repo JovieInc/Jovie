@@ -8,6 +8,7 @@ import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionSafe } from '@/components/home/SeeItInActionSafe';
 import { SeeItInActionSkeleton } from '@/components/home/SeeItInActionSkeleton';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
+import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 // Revalidate every hour to balance freshness with performance using ISR
@@ -250,19 +251,43 @@ export default function HomePage() {
       {/* 3. Comparison Section */}
       <ComparisonSection />
 
-      {/* 4. What You Get Section */}
-      <WhatYouGetSection />
+      <DeferredSection
+        placeholderHeight={560}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 4. What You Get Section */}
+        <WhatYouGetSection />
+      </DeferredSection>
 
-      {/* 5. How It Works Section */}
-      <HowItWorksSection />
+      <DeferredSection
+        placeholderHeight={640}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 5. How It Works Section */}
+        <HowItWorksSection />
+      </DeferredSection>
 
-      {/* 6. See It In Action Section */}
-      <Suspense fallback={<SeeItInActionSkeleton />}>
-        <SeeItInActionSafe />
-      </Suspense>
+      <DeferredSection
+        placeholderHeight={520}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 6. See It In Action Section */}
+        <Suspense fallback={<SeeItInActionSkeleton />}>
+          <SeeItInActionSafe />
+        </Suspense>
+      </DeferredSection>
 
-      {/* 7. Final CTA Section */}
-      <FinalCTASection />
+      <DeferredSection
+        placeholderHeight={480}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 7. Final CTA Section */}
+        <FinalCTASection />
+      </DeferredSection>
     </div>
   );
 }

@@ -63,6 +63,7 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
                 alt={`QR code for ${handle}`}
                 width={100}
                 height={100}
+                sizes='100px'
                 className='w-full h-full'
                 onLoad={() => setIsLoading(false)}
                 onError={() => {

@@ -85,6 +85,7 @@ export function QRCode({
         alt={label}
         width={size}
         height={size}
+        sizes={`${size}px`}
         className={cn(className)}
         unoptimized // QR codes are dynamically generated
         onLoad={() => setIsLoading(false)}
