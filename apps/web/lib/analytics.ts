@@ -156,20 +156,16 @@ export function track(event: string, properties?: Record<string, unknown>) {
   });
 }
 
-export function page(name?: string, properties?: Record<string, unknown>) {
-  withAnalyticsGuard('page', name, () => {
+export function page(_name?: string, _properties?: Record<string, unknown>) {
+  withAnalyticsGuard('page', _name, () => {
     // NOTE: Removed window.va() calls - <VercelAnalytics /> handles pageviews automatically
     // This was causing excessive events and costs
-    void name;
-    void properties;
   });
 }
 
-export function identify(userId: string, traits?: Record<string, unknown>) {
-  withAnalyticsGuard('identify', userId, () => {
+export function identify(_userId: string, _traits?: Record<string, unknown>) {
+  withAnalyticsGuard('identify', _userId, () => {
     // NOTE: Removed window.va() calls - was causing excessive events and costs
-    void userId;
-    void traits;
   });
 }
 
@@ -185,7 +181,6 @@ export type FeatureFlagName =
 // Lightweight feature flag helpers (client-only)
 // Use defaultValue for safe rendering before flags load
 export function isFeatureEnabled(_flag: FeatureFlagName | string): boolean {
-  void _flag;
   return false;
 }
 
@@ -193,7 +188,6 @@ export function useFeatureFlag(
   _flag: FeatureFlagName | string,
   defaultValue: boolean = false
 ): boolean {
-  void _flag;
   return defaultValue;
 }
 
@@ -202,6 +196,5 @@ export function useFeatureFlagWithLoading(
   _flag: FeatureFlagName | string,
   defaultValue: boolean = false
 ): { enabled: boolean; loading: boolean } {
-  void _flag;
   return { enabled: defaultValue, loading: false };
 }

@@ -61,8 +61,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     const mqlMd = window.matchMedia('(min-width: 768px)');
     const mqlLg = window.matchMedia('(min-width: 1024px)');
 
-    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      void e;
+    const onChange = (_e: MediaQueryListEvent | MediaQueryList) => {
       const isMdUp = mqlMd.matches;
       const isLgUp = mqlLg.matches;
 
