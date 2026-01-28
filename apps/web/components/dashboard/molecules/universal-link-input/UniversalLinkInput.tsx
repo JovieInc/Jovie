@@ -53,21 +53,22 @@ function HighlightedName({
   }
 
   const matchSet = new Set(matchIndices);
+  const characters = Array.from(name).map((char, index) => ({
+    id: `${name}-${index}-${char}`,
+    char,
+    index,
+  }));
 
-  // For character-by-character rendering, using index as key is acceptable
-  // since the string content is static and reordering never occurs
   return (
     <span className='font-medium'>
-      {name.split('').map(
-        (
-          char,
-          i // NOSONAR S6479: Index key is safe - static string with no reordering
-        ) => (
-          <span key={i} className={matchSet.has(i) ? 'text-accent' : undefined}>
-            {char}
-          </span>
-        )
-      )}
+      {characters.map(character => (
+        <span
+          key={character.id}
+          className={matchSet.has(character.index) ? 'text-accent' : undefined}
+        >
+          {character.char}
+        </span>
+      ))}
     </span>
   );
 }
