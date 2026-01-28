@@ -239,6 +239,36 @@ function getBestImageUrl(
   return sorted[0]?.url;
 }
 
+/**
+ * Check if a bracketed segment contains remix keywords
+ */
+function isRemixSegment(segment: string): boolean {
+  return (
+    REMIX_KEYWORD_PATTERN.test(segment) ||
+    REMIXED_BY_PREFIX_PATTERN.test(segment)
+  );
+}
+
+/**
+ * Extract cleaned remixer name from a segment, filtering out invalid names
+ */
+function extractValidRemixerName(segment: string): string | null {
+  const remixerPart = getRemixerPart(segment);
+  if (!remixerPart) return null;
+
+  const cleanedPart = cleanArtistName(remixerPart);
+  // Filter out generic keywords that aren't artist names
+  if (
+    !cleanedPart ||
+    cleanedPart.toLowerCase() === 'remix' ||
+    cleanedPart.toLowerCase() === 'original'
+  ) {
+    return null;
+  }
+
+  return cleanedPart;
+}
+
 function appendUniqueCredits(
   existingCredits: ParsedArtistCredit[],
   nextCredits: ParsedArtistCredit[],
@@ -279,44 +309,26 @@ function appendUniqueCredits(
 export function extractRemixers(title: string): ParsedArtistCredit[] {
   const remixers: ParsedArtistCredit[] = [];
   let position = 0;
-  const bracketedSegments = getBracketedSegments(title);
 
-  for (const segment of bracketedSegments) {
-    if (
-      !REMIX_KEYWORD_PATTERN.test(segment) &&
-      !REMIXED_BY_PREFIX_PATTERN.test(segment)
-    ) {
-      continue;
-    }
+  const remixSegments = getBracketedSegments(title).filter(isRemixSegment);
 
-    const remixerPart = getRemixerPart(segment);
-    if (!remixerPart) {
-      continue;
-    }
-
-    // Check if this is just "Remix" without an artist
-    const cleanedPart = cleanArtistName(remixerPart);
-    if (
-      !cleanedPart ||
-      cleanedPart.toLowerCase() === 'remix' ||
-      cleanedPart.toLowerCase() === 'original'
-    ) {
-      continue;
-    }
+  for (const segment of remixSegments) {
+    const cleanedPart = extractValidRemixerName(segment);
+    if (!cleanedPart) continue;
 
     // Handle multiple remixers separated by & or and
     const remixerNames = splitByConjunction(cleanedPart);
 
     for (const remixerName of remixerNames) {
-      if (remixerName.trim()) {
-        remixers.push({
-          name: cleanArtistName(remixerName),
-          role: 'remixer',
-          joinPhrase: remixers.length === 0 ? null : ' & ',
-          position: position++,
-          isPrimary: false,
-        });
-      }
+      if (!remixerName.trim()) continue;
+
+      remixers.push({
+        name: cleanArtistName(remixerName),
+        role: 'remixer',
+        joinPhrase: remixers.length === 0 ? null : ' & ',
+        position: position++,
+        isPrimary: false,
+      });
     }
   }
 

@@ -23,10 +23,71 @@ import {
 } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 
+function buildProfileUrl(
+  handle: string | null | undefined
+): string | undefined {
+  if (!handle) return undefined;
+  const base = trimTrailingSlashes(PROFILE_URL);
+  const path = trimLeadingSlashes(handle);
+  return `${base}/${path}`;
+}
+
+function getGreetingName(artistName: string | null | undefined): string {
+  const raw = (artistName || 'Artist').trim();
+  const first = raw.split(/\s+/)[0];
+  return first || 'Artist';
+}
+
 interface DashboardOverviewProps {
   artist: Artist | null;
   hasSocialLinks: boolean;
   hasMusicLinks?: boolean;
+}
+
+interface SetupTaskItemProps {
+  isComplete: boolean;
+  stepNumber: number;
+  label: string;
+  actionHref: string;
+  actionLabel: string;
+}
+
+function SetupTaskItem({
+  isComplete,
+  stepNumber,
+  label,
+  actionHref,
+  actionLabel,
+}: SetupTaskItemProps) {
+  const containerClass = isComplete
+    ? getCompletedTaskContainerClass()
+    : getIncompleteTaskContainerClass();
+  const indicatorClass = isComplete
+    ? getCompletedTaskIndicatorClass()
+    : getIncompleteTaskIndicatorClass();
+  const indicatorContent = isComplete
+    ? getCompletedTaskIndicatorContent()
+    : getIncompleteTaskIndicatorContent(stepNumber);
+  const labelClass = isComplete
+    ? getCompletedTaskLabelClass()
+    : getIncompleteTaskLabelClass();
+
+  return (
+    <li className={containerClass}>
+      <span className={indicatorClass}>{indicatorContent}</span>
+      <div className='flex-1 min-w-0'>
+        <p className={labelClass}>{label}</p>
+      </div>
+      {!isComplete && (
+        <Link
+          href={actionHref}
+          className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
+        >
+          {actionLabel} →
+        </Link>
+      )}
+    </li>
+  );
 }
 
 export function DashboardOverview({
@@ -63,18 +124,8 @@ export function DashboardOverview({
     Boolean
   ).length;
 
-  const profileUrl = (() => {
-    if (!artist.handle) return undefined;
-    const base = trimTrailingSlashes(PROFILE_URL);
-    const path = trimLeadingSlashes(artist.handle);
-    return `${base}/${path}`;
-  })();
-
-  const greetingName = (() => {
-    const raw = (artist.name || 'Artist').trim();
-    const first = raw.split(/\s+/)[0];
-    return first || 'Artist';
-  })();
+  const profileUrl = buildProfileUrl(artist.handle);
+  const greetingName = getGreetingName(artist.name);
 
   const header = (
     <header className='flex flex-col gap-0.5 rounded-2xl bg-transparent p-3'>
@@ -144,122 +195,27 @@ export function DashboardOverview({
             </div>
 
             <ul className='space-y-1'>
-              <li
-                className={
-                  isHandleClaimed
-                    ? getCompletedTaskContainerClass()
-                    : getIncompleteTaskContainerClass()
-                }
-              >
-                <span
-                  className={
-                    isHandleClaimed
-                      ? getCompletedTaskIndicatorClass()
-                      : getIncompleteTaskIndicatorClass()
-                  }
-                >
-                  {isHandleClaimed
-                    ? getCompletedTaskIndicatorContent()
-                    : getIncompleteTaskIndicatorContent(1)}
-                </span>
-                <div className='flex-1 min-w-0'>
-                  <p
-                    className={
-                      isHandleClaimed
-                        ? getCompletedTaskLabelClass()
-                        : getIncompleteTaskLabelClass()
-                    }
-                  >
-                    Claim your handle
-                  </p>
-                </div>
-                {!isHandleClaimed && (
-                  <Link
-                    href='/app/settings'
-                    className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
-                  >
-                    Claim →
-                  </Link>
-                )}
-              </li>
-
-              <li
-                className={
-                  hasMusicLink
-                    ? getCompletedTaskContainerClass()
-                    : getIncompleteTaskContainerClass()
-                }
-              >
-                <span
-                  className={
-                    hasMusicLink
-                      ? getCompletedTaskIndicatorClass()
-                      : getIncompleteTaskIndicatorClass()
-                  }
-                >
-                  {hasMusicLink
-                    ? getCompletedTaskIndicatorContent()
-                    : getIncompleteTaskIndicatorContent(2)}
-                </span>
-                <div className='flex-1 min-w-0'>
-                  <p
-                    className={
-                      hasMusicLink
-                        ? getCompletedTaskLabelClass()
-                        : getIncompleteTaskLabelClass()
-                    }
-                  >
-                    Add a music link
-                  </p>
-                </div>
-                {!hasMusicLink && (
-                  <Link
-                    href='/app/dashboard/profile'
-                    className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
-                  >
-                    Add →
-                  </Link>
-                )}
-              </li>
-
-              <li
-                className={
-                  hasSocialLinks
-                    ? getCompletedTaskContainerClass()
-                    : getIncompleteTaskContainerClass()
-                }
-              >
-                <span
-                  className={
-                    hasSocialLinks
-                      ? getCompletedTaskIndicatorClass()
-                      : getIncompleteTaskIndicatorClass()
-                  }
-                >
-                  {hasSocialLinks
-                    ? getCompletedTaskIndicatorContent()
-                    : getIncompleteTaskIndicatorContent(3)}
-                </span>
-                <div className='flex-1 min-w-0'>
-                  <p
-                    className={
-                      hasSocialLinks
-                        ? getCompletedTaskLabelClass()
-                        : getIncompleteTaskLabelClass()
-                    }
-                  >
-                    Add social links
-                  </p>
-                </div>
-                {!hasSocialLinks && (
-                  <Link
-                    href='/app/dashboard/profile'
-                    className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
-                  >
-                    Add →
-                  </Link>
-                )}
-              </li>
+              <SetupTaskItem
+                isComplete={isHandleClaimed}
+                stepNumber={1}
+                label='Claim your handle'
+                actionHref='/app/settings'
+                actionLabel='Claim'
+              />
+              <SetupTaskItem
+                isComplete={hasMusicLink}
+                stepNumber={2}
+                label='Add a music link'
+                actionHref='/app/dashboard/profile'
+                actionLabel='Add'
+              />
+              <SetupTaskItem
+                isComplete={hasSocialLinks}
+                stepNumber={3}
+                label='Add social links'
+                actionHref='/app/dashboard/profile'
+                actionLabel='Add'
+              />
             </ul>
           </div>
         </div>
