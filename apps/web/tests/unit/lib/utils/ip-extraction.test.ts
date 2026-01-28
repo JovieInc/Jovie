@@ -10,12 +10,15 @@ describe('ip-extraction', () => {
       expect(isValidIP('256.0.0.1')).toBe(false);
       expect(isValidIP('192.168.1')).toBe(false);
       expect(isValidIP('192.168.1.1.1')).toBe(false);
+      expect(isValidIP('192.168..1')).toBe(false);
+      expect(isValidIP('192.168.one.1')).toBe(false);
     });
 
     it('validates common IPv6 formats', () => {
       expect(isValidIP('2001:0db8:85a3:0000:0000:8a2e:0370:7334')).toBe(true);
       expect(isValidIP('2001:db8::1')).toBe(true);
       expect(isValidIP('2001:db8:::1')).toBe(false);
+      expect(isValidIP('2001:db8::zzzz')).toBe(false);
     });
   });
 

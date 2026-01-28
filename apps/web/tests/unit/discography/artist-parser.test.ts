@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanTrackTitle,
   extractRemixers,
+  extractWith,
   isRemix,
   normalizeArtistName,
   parseArtistCredits,
@@ -157,6 +158,23 @@ describe('artist-parser', () => {
           .filter(credit => credit.role === 'featured_artist')
           .map(credit => credit.name)
       ).toEqual(['Artist C']);
+    });
+  });
+
+  describe('extractWith', () => {
+    it('extracts bracketed and inline "with" credits', () => {
+      expect(extractWith('Song (with Artist B)').map(r => r.name)).toEqual([
+        'Artist B',
+      ]);
+      expect(extractWith('Song with Artist C').map(r => r.name)).toEqual([
+        'Artist C',
+      ]);
+    });
+
+    it('splits multiple "with" artists by conjunctions', () => {
+      expect(
+        extractWith('Song (with Artist B & Artist C)').map(r => r.name)
+      ).toEqual(['Artist B', 'Artist C']);
     });
   });
 
