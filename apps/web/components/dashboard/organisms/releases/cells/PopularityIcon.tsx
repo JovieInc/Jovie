@@ -30,15 +30,12 @@ export const PopularityIcon = memo(function PopularityIcon({
   const displayPopularity = Math.round(clampedPopularity);
 
   // Determine level: low (0-33), med (34-66), high (67-100)
-  let level: 'low' | 'med' | 'high';
-
-  if (clampedPopularity <= 33) {
-    level = 'low';
-  } else if (clampedPopularity <= 66) {
-    level = 'med';
-  } else {
-    level = 'high';
-  }
+  const getPopularityLevel = (value: number): 'low' | 'med' | 'high' => {
+    if (value <= 33) return 'low';
+    if (value <= 66) return 'med';
+    return 'high';
+  };
+  const level = getPopularityLevel(clampedPopularity);
 
   // Color mapping for each level
   const colors = {
@@ -51,13 +48,12 @@ export const PopularityIcon = memo(function PopularityIcon({
   const inactiveColor = 'bg-surface-3';
 
   // Number of bars to fill based on level
-  let filledBars = 3;
-
-  if (level === 'low') {
-    filledBars = 1;
-  } else if (level === 'med') {
-    filledBars = 2;
-  }
+  const barCounts: Record<'low' | 'med' | 'high', number> = {
+    low: 1,
+    med: 2,
+    high: 3,
+  };
+  const filledBars = barCounts[level];
 
   return (
     <Tooltip>

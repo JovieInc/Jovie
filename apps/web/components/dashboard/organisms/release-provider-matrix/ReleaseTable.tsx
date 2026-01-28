@@ -299,12 +299,12 @@ export function ReleaseTable({
       }
 
       // Add external link options for available providers
-      const supportedProviders: ProviderKey[] = [
+      const supportedProviders = new Set<ProviderKey>([
         'spotify',
         'apple_music',
         'youtube',
         'deezer',
-      ];
+      ]);
       const providerLabels: Partial<Record<ProviderKey, string>> = {
         spotify: 'Spotify',
         apple_music: 'Apple Music',
@@ -313,7 +313,7 @@ export function ReleaseTable({
       };
 
       const externalProviders = release.providers.filter(
-        p => supportedProviders.includes(p.key) && p.url
+        p => supportedProviders.has(p.key) && p.url
       );
 
       if (externalProviders.length > 0) {

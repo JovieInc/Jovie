@@ -8,12 +8,12 @@ import { publicEnv } from '@/lib/env-public';
 /**
  * Production hostnames
  */
-const PRODUCTION_HOSTNAMES = ['jov.ie', 'meetjovie.com'];
+const PRODUCTION_HOSTNAMES = new Set(['jov.ie', 'meetjovie.com']);
 
 /**
  * Preview/staging hostnames
  */
-const PREVIEW_HOSTNAMES = ['main.jov.ie', 'main.meetjovie.com'];
+const PREVIEW_HOSTNAMES = new Set(['main.jov.ie', 'main.meetjovie.com']);
 
 /**
  * Dynamically get the base URL for the current browser origin.
@@ -42,10 +42,7 @@ export function getBaseUrl(): string {
     }
 
     // For staging or non-production deployments (e.g., Vercel preview URLs)
-    if (
-      PREVIEW_HOSTNAMES.includes(hostname) ||
-      hostname.includes('vercel.app')
-    ) {
+    if (PREVIEW_HOSTNAMES.has(hostname) || hostname.includes('vercel.app')) {
       return `${protocol}//${hostname}${portSuffix}`;
     }
   }
@@ -68,9 +65,7 @@ export function isDevelopment(): boolean {
 export function isPreview(): boolean {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    return (
-      hostname.includes('vercel.app') || PREVIEW_HOSTNAMES.includes(hostname)
-    );
+    return hostname.includes('vercel.app') || PREVIEW_HOSTNAMES.has(hostname);
   }
   // VERCEL_ENV is only available server-side
   return process.env.VERCEL_ENV === 'preview';
@@ -82,7 +77,7 @@ export function isPreview(): boolean {
 export function isProduction(): boolean {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    return PRODUCTION_HOSTNAMES.includes(hostname);
+    return PRODUCTION_HOSTNAMES.has(hostname);
   }
   return (
     process.env.NODE_ENV === 'production' &&
