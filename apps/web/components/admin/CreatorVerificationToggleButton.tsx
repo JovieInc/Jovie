@@ -44,7 +44,7 @@ export function CreatorVerificationToggleButton({
   const icon = getIcon();
 
   const handleClick = useCallback(() => {
-    Promise.resolve(onToggle()).catch(() => {});
+    void onToggle();
   }, [onToggle]);
 
   return (
