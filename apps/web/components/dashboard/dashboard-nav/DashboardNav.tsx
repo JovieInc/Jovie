@@ -92,7 +92,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
-    (item: NavItem) => {
+    (item: NavItem, _index: number) => {
       const isActive = isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
       const isProfileItem = item.href === PROFILE_HREF;
@@ -112,7 +112,11 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
-    (items: NavItem[]) => <SidebarMenu>{items.map(renderNavItem)}</SidebarMenu>,
+    (items: NavItem[]) => (
+      <SidebarMenu>
+        {items.map((item, index) => renderNavItem(item, index))}
+      </SidebarMenu>
+    ),
     [renderNavItem]
   );
 

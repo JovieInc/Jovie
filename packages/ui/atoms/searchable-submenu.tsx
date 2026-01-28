@@ -550,13 +550,14 @@ export function SearchableList({
             prev > 0 ? prev - 1 : filteredItems.length - 1
           );
           break;
-        case 'Enter':
+        case 'Enter': {
           e.preventDefault();
           const item = filteredItems[highlightedIndex];
           if (item && !item.disabled) {
             onSelect(item);
           }
           break;
+        }
       }
     },
     [filteredItems, highlightedIndex, onSelect]

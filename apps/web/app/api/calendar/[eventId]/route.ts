@@ -36,7 +36,10 @@ export async function GET(
   // Format date for ICS (YYYYMMDD format)
   const startDate = new Date(tourDate.startDate);
   const formatIcsDate = (date: Date) => {
-    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    return (
+      date.toISOString().replaceAll('-', '').replaceAll(':', '').split('.')[0] +
+      'Z'
+    );
   };
 
   // Create end date (assume 3 hours if no end time specified)
@@ -95,8 +98,8 @@ export async function GET(
     .join('\r\n');
 
   // Generate filename with null-safe city handling
-  const citySlug = (tourDate.city || 'event').replace(/[^a-zA-Z0-9]/g, '_');
-  const filename = `${artistName.replace(/[^a-zA-Z0-9]/g, '_')}_${citySlug}.ics`;
+  const citySlug = (tourDate.city || 'event').replaceAll(/[^a-zA-Z0-9]/g, '_');
+  const filename = `${artistName.replaceAll(/[^a-zA-Z0-9]/g, '_')}_${citySlug}.ics`;
 
   return new NextResponse(icsContent, {
     headers: {
@@ -112,9 +115,9 @@ export async function GET(
  */
 function escapeIcsText(text: string): string {
   return text
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r/g, '')
-    .replace(/\n/g, '\\n');
+    .replaceAll('\\', '\\\\')
+    .replaceAll(';', '\\;')
+    .replaceAll(',', '\\,')
+    .replaceAll('\r', '')
+    .replaceAll('\n', '\\n');
 }

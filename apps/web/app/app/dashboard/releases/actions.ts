@@ -532,7 +532,7 @@ export async function loadTracksForRelease(params: {
 
   // Verify the release belongs to the user's profile
   const release = await getReleaseById(params.releaseId);
-  if (!release || release.creatorProfileId !== profile.id) {
+  if (release?.creatorProfileId !== profile.id) {
     throw new Error('Release not found');
   }
 

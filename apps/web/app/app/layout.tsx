@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { resolveUserState } from '@/lib/auth/gate';
@@ -86,6 +87,7 @@ export default async function AppShellLayout({
           {/* ENG-004: Show environment issues to admins in non-production */}
           <OperatorBanner isAdmin={dashboardData.isAdmin} />
           <ImpersonationBannerWrapper />
+          <VersionUpdateBannerWrapper />
           <DashboardDataProvider value={dashboardData}>
             <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>
               {children}

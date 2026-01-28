@@ -13,6 +13,10 @@
     },
     "linear": {
       "url": "https://mcp.linear.app/sse"
+    },
+    "next-devtools": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "next-devtools-mcp@latest"]
     }
   }
 }

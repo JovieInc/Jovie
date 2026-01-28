@@ -94,7 +94,7 @@ export function ErrorBanner({
 
           {actions.length > 0 ? (
             <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
-              {actions.map(renderAction)}
+              {actions.map((action, index) => renderAction(action, index))}
             </div>
           ) : null}
         </div>
