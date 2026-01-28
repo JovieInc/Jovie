@@ -95,7 +95,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-white dark:bg-[#101011] p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-white dark:bg-surface-2 p-2 pb-1'>
       <div className='relative'>
         <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
@@ -106,7 +106,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-md border border-subtle bg-surface-2 dark:bg-[#151618] py-1.5 pl-8 pr-7 text-xs',
+            'w-full rounded-md border border-subtle bg-surface-2 py-1.5 pl-8 pr-7 text-xs',
             'text-primary-token placeholder:text-tertiary-token',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
           )}
@@ -269,14 +269,12 @@ interface ReleaseFilterDropdownProps {
   filters: ReleaseFilters;
   onFiltersChange: (filters: ReleaseFilters) => void;
   counts: ReleaseFilterCounts;
-  buttonClassName?: string;
 }
 
 export function ReleaseFilterDropdown({
   filters,
   onFiltersChange,
   counts,
-  buttonClassName,
 }: ReleaseFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mainSearch, setMainSearch] = useState('');
@@ -419,10 +417,7 @@ export function ReleaseFilterDropdown({
             <Button
               variant='ghost'
               size='sm'
-              className={cn(
-                'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token dark:border-[#1f2022] dark:bg-transparent dark:hover:border-[#2a2b2d] dark:hover:bg-[#151618] dark:hover:text-white',
-                buttonClassName
-              )}
+              className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
             >
               <Icon name='Filter' className='h-3.5 w-3.5' />
               Filter
@@ -439,7 +434,7 @@ export function ReleaseFilterDropdown({
               DROPDOWN_SHADOW,
               DROPDOWN_TRANSITIONS,
               DROPDOWN_SLIDE_ANIMATIONS,
-              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
+              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col bg-white dark:bg-surface-2'
             )}
             onCloseAutoFocus={e => e.preventDefault()}
           >
