@@ -113,8 +113,10 @@ export function TourDatesManager({
     setHasApiKey(true);
   }, []);
 
-  // Show empty state if no tour dates and not connected
-  if (tourDates.length === 0 && !isConnected) {
+  // Show empty state if:
+  // 1. No API key configured (need to set up API key first), OR
+  // 2. No tour dates and not connected (need to connect artist)
+  if (!hasApiKey || (tourDates.length === 0 && !isConnected)) {
     return (
       <TourDatesEmptyState
         profileId={profileId}

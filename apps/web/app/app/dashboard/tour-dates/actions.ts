@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   fetchBandsintownEvents,
+  isBandsintownConfigured,
   verifyBandsintownArtist,
 } from '@/lib/bandsintown';
 import { db } from '@/lib/db';
@@ -264,7 +265,8 @@ export async function checkBandsintownConnection(): Promise<BandsintownConnectio
       connected: !!profile.bandsintownArtistName,
       artistName: profile.bandsintownArtistName,
       lastSyncedAt: lastSynced?.lastSyncedAt?.toISOString() ?? null,
-      hasApiKey: !!profile.bandsintownApiKey,
+      // User has API key if they set one OR if there's an env key configured
+      hasApiKey: !!profile.bandsintownApiKey || isBandsintownConfigured(),
     };
   } catch (error) {
     // Re-throw redirect errors to allow onboarding flows to work
@@ -302,33 +304,43 @@ export async function saveBandsintownApiKey(params: {
     };
   }
 
-  // Encrypt and store the API key
-  const encryptedKey = encryptPII(trimmedKey);
+  try {
+    // Encrypt and store the API key
+    const encryptedKey = encryptPII(trimmedKey);
 
-  await db
-    .update(creatorProfiles)
-    .set({
-      bandsintownApiKey: encryptedKey,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+    await db
+      .update(creatorProfiles)
+      .set({
+        bandsintownApiKey: encryptedKey,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
 
-  void trackServerEvent('bandsintown_api_key_saved', {
-    profileId: profile.id,
-  });
+    void trackServerEvent('bandsintown_api_key_saved', {
+      profileId: profile.id,
+    });
 
-  revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath('/app/dashboard/tour-dates');
 
-  return {
-    success: true,
-    message: 'API key saved successfully.',
-  };
+    return {
+      success: true,
+      message: 'API key saved successfully.',
+    };
+  } catch {
+    return {
+      success: false,
+      message: 'Unable to save API key right now. Please try again.',
+    };
+  }
 }
 
 /**
  * Remove user's Bandsintown API key
  */
-export async function removeBandsintownApiKey(): Promise<{ success: boolean }> {
+export async function removeBandsintownApiKey(): Promise<{
+  success: boolean;
+  message?: string;
+}> {
   noStore();
   const { userId } = await getCachedAuth();
 
@@ -338,24 +350,31 @@ export async function removeBandsintownApiKey(): Promise<{ success: boolean }> {
 
   const profile = await requireProfile();
 
-  // Clear both API key and artist name to fully disconnect
-  // This ensures the connection status is correctly reported as disconnected
-  await db
-    .update(creatorProfiles)
-    .set({
-      bandsintownApiKey: null,
-      bandsintownArtistName: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+  try {
+    // Clear both API key and artist name to fully disconnect
+    // This ensures the connection status is correctly reported as disconnected
+    await db
+      .update(creatorProfiles)
+      .set({
+        bandsintownApiKey: null,
+        bandsintownArtistName: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
 
-  void trackServerEvent('bandsintown_api_key_removed', {
-    profileId: profile.id,
-  });
+    void trackServerEvent('bandsintown_api_key_removed', {
+      profileId: profile.id,
+    });
 
-  revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath('/app/dashboard/tour-dates');
 
-  return { success: true };
+    return { success: true };
+  } catch {
+    return {
+      success: false,
+      message: 'Unable to remove API key right now. Please try again.',
+    };
+  }
 }
 
 /**
