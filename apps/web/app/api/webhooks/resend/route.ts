@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { webhookEvents } from '@/lib/db/schema';
+import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
@@ -53,7 +54,9 @@ type ResendEventType =
   | 'email.delivered'
   | 'email.delivery_delayed'
   | 'email.bounced'
-  | 'email.complained';
+  | 'email.complained'
+  | 'email.opened'
+  | 'email.clicked';
 
 /**
  * Resend webhook payload structure
@@ -77,6 +80,17 @@ interface ResendWebhookPayload {
     complaint?: {
       // Feedback type from ISP
       feedback_type?: string;
+    };
+    // Click-specific fields
+    click?: {
+      // IP address of the clicker
+      ip_address?: string;
+      // Link that was clicked
+      link?: string;
+      // Timestamp of the click
+      timestamp?: string;
+      // User agent
+      user_agent?: string;
     };
   };
 }
@@ -295,9 +309,10 @@ async function processBounceOrComplaint(
     await updateCreatorReputation(type, creatorProfileId, eventId);
   }
 
-  // Log all delivery outcomes in parallel
-  await Promise.all(
-    emails.map(email =>
+  // Log all delivery outcomes and stop campaign enrollments in parallel
+  await Promise.all([
+    // Log delivery outcomes
+    ...emails.map(email =>
       logDelivery({
         channel: 'email',
         recipientEmail: email,
@@ -309,6 +324,50 @@ async function processBounceOrComplaint(
           bounceCode: data.bounce?.diagnostic_code,
           complaintType,
           ...(creatorProfileId && { creatorProfileId }),
+        },
+      })
+    ),
+    // Stop campaign enrollments for bounced/complained emails
+    ...emails.map(email =>
+      stopEnrollmentsForEmail(
+        email,
+        type === 'email.bounced' ? 'bounced' : 'complained'
+      )
+    ),
+  ]);
+}
+
+/**
+ * Process an open or click event from Resend
+ * Note: We also have our own tracking via email pixels and wrapped links,
+ * but this provides a backup signal from Resend's tracking.
+ */
+async function processOpenOrClick(
+  event: ResendWebhookPayload,
+  eventId: string
+): Promise<void> {
+  const { type, data } = event;
+  const eventName = type === 'email.opened' ? 'open' : 'click';
+
+  logger.info(`[Resend Webhook] ${type}`, {
+    eventId,
+    emailId: data.email_id,
+    clickLink: data.click?.link,
+  });
+
+  // Log the engagement event
+  await Promise.all(
+    data.to.map(email =>
+      logDelivery({
+        channel: 'email',
+        recipientEmail: email,
+        status: 'delivered', // Opens/clicks imply delivery
+        providerMessageId: data.email_id,
+        metadata: {
+          eventType: type,
+          engagementType: eventName,
+          clickLink: data.click?.link,
+          clickUserAgent: data.click?.user_agent,
         },
       })
     )
@@ -433,6 +492,11 @@ export async function POST(request: NextRequest) {
 
       case 'email.delivered':
         await processDelivered(event);
+        break;
+
+      case 'email.opened':
+      case 'email.clicked':
+        await processOpenOrClick(event, eventId);
         break;
 
       case 'email.sent':

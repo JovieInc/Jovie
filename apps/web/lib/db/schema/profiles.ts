@@ -59,6 +59,12 @@ export interface FitScoreBreakdown {
   releaseRecency: number;
   /** Target genre match (electronic/DJ) - max 5 points */
   genreMatch: number;
+  /** Has alternative DSP presence (Apple Music, SoundCloud) - max 10 points */
+  hasAlternativeDsp?: number;
+  /** Multi-platform presence bonus - max 5 points */
+  multiDspPresence?: number;
+  /** Has contact email available - max 5 points */
+  hasContactEmail?: number;
   /** Metadata about the scoring */
   meta?: {
     calculatedAt: string;
@@ -66,6 +72,8 @@ export interface FitScoreBreakdown {
     musicToolsDetected?: string[];
     matchedGenres?: string[];
     latestReleaseDate?: string;
+    alternativeDspPlatforms?: string[];
+    dspPlatformCount?: number;
   };
 }
 
