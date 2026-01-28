@@ -103,6 +103,7 @@ export function DspMatchCard({
               alt={externalArtistName}
               width={40}
               height={40}
+              sizes='40px'
               className='rounded-full object-cover'
               unoptimized={isExternalDspImage(externalArtistImageUrl)}
             />

@@ -108,6 +108,7 @@ export function ConfirmMatchDialog({
                 alt={externalArtistName}
                 width={64}
                 height={64}
+                sizes='64px'
                 className='rounded-full object-cover ring-2 ring-surface-3'
                 unoptimized={isExternalDspImage(externalArtistImageUrl)}
               />

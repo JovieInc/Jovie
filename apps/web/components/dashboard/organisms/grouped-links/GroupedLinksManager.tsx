@@ -98,21 +98,36 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
     handlePreviewChange,
   } = usePendingPreview({ onAdd: handleAdd });
 
+  const existingPlatforms = useMemo(
+    () => new Set(links.map(l => l.platform.id)),
+    [links]
+  );
+
+  const existingNormalizedUrlPlatforms = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    links.forEach(link => {
+      const normalizedUrl = link.normalizedUrl;
+      if (!normalizedUrl) return;
+      const existing = map.get(normalizedUrl);
+      if (existing) {
+        existing.add(link.platform.id);
+        return;
+      }
+      map.set(normalizedUrl, new Set([link.platform.id]));
+    });
+    return map;
+  }, [links]);
+
   // Suggestion handlers
   const { handleAcceptSuggestionClick, handleDismissSuggestionClick } =
     useSuggestionHandlers<T>({
-      links,
+      existingNormalizedUrlPlatforms,
       setLinks,
       insertLinkWithSectionOrdering,
       onLinkAdded,
       handleAcceptSuggestionFromHook,
       handleDismissSuggestionFromHook,
     });
-
-  const existingPlatforms = useMemo(
-    () => new Set(links.map(l => l.platform.id)),
-    [links]
-  );
 
   // Memoize platform IDs for UniversalLinkInput to prevent unnecessary re-renders
   const existingPlatformIds = useMemo(
