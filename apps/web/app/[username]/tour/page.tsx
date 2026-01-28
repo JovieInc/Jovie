@@ -7,7 +7,7 @@ import { loadUpcomingTourDates } from '@/app/app/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { PROFILE_URL } from '@/constants/app';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
-import { TourDateCard } from './TourDateCard';
+import { TourDatesList } from './TourDatesList';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -110,11 +110,7 @@ export default async function TourPage({ params }: Props) {
         </div>
 
         {tourDates.length > 0 ? (
-          <div className='space-y-4'>
-            {tourDates.map(tourDate => (
-              <TourDateCard key={tourDate.id} tourDate={tourDate} />
-            ))}
-          </div>
+          <TourDatesList tourDates={tourDates} />
         ) : (
           <div className='rounded-xl border border-subtle bg-surface-1 p-8 text-center'>
             <Icon

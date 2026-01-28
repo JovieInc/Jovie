@@ -11,9 +11,15 @@ const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
 interface TourDateCardProps {
   tourDate: TourDateViewModel;
+  isNearYou?: boolean;
+  distanceKm?: number | null;
 }
 
-export function TourDateCard({ tourDate }: TourDateCardProps) {
+export function TourDateCard({
+  tourDate,
+  isNearYou = false,
+  distanceKm,
+}: TourDateCardProps) {
   const date = new Date(tourDate.startDate);
   const location = [tourDate.city, tourDate.region, tourDate.country]
     .filter(Boolean)
@@ -69,17 +75,25 @@ export function TourDateCard({ tourDate }: TourDateCardProps) {
               )}
             </div>
 
-            {/* Status badge */}
-            {isSoldOut && (
-              <span className='shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'>
-                Sold Out
-              </span>
-            )}
-            {isCancelled && (
-              <span className='shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400'>
-                Cancelled
-              </span>
-            )}
+            {/* Status badges */}
+            <div className='flex shrink-0 flex-col items-end gap-1'>
+              {isNearYou && (
+                <span className='inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'>
+                  <Icon name='MapPin' className='h-3 w-3' />
+                  Near You
+                </span>
+              )}
+              {isSoldOut && (
+                <span className='rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'>
+                  Sold Out
+                </span>
+              )}
+              {isCancelled && (
+                <span className='rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400'>
+                  Cancelled
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Actions */}
