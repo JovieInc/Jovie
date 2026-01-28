@@ -134,9 +134,18 @@ async function globalSetup() {
   // Navigate to the app to ensure it's ready
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';
   try {
+    // Warm up the home page
     await page.goto(baseURL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
-    console.log('✓ Browser warmup complete');
+    console.log('✓ Home page warmup complete');
+
+    // Also warm up the dashboard route (takes ~20s on cold start)
+    console.log('🔥 Pre-warming dashboard route...');
+    await page.goto(`${baseURL}/app/dashboard`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
+    console.log('✓ Dashboard warmup complete');
   } catch (error) {
     console.warn('⚠ Browser warmup failed (non-fatal):', error);
   } finally {
