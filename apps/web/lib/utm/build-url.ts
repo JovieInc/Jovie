@@ -35,7 +35,7 @@ function resolvePlaceholder(
   context: Partial<UTMContext>
 ): string | undefined {
   // Extract the key from {{key}} format
-  const key = placeholder.replace(/\{\{|\}\}/g, '');
+  const key = placeholder.replaceAll(/\{\{|\}\}/g, '');
   const contextKey = PLACEHOLDER_TO_CONTEXT[key];
 
   if (contextKey && contextKey in context) {
@@ -56,7 +56,7 @@ function resolveString(
 ): { resolved: string; hasUnresolved: boolean } {
   let hasUnresolved = false;
 
-  const resolved = value.replace(PLACEHOLDER_PATTERN, match => {
+  const resolved = value.replaceAll(PLACEHOLDER_PATTERN, match => {
     const replacement = resolvePlaceholder(match as UTMPlaceholder, context);
     if (replacement === undefined) {
       hasUnresolved = true;
@@ -102,10 +102,10 @@ export function slugify(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Remove non-word chars except spaces and hyphens
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .replace(/(?:^-+)|(?:-+$)/g, ''); // Trim hyphens from start and end
+    .replaceAll(/[^\w\s-]/g, '') // Remove non-word chars except spaces and hyphens
+    .replaceAll(/\s+/g, '-') // Replace spaces with hyphens
+    .replaceAll(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replaceAll(/(?:^-+)|(?:-+$)/g, ''); // Trim hyphens from start and end
 }
 
 /**
@@ -297,8 +297,8 @@ export function createSimpleUTMParams(
   campaign?: string
 ): UTMParams {
   return {
-    utm_source: source.toLowerCase().replace(/\s+/g, '_'),
-    utm_medium: medium.toLowerCase().replace(/\s+/g, '_'),
+    utm_source: source.toLowerCase().replaceAll(/\s+/g, '_'),
+    utm_medium: medium.toLowerCase().replaceAll(/\s+/g, '_'),
     utm_campaign: campaign,
   };
 }
