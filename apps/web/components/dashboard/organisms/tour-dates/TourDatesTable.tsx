@@ -141,31 +141,30 @@ const TicketsCell = memo(function TicketsCell({
   );
 });
 
+const PROVIDER_CONFIG: Record<
+  TourDateViewModel['provider'],
+  { label: string; className: string }
+> = {
+  bandsintown: {
+    label: 'Bandsintown',
+    className: 'text-teal-600 dark:text-teal-400',
+  },
+  songkick: {
+    label: 'Songkick',
+    className: 'text-pink-600 dark:text-pink-400',
+  },
+  manual: { label: 'Manual', className: 'text-tertiary-token' },
+};
+
 const SourceCell = memo(function SourceCell({
   provider,
 }: {
   provider: TourDateViewModel['provider'];
 }) {
-  const label =
-    provider === 'bandsintown'
-      ? 'Bandsintown'
-      : provider === 'songkick'
-        ? 'Songkick'
-        : 'Manual';
+  const config = PROVIDER_CONFIG[provider];
 
   return (
-    <span
-      className={cn(
-        'text-xs',
-        provider === 'bandsintown'
-          ? 'text-teal-600 dark:text-teal-400'
-          : provider === 'songkick'
-            ? 'text-pink-600 dark:text-pink-400'
-            : 'text-tertiary-token'
-      )}
-    >
-      {label}
-    </span>
+    <span className={cn('text-xs', config.className)}>{config.label}</span>
   );
 });
 

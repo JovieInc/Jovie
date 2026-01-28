@@ -178,7 +178,7 @@ function transformCloudinaryUrl(
 ): string {
   try {
     const urlParts = url.split('/');
-    const uploadIndex = urlParts.findIndex(part => part === 'upload');
+    const uploadIndex = urlParts.indexOf('upload');
 
     if (uploadIndex === -1) return url;
 

@@ -53,26 +53,22 @@ function HighlightedName({
   }
 
   const matchSet = new Set(matchIndices);
-  const charCounts = new Map<string, number>();
-  let charIndex = 0;
+  const characters = Array.from(name).map((char, index) => ({
+    id: `${name}-${index}-${char}`,
+    char,
+    index,
+  }));
 
   return (
     <span className='font-medium'>
-      {name.split('').map(char => {
-        const currentIndex = charIndex;
-        charIndex += 1;
-        const count = charCounts.get(char) ?? 0;
-        charCounts.set(char, count + 1);
-
-        return (
-          <span
-            key={`${char}-${count}`}
-            className={matchSet.has(currentIndex) ? 'text-accent' : undefined}
-          >
-            {char}
-          </span>
-        );
-      })}
+      {characters.map(character => (
+        <span
+          key={character.id}
+          className={matchSet.has(character.index) ? 'text-accent' : undefined}
+        >
+          {character.char}
+        </span>
+      ))}
     </span>
   );
 }

@@ -9,8 +9,8 @@
  * Validity: 5 minutes (configurable)
  */
 
+import crypto from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
-import crypto from 'crypto';
 import { env } from '@/lib/env-server';
 
 // Token validity in milliseconds (5 minutes default)
