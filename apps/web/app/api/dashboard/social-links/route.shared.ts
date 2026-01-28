@@ -10,7 +10,7 @@ import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
   createRateLimitHeaders,
-  dashboardLinksRateLimit,
+  dashboardLinksLimiter,
 } from '@/lib/rate-limit';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
@@ -98,16 +98,12 @@ export const validateUpdateSocialLinksPayload = (
 export async function applyRateLimiting(
   userId: string
 ): Promise<{ allowed: boolean; headers: HeadersInit }> {
-  if (!dashboardLinksRateLimit) {
-    return { allowed: true, headers: {} };
-  }
-
-  const result = await dashboardLinksRateLimit.limit(userId);
+  const result = await dashboardLinksLimiter.limit(userId);
   const headers = createRateLimitHeaders({
     success: result.success,
     limit: result.limit,
     remaining: result.remaining,
-    reset: new Date(result.reset),
+    reset: result.reset,
   });
 
   return { allowed: result.success, headers };

@@ -9,7 +9,7 @@ interface Props {
   }>;
 }
 
-export default function TipPage({ params }: Props) {
+export default function TipPage({ params }: Readonly<Props>) {
   const router = useRouter();
   const searchParams = useSearchParams();
 

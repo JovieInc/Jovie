@@ -420,7 +420,7 @@ describe('GET /api/admin/creator-invite/bulk', () => {
 
   it('returns preview with eligible profiles', async () => {
     mockGetCurrentUserEntitlements.mockResolvedValue(mockEntitlementsAdmin);
-    mockFetchEligibleProfilesForPreview.mockResolvedValue(mockEligibleProfiles);
+    mockFetchProfilesByFitScore.mockResolvedValue(mockEligibleProfiles);
     mockGetEligibleProfileCount.mockResolvedValue(100);
 
     const { GET } = await import('@/app/api/admin/creator-invite/bulk/route');
@@ -443,7 +443,7 @@ describe('GET /api/admin/creator-invite/bulk', () => {
 
   it('uses default params when not provided', async () => {
     mockGetCurrentUserEntitlements.mockResolvedValue(mockEntitlementsAdmin);
-    mockFetchEligibleProfilesForPreview.mockResolvedValue([]);
+    mockFetchProfilesByFitScore.mockResolvedValue([]);
     mockGetEligibleProfileCount.mockResolvedValue(0);
 
     const { GET } = await import('@/app/api/admin/creator-invite/bulk/route');
@@ -456,7 +456,7 @@ describe('GET /api/admin/creator-invite/bulk', () => {
 
     expect(response.status).toBe(200);
     expect(data.threshold).toBe(50); // Default threshold
-    expect(mockFetchEligibleProfilesForPreview).toHaveBeenCalledWith(50, 50);
+    expect(mockFetchProfilesByFitScore).toHaveBeenCalledWith(50, 50);
   });
 });
 

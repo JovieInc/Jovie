@@ -8,7 +8,7 @@ interface ErrorProps {
   reset: () => void;
 }
 
-export default function MarketingError({ error, reset }: ErrorProps) {
+export default function MarketingError({ error, reset }: Readonly<ErrorProps>) {
   useEffect(() => {
     // Detect and log database-related errors for better debugging
     const isDatabaseError =

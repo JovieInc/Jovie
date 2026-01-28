@@ -14,7 +14,6 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
   getCreatorProfileWithLinks,
   incrementProfileViews,
-  isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
 import type {
   CreatorContact as DbCreatorContact,
@@ -24,7 +23,10 @@ import { getLatestReleaseForProfile } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
-import { getTopProfilesForStaticGeneration } from '@/lib/services/profile';
+import {
+  getTopProfilesForStaticGeneration,
+  isClaimTokenValid,
+} from '@/lib/services/profile';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -297,7 +299,10 @@ async function checkFeatureFlagWithTimeout(
   }
 }
 
-export default async function ArtistPage({ params, searchParams }: Props) {
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: Readonly<Props>) {
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
   const { mode = 'profile', claim_token: claimTokenParam } =
@@ -391,10 +396,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   if (typeof claimTokenParam === 'string' && claimTokenParam.length > 0) {
     const claimToken = claimTokenParam;
     if (!profile.is_claimed) {
-      showClaimBanner = await isClaimTokenValidForProfile({
-        username: normalizedUsername,
-        claimToken,
-      });
+      showClaimBanner = await isClaimTokenValid(normalizedUsername, claimToken);
     }
   }
 

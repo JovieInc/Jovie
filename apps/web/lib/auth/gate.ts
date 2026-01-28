@@ -333,29 +333,62 @@ export async function resolveUserState(
     },
   };
 
-  // 1. Check Clerk authentication
-  const { userId: clerkUserId } = await getCachedAuth();
+  // 1. Check Clerk authentication (parallelize both calls for performance)
+  const [authResult, clerkUser] = await Promise.all([
+    getCachedAuth(),
+    getCachedCurrentUser(),
+  ]);
+
+  const { userId: clerkUserId } = authResult;
   if (!clerkUserId) {
     return emptyResult;
   }
 
   // Get email from Clerk user
-  const clerkUser = await getCachedCurrentUser();
   const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? null;
 
-  // 2. Query DB user by clerk_id
-  const [dbUser] = await db
+  // 2. Query DB user AND profile in a single JOIN query (performance optimization)
+  // This reduces database round trips from 2 to 1
+  const [dbResult] = await db
     .select({
+      // User fields
       id: users.id,
       email: users.email,
       userStatus: users.userStatus,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
       deletedAt: users.deletedAt,
+      // Profile fields (nullable from LEFT JOIN)
+      profileId: creatorProfiles.id,
+      profileUsername: creatorProfiles.username,
+      profileUsernameNormalized: creatorProfiles.usernameNormalized,
+      profileDisplayName: creatorProfiles.displayName,
+      profileIsPublic: creatorProfiles.isPublic,
+      profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      profileIsClaimed: creatorProfiles.isClaimed,
     })
     .from(users)
+    .leftJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
+
+  // Extract user data from result (may be undefined if no user exists)
+  const dbUser = dbResult
+    ? {
+        id: dbResult.id,
+        email: dbResult.email,
+        userStatus: dbResult.userStatus,
+        isAdmin: dbResult.isAdmin,
+        isPro: dbResult.isPro,
+        deletedAt: dbResult.deletedAt,
+      }
+    : null;
 
   const baseContext = {
     isAdmin: dbUser?.isAdmin ?? false,
@@ -403,6 +436,19 @@ export async function resolveUserState(
   // 2b. If no DB user exists, create one if requested
   let dbUserId: string | null = dbUser?.id ?? null;
 
+  // Profile from the JOIN query (only valid if dbUser exists)
+  let profile = dbResult?.profileId
+    ? {
+        id: dbResult.profileId,
+        username: dbResult.profileUsername,
+        usernameNormalized: dbResult.profileUsernameNormalized,
+        displayName: dbResult.profileDisplayName,
+        isPublic: dbResult.profileIsPublic,
+        onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
+        isClaimed: dbResult.profileIsClaimed,
+      }
+    : null;
+
   if (!dbUserId) {
     const creationResult = await handleMissingDbUser({
       createDbUserIfMissing,
@@ -418,29 +464,9 @@ export async function resolveUserState(
 
     // Otherwise, we got the new user ID
     dbUserId = creationResult.dbUserId;
+    // New user won't have a profile yet
+    profile = null;
   }
-
-  // 3. Query creator profile first to determine if user is mid-onboarding
-  // We need to check this before waitlist logic to avoid redirect loops
-  // for users who just signed up via OAuth and are completing onboarding
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      isPublic: creatorProfiles.isPublic,
-      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-      isClaimed: creatorProfiles.isClaimed,
-    })
-    .from(creatorProfiles)
-    .where(
-      and(
-        eq(creatorProfiles.userId, dbUserId),
-        eq(creatorProfiles.isClaimed, true)
-      )
-    )
-    .limit(1);
 
   // Resolve user state based on profile status
   const profileState = resolveProfileState(profile);

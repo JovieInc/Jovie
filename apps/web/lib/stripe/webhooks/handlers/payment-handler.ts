@@ -25,6 +25,12 @@ import type Stripe from 'stripe';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+import {
+  sendPaymentFailedEmail,
+  sendPaymentRecoveredEmail,
+  shouldSendDunningEmail,
+} from '@/lib/stripe/dunning';
+import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import type {
@@ -175,6 +181,23 @@ export class PaymentHandler extends BaseSubscriptionHandler {
 
       await invalidateBillingCache();
 
+      // Check if this is a recovery from a failed payment (attempt_count > 1)
+      // If so, send a recovery confirmation email
+      if (invoice.attempt_count && invoice.attempt_count > 1) {
+        const priceId = subscription.items.data[0]?.price?.id;
+        sendPaymentRecoveredEmail({
+          userId,
+          amountPaid: invoice.amount_paid,
+          currency: invoice.currency,
+          priceId,
+        }).catch(error => {
+          logger.warn('Failed to send payment recovery email', {
+            userId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        });
+      }
+
       return result;
     } catch (error) {
       await captureCriticalError(
@@ -300,6 +323,25 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
 
     await invalidateBillingCache();
+
+    // Send dunning email (fire-and-forget, don't block webhook response)
+    if (shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
+      const priceId = subscription.items.data[0]?.price?.id;
+      sendPaymentFailedEmail({
+        userId,
+        amountDue: invoice.amount_due,
+        currency: invoice.currency,
+        attemptCount: invoice.attempt_count ?? 1,
+        invoiceId: invoice.id,
+        priceId,
+        customerId: customerId ?? undefined,
+      }).catch(error => {
+        logger.warn('Failed to send dunning email', {
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      });
+    }
 
     return {
       success: true,

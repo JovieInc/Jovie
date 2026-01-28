@@ -43,7 +43,9 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
   }
 }
 
-export default async function BlogPostRoute({ params }: BlogPostPageProps) {
+export default async function BlogPostRoute({
+  params,
+}: Readonly<BlogPostPageProps>) {
   const { slug } = await params;
 
   try {

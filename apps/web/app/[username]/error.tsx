@@ -12,7 +12,7 @@ interface ErrorProps {
  * Error boundary for profile pages.
  * Handles database errors, timeouts, and other failures gracefully.
  */
-export default function ProfileError({ error, reset }: ErrorProps) {
+export default function ProfileError({ error, reset }: Readonly<ErrorProps>) {
   useEffect(() => {
     // Detect and log database-related errors for better debugging
     const isDatabaseError =

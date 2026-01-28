@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import type { DbType } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
+import { enrollInCampaign } from '@/lib/email/campaigns/enrollment';
 import {
   type ClaimInviteTemplateData,
   getClaimInviteEmail,
@@ -191,7 +192,7 @@ export async function processSendClaimInviteJob(
     })
     .where(eq(creatorClaimInvites.id, invite.id));
 
-  // Generate email content
+  // Generate email content (inviteId enables tracking)
   const templateData: ClaimInviteTemplateData = {
     creatorName: profile.displayName || profile.username,
     username: profile.username,
@@ -199,6 +200,7 @@ export async function processSendClaimInviteJob(
     avatarUrl: profile.avatarUrl,
     fitScore: profile.fitScore,
     recipientEmail: invite.email,
+    inviteId: invite.id,
   };
 
   const emailContent = getClaimInviteEmail(templateData);
@@ -230,6 +232,20 @@ export async function processSendClaimInviteJob(
       emailDomain: invite.email.split('@')[1], // Log domain only for PII protection
       profileUsername: profile.username,
       resendId: result.detail,
+    });
+
+    // Enroll in drip campaign for follow-ups (72 hours = 3 days until first follow-up)
+    enrollInCampaign({
+      campaignKey: 'claim_invite_drip',
+      subjectId: profile.id,
+      recipientEmail: invite.email,
+      delayHours: 72,
+    }).catch(error => {
+      // Don't fail the job if campaign enrollment fails
+      logger.error('Failed to enroll in drip campaign', {
+        inviteId: invite.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     });
 
     return {

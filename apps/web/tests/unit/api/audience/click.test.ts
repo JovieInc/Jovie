@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockCheckPublicRateLimit = vi.hoisted(() => vi.fn());
-const mockGetPublicRateLimitStatus = vi.hoisted(() => vi.fn());
+const mockPublicClickLimiterGetStatus = vi.hoisted(() => vi.fn());
+const mockPublicClickLimiterLimit = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/utils/rate-limit', () => ({
-  checkPublicRateLimit: mockCheckPublicRateLimit,
-  getPublicRateLimitStatus: mockGetPublicRateLimitStatus,
+vi.mock('@/lib/rate-limit', () => ({
+  publicClickLimiter: {
+    getStatus: mockPublicClickLimiterGetStatus,
+    limit: mockPublicClickLimiterLimit,
+  },
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -131,12 +133,18 @@ describe('POST /api/audience/click', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockCheckPublicRateLimit.mockReturnValue(false);
+    mockPublicClickLimiterGetStatus.mockReturnValue({
+      blocked: false,
+      retryAfterSeconds: 0,
+      limit: 100,
+      remaining: 100,
+    });
+    mockPublicClickLimiterLimit.mockResolvedValue({ success: true });
   });
 
   it('returns 429 when rate limited', async () => {
-    mockCheckPublicRateLimit.mockReturnValue(true);
-    mockGetPublicRateLimitStatus.mockReturnValue({
+    mockPublicClickLimiterGetStatus.mockReturnValue({
+      blocked: true,
       retryAfterSeconds: 60,
       limit: 100,
       remaining: 0,

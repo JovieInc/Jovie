@@ -115,7 +115,14 @@ vi.mock('@/lib/cache', () => ({
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  avatarUploadRateLimit: null, // Disabled in tests
+  avatarUploadLimiter: {
+    limit: vi.fn().mockResolvedValue({
+      success: true,
+      limit: 3,
+      remaining: 2,
+      reset: new Date(Date.now() + 60000),
+    }),
+  },
 }));
 
 // Mock magic bytes validation - we test this separately

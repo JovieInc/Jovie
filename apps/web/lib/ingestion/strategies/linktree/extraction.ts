@@ -5,6 +5,10 @@
  */
 
 import {
+  extractAndRankEmails,
+  getBestContactEmail,
+} from '@/lib/email/extraction';
+import {
   canonicalIdentity,
   detectPlatform,
   normalizeUrl,
@@ -168,5 +172,42 @@ export function extractLinktree(html: string): ExtractionResult {
   // Detect paid tier by checking for branding
   const hasPaidTier = detectLinktreePaidTier(html);
 
-  return createExtractionResult(links, displayName, avatarUrl, hasPaidTier);
+  // Extract bio/description from Next.js data (using type assertions for optional fields)
+  const pageProps = nextData?.props?.pageProps as
+    | {
+        user?: { description?: string | null };
+        account?: { description?: string | null };
+        seo?: { description?: string | null };
+      }
+    | undefined;
+
+  const bio =
+    pageProps?.user?.description ??
+    pageProps?.account?.description ??
+    pageProps?.seo?.description ??
+    extractMetaContent(html, 'og:description') ??
+    null;
+
+  // Extract contact email from bio, HTML, and link titles
+  const linkTitles = links.map(l => l.title).filter((t): t is string => !!t);
+  const extractedEmails = extractAndRankEmails({
+    bio,
+    html,
+    linkTitles,
+  });
+  const contactEmail = getBestContactEmail(extractedEmails);
+
+  const result = createExtractionResult(
+    links,
+    displayName,
+    avatarUrl,
+    hasPaidTier
+  );
+
+  // Add bio and contact email to result
+  return {
+    ...result,
+    bio,
+    contactEmail,
+  };
 }
