@@ -136,7 +136,10 @@ export function DashboardNav(_: DashboardNavProps) {
         </SidebarGroupContent>
       </SidebarGroup>
       {isAdmin && !isInSettings && (
-        <div className='mt-3 pt-3 border-t border-sidebar-border/50'>
+        <div
+          className='mt-3 pt-3 border-t border-sidebar-border/50'
+          data-testid='admin-nav-section'
+        >
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>

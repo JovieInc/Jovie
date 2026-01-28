@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
+import { memo, type ReactNode, useMemo } from 'react';
 import { GradientText } from '@/components/atoms/GradientText';
 import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ export interface HeroSectionProps {
   showBackgroundEffects?: boolean;
 }
 
-export function HeroSection({
+export const HeroSection = memo(function HeroSection({
   headline,
   highlightText,
   gradientVariant = 'primary',
@@ -140,4 +140,4 @@ export function HeroSection({
       </Container>
     </header>
   );
-}
+});

@@ -158,6 +158,17 @@ export async function signInUser(
   // The signin page doesn't automatically redirect in test mode
   await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
+  // Wait for page to stabilize after React 19 transient hooks error
+  // There's a known React 19 bug (facebook/react#33580) that causes a transient
+  // "Rendered more hooks than during the previous render" error during hydration.
+  // The error appears briefly then "magically disappears" as the page stabilizes.
+  await expect(async () => {
+    const bodyText = await page.locator('body').innerText();
+    // The page should not show the error message once stabilized
+    expect(bodyText).not.toContain('Application error');
+    expect(bodyText).not.toContain('client-side exception');
+  }).toPass({ timeout: 20000, intervals: [500, 1000, 2000, 3000, 5000] });
+
   // Verify we're authenticated by checking for dashboard elements
   const userButton = page.locator('[data-clerk-element="userButton"]');
   const userMenu = page.locator('[data-testid="user-menu"]');

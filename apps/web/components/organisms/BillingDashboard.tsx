@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -13,7 +13,7 @@ import {
   usePricingOptionsQuery,
 } from '@/lib/queries';
 
-export function BillingDashboard() {
+export const BillingDashboard = memo(function BillingDashboard() {
   const { error: notifyError } = useNotifications();
   const queryClient = useQueryClient();
 
@@ -158,4 +158,4 @@ export function BillingDashboard() {
       </div>
     </div>
   );
-}
+});
