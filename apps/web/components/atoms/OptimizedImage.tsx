@@ -1,7 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { generateSEOAltText } from '@/lib/images/seo';
 import { versionImageUrl } from '@/lib/images/versioning';
 import { cn } from '@/lib/utils';
@@ -65,6 +71,10 @@ const BLUR_PLACEHOLDERS = {
   portrait:
     'data:image/webp;base64,UklGRnICAABXRUJQVlA4WAoAAAAgAAAAOQAATwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAaSQBuAGMALgAgADIAMAAxADZWUDhUAAAAKwAAAP8QEI0AAAAgHyAQg4CARGQ5iXnORlY=',
   wide: 'data:image/webp;base64,UklGRnoCAABXRUJQVlA4WAoAAAAgAAAAfwAAOQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAaSQBuAGMALgAgADIAMAExADZWUDhUAAAAKwAAAP8QEI0AAAAgHyAQg4CARGQ5iXnORlYjFxAQ',
+};
+
+type WindowWithImageRenderCounts = Window & {
+  __jovieImageRenderCounts?: Record<string, number>;
 };
 
 // Utility functions for enhanced image handling
@@ -210,6 +220,9 @@ export const OptimizedImage = React.memo(function OptimizedImage({
 }: Readonly<OptimizedImageProps>) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const renderCount = useRef(0);
+
+  renderCount.current += 1;
 
   // Memoize the image source to prevent unnecessary re-renders
   const imageSrc = useOptimizedImageSource({
@@ -230,8 +243,17 @@ export const OptimizedImage = React.memo(function OptimizedImage({
       blurDataURL,
     });
 
+  const handleLoad = useCallback(() => {
+    setIsLoading(false);
+  }, []);
+
+  const handleError = useCallback(() => {
+    setHasError(true);
+    setIsLoading(false);
+  }, []);
+
   // Memoize sizes and classes to prevent unnecessary re-renders - must be before conditional returns
-  const { defaultSizes, containerClasses, imageProps } = useMemo(() => {
+  const { defaultSizes, containerClasses } = useMemo(() => {
     const defaultSizes = getDefaultSizes({ sizes, fill, size });
     const containerClasses = cn(
       'relative overflow-hidden',
@@ -240,7 +262,11 @@ export const OptimizedImage = React.memo(function OptimizedImage({
       className
     );
 
-    const imageProps = {
+    return { defaultSizes, containerClasses };
+  }, [sizes, fill, size, shape, className]);
+
+  const stableImageProps = useMemo(() => {
+    return {
       src: imageSrc,
       alt: computedAlt,
       priority,
@@ -248,15 +274,6 @@ export const OptimizedImage = React.memo(function OptimizedImage({
       placeholder: placeholder as 'blur' | 'empty',
       ...(placeholder === 'blur' && { blurDataURL: defaultBlur }),
       ...(priority && { fetchPriority: 'high' as const }),
-      className: cn(
-        'transition-opacity duration-300',
-        isLoading ? 'opacity-0' : 'opacity-100'
-      ),
-      onLoad: () => setIsLoading(false),
-      onError: () => {
-        setHasError(true);
-        setIsLoading(false);
-      },
       style: {
         objectFit,
         objectPosition,
@@ -264,26 +281,48 @@ export const OptimizedImage = React.memo(function OptimizedImage({
       },
       unoptimized,
     };
-
-    return { defaultSizes, containerClasses, imageProps };
   }, [
-    sizes,
-    fill,
-    size,
-    shape,
-    className,
     imageSrc,
     computedAlt,
     priority,
     quality,
     placeholder,
     defaultBlur,
-    isLoading,
     objectFit,
     objectPosition,
     aspectRatioValue,
     unoptimized,
   ]);
+
+  const loadingImageProps = useMemo(() => {
+    return {
+      className: cn(
+        'transition-opacity duration-300',
+        isLoading ? 'opacity-0' : 'opacity-100'
+      ),
+      onLoad: handleLoad,
+      onError: handleError,
+    };
+  }, [handleError, handleLoad, isLoading]);
+
+  const imageProps = useMemo(
+    () => ({ ...stableImageProps, ...loadingImageProps }),
+    [loadingImageProps, stableImageProps]
+  );
+
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.NEXT_PUBLIC_IMAGE_RENDER_DEBUG === 'true'
+    ) {
+      const renderKey = imageSrc || computedAlt;
+      if (typeof window !== 'undefined') {
+        const typedWindow = window as WindowWithImageRenderCounts;
+        typedWindow.__jovieImageRenderCounts ??= {};
+        typedWindow.__jovieImageRenderCounts[renderKey] = renderCount.current;
+      }
+    }
+  }, [computedAlt, imageSrc]);
 
   // If no src or error occurred and no fallback, show placeholder
   if (!imageSrc) {
