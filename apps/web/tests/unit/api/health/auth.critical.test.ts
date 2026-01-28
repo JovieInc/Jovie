@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
-const mockGetUserByClerkId = vi.hoisted(() => vi.fn());
+const mockGetDbUser = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
 }));
 
-vi.mock('@/lib/db/queries', () => ({
-  getUserByClerkId: mockGetUserByClerkId,
+vi.mock('@/lib/auth/session', () => ({
+  getDbUser: mockGetDbUser,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -58,7 +58,7 @@ describe('@critical GET /api/health/auth', () => {
 
   it('returns authenticated status with user info', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockGetUserByClerkId.mockResolvedValue({ id: 'db_user_1' });
+    mockGetDbUser.mockResolvedValue({ id: 'db_user_1' });
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({

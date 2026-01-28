@@ -223,7 +223,7 @@ export function useDedupedFetch<T = unknown>(
     mountedRef.current = true;
 
     if (url && !skip) {
-      fetchData(false).catch(() => {});
+      void fetchData(false);
     }
 
     return () => {
@@ -243,7 +243,7 @@ export function useDedupedFetch<T = unknown>(
 
     const poll = () => {
       if (mountedRef.current) {
-        fetchData(true).catch(() => {});
+        void fetchData(true);
         pollingTimeoutRef.current = setTimeout(poll, pollingIntervalMs);
       }
     };
@@ -370,7 +370,7 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchAll(false).catch(() => {});
+    void fetchAll(false);
 
     return () => {
       mountedRef.current = false;

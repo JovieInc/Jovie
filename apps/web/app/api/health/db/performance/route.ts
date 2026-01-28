@@ -2,14 +2,13 @@ import { NextResponse } from 'next/server';
 import { checkDbPerformance, getDbConfig } from '@/lib/db';
 import { HEALTH_CHECK_CONFIG, PERFORMANCE_THRESHOLDS } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
+import {
+  createRateLimitHeadersFromStatus,
+  getClientIP,
+  healthLimiter,
+} from '@/lib/rate-limit';
 import { validateDatabaseEnvironment } from '@/lib/startup/environment-validator';
 import { logger } from '@/lib/utils/logger';
-import {
-  checkRateLimit,
-  createRateLimitHeaders,
-  getClientIP,
-  getRateLimitStatus,
-} from '@/lib/utils/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,10 +50,9 @@ export async function GET(request: Request) {
 
   // Rate limiting check
   const clientIP = getClientIP(request);
-  const isRateLimited = checkRateLimit(clientIP, true);
-  const rateLimitStatus = getRateLimitStatus(clientIP, true);
+  const rateLimitStatus = healthLimiter.getStatus(clientIP);
 
-  if (isRateLimited) {
+  if (rateLimitStatus.blocked) {
     return NextResponse.json(
       {
         service: 'db-performance',
@@ -72,11 +70,14 @@ export async function GET(request: Request) {
         status: 429,
         headers: {
           ...HEALTH_CHECK_CONFIG.cacheHeaders,
-          ...createRateLimitHeaders(rateLimitStatus),
+          ...createRateLimitHeadersFromStatus(rateLimitStatus),
         },
       }
     );
   }
+
+  // Trigger rate limit counter increment (fire-and-forget)
+  void healthLimiter.limit(clientIP);
 
   // Validate database environment first
   const dbValidation = validateDatabaseEnvironment();
@@ -109,7 +110,7 @@ export async function GET(request: Request) {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeaders(rateLimitStatus),
+        ...createRateLimitHeadersFromStatus(rateLimitStatus),
       },
     });
   }
@@ -121,10 +122,7 @@ export async function GET(request: Request) {
   let status: 'ok' | 'warning' | 'error' = 'ok';
   let ok = true;
 
-  if (!performanceResult.healthy) {
-    status = 'error';
-    ok = false;
-  } else {
+  if (performanceResult.healthy) {
     // Check for warning conditions (slower than optimal but not critical)
     const simpleQuerySlow =
       (performanceResult.metrics.simpleQuery || 0) >
@@ -137,6 +135,9 @@ export async function GET(request: Request) {
       status = 'warning';
       // Still ok=true for warnings, just indicates suboptimal performance
     }
+  } else {
+    status = 'error';
+    ok = false;
   }
 
   const body: PerformanceHealthResponse = {
@@ -180,7 +181,7 @@ export async function GET(request: Request) {
       : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
     headers: {
       ...HEALTH_CHECK_CONFIG.cacheHeaders,
-      ...createRateLimitHeaders(rateLimitStatus),
+      ...createRateLimitHeadersFromStatus(rateLimitStatus),
     },
   });
 }

@@ -1,8 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getDbUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { getUserByClerkId } from '@/lib/db/queries';
 import { creatorProfiles } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
 
@@ -35,7 +35,7 @@ export async function GET() {
     }
 
     // Test that we can find the user and their profile
-    const user = await getUserByClerkId(userId);
+    const user = await getDbUser(userId);
 
     if (!user) {
       return NextResponse.json(

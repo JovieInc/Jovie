@@ -1,17 +1,19 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockCheckPublicRateLimit = vi.hoisted(() => vi.fn());
-const mockGetPublicRateLimitStatus = vi.hoisted(() => vi.fn());
+const mockPublicVisitLimiterGetStatus = vi.hoisted(() => vi.fn());
+const mockPublicVisitLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDetectBot = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/utils/rate-limit', () => ({
-  checkPublicRateLimit: mockCheckPublicRateLimit,
-  getPublicRateLimitStatus: mockGetPublicRateLimitStatus,
+vi.mock('@/lib/rate-limit', () => ({
+  publicVisitLimiter: {
+    getStatus: mockPublicVisitLimiterGetStatus,
+    limit: mockPublicVisitLimiterLimit,
+  },
 }));
 
 vi.mock('@/lib/utils/bot-detection', () => ({
@@ -52,15 +54,21 @@ describe('POST /api/audience/visit', () => {
     vi.clearAllMocks();
     vi.resetModules();
 
-    mockCheckPublicRateLimit.mockReturnValue(false);
+    mockPublicVisitLimiterGetStatus.mockReturnValue({
+      blocked: false,
+      retryAfterSeconds: 0,
+      limit: 100,
+      remaining: 100,
+    });
+    mockPublicVisitLimiterLimit.mockResolvedValue({ success: true });
     mockDetectBot.mockReturnValue({ isBot: false });
     mockIsTrackingTokenEnabled.mockReturnValue(false);
     mockCheckVisitRateLimit.mockResolvedValue({ success: true });
   });
 
   it('returns 429 when rate limited', async () => {
-    mockCheckPublicRateLimit.mockReturnValue(true);
-    mockGetPublicRateLimitStatus.mockReturnValue({
+    mockPublicVisitLimiterGetStatus.mockReturnValue({
+      blocked: true,
       retryAfterSeconds: 60,
       limit: 100,
       remaining: 0,

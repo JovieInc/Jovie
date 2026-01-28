@@ -63,7 +63,7 @@ export async function GET(
   if (tourDate.ticketUrl) {
     descriptionParts.push(`Tickets: ${tourDate.ticketUrl}`);
   }
-  const description = descriptionParts.join('\\n');
+  const description = descriptionParts.join(String.raw`\n`);
 
   // Build event summary
   const summary = tourDate.title
@@ -115,9 +115,9 @@ export async function GET(
  */
 function escapeIcsText(text: string): string {
   return text
-    .replaceAll('\\', '\\\\')
-    .replaceAll(';', '\\;')
-    .replaceAll(',', '\\,')
+    .replaceAll('\\', String.raw`\\`)
+    .replaceAll(';', String.raw`\;`)
+    .replaceAll(',', String.raw`\,`)
     .replaceAll('\r', '')
-    .replaceAll('\n', '\\n');
+    .replaceAll('\n', String.raw`\n`);
 }

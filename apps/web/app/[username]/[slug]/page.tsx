@@ -281,7 +281,7 @@ function pickProviderUrl(
 export default async function ContentSmartLinkPage({
   params,
   searchParams,
-}: PageProps) {
+}: Readonly<PageProps>) {
   const { username, slug } = await params;
   const { dsp } = await searchParams;
 
