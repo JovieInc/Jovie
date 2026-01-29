@@ -5,11 +5,12 @@ import { useCallback } from 'react';
 import type { CreatorVerificationStatus } from '@/components/admin/useCreatorVerification';
 import { cn } from '@/lib/utils';
 
-interface VerificationStatusToggleProps {
-  isVerified: boolean;
-  status: CreatorVerificationStatus;
-  onToggle: () => Promise<void> | void;
-}
+interface VerificationStatusToggleProps
+  extends Readonly<{
+    isVerified: boolean;
+    status: CreatorVerificationStatus;
+    onToggle: () => Promise<void> | void;
+  }> {}
 
 function getButtonStyles(
   isVerified: boolean,

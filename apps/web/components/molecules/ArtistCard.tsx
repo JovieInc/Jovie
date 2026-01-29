@@ -14,16 +14,17 @@ const REDUCED_MOTION_DURATION = 0.1;
 const NAME_HOVER_DURATION = 0.2;
 const NAME_HOVER_OPACITY = 0.8;
 
-export interface ArtistCardProps {
-  handle: string;
-  name: string;
-  src: string;
-  alt?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  showName?: boolean;
-  className?: string;
-  isVerified?: boolean;
-}
+export interface ArtistCardProps
+  extends Readonly<{
+    handle: string;
+    name: string;
+    src: string;
+    alt?: string;
+    size?: 'sm' | 'md' | 'lg' | 'xl';
+    showName?: boolean;
+    className?: string;
+    isVerified?: boolean;
+  }> {}
 
 export function ArtistCard({
   handle,
