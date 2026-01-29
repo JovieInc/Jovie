@@ -13,11 +13,12 @@ import { usePathname } from 'next/navigation';
 import { Header } from '@/components/site/Header';
 import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 
-export interface MarketingHeaderProps {
-  logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  scrollThresholdPx?: number;
-  hideNav?: boolean;
-}
+export interface MarketingHeaderProps
+  extends Readonly<{
+    logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    scrollThresholdPx?: number;
+    hideNav?: boolean;
+  }> {}
 
 /**
  * Marketing header with scroll-aware background.

@@ -20,19 +20,20 @@ interface Provider {
   url: string | null;
 }
 
-interface ReleaseLandingPageProps {
-  release: {
-    title: string;
-    artworkUrl: string | null;
-    releaseDate: string | null;
-  };
-  artist: {
-    name: string;
-    avatarUrl: string | null;
-  };
-  providers: Provider[];
-  slug: string;
-}
+interface ReleaseLandingPageProps
+  extends Readonly<{
+    release: {
+      title: string;
+      artworkUrl: string | null;
+      releaseDate: string | null;
+    };
+    artist: {
+      name: string;
+      avatarUrl: string | null;
+    };
+    providers: Provider[];
+    slug: string;
+  }> {}
 
 /**
  * Map provider key to social icon platform name

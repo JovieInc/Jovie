@@ -2,27 +2,28 @@
 
 import { cn } from '../table.styles';
 
-interface ActionsCellProps {
-  /**
-   * Action buttons (always visible on hover)
-   */
-  actions?: React.ReactNode;
+interface ActionsCellProps
+  extends Readonly<{
+    /**
+     * Action buttons (always visible on hover)
+     */
+    actions?: React.ReactNode;
 
-  /**
-   * Overflow menu (always visible on hover)
-   */
-  menu?: React.ReactNode;
+    /**
+     * Overflow menu (always visible on hover)
+     */
+    menu?: React.ReactNode;
 
-  /**
-   * Whether the menu is currently open
-   */
-  isMenuOpen?: boolean;
+    /**
+     * Whether the menu is currently open
+     */
+    isMenuOpen?: boolean;
 
-  /**
-   * Additional CSS classes
-   */
-  className?: string;
-}
+    /**
+     * Additional CSS classes
+     */
+    className?: string;
+  }> {}
 
 /**
  * ActionsCell - Icon button actions and overflow menu

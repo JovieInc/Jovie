@@ -6,9 +6,10 @@ export interface PhoneMockupLink {
   isVisible: boolean;
 }
 
-export interface PhoneMockupPreviewProps {
-  username: string;
-  avatarUrl?: string | null;
-  links: PhoneMockupLink[];
-  className?: string;
-}
+export interface PhoneMockupPreviewProps
+  extends Readonly<{
+    username: string;
+    avatarUrl?: string | null;
+    links: PhoneMockupLink[];
+    className?: string;
+  }> {}
