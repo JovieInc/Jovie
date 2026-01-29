@@ -35,7 +35,7 @@ export const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-1.5 py-[5px] text-left text-[13px] font-medium leading-[19px] tracking-tight outline-none ring-sidebar-ring transition-all duration-150 ease-out text-[#b0b3bb] hover:text-white data-[active=true]:text-white hover:bg-white/5 data-[active=true]:bg-white/10 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-white/6 active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-[17px] [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:size-[17px] [&>svg]:shrink-0 [&>svg]:text-[#9aa0aa] [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-white',
+  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-2 text-left text-[14px] font-medium leading-[20px] outline-none ring-sidebar-ring transition-all duration-150 ease-out text-[#cdd0d5] hover:text-white data-[active=true]:text-white hover:bg-white/6 data-[active=true]:bg-white/12 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-white/8 active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-9 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-[#9ea4ad] [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-white',
   {
     variants: {
       variant: {
@@ -44,9 +44,9 @@ const sidebarMenuButtonVariants = cva(
           'bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]',
       },
       size: {
-        default: 'h-8',
-        sm: 'h-7 text-xs',
-        lg: 'h-9 group-data-[collapsible=icon]:!size-9',
+        default: 'h-9',
+        sm: 'h-8 text-xs',
+        lg: 'h-10 group-data-[collapsible=icon]:!size-9',
       },
     },
     defaultVariants: {
