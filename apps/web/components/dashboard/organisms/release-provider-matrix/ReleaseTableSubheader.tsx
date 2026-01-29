@@ -162,6 +162,7 @@ function LinearStyleDisplayMenu({
   onShowTracksChange,
   groupByYear,
   onGroupByYearChange,
+  triggerClassName,
 }: {
   columnVisibility: Record<string, boolean>;
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
@@ -171,6 +172,7 @@ function LinearStyleDisplayMenu({
   onShowTracksChange?: (show: boolean) => void;
   groupByYear?: boolean;
   onGroupByYearChange?: (group: boolean) => void;
+  triggerClassName?: string;
 }) {
   return (
     <Popover>
@@ -179,7 +181,10 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
+            className={cn(
+              'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token',
+              triggerClassName
+            )}
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
             Display
@@ -283,6 +288,9 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
 
+  const pillButtonClass =
+    'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token dark:border-[#1f2022] dark:bg-transparent dark:hover:border-[#2a2b2d] dark:hover:bg-[#151618] dark:hover:text-white';
+
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-1.5'>
       {/* Left: Filter first, then release view toggle */}
@@ -291,6 +299,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           filters={filters}
           onFiltersChange={onFiltersChange}
           counts={counts}
+          buttonClassName={pillButtonClass}
         />
         {onReleaseViewChange && (
           <ReleaseViewSegmentedControl
@@ -311,6 +320,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onShowTracksChange={onShowTracksChange}
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
+          triggerClassName={pillButtonClass}
         />
         <ExportCSVButton
           getData={() => getReleasesForExport(releases, selectedIds)}
@@ -319,7 +329,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label={selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'}
           variant='ghost'
           size='sm'
-          className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
+          className={pillButtonClass}
         />
       </div>
     </div>

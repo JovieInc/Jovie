@@ -269,12 +269,14 @@ interface ReleaseFilterDropdownProps {
   filters: ReleaseFilters;
   onFiltersChange: (filters: ReleaseFilters) => void;
   counts: ReleaseFilterCounts;
+  buttonClassName?: string;
 }
 
 export function ReleaseFilterDropdown({
   filters,
   onFiltersChange,
   counts,
+  buttonClassName,
 }: ReleaseFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mainSearch, setMainSearch] = useState('');
@@ -417,7 +419,10 @@ export function ReleaseFilterDropdown({
             <Button
               variant='ghost'
               size='sm'
-              className='h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token'
+              className={cn(
+                'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token dark:border-[#1f2022] dark:bg-transparent dark:hover:border-[#2a2b2d] dark:hover:bg-[#151618] dark:hover:text-white',
+                buttonClassName
+              )}
             >
               <Icon name='Filter' className='h-3.5 w-3.5' />
               Filter

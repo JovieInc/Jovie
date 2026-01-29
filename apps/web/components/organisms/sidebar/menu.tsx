@@ -35,7 +35,7 @@ export const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md px-1 py-1.5 text-left text-[13px] tracking-tight font-normal leading-5 outline-none ring-sidebar-ring transition-all duration-150 ease-out text-sidebar-muted hover:text-sidebar-foreground focus-visible:ring-2 data-[active=true]:text-sidebar-accent-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-sidebar-accent-foreground',
+  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-2 text-left text-[14px] font-medium leading-[20px] outline-none ring-sidebar-ring transition-all duration-150 ease-out text-[#cdd0d5] hover:text-white data-[active=true]:text-white hover:bg-white/6 data-[active=true]:bg-white/12 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-white/8 active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-9 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-[#9ea4ad] [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-white',
   {
     variants: {
       variant: {
@@ -44,9 +44,9 @@ const sidebarMenuButtonVariants = cva(
           'bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]',
       },
       size: {
-        default: 'h-8',
-        sm: 'h-7 text-xs',
-        lg: 'h-9 group-data-[collapsible=icon]:!size-9',
+        default: 'h-9',
+        sm: 'h-8 text-xs',
+        lg: 'h-10 group-data-[collapsible=icon]:!size-9',
       },
     },
     defaultVariants: {
@@ -178,8 +178,8 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-sidebar-foreground select-none pointer-events-none',
-      'peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground',
+      'absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-[11px] font-medium tabular-nums text-[#cdd0d5] select-none pointer-events-none',
+      'peer-hover/menu-button:text-white peer-data-[active=true]/menu-button:text-white',
       'peer-data-[size=sm]/menu-button:text-xs',
       'peer-data-[size=default]/menu-button:text-xs',
       'peer-data-[size=lg]/menu-button:text-sm',
