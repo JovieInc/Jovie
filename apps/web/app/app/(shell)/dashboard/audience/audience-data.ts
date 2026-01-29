@@ -115,8 +115,11 @@ export async function getAudienceServerData(params: {
 
   const { userId: _userId, selectedProfileId, searchParams } = params;
   const modeParamRaw = searchParams.mode;
-  const modeParam = Array.isArray(modeParamRaw) ? modeParamRaw[0] : modeParamRaw;
-  const mode: AudienceMode = modeParam === 'subscribers' ? 'subscribers' : 'members';
+  const modeParam = Array.isArray(modeParamRaw)
+    ? modeParamRaw[0]
+    : modeParamRaw;
+  const mode: AudienceMode =
+    modeParam === 'subscribers' ? 'subscribers' : 'members';
 
   if (!selectedProfileId) {
     return {

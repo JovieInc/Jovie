@@ -18,8 +18,14 @@ import {
 } from '@/lib/ingestion/strategies/instagram';
 import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
-import { isTikTokUrl, validateTikTokUrl } from '@/lib/ingestion/strategies/tiktok';
-import { isTwitterUrl, validateTwitterUrl } from '@/lib/ingestion/strategies/twitter';
+import {
+  isTikTokUrl,
+  validateTikTokUrl,
+} from '@/lib/ingestion/strategies/tiktok';
+import {
+  isTwitterUrl,
+  validateTwitterUrl,
+} from '@/lib/ingestion/strategies/twitter';
 import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
 
 interface LinkInput {

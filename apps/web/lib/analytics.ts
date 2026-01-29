@@ -19,7 +19,11 @@ function getAnalyticsWindow(): AnalyticsWindow | null {
 function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
   try {
     const prodHost = new URL(publicEnv.NEXT_PUBLIC_APP_URL).hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) {
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.endsWith('.local')
+    ) {
       return 'dev';
     }
     if (host === prodHost || host === `www.${prodHost}`) {

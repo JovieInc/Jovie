@@ -31,6 +31,14 @@ export {
   normalizeHandle as normalizeBeaconsHandle,
   validateBeaconsUrl,
 } from './beacons';
+// Instagram strategy
+export {
+  extractInstagram,
+  extractInstagramHandle,
+  fetchInstagramDocument,
+  isInstagramUrl,
+  validateInstagramUrl,
+} from './instagram';
 // Laylo strategy
 export {
   extractLaylo,
@@ -40,14 +48,16 @@ export {
   normalizeLayloHandle,
   validateLayloUrl,
 } from './laylo';
-// Instagram strategy
+// Linktree strategy
 export {
-  extractInstagram,
-  extractInstagramHandle,
-  fetchInstagramDocument,
-  isInstagramUrl,
-  validateInstagramUrl,
-} from './instagram';
+  extractLinktree,
+  extractLinktreeHandle,
+  fetchLinktreeDocument,
+  isLinktreeUrl,
+  isValidHandle as isValidLinktreeHandle,
+  normalizeHandle as normalizeLinktreeHandle,
+  validateLinktreeUrl,
+} from './linktree';
 // TikTok strategy
 export {
   extractTikTok,
@@ -64,16 +74,6 @@ export {
   isTwitterUrl,
   validateTwitterUrl,
 } from './twitter';
-// Linktree strategy
-export {
-  extractLinktree,
-  extractLinktreeHandle,
-  fetchLinktreeDocument,
-  isLinktreeUrl,
-  isValidHandle as isValidLinktreeHandle,
-  normalizeHandle as normalizeLinktreeHandle,
-  validateLinktreeUrl,
-} from './linktree';
 // YouTube strategy
 export {
   extractYouTube,
@@ -88,9 +88,9 @@ export {
 // ============================================================================
 
 import { isBeaconsUrl } from './beacons';
+import { isInstagramUrl } from './instagram';
 import { isLayloUrl } from './laylo';
 import { isLinktreeUrl } from './linktree';
-import { isInstagramUrl } from './instagram';
 import { isTikTokUrl } from './tiktok';
 import { isTwitterUrl } from './twitter';
 import { isYouTubeChannelUrl } from './youtube';

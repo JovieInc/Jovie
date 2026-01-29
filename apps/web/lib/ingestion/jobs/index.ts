@@ -9,8 +9,8 @@ export { deriveLayloHandle, layloJobConfig, processLayloJob } from './laylo';
 
 // Platform-specific job processors
 export { linktreeJobConfig, processLinktreeJob } from './linktree';
-export { processTikTokJob, tiktokJobConfig } from './tiktok';
 export * from './schemas';
-export * from './types';
+export { processTikTokJob, tiktokJobConfig } from './tiktok';
 export { processTwitterJob, twitterJobConfig } from './twitter';
+export * from './types';
 export { processYouTubeJob, youtubeJobConfig } from './youtube';

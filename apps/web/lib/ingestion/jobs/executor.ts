@@ -57,7 +57,10 @@ export async function executeIngestionJob<TPayload extends BaseJobPayload>(
     const extractionWithProvenance = {
       ...extraction,
       sourceUrl: extraction.sourceUrl ?? parsed.sourceUrl,
-      sourcePlatform: resolveSourcePlatform(extraction.sourcePlatform, detected),
+      sourcePlatform: resolveSourcePlatform(
+        extraction.sourcePlatform,
+        detected
+      ),
     };
     const result = await normalizeAndMergeExtraction(
       tx,

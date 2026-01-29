@@ -36,6 +36,7 @@ export {
 // Re-export job processors (direct imports to avoid barrel export issues)
 export { linktreeJobConfig, processLinktreeJob } from './jobs/linktree';
 export { processTikTokJob, tiktokJobConfig } from './jobs/tiktok';
+export { processTwitterJob, twitterJobConfig } from './jobs/twitter';
 // Re-export types
 export type {
   BaseJobPayload,
@@ -45,7 +46,6 @@ export type {
   ProfileData,
   SupportedRecursiveJobType,
 } from './jobs/types';
-export { processTwitterJob, twitterJobConfig } from './jobs/twitter';
 export { processYouTubeJob, youtubeJobConfig } from './jobs/youtube';
 // Re-export merge functions
 export {

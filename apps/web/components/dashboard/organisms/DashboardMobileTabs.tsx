@@ -105,7 +105,7 @@ export interface DashboardMobileTabsProps {
 export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  
+
   const isMoreActive = MORE_MENU_ITEMS.some(
     item => pathname === item.href || pathname.startsWith(`${item.href}/`)
   );

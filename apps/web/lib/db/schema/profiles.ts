@@ -268,7 +268,12 @@ export const creatorProfileAttributes = pgTable(
     ).on(table.creatorProfileId, table.createdAt),
     creatorProfileAttributesUnique: uniqueIndex(
       'idx_creator_profile_attributes_unique'
-    ).on(table.creatorProfileId, table.sourcePlatform, table.displayName, table.bio),
+    ).on(
+      table.creatorProfileId,
+      table.sourcePlatform,
+      table.displayName,
+      table.bio
+    ),
   })
 );
 
@@ -359,15 +364,19 @@ export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
-export const insertCreatorAvatarCandidateSchema =
-  createInsertSchema(creatorAvatarCandidates);
-export const selectCreatorAvatarCandidateSchema =
-  createSelectSchema(creatorAvatarCandidates);
+export const insertCreatorAvatarCandidateSchema = createInsertSchema(
+  creatorAvatarCandidates
+);
+export const selectCreatorAvatarCandidateSchema = createSelectSchema(
+  creatorAvatarCandidates
+);
 
-export const insertCreatorProfileAttributeSchema =
-  createInsertSchema(creatorProfileAttributes);
-export const selectCreatorProfileAttributeSchema =
-  createSelectSchema(creatorProfileAttributes);
+export const insertCreatorProfileAttributeSchema = createInsertSchema(
+  creatorProfileAttributes
+);
+export const selectCreatorProfileAttributeSchema = createSelectSchema(
+  creatorProfileAttributes
+);
 
 export const insertCreatorClaimInviteSchema =
   createInsertSchema(creatorClaimInvites);

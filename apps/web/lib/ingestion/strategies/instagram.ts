@@ -74,7 +74,11 @@ export function extractInstagram(html: string): ExtractionResult {
   });
 
   return {
-    ...createExtractionResult(links, ogProfile.displayName, ogProfile.avatarUrl),
+    ...createExtractionResult(
+      links,
+      ogProfile.displayName,
+      ogProfile.avatarUrl
+    ),
     sourcePlatform: 'instagram',
     bio: bio?.trim() || null,
   };

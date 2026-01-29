@@ -40,8 +40,8 @@ export {
   extractMetaContent,
   extractOpenGraphProfile,
   extractScriptJson,
-  stripTrackingParams,
   type OpenGraphProfile,
+  stripTrackingParams,
 } from './parsing';
 // Result
 export { createExtractionResult } from './result';

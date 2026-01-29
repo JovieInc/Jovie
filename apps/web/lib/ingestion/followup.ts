@@ -5,10 +5,7 @@ import {
   detectPlatform,
 } from '@/lib/utils/platform-detection';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
-import {
-  isInstagramUrl,
-  validateInstagramUrl,
-} from './strategies/instagram';
+import { isInstagramUrl, validateInstagramUrl } from './strategies/instagram';
 import { validateLayloUrl } from './strategies/laylo';
 import { validateLinktreeUrl } from './strategies/linktree';
 import { isTikTokUrl, validateTikTokUrl } from './strategies/tiktok';
