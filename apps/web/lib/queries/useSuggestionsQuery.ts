@@ -205,12 +205,14 @@ export function useSuggestionsQuery({
         lastDataUpdatedAtRef.current = dataUpdatedAt;
       }
 
-      const baseInterval =
-        refetchInterval === 'adaptive'
-          ? getAdaptiveInterval(query.state.data)
-          : typeof refetchInterval === 'number'
-            ? refetchInterval
-            : false;
+      let baseInterval: number | false;
+      if (refetchInterval === 'adaptive') {
+        baseInterval = getAdaptiveInterval(query.state.data);
+      } else if (typeof refetchInterval === 'number') {
+        baseInterval = refetchInterval;
+      } else {
+        baseInterval = false;
+      }
 
       if (baseInterval === false) return false;
       if (errorCountRef.current > 0) {

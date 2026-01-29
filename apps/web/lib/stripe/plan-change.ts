@@ -310,7 +310,7 @@ export async function executePlanChange(
     // Cast through unknown since Stripe SDK response wrapper type differs from base type
     const subscription = subscriptionRaw as unknown as SubscriptionWithPeriod;
 
-    if (!subscription || subscription.status !== 'active') {
+    if (subscription?.status !== 'active') {
       return {
         success: false,
         error: 'No active subscription found',
