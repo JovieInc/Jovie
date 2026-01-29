@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { memo, useState } from 'react';
-import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 const SettingsPolished = dynamic(

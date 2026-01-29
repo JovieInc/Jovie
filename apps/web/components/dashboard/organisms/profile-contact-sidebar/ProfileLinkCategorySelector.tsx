@@ -43,7 +43,7 @@ export function ProfileLinkCategorySelector({
     <div // NOSONAR S6819
       role='group'
       aria-label='Link categories'
-      className='relative inline-flex w-full rounded-lg bg-surface-1 p-0.5'
+      className='relative inline-flex w-full rounded-xl border border-subtle bg-[#f7f7f7] p-1 shadow-inner'
     >
       {visibleCategories.map(category => {
         const isActive = selectedCategory === category.id;
@@ -54,13 +54,13 @@ export function ProfileLinkCategorySelector({
             type='button'
             onClick={() => onCategoryChange(category.id)}
             aria-pressed={isActive}
-            className='relative flex-1 h-7 rounded-md px-3 text-xs font-medium text-secondary-token transition-colors ease-out hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-1 z-10'
+            className='relative flex-1 h-8 rounded-lg px-4 text-sm font-medium text-secondary-token transition-colors duration-150 ease-out hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token/70 focus-visible:ring-offset-1 z-10'
           >
             {isActive && (
               <motion.span
                 layoutId='category-selector-active'
-                className='absolute inset-0 rounded-md bg-surface-2'
-                transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+                className='absolute inset-0 rounded-lg bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_1px_2px_rgba(0,0,0,0.06)]'
+                transition={{ type: 'tween', ease: 'easeOut', duration: 0.12 }}
               />
             )}
             <span

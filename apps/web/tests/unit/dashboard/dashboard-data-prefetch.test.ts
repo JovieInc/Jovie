@@ -120,7 +120,7 @@ describe('dashboard data prefetch', () => {
 
   it('dedupes dashboard fetches after prefetching', async () => {
     const { getDashboardData, getDashboardDataCached, prefetchDashboardData } =
-      await import('@/app/app/dashboard/actions');
+      await import('@/app/app/(shell)/dashboard/actions');
 
     prefetchDashboardData();
 

@@ -63,11 +63,11 @@ const config: StorybookConfig = {
       alias: [
         // Must come before the generic '@' alias to avoid resolving to the real file.
         {
-          find: '@/app/app/dashboard/DashboardLayoutClient',
+          find: '@/app/app/(shell)/dashboard/DashboardLayoutClient',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
         },
         {
-          find: '@/app/dashboard/actions',
+          find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
         {
@@ -76,15 +76,15 @@ const config: StorybookConfig = {
         },
         // Also handle absolute imports without alias
         {
-          find: '../../../app/dashboard/actions',
+          find: '../../../app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
         {
-          find: '../../app/dashboard/actions',
+          find: '../../app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
         {
-          find: '../app/dashboard/actions',
+          find: '../app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
         {

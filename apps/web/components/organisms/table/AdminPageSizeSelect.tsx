@@ -44,10 +44,25 @@ export function AdminPageSizeSelect({
             <SelectTrigger className='h-8 w-20 px-2 text-xs'>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='10'>10</SelectItem>
-              <SelectItem value='20'>20</SelectItem>
-              <SelectItem value='50'>50</SelectItem>
+            <SelectContent className='bg-white dark:bg-[#101011] text-primary-token dark:text-[#e3e5e9] border border-subtle dark:border-[#1f2022]'>
+              <SelectItem
+                value='10'
+                className='text-primary-token dark:text-[#e3e5e9] data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white'
+              >
+                10
+              </SelectItem>
+              <SelectItem
+                value='20'
+                className='text-primary-token dark:text-[#e3e5e9] data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white'
+              >
+                20
+              </SelectItem>
+              <SelectItem
+                value='50'
+                className='text-primary-token dark:text-[#e3e5e9] data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white'
+              >
+                50
+              </SelectItem>
             </SelectContent>
           </Select>
         </label>

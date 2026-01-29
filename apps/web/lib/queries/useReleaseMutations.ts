@@ -5,7 +5,7 @@ import {
   resetProviderOverride,
   saveProviderOverride,
   syncFromSpotify,
-} from '@/app/app/dashboard/releases/actions';
+} from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from './keys';
 

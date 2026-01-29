@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
-import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
   SidebarGroupContent,

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
+import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
