@@ -95,7 +95,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-white dark:bg-surface-2 p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-white dark:bg-[#101011] p-2 pb-1'>
       <div className='relative'>
         <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
@@ -106,7 +106,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-md border border-subtle bg-surface-2 py-1.5 pl-8 pr-7 text-xs',
+            'w-full rounded-md border border-subtle bg-surface-2 dark:bg-[#151618] py-1.5 pl-8 pr-7 text-xs',
             'text-primary-token placeholder:text-tertiary-token',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
           )}
@@ -434,7 +434,7 @@ export function ReleaseFilterDropdown({
               DROPDOWN_SHADOW,
               DROPDOWN_TRANSITIONS,
               DROPDOWN_SLIDE_ANIMATIONS,
-              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col bg-white dark:bg-surface-2'
+              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
             )}
             onCloseAutoFocus={e => e.preventDefault()}
           >
