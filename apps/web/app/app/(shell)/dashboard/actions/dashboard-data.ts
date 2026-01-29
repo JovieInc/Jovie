@@ -45,24 +45,42 @@ function truncateString(value: string, maxLength: number): string {
 
 function safeSerializeError(error: unknown): string {
   if (error instanceof Error) {
-    return JSON.stringify({
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-    });
+    try {
+      return JSON.stringify({
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+    } catch {
+      return JSON.stringify({
+        message: String(error.message),
+        name: error.name,
+      });
+    }
   }
 
   if (typeof error === 'object' && error !== null) {
     const obj = error as Record<string, unknown>;
-    return JSON.stringify({
-      message: typeof obj.message === 'string' ? obj.message : undefined,
-      code: typeof obj.code === 'string' ? obj.code : undefined,
-      name: typeof obj.name === 'string' ? obj.name : undefined,
-      cause: obj.cause,
-    });
+    try {
+      return JSON.stringify({
+        message: typeof obj.message === 'string' ? obj.message : undefined,
+        code: typeof obj.code === 'string' ? obj.code : undefined,
+        name: typeof obj.name === 'string' ? obj.name : undefined,
+        cause: obj.cause,
+      });
+    } catch {
+      return JSON.stringify({
+        message: typeof obj.message === 'string' ? obj.message : String(error),
+        name: typeof obj.name === 'string' ? obj.name : undefined,
+      });
+    }
   }
 
-  return JSON.stringify({ value: String(error) });
+  try {
+    return JSON.stringify({ value: String(error) });
+  } catch {
+    return String(error);
+  }
 }
 
 /**
