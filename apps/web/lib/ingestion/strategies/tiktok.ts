@@ -99,7 +99,11 @@ export function extractTikTok(html: string): ExtractionResult {
   });
 
   return {
-    ...createExtractionResult(links, ogProfile.displayName, ogProfile.avatarUrl),
+    ...createExtractionResult(
+      links,
+      ogProfile.displayName,
+      ogProfile.avatarUrl
+    ),
     sourcePlatform: 'tiktok',
     bio: bio?.trim() || null,
   };

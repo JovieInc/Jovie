@@ -33,14 +33,27 @@ describe('Ingestion Jobs', () => {
       );
     });
 
+    it('detects Instagram URLs', () => {
+      expect(detectIngestionPlatform('https://instagram.com/username')).toBe(
+        'instagram'
+      );
+      expect(
+        detectIngestionPlatform('https://www.instagram.com/username')
+      ).toBe('instagram');
+    });
+
+    it('detects Twitter/X URLs', () => {
+      expect(detectIngestionPlatform('https://twitter.com/username')).toBe(
+        'twitter'
+      );
+      expect(detectIngestionPlatform('https://x.com/username')).toBe('twitter');
+    });
+
     it('returns unknown for unsupported URLs', () => {
       expect(detectIngestionPlatform('https://example.com/username')).toBe(
         'unknown'
       );
-      expect(detectIngestionPlatform('https://instagram.com/username')).toBe(
-        'unknown'
-      );
-      expect(detectIngestionPlatform('https://twitter.com/username')).toBe(
+      expect(detectIngestionPlatform('https://facebook.com/username')).toBe(
         'unknown'
       );
     });
@@ -81,11 +94,20 @@ describe('Ingestion Jobs', () => {
       expect(isSupportedIngestionUrl('https://beacons.ai/username')).toBe(true);
     });
 
+    it('returns true for Instagram and Twitter', () => {
+      expect(isSupportedIngestionUrl('https://instagram.com/username')).toBe(
+        true
+      );
+      expect(isSupportedIngestionUrl('https://twitter.com/username')).toBe(
+        true
+      );
+    });
+
     it('returns false for unsupported platforms', () => {
       expect(isSupportedIngestionUrl('https://example.com/username')).toBe(
         false
       );
-      expect(isSupportedIngestionUrl('https://instagram.com/username')).toBe(
+      expect(isSupportedIngestionUrl('https://facebook.com/username')).toBe(
         false
       );
     });

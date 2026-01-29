@@ -356,15 +356,19 @@ export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
-export const insertCreatorAvatarCandidateSchema =
-  createInsertSchema(creatorAvatarCandidates);
-export const selectCreatorAvatarCandidateSchema =
-  createSelectSchema(creatorAvatarCandidates);
+export const insertCreatorAvatarCandidateSchema = createInsertSchema(
+  creatorAvatarCandidates
+);
+export const selectCreatorAvatarCandidateSchema = createSelectSchema(
+  creatorAvatarCandidates
+);
 
-export const insertCreatorProfileAttributeSchema =
-  createInsertSchema(creatorProfileAttributes);
-export const selectCreatorProfileAttributeSchema =
-  createSelectSchema(creatorProfileAttributes);
+export const insertCreatorProfileAttributeSchema = createInsertSchema(
+  creatorProfileAttributes
+);
+export const selectCreatorProfileAttributeSchema = createSelectSchema(
+  creatorProfileAttributes
+);
 
 export const insertCreatorClaimInviteSchema =
   createInsertSchema(creatorClaimInvites);
