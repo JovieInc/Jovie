@@ -228,6 +228,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           '/billing',
           '/account',
           '/waitlist',
+          '/monitoring', // Sentry tunnel endpoint
         ];
 
         const isAppPath =

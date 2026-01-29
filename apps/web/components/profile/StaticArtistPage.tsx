@@ -28,7 +28,12 @@ const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
 const TIP_AMOUNTS = [3, 5, 7];
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 
-function mapSocialPlatformToDSPKey(platform: string): string | null {
+function mapSocialPlatformToDSPKey(
+  platform: string | undefined
+): string | null {
+  if (typeof platform !== 'string' || !platform) {
+    return null;
+  }
   const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 
   for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {

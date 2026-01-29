@@ -27,20 +27,32 @@ import type {
   TableExistsRow,
 } from './types';
 
-const positiveTableExistenceCache = new Set<string>();
+// Cache with TTL for both positive and negative results
+const tableExistenceCache = new Map<
+  string,
+  { exists: boolean; timestamp: number }
+>();
 let lastTableExistenceDatabaseUrl: string | null = null;
 
+// 60 seconds TTL for table existence cache
+const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
+
 /**
- * Check if a table exists in the database
+ * Check if a table exists in the database.
+ * Uses a TTL-based cache for both positive and negative results to avoid
+ * repeated database round-trips on cold start.
  */
 export async function doesTableExist(tableName: string): Promise<boolean> {
+  // Clear cache if database URL changes
   if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
-    positiveTableExistenceCache.clear();
+    tableExistenceCache.clear();
     lastTableExistenceDatabaseUrl = env.DATABASE_URL;
   }
 
-  if (positiveTableExistenceCache.has(tableName)) {
-    return true;
+  // Check cache (both positive and negative results)
+  const cached = tableExistenceCache.get(tableName);
+  if (cached && Date.now() - cached.timestamp < TABLE_EXISTENCE_CACHE_TTL_MS) {
+    return cached.exists;
   }
 
   if (!env.DATABASE_URL) {
@@ -65,9 +77,8 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     const firstRow = result.rows[0];
     const exists = isTableExistsRow(firstRow) ? firstRow.table_exists : false;
 
-    if (exists) {
-      positiveTableExistenceCache.add(tableName);
-    }
+    // Cache both positive and negative results with timestamp
+    tableExistenceCache.set(tableName, { exists, timestamp: Date.now() });
 
     return exists;
   } catch (error) {
