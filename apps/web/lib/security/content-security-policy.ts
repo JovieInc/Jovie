@@ -70,8 +70,6 @@ const buildCspDirectives = ({
       'https://*.clerk.com',
       'https://*.clerk.services',
       'https://*.clerk.accounts.dev',
-      'https://cdn.statsig.com',
-      'https://*.statsigcdn.com',
       'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
     ]
       .filter(Boolean)
@@ -91,15 +89,6 @@ const buildCspDirectives = ({
     ].join(' '),
     [
       "connect-src 'self'",
-      'https://api.statsig.com',
-      'https://statsigapi.net',
-      'https://featureassets.org',
-      'https://prodregistryv2.org',
-      'https://cloudflare-dns.com',
-      'https://*.statsigcdn.com',
-      'https://*.statsig.com',
-      'https://va.vercel-scripts.com',
-      'https://vitals.vercel-insights.com',
       'https://clerk.jov.ie',
       'https://clerk.com',
       'https://cdn.clerk.com',

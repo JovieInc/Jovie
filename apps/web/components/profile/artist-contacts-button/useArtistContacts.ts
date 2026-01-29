@@ -3,8 +3,6 @@
 import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { decodeContactPayload } from '@/lib/contacts/obfuscation';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { UseArtistContactsReturn } from './types';
 
@@ -19,7 +17,6 @@ export function useArtistContacts({
   artistHandle,
   onNavigate,
 }: UseArtistContactsOptions): UseArtistContactsReturn {
-  const gate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
   const [open, setOpen] = useState(false);
   const navigate = onNavigate ?? ((url: string) => window.location.assign(url));
 
@@ -88,6 +85,6 @@ export function useArtistContacts({
     onIconClick,
     primaryChannel,
     buildTerritoryLabel,
-    isEnabled: gate.value && available.length > 0,
+    isEnabled: available.length > 0,
   };
 }

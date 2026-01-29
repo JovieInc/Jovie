@@ -8,8 +8,6 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import type { AudienceAction, AudienceMember, AudienceReferrer } from '@/types';
 
@@ -115,14 +113,13 @@ export async function getAudienceServerData(params: {
 }): Promise<AudienceServerData> {
   noStore();
 
-  const { userId, selectedProfileId, searchParams } = params;
-
-  const isAudienceV2Enabled = await checkGateForUser(
-    STATSIG_FLAGS.AUDIENCE_V2,
-    { userID: userId }
-  );
-
-  const mode: AudienceMode = isAudienceV2Enabled ? 'members' : 'subscribers';
+  const { userId: _userId, selectedProfileId, searchParams } = params;
+  const modeParamRaw = searchParams.mode;
+  const modeParam = Array.isArray(modeParamRaw)
+    ? modeParamRaw[0]
+    : modeParamRaw;
+  const mode: AudienceMode =
+    modeParam === 'subscribers' ? 'subscribers' : 'members';
 
   if (!selectedProfileId) {
     return {

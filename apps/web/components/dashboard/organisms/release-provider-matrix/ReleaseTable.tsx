@@ -262,13 +262,13 @@ export function ReleaseTable({
       const isRowExpanded = showTracks && isExpanded(row.id);
 
       if (isSelected) {
-        return 'group bg-[#fcfcfc] bg-primary/5 dark:bg-[#101011] dark:bg-primary/10 border-l-2 border-l-primary hover:bg-(--color-cell-hover) dark:hover:bg-[#151618]';
+        return 'group bg-surface-1 bg-primary/5 dark:bg-surface-1 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-(--color-cell-hover) dark:hover:bg-surface-2';
       }
       if (isRowExpanded) {
         // Expanded parent row has slightly darker background (like Linear)
-        return 'group bg-[#fcfcfc] bg-surface-2/50 dark:bg-[#101011] dark:bg-surface-2/30 hover:bg-(--color-cell-hover) dark:hover:bg-[#151618]';
+        return 'group bg-surface-1 bg-surface-2/50 dark:bg-surface-1 dark:bg-surface-2/30 hover:bg-(--color-cell-hover) dark:hover:bg-surface-2';
       }
-      return 'group bg-[#fcfcfc] dark:bg-[#101011] hover:bg-(--color-cell-hover) dark:hover:bg-[#151618]';
+      return 'group bg-surface-1 dark:bg-surface-1 hover:bg-(--color-cell-hover) dark:hover:bg-surface-2';
     },
     [selectedIdsRef, showTracks, isExpanded]
   );

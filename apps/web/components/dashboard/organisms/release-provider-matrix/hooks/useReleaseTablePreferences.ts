@@ -20,6 +20,7 @@ export const TOGGLEABLE_COLUMNS = [
   { id: 'releaseType', label: 'Type' },
   { id: 'availability', label: 'Availability' },
   { id: 'smartLink', label: 'Smart Link' },
+  { id: 'genres', label: 'Genres' },
   { id: 'stats', label: 'Stats' },
   { id: 'upc', label: 'UPC' },
   { id: 'primaryIsrc', label: 'ISRC' },

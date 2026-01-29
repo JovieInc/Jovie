@@ -38,6 +38,51 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 const { logger } = Sentry;
 
+function truncateString(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
+}
+
+function safeSerializeError(error: unknown): string {
+  if (error instanceof Error) {
+    try {
+      return JSON.stringify({
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+    } catch {
+      return JSON.stringify({
+        message: String(error.message),
+        name: error.name,
+      });
+    }
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const obj = error as Record<string, unknown>;
+    try {
+      return JSON.stringify({
+        message: typeof obj.message === 'string' ? obj.message : undefined,
+        code: typeof obj.code === 'string' ? obj.code : undefined,
+        name: typeof obj.name === 'string' ? obj.name : undefined,
+        cause: obj.cause,
+      });
+    } catch {
+      return JSON.stringify({
+        message: typeof obj.message === 'string' ? obj.message : String(error),
+        name: typeof obj.name === 'string' ? obj.name : undefined,
+      });
+    }
+  }
+
+  try {
+    return JSON.stringify({ value: String(error) });
+  } catch {
+    return String(error);
+  }
+}
+
 /**
  * Complete dashboard data structure containing all information
  * needed to render the dashboard UI.
@@ -237,7 +282,7 @@ async function fetchChromeDataWithSession(
       code,
       errorType,
       errorString: String(error),
-      errorJson: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      errorJson: truncateString(safeSerializeError(errorObj), 1000),
       stack: (errorObj as Error).stack?.split('\n').slice(0, 3).join('\n'),
     });
 

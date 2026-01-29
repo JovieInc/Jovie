@@ -9,8 +9,6 @@ import {
   users,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   extractPayloadProps,
@@ -250,13 +248,7 @@ async function fetchArtistProfile(
       ? artistProfile.creatorClerkId
       : null;
 
-  const dynamicOverrideEnabled = creatorClerkId
-    ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
-        userID: creatorClerkId,
-      })
-    : false;
-
-  const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
+  const dynamicEnabled = creatorIsPro;
 
   return {
     profile: {

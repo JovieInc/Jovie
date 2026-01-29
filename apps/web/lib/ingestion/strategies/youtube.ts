@@ -270,5 +270,6 @@ export function extractYouTube(html: string): ExtractionResult {
     links,
     displayName,
     avatarUrl,
+    sourcePlatform: 'youtube',
   };
 }

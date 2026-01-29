@@ -18,8 +18,6 @@ import type {
 } from '@/lib/db/schema';
 import { getLatestReleaseForProfile } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
 import {
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
@@ -106,9 +104,6 @@ function generateProfileStructuredData(
 
   return { musicGroupSchema, breadcrumbSchema };
 }
-
-// Feature flag check timeout (ms) - don't block render for slow flag checks
-const FLAG_CHECK_TIMEOUT_MS = 100;
 
 // Note: runtime = 'edge' removed for cacheComponents compatibility
 // Edge runtime is incompatible with Cache Components
@@ -277,25 +272,6 @@ interface Props {
  * Non-blocking feature flag check with timeout.
  * Returns false if the check takes too long, avoiding render delays.
  */
-async function checkFeatureFlagWithTimeout(
-  clerkId: string | null
-): Promise<boolean> {
-  if (!clerkId) return false;
-
-  try {
-    const result = await Promise.race([
-      checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, { userID: clerkId }),
-      new Promise<false>(resolve =>
-        setTimeout(() => resolve(false), FLAG_CHECK_TIMEOUT_MS)
-      ),
-    ]);
-    return result;
-  } catch {
-    // Fail open - don't block render for flag check failures
-    return false;
-  }
-}
-
 export default async function ArtistPage({
   params,
   searchParams,
@@ -321,7 +297,6 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
-    creatorClerkId,
     latestRelease,
   } = await getProfileAndLinks(normalizedUsername, {
     forceNoStore: Boolean(claimTokenParam),
@@ -351,9 +326,7 @@ export default async function ArtistPage({
   const artist = convertCreatorProfileToArtist(profile);
 
   // Non-blocking feature flag check with timeout
-  const dynamicOverrideEnabled =
-    await checkFeatureFlagWithTimeout(creatorClerkId);
-  const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
+  const dynamicEnabled = creatorIsPro;
 
   // Social links loaded together with profile in a single cached helper
   const socialLinks = links;

@@ -3,22 +3,13 @@
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { page, setAnalyticsEnabled } from '@/lib/analytics';
-import { publicEnv } from '@/lib/env-public';
+import { page } from '@/lib/analytics';
 
 export function Analytics() {
   const pathname = usePathname();
-  const hasStatsigKey = Boolean(publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY);
-  const shouldLoadAnalytics = hasStatsigKey;
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setAnalyticsEnabled(shouldLoadAnalytics);
-  }, [shouldLoadAnalytics]);
 
   useEffect(() => {
     try {
-      if (!hasStatsigKey) return;
       if (typeof window === 'undefined') return;
 
       page(pathname ?? undefined, {
@@ -27,11 +18,7 @@ export function Analytics() {
     } catch (error) {
       console.error('Analytics error:', error);
     }
-  }, [pathname, hasStatsigKey]);
-
-  if (!shouldLoadAnalytics) {
-    return null;
-  }
+  }, [pathname]);
 
   return <VercelAnalytics />;
 }

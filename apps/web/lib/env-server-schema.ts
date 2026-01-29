@@ -70,9 +70,6 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_GROWTH_YEARLY: z.string().optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
-  // Statsig server-side
-  STATSIG_SERVER_API_KEY: z.string().optional(),
-
   // URL encryption (required in production/preview)
   URL_ENCRYPTION_KEY: z.string().optional(),
 
@@ -169,7 +166,6 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'INGESTION_CRON_SECRET',
-  'STATSIG_SERVER_API_KEY',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',

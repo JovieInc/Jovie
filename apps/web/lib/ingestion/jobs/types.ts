@@ -57,7 +57,10 @@ export type SupportedRecursiveJobType =
   | 'import_linktree'
   | 'import_laylo'
   | 'import_youtube'
-  | 'import_beacons';
+  | 'import_beacons'
+  | 'import_instagram'
+  | 'import_tiktok'
+  | 'import_twitter';
 
 /**
  * Maximum depth allowed for each job type.
@@ -68,6 +71,9 @@ export const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> =
     import_laylo: 3,
     import_youtube: 1,
     import_beacons: 3,
+    import_instagram: 2,
+    import_tiktok: 2,
+    import_twitter: 2,
   };
 
 /**

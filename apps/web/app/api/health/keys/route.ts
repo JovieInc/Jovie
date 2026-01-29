@@ -44,11 +44,6 @@ const RECOMMENDED_KEYS = [
     check: () => Boolean(publicEnv.NEXT_PUBLIC_APP_URL),
   },
   {
-    key: 'STATSIG_SERVER_API_KEY',
-    label: 'Feature Flags',
-    check: () => Boolean(env.STATSIG_SERVER_API_KEY),
-  },
-  {
     key: 'STRIPE_SECRET_KEY',
     label: 'Payments',
     check: () => Boolean(env.STRIPE_SECRET_KEY),

@@ -34,7 +34,6 @@ const CRITICAL_VARS = [
 // Important but not critical for MVP launch
 const IMPORTANT_VARS = [
   { key: 'NEXT_PUBLIC_APP_URL', label: 'App URL' },
-  { key: 'STATSIG_SERVER_API_KEY', label: 'Feature Flags (Statsig)' },
 ] as const;
 
 // Production-only requirements
