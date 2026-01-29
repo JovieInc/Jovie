@@ -11,6 +11,7 @@ import { db } from '@/lib/db';
 import {
   type CampaignStep,
   campaignEnrollments,
+  campaignSequences,
   creatorClaimInvites,
   creatorProfiles,
   emailEngagement,
@@ -46,84 +47,98 @@ async function checkStopConditions(
   }
 
   for (const condition of conditions) {
-    switch (condition.type) {
-      case 'claimed': {
-        // Check if the profile has been claimed
-        const [profile] = await db
-          .select({ isClaimed: creatorProfiles.isClaimed })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.id, enrollment.subjectId))
-          .limit(1);
-
-        if (profile?.isClaimed) {
-          return 'claimed';
-        }
-        break;
-      }
-
-      case 'unsubscribed': {
-        // Check if the email is suppressed with user_request
-        const [suppression] = await db.query.emailSuppressions.findMany({
-          where: (table, { eq: eqOp, and: andOp }) =>
-            andOp(
-              eqOp(table.emailHash, enrollment.recipientHash),
-              eqOp(table.reason, 'user_request')
-            ),
-          limit: 1,
-        });
-
-        if (suppression) {
-          return 'unsubscribed';
-        }
-        break;
-      }
-
-      case 'bounced': {
-        // Check if the email has bounced
-        const [suppression] = await db.query.emailSuppressions.findMany({
-          where: (table, { eq: eqOp, and: andOp, or: orOp }) =>
-            andOp(
-              eqOp(table.emailHash, enrollment.recipientHash),
-              orOp(
-                eqOp(table.reason, 'hard_bounce'),
-                eqOp(table.reason, 'soft_bounce')
-              )
-            ),
-          limit: 1,
-        });
-
-        if (suppression) {
-          return 'bounced';
-        }
-        break;
-      }
-
-      case 'opened':
-      case 'clicked': {
-        // Check engagement
-        const [engagement] = await db
-          .select({ id: emailEngagement.id })
-          .from(emailEngagement)
-          .where(
-            and(
-              eq(emailEngagement.recipientHash, enrollment.recipientHash),
-              eq(
-                emailEngagement.eventType,
-                condition.type === 'opened' ? 'open' : 'click'
-              )
-            )
-          )
-          .limit(1);
-
-        if (engagement) {
-          return condition.type;
-        }
-        break;
-      }
+    const reason = await getStopReasonForCondition(enrollment, condition);
+    if (reason) {
+      return reason;
     }
   }
 
   return null;
+}
+
+async function getStopReasonForCondition(
+  enrollment: {
+    subjectId: string;
+    recipientHash: string;
+  },
+  condition: NonNullable<CampaignStep['stopConditions']>[number]
+): Promise<string | null> {
+  const handlers: Record<string, () => Promise<string | null>> = {
+    claimed: () => checkProfileClaimed(enrollment.subjectId),
+    unsubscribed: () =>
+      checkSuppressionReason(enrollment.recipientHash, 'user_request'),
+    bounced: () =>
+      checkSuppressionReason(
+        enrollment.recipientHash,
+        'hard_bounce',
+        'soft_bounce'
+      ),
+    opened: () => checkEngagement(enrollment.recipientHash, 'open', 'opened'),
+    clicked: () =>
+      checkEngagement(enrollment.recipientHash, 'click', 'clicked'),
+  };
+
+  const handler = handlers[condition.type];
+  return handler ? handler() : null;
+}
+
+async function checkProfileClaimed(subjectId: string): Promise<string | null> {
+  const [profile] = await db
+    .select({ isClaimed: creatorProfiles.isClaimed })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, subjectId))
+    .limit(1);
+
+  return profile?.isClaimed ? 'claimed' : null;
+}
+
+async function checkSuppressionReason(
+  recipientHash: string,
+  ...reasons: ('user_request' | 'hard_bounce' | 'soft_bounce')[]
+): Promise<string | null> {
+  const [suppression] = await db.query.emailSuppressions.findMany({
+    where: (table, { eq: eqOp, and: andOp, or: orOp }) =>
+      andOp(
+        eqOp(table.emailHash, recipientHash),
+        reasons.length === 1
+          ? eqOp(table.reason, reasons[0])
+          : orOp(...reasons.map(reason => eqOp(table.reason, reason)))
+      ),
+    limit: 1,
+  });
+
+  if (!suppression) {
+    return null;
+  }
+
+  if (reasons.includes('user_request')) {
+    return 'unsubscribed';
+  }
+
+  if (reasons.includes('hard_bounce') || reasons.includes('soft_bounce')) {
+    return 'bounced';
+  }
+
+  return null;
+}
+
+async function checkEngagement(
+  recipientHash: string,
+  eventType: 'open' | 'click',
+  reason: 'opened' | 'clicked'
+): Promise<string | null> {
+  const [engagement] = await db
+    .select({ id: emailEngagement.id })
+    .from(emailEngagement)
+    .where(
+      and(
+        eq(emailEngagement.recipientHash, recipientHash),
+        eq(emailEngagement.eventType, eventType)
+      )
+    )
+    .limit(1);
+
+  return engagement ? reason : null;
 }
 
 /**
@@ -238,204 +253,16 @@ export async function processCampaigns(): Promise<ProcessCampaignsResult> {
   const now = new Date();
 
   try {
-    // Find enrollments that need processing
-    const pendingEnrollments = await db
-      .select({
-        id: campaignEnrollments.id,
-        campaignSequenceId: campaignEnrollments.campaignSequenceId,
-        subjectId: campaignEnrollments.subjectId,
-        recipientHash: campaignEnrollments.recipientHash,
-        currentStep: campaignEnrollments.currentStep,
-        stepCompletedAt: campaignEnrollments.stepCompletedAt,
-      })
-      .from(campaignEnrollments)
-      .where(
-        and(
-          eq(campaignEnrollments.status, 'active'),
-          lte(campaignEnrollments.nextStepAt, now)
-        )
-      )
-      .limit(50); // Process in batches
-
+    const pendingEnrollments = await fetchPendingEnrollments(now);
     if (pendingEnrollments.length === 0) {
       return result;
     }
 
-    // Get all campaign sequences
-    const sequences = await db.query.campaignSequences.findMany();
-    const sequenceMap = new Map(sequences.map(s => [s.id, s]));
+    const sequenceMap = await loadSequenceMap();
 
     for (const enrollment of pendingEnrollments) {
       result.processed++;
-
-      try {
-        const sequence = sequenceMap.get(enrollment.campaignSequenceId);
-        if (!sequence || sequence.isActive !== 'true') {
-          // Campaign not found or inactive - stop enrollment
-          await db
-            .update(campaignEnrollments)
-            .set({
-              status: 'stopped',
-              stopReason: 'campaign_inactive',
-              updatedAt: now,
-            })
-            .where(eq(campaignEnrollments.id, enrollment.id));
-          result.stopped++;
-          continue;
-        }
-
-        const steps = sequence.steps as CampaignStep[];
-        const currentStepNumber = Number(enrollment.currentStep);
-        const nextStepNumber = currentStepNumber + 1;
-        const nextStep = steps.find(s => s.stepNumber === nextStepNumber);
-
-        if (!nextStep) {
-          // No more steps - mark as completed
-          await db
-            .update(campaignEnrollments)
-            .set({
-              status: 'completed',
-              updatedAt: now,
-            })
-            .where(eq(campaignEnrollments.id, enrollment.id));
-          result.completed++;
-          continue;
-        }
-
-        // Check stop conditions
-        const stopReason = await checkStopConditions(
-          enrollment,
-          nextStep.stopConditions
-        );
-        if (stopReason) {
-          await db
-            .update(campaignEnrollments)
-            .set({
-              status: 'stopped',
-              stopReason,
-              updatedAt: now,
-            })
-            .where(eq(campaignEnrollments.id, enrollment.id));
-          result.stopped++;
-          continue;
-        }
-
-        // Check skip conditions
-        const shouldSkip = await checkSkipConditions(
-          enrollment,
-          nextStep.skipConditions
-        );
-        if (shouldSkip) {
-          // Skip this step but schedule next one
-          const nextNextStep = steps.find(
-            s => s.stepNumber === nextStepNumber + 1
-          );
-          const nextStepAt = nextNextStep
-            ? new Date(now.getTime() + nextNextStep.delayHours * 60 * 60 * 1000)
-            : null;
-
-          const stepCompletedAt = {
-            ...(enrollment.stepCompletedAt as Record<string, string>),
-            [nextStepNumber]: now.toISOString(),
-          };
-
-          await db
-            .update(campaignEnrollments)
-            .set({
-              currentStep: String(nextStepNumber),
-              stepCompletedAt,
-              nextStepAt,
-              status: nextStepAt ? 'active' : 'completed',
-              updatedAt: now,
-            })
-            .where(eq(campaignEnrollments.id, enrollment.id));
-
-          result.skipped++;
-          continue;
-        }
-
-        // Get invite data for sending
-        const inviteData = await getClaimInviteData(enrollment.subjectId);
-        if (!inviteData) {
-          logger.warn('[Campaign Processor] No invite data found', {
-            enrollmentId: enrollment.id,
-            subjectId: enrollment.subjectId,
-          });
-          result.errors++;
-          continue;
-        }
-
-        // Check if email is suppressed
-        const suppressionCheck = await isEmailSuppressed(
-          inviteData.invite.email
-        );
-        if (suppressionCheck.suppressed) {
-          await db
-            .update(campaignEnrollments)
-            .set({
-              status: 'stopped',
-              stopReason: `suppressed:${suppressionCheck.reason}`,
-              updatedAt: now,
-            })
-            .where(eq(campaignEnrollments.id, enrollment.id));
-          result.stopped++;
-          continue;
-        }
-
-        // Enqueue the follow-up email job
-        // We'll use a custom job type for follow-ups
-        await enqueueBulkClaimInviteJobs(
-          db,
-          [
-            {
-              inviteId: inviteData.invite.id,
-              creatorProfileId: enrollment.subjectId,
-            },
-          ],
-          {
-            minDelayMs: 0,
-            maxDelayMs: 60000, // Send within 1 minute
-          }
-        );
-
-        // Update enrollment
-        const nextNextStep = steps.find(
-          s => s.stepNumber === nextStepNumber + 1
-        );
-        const nextStepAt = nextNextStep
-          ? new Date(now.getTime() + nextNextStep.delayHours * 60 * 60 * 1000)
-          : null;
-
-        const stepCompletedAt = {
-          ...(enrollment.stepCompletedAt as Record<string, string>),
-          [nextStepNumber]: now.toISOString(),
-        };
-
-        await db
-          .update(campaignEnrollments)
-          .set({
-            currentStep: String(nextStepNumber),
-            stepCompletedAt,
-            nextStepAt,
-            status: nextStepAt ? 'active' : 'completed',
-            updatedAt: now,
-          })
-          .where(eq(campaignEnrollments.id, enrollment.id));
-
-        result.sent++;
-
-        logger.info('[Campaign Processor] Sent follow-up', {
-          enrollmentId: enrollment.id,
-          step: nextStepNumber,
-          email: inviteData.invite.email.slice(0, 3) + '***',
-        });
-      } catch (error) {
-        logger.error('[Campaign Processor] Failed to process enrollment', {
-          enrollmentId: enrollment.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        result.errors++;
-      }
+      await processEnrollment(enrollment, sequenceMap, now, result);
     }
 
     return result;
@@ -445,4 +272,222 @@ export async function processCampaigns(): Promise<ProcessCampaignsResult> {
     });
     throw error;
   }
+}
+
+type EnrollmentRow = Awaited<
+  ReturnType<typeof fetchPendingEnrollments>
+>[number];
+type SequenceRow = typeof campaignSequences.$inferSelect;
+
+async function fetchPendingEnrollments(now: Date) {
+  return db
+    .select({
+      id: campaignEnrollments.id,
+      campaignSequenceId: campaignEnrollments.campaignSequenceId,
+      subjectId: campaignEnrollments.subjectId,
+      recipientHash: campaignEnrollments.recipientHash,
+      currentStep: campaignEnrollments.currentStep,
+      stepCompletedAt: campaignEnrollments.stepCompletedAt,
+      nextStepAt: campaignEnrollments.nextStepAt,
+    })
+    .from(campaignEnrollments)
+    .where(
+      and(
+        eq(campaignEnrollments.status, 'active'),
+        lte(campaignEnrollments.nextStepAt, now)
+      )
+    )
+    .limit(50);
+}
+
+async function loadSequenceMap() {
+  const sequences = await db.query.campaignSequences.findMany();
+  return new Map(sequences.map(sequence => [sequence.id, sequence]));
+}
+
+async function processEnrollment(
+  enrollment: EnrollmentRow,
+  sequenceMap: Map<string, SequenceRow>,
+  now: Date,
+  result: ProcessCampaignsResult
+) {
+  try {
+    const sequence = sequenceMap.get(enrollment.campaignSequenceId);
+    if (!sequence || sequence.isActive !== 'true') {
+      await stopEnrollment(enrollment.id, 'campaign_inactive', now);
+      result.stopped++;
+      return;
+    }
+
+    const { steps, nextStep, nextStepNumber } = getNextStep(
+      sequence,
+      enrollment
+    );
+    if (!nextStep) {
+      await completeEnrollment(enrollment.id, now);
+      result.completed++;
+      return;
+    }
+
+    const stopReason = await checkStopConditions(
+      enrollment,
+      nextStep.stopConditions
+    );
+    if (stopReason) {
+      await stopEnrollment(enrollment.id, stopReason, now);
+      result.stopped++;
+      return;
+    }
+
+    const skipped = await maybeSkipStep(
+      enrollment,
+      nextStep,
+      steps,
+      now,
+      nextStepNumber
+    );
+    if (skipped) {
+      result.skipped++;
+      return;
+    }
+
+    const inviteData = await getClaimInviteData(enrollment.subjectId);
+    if (!inviteData) {
+      logger.warn('[Campaign Processor] No invite data found', {
+        enrollmentId: enrollment.id,
+        subjectId: enrollment.subjectId,
+      });
+      result.errors++;
+      return;
+    }
+
+    const suppressionCheck = await isEmailSuppressed(inviteData.invite.email);
+    if (suppressionCheck.suppressed) {
+      await stopEnrollment(
+        enrollment.id,
+        `suppressed:${suppressionCheck.reason}`,
+        now
+      );
+      result.stopped++;
+      return;
+    }
+
+    await sendFollowUp(inviteData, enrollment.subjectId);
+    await advanceEnrollment(enrollment, steps, now, nextStepNumber);
+    result.sent++;
+
+    logger.info('[Campaign Processor] Sent follow-up', {
+      enrollmentId: enrollment.id,
+      step: nextStepNumber,
+      email: inviteData.invite.email.slice(0, 3) + '***',
+    });
+  } catch (error) {
+    logger.error('[Campaign Processor] Failed to process enrollment', {
+      enrollmentId: enrollment.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    result.errors++;
+  }
+}
+
+function getNextStep(sequence: SequenceRow, enrollment: EnrollmentRow) {
+  const steps = sequence.steps as CampaignStep[];
+  const currentStepNumber = Number(enrollment.currentStep);
+  const nextStepNumber = currentStepNumber + 1;
+  const nextStep = steps.find(step => step.stepNumber === nextStepNumber);
+  return { steps, nextStep, nextStepNumber };
+}
+
+async function maybeSkipStep(
+  enrollment: EnrollmentRow,
+  nextStep: CampaignStep,
+  steps: CampaignStep[],
+  now: Date,
+  nextStepNumber: number
+) {
+  const shouldSkip = await checkSkipConditions(
+    enrollment,
+    nextStep.skipConditions
+  );
+
+  if (!shouldSkip) {
+    return false;
+  }
+
+  await advanceEnrollment(enrollment, steps, now, nextStepNumber);
+  return true;
+}
+
+async function stopEnrollment(
+  enrollmentId: string,
+  stopReason: string,
+  now: Date
+) {
+  await db
+    .update(campaignEnrollments)
+    .set({
+      status: 'stopped',
+      stopReason,
+      updatedAt: now,
+    })
+    .where(eq(campaignEnrollments.id, enrollmentId));
+}
+
+async function completeEnrollment(enrollmentId: string, now: Date) {
+  await db
+    .update(campaignEnrollments)
+    .set({
+      status: 'completed',
+      updatedAt: now,
+    })
+    .where(eq(campaignEnrollments.id, enrollmentId));
+}
+
+async function advanceEnrollment(
+  enrollment: EnrollmentRow,
+  steps: CampaignStep[],
+  now: Date,
+  nextStepNumber: number
+) {
+  const nextNextStep = steps.find(
+    step => step.stepNumber === nextStepNumber + 1
+  );
+  const nextStepAt = nextNextStep
+    ? new Date(now.getTime() + nextNextStep.delayHours * 60 * 60 * 1000)
+    : null;
+
+  const stepCompletedAt = {
+    ...(enrollment.stepCompletedAt as Record<string, string>),
+    [nextStepNumber]: now.toISOString(),
+  };
+
+  await db
+    .update(campaignEnrollments)
+    .set({
+      currentStep: String(nextStepNumber),
+      stepCompletedAt,
+      nextStepAt,
+      status: nextStepAt ? 'active' : 'completed',
+      updatedAt: now,
+    })
+    .where(eq(campaignEnrollments.id, enrollment.id));
+}
+
+async function sendFollowUp(
+  inviteData: NonNullable<Awaited<ReturnType<typeof getClaimInviteData>>>,
+  subjectId: string
+) {
+  await enqueueBulkClaimInviteJobs(
+    db,
+    [
+      {
+        inviteId: inviteData.invite.id,
+        creatorProfileId: subjectId,
+      },
+    ],
+    {
+      minDelayMs: 0,
+      maxDelayMs: 60000,
+    }
+  );
 }
