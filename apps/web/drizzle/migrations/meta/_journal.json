@@ -134,6 +134,13 @@
       "when": 1769800000000,
       "tag": "0018_featured_creator_query_index",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1769900000000,
+      "tag": "0019_creator_provenance_tables",
+      "breakpoints": true
     }
   ]
 }
