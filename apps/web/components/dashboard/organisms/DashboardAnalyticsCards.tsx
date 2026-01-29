@@ -1,8 +1,10 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -273,8 +275,41 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     );
   };
 
+  const refreshLabel = refreshing ? 'Refreshing…' : 'Refresh analytics';
+
   return (
-    <div ref={containerRef} data-testid='dashboard-analytics-cards'>
+    <div
+      ref={containerRef}
+      data-testid='dashboard-analytics-cards'
+      className='space-y-4'
+    >
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <div className='space-y-0.5'>
+          <p className='text-[11px] font-semibold uppercase tracking-[0.2em] text-tertiary-token'>
+            Overview
+          </p>
+          <p className='text-xs text-secondary-token'>{rangeLabel}</p>
+        </div>
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          onClick={() => void refetch()}
+          disabled={refreshing}
+          className='h-8 gap-2 px-3'
+          aria-label='Refresh analytics overview'
+        >
+          <Icon
+            name={refreshing ? 'Loader2' : 'RefreshCw'}
+            className={
+              refreshing
+                ? 'h-3.5 w-3.5 animate-spin motion-reduce:animate-none'
+                : 'h-3.5 w-3.5'
+            }
+          />
+          {refreshLabel}
+        </Button>
+      </div>
       {renderContent()}
       <div className='sr-only' aria-live='polite' aria-atomic='true'>
         {displayProfileViews > 0 &&
