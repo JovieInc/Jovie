@@ -42,9 +42,9 @@ export const SidebarTrigger = React.forwardRef<
 });
 SidebarTrigger.displayName = 'SidebarTrigger';
 
-type SidebarShortcutHintProps = {
+type SidebarShortcutHintProps = Readonly<{
   className?: string;
-};
+}>;
 
 export function SidebarShortcutHint({ className }: SidebarShortcutHintProps) {
   return (

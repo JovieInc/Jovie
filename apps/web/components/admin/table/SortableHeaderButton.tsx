@@ -2,12 +2,13 @@
 
 import { cn } from '@/lib/utils';
 
-export interface SortableHeaderButtonProps {
-  label: string;
-  direction?: 'asc' | 'desc';
-  onClick: () => void;
-  className?: string;
-}
+export interface SortableHeaderButtonProps
+  extends Readonly<{
+    label: string;
+    direction?: 'asc' | 'desc';
+    onClick: () => void;
+    className?: string;
+  }> {}
 
 export function SortableHeaderButton({
   label,

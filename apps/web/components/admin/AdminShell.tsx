@@ -11,9 +11,10 @@ import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import { AdminSidebar } from './AdminSidebar';
 
-interface AdminShellProps {
-  children: ReactNode;
-}
+interface AdminShellProps
+  extends Readonly<{
+    children: ReactNode;
+  }> {}
 
 export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
