@@ -28,7 +28,7 @@ const TIKTOK_CONFIG: StrategyConfig = {
   defaultTimeoutMs: 10000,
 } as const;
 
-const SKIP_HOSTS = new Set(['tiktok.com', 'www.tiktok.com', 'm.tiktok.com']);
+const SKIP_HOSTS = new Set(TIKTOK_CONFIG.validHosts);
 
 function extractHandleFromPath(pathname: string): string | null {
   const parts = pathname.split('/').filter(Boolean);
@@ -101,7 +101,11 @@ export function extractTikTok(html: string): ExtractionResult {
   });
 
   return {
-    ...createExtractionResult(links, ogProfile.displayName, ogProfile.avatarUrl),
+    ...createExtractionResult(
+      links,
+      ogProfile.displayName,
+      ogProfile.avatarUrl
+    ),
     sourcePlatform: 'tiktok',
     bio: bio?.trim() || null,
   };
