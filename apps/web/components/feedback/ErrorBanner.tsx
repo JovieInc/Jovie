@@ -26,6 +26,9 @@ export function ErrorBanner({
   testId,
   onDismiss,
 }: ErrorBannerProps) {
+  const actionClass =
+    'inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150b0b] dark:focus-visible:ring-offset-[#0d0a0a]';
+
   const renderAction = (action: ErrorBannerAction, index: number) => {
     if (action.href) {
       const isInternal = action.href.startsWith('/');
@@ -35,7 +38,10 @@ export function ErrorBanner({
           <Link
             key={`${action.label}-${index}`}
             href={action.href}
-            className='inline-flex w-full items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-900 shadow-sm transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 dark:border-red-400/40 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/60 sm:w-auto'
+            className={cn(
+              actionClass,
+              'border border-red-500/50 bg-red-500/15 text-[#fce2e2] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:bg-red-500/25 hover:border-red-400/70 dark:border-red-500/40 dark:bg-red-900/30 dark:hover:bg-red-900/45'
+            )}
           >
             {action.label}
           </Link>
@@ -47,7 +53,10 @@ export function ErrorBanner({
           key={`${action.label}-${index}`}
           href={action.href}
           onClick={action.onClick}
-          className='inline-flex w-full items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-900 shadow-sm transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 dark:border-red-400/40 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/60 sm:w-auto'
+          className={cn(
+            actionClass,
+            'border border-red-500/50 bg-red-500/15 text-[#fce2e2] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:bg-red-500/25 hover:border-red-400/70 dark:border-red-500/40 dark:bg-red-900/30 dark:hover:bg-red-900/45'
+          )}
         >
           {action.label}
         </a>
@@ -59,7 +68,10 @@ export function ErrorBanner({
         key={`${action.label}-${index}`}
         type='button'
         onClick={action.onClick}
-        className='inline-flex w-full items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-900 shadow-sm transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 dark:border-red-400/40 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/60 sm:w-auto'
+        className={cn(
+          actionClass,
+          'border border-red-500/50 bg-red-500/15 text-[#fce2e2] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:bg-red-500/25 hover:border-red-400/70 dark:border-red-500/40 dark:bg-red-900/30 dark:hover:bg-red-900/45'
+        )}
       >
         {action.label}
       </button>
@@ -73,21 +85,21 @@ export function ErrorBanner({
       aria-label='Error'
       data-testid={testId ?? 'app-error-banner'}
       className={cn(
-        'rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-red-900 shadow-sm dark:border-red-800/70 dark:bg-red-950/60 dark:text-red-50',
+        'rounded-2xl border border-red-500/30 bg-[rgba(140,26,26,0.12)] px-5 py-4 text-[#f8e8e8] shadow-[0_18px_40px_-20px_rgba(0,0,0,0.75)] backdrop-blur-sm dark:border-red-900/60 dark:bg-[rgba(70,12,12,0.45)] dark:text-red-50',
         className
       )}
     >
       <div className='flex gap-3'>
-        <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-red-500/10 text-red-700 dark:bg-red-900/60 dark:text-red-200'>
+        <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-red-500/40 bg-red-500/15 text-red-200 shadow-inner dark:border-red-700/60 dark:bg-red-900/40'>
           <AlertTriangle className='h-5 w-5' aria-hidden='true' />
         </span>
 
-        <div className='flex-1 min-w-0 space-y-1'>
-          <p className='text-sm font-semibold leading-snug wrap-break-word'>
+        <div className='flex-1 min-w-0 space-y-1.5'>
+          <p className='text-sm font-semibold leading-snug tracking-tight wrap-break-word'>
             {title}
           </p>
           {description ? (
-            <p className='text-sm leading-snug text-red-800 dark:text-red-100/80'>
+            <p className='text-sm leading-snug text-red-100/90 dark:text-red-100/80'>
               {description}
             </p>
           ) : null}

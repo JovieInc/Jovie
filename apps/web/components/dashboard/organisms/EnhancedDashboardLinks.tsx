@@ -2,8 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo } from 'react';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
-import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';

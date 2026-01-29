@@ -3,7 +3,7 @@
 import { Button, Input } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import type { TourDateViewModel } from '@/app/app/dashboard/tour-dates/actions';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
   useConnectBandsintownMutation,

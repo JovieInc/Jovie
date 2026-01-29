@@ -240,6 +240,35 @@ export function createSmartLinkCellRenderer(
   };
 }
 
+/** Combined right column: smart link + popularity + year (responsive) */
+export function createRightMetaCellRenderer(
+  onCopy: (path: string, label: string, testId: string) => Promise<string>
+) {
+  return function RightMetaCellRenderer({
+    row,
+  }: CellContext<ReleaseViewModel, unknown>) {
+    const release = row.original;
+    const year = release.releaseDate
+      ? new Date(release.releaseDate).getFullYear()
+      : null;
+
+    return (
+      <div className='flex min-w-0 items-center justify-end gap-3 text-xs text-secondary-token'>
+        <div className='min-w-[140px] max-w-[240px] flex-1'>
+          <SmartLinkCell release={release} onCopy={onCopy} />
+        </div>
+
+        <div className='hidden sm:flex items-center gap-2 tabular-nums text-secondary-token shrink-0'>
+          <div className='w-4 flex justify-center'>
+            <PopularityIcon popularity={release.spotifyPopularity} />
+          </div>
+          <span className='w-10 text-right'>{year ?? '—'}</span>
+        </div>
+      </div>
+    );
+  };
+}
+
 /** Creates a cell renderer for the actions column */
 export function createActionsCellRenderer(
   getContextMenuItems: (release: ReleaseViewModel) => ContextMenuItemType[]

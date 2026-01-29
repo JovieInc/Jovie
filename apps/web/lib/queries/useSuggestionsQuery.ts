@@ -9,7 +9,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { queryKeys } from './keys';
 
 export interface SuggestionsQueryResult {

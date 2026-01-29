@@ -10,7 +10,7 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { PreviewPanelProvider } from '@/app/app/dashboard/PreviewPanelContext';
+import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
