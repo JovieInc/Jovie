@@ -69,20 +69,11 @@ async function requireProfile(): Promise<{
     throw new Error('Missing creator profile');
   }
 
-  // Get bandsintown fields from database
-  const [profile] = await db
-    .select({
-      bandsintownArtistName: creatorProfiles.bandsintownArtistName,
-      bandsintownApiKey: creatorProfiles.bandsintownApiKey,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, data.selectedProfile.id))
-    .limit(1);
-
+  // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)
   return {
     id: data.selectedProfile.id,
-    bandsintownArtistName: profile?.bandsintownArtistName ?? null,
-    bandsintownApiKey: profile?.bandsintownApiKey ?? null,
+    bandsintownArtistName: data.selectedProfile.bandsintownArtistName,
+    bandsintownApiKey: data.selectedProfile.bandsintownApiKey,
     handle:
       data.selectedProfile.usernameNormalized ?? data.selectedProfile.username,
   };
