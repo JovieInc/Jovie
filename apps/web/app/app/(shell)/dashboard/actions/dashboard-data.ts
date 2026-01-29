@@ -10,7 +10,10 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
-import { unstable_noStore as noStore } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  unstable_cache as unstableCache,
+} from 'next/cache';
 import { cache } from 'react';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { type DbType, sqlAny } from '@/lib/db';
@@ -72,14 +75,14 @@ export interface DashboardData {
  * @param clerkUserId - Clerk user ID for the current user
  * @returns Dashboard data without isAdmin (added by caller)
  */
-async function fetchDashboardDataWithSession(
+type ChromeData = Omit<DashboardData, 'isAdmin' | 'tippingStats'>;
+
+async function fetchChromeDataWithSession(
   dbClient: DbType,
   clerkUserId: string
-): Promise<Omit<DashboardData, 'isAdmin'>> {
+): Promise<ChromeData> {
   // All queries run inside a transaction to keep the RLS session variable set
   try {
-    const emptyTippingStats = createEmptyTippingStats();
-
     // First check if user exists in users table
     const [userData] = await dbClient
       .select({ id: users.id })
@@ -97,7 +100,6 @@ async function fetchDashboardDataWithSession(
         sidebarCollapsed: false,
         hasSocialLinks: false,
         hasMusicLinks: false,
-        tippingStats: emptyTippingStats,
       };
     }
 
@@ -133,7 +135,6 @@ async function fetchDashboardDataWithSession(
         sidebarCollapsed: false,
         hasSocialLinks: false,
         hasMusicLinks: false,
-        tippingStats: emptyTippingStats,
       };
     }
 
@@ -202,63 +203,6 @@ async function fetchDashboardDataWithSession(
     const hasLinks = linkCounts.hasLinks;
     const hasMusicLinks = linkCounts.hasMusicLinks;
 
-    const startOfMonth = new Date();
-    startOfMonth.setUTCDate(1);
-    startOfMonth.setUTCHours(0, 0, 0, 0);
-    // Convert to ISO string for proper SQL parameter formatting
-    const startOfMonthISO = startOfMonth.toISOString();
-
-    const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
-      dbClient
-        .select({
-          totalReceived: drizzleSql`
-            COALESCE(SUM(${tips.amountCents}), 0)
-          `,
-          monthReceived: drizzleSql`
-            COALESCE(
-              SUM(
-                CASE
-                  WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp
-                  THEN ${tips.amountCents}
-                  ELSE 0
-                END
-              ),
-              0
-            )
-          `,
-          tipsSubmitted: drizzleSql`
-            COALESCE(COUNT(${tips.id}), 0)
-          `,
-        })
-        .from(tips)
-        .where(eq(tips.creatorProfileId, selected.id)),
-      dbClient
-        .select({
-          total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
-          qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
-          link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
-        })
-        .from(clickEvents)
-        .where(
-          and(
-            eq(clickEvents.creatorProfileId, selected.id),
-            eq(clickEvents.linkType, 'tip')
-          )
-        ),
-    ]);
-
-    const tipTotalsRaw = tipTotalsRawResult?.[0];
-    const clickStats = clickStatsResult?.[0];
-
-    const tippingStats: TippingStats = {
-      tipClicks: Number(clickStats?.total ?? 0),
-      qrTipClicks: Number(clickStats?.qr ?? 0),
-      linkTipClicks: Number(clickStats?.link ?? 0),
-      tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
-      totalReceivedCents: Number(tipTotalsRaw?.totalReceived ?? 0),
-      monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
-    };
-
     // Return data with first profile selected by default
     return {
       user: userData,
@@ -268,7 +212,6 @@ async function fetchDashboardDataWithSession(
       sidebarCollapsed: settings?.sidebarCollapsed ?? false,
       hasSocialLinks: hasLinks,
       hasMusicLinks,
-      tippingStats,
     };
   } catch (error) {
     // Handle both standard and non-standard error objects
@@ -310,8 +253,75 @@ async function fetchDashboardDataWithSession(
       sidebarCollapsed: false,
       hasSocialLinks: false,
       hasMusicLinks: false,
-      tippingStats: createEmptyTippingStats(),
     };
+  }
+}
+
+async function fetchTippingStatsWithSession(
+  dbClient: DbType,
+  profileId: string
+): Promise<TippingStats> {
+  try {
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+    const startOfMonthISO = startOfMonth.toISOString();
+
+    const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
+      dbClient
+        .select({
+          totalReceived: drizzleSql`
+            COALESCE(SUM(${tips.amountCents}), 0)
+          `,
+          monthReceived: drizzleSql`
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp
+                  THEN ${tips.amountCents}
+                  ELSE 0
+                END
+              ),
+              0
+            )
+          `,
+          tipsSubmitted: drizzleSql`
+            COALESCE(COUNT(${tips.id}), 0)
+          `,
+        })
+        .from(tips)
+        .where(eq(tips.creatorProfileId, profileId)),
+      dbClient
+        .select({
+          total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+          qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
+          link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
+        })
+        .from(clickEvents)
+        .where(
+          and(
+            eq(clickEvents.creatorProfileId, profileId),
+            eq(clickEvents.linkType, 'tip')
+          )
+        ),
+    ]);
+
+    const tipTotalsRaw = tipTotalsRawResult?.[0];
+    const clickStats = clickStatsResult?.[0];
+
+    return {
+      tipClicks: Number(clickStats?.total ?? 0),
+      qrTipClicks: Number(clickStats?.qr ?? 0),
+      linkTipClicks: Number(clickStats?.link ?? 0),
+      tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
+      totalReceivedCents: Number(tipTotalsRaw?.totalReceived ?? 0),
+      monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
+    };
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { query: 'tipping_stats', context: 'dashboard_data' },
+    });
+    return createEmptyTippingStats();
   }
 }
 
@@ -347,19 +357,27 @@ async function resolveDashboardData(): Promise<DashboardData> {
   }
 
   try {
-    const base = await Sentry.startSpan(
-      { op: 'task', name: 'dashboard.getDashboardData' },
-      async () => {
-        return withDbSessionTx(
-          async (tx, clerkUserId) =>
-            fetchDashboardDataWithSession(tx, clerkUserId),
-          { clerkUserId: userId }
-        );
-      }
+    const chromeData = await Sentry.startSpan(
+      { op: 'task', name: 'dashboard.getChromeData' },
+      async () => getCachedChromeData(userId)
     );
 
+    let tippingStats = createEmptyTippingStats();
+    if (chromeData.selectedProfile) {
+      tippingStats = await Sentry.startSpan(
+        { op: 'task', name: 'dashboard.getTippingStats' },
+        async () =>
+          withDbSessionTx(
+            async tx =>
+              fetchTippingStatsWithSession(tx, chromeData.selectedProfile!.id),
+            { clerkUserId: userId }
+          )
+      );
+    }
+
     return {
-      ...base,
+      ...chromeData,
+      tippingStats,
       isAdmin,
     };
   } catch (error) {
@@ -380,6 +398,15 @@ async function resolveDashboardData(): Promise<DashboardData> {
     };
   }
 }
+
+const getCachedChromeData = unstableCache(
+  async (clerkUserId: string) =>
+    withDbSessionTx(async tx => fetchChromeDataWithSession(tx, clerkUserId), {
+      clerkUserId,
+    }),
+  ['dashboard-chrome'],
+  { revalidate: 30 }
+);
 
 /**
  * Cached loader for dashboard data.

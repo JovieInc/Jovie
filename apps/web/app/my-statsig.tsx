@@ -102,26 +102,6 @@ function StatsigClientProvider({
   );
 }
 
-/**
- * Wrapper that always renders StatsigProvider for consistent hook behavior.
- * The client initialization is deferred until after hydration to avoid
- * state updates during render, but the provider context is always present.
- */
-function MyStatsigEnabledInner({
-  children,
-  sdkKey,
-  user,
-  plugins,
-}: MyStatsigEnabledProps) {
-  // Always render through StatsigClientProvider to ensure consistent hook calls
-  // in child components that use useFeatureGate, useExperiment, etc.
-  return (
-    <StatsigClientProvider sdkKey={sdkKey} user={user} plugins={plugins}>
-      {children}
-    </StatsigClientProvider>
-  );
-}
-
 export function MyStatsig({ children, userId }: MyStatsigProps) {
   const sdkKey = publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY;
   const pathname = usePathname();
@@ -140,8 +120,7 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   // Note: Session replay requires 'unsafe-eval' which is only allowed in development
   // due to CSP restrictions. In production, eval-based replay would violate CSP.
   React.useEffect(() => {
-    // Only load session replay in development (when unsafe-eval is allowed in CSP)
-    // and on dashboard routes
+    // Only load session replay in development and on dashboard routes
     if (
       process.env.NODE_ENV !== 'development' ||
       !pathname.startsWith('/app/dashboard')
@@ -173,8 +152,8 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   }
 
   return (
-    <MyStatsigEnabledInner sdkKey={sdkKey} user={user} plugins={plugins}>
+    <StatsigClientProvider sdkKey={sdkKey} user={user} plugins={plugins}>
       {children}
-    </MyStatsigEnabledInner>
+    </StatsigClientProvider>
   );
 }
