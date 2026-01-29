@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { creatorProfiles, type DbType } from '@/lib/db';
+import { detectPlatform } from '@/lib/utils/platform-detection';
 import { enqueueFollowupIngestionJobs } from '../followup';
 import { normalizeAndMergeExtraction } from '../merge';
 import type {
@@ -7,6 +8,15 @@ import type {
   JobExecutionResult,
   JobExecutorConfig,
 } from './types';
+
+function resolveSourcePlatform(
+  extractionPlatform: string | null | undefined,
+  detected: ReturnType<typeof detectPlatform>
+): string | null {
+  if (extractionPlatform) return extractionPlatform;
+  if (detected.isValid) return detected.platform.id;
+  return null;
+}
 
 /**
  * Generic job executor that handles the common workflow for all ingestion jobs.
@@ -43,13 +53,23 @@ export async function executeIngestionJob<TPayload extends BaseJobPayload>(
 
   try {
     const extraction = await config.fetchAndExtract(parsed, profile);
-    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+    const detected = detectPlatform(parsed.sourceUrl);
+    const extractionWithProvenance = {
+      ...extraction,
+      sourceUrl: extraction.sourceUrl ?? parsed.sourceUrl,
+      sourcePlatform: resolveSourcePlatform(extraction.sourcePlatform, detected),
+    };
+    const result = await normalizeAndMergeExtraction(
+      tx,
+      profile,
+      extractionWithProvenance
+    );
 
     await enqueueFollowupIngestionJobs({
       tx,
       creatorProfileId: profile.id,
       currentDepth: parsed.depth,
-      extraction,
+      extraction: extractionWithProvenance,
     });
 
     await tx

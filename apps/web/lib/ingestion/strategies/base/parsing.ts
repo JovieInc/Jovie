@@ -84,6 +84,36 @@ export function extractMetaContent(
   return null;
 }
 
+export type OpenGraphProfile = {
+  displayName: string | null;
+  avatarUrl: string | null;
+  canonicalUrl: string | null;
+};
+
+/**
+ * Extracts lightweight profile metadata from OpenGraph/Twitter card tags.
+ */
+export function extractOpenGraphProfile(html: string): OpenGraphProfile {
+  const displayName =
+    extractMetaContent(html, 'og:title') ??
+    extractMetaContent(html, 'twitter:title') ??
+    null;
+  const avatarUrl =
+    extractMetaContent(html, 'og:image') ??
+    extractMetaContent(html, 'twitter:image') ??
+    null;
+  const canonicalUrl =
+    extractMetaContent(html, 'og:url') ??
+    extractMetaContent(html, 'twitter:url') ??
+    null;
+
+  return {
+    displayName: displayName?.trim() || null,
+    avatarUrl: avatarUrl?.trim() || null,
+    canonicalUrl: canonicalUrl?.trim() || null,
+  };
+}
+
 function isValidHref(href: string): boolean {
   if (!href) return false;
   const trimmed = href.trim();

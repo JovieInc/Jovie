@@ -13,6 +13,10 @@ import {
   buildCanonicalIndex,
   getCanonicalIdentity,
 } from './services/link-deduplication';
+import {
+  storeAvatarCandidate,
+  storeProfileAttributes,
+} from './services/provenance-store';
 import type { ExtractionResult } from './types';
 
 type SocialLinkRow = typeof socialLinks.$inferSelect;
@@ -269,6 +273,25 @@ export async function normalizeAndMergeExtraction(
     profile,
     extraction.avatarUrl ?? null
   );
+
+  // Step 3.5: Store provenance for avatar/name/bio
+  const sourcePlatform = extraction.sourcePlatform ?? 'ingestion';
+  const sourceUrl = extraction.sourceUrl ?? null;
+  await storeAvatarCandidate({
+    tx,
+    profileId: profile.id,
+    avatarUrl: extraction.avatarUrl ?? null,
+    sourcePlatform,
+    sourceUrl,
+  });
+  await storeProfileAttributes({
+    tx,
+    profileId: profile.id,
+    sourcePlatform,
+    sourceUrl,
+    displayName: extraction.displayName ?? null,
+    bio: extraction.bio ?? null,
+  });
 
   // Step 4: Apply profile enrichment (respects user locks)
   await applyProfileEnrichment(tx, {

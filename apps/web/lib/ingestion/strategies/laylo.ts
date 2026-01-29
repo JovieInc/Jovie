@@ -186,5 +186,6 @@ export function extractLaylo(
     links,
     displayName,
     avatarUrl,
+    sourcePlatform: 'laylo',
   };
 }
