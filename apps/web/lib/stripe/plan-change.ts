@@ -507,11 +507,13 @@ export async function getAvailablePlanChanges(customerId: string): Promise<{
         isIntervalChange: false,
       }));
 
+      const sortedOptions = [...allOptions].sort((a, b) => a.amount - b.amount);
+
       return {
         currentPlan: 'free',
         currentPriceId: null,
         currentInterval: null,
-        availableChanges: allOptions.sort((a, b) => a.amount - b.amount),
+        availableChanges: sortedOptions,
       };
     }
 
@@ -529,11 +531,13 @@ export async function getAvailablePlanChanges(customerId: string): Promise<{
         isIntervalChange: false,
       }));
 
+      const sortedOptions = [...allOptions].sort((a, b) => a.amount - b.amount);
+
       return {
         currentPlan: 'free',
         currentPriceId: null,
         currentInterval: null,
-        availableChanges: allOptions.sort((a, b) => a.amount - b.amount),
+        availableChanges: sortedOptions,
       };
     }
 
@@ -563,20 +567,21 @@ export async function getAvailablePlanChanges(customerId: string): Promise<{
           currentPriceDetails.interval,
           mapping.interval
         ),
-      }))
-      .sort((a, b) => {
-        // Sort: upgrades first, then by amount
-        if (a.isUpgrade !== b.isUpgrade) {
-          return a.isUpgrade ? -1 : 1;
-        }
-        return a.amount - b.amount;
-      });
+      }));
+
+    const sortedAvailableChanges = [...availableChanges].sort((a, b) => {
+      // Sort: upgrades first, then by amount
+      if (a.isUpgrade !== b.isUpgrade) {
+        return a.isUpgrade ? -1 : 1;
+      }
+      return a.amount - b.amount;
+    });
 
     return {
       currentPlan: currentPriceDetails.plan,
       currentPriceId,
       currentInterval: currentPriceDetails.interval,
-      availableChanges,
+      availableChanges: sortedAvailableChanges,
     };
   } catch (error) {
     captureError('Error getting available plan changes', error, { customerId });
