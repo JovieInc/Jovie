@@ -5,8 +5,6 @@ import type {
   Activity,
   ActivityRange,
 } from '@/components/dashboard/organisms/dashboard-activity-feed/types';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -76,12 +74,10 @@ export function useActivityFeedQuery({
   range,
   enabled = true,
 }: ActivityFeedOptions) {
-  const gate = useFeatureGate(STATSIG_FLAGS.AUDIENCE_V2);
-
   return useQuery({
     queryKey: queryKeys.dashboard.activityFeed(profileId, range),
     queryFn: ({ signal }) => fetchActivityFeed(profileId, range, signal),
-    enabled: gate && enabled,
+    enabled,
     staleTime: 60_000, // 1 minute
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchInterval: 5 * 60 * 1000, // 5 minutes (matches legacy polling)

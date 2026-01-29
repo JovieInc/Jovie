@@ -1,176 +1,56 @@
 'use client';
 
 import { publicEnv } from '@/lib/env-public';
-import { logger } from '@/lib/utils/logger';
-
-type AnalyticsKind = 'event' | 'page' | 'identify';
 
 type AnalyticsWindow = Window & {
-  __JOVIE_ANALYTICS_ENABLED__?: boolean;
-  __JOVIE_ANALYTICS_READY__?: boolean;
+  gtag?: (
+    command: string,
+    event: string,
+    properties?: Record<string, unknown>
+  ) => void;
 };
-
-const pendingEvents: Array<() => void> = [];
-const MAX_PENDING_EVENTS = 100;
-const skipReasonsLogged = new Set<string>();
 
 function getAnalyticsWindow(): AnalyticsWindow | null {
   if (typeof window === 'undefined') return null;
   return window as AnalyticsWindow;
 }
 
-function hasStatsigClientKey() {
-  return Boolean(publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY);
-}
-
-function logSkip(
-  kind: AnalyticsKind,
-  name: string | undefined,
-  reason: string
-) {
-  if (!logger.enabled) return;
-  const key = `${kind}:${reason}`;
-  if (skipReasonsLogged.has(key)) return;
-  skipReasonsLogged.add(key);
-  logger.debug('Analytics suppressed', { kind, name, reason }, 'analytics');
-}
-
-function getAnalyticsState() {
-  const analyticsWindow = getAnalyticsWindow();
-  if (!analyticsWindow) {
-    return { enabled: false, ready: false, reason: 'no-window' };
-  }
-
-  if (!hasStatsigClientKey()) {
-    return { enabled: false, ready: true, reason: 'missing-statsig-key' };
-  }
-
-  const ready = Boolean(analyticsWindow.__JOVIE_ANALYTICS_READY__);
-  const enabled = Boolean(analyticsWindow.__JOVIE_ANALYTICS_ENABLED__);
-
-  if (!ready) {
-    return { enabled: false, ready: false, reason: 'pending-analytics-gate' };
-  }
-
-  if (!enabled) {
-    return { enabled: false, ready: true, reason: 'analytics-gate-disabled' };
-  }
-
-  return { enabled: true, ready: true, reason: undefined };
-}
-
-function flushQueue() {
-  while (pendingEvents.length) {
-    const event = pendingEvents.shift();
-    event?.();
-  }
-}
-
-function withAnalyticsGuard(
-  kind: AnalyticsKind,
-  name: string | undefined,
-  callback: () => void
-) {
-  const state = getAnalyticsState();
-
-  if (state.enabled) {
-    callback();
-    return;
-  }
-
-  if (!state.ready && hasStatsigClientKey()) {
-    // Limit pending events to prevent memory leaks if analytics never enables
-    if (pendingEvents.length < MAX_PENDING_EVENTS) {
-      pendingEvents.push(callback);
+function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
+  try {
+    const prodHost = new URL(publicEnv.NEXT_PUBLIC_APP_URL).hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) {
+      return 'dev';
     }
-    return;
-  }
-
-  logSkip(kind, name, state.reason ?? 'unknown');
-}
-
-export function setAnalyticsEnabled(enabled: boolean) {
-  const analyticsWindow = getAnalyticsWindow();
-  if (!analyticsWindow) return;
-
-  analyticsWindow.__JOVIE_ANALYTICS_READY__ = true;
-  analyticsWindow.__JOVIE_ANALYTICS_ENABLED__ = enabled;
-
-  if (enabled) {
-    flushQueue();
-  } else {
-    pendingEvents.length = 0;
-  }
-}
-
-// Type definitions for analytics
-
-// Extend window interface for analytics
-declare global {
-  interface Window {
-    __JOVIE_ANALYTICS_ENABLED__?: boolean;
-    __JOVIE_ANALYTICS_READY__?: boolean;
-    gtag?: (
-      command: string,
-      event: string,
-      properties?: Record<string, unknown>
-    ) => void;
+    if (host === prodHost || host === `www.${prodHost}`) {
+      return 'prod';
+    }
+    return 'preview';
+  } catch {
+    return process.env.NODE_ENV === 'development' ? 'dev' : 'prod';
   }
 }
 
 export function track(event: string, properties?: Record<string, unknown>) {
-  withAnalyticsGuard('event', event, () => {
-    const analyticsWindow = getAnalyticsWindow();
-    if (!analyticsWindow) return;
+  const analyticsWindow = getAnalyticsWindow();
+  if (!analyticsWindow?.gtag) return;
 
-    const envTag = (() => {
-      try {
-        const prodHost = new URL(publicEnv.NEXT_PUBLIC_APP_URL).hostname;
-        const host = analyticsWindow.location.hostname;
-        if (
-          host === 'localhost' ||
-          host === '127.0.0.1' ||
-          host.endsWith('.local')
-        ) {
-          return 'dev';
-        }
-        if (host === prodHost || host === `www.${prodHost}`) {
-          return 'prod';
-        }
-        return 'preview';
-      } catch {
-        return process.env.NODE_ENV === 'development' ? 'dev' : 'prod';
-      }
-    })();
+  const envTag = getEnvTag(analyticsWindow.location.hostname);
 
-    // NOTE: Removed window.va() calls - was causing 4M events/day ($100+/day)
-    // <VercelAnalytics /> handles pageviews, we don't need custom events there
-
-    // Track with Google Analytics (if available)
-    if (analyticsWindow.gtag) {
-      analyticsWindow.gtag('event', event, {
-        ...(properties || {}),
-        env: envTag,
-      });
-    }
+  analyticsWindow.gtag('event', event, {
+    ...(properties || {}),
+    env: envTag,
   });
 }
 
 export function page(name?: string, properties?: Record<string, unknown>) {
-  withAnalyticsGuard('page', name, () => {
-    // NOTE: Removed window.va() calls - <VercelAnalytics /> handles pageviews automatically
-    // This was causing excessive events and costs
-    void name;
-    void properties;
-  });
+  void name;
+  void properties;
+  // Vercel Analytics handles pageviews; we just ensure the module is imported
 }
 
 export function identify(userId: string, traits?: Record<string, unknown>) {
-  withAnalyticsGuard('identify', userId, () => {
-    // NOTE: Removed window.va() calls - was causing excessive events and costs
-    void userId;
-    void traits;
-  });
+  void userId;
+  void traits;
 }
 
 // Feature flag constants for type safety

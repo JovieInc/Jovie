@@ -47,3 +47,39 @@ export const beaconsPayloadSchema = z.object({
 });
 
 export type BeaconsPayload = z.infer<typeof beaconsPayloadSchema>;
+
+/**
+ * Payload schema for Instagram import jobs.
+ */
+export const instagramPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(2).default(0),
+});
+
+export type InstagramPayload = z.infer<typeof instagramPayloadSchema>;
+
+/**
+ * Payload schema for TikTok import jobs.
+ */
+export const tiktokPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(2).default(0),
+});
+
+export type TikTokPayload = z.infer<typeof tiktokPayloadSchema>;
+
+/**
+ * Payload schema for Twitter import jobs.
+ */
+export const twitterPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(2).default(0),
+});
+
+export type TwitterPayload = z.infer<typeof twitterPayloadSchema>;

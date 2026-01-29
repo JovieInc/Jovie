@@ -1,16 +1,25 @@
 import { captureError } from '@/lib/error-tracking';
 import {
   enqueueBeaconsIngestionJob,
+  enqueueInstagramIngestionJob,
   enqueueLayloIngestionJob,
   enqueueLinktreeIngestionJob,
+  enqueueTikTokIngestionJob,
+  enqueueTwitterIngestionJob,
   enqueueYouTubeIngestionJob,
 } from '@/lib/ingestion/jobs';
 import {
   isBeaconsUrl,
   validateBeaconsUrl,
 } from '@/lib/ingestion/strategies/beacons';
+import {
+  isInstagramUrl,
+  validateInstagramUrl,
+} from '@/lib/ingestion/strategies/instagram';
 import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
+import { isTikTokUrl, validateTikTokUrl } from '@/lib/ingestion/strategies/tiktok';
+import { isTwitterUrl, validateTwitterUrl } from '@/lib/ingestion/strategies/twitter';
 import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
 
 interface LinkInput {
@@ -44,6 +53,36 @@ export async function scheduleIngestionJobs(
     link => link.platform === 'laylo' || isLayloUrl(link.url)
   );
 
+  const instagramTargets = links
+    .map(link => {
+      const validated = validateInstagramUrl(link.url);
+      if (!validated) return null;
+      return link.platform === 'instagram' || isInstagramUrl(validated)
+        ? { ...link, url: validated }
+        : null;
+    })
+    .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
+  const tiktokTargets = links
+    .map(link => {
+      const validated = validateTikTokUrl(link.url);
+      if (!validated) return null;
+      return link.platform === 'tiktok' || isTikTokUrl(validated)
+        ? { ...link, url: validated }
+        : null;
+    })
+    .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
+  const twitterTargets = links
+    .map(link => {
+      const validated = validateTwitterUrl(link.url);
+      if (!validated) return null;
+      return link.platform === 'twitter' || isTwitterUrl(validated)
+        ? { ...link, url: validated }
+        : null;
+    })
+    .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
   const youtubeTargets = links
     .map(link => {
       const validated = validateYouTubeChannelUrl(link.url);
@@ -61,6 +100,57 @@ export async function scheduleIngestionJobs(
           sourceUrl: link.url,
         }).catch(err => {
           captureError('Failed to enqueue beacons ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
+          return null;
+        })
+      )
+    );
+  }
+
+  if (instagramTargets.length > 0) {
+    jobs.push(
+      ...instagramTargets.map(link =>
+        enqueueInstagramIngestionJob({
+          creatorProfileId: profileId,
+          sourceUrl: link.url,
+        }).catch(err => {
+          captureError('Failed to enqueue instagram ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
+          return null;
+        })
+      )
+    );
+  }
+
+  if (tiktokTargets.length > 0) {
+    jobs.push(
+      ...tiktokTargets.map(link =>
+        enqueueTikTokIngestionJob({
+          creatorProfileId: profileId,
+          sourceUrl: link.url,
+        }).catch(err => {
+          captureError('Failed to enqueue tiktok ingestion job', err, {
+            profileId,
+            url: link.url,
+          });
+          return null;
+        })
+      )
+    );
+  }
+
+  if (twitterTargets.length > 0) {
+    jobs.push(
+      ...twitterTargets.map(link =>
+        enqueueTwitterIngestionJob({
+          creatorProfileId: profileId,
+          sourceUrl: link.url,
+        }).catch(err => {
+          captureError('Failed to enqueue twitter ingestion job', err, {
             profileId,
             url: link.url,
           });

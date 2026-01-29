@@ -23,8 +23,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/atoms/Sheet';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 type DashboardMobileTab = {
@@ -107,11 +105,7 @@ export interface DashboardMobileTabsProps {
 export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
-
-  const visibleTabs = contactsGate.value
-    ? DASHBOARD_TABS
-    : DASHBOARD_TABS.filter(tab => tab.id !== 'contacts');
+  const visibleTabs = DASHBOARD_TABS;
 
   const isMoreActive = MORE_MENU_ITEMS.some(
     item => pathname === item.href || pathname.startsWith(`${item.href}/`)

@@ -8,8 +8,6 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -281,16 +279,13 @@ export async function getUserDashboardAnalytics(
   range: AnalyticsRange,
   view: DashboardAnalyticsView
 ): Promise<DashboardAnalyticsResponse> {
-  const [userRow, dynamicOverrideEnabled, creatorProfile] = await Promise.all([
+  const [userRow, creatorProfile] = await Promise.all([
     db
       .select({ id: users.id, isPro: users.isPro })
       .from(users)
       .where(eq(users.clerkId, clerkUserId))
       .limit(1)
       .then(results => results[0]),
-    checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
-      userID: clerkUserId,
-    }),
     db
       .select({
         id: creatorProfiles.id,
@@ -309,7 +304,7 @@ export async function getUserDashboardAnalytics(
     throw new Error('User not found for Clerk ID');
   }
 
-  const dynamicEnabled = userIsPro || dynamicOverrideEnabled;
+  const dynamicEnabled = userIsPro;
 
   if (!creatorProfile) {
     throw new Error('Creator profile not found');

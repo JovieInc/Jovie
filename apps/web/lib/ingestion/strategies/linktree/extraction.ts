@@ -207,6 +207,7 @@ export function extractLinktree(html: string): ExtractionResult {
   // Add bio and contact email to result
   return {
     ...result,
+    sourcePlatform: 'linktree',
     bio,
     contactEmail,
   };
