@@ -25,12 +25,7 @@ const TWITTER_CONFIG: StrategyConfig = {
   defaultTimeoutMs: 10000,
 } as const;
 
-const SKIP_HOSTS = new Set([
-  'x.com',
-  'www.x.com',
-  'twitter.com',
-  'www.twitter.com',
-]);
+const SKIP_HOSTS = new Set(TWITTER_CONFIG.validHosts);
 
 export function isTwitterUrl(url: string): boolean {
   return validatePlatformUrl(url, TWITTER_CONFIG).valid;
@@ -55,9 +50,11 @@ export async function fetchTwitterDocument(
     throw new ExtractionError('Invalid Twitter profile URL', 'INVALID_URL');
   }
 
+  const timeoutMs = options?.timeoutMs ?? TWITTER_CONFIG.defaultTimeoutMs;
+
   const { html } = await fetchDocument(validated, {
     ...options,
-    timeoutMs: TWITTER_CONFIG.defaultTimeoutMs,
+    timeoutMs,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
       ...(options?.headers ?? {}),
