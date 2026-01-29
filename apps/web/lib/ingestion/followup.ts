@@ -5,8 +5,14 @@ import {
   detectPlatform,
 } from '@/lib/utils/platform-detection';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
+import {
+  isInstagramUrl,
+  validateInstagramUrl,
+} from './strategies/instagram';
 import { validateLayloUrl } from './strategies/laylo';
 import { validateLinktreeUrl } from './strategies/linktree';
+import { isTikTokUrl, validateTikTokUrl } from './strategies/tiktok';
+import { isTwitterUrl, validateTwitterUrl } from './strategies/twitter';
 import { isYouTubeChannelUrl } from './strategies/youtube';
 import type { ExtractionResult } from './types';
 
@@ -17,7 +23,10 @@ type SupportedRecursiveJobType =
   | 'import_linktree'
   | 'import_laylo'
   | 'import_youtube'
-  | 'import_beacons';
+  | 'import_beacons'
+  | 'import_instagram'
+  | 'import_tiktok'
+  | 'import_twitter';
 
 /**
  * Maximum depth allowed for each job type.
@@ -27,6 +36,9 @@ const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
   import_laylo: 3,
   import_youtube: 1,
   import_beacons: 3,
+  import_instagram: 2,
+  import_tiktok: 2,
+  import_twitter: 2,
 };
 
 /**
@@ -128,6 +140,24 @@ function classifyLink(
   const validatedLaylo = validateLayloUrl(url);
   if (validatedLaylo) {
     return { jobType: 'import_laylo', sourceUrl: validatedLaylo };
+  }
+
+  // Instagram
+  const validatedInstagram = validateInstagramUrl(url);
+  if (validatedInstagram && isInstagramUrl(validatedInstagram)) {
+    return { jobType: 'import_instagram', sourceUrl: validatedInstagram };
+  }
+
+  // TikTok
+  const validatedTikTok = validateTikTokUrl(url);
+  if (validatedTikTok && isTikTokUrl(validatedTikTok)) {
+    return { jobType: 'import_tiktok', sourceUrl: validatedTikTok };
+  }
+
+  // Twitter
+  const validatedTwitter = validateTwitterUrl(url);
+  if (validatedTwitter && isTwitterUrl(validatedTwitter)) {
+    return { jobType: 'import_twitter', sourceUrl: validatedTwitter };
   }
 
   return null;

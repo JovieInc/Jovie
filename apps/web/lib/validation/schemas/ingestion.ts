@@ -26,6 +26,9 @@ export const INGESTION_MAX_DEPTH = {
   laylo: 3,
   youtube: 1,
   beacons: 3,
+  instagram: 2,
+  tiktok: 2,
+  twitter: 2,
   thematic: 1,
 } as const;
 
@@ -76,6 +79,27 @@ export const youtubePayloadSchema = createBaseIngestionPayloadSchema(
  */
 export const beaconsPayloadSchema = createBaseIngestionPayloadSchema(
   INGESTION_MAX_DEPTH.beacons
+);
+
+/**
+ * Instagram ingestion payload schema (processor variant).
+ */
+export const instagramPayloadSchema = createBaseIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.instagram
+);
+
+/**
+ * TikTok ingestion payload schema (processor variant).
+ */
+export const tiktokPayloadSchema = createBaseIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.tiktok
+);
+
+/**
+ * Twitter ingestion payload schema (processor variant).
+ */
+export const twitterPayloadSchema = createBaseIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.twitter
 );
 
 /**
@@ -136,6 +160,27 @@ export const beaconsJobPayloadSchema = createJobIngestionPayloadSchema(
 );
 
 /**
+ * Instagram job payload schema (enqueue variant).
+ */
+export const instagramJobPayloadSchema = createJobIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.instagram
+);
+
+/**
+ * TikTok job payload schema (enqueue variant).
+ */
+export const tiktokJobPayloadSchema = createJobIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.tiktok
+);
+
+/**
+ * Twitter job payload schema (enqueue variant).
+ */
+export const twitterJobPayloadSchema = createJobIngestionPayloadSchema(
+  INGESTION_MAX_DEPTH.twitter
+);
+
+/**
  * Thematic job payload schema (enqueue variant).
  * Used when creating import_thematic jobs with deduplication.
  */
@@ -154,6 +199,9 @@ export type LinktreePayload = z.infer<typeof linktreePayloadSchema>;
 export type LayloPayload = z.infer<typeof layloPayloadSchema>;
 export type YouTubePayload = z.infer<typeof youtubePayloadSchema>;
 export type BeaconsPayload = z.infer<typeof beaconsPayloadSchema>;
+export type InstagramPayload = z.infer<typeof instagramPayloadSchema>;
+export type TikTokPayload = z.infer<typeof tiktokPayloadSchema>;
+export type TwitterPayload = z.infer<typeof twitterPayloadSchema>;
 export type ThematicPayload = z.infer<typeof thematicPayloadSchema>;
 
 /**
@@ -163,4 +211,7 @@ export type LinktreeJobPayload = z.infer<typeof linktreeJobPayloadSchema>;
 export type LayloJobPayload = z.infer<typeof layloJobPayloadSchema>;
 export type YouTubeJobPayload = z.infer<typeof youtubeJobPayloadSchema>;
 export type BeaconsJobPayload = z.infer<typeof beaconsJobPayloadSchema>;
+export type InstagramJobPayload = z.infer<typeof instagramJobPayloadSchema>;
+export type TikTokJobPayload = z.infer<typeof tiktokJobPayloadSchema>;
+export type TwitterJobPayload = z.infer<typeof twitterJobPayloadSchema>;
 export type ThematicJobPayload = z.infer<typeof thematicJobPayloadSchema>;

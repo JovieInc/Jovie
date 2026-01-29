@@ -39,6 +39,8 @@ export interface ProfileForExtraction {
  */
 export interface ExtractionData {
   links: Array<{ url: string; platformId?: string; title?: string }>;
+  sourcePlatform?: string | null;
+  sourceUrl?: string | null;
   avatarUrl?: string | null;
   hasPaidTier?: boolean | null;
   displayName?: string | null;

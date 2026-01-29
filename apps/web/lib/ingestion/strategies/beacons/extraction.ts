@@ -155,5 +155,8 @@ export function extractBeacons(html: string): ExtractionResult {
   const { displayName, avatarUrl } = extractProfileMetadata(html);
   const hasPaidTier = detectBeaconsPaidTier(html);
 
-  return createExtractionResult(links, displayName, avatarUrl, hasPaidTier);
+  return {
+    ...createExtractionResult(links, displayName, avatarUrl, hasPaidTier),
+    sourcePlatform: 'beacons',
+  };
 }

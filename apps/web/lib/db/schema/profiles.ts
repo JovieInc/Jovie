@@ -216,6 +216,59 @@ export const creatorContacts = pgTable('creator_contacts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Creator avatar candidates table for ingestion suggestions
+export const creatorAvatarCandidates = pgTable(
+  'creator_avatar_candidates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    sourcePlatform: text('source_platform').notNull(),
+    sourceUrl: text('source_url'),
+    avatarUrl: text('avatar_url').notNull(),
+    confidenceScore: numeric('confidence_score', { precision: 4, scale: 3 })
+      .default('0.700')
+      .notNull(),
+    colorPalette: jsonb('color_palette').$type<string[]>().default([]),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorAvatarCandidateProfileIdx: index(
+      'idx_creator_avatar_candidates_profile_id'
+    ).on(table.creatorProfileId),
+    creatorAvatarCandidateUnique: uniqueIndex(
+      'idx_creator_avatar_candidates_unique'
+    ).on(table.creatorProfileId, table.avatarUrl),
+  })
+);
+
+// Creator profile attributes history table
+export const creatorProfileAttributes = pgTable(
+  'creator_profile_attributes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    sourcePlatform: text('source_platform').notNull(),
+    sourceUrl: text('source_url'),
+    displayName: text('display_name'),
+    bio: text('bio'),
+    confidenceScore: numeric('confidence_score', { precision: 4, scale: 3 })
+      .default('0.700')
+      .notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileAttributesProfileIdx: index(
+      'idx_creator_profile_attributes_profile_id'
+    ).on(table.creatorProfileId, table.createdAt),
+  })
+);
+
 // Profile photos table for avatar uploads with Vercel Blob
 export const profilePhotos = pgTable('profile_photos', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -303,6 +356,16 @@ export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
+export const insertCreatorAvatarCandidateSchema =
+  createInsertSchema(creatorAvatarCandidates);
+export const selectCreatorAvatarCandidateSchema =
+  createSelectSchema(creatorAvatarCandidates);
+
+export const insertCreatorProfileAttributeSchema =
+  createInsertSchema(creatorProfileAttributes);
+export const selectCreatorProfileAttributeSchema =
+  createSelectSchema(creatorProfileAttributes);
+
 export const insertCreatorClaimInviteSchema =
   createInsertSchema(creatorClaimInvites);
 export const selectCreatorClaimInviteSchema =
@@ -317,6 +380,16 @@ export type NewCreatorContact = typeof creatorContacts.$inferInsert;
 
 export type ProfilePhoto = typeof profilePhotos.$inferSelect;
 export type NewProfilePhoto = typeof profilePhotos.$inferInsert;
+
+export type CreatorAvatarCandidate =
+  typeof creatorAvatarCandidates.$inferSelect;
+export type NewCreatorAvatarCandidate =
+  typeof creatorAvatarCandidates.$inferInsert;
+
+export type CreatorProfileAttribute =
+  typeof creatorProfileAttributes.$inferSelect;
+export type NewCreatorProfileAttribute =
+  typeof creatorProfileAttributes.$inferInsert;
 
 export type CreatorClaimInvite = typeof creatorClaimInvites.$inferSelect;
 export type NewCreatorClaimInvite = typeof creatorClaimInvites.$inferInsert;

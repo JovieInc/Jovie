@@ -9,8 +9,6 @@ export const metadata = {
   description: 'Manage your tour dates and sync from Bandsintown',
 };
 
-export const runtime = 'nodejs';
-
 export default async function TourDatesPage() {
   const { userId } = await getCachedAuth();
 

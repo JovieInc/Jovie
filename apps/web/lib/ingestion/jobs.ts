@@ -7,13 +7,19 @@ import {
 } from '@/lib/utils/platform-detection';
 import {
   beaconsJobPayloadSchema,
+  instagramJobPayloadSchema,
   layloJobPayloadSchema,
   linktreeJobPayloadSchema,
+  tiktokJobPayloadSchema,
+  twitterJobPayloadSchema,
   youtubeJobPayloadSchema,
 } from '@/lib/validation/schemas';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
+import { isInstagramUrl, validateInstagramUrl } from './strategies/instagram';
 import { isLayloUrl } from './strategies/laylo';
 import { isLinktreeUrl } from './strategies/linktree';
+import { isTikTokUrl, validateTikTokUrl } from './strategies/tiktok';
+import { isTwitterUrl, validateTwitterUrl } from './strategies/twitter';
 import {
   isYouTubeChannelUrl,
   validateYouTubeChannelUrl,
@@ -75,6 +81,192 @@ export async function enqueueLinktreeIngestionJob(params: {
     .insert(ingestionJobs)
     .values({
       jobType: 'import_linktree',
+      payload,
+      dedupKey: payload.dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 0,
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
+
+export async function enqueueInstagramIngestionJob(params: {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth?: number;
+}): Promise<string | null> {
+  const validated = validateInstagramUrl(params.sourceUrl);
+  if (!validated || !isInstagramUrl(validated)) {
+    return null;
+  }
+
+  const normalizedSource = normalizeUrl(validated);
+  const detected = detectPlatform(normalizedSource);
+  const dedupKey = canonicalIdentity({
+    platform: detected.platform,
+    normalizedUrl: detected.normalizedUrl,
+  });
+
+  const payload = instagramJobPayloadSchema.parse({
+    creatorProfileId: params.creatorProfileId,
+    sourceUrl: detected.normalizedUrl,
+    dedupKey,
+    depth: params.depth ?? 0,
+  });
+
+  const existing = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'import_instagram'),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
+        or(
+          eq(ingestionJobs.dedupKey, payload.dedupKey),
+          and(
+            isNull(ingestionJobs.dedupKey),
+            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'import_instagram',
+      payload,
+      dedupKey: payload.dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 0,
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
+
+export async function enqueueTikTokIngestionJob(params: {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth?: number;
+}): Promise<string | null> {
+  const validated = validateTikTokUrl(params.sourceUrl);
+  if (!validated || !isTikTokUrl(validated)) {
+    return null;
+  }
+
+  const normalizedSource = normalizeUrl(validated);
+  const detected = detectPlatform(normalizedSource);
+  const dedupKey = canonicalIdentity({
+    platform: detected.platform,
+    normalizedUrl: detected.normalizedUrl,
+  });
+
+  const payload = tiktokJobPayloadSchema.parse({
+    creatorProfileId: params.creatorProfileId,
+    sourceUrl: detected.normalizedUrl,
+    dedupKey,
+    depth: params.depth ?? 0,
+  });
+
+  const existing = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'import_tiktok'),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
+        or(
+          eq(ingestionJobs.dedupKey, payload.dedupKey),
+          and(
+            isNull(ingestionJobs.dedupKey),
+            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'import_tiktok',
+      payload,
+      dedupKey: payload.dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 0,
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
+
+export async function enqueueTwitterIngestionJob(params: {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth?: number;
+}): Promise<string | null> {
+  const validated = validateTwitterUrl(params.sourceUrl);
+  if (!validated || !isTwitterUrl(validated)) {
+    return null;
+  }
+
+  const normalizedSource = normalizeUrl(validated);
+  const detected = detectPlatform(normalizedSource);
+  const dedupKey = canonicalIdentity({
+    platform: detected.platform,
+    normalizedUrl: detected.normalizedUrl,
+  });
+
+  const payload = twitterJobPayloadSchema.parse({
+    creatorProfileId: params.creatorProfileId,
+    sourceUrl: detected.normalizedUrl,
+    dedupKey,
+    depth: params.depth ?? 0,
+  });
+
+  const existing = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'import_twitter'),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
+        or(
+          eq(ingestionJobs.dedupKey, payload.dedupKey),
+          and(
+            isNull(ingestionJobs.dedupKey),
+            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'import_twitter',
       payload,
       dedupKey: payload.dedupKey,
       status: 'pending',
