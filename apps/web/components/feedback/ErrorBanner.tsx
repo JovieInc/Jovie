@@ -95,7 +95,7 @@ export function ErrorBanner({
         </span>
 
         <div className='flex-1 min-w-0 space-y-1.5'>
-          <p className='text-sm font-semibold leading-snug tracking-tight wrap-break-word'>
+          <p className='text-sm font-semibold leading-snug tracking-tight break-words'>
             {title}
           </p>
           {description ? (

@@ -9,6 +9,7 @@ import {
 } from '@statsig/react-bindings';
 import { usePathname } from 'next/navigation';
 import React from 'react';
+import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 
 export interface MyStatsigProps {
@@ -52,7 +53,7 @@ function StatsigClientProvider({
     {
       logLevel: LogLevel.Debug,
       plugins,
-      ...(process.env.NODE_ENV === 'test'
+      ...(env.NODE_ENV === 'test'
         ? {
             overrideAdapter: {
               getGateOverride: current => {
@@ -121,10 +122,7 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   // due to CSP restrictions. In production, eval-based replay would violate CSP.
   React.useEffect(() => {
     // Only load session replay in development and on dashboard routes
-    if (
-      process.env.NODE_ENV !== 'development' ||
-      !pathname.startsWith('/app/dashboard')
-    ) {
+    if (!env.IS_DEV || !pathname.startsWith('/app/dashboard')) {
       // Use stable reference and functional update to avoid unnecessary re-renders
       setPlugins(prev => (prev.length === 0 ? prev : EMPTY_PLUGINS));
       return;

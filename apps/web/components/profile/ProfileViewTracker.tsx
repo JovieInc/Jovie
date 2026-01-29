@@ -22,8 +22,6 @@ export function ProfileViewTracker({
   const hasTracked = useRef(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
     // Only track once per mount
     if (hasTracked.current) return;
     hasTracked.current = true;

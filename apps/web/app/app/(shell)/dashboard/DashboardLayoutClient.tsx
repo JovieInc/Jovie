@@ -147,9 +147,7 @@ export default function DashboardLayoutClient({
       isContactsRoute ||
       pathname?.startsWith('/app/dashboard/releases');
     const isContactTableRoute =
-      pathname?.startsWith('/app/admin/creators') ||
-      isAudienceRoute ||
-      isContactsRoute;
+      pathname?.startsWith('/app/admin/creators') || isAudienceRoute;
 
     return {
       isAppDashboardRoute,

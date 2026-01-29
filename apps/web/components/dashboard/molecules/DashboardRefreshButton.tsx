@@ -34,9 +34,10 @@ export function DashboardRefreshButton({
       icon={
         <RefreshCw
           className={
+            // Dashboard icon convention: use tighter 3.5 sizing; align other dashboard icons to match.
             isPending
-              ? 'h-5 w-5 animate-spin motion-reduce:animate-none'
-              : 'h-5 w-5'
+              ? 'h-3.5 w-3.5 animate-spin motion-reduce:animate-none'
+              : 'h-3.5 w-3.5'
           }
         />
       }

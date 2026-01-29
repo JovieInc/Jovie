@@ -166,7 +166,7 @@ export const MENU_ITEM_BASE =
   'data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-ring-themed focus-visible:ring-offset-0 ' +
-  '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-neutral-500 dark:[&_svg]:text-[#a6abb3] ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-neutral-500 dark:[&_svg]:text-[#a6abb3] ' +
   'hover:[&_svg]:text-neutral-600 data-highlighted:[&_svg]:text-neutral-600 dark:hover:[&_svg]:text-[#d0d3d8] dark:data-highlighted:[&_svg]:text-[#d0d3d8]';
 
 /**
@@ -212,7 +212,8 @@ export const MENU_LABEL_BASE =
  * Menu separator styles
  * Uses design token for border consistency
  */
-export const MENU_SEPARATOR_BASE = '-mx-0.5 my-1 h-px bg-[#e5e5e5]';
+export const MENU_SEPARATOR_BASE =
+  '-mx-0.5 my-1 h-px bg-[#e5e5e5] dark:bg-surface-3';
 
 /**
  * Keyboard shortcut indicator styles

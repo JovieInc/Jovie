@@ -9,6 +9,9 @@ import {
 } from '@jovie/ui';
 import * as React from 'react';
 
+const selectItemClassName =
+  'text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token';
+
 export interface AdminPageSizeSelectProps {
   initialPageSize: number;
   name?: string;
@@ -44,23 +47,14 @@ export function AdminPageSizeSelect({
             <SelectTrigger className='h-8 w-20 px-2 text-xs'>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className='bg-white dark:bg-[#101011] text-primary-token dark:text-[#e3e5e9] border border-subtle dark:border-[#1f2022]'>
-              <SelectItem
-                value='10'
-                className='text-primary-token dark:text-[#e3e5e9] data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white'
-              >
+            <SelectContent className='bg-surface-1 text-primary-token border border-subtle'>
+              <SelectItem value='10' className={selectItemClassName}>
                 10
               </SelectItem>
-              <SelectItem
-                value='20'
-                className='text-primary-token dark:text-[#e3e5e9] data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white'
-              >
+              <SelectItem value='20' className={selectItemClassName}>
                 20
               </SelectItem>
-              <SelectItem
-                value='50'
-                className='text-primary-token dark:text-[#e3e5e9] data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white'
-              >
+              <SelectItem value='50' className={selectItemClassName}>
                 50
               </SelectItem>
             </SelectContent>
