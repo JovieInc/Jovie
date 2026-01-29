@@ -27,7 +27,7 @@
       "@/atoms/*": ["./components/atoms/*"],
       "@/molecules/*": ["./components/molecules/*"],
       "@/organisms/*": ["./components/organisms/*"],
-      "@/app/*": ["./app/app/*", "./app/*"],
+      "@/app/*": ["./app/*", "./app/app/*"],
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],
       "@jovie/ui": ["../../packages/ui"],

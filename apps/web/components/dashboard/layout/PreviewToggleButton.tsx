@@ -2,7 +2,7 @@
 
 import { TooltipShortcut } from '@jovie/ui';
 import { PanelRight, PanelRightOpen } from 'lucide-react';
-import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
+import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export function PreviewToggleButton() {

@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useTransition } from 'react';
-import { connectSpotifyArtist } from '@/app/app/dashboard/releases/actions';
+import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { ReleasesEmptyStateAction } from '../types';
 

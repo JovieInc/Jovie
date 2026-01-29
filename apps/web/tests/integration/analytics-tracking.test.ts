@@ -277,7 +277,8 @@ describe('Analytics Tracking Integration', () => {
   describe('RLS Security', () => {
     it('should not have RLS bypass capability', async () => {
       // The ALLOW_AUDIENCE_RLS_BYPASS env var should no longer be used
-      const audienceDataPath = '@/app/app/dashboard/audience/audience-data';
+      const audienceDataPath =
+        '@/app/app/(shell)/dashboard/audience/audience-data';
 
       // Check that the function signature doesn't include rlsBypass
       const { getAudienceServerData } = await import(audienceDataPath);

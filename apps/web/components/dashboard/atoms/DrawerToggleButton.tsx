@@ -22,7 +22,7 @@ export function DrawerToggleButton() {
       size='icon'
       onClick={() => tableMeta.toggle?.()}
       aria-label='Toggle contact details'
-      className='h-8 w-8'
+      className='h-8 w-8 border-none'
       disabled={!tableMeta.toggle}
     >
       <Icon className='h-4 w-4' />

@@ -27,67 +27,10 @@ interface MyStatsigEnabledProps {
 }
 
 /**
- * Inner component that initializes the Statsig client after mount.
- * Defers hook call until component is mounted to prevent async state
- * updates during initial render (React Strict Mode compatibility).
- */
-function StatsigClientProviderInner({
-  children,
-  sdkKey,
-  user,
-  plugins,
-}: MyStatsigEnabledProps) {
-  const { client } = useClientAsyncInit(sdkKey, user, {
-    logLevel: LogLevel.Debug,
-    plugins,
-    ...(process.env.NODE_ENV === 'test'
-      ? {
-          overrideAdapter: {
-            getGateOverride: current => {
-              const overrides = (
-                window as unknown as {
-                  __STATSIG_OVERRIDES__?: Record<string, boolean>;
-                }
-              ).__STATSIG_OVERRIDES__;
-
-              const override = overrides?.[current.name];
-              if (typeof override !== 'boolean') {
-                return null;
-              }
-
-              return {
-                ...current,
-                value: override,
-                ruleID: 'override',
-                details: {
-                  ...current.details,
-                  reason: 'OverrideAdapter',
-                },
-                __evaluation: current.__evaluation
-                  ? {
-                      ...current.__evaluation,
-                      value: override,
-                      rule_id: 'override',
-                    }
-                  : null,
-              };
-            },
-          },
-        }
-      : null),
-  });
-
-  return (
-    <StatsigProvider client={client} loadingComponent={null}>
-      {children}
-    </StatsigProvider>
-  );
-}
-
-/**
- * Wrapper that defers Statsig initialization until after mount.
- * This prevents the "state update on unmounted component" warning
- * that occurs when useClientAsyncInit runs during initial render.
+ * Wrapper that initializes Statsig client after mount.
+ * Uses a single component to maintain consistent hook count across renders.
+ * The client initialization is deferred until after hydration to avoid
+ * state updates during render, but hooks are always called.
  */
 function StatsigClientProvider({
   children,
@@ -101,35 +44,61 @@ function StatsigClientProvider({
     setIsMounted(true);
   }, []);
 
-  // Don't initialize Statsig until after mount to prevent async state updates
+  // Always call the hook to maintain consistent hook count
+  // Pass a dummy key when not mounted to satisfy the hook requirement
+  const { client } = useClientAsyncInit(
+    isMounted ? sdkKey : 'not-initialized',
+    user,
+    {
+      logLevel: LogLevel.Debug,
+      plugins,
+      ...(process.env.NODE_ENV === 'test'
+        ? {
+            overrideAdapter: {
+              getGateOverride: current => {
+                const overrides = (
+                  window as unknown as {
+                    __STATSIG_OVERRIDES__?: Record<string, boolean>;
+                  }
+                ).__STATSIG_OVERRIDES__;
+
+                const override = overrides?.[current.name];
+                if (typeof override !== 'boolean') {
+                  return null;
+                }
+
+                return {
+                  ...current,
+                  value: override,
+                  ruleID: 'override',
+                  details: {
+                    ...current.details,
+                    reason: 'OverrideAdapter',
+                  },
+                  __evaluation: current.__evaluation
+                    ? {
+                        ...current.__evaluation,
+                        value: override,
+                        rule_id: 'override',
+                      }
+                    : null,
+                };
+              },
+            },
+          }
+        : null),
+    }
+  );
+
+  // Don't wrap with StatsigProvider until mounted to prevent hydration issues
   if (!isMounted) {
     return <>{children}</>;
   }
 
   return (
-    <StatsigClientProviderInner sdkKey={sdkKey} user={user} plugins={plugins}>
+    <StatsigProvider client={client} loadingComponent={null}>
       {children}
-    </StatsigClientProviderInner>
-  );
-}
-
-/**
- * Wrapper that always renders StatsigProvider for consistent hook behavior.
- * The client initialization is deferred until after hydration to avoid
- * state updates during render, but the provider context is always present.
- */
-function MyStatsigEnabledInner({
-  children,
-  sdkKey,
-  user,
-  plugins,
-}: MyStatsigEnabledProps) {
-  // Always render through StatsigClientProvider to ensure consistent hook calls
-  // in child components that use useFeatureGate, useExperiment, etc.
-  return (
-    <StatsigClientProvider sdkKey={sdkKey} user={user} plugins={plugins}>
-      {children}
-    </StatsigClientProvider>
+    </StatsigProvider>
   );
 }
 
@@ -151,8 +120,7 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   // Note: Session replay requires 'unsafe-eval' which is only allowed in development
   // due to CSP restrictions. In production, eval-based replay would violate CSP.
   React.useEffect(() => {
-    // Only load session replay in development (when unsafe-eval is allowed in CSP)
-    // and on dashboard routes
+    // Only load session replay in development and on dashboard routes
     if (
       process.env.NODE_ENV !== 'development' ||
       !pathname.startsWith('/app/dashboard')
@@ -184,8 +152,8 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   }
 
   return (
-    <MyStatsigEnabledInner sdkKey={sdkKey} user={user} plugins={plugins}>
+    <StatsigClientProvider sdkKey={sdkKey} user={user} plugins={plugins}>
       {children}
-    </MyStatsigEnabledInner>
+    </StatsigClientProvider>
   );
 }

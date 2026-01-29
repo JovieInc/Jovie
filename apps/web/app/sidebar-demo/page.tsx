@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
-import type { DashboardData } from '@/app/dashboard/actions';
-import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
-import DashboardLayoutClient from '@/app/dashboard/DashboardLayoutClient';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions';
+import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import DashboardLayoutClient from '@/app/app/(shell)/dashboard/DashboardLayoutClient';
 import { MyStatsig } from '@/app/my-statsig';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import type { Artist } from '@/types/db';

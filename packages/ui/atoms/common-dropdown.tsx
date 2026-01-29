@@ -238,7 +238,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
               placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-3 text-sm text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              className='w-full rounded-lg border border-subtle bg-white dark:bg-surface-2 py-2 pl-9 pr-3 text-sm text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             />
           </div>
         )}

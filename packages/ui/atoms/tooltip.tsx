@@ -83,8 +83,10 @@ const TooltipContent = React.forwardRef<
         sideOffset={sideOffset}
         data-testid={testId}
         className={cn(
-          // Base layout + spacing
-          'z-50 inline-flex select-none items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium leading-tight',
+          // Base layout + spacing (single-line, no wrap)
+          'z-50 inline-flex select-none items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium leading-tight whitespace-nowrap',
+          // Normalize height so presence of a shortcut badge doesn't shift positioning
+          'min-h-[28px]',
           // Theme-aware surface with subtle border using design tokens
           'max-w-xs border shadow-lg',
           'border-default bg-surface-2 text-primary-token',

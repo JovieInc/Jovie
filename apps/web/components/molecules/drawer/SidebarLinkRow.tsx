@@ -49,7 +49,7 @@ export function SidebarLinkRow({
   return (
     <div
       className={cn(
-        'group flex items-center justify-between rounded-md py-2 hover:bg-sidebar-surface-hover transition-colors',
+        'group flex items-center justify-between rounded-md py-0.5 hover:bg-sidebar-surface-hover transition-colors',
         className
       )}
       data-testid={testId}

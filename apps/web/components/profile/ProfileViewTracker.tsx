@@ -22,6 +22,8 @@ export function ProfileViewTracker({
   const hasTracked = useRef(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     // Only track once per mount
     if (hasTracked.current) return;
     hasTracked.current = true;
@@ -30,6 +32,22 @@ export function ProfileViewTracker({
       handle,
       artist_id: artistId,
       source: source ?? (document.referrer || 'direct'),
+    });
+
+    const body = JSON.stringify({ handle });
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' });
+      const sent = navigator.sendBeacon('/api/profile/view', blob);
+      if (sent) return;
+    }
+
+    fetch('/api/profile/view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {
+      // Ignore tracking errors
     });
   }, [handle, artistId, source]);
 

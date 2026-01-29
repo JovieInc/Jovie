@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState, useTransition } from 'react';
-import { loadTracksForRelease } from '@/app/app/dashboard/releases/actions';
+import { loadTracksForRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel, TrackViewModel } from '@/lib/discography/types';
 
 export interface UseExpandedTracksResult {
