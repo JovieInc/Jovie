@@ -35,7 +35,7 @@ export const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-1.5 py-[5px] text-left text-[13px] font-medium leading-[19px] tracking-tight outline-none ring-sidebar-ring transition-all duration-150 ease-out text-[#b0b3bb] hover:text-white data-[active=true]:text-white hover:bg-white/5 data-[active=true]:bg-white/10 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-white/6 active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-[17px] [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:size-[17px] [&>svg]:shrink-0 [&>svg]:text-[#9aa0aa] [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-white',
+  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-1.5 py-[5px] text-left text-[13px] font-medium leading-[19px] tracking-tight outline-none ring-sidebar-ring transition-all duration-150 ease-out text-sidebar-muted hover:text-white data-[active=true]:text-white hover:bg-white/5 data-[active=true]:bg-white/10 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-white/6 active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:h-4 [&>[data-sidebar-icon]]:w-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-white',
   {
     variants: {
       variant: {
@@ -178,7 +178,7 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-[11px] font-medium tabular-nums text-[#cdd0d5] select-none pointer-events-none',
+      'absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-[11px] font-medium tabular-nums text-sidebar-muted select-none pointer-events-none',
       'peer-hover/menu-button:text-white peer-data-[active=true]/menu-button:text-white',
       'peer-data-[size=sm]/menu-button:text-xs',
       'peer-data-[size=default]/menu-button:text-xs',

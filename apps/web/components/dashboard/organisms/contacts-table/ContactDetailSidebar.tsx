@@ -255,15 +255,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           <div className='space-y-2'>
             <Label className='text-xs text-secondary-token'>Contact type</Label>
             <Select value={contact.role} onValueChange={handleRoleChange}>
-              <SelectTrigger className='h-9 text-xs rounded-lg border border-subtle bg-white px-3'>
+              <SelectTrigger className='h-9 text-xs rounded-lg border border-subtle bg-surface-1 px-3'>
                 <SelectValue>{roleLabel}</SelectValue>
               </SelectTrigger>
-              <SelectContent className='rounded-lg border border-subtle bg-white shadow-lg p-1'>
+              <SelectContent className='rounded-lg border border-subtle bg-surface-1 shadow-lg p-1'>
                 {CONTACT_ROLE_OPTIONS.map(option => (
                   <SelectItem
                     key={option.value}
                     value={option.value}
-                    className='rounded-md px-2.5 py-2 text-sm font-medium text-secondary-token data-highlighted:bg-[#f2f2f2] data-highlighted:text-primary-token'
+                    className='rounded-md px-2.5 py-2 text-sm font-medium text-secondary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token'
                   >
                     <div className='flex items-center gap-2'>
                       <Icon

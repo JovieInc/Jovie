@@ -66,8 +66,8 @@ export function initWebVitals(onMetric?: MetricHandler) {
 
 /**
  * Send Web Vitals metrics to analytics
- * Note: We only send to Statsig via track() - Vercel Analytics SpeedInsights
- * was removed to reduce analytics costs. Do NOT add duplicate sending here.
+ * Vercel Analytics handles pageviews; this streams vitals to our own track()
+ * helper for lightweight monitoring. Do NOT add duplicate destinations here.
  */
 function sendToAnalytics(metric: Metric) {
   // Normalize the metric name to lowercase for consistency
@@ -83,7 +83,7 @@ function sendToAnalytics(metric: Metric) {
     rating: getRating(name, metric.value),
   };
 
-  // Send to Statsig via our analytics utility (single destination)
+  // Send via our analytics utility (single destination)
   track(`web_vital_${name}`, payload);
 }
 

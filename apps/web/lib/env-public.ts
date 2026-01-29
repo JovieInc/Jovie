@@ -31,9 +31,6 @@ export const publicEnv = {
   get NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN() {
     return process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN || 'jov.ie';
   },
-  get NEXT_PUBLIC_STATSIG_CLIENT_KEY() {
-    return process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY || undefined;
-  },
   get NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY() {
     return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || undefined;
   },
