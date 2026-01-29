@@ -12,9 +12,10 @@ import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 import { formatActionLabel, resolveAudienceActionIcon } from './utils';
 
-interface AudienceMemberActionsProps {
-  member: AudienceMember;
-}
+interface AudienceMemberActionsProps
+  extends Readonly<{
+    member: AudienceMember;
+  }> {}
 
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   if (member.latestActions.length === 0) {

@@ -5,15 +5,16 @@ import { cn } from '@/lib/utils';
 
 export type LogoVariant = 'word' | 'wordAlt' | 'icon' | 'full' | 'fullAlt';
 
-interface LogoProps {
-  className?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  variant?: LogoVariant;
-  tone?: BrandLogoTone;
-  priority?: boolean;
-  'aria-hidden'?: boolean;
-  'data-testid'?: string;
-}
+interface LogoProps
+  extends Readonly<{
+    className?: string;
+    size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    variant?: LogoVariant;
+    tone?: BrandLogoTone;
+    priority?: boolean;
+    'aria-hidden'?: boolean;
+    'data-testid'?: string;
+  }> {}
 
 export function Logo({
   className,
