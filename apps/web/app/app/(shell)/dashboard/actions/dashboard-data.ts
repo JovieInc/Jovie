@@ -43,44 +43,58 @@ function truncateString(value: string, maxLength: number): string {
   return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
+function trySerialize(value: unknown): string | null {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+function serializeErrorObject(error: Error): string {
+  return (
+    trySerialize({
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    }) ??
+    trySerialize({
+      message: String(error.message),
+      name: error.name,
+    }) ??
+    String(error)
+  );
+}
+
+function serializePlainObject(
+  obj: Record<string, unknown>,
+  error: unknown
+): string {
+  return (
+    trySerialize({
+      message: typeof obj.message === 'string' ? obj.message : undefined,
+      code: typeof obj.code === 'string' ? obj.code : undefined,
+      name: typeof obj.name === 'string' ? obj.name : undefined,
+      cause: obj.cause,
+    }) ??
+    trySerialize({
+      message: typeof obj.message === 'string' ? obj.message : String(error),
+      name: typeof obj.name === 'string' ? obj.name : undefined,
+    }) ??
+    String(error)
+  );
+}
+
 function safeSerializeError(error: unknown): string {
   if (error instanceof Error) {
-    try {
-      return JSON.stringify({
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    } catch {
-      return JSON.stringify({
-        message: String(error.message),
-        name: error.name,
-      });
-    }
+    return serializeErrorObject(error);
   }
 
   if (typeof error === 'object' && error !== null) {
-    const obj = error as Record<string, unknown>;
-    try {
-      return JSON.stringify({
-        message: typeof obj.message === 'string' ? obj.message : undefined,
-        code: typeof obj.code === 'string' ? obj.code : undefined,
-        name: typeof obj.name === 'string' ? obj.name : undefined,
-        cause: obj.cause,
-      });
-    } catch {
-      return JSON.stringify({
-        message: typeof obj.message === 'string' ? obj.message : String(error),
-        name: typeof obj.name === 'string' ? obj.name : undefined,
-      });
-    }
+    return serializePlainObject(error as Record<string, unknown>, error);
   }
 
-  try {
-    return JSON.stringify({ value: String(error) });
-  } catch {
-    return String(error);
-  }
+  return trySerialize({ value: String(error) }) ?? String(error);
 }
 
 /**
