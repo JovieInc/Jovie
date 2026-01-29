@@ -4,18 +4,19 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 
-export interface AdminCreatorsFooterProps {
-  page: number;
-  totalPages: number;
-  from: number;
-  to: number;
-  total: number;
-  pageSize: number;
-  canPrev: boolean;
-  canNext: boolean;
-  prevHref: string | null | undefined;
-  nextHref: string | null | undefined;
-}
+export interface AdminCreatorsFooterProps
+  extends Readonly<{
+    page: number;
+    totalPages: number;
+    from: number;
+    to: number;
+    total: number;
+    pageSize: number;
+    canPrev: boolean;
+    canNext: boolean;
+    prevHref: string | null | undefined;
+    nextHref: string | null | undefined;
+  }> {}
 
 export function AdminCreatorsFooter({
   page,
