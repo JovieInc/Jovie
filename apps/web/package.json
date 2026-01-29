@@ -167,6 +167,7 @@
     "sharp": "^0.34.5",
     "simple-icons": "^16.1.0",
     "sonner": "^2.0.7",
+    "statsig-node": "^6.5.1",
     "stripe": "^20.1.2",
     "svix": "^1.84.1",
     "tailwind-merge": "^3.3.1",
