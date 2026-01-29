@@ -5,14 +5,15 @@ import { flexRender } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
 import { cn, iconColors } from '../table.styles';
 
-interface TableHeaderCellProps<TData> {
-  header: Header<TData, unknown>;
-  canSort: boolean;
-  sortDirection: false | 'asc' | 'desc';
-  stickyHeaderClass: string;
-  tableHeaderClass: string;
-  onToggleSort?: (event: unknown) => void;
-}
+interface TableHeaderCellProps<TData>
+  extends Readonly<{
+    header: Header<TData, unknown>;
+    canSort: boolean;
+    sortDirection: false | 'asc' | 'desc';
+    stickyHeaderClass: string;
+    tableHeaderClass: string;
+    onToggleSort?: (event: unknown) => void;
+  }> {}
 
 /**
  * TableHeaderCell - Reusable table header cell component

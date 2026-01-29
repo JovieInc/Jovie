@@ -2,14 +2,15 @@ import { Footer as FooterOrganism } from '@/components/organisms/footer-module';
 
 type FooterVersion = 1 | 2 | 'minimal' | 'regular';
 
-interface SiteFooterProps {
-  version?: FooterVersion;
-  className?: string;
-  brandingMark?: 'wordmark' | 'icon';
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
-  themeShortcutKey?: string;
-  showThemeToggle?: boolean;
-}
+interface SiteFooterProps
+  extends Readonly<{
+    version?: FooterVersion;
+    className?: string;
+    brandingMark?: 'wordmark' | 'icon';
+    containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
+    themeShortcutKey?: string;
+    showThemeToggle?: boolean;
+  }> {}
 
 export function Footer({
   version,
