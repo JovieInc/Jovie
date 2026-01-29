@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { usePollingManager } from '@/lib/hooks/usePollingManager';
 import {
   useAcceptSuggestionMutation,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
+import { updateCreatorAvatarAsAdmin } from '@/app/app/(shell)/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 

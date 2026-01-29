@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
-import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { Range } from './types';

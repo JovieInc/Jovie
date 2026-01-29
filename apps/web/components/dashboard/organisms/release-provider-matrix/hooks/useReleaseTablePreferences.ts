@@ -32,30 +32,30 @@ const ALWAYS_VISIBLE_COLUMNS = ['select', 'release', 'actions'];
 const DEFAULT_DESKTOP_VISIBILITY: ColumnVisibility = {
   releaseType: false, // Moved into release cell
   availability: false, // Hidden for now - accessible via context menu
-  smartLink: false, // Hide - accessible via context menu
-  stats: true, // Combined: year, popularity icon, duration
-  upc: false, // Hide - accessible via context menu
-  primaryIsrc: false, // Hide - accessible via context menu
+  smartLink: true,
+  genres: true,
+  upc: true,
+  stats: true,
 };
 
 /** Default column visibility for tablet (768-1024px) */
 const DEFAULT_TABLET_VISIBILITY: ColumnVisibility = {
   releaseType: false,
   availability: false,
-  smartLink: false,
+  smartLink: true,
+  genres: true,
+  upc: true,
   stats: true,
-  upc: false,
-  primaryIsrc: false,
 };
 
 /** Default column visibility for mobile (<768px) */
 const DEFAULT_MOBILE_VISIBILITY: ColumnVisibility = {
   releaseType: false,
   availability: false,
-  smartLink: false,
+  smartLink: true,
+  genres: true,
+  upc: true,
   stats: true,
-  upc: false,
-  primaryIsrc: false,
 };
 
 export interface ReleaseTablePreset {

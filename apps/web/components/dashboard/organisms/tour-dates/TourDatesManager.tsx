@@ -7,7 +7,7 @@ import {
   type BandsintownConnectionStatus,
   loadTourDates,
   type TourDateViewModel,
-} from '@/app/app/dashboard/tour-dates/actions';
+} from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
   useDeleteTourDateMutation,

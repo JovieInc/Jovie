@@ -11,7 +11,7 @@ const adminActionsMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/entitlements/server', () => entitlementsMock);
-vi.mock('@/app/admin/actions', () => adminActionsMock);
+vi.mock('@/app/app/(shell)/admin/actions', () => adminActionsMock);
 
 describe('POST /api/admin/creator-avatar', () => {
   const { getCurrentUserEntitlements } = entitlementsMock;

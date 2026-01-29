@@ -46,7 +46,7 @@ vi.mock('@/lib/db/schema', () => ({
 }));
 
 // Import after mocks are set up
-import { POST } from '@/app/app/admin/waitlist/approve/route';
+import { POST } from '@/app/app/(shell)/admin/waitlist/approve/route';
 
 describe('Admin Waitlist Approve API', () => {
   const mockMessage = { id: 'test', subject: 'Welcome' };

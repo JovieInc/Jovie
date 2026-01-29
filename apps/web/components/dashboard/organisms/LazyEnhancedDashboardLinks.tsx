@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 
 const LAZY_ENHANCED_DASHBOARD_LINKS_LOADING_KEYS = Array.from(
   { length: 4 },
