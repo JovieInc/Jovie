@@ -28,7 +28,7 @@ const TIKTOK_CONFIG: StrategyConfig = {
   defaultTimeoutMs: 10000,
 } as const;
 
-const SKIP_HOSTS = new Set(TIKTOK_CONFIG.validHosts);
+const SKIP_HOSTS = new Set(['tiktok.com', 'www.tiktok.com', 'm.tiktok.com']);
 
 function extractHandleFromPath(pathname: string): string | null {
   const parts = pathname.split('/').filter(Boolean);
@@ -75,11 +75,9 @@ export async function fetchTikTokDocument(
     throw new ExtractionError('Invalid TikTok profile URL', 'INVALID_URL');
   }
 
-  const timeoutMs = options?.timeoutMs ?? TIKTOK_CONFIG.defaultTimeoutMs;
-
   const { html } = await fetchDocument(validated, {
     ...options,
-    timeoutMs,
+    timeoutMs: TIKTOK_CONFIG.defaultTimeoutMs,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
       ...(options?.headers ?? {}),

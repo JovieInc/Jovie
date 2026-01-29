@@ -25,7 +25,7 @@ const INSTAGRAM_CONFIG: StrategyConfig = {
   defaultTimeoutMs: 10000,
 } as const;
 
-const SKIP_HOSTS = new Set(INSTAGRAM_CONFIG.validHosts);
+const SKIP_HOSTS = new Set(['instagram.com', 'www.instagram.com']);
 
 export function isInstagramUrl(url: string): boolean {
   return validatePlatformUrl(url, INSTAGRAM_CONFIG).valid;
