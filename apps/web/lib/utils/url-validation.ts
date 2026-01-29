@@ -8,7 +8,7 @@ const PRIVATE_IP_PATTERNS = [
   // IPv4 private ranges
   /^127\./, // Loopback
   /^10\./, // Class A private
-  /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private
+  /^172\.(1[6-9]|2\d|3[0-1])\./, // Class B private
   /^192\.168\./, // Class C private
   /^169\.254\./, // Link-local
   /^0\./, // Current network
@@ -17,7 +17,7 @@ const PRIVATE_IP_PATTERNS = [
   /^fc[0-9a-f]{2}:/i, // Unique local
   /^fd[0-9a-f]{2}:/i, // Unique local
   /^fe80:/i, // Link-local
-  /^::ffff:(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/i, // IPv4-mapped
+  /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.|192\.168\.)/i, // IPv4-mapped
 ];
 
 // Blocked hostnames
