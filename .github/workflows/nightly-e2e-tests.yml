@@ -91,6 +91,23 @@ jobs:
           path: apps/web/test-results/
           retention-days: 7
 
+      - name: Cleanup Neon branch
+        if: always()
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_NAME: nightly-e2e-${{ github.run_id }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "Neon credentials missing; skipping branch cleanup." >&2
+            exit 0
+          fi
+
+          echo "Deleting Neon branch '$BRANCH_NAME' for nightly run ${{ github.run_id }}..."
+          pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
+            echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
+          }
+
   notify:
     name: Notify Results
     needs: [nightly-e2e]
