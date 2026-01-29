@@ -92,7 +92,14 @@ function getDateRangeFilter(range: DateRange): Date | null {
   if (range === 'all') return null;
 
   const now = new Date();
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
+  let days: number;
+  if (range === '7d') {
+    days = 7;
+  } else if (range === '30d') {
+    days = 30;
+  } else {
+    days = 90;
+  }
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 }
 
