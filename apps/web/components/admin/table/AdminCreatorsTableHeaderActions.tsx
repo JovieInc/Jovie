@@ -50,7 +50,7 @@ export function AdminCreatorsTableHeaderActions({
         className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
         disabled={!tableMeta.toggle}
       >
-        <DrawerIcon className='h-4 w-4' />
+        <DrawerIcon className='h-3.5 w-3.5' />
       </Button>
     </div>
   );

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 
-import { PageShell } from '@/components/organisms/PageShell';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 const InviteCampaignManager = dynamic(
   () =>
@@ -28,7 +28,7 @@ export const runtime = 'nodejs';
 export default function AdminCampaignsPage() {
   return (
     <PageShell>
-      <div className='mx-auto max-w-4xl px-4 py-8'>
+      <PageContent className='mx-auto max-w-4xl'>
         <div className='mb-8'>
           <h1 className='text-2xl font-bold text-primary-token'>
             Invite Campaigns
@@ -40,7 +40,7 @@ export default function AdminCampaignsPage() {
         </div>
 
         <InviteCampaignManager />
-      </div>
+      </PageContent>
     </PageShell>
   );
 }

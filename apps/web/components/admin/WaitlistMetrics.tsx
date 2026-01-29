@@ -25,7 +25,7 @@ function MetricCard({
           bgClass
         )}
       >
-        <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', colorClass)} />
+        <Icon className={cn('h-3.5 w-3.5 sm:h-5 sm:w-5', colorClass)} />
       </div>
       <div className='min-w-0'>
         <p className='text-xs text-tertiary-token uppercase tracking-wide'>

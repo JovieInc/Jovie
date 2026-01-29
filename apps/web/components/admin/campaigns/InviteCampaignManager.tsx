@@ -123,7 +123,7 @@ export function InviteCampaignManager() {
           {isLoadingStats && (
             <Icon
               name='Loader2'
-              className='h-4 w-4 animate-spin text-secondary-token'
+              className='h-3.5 w-3.5 animate-spin text-secondary-token'
             />
           )}
         </div>
@@ -376,7 +376,7 @@ export function InviteCampaignManager() {
         <div className='mt-4 flex items-start gap-2 rounded-lg bg-amber-500/10 px-4 py-3'>
           <Icon
             name='AlertTriangle'
-            className='h-4 w-4 text-amber-600 mt-0.5'
+            className='h-3.5 w-3.5 text-amber-600 mt-0.5'
           />
           <p className='text-xs text-amber-700 dark:text-amber-400'>
             Delays are randomized between min and max to appear human-like. Stay
@@ -396,9 +396,9 @@ export function InviteCampaignManager() {
             disabled={isLoadingPreview}
           >
             {isLoadingPreview ? (
-              <Icon name='Loader2' className='h-4 w-4 animate-spin' />
+              <Icon name='Loader2' className='h-3.5 w-3.5 animate-spin' />
             ) : (
-              <Icon name='RefreshCw' className='h-4 w-4' />
+              <Icon name='RefreshCw' className='h-3.5 w-3.5' />
             )}
             <span className='ml-2'>Refresh</span>
           </Button>
@@ -406,7 +406,7 @@ export function InviteCampaignManager() {
 
         {error && (
           <div className='mb-4 flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3'>
-            <Icon name='XCircle' className='h-4 w-4 text-destructive' />
+            <Icon name='XCircle' className='h-3.5 w-3.5 text-destructive' />
             <p className='text-sm text-destructive'>{error}</p>
           </div>
         )}
@@ -495,7 +495,7 @@ export function InviteCampaignManager() {
           <div className='mb-4 flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3'>
             <Icon
               name='CheckCircle'
-              className='h-4 w-4 text-green-600 dark:text-green-400'
+              className='h-3.5 w-3.5 text-green-600 dark:text-green-400'
             />
             <div>
               <p className='text-sm font-medium text-green-700 dark:text-green-300'>
@@ -521,12 +521,15 @@ export function InviteCampaignManager() {
           >
             {sendInvitesMutation.isPending ? (
               <>
-                <Icon name='Loader2' className='mr-2 h-4 w-4 animate-spin' />
+                <Icon
+                  name='Loader2'
+                  className='mr-2 h-3.5 w-3.5 animate-spin'
+                />
                 Sending...
               </>
             ) : (
               <>
-                <Icon name='Send' className='mr-2 h-4 w-4' />
+                <Icon name='Send' className='mr-2 h-3.5 w-3.5' />
                 Send {preview?.sample.withEmails ?? 0} Invites
               </>
             )}
@@ -568,7 +571,7 @@ export function InviteCampaignManager() {
             <div className='flex items-start gap-2'>
               <Icon
                 name='AlertTriangle'
-                className='h-4 w-4 text-amber-600 mt-0.5'
+                className='h-3.5 w-3.5 text-amber-600 mt-0.5'
               />
               <p className='text-xs text-amber-700 dark:text-amber-400'>
                 This action cannot be undone. Emails will be queued and sent

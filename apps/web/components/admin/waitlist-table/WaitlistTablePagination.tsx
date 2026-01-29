@@ -41,7 +41,7 @@ export function WaitlistTablePagination({
             aria-disabled={!canPrev}
             aria-label='Previous page'
           >
-            <ChevronLeft className='h-4 w-4 sm:hidden' />
+            <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
             <span className='hidden sm:inline'>Previous</span>
           </Link>
         </Button>
@@ -57,7 +57,7 @@ export function WaitlistTablePagination({
             aria-disabled={!canNext}
             aria-label='Next page'
           >
-            <ChevronRight className='h-4 w-4 sm:hidden' />
+            <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
             <span className='hidden sm:inline'>Next</span>
           </Link>
         </Button>

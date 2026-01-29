@@ -41,7 +41,7 @@ export function TableRowActions({
         title='Refresh ingest data'
       >
         <RefreshCw
-          className={cn('h-4 w-4', isRefreshLoading && 'animate-spin')}
+          className={cn('h-3.5 w-3.5', isRefreshLoading && 'animate-spin')}
         />
       </Button>
 
@@ -60,7 +60,7 @@ export function TableRowActions({
         aria-label={isClaimed ? 'Claimed' : 'Not claimed'}
         title={isClaimed ? 'Claimed' : 'Not claimed'}
       >
-        <Star className={cn('h-4 w-4', isClaimed && 'fill-current')} />
+        <Star className={cn('h-3.5 w-3.5', isClaimed && 'fill-current')} />
       </Button>
 
       {/* Verified toggle button */}
@@ -96,7 +96,10 @@ export function TableRowActions({
         }
       >
         <BadgeCheck
-          className={cn('h-4 w-4', isVerificationLoading && 'animate-pulse')}
+          className={cn(
+            'h-3.5 w-3.5',
+            isVerificationLoading && 'animate-pulse'
+          )}
         />
       </Button>
     </div>
