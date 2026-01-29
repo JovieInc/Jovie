@@ -107,48 +107,29 @@ async function getProcessingHostCounts(
   }, new Map<string, number>());
 }
 
+const JOB_TYPE_TO_SCHEMA_MAP = {
+  import_linktree: linktreePayloadSchema,
+  import_laylo: layloPayloadSchema,
+  import_youtube: youtubePayloadSchema,
+  import_beacons: beaconsPayloadSchema,
+  import_instagram: instagramPayloadSchema,
+  import_tiktok: tiktokPayloadSchema,
+  import_twitter: twitterPayloadSchema,
+  send_claim_invite: sendClaimInvitePayloadSchema,
+} as const;
+
 /**
  * Extract creator profile ID from a job based on its type.
  */
 export function getCreatorProfileIdFromJob(
   job: typeof ingestionJobs.$inferSelect
 ): string | null {
-  switch (job.jobType) {
-    case 'import_linktree': {
-      const parsed = linktreePayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_laylo': {
-      const parsed = layloPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_youtube': {
-      const parsed = youtubePayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_beacons': {
-      const parsed = beaconsPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_instagram': {
-      const parsed = instagramPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_tiktok': {
-      const parsed = tiktokPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_twitter': {
-      const parsed = twitterPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'send_claim_invite': {
-      const parsed = sendClaimInvitePayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    default:
-      return null;
-  }
+  const schema =
+    JOB_TYPE_TO_SCHEMA_MAP[job.jobType as keyof typeof JOB_TYPE_TO_SCHEMA_MAP];
+  if (!schema) return null;
+
+  const parsed = schema.safeParse(job.payload);
+  return parsed.success ? parsed.data.creatorProfileId : null;
 }
 
 /**
