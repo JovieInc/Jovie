@@ -33,9 +33,15 @@ async function processChangelogMarkdown(): Promise<string> {
     );
   }
 
-  const fileContents = fs.readFileSync(changelogPath, 'utf8');
-  const processedContent = await remark().use(html).process(fileContents);
-  return DOMPurify.sanitize(processedContent.toString());
+  try {
+    const fileContents = fs.readFileSync(changelogPath, 'utf8');
+    const processedContent = await remark().use(html).process(fileContents);
+    return DOMPurify.sanitize(processedContent.toString());
+  } catch {
+    return DOMPurify.sanitize(
+      '<h2>Changelog unavailable</h2><p>Please check back soon.</p>'
+    );
+  }
 }
 
 /**

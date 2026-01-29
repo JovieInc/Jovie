@@ -1,7 +1,9 @@
 'use client';
 
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+
 export const env = {
-  NODE_ENV: process.env.NODE_ENV ?? 'development',
-  IS_DEV: (process.env.NODE_ENV ?? 'development') === 'development',
-  IS_TEST: process.env.NODE_ENV === 'test',
+  NODE_ENV: nodeEnv,
+  IS_DEV: nodeEnv === 'development',
+  IS_TEST: nodeEnv === 'test',
 } as const;

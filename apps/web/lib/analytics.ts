@@ -1,5 +1,6 @@
 'use client';
 
+import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 
 type AnalyticsWindow = Window & {
@@ -26,7 +27,7 @@ function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
     }
     return 'preview';
   } catch {
-    return process.env.NODE_ENV === 'development' ? 'dev' : 'prod';
+    return env.IS_DEV ? 'dev' : 'prod';
   }
 }
 

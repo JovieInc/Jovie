@@ -266,6 +266,9 @@ export const creatorProfileAttributes = pgTable(
     creatorProfileAttributesProfileIdx: index(
       'idx_creator_profile_attributes_profile_id'
     ).on(table.creatorProfileId, table.createdAt),
+    creatorProfileAttributesUnique: uniqueIndex(
+      'idx_creator_profile_attributes_unique'
+    ).on(table.creatorProfileId, table.sourcePlatform, table.displayName, table.bio),
   })
 );
 

@@ -75,9 +75,11 @@ export async function fetchTikTokDocument(
     throw new ExtractionError('Invalid TikTok profile URL', 'INVALID_URL');
   }
 
+  const timeoutMs = options?.timeoutMs ?? TIKTOK_CONFIG.defaultTimeoutMs;
+
   const { html } = await fetchDocument(validated, {
     ...options,
-    timeoutMs: TIKTOK_CONFIG.defaultTimeoutMs,
+    timeoutMs,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
       ...(options?.headers ?? {}),
