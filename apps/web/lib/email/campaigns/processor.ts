@@ -221,7 +221,7 @@ async function getClaimInviteData(subjectId: string): Promise<{
     .orderBy(sql`${creatorClaimInvites.sentAt} DESC`)
     .limit(1);
 
-  if (!invite || !invite.claimToken) {
+  if (!invite?.claimToken) {
     return null;
   }
 
@@ -313,7 +313,7 @@ async function processEnrollment(
 ) {
   try {
     const sequence = sequenceMap.get(enrollment.campaignSequenceId);
-    if (!sequence || sequence.isActive !== 'true') {
+    if (sequence?.isActive !== 'true') {
       await stopEnrollment(enrollment.id, 'campaign_inactive', now);
       result.stopped++;
       return;

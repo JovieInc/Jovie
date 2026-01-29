@@ -13,7 +13,7 @@ import { logger } from '@/lib/utils/logger';
  * Common email regex pattern
  * Matches most valid email addresses while avoiding false positives
  */
-const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi;
+const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi;
 
 /**
  * Obfuscation patterns used by creators to prevent scraping
