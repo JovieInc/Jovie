@@ -197,11 +197,11 @@ export async function downloadImage(
     .toLowerCase();
 
   if (!contentTypeHeader) {
-    throw new Error('Unsupported image content type');
+    throw new TypeError('Unsupported image content type');
   }
 
   if (!SUPPORTED_IMAGE_MIME_TYPES_SET.has(contentTypeHeader)) {
-    throw new Error('Unsupported image content type');
+    throw new TypeError('Unsupported image content type');
   }
 
   const contentType = contentTypeHeader as SupportedImageMimeType;
