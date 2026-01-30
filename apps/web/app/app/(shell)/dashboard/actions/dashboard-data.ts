@@ -15,8 +15,8 @@ import {
   unstable_cache as unstableCache,
 } from 'next/cache';
 import { cache } from 'react';
-import { withDbSessionTx } from '@/lib/auth/session';
-import { type DbOrTransaction, sqlAny } from '@/lib/db';
+import { setupDbSession } from '@/lib/auth/session';
+import { db, sqlAny } from '@/lib/db';
 import {
   type CreatorProfile,
   clickEvents,
@@ -130,20 +130,19 @@ export interface DashboardData {
  * link counts, and tipping statistics. It handles migration-related errors
  * gracefully by treating them as "needs onboarding" states.
  *
- * @param dbClient - Database client (transaction) to use for queries
  * @param clerkUserId - Clerk user ID for the current user
  * @returns Dashboard data without isAdmin (added by caller)
  */
 type ChromeData = Omit<DashboardData, 'isAdmin' | 'tippingStats'>;
 
 async function fetchChromeDataWithSession(
-  dbClient: DbOrTransaction,
   clerkUserId: string
 ): Promise<ChromeData> {
-  // All queries run inside a transaction to keep the RLS session variable set
+  // Set up RLS session for all queries
+  await setupDbSession(clerkUserId);
   try {
     // First check if user exists in users table
-    const [userData] = await dbClient
+    const [userData] = await db
       .select({ id: users.id })
       .from(users)
       .where(eq(users.clerkId, clerkUserId))
@@ -163,7 +162,7 @@ async function fetchChromeDataWithSession(
     }
 
     // Now that we know user exists, get creator profiles
-    const creatorData = await dbClient
+    const creatorData = await db
       .select()
       .from(creatorProfiles)
       .where(eq(creatorProfiles.userId, userData.id))
@@ -202,7 +201,7 @@ async function fetchChromeDataWithSession(
     // Performance optimization: Single query for both link counts using conditional aggregation
     // This reduces database round trips from 3 to 2 (33% reduction)
     const [settings, linkCounts] = await Promise.all([
-      dbClient
+      db
         .select()
         .from(userSettings)
         .where(eq(userSettings.userId, userData.id))
@@ -227,7 +226,7 @@ async function fetchChromeDataWithSession(
           throw error;
         }),
       // Consolidated link count query - counts all active links and music links in one query
-      dbClient
+      db
         .select({
           totalActive: count(),
           musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
@@ -317,9 +316,11 @@ async function fetchChromeDataWithSession(
 }
 
 async function fetchTippingStatsWithSession(
-  dbClient: DbOrTransaction,
-  profileId: string
+  profileId: string,
+  clerkUserId: string
 ): Promise<TippingStats> {
+  // Set up RLS session for all queries
+  await setupDbSession(clerkUserId);
   try {
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
@@ -327,7 +328,7 @@ async function fetchTippingStatsWithSession(
     const startOfMonthISO = startOfMonth.toISOString();
 
     const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
-      dbClient
+      db
         .select({
           totalReceived: drizzleSql`
             COALESCE(SUM(${tips.amountCents}), 0)
@@ -350,7 +351,7 @@ async function fetchTippingStatsWithSession(
         })
         .from(tips)
         .where(eq(tips.creatorProfileId, profileId)),
-      dbClient
+      db
         .select({
           total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
           qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
@@ -426,11 +427,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       tippingStats = await Sentry.startSpan(
         { op: 'task', name: 'dashboard.getTippingStats' },
         async () =>
-          withDbSessionTx(
-            async tx =>
-              fetchTippingStatsWithSession(tx, chromeData.selectedProfile!.id),
-            { clerkUserId: userId }
-          )
+          fetchTippingStatsWithSession(chromeData.selectedProfile!.id, userId)
       );
     }
 
@@ -459,10 +456,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
 }
 
 const getCachedChromeData = unstableCache(
-  async (clerkUserId: string) =>
-    withDbSessionTx(async tx => fetchChromeDataWithSession(tx, clerkUserId), {
-      clerkUserId,
-    }),
+  async (clerkUserId: string) => fetchChromeDataWithSession(clerkUserId),
   ['dashboard-chrome'],
   { revalidate: 30 }
 );
