@@ -116,7 +116,7 @@ export async function copyAvatarToBlob(
     }
 
     if (arrayBuffer.byteLength > AVATAR_MAX_FILE_SIZE_BYTES) {
-      throw new Error('Avatar exceeds max size');
+      throw new RangeError('Avatar exceeds max size');
     }
     const buffer = Buffer.from(arrayBuffer);
 

@@ -66,7 +66,7 @@ export async function syncClerkProfile({
 
       const arrayBuffer = await avatarResponse.arrayBuffer();
       if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
-        throw new Error('Avatar file size exceeds 5MB limit');
+        throw new RangeError('Avatar file size exceeds 5MB limit');
       }
 
       const blob = new Blob([arrayBuffer], { type: contentType });

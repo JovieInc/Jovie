@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { type ModelMessage, streamText } from 'ai';
 import { NextResponse } from 'next/server';
+import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 
 export const maxDuration = 30;
@@ -159,11 +160,27 @@ function buildSystemPrompt(context: ArtistContext): string {
 - Be encouraging but realistic`;
 }
 
+/**
+ * OPTIONS - CORS preflight handler
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...CORS_HEADERS,
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 export async function POST(req: Request) {
   // Auth check - ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: CORS_HEADERS }
+    );
   }
 
   // Rate limiting - protect Anthropic API costs
@@ -179,7 +196,10 @@ export async function POST(req: Request) {
       },
       {
         status: 429,
-        headers: createRateLimitHeaders(rateLimitResult),
+        headers: {
+          ...CORS_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
       }
     );
   }
@@ -189,7 +209,10 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Invalid JSON body' },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   const { messages, artistContext } = body;
@@ -198,14 +221,17 @@ export async function POST(req: Request) {
   if (!artistContext || typeof artistContext !== 'object') {
     return NextResponse.json(
       { error: 'Missing or invalid artist context' },
-      { status: 400 }
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
   // Validate messages array and individual messages
   const messagesError = validateMessagesArray(messages);
   if (messagesError) {
-    return NextResponse.json({ error: messagesError }, { status: 400 });
+    return NextResponse.json(
+      { error: messagesError },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   // After validation, we know messages is a valid ModelMessage array
@@ -219,7 +245,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(
       { error: 'AI chat is not configured. Please contact support.' },
-      { status: 503 }
+      { status: 503, headers: CORS_HEADERS }
     );
   }
 
@@ -247,7 +273,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { error: 'Failed to process chat request', message },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
