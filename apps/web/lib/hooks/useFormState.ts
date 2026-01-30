@@ -580,7 +580,7 @@ export function useFormState(
           isRetrying: false,
         }));
 
-        let lastError: Error | unknown;
+        let lastError: unknown;
 
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
           try {

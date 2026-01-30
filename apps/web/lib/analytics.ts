@@ -69,13 +69,13 @@ export type FeatureFlagName =
 
 // Lightweight feature flag helpers (client-only)
 // Use defaultValue for safe rendering before flags load
-export function isFeatureEnabled(_flag: FeatureFlagName | string): boolean {
+export function isFeatureEnabled(_flag: string): boolean {
   void _flag;
   return false;
 }
 
 export function useFeatureFlag(
-  _flag: FeatureFlagName | string,
+  _flag: string,
   defaultValue: boolean = false
 ): boolean {
   void _flag;
@@ -84,7 +84,7 @@ export function useFeatureFlag(
 
 // Hook with loading state to prevent flash of content
 export function useFeatureFlagWithLoading(
-  _flag: FeatureFlagName | string,
+  _flag: string,
   defaultValue: boolean = false
 ): { enabled: boolean; loading: boolean } {
   void _flag;
