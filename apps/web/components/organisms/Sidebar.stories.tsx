@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import {
   Sidebar,
   SidebarContent,

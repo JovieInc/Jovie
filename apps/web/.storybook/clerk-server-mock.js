@@ -51,8 +51,29 @@ const mockAuth = {
 const auth = () => Promise.resolve(mockAuth);
 const currentUser = () => Promise.resolve(mockUser);
 
+// Mock clerkClient for server-side operations
+const clerkClient = {
+  users: {
+    getUser: () => Promise.resolve(mockUser),
+    updateUser: () => Promise.resolve(mockUser),
+    deleteUser: () => Promise.resolve(),
+  },
+};
+
+// Mock error handling utilities from @clerk/nextjs/errors
+const isClerkAPIResponseError = () => false;
+
+// Mock clerkMiddleware for proxy.ts
+const clerkMiddleware = () => (req, res, next) => next?.();
+
 // Export all server-side functions using ES modules for consistency
-export { auth, currentUser };
+export {
+  auth,
+  currentUser,
+  clerkClient,
+  isClerkAPIResponseError,
+  clerkMiddleware,
+};
 
 // Also provide default export for compatibility
 export default {
