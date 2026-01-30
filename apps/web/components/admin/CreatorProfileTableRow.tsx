@@ -226,6 +226,9 @@ function CreatorProfileTableRowComponent({
           onKeyDown={event =>
             handleActivationKeyDown(event, e => e.stopPropagation())
           }
+          role='button'
+          tabIndex={-1}
+          aria-label='Checkbox container'
         >
           <span
             className={cn(
