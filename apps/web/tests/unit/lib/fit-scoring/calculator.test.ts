@@ -45,6 +45,9 @@ describe('Fit Score Calculator', () => {
           spotifyPopularity: 0,
           releaseRecency: 0,
           genreMatch: 0,
+          hasAlternativeDsp: 0,
+          multiDspPresence: 0,
+          hasContactEmail: 0,
           meta: {
             calculatedAt: expect.any(String),
             version: FIT_SCORE_VERSION,
@@ -412,6 +415,124 @@ describe('Fit Score Calculator', () => {
       });
     });
 
+    describe('alternative DSP scoring (+10 points)', () => {
+      it('should award 10 points for Apple Music when no Spotify', () => {
+        const result = calculateFitScore({
+          hasAppleMusicId: true,
+          hasSpotifyId: false,
+        });
+        expect(result.breakdown.hasAlternativeDsp).toBe(
+          SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP
+        );
+      });
+
+      it('should award 10 points for SoundCloud when no Spotify', () => {
+        const result = calculateFitScore({
+          hasSoundCloudId: true,
+          hasSpotifyId: false,
+        });
+        expect(result.breakdown.hasAlternativeDsp).toBe(
+          SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP
+        );
+      });
+
+      it('should not award points if Spotify is present', () => {
+        const result = calculateFitScore({
+          hasAppleMusicId: true,
+          hasSoundCloudId: true,
+          hasSpotifyId: true,
+        });
+        expect(result.breakdown.hasAlternativeDsp).toBe(0);
+      });
+
+      it('should not award points if no alternative DSP', () => {
+        const result = calculateFitScore({
+          hasAppleMusicId: false,
+          hasSoundCloudId: false,
+          hasSpotifyId: false,
+        });
+        expect(result.breakdown.hasAlternativeDsp).toBe(0);
+      });
+
+      it('should store alternative platforms in meta', () => {
+        const result = calculateFitScore({
+          hasAppleMusicId: true,
+          hasSoundCloudId: true,
+          hasSpotifyId: false,
+        });
+        expect(result.breakdown.meta?.alternativeDspPlatforms).toEqual([
+          'apple_music',
+          'soundcloud',
+        ]);
+      });
+    });
+
+    describe('multi-DSP presence scoring (+5 points)', () => {
+      it('should award 5 points for 3+ DSP platforms', () => {
+        const result = calculateFitScore({
+          dspPlatformCount: 3,
+        });
+        expect(result.breakdown.multiDspPresence).toBe(
+          SCORE_WEIGHTS.MULTI_DSP_PRESENCE
+        );
+      });
+
+      it('should award 5 points for high DSP count', () => {
+        const result = calculateFitScore({
+          dspPlatformCount: 10,
+        });
+        expect(result.breakdown.multiDspPresence).toBe(
+          SCORE_WEIGHTS.MULTI_DSP_PRESENCE
+        );
+      });
+
+      it('should not award points for less than 3 platforms', () => {
+        const result = calculateFitScore({
+          dspPlatformCount: 2,
+        });
+        expect(result.breakdown.multiDspPresence).toBe(0);
+      });
+
+      it('should not award points for null DSP count', () => {
+        const result = calculateFitScore({
+          dspPlatformCount: undefined,
+        });
+        expect(result.breakdown.multiDspPresence).toBe(0);
+      });
+
+      it('should store DSP platform count in meta', () => {
+        const result = calculateFitScore({
+          dspPlatformCount: 5,
+        });
+        expect(result.breakdown.meta?.dspPlatformCount).toBe(5);
+      });
+    });
+
+    describe('contact email scoring (+5 points)', () => {
+      it('should award 5 points for having contact email', () => {
+        const result = calculateFitScore({
+          hasContactEmail: true,
+        });
+        expect(result.breakdown.hasContactEmail).toBe(
+          SCORE_WEIGHTS.HAS_CONTACT_EMAIL
+        );
+      });
+
+      it('should not award points when hasContactEmail is false', () => {
+        const result = calculateFitScore({
+          hasContactEmail: false,
+        });
+        expect(result.breakdown.hasContactEmail).toBe(0);
+      });
+
+      it('should not award points when hasContactEmail is undefined', () => {
+        const result = calculateFitScore({
+          hasContactEmail: undefined,
+        });
+        expect(result.breakdown.hasContactEmail).toBe(0);
+      });
+    });
+
     describe('maximum score calculation', () => {
       it('should calculate maximum score of 90 with all criteria met', () => {
         const input: FitScoreInput = {
@@ -458,7 +579,10 @@ describe('Fit Score Calculator', () => {
           result.breakdown.hasSpotify +
           result.breakdown.spotifyPopularity +
           result.breakdown.releaseRecency +
-          result.breakdown.genreMatch;
+          result.breakdown.genreMatch +
+          (result.breakdown.hasAlternativeDsp ?? 0) +
+          (result.breakdown.multiDspPresence ?? 0) +
+          (result.breakdown.hasContactEmail ?? 0);
 
         expect(result.score).toBe(breakdownSum);
       });
@@ -535,6 +659,9 @@ describe('Fit Score Calculator', () => {
       expect(SCORE_WEIGHTS.RELEASE_RECENCY_6MO).toBe(10);
       expect(SCORE_WEIGHTS.RELEASE_RECENCY_1YR).toBe(5);
       expect(SCORE_WEIGHTS.GENRE_MATCH).toBe(5);
+      expect(SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP).toBe(10);
+      expect(SCORE_WEIGHTS.MULTI_DSP_PRESENCE).toBe(5);
+      expect(SCORE_WEIGHTS.HAS_CONTACT_EMAIL).toBe(5);
     });
 
     it('should have correct version', () => {
@@ -561,7 +688,7 @@ describe('Fit Score Calculator', () => {
       expect(TARGET_GENRES.size).toBeGreaterThan(20);
     });
 
-    it('should have total max score of 90', () => {
+    it('should have total max score of 110', () => {
       const maxScore =
         SCORE_WEIGHTS.USES_LINK_IN_BIO +
         SCORE_WEIGHTS.PAID_TIER +
@@ -569,8 +696,11 @@ describe('Fit Score Calculator', () => {
         SCORE_WEIGHTS.HAS_SPOTIFY +
         SCORE_WEIGHTS.SPOTIFY_POPULARITY_MAX +
         SCORE_WEIGHTS.RELEASE_RECENCY_6MO +
-        SCORE_WEIGHTS.GENRE_MATCH;
-      expect(maxScore).toBe(90);
+        SCORE_WEIGHTS.GENRE_MATCH +
+        SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP +
+        SCORE_WEIGHTS.MULTI_DSP_PRESENCE +
+        SCORE_WEIGHTS.HAS_CONTACT_EMAIL;
+      expect(maxScore).toBe(110);
     });
   });
 });
