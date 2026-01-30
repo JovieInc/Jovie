@@ -91,7 +91,7 @@ export function ReleaseSidebarHeader({
       id: 'open',
       label: 'Open smart link',
       icon: ExternalLink,
-      href: release!.smartLinkPath,
+      href: release.smartLinkPath,
     });
   }
 

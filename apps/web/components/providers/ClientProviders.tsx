@@ -151,10 +151,7 @@ export function ClientProviders({
   }
 
   return (
-    <ClerkProvider
-      publishableKey={publishableKey!}
-      appearance={clerkAppearance}
-    >
+    <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
       <ClerkSafeValuesProvider>
         {wrapWithCoreProviders({
           children,

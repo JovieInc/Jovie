@@ -271,7 +271,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
       alt: computedAlt,
       priority,
       quality,
-      placeholder: placeholder as 'blur' | 'empty',
+      placeholder,
       ...(placeholder === 'blur' && { blurDataURL: defaultBlur }),
       ...(priority && { fetchPriority: 'high' as const }),
       style: {

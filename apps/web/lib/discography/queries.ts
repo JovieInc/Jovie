@@ -407,9 +407,7 @@ export async function upsertProviderLink(
     releaseId: isTrackLink
       ? null
       : (input as UpsertReleaseProviderLinkInput).releaseId,
-    trackId: isTrackLink
-      ? (input as UpsertTrackProviderLinkInput).trackId
-      : null,
+    trackId: isTrackLink ? input.trackId : null,
     url: input.url,
     externalId: input.externalId ?? null,
     sourceType: input.sourceType ?? 'ingested',

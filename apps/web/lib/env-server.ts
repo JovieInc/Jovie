@@ -39,7 +39,7 @@ if (!parsedAtLoad.success && process.env.NODE_ENV === 'development') {
  *
  * Reads values from `process.env` at access time to keep runtime and tests in sync.
  */
-const ENV_KEY_SET = new Set<string>(ENV_KEYS as unknown as readonly string[]);
+const ENV_KEY_SET = new Set<string>(ENV_KEYS);
 
 export const env = new Proxy({} as ServerEnv, {
   get: (_target, prop) => {

@@ -130,7 +130,7 @@ export async function enqueueBulkClaimInviteJobs(
     if (useRandomDelay) {
       // Add random delay to cumulative total
       delayMs = cumulativeDelayMs;
-      cumulativeDelayMs += randomDelay(minDelayMs!, maxDelayMs!);
+      cumulativeDelayMs += randomDelay(minDelayMs, maxDelayMs);
     } else {
       // Use fixed delay
       delayMs = i * fixedDelay;

@@ -146,7 +146,7 @@ export async function fetchWithRedirects(
       const location = res.headers.get('location');
       const isRedirect = res.status >= 300 && res.status < 400 && location;
       if (isRedirect) {
-        const next = new URL(location!, current).toString();
+        const next = new URL(location, current).toString();
         const parsed = new URL(next);
         if (parsed.protocol !== 'https:') {
           throw new Error('Invalid redirect protocol');

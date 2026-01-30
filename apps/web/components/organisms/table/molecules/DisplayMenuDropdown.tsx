@@ -262,7 +262,7 @@ export function DisplayMenuDropdown({
                     columnId={column.id}
                     label={column.label}
                     isVisible={columnVisibility?.[column.id] ?? true}
-                    onToggle={onColumnVisibilityChange!}
+                    onToggle={onColumnVisibilityChange}
                   />
                 ))}
               </div>

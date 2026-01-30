@@ -112,7 +112,7 @@ export function ContactSidebarHeader({
       id: 'open',
       label: 'Open profile',
       icon: ExternalLink,
-      href: `/${contact!.username}`,
+      href: `/${contact.username}`,
     });
   }
 

@@ -129,7 +129,7 @@ export function AudienceTableHeader({
                 {isSortable ? (
                   <SortableHeaderButton
                     label={column.label}
-                    direction={activeDirection as 'asc' | 'desc' | undefined}
+                    direction={activeDirection}
                     onClick={() => onSortChange(sortKey as unknown as string)}
                   />
                 ) : (
