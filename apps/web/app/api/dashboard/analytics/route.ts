@@ -12,7 +12,8 @@ type CacheEntry = {
   expiresAt: number;
 };
 
-const TTL_MS = 5_000;
+// Cache TTL matches client-side staleTime (60s) to avoid unnecessary recomputation
+const TTL_MS = 60_000;
 const MAX_CACHE_ENTRIES = 1000;
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<unknown>>();

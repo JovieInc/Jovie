@@ -294,7 +294,9 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
           type='button'
           variant='secondary'
           size='sm'
-          onClick={() => void refetch()}
+          onClick={() => {
+            refetch();
+          }}
           disabled={refreshing}
           className='h-8 gap-2 px-3'
           aria-label='Refresh analytics overview'

@@ -6,52 +6,53 @@ import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import { AuthBackButton, AuthButton, FormError, OtpInput } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
-interface VerificationStepProps {
-  /**
-   * The email address the code was sent to
-   */
-  email: string;
-  /**
-   * Current code value
-   */
-  code: string;
-  /**
-   * Called when code changes
-   */
-  onCodeChange: (code: string) => void;
-  /**
-   * Called when form is submitted. Returns true if successful.
-   */
-  onSubmit: (code: string) => Promise<boolean | void>;
-  /**
-   * Called when resend is requested. Returns true if successful.
-   */
-  onResend: () => Promise<boolean | void>;
-  /**
-   * Whether verification is in progress
-   */
-  isVerifying: boolean;
-  /**
-   * Whether signup completion (session propagation) is in progress
-   */
-  isCompleting?: boolean;
-  /**
-   * Whether resend is in progress
-   */
-  isResending: boolean;
-  /**
-   * Error message to display
-   */
-  error: string | null;
-  /**
-   * Called when back button is clicked
-   */
-  onBack: () => void;
-  /**
-   * Mode - affects copy
-   */
-  mode: 'signin' | 'signup';
-}
+interface VerificationStepProps
+  extends Readonly<{
+    /**
+     * The email address the code was sent to
+     */
+    email: string;
+    /**
+     * Current code value
+     */
+    code: string;
+    /**
+     * Called when code changes
+     */
+    onCodeChange: (code: string) => void;
+    /**
+     * Called when form is submitted. Returns true if successful.
+     */
+    onSubmit: (code: string) => Promise<boolean | void>;
+    /**
+     * Called when resend is requested. Returns true if successful.
+     */
+    onResend: () => Promise<boolean | void>;
+    /**
+     * Whether verification is in progress
+     */
+    isVerifying: boolean;
+    /**
+     * Whether signup completion (session propagation) is in progress
+     */
+    isCompleting?: boolean;
+    /**
+     * Whether resend is in progress
+     */
+    isResending: boolean;
+    /**
+     * Error message to display
+     */
+    error: string | null;
+    /**
+     * Called when back button is clicked
+     */
+    onBack: () => void;
+    /**
+     * Mode - affects copy
+     */
+    mode: 'signin' | 'signup';
+  }> {}
 
 /**
  * OTP verification step for auth flows.

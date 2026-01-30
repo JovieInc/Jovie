@@ -15,12 +15,13 @@ import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
-interface DeleteCreatorDialogProps {
-  profile: AdminCreatorProfileRow | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => Promise<{ success: boolean; error?: string }>;
-}
+interface DeleteCreatorDialogProps
+  extends Readonly<{
+    profile: AdminCreatorProfileRow | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: () => Promise<{ success: boolean; error?: string }>;
+  }> {}
 
 export function DeleteCreatorDialog({
   profile,

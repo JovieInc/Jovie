@@ -11,8 +11,9 @@ import React, {
   useTransition,
 } from 'react';
 
-// Re-export and import useTableMeta from AuthShellWrapper for backward compatibility
-export { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+// Import useTableMeta for internal use and re-export for backward compatibility
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+export { useTableMeta };
 
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
@@ -22,7 +23,6 @@ import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggle
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   SidebarInset,
   SidebarProvider,
