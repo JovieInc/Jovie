@@ -1,4 +1,4 @@
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import {
   creatorAvatarCandidates,
   creatorProfileAttributes,
@@ -13,7 +13,7 @@ function normalizeText(value: string | null | undefined): string | null {
 }
 
 export async function storeAvatarCandidate(params: {
-  tx: DbType;
+  tx: DbOrTransaction;
   profileId: string;
   avatarUrl: string | null | undefined;
   sourcePlatform: string;
@@ -51,7 +51,7 @@ export async function storeAvatarCandidate(params: {
 }
 
 export async function storeProfileAttributes(params: {
-  tx: DbType;
+  tx: DbOrTransaction;
   profileId: string;
   sourcePlatform: string;
   sourceUrl?: string | null;

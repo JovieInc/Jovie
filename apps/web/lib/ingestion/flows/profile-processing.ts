@@ -9,7 +9,7 @@
 
 import { eq } from 'drizzle-orm';
 
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorContacts } from '@/lib/db/schema';
 import {
   calculateAndStoreFitScore,
@@ -70,7 +70,7 @@ export interface ProcessingResult {
  * @returns Object with mergeError if link processing failed
  */
 export async function processProfileExtraction(
-  tx: DbType,
+  tx: DbOrTransaction,
   profile: ProfileForExtraction,
   extraction: ExtractionData,
   displayName: string | null
@@ -150,7 +150,7 @@ export async function processProfileExtraction(
  * Creates a new contact record if one doesn't exist.
  */
 async function storeContactEmail(
-  tx: DbType,
+  tx: DbOrTransaction,
   profileId: string,
   email: string
 ): Promise<void> {

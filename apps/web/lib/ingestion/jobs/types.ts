@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import type { ExtractionResult } from '../types';
 
 /**
@@ -85,6 +85,6 @@ export type JobFailureReason = 'rate_limited' | 'transient';
  * Job processor function signature.
  */
 export type JobProcessor = (
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ) => Promise<JobExecutionResult>;

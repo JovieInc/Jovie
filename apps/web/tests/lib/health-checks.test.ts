@@ -26,13 +26,16 @@ vi.mock('@neondatabase/serverless', () => {
   class MockPool {
     end = vi.fn().mockReturnValue(Promise.resolve());
   }
+  // Mock neon HTTP client function
+  const mockNeon = vi.fn().mockReturnValue(() => Promise.resolve({ rows: [] }));
   return {
     neonConfig: { webSocketConstructor: undefined },
     Pool: MockPool,
+    neon: mockNeon,
   };
 });
 
-// Mock drizzle-orm
+// Mock drizzle-orm (WebSocket driver - used in tests)
 vi.mock('drizzle-orm/neon-serverless', () => {
   const mockExecute = vi
     .fn()
@@ -48,6 +51,19 @@ vi.mock('drizzle-orm/neon-serverless', () => {
     }),
     __mockExecute: mockExecute,
     __mockTransaction: mockTransaction,
+  };
+});
+
+// Mock drizzle-orm HTTP driver (used by health.ts validateDbConnection)
+vi.mock('drizzle-orm/neon-http', () => {
+  const mockExecute = vi
+    .fn()
+    .mockResolvedValue({ rows: [{ health_check: 1 }] });
+
+  return {
+    drizzle: vi.fn().mockReturnValue({
+      execute: mockExecute,
+    }),
   };
 });
 

@@ -12,7 +12,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema';
 import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
@@ -70,7 +70,7 @@ export {
  * Routes to the appropriate platform-specific processor.
  */
 export async function processJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect
 ) {
   switch (job.jobType) {

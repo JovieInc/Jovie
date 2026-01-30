@@ -2,18 +2,25 @@
  * Database Client Types
  *
  * Type definitions for the database client module.
+ * Uses Neon HTTP driver for serverless-optimized connections.
  */
 
-import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
+import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import type * as schema from '../schema';
 
-export type DbType = NeonDatabase<typeof schema>;
+export type DbType = NeonHttpDatabase<typeof schema>;
 
 export type TransactionType = Parameters<DbType['transaction']>[0] extends (
   tx: infer T
 ) => unknown
   ? T
   : never;
+
+/**
+ * Union type for functions that accept either a database or transaction context.
+ * Use this when a function can operate within or outside a transaction.
+ */
+export type DbOrTransaction = DbType | TransactionType;
 
 /** Row type for table existence check query */
 export interface TableExistsRow {

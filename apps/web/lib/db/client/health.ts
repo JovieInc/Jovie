@@ -4,9 +4,9 @@
  * Health check and performance monitoring functions for the database.
  */
 
-import { Pool } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { env } from '@/lib/env-server';
 import { TABLE_NAMES } from '../config';
 import * as schema from '../schema';
@@ -174,8 +174,9 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
     };
   }
 
-  const pool = new Pool({ connectionString });
-  const tempDb = drizzle(pool, { schema });
+  // Use HTTP driver - stateless, no pool cleanup needed
+  const sql = neon(connectionString);
+  const tempDb = drizzle(sql, { schema });
 
   try {
     await withRetry(
@@ -198,13 +199,8 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
       latency,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
-  } finally {
-    try {
-      await pool.end();
-    } catch {
-      // Ignore shutdown errors; connection might already be closed.
-    }
   }
+  // No cleanup needed - HTTP driver is stateless
 }
 
 /**

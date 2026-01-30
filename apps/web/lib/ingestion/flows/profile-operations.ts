@@ -5,7 +5,7 @@
  */
 
 import { eq, inArray } from 'drizzle-orm';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
@@ -41,7 +41,7 @@ export interface ExistingProfileCheck {
  * @returns Available handle, or null if all attempts exhausted
  */
 export async function findAvailableHandle(
-  tx: DbType,
+  tx: DbOrTransaction,
   baseHandle: string
 ): Promise<string | null> {
   const MAX_LEN = 30;
