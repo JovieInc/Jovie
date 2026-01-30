@@ -65,7 +65,7 @@ The `useUpdateDashboardProfileMutation()` hook demonstrates proper optimistic up
 **Examples:**
 
 | File | Pattern | Issue |
-|------|---------|-------|
+| ------ | --------- | ------- |
 | `SettingsNotificationsSection.tsx` | Manual `useState` for loading/error | Should use `useMutation` |
 | `SettingsAppearanceSection.tsx` | No user feedback on error | Silent failures |
 | `useLinksPersistence.ts` | Raw fetch for PUT | Should use `useMutation` with optimistic updates |

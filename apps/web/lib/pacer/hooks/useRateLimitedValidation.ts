@@ -102,6 +102,14 @@ export function useRateLimitedValidation<TValue, TResult>({
     createValidationCache<string, TResult>(CACHE_PRESETS.validation)
   );
 
+  // Helper to generate cache key (memoized to avoid recreation)
+  const generateCacheKey = useCallback(
+    (value: TValue): string => {
+      return getCacheKey ? getCacheKey(value) : JSON.stringify(value);
+    },
+    [getCacheKey]
+  );
+
   // Rate-limited executor with state selector for reactivity
   const rateLimiter = useAsyncRateLimiter(
     async (value: TValue) => {
@@ -109,16 +117,7 @@ export function useRateLimitedValidation<TValue, TResult>({
 
       // Use custom cache key generator if provided, otherwise fall back to JSON.stringify
       // Note: JSON.stringify may produce unstable keys for objects with varying property order
-      const cacheKey = getCacheKey ? getCacheKey(value) : JSON.stringify(value);
-
-      // Check cache first (respects TTL)
-      const cached = cacheRef.current.get(cacheKey);
-      if (cached !== undefined) {
-        setResult(cached);
-        setError(null);
-        onSuccess?.(cached);
-        return cached;
-      }
+      const cacheKey = generateCacheKey(value);
 
       // Cancel any previous request
       abortControllerRef.current?.abort();
@@ -174,27 +173,35 @@ export function useRateLimitedValidation<TValue, TResult>({
     // Selector to subscribe to state changes
     state => ({
       isExecuting: state.isExecuting,
-      successCount: state.successCount,
     })
   );
 
   const validate = useCallback(
     async (value: TValue) => {
       setError(null);
+
+      // Check cache BEFORE calling rate-limited executor
+      // This ensures cached values don't consume rate-limit slots
+      const cacheKey = generateCacheKey(value);
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached !== undefined) {
+        setResult(cached);
+        setError(null);
+        onSuccess?.(cached);
+        return cached;
+      }
+
       return rateLimiter.maybeExecute(value);
     },
-    [rateLimiter]
+    [rateLimiter, generateCacheKey, onSuccess]
   );
 
   const cancel = useCallback(() => {
     abortControllerRef.current?.abort();
   }, []);
 
-  // Calculate remaining requests (approximate) using selected state
-  const remainingRequests = Math.max(
-    0,
-    rateLimit - (rateLimiter.state?.successCount ?? 0)
-  );
+  // Use getRemainingInWindow() for accurate sliding-window remaining count
+  const remainingRequests = rateLimiter.getRemainingInWindow();
 
   return {
     validate,
