@@ -70,6 +70,10 @@ interface ReleaseTableProps {
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
 
+const MetaHeaderCell = () => (
+  <span className='sr-only'>Smart link, popularity, year</span>
+);
+
 /**
  * ReleaseTable - Releases table using UnifiedTable
  *
@@ -324,10 +328,8 @@ export function ReleaseTable({
 
     const rightMetaColumn = columnHelper.display({
       id: 'meta',
-      // NOSONAR S6478: TanStack Table header renderer prop
-      header: () => (
-        <span className='sr-only'>Smart link, popularity, year</span>
-      ),
+      // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
+      header: MetaHeaderCell,
       cell: createRightMetaCellRenderer(onCopy),
       size: 260,
       minSize: 260,
