@@ -129,7 +129,7 @@ function getRemixerPart(segment: string): string | null {
     return trimmed.replace(REMIXED_BY_PREFIX_PATTERN, '').trim() || null;
   }
 
-  const trailingMatch = trimmed.match(REMIX_TRAILING_PATTERN);
+  const trailingMatch = REMIX_TRAILING_PATTERN.exec(trimmed);
   if (!trailingMatch) return null;
 
   return trailingMatch[1]?.trim() || null;
