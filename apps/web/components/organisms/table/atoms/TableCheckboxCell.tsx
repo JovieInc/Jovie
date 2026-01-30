@@ -22,13 +22,17 @@ export interface TableCheckboxCellLegacyProps {
 
 // TanStack Table props (recommended)
 export interface TableCheckboxCellTanStackProps<TData = unknown> {
-  table?: Table<TData>;
-  row?: Row<TData>;
-  rowNumber?: number;
-  isChecked?: boolean;
-  onToggleSelect?: () => void;
-  headerCheckboxState?: 'checked' | 'unchecked' | 'indeterminate' | boolean;
-  onToggleSelectAll?: () => void;
+  readonly table?: Table<TData>;
+  readonly row?: Row<TData>;
+  readonly rowNumber?: number;
+  readonly isChecked?: boolean;
+  readonly onToggleSelect?: () => void;
+  readonly headerCheckboxState?:
+    | 'checked'
+    | 'unchecked'
+    | 'indeterminate'
+    | boolean;
+  readonly onToggleSelectAll?: () => void;
 }
 
 export type TableCheckboxCellProps<TData = unknown> =

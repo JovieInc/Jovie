@@ -4,10 +4,10 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface UnifiedDrawerProps {
-  width?: number;
-  children: ReactNode;
-  onClose?: () => void;
-  isOpen?: boolean;
+  readonly width?: number;
+  readonly children: ReactNode;
+  readonly onClose?: () => void;
+  readonly isOpen?: boolean;
 }
 
 /**

@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
 export interface LegalSupportBlockProps {
-  title?: string;
-  description: string;
-  email: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly email: string;
 }
 
 export function LegalSupportBlock({

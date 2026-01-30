@@ -17,21 +17,21 @@ import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthShellProps {
-  section: 'admin' | 'dashboard' | 'settings';
-  navigation: NavItem[];
-  breadcrumbs: DashboardBreadcrumbItem[];
+  readonly section: 'admin' | 'dashboard' | 'settings';
+  readonly navigation: NavItem[];
+  readonly breadcrumbs: DashboardBreadcrumbItem[];
   /** Badge/pill shown after breadcrumb (left side) */
-  headerBadge?: ReactNode;
+  readonly headerBadge?: ReactNode;
   /** Actions shown on right side of header */
-  headerAction?: ReactNode;
-  showMobileTabs?: boolean;
-  drawerContent?: ReactNode;
-  drawerWidth?: number;
-  isTableRoute?: boolean;
+  readonly headerAction?: ReactNode;
+  readonly showMobileTabs?: boolean;
+  readonly drawerContent?: ReactNode;
+  readonly drawerWidth?: number;
+  readonly isTableRoute?: boolean;
   /** Preview panel slot (rendered alongside main content) */
-  previewPanel?: ReactNode;
-  onSidebarOpenChange?: (open: boolean) => void;
-  children: ReactNode;
+  readonly previewPanel?: ReactNode;
+  readonly onSidebarOpenChange?: (open: boolean) => void;
+  readonly children: ReactNode;
 }
 
 /**

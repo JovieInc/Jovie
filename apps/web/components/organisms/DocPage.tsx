@@ -9,10 +9,10 @@ import { LegalSidebar } from '@/components/molecules/LegalSidebar';
 import type { MarkdownDocument } from '@/types/docs';
 
 export interface DocPageProps {
-  doc: MarkdownDocument;
-  hero: LegalHeroProps;
-  aside?: React.ReactNode;
-  pdfTitle: string;
+  readonly doc: MarkdownDocument;
+  readonly hero: LegalHeroProps;
+  readonly aside?: React.ReactNode;
+  readonly pdfTitle: string;
 }
 
 export function DocPage({ doc, hero, aside, pdfTitle }: DocPageProps) {

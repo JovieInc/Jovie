@@ -5,9 +5,9 @@ import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 
 interface ContextMenuWrapperProps {
-  menuItems: TableActionMenuItem[];
-  onOpenChange?: (open: boolean) => void;
-  children: React.ReactNode;
+  readonly menuItems: TableActionMenuItem[];
+  readonly onOpenChange?: (open: boolean) => void;
+  readonly children: React.ReactNode;
 }
 
 /**

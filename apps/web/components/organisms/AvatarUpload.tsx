@@ -12,11 +12,11 @@ import { useUserAvatarMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 interface AvatarUploadProps {
-  currentAvatarUrl?: string | null;
-  artistName: string;
-  onUploadSuccess?: (imageUrl: string) => void;
-  onUploadError?: (error: string) => void;
-  className?: string;
+  readonly currentAvatarUrl?: string | null;
+  readonly artistName: string;
+  readonly onUploadSuccess?: (imageUrl: string) => void;
+  readonly onUploadError?: (error: string) => void;
+  readonly className?: string;
 }
 
 const ACCEPTED_TYPES = SUPPORTED_IMAGE_MIME_TYPES;

@@ -73,21 +73,21 @@ const LightningIcon = (
 
 export interface HowItWorksSectionProps {
   /** Section title */
-  title?: string;
+  readonly title?: string;
   /** Section description */
-  description?: string;
+  readonly description?: string;
   /** Badge text */
-  badgeText?: string;
+  readonly badgeText?: string;
   /** Steps data */
-  steps?: Array<{
-    number: string;
-    title: string;
-    description: string;
+  readonly steps?: Array<{
+    readonly number: string;
+    readonly title: string;
+    readonly description: string;
   }>;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether to show accent border */
-  showAccentBorder?: boolean;
+  readonly showAccentBorder?: boolean;
 }
 
 const defaultSteps = [

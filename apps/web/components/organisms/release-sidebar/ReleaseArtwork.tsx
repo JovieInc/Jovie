@@ -13,11 +13,11 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
 interface ReleaseArtworkProps {
-  artworkUrl: string | null | undefined;
-  title: string;
-  artistName?: string | null;
-  canUploadArtwork: boolean;
-  onArtworkUpload?: (file: File) => Promise<string>;
+  readonly artworkUrl: string | null | undefined;
+  readonly title: string;
+  readonly artistName?: string | null;
+  readonly canUploadArtwork: boolean;
+  readonly onArtworkUpload?: (file: File) => Promise<string>;
 }
 
 export function ReleaseArtwork({

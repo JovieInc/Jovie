@@ -7,27 +7,27 @@ interface GroupHeaderProps {
   /**
    * Label for the group (e.g., "New", "Invited", "Jan 2025")
    */
-  label: string;
+  readonly label: string;
 
   /**
    * Number of items in this group
    */
-  count: number;
+  readonly count: number;
 
   /**
    * Number of columns the header should span
    */
-  colSpan: number;
+  readonly colSpan: number;
 
   /**
    * Whether this header is currently sticky
    */
-  isSticky?: boolean;
+  readonly isSticky?: boolean;
 
   /**
    * Additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

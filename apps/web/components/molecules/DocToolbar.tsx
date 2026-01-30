@@ -5,7 +5,7 @@ import { Download, Printer } from 'lucide-react';
 import { APP_NAME } from '@/constants/app';
 
 export interface DocToolbarProps {
-  pdfTitle: string;
+  readonly pdfTitle: string;
 }
 
 export function DocToolbar({ pdfTitle }: DocToolbarProps) {

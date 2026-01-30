@@ -16,12 +16,12 @@ import { cn } from '@/lib/utils';
  */
 interface PrimaryCTAProps
   extends Omit<ButtonProps, 'variant' | 'size' | 'loading'> {
-  ariaLabel: string;
-  loadingLabel?: string;
-  loading?: boolean;
-  size?: 'md' | 'lg';
-  fullWidth?: boolean;
-  dataTestId?: string;
+  readonly ariaLabel: string;
+  readonly loadingLabel?: string;
+  readonly loading?: boolean;
+  readonly size?: 'md' | 'lg';
+  readonly fullWidth?: boolean;
+  readonly dataTestId?: string;
 }
 
 export function PrimaryCTA({

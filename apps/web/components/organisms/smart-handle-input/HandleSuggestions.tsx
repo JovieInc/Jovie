@@ -1,9 +1,9 @@
 'use client';
 
 interface HandleSuggestionsProps {
-  suggestions: string[];
-  disabled: boolean;
-  onChange: (value: string) => void;
+  readonly suggestions: string[];
+  readonly disabled: boolean;
+  readonly onChange: (value: string) => void;
 }
 
 export function HandleSuggestions({

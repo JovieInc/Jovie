@@ -4,9 +4,9 @@ import { IconBadge } from '@/components/atoms/IconBadge';
 import type { Feature } from '@/lib/features';
 
 interface FlyoutItemProps {
-  feature: Feature;
-  className?: string;
-  style?: React.CSSProperties;
+  readonly feature: Feature;
+  readonly className?: string;
+  readonly style?: React.CSSProperties;
 }
 
 export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(

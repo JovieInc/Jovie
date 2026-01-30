@@ -3,24 +3,24 @@ import { cn } from '@/lib/utils';
 
 export interface StepCardProps {
   /** Step number (e.g., "01", "02", "03") */
-  stepNumber: string;
+  readonly stepNumber: string;
   /** Step title */
-  title: string;
+  readonly title: string;
   /** Step description */
-  description: string;
+  readonly description: string;
   /** Icon element to display */
-  icon: ReactNode;
+  readonly icon: ReactNode;
   /** Whether to show connection line to next step */
-  showConnectionLine?: boolean;
+  readonly showConnectionLine?: boolean;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether to show hover effects */
-  interactive?: boolean;
+  readonly interactive?: boolean;
   /** Outer wrapper element */
-  as?: ElementType;
+  readonly as?: ElementType;
   /** Heading level for title */
-  titleLevel?: 1 | 2 | 3 | 4 | 5 | 6;
-  [key: string]: unknown;
+  readonly titleLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly [key: string]: unknown;
 }
 
 export const cardBaseClasses =

@@ -50,8 +50,8 @@ export function useTableMeta(): TableMetaContextValue {
 }
 
 export interface AuthShellWrapperProps {
-  persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
-  children: ReactNode;
+  readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
+  readonly children: ReactNode;
 }
 
 /**

@@ -6,14 +6,14 @@ import { cn } from '@/lib/utils';
 import { AdminPageSizeSelect } from '../AdminPageSizeSelect';
 
 export interface TablePaginationFooterProps {
-  currentPage: number;
-  totalPages: number;
-  pageSize: number;
-  totalItems: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-  pageSizeOptions?: number[];
-  className?: string;
+  readonly currentPage: number;
+  readonly totalPages: number;
+  readonly pageSize: number;
+  readonly totalItems: number;
+  readonly onPageChange: (page: number) => void;
+  readonly onPageSizeChange: (size: number) => void;
+  readonly pageSizeOptions?: number[];
+  readonly className?: string;
 }
 
 export function TablePaginationFooter({

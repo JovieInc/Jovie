@@ -16,7 +16,7 @@ declare global {
 }
 
 export interface CookieBannerSectionProps {
-  showBanner?: boolean;
+  readonly showBanner?: boolean;
 }
 
 export function CookieBannerSection({

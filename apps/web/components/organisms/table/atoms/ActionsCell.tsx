@@ -7,22 +7,22 @@ interface ActionsCellProps
     /**
      * Action buttons (always visible on hover)
      */
-    actions?: React.ReactNode;
+    readonly actions?: React.ReactNode;
 
     /**
      * Overflow menu (always visible on hover)
      */
-    menu?: React.ReactNode;
+    readonly menu?: React.ReactNode;
 
     /**
      * Whether the menu is currently open
      */
-    isMenuOpen?: boolean;
+    readonly isMenuOpen?: boolean;
 
     /**
      * Additional CSS classes
      */
-    className?: string;
+    readonly className?: string;
   }> {}
 
 /**

@@ -17,9 +17,9 @@ const STATUS_COLORS = {
 } as const;
 
 export interface AvatarProgressRingProps {
-  progress: number;
-  size: number;
-  status: AvatarUploadStatus;
+  readonly progress: number;
+  readonly size: number;
+  readonly status: AvatarUploadStatus;
 }
 
 export function AvatarProgressRing({

@@ -14,12 +14,15 @@ import { DrawerPropertyRow } from '@/components/molecules/drawer';
 import { formatUsername } from './utils';
 
 interface ContactFieldsProps {
-  firstName: string | null | undefined;
-  lastName: string | null | undefined;
-  username: string;
-  isEditable: boolean;
-  onNameChange: (field: 'firstName' | 'lastName', value: string) => void;
-  onUsernameChange: (value: string) => void;
+  readonly firstName: string | null | undefined;
+  readonly lastName: string | null | undefined;
+  readonly username: string;
+  readonly isEditable: boolean;
+  readonly onNameChange: (
+    field: 'firstName' | 'lastName',
+    value: string
+  ) => void;
+  readonly onUsernameChange: (value: string) => void;
 }
 
 export const ContactFields = memo(function ContactFields({
