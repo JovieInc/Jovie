@@ -4,14 +4,14 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SettingsSectionProps {
-  id: string;
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-  className?: string;
-  headerClassName?: string;
-  titleClassName?: string;
-  descriptionClassName?: string;
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly headerClassName?: string;
+  readonly titleClassName?: string;
+  readonly descriptionClassName?: string;
 }
 
 export function SettingsSection({

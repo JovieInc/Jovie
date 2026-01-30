@@ -40,17 +40,17 @@ type LinkItemMenuItem = {
 };
 
 export interface ChatStyleLinkItemProps<T extends DetectedLink = DetectedLink> {
-  id: string;
-  link: T;
-  index: number;
-  onToggle: (idx: number) => void;
-  onRemove: (idx: number) => void;
-  onEdit: (idx: number) => void;
-  visible: boolean;
-  draggable?: boolean;
-  openMenuId: string | null;
-  onAnyMenuOpen: (id: string | null) => void;
-  isLastAdded: boolean;
+  readonly id: string;
+  readonly link: T;
+  readonly index: number;
+  readonly onToggle: (idx: number) => void;
+  readonly onRemove: (idx: number) => void;
+  readonly onEdit: (idx: number) => void;
+  readonly visible: boolean;
+  readonly draggable?: boolean;
+  readonly openMenuId: string | null;
+  readonly onAnyMenuOpen: (id: string | null) => void;
+  readonly isLastAdded: boolean;
 }
 
 export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<

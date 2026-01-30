@@ -45,12 +45,12 @@ type EditableField =
   | null;
 
 interface ContactDetailSidebarProps {
-  contact: EditableContact | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onUpdate: (updates: Partial<EditableContact>) => void;
-  onSave: () => void;
-  onDelete: () => void;
+  readonly contact: EditableContact | null;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onUpdate: (updates: Partial<EditableContact>) => void;
+  readonly onSave: () => void;
+  readonly onDelete: () => void;
 }
 
 export const ContactDetailSidebar = memo(function ContactDetailSidebar({

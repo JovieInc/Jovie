@@ -5,9 +5,9 @@ import { useDashboardOverviewControls } from '@/components/dashboard/organisms/D
 import { DashboardActivityFeed } from '@/components/dashboard/organisms/dashboard-activity-feed';
 
 export interface DashboardOverviewMetricsClientProps {
-  profileId: string;
-  profileUrl?: string;
-  showActivity?: boolean;
+  readonly profileId: string;
+  readonly profileUrl?: string;
+  readonly showActivity?: boolean;
 }
 
 export function DashboardOverviewMetricsClient({

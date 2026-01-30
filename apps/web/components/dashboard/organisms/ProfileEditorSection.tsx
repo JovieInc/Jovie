@@ -22,38 +22,38 @@ import type { EditingField } from './links/hooks/useProfileEditor';
  */
 export interface ProfileEditorSectionProps {
   /** Artist data for display */
-  artist: Artist;
+  readonly artist: Artist;
   /** Avatar URL */
-  avatarUrl: string | null;
+  readonly avatarUrl: string | null;
   /** Username value */
-  username: string;
+  readonly username: string;
   /** Display name value */
-  displayName: string;
+  readonly displayName: string;
   /** Current field being edited */
-  editingField: EditingField;
+  readonly editingField: EditingField;
   /** Set editing field */
-  setEditingField: (field: EditingField) => void;
+  readonly setEditingField: (field: EditingField) => void;
   /** Display name input ref */
-  displayNameInputRef: React.RefObject<HTMLInputElement | null>;
+  readonly displayNameInputRef: React.RefObject<HTMLInputElement | null>;
   /** Username input ref */
-  usernameInputRef: React.RefObject<HTMLInputElement | null>;
+  readonly usernameInputRef: React.RefObject<HTMLInputElement | null>;
   /** Profile display name value (for input) */
-  profileDisplayName: string;
+  readonly profileDisplayName: string;
   /** Profile username value (for input) */
-  profileUsername: string;
+  readonly profileUsername: string;
   /** Handle display name change */
-  onDisplayNameChange: (value: string) => void;
+  readonly onDisplayNameChange: (value: string) => void;
   /** Handle username change */
-  onUsernameChange: (value: string) => void;
+  readonly onUsernameChange: (value: string) => void;
   /** Handle avatar upload */
-  onAvatarUpload: (file: File) => Promise<string>;
+  readonly onAvatarUpload: (file: File) => Promise<string>;
   /** Handle input key down */
-  onInputKeyDown: (
+  readonly onInputKeyDown: (
     e: React.KeyboardEvent,
     field: 'displayName' | 'username'
   ) => void;
   /** Handle input blur */
-  onInputBlur: () => void;
+  readonly onInputBlur: () => void;
 }
 
 /**

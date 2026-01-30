@@ -4,13 +4,13 @@ import { AuthButton, AuthLinkPreviewCard } from '@/components/auth';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface OnboardingCompleteStepProps {
-  title: string;
-  prompt?: string;
-  displayDomain: string;
-  handle: string;
-  copied: boolean;
-  onGoToDashboard: () => void;
-  onCopyLink: () => void;
+  readonly title: string;
+  readonly prompt?: string;
+  readonly displayDomain: string;
+  readonly handle: string;
+  readonly copied: boolean;
+  readonly onGoToDashboard: () => void;
+  readonly onCopyLink: () => void;
 }
 
 export function OnboardingCompleteStep({
