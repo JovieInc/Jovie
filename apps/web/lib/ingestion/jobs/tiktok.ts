@@ -1,4 +1,4 @@
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { extractTikTok, fetchTikTokDocument } from '../strategies/tiktok';
 import { executeIngestionJob } from './executor';
 import { type TikTokPayload, tiktokPayloadSchema } from './schemas';
@@ -20,7 +20,7 @@ export const tiktokJobConfig: JobExecutorConfig<TikTokPayload> = {
  * Process a TikTok import job.
  */
 export async function processTikTokJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
   return executeIngestionJob(tx, jobPayload, tiktokJobConfig);

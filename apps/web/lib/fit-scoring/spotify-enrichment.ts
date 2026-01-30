@@ -7,7 +7,7 @@
 
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getSpotifyArtist, isSpotifyAvailable } from '@/lib/spotify/index';
 
@@ -36,7 +36,7 @@ export interface EnrichmentResult {
  * @returns Enrichment result
  */
 export async function enrichProfileWithSpotify(
-  db: DbType,
+  db: DbOrTransaction,
   creatorProfileId: string
 ): Promise<EnrichmentResult> {
   // Check if Spotify is available
@@ -127,7 +127,7 @@ export async function enrichProfileWithSpotify(
  * @returns Array of enrichment results
  */
 export async function enrichMissingSpotifyData(
-  db: DbType,
+  db: DbOrTransaction,
   limit = 50
 ): Promise<EnrichmentResult[]> {
   if (!isSpotifyAvailable()) {
@@ -169,7 +169,7 @@ export async function enrichMissingSpotifyData(
  * @returns Count and sample of profiles needing enrichment
  */
 export async function getEnrichmentQueue(
-  db: DbType,
+  db: DbOrTransaction,
   limit = 10
 ): Promise<{
   total: number;

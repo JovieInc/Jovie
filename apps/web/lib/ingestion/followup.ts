@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
-import { type DbType, ingestionJobs } from '@/lib/db';
+import { type DbOrTransaction, ingestionJobs } from '@/lib/db';
 import {
   canonicalIdentity,
   detectPlatform,
@@ -43,7 +43,7 @@ const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
  * Returns the job ID if created or found, null if depth exceeded.
  */
 async function enqueueIngestionJobTx(params: {
-  tx: DbType;
+  tx: DbOrTransaction;
   jobType: SupportedRecursiveJobType;
   creatorProfileId: string;
   sourceUrl: string;
@@ -168,7 +168,7 @@ function classifyLink(
  * execution (Promise.all is not supported within Drizzle transactions).
  */
 export async function enqueueFollowupIngestionJobs(params: {
-  tx: DbType;
+  tx: DbOrTransaction;
   creatorProfileId: string;
   currentDepth: number;
   extraction: ExtractionResult;

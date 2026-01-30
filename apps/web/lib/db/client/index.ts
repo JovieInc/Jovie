@@ -34,6 +34,7 @@ export { setSessionUser, withDb, withTransaction } from './session';
 export type {
   ActiveConnectionsRow,
   ConnectionValidationResult,
+  DbOrTransaction,
   DbType,
   HealthCheckResult,
   PerformanceCheckResult,

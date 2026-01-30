@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { creatorProfiles, type DbType } from '@/lib/db';
+import { creatorProfiles, type DbOrTransaction } from '@/lib/db';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { enqueueFollowupIngestionJobs } from '../followup';
 import { normalizeAndMergeExtraction } from '../merge';
@@ -23,7 +23,7 @@ function resolveSourcePlatform(
  * This reduces duplication across processLinktreeJob, processLayloJob, etc.
  */
 export async function executeIngestionJob<TPayload extends BaseJobPayload>(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown,
   config: JobExecutorConfig<TPayload>
 ): Promise<JobExecutionResult> {

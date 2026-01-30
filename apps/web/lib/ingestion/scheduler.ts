@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
-import { type DbType, ingestionJobs } from '@/lib/db';
+import { type DbOrTransaction, ingestionJobs } from '@/lib/db';
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -88,7 +88,7 @@ function getJobHost(job: typeof ingestionJobs.$inferSelect): string | null {
  * Get count of currently processing jobs per host.
  */
 async function getProcessingHostCounts(
-  tx: DbType
+  tx: DbOrTransaction
 ): Promise<Map<string, number>> {
   const processingJobs = await tx
     .select({ payload: ingestionJobs.payload })
@@ -136,7 +136,7 @@ export function getCreatorProfileIdFromJob(
  * Handle job failure with retry logic.
  */
 export async function handleIngestionJobFailure(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect,
   error: unknown
 ): Promise<void> {
@@ -162,7 +162,7 @@ export async function handleIngestionJobFailure(
  * Respects maxAttempts and only claims jobs that are ready to run.
  */
 export async function claimPendingJobs(
-  tx: DbType,
+  tx: DbOrTransaction,
   now: Date,
   limit = 5
 ): Promise<(typeof ingestionJobs.$inferSelect)[]> {
@@ -291,7 +291,7 @@ export async function claimPendingJobs(
  * Mark a job as failed with optional retry scheduling.
  */
 export async function failJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect,
   error: string,
   options: { reason?: JobFailureReason } = {}
@@ -346,7 +346,7 @@ export async function failJob(
  * Mark a job as succeeded.
  */
 export async function succeedJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect
 ): Promise<void> {
   await tx
@@ -363,7 +363,7 @@ export async function succeedJob(
  * Reset a failed job for retry (admin action).
  */
 export async function resetJobForRetry(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobId: string
 ): Promise<boolean> {
   const [updated] = await tx

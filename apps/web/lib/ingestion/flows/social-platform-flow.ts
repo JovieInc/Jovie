@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
 import { logger } from '@/lib/utils/logger';
@@ -81,7 +81,7 @@ export function getLinkDisplayText(
  * Idempotently add a social link to a creator profile
  */
 async function addSocialLinkIdempotent(
-  tx: DbType,
+  tx: DbOrTransaction,
   creatorProfileId: string,
   platform: string,
   url: string,
@@ -127,7 +127,7 @@ async function addSocialLinkIdempotent(
  * Handle adding a link to an existing unclaimed profile
  */
 export async function handleExistingUnclaimedProfile(
-  tx: DbType,
+  tx: DbOrTransaction,
   existing: ExistingProfileData,
   context: SocialPlatformContext
 ): Promise<NextResponse> {
@@ -204,7 +204,7 @@ export async function handleExistingUnclaimedProfile(
  * Create a new profile with the social link
  */
 export async function createNewSocialProfile(
-  tx: DbType,
+  tx: DbOrTransaction,
   finalHandle: string,
   context: SocialPlatformContext
 ): Promise<NextResponse> {

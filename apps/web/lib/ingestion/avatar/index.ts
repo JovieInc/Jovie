@@ -9,7 +9,7 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema';
 import { buildSeoFilename } from '@/lib/images/config';
 import { logger } from '@/lib/utils/logger';
@@ -109,7 +109,7 @@ async function extractAndDownloadCandidate(linkUrl: string): Promise<{
  * then creates the profile photo record for the first successful candidate.
  */
 export async function maybeSetProfileAvatarFromLinks(params: {
-  db: DbType;
+  db: DbOrTransaction;
   clerkUserId: string;
   profileId: string;
   userId: string | null;
