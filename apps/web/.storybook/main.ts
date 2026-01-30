@@ -122,15 +122,7 @@ const config: StorybookConfig = {
           replacement: require.resolve('./next-navigation-mock.js'),
         },
         // Mock Clerk authentication for Storybook
-        {
-          find: '@clerk/nextjs',
-          replacement: path.resolve(__dirname, 'clerk-mock.jsx'),
-        },
-        {
-          find: '@clerk/nextjs/server',
-          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
-        },
-        // Also handle any nested imports from server path
+        // IMPORTANT: More specific paths MUST come before less specific ones
         {
           find: '@clerk/nextjs/server/auth',
           replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
@@ -139,11 +131,20 @@ const config: StorybookConfig = {
           find: '@clerk/nextjs/server/currentUser',
           replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
         },
-        // Mock @clerk/elements to prevent package.json lookup warning
         {
-          find: '@clerk/elements',
-          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+          find: '@clerk/nextjs/server',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
         },
+        {
+          find: '@clerk/nextjs/errors',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
+        {
+          find: '@clerk/nextjs',
+          replacement: path.resolve(__dirname, 'clerk-mock.jsx'),
+        },
+        // Mock @clerk/elements to prevent package.json lookup warning
+        // IMPORTANT: More specific paths MUST come before less specific ones
         {
           find: '@clerk/elements/common',
           replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
@@ -154,6 +155,10 @@ const config: StorybookConfig = {
         },
         {
           find: '@clerk/elements/sign-up',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements',
           replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
         },
         // Project aliases

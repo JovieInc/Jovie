@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Artist, LegacySocialLink } from '@/types/db';
-import { ProfileShell } from './ProfileShell';
+import { ProfileShell } from './profile-shell/ProfileShell';
 
 // Mock data for the stories
 const mockArtist: Artist = {
