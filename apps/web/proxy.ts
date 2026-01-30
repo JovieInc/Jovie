@@ -416,6 +416,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             '/tour-dates',
             '/audience',
             '/earnings',
+            '/links',
             '/chat',
             '/analytics',
           ];

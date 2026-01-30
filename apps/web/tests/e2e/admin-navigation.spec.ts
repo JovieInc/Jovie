@@ -327,7 +327,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     }
 
     // 4. Navigate back to dashboard and verify admin nav still visible
-    await page.goto('/', {
+    await page.goto(DASHBOARD_PAGES[0].path, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
