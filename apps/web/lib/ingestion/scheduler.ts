@@ -146,12 +146,19 @@ export async function handleIngestionJobFailure(
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
-    await IngestionStatusManager.handleJobFailure(
-      tx,
-      creatorProfileId,
-      shouldRetry,
-      message
-    );
+    if (shouldRetry) {
+      await IngestionStatusManager.recordErrorForRetry(
+        tx,
+        creatorProfileId,
+        message
+      );
+    } else {
+      await IngestionStatusManager.markFailedAfterRetries(
+        tx,
+        creatorProfileId,
+        message
+      );
+    }
   }
 
   await failJob(tx, job, message, { reason });

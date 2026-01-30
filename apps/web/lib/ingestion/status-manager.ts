@@ -109,33 +109,37 @@ export const IngestionStatusManager = {
   },
 
   /**
-   * Handle job failure with retry logic
-   * Only marks as failed if shouldRetry is false
+   * Record an ingestion error that will be retried.
+   * Updates the error message but keeps the current ingestion status.
    */
-  async handleJobFailure(
+  async recordErrorForRetry(
     tx: DbOrTransaction,
     profileId: string,
-    shouldRetry: boolean,
     errorMessage: string
   ): Promise<void> {
-    // NOSONAR S2301: Boolean parameter is intentional - called from single location with computed value
-    if (shouldRetry) {
-      // Update error message but keep status (job will be retried)
-      logger.debug('Ingestion error (will retry)', {
-        profileId,
-        error: errorMessage,
-      });
-      await tx
-        .update(creatorProfiles)
-        .set({
-          lastIngestionError: errorMessage,
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, profileId));
-    } else {
-      // Max attempts exceeded, mark as failed
-      await this.markFailed(tx, profileId, errorMessage);
-    }
+    logger.debug('Ingestion error recorded (will retry)', {
+      profileId,
+      error: errorMessage,
+    });
+    await tx
+      .update(creatorProfiles)
+      .set({
+        lastIngestionError: errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profileId));
+  },
+
+  /**
+   * Mark an ingestion as permanently failed after exhausting retries.
+   * Updates status to 'failed' and records the final error.
+   */
+  async markFailedAfterRetries(
+    tx: DbOrTransaction,
+    profileId: string,
+    errorMessage: string
+  ): Promise<void> {
+    await this.markFailed(tx, profileId, errorMessage);
   },
 
   /**
