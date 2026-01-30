@@ -1,6 +1,8 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
+
 import { db, doesTableExist } from '@/lib/db';
 import {
+  creatorProfiles,
   type ProviderLink as DbProviderLink,
   type DiscogRelease,
   discogReleases,
@@ -135,6 +137,49 @@ export async function getLatestReleaseForProfile(
     .select()
     .from(discogReleases)
     .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(1);
+
+  return release ?? null;
+}
+
+/**
+ * Get the latest release for a creator by username (normalized).
+ * This allows fetching the latest release in parallel with profile data
+ * without needing the profile ID first.
+ */
+export async function getLatestReleaseByUsername(
+  usernameNormalized: string
+): Promise<DiscogRelease | null> {
+  if (!(await hasDiscogReleasesTable())) {
+    return null;
+  }
+
+  const [release] = await db
+    .select({
+      id: discogReleases.id,
+      creatorProfileId: discogReleases.creatorProfileId,
+      title: discogReleases.title,
+      slug: discogReleases.slug,
+      releaseType: discogReleases.releaseType,
+      releaseDate: discogReleases.releaseDate,
+      label: discogReleases.label,
+      upc: discogReleases.upc,
+      totalTracks: discogReleases.totalTracks,
+      isExplicit: discogReleases.isExplicit,
+      artworkUrl: discogReleases.artworkUrl,
+      spotifyPopularity: discogReleases.spotifyPopularity,
+      sourceType: discogReleases.sourceType,
+      metadata: discogReleases.metadata,
+      createdAt: discogReleases.createdAt,
+      updatedAt: discogReleases.updatedAt,
+    })
+    .from(discogReleases)
+    .innerJoin(
+      creatorProfiles,
+      eq(discogReleases.creatorProfileId, creatorProfiles.id)
+    )
+    .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
     .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
