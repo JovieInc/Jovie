@@ -320,6 +320,7 @@ export function ReleaseTable({
 
     const rightMetaColumn = columnHelper.display({
       id: 'meta',
+      // NOSONAR S6478: TanStack Table header renderer prop
       header: () => (
         <span className='sr-only'>Smart link, popularity, year</span>
       ),
