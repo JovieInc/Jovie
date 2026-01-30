@@ -15,10 +15,10 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { PROFILE_URL } from '@/constants/domains';
 
 interface ProfileSidebarHeaderProps {
-  username: string;
-  displayName: string;
-  profilePath: string;
-  onClose: () => void;
+  readonly username: string;
+  readonly displayName: string;
+  readonly profilePath: string;
+  readonly onClose: () => void;
 }
 
 function generateVCard(

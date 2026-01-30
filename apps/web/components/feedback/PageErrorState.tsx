@@ -3,8 +3,8 @@
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 interface PageErrorStateProps {
-  title?: string;
-  message: string;
+  readonly title?: string;
+  readonly message: string;
 }
 
 /**

@@ -3,8 +3,8 @@
 import { X } from 'lucide-react';
 
 interface VersionUpdateBannerProps {
-  onReload: () => void;
-  onDismiss: () => void;
+  readonly onReload: () => void;
+  readonly onDismiss: () => void;
 }
 
 /**

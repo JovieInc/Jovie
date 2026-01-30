@@ -50,13 +50,13 @@ const POPULARITY_OPTIONS: {
 // ============================================================================
 
 interface SearchInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onClear: () => void;
-  placeholder?: string;
-  inputRef?: React.RefObject<HTMLInputElement | null>;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onClear: () => void;
+  readonly placeholder?: string;
+  readonly inputRef?: React.RefObject<HTMLInputElement | null>;
   /** Called when Escape is pressed in the search input */
-  onEscape?: () => void;
+  readonly onEscape?: () => void;
 }
 
 function SearchInput({
@@ -132,10 +132,10 @@ function SearchInput({
 // ============================================================================
 
 interface ActiveFilterPillProps {
-  groupLabel: string;
-  values: string[];
-  icon?: ReactNode;
-  onClear: () => void;
+  readonly groupLabel: string;
+  readonly values: string[];
+  readonly icon?: ReactNode;
+  readonly onClear: () => void;
 }
 
 function ActiveFilterPill({
@@ -176,13 +176,13 @@ function ActiveFilterPill({
 // ============================================================================
 
 interface SubmenuCheckboxItemProps {
-  label: string;
-  icon?: ReactNode;
-  count?: number;
-  checked: boolean;
-  onCheckedChange: () => void;
+  readonly label: string;
+  readonly icon?: ReactNode;
+  readonly count?: number;
+  readonly checked: boolean;
+  readonly onCheckedChange: () => void;
   /** Ref to the search input to return focus on ArrowUp from first item */
-  searchInputRef?: React.RefObject<HTMLInputElement | null>;
+  readonly searchInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 function SubmenuCheckboxItem({
@@ -266,10 +266,10 @@ function SubmenuCheckboxItem({
 // ============================================================================
 
 interface ReleaseFilterDropdownProps {
-  filters: ReleaseFilters;
-  onFiltersChange: (filters: ReleaseFilters) => void;
-  counts: ReleaseFilterCounts;
-  buttonClassName?: string;
+  readonly filters: ReleaseFilters;
+  readonly onFiltersChange: (filters: ReleaseFilters) => void;
+  readonly counts: ReleaseFilterCounts;
+  readonly buttonClassName?: string;
 }
 
 export function ReleaseFilterDropdown({

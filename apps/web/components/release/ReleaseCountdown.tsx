@@ -37,7 +37,7 @@ function getTimeLeft(targetDate: Date): TimeLeft {
 }
 
 interface ReleaseCountdownProps {
-  releaseDate: Date;
+  readonly releaseDate: Date;
 }
 
 const UPDATE_INTERVAL_MS = 60_000;
