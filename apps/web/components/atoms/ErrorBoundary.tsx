@@ -7,10 +7,10 @@ import { useEffect } from 'react';
 import { isSentryInitialized } from '@/lib/sentry/init';
 
 interface ErrorBoundaryProps {
-  error: Error & { digest?: string };
-  reset: () => void;
-  context: string;
-  message?: string;
+  readonly error: Error & { digest?: string };
+  readonly reset: () => void;
+  readonly context: string;
+  readonly message?: string;
 }
 
 export default function ErrorBoundary({

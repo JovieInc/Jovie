@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils';
 
 export type DividerProps = {
-  className?: string;
-  inset?: boolean; // adds horizontal padding inset for alignment with content
-  orientation?: 'horizontal' | 'vertical';
-  ariaHidden?: boolean; // hide from assistive tech when decorative
+  readonly className?: string;
+  readonly inset?: boolean; // adds horizontal padding inset for alignment with content
+  readonly orientation?: 'horizontal' | 'vertical';
+  readonly ariaHidden?: boolean; // hide from assistive tech when decorative
 };
 
 // Divider aligning with our border tokens

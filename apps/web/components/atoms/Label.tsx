@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 
 export interface LabelProps
   extends React.LabelHTMLAttributes<HTMLLabelElement> {
-  htmlFor: string;
-  className?: string;
-  children: React.ReactNode;
-  required?: boolean;
+  readonly htmlFor: string;
+  readonly className?: string;
+  readonly children: React.ReactNode;
+  readonly required?: boolean;
 }
 
 export const Label = forwardRef<HTMLLabelElement, LabelProps>(

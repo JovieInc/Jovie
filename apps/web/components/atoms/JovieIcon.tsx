@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils';
 
 interface JovieIconProps {
-  className?: string;
-  size?: number;
+  readonly className?: string;
+  readonly size?: number;
 }
 
 export function JovieIcon({ className, size = 24 }: JovieIconProps) {
