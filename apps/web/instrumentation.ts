@@ -27,6 +27,13 @@ function shouldReportToSentry(issues: string[]): boolean {
   return trulyBlockingIssues.length > 0;
 }
 
+/**
+ * Sleep utility for retry mechanism
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./sentry.server.config');
@@ -37,7 +44,24 @@ export async function register() {
       const { runStartupEnvironmentValidation } = await import(
         '@/lib/startup/environment-validator'
       );
-      const result = await runStartupEnvironmentValidation();
+      
+      // On Vercel cold starts, environment variables may not be fully initialized yet
+      // Add a small delay to allow env vars to populate, especially for early diagnostic requests
+      const isVercelProduction = process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview';
+      if (isVercelProduction) {
+        // Small delay to allow environment variables to fully initialize on cold starts
+        await sleep(100);
+      }
+
+      let result = await runStartupEnvironmentValidation();
+
+      // Retry once if validation fails - handles race condition on Vercel cold starts
+      // where environment variables may not be available on first attempt
+      if (result && result.critical.length > 0 && isVercelProduction) {
+        console.log('[STARTUP] Initial validation found critical issues, retrying after delay...');
+        await sleep(100);
+        result = await runStartupEnvironmentValidation();
+      }
 
       if (result && result.critical.length > 0) {
         // Only report to Sentry if the issues are truly blocking in production
