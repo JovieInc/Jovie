@@ -6,6 +6,7 @@
  */
 
 import { and, eq, ne } from 'drizzle-orm';
+
 import { db } from '@/lib/db';
 import {
   type CreatorContact,
@@ -14,6 +15,7 @@ import {
   socialLinks,
   users,
 } from '@/lib/db/schema';
+import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { redis } from '@/lib/redis';
 import type {
@@ -31,6 +33,9 @@ const MAX_CONTACTS = 50;
 // Redis edge cache settings
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
+
+// Query timeout for public profile pages (fail fast for user-facing pages)
+const PUBLIC_PROFILE_QUERY_TIMEOUT_MS = 5000; // 5 seconds
 
 /**
  * Get a profile by its ID.
@@ -307,8 +312,26 @@ export async function getProfileWithLinks(
     }
   }
 
-  // Cache miss - query database with parallel fetches
-  const result = await fetchProfileFromDatabase(normalizedUsername);
+  // Cache miss - query database with parallel fetches and timeout
+  // Timeout ensures we fail fast (5s) rather than blocking on Neon retry backoff (15s)
+  let result: ProfileWithLinks | null;
+  try {
+    result = await Promise.race([
+      fetchProfileFromDatabase(normalizedUsername),
+      new Promise<null>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Profile query timeout')),
+          PUBLIC_PROFILE_QUERY_TIMEOUT_MS
+        )
+      ),
+    ]);
+  } catch (error) {
+    captureWarning('[profile-service] Profile query failed or timed out', {
+      error,
+      username: normalizedUsername,
+    });
+    return null;
+  }
 
   // Cache the result in Redis (fire-and-forget)
   if (redis && result) {
@@ -340,6 +363,16 @@ function reviveProfileDates(profile: ProfileWithLinks): ProfileWithLinks {
       createdAt: new Date(contact.createdAt),
       updatedAt: new Date(contact.updatedAt),
     })),
+    latestRelease: profile.latestRelease
+      ? {
+          ...profile.latestRelease,
+          releaseDate: profile.latestRelease.releaseDate
+            ? new Date(profile.latestRelease.releaseDate)
+            : null,
+          createdAt: new Date(profile.latestRelease.createdAt),
+          updatedAt: new Date(profile.latestRelease.updatedAt),
+        }
+      : null,
   };
 }
 
@@ -349,106 +382,110 @@ function reviveProfileDates(profile: ProfileWithLinks): ProfileWithLinks {
 async function fetchProfileFromDatabase(
   normalizedUsername: string
 ): Promise<ProfileWithLinks | null> {
-  // Single query that fetches profile, user, links, and contacts together
+  // Fetch profile, user, links, contacts, and latest release in parallel
   // Using Promise.all at the database driver level for true parallelism
-  const [profileResult, linksResult, contactsResult] = await Promise.all([
-    // Profile with user data
-    db
-      .select({
-        id: creatorProfiles.id,
-        userId: creatorProfiles.userId,
-        userIsPro: users.isPro,
-        userClerkId: users.clerkId,
-        creatorType: creatorProfiles.creatorType,
-        username: creatorProfiles.username,
-        usernameNormalized: creatorProfiles.usernameNormalized,
-        displayName: creatorProfiles.displayName,
-        bio: creatorProfiles.bio,
-        avatarUrl: creatorProfiles.avatarUrl,
-        spotifyUrl: creatorProfiles.spotifyUrl,
-        appleMusicUrl: creatorProfiles.appleMusicUrl,
-        youtubeUrl: creatorProfiles.youtubeUrl,
-        spotifyId: creatorProfiles.spotifyId,
-        isPublic: creatorProfiles.isPublic,
-        isVerified: creatorProfiles.isVerified,
-        isClaimed: creatorProfiles.isClaimed,
-        isFeatured: creatorProfiles.isFeatured,
-        marketingOptOut: creatorProfiles.marketingOptOut,
-        settings: creatorProfiles.settings,
-        theme: creatorProfiles.theme,
-        profileViews: creatorProfiles.profileViews,
-        genres: creatorProfiles.genres,
-        spotifyPopularity: creatorProfiles.spotifyPopularity,
-        createdAt: creatorProfiles.createdAt,
-        updatedAt: creatorProfiles.updatedAt,
-      })
-      .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
-      .limit(1),
+  const [profileResult, linksResult, contactsResult, latestRelease] =
+    await Promise.all([
+      // Profile with user data
+      db
+        .select({
+          id: creatorProfiles.id,
+          userId: creatorProfiles.userId,
+          userIsPro: users.isPro,
+          userClerkId: users.clerkId,
+          creatorType: creatorProfiles.creatorType,
+          username: creatorProfiles.username,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          displayName: creatorProfiles.displayName,
+          bio: creatorProfiles.bio,
+          avatarUrl: creatorProfiles.avatarUrl,
+          spotifyUrl: creatorProfiles.spotifyUrl,
+          appleMusicUrl: creatorProfiles.appleMusicUrl,
+          youtubeUrl: creatorProfiles.youtubeUrl,
+          spotifyId: creatorProfiles.spotifyId,
+          isPublic: creatorProfiles.isPublic,
+          isVerified: creatorProfiles.isVerified,
+          isClaimed: creatorProfiles.isClaimed,
+          isFeatured: creatorProfiles.isFeatured,
+          marketingOptOut: creatorProfiles.marketingOptOut,
+          settings: creatorProfiles.settings,
+          theme: creatorProfiles.theme,
+          profileViews: creatorProfiles.profileViews,
+          genres: creatorProfiles.genres,
+          spotifyPopularity: creatorProfiles.spotifyPopularity,
+          createdAt: creatorProfiles.createdAt,
+          updatedAt: creatorProfiles.updatedAt,
+        })
+        .from(creatorProfiles)
+        .leftJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+        .limit(1),
 
-    // Social links - executed in parallel with profile query
-    db
-      .select({
-        id: socialLinks.id,
-        creatorProfileId: socialLinks.creatorProfileId,
-        platform: socialLinks.platform,
-        platformType: socialLinks.platformType,
-        url: socialLinks.url,
-        displayText: socialLinks.displayText,
-        clicks: socialLinks.clicks,
-        isActive: socialLinks.isActive,
-        sortOrder: socialLinks.sortOrder,
-        createdAt: socialLinks.createdAt,
-        updatedAt: socialLinks.updatedAt,
-      })
-      .from(socialLinks)
-      .innerJoin(
-        creatorProfiles,
-        eq(socialLinks.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(
-          eq(creatorProfiles.usernameNormalized, normalizedUsername),
-          eq(socialLinks.isActive, true),
-          ne(socialLinks.state, 'rejected')
+      // Social links - executed in parallel with profile query
+      db
+        .select({
+          id: socialLinks.id,
+          creatorProfileId: socialLinks.creatorProfileId,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          displayText: socialLinks.displayText,
+          clicks: socialLinks.clicks,
+          isActive: socialLinks.isActive,
+          sortOrder: socialLinks.sortOrder,
+          createdAt: socialLinks.createdAt,
+          updatedAt: socialLinks.updatedAt,
+        })
+        .from(socialLinks)
+        .innerJoin(
+          creatorProfiles,
+          eq(socialLinks.creatorProfileId, creatorProfiles.id)
         )
-      )
-      .orderBy(socialLinks.sortOrder)
-      .limit(MAX_SOCIAL_LINKS),
+        .where(
+          and(
+            eq(creatorProfiles.usernameNormalized, normalizedUsername),
+            eq(socialLinks.isActive, true),
+            ne(socialLinks.state, 'rejected')
+          )
+        )
+        .orderBy(socialLinks.sortOrder)
+        .limit(MAX_SOCIAL_LINKS),
 
-    // Contacts - executed in parallel with profile query
-    db
-      .select({
-        id: creatorContacts.id,
-        creatorProfileId: creatorContacts.creatorProfileId,
-        role: creatorContacts.role,
-        customLabel: creatorContacts.customLabel,
-        personName: creatorContacts.personName,
-        companyName: creatorContacts.companyName,
-        territories: creatorContacts.territories,
-        email: creatorContacts.email,
-        phone: creatorContacts.phone,
-        preferredChannel: creatorContacts.preferredChannel,
-        isActive: creatorContacts.isActive,
-        sortOrder: creatorContacts.sortOrder,
-        createdAt: creatorContacts.createdAt,
-        updatedAt: creatorContacts.updatedAt,
-      })
-      .from(creatorContacts)
-      .innerJoin(
-        creatorProfiles,
-        eq(creatorContacts.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(
-          eq(creatorProfiles.usernameNormalized, normalizedUsername),
-          eq(creatorContacts.isActive, true)
+      // Contacts - executed in parallel with profile query
+      db
+        .select({
+          id: creatorContacts.id,
+          creatorProfileId: creatorContacts.creatorProfileId,
+          role: creatorContacts.role,
+          customLabel: creatorContacts.customLabel,
+          personName: creatorContacts.personName,
+          companyName: creatorContacts.companyName,
+          territories: creatorContacts.territories,
+          email: creatorContacts.email,
+          phone: creatorContacts.phone,
+          preferredChannel: creatorContacts.preferredChannel,
+          isActive: creatorContacts.isActive,
+          sortOrder: creatorContacts.sortOrder,
+          createdAt: creatorContacts.createdAt,
+          updatedAt: creatorContacts.updatedAt,
+        })
+        .from(creatorContacts)
+        .innerJoin(
+          creatorProfiles,
+          eq(creatorContacts.creatorProfileId, creatorProfiles.id)
         )
-      )
-      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
-      .limit(MAX_CONTACTS),
-  ]);
+        .where(
+          and(
+            eq(creatorProfiles.usernameNormalized, normalizedUsername),
+            eq(creatorContacts.isActive, true)
+          )
+        )
+        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
+        .limit(MAX_CONTACTS),
+
+      // Latest release - executed in parallel (uses username, not profile ID)
+      getLatestReleaseByUsername(normalizedUsername),
+    ]);
 
   const profile = profileResult[0];
   if (!profile) return null;
@@ -457,6 +494,7 @@ async function fetchProfileFromDatabase(
     ...profile,
     socialLinks: linksResult,
     contacts: contactsResult,
+    latestRelease,
   };
 }
 

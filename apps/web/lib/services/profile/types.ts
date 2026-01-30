@@ -9,6 +9,7 @@ import type {
   CreatorContact,
   CreatorProfile,
   creatorTypeEnum,
+  DiscogRelease,
 } from '@/lib/db/schema';
 
 /** Creator type enum values */
@@ -87,11 +88,12 @@ export interface ProfileSocialLink {
 }
 
 /**
- * Full profile with social links and contacts.
+ * Full profile with social links, contacts, and latest release.
  */
 export type ProfileWithLinks = ProfileWithUser & {
   socialLinks: ProfileSocialLink[];
   contacts: CreatorContact[];
+  latestRelease: DiscogRelease | null;
 };
 
 /**

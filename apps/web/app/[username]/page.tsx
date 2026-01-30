@@ -16,7 +16,6 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
-import { getLatestReleaseForProfile } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   getTopProfilesForStaticGeneration,
@@ -193,8 +192,8 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
 
-    // Fetch latest release for the profile
-    const latestRelease = await getLatestReleaseForProfile(result.id);
+    // Latest release is now fetched in parallel with profile data
+    const latestRelease = result.latestRelease ?? null;
 
     return {
       profile,
@@ -290,6 +289,22 @@ export default async function ArtistPage({
   // via the StaticArtistPage component which reads cookies on hydration.
 
   const normalizedUsername = username.toLowerCase();
+
+  // Run profile fetch and claim token validation in parallel when claim token is present
+  // This eliminates the sequential DB call that was blocking rendering
+  const hasClaimToken =
+    typeof claimTokenParam === 'string' && claimTokenParam.length > 0;
+
+  const [profileResult, claimTokenValidResult] = await Promise.all([
+    getProfileAndLinks(normalizedUsername, {
+      forceNoStore: hasClaimToken,
+    }),
+    // Only validate claim token if present (returns false immediately otherwise)
+    hasClaimToken
+      ? isClaimTokenValid(normalizedUsername, claimTokenParam)
+      : Promise.resolve(false),
+  ]);
+
   const {
     profile,
     links,
@@ -298,9 +313,7 @@ export default async function ArtistPage({
     status,
     creatorIsPro,
     latestRelease,
-  } = await getProfileAndLinks(normalizedUsername, {
-    forceNoStore: Boolean(claimTokenParam),
-  });
+  } = profileResult;
 
   if (status === 'error') {
     return (
@@ -356,14 +369,9 @@ export default async function ArtistPage({
 
   // Determine if we should show the claim banner
   // Show only when a claim token is present in the URL and matches the profile's token
-  // NOTE: This is async but only runs for unclaimed profiles with a claim token (rare path)
-  let showClaimBanner = false;
-  if (typeof claimTokenParam === 'string' && claimTokenParam.length > 0) {
-    const claimToken = claimTokenParam;
-    if (!profile.is_claimed) {
-      showClaimBanner = await isClaimTokenValid(normalizedUsername, claimToken);
-    }
-  }
+  // The claim token validation was already done in parallel with profile fetch above
+  const showClaimBanner =
+    hasClaimToken && !profile.is_claimed && claimTokenValidResult;
 
   // Generate structured data for SEO
   const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
