@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries';
+import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import type { Contact } from '@/types';
 import type { AdminCreatorSocialLinksResponse } from './types';
 
@@ -36,44 +37,50 @@ export function useContactSave({
         throw new Error('Cannot save contact without ID');
       }
 
-      const response = await fetch('/api/admin/creator-social-links', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          profileId: contact.id,
-          links: contact.socialLinks.map((link, index) => ({
+      try {
+        const result = await fetchWithTimeout<AdminCreatorSocialLinksResponse>(
+          '/api/admin/creator-social-links',
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              profileId: contact.id,
+              links: contact.socialLinks.map((link, index) => ({
+                id: link.id,
+                url: link.url,
+                label: link.label,
+                platformType: link.platformType,
+                sortOrder: index,
+              })),
+            }),
+          }
+        );
+
+        if (!result.success) {
+          throw new Error(
+            'error' in result ? result.error : 'Failed to save contact'
+          );
+        }
+
+        const updatedContact: Contact = {
+          ...contact,
+          socialLinks: result.links.map(link => ({
             id: link.id,
             url: link.url,
             label: link.label,
             platformType: link.platformType,
-            sortOrder: index,
           })),
-        }),
-      });
+        };
 
-      const result = (await response
-        .json()
-        .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
-
-      if (!response.ok || !result?.success) {
-        const message =
-          result && 'error' in result ? result.error : 'Failed to save contact';
-        throw new Error(message);
+        return updatedContact;
+      } catch (error) {
+        if (error instanceof FetchError) {
+          throw new Error('Failed to save contact');
+        }
+        throw error;
       }
-
-      const updatedContact: Contact = {
-        ...contact,
-        socialLinks: result.links.map(link => ({
-          id: link.id,
-          url: link.url,
-          label: link.label,
-          platformType: link.platformType,
-        })),
-      };
-
-      return updatedContact;
     },
     onSuccess: async (updatedContact, contact) => {
       toast.success('Contact saved', { id: 'admin-contact-save' });

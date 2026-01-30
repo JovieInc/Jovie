@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STANDARD_CACHE } from './cache-strategies';
-import { createMutationFn, createQueryFn } from './fetch';
+import { createMutationFn, createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface DashboardProfile {
@@ -146,17 +146,11 @@ export function useUpdateVenmoMutation() {
 
   return useMutation({
     mutationFn: async (input: UpdateVenmoInput) => {
-      const response = await fetch('/api/dashboard/profile', {
+      return fetchWithTimeout<DashboardProfile>('/api/dashboard/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates: input }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update Venmo handle');
-      }
-
-      return response.json();
     },
 
     onSettled: () => {

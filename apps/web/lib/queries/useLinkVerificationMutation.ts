@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { FetchError } from './fetch';
+import { FetchError, fetchWithTimeout } from './fetch';
 
 export interface LinkVerificationInput {
   shortId: string;
@@ -19,38 +19,42 @@ export interface LinkVerificationResponse {
 async function verifyLink(
   input: LinkVerificationInput
 ): Promise<LinkVerificationResponse> {
-  const response = await fetch(`/api/link/${input.shortId}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      verified: input.verified,
-      timestamp: input.timestamp,
-    }),
-  });
+  try {
+    const data = await fetchWithTimeout<LinkVerificationResponse>(
+      `/api/link/${input.shortId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          verified: input.verified,
+          timestamp: input.timestamp,
+        }),
+      }
+    );
 
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new FetchError(
-        'Too many requests. Please wait a moment.',
-        429,
-        response
-      );
+    if (!data.url) {
+      throw new FetchError('Invalid response from server.', 500);
     }
-    if (response.status === 404) {
-      throw new FetchError('Link not found or expired.', 404, response);
+
+    return data;
+  } catch (error) {
+    if (error instanceof FetchError) {
+      // Provide user-friendly messages for specific status codes
+      if (error.status === 429) {
+        throw new FetchError(
+          'Too many requests. Please wait a moment.',
+          429,
+          error.response
+        );
+      }
+      if (error.status === 404) {
+        throw new FetchError('Link not found or expired.', 404, error.response);
+      }
     }
-    throw new FetchError('Failed to verify link.', response.status, response);
+    throw error;
   }
-
-  const data = (await response.json()) as LinkVerificationResponse;
-
-  if (!data.url) {
-    throw new FetchError('Invalid response from server.', 500);
-  }
-
-  return data;
 }
 
 export interface UseLinkVerificationMutationOptions {

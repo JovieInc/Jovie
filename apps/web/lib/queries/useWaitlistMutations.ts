@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { FetchError } from './fetch';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 // Types
@@ -40,29 +40,34 @@ export interface WaitlistSubmitResponse {
 async function approveWaitlistEntry(
   input: ApproveWaitlistInput
 ): Promise<WaitlistMutationResponse> {
-  const response = await fetch('/app/admin/waitlist/approve', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
+  try {
+    const payload = await fetchWithTimeout<{
+      success?: boolean;
+      status?: string;
+      error?: string;
+    }>('/app/admin/waitlist/approve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
 
-  const payload = (await response.json().catch(() => null)) as {
-    success?: boolean;
-    status?: string;
-    error?: string;
-  } | null;
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'Failed to approve waitlist entry');
+    }
 
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.error ?? 'Failed to approve waitlist entry');
+    return {
+      success: true,
+      status: payload.status ?? 'invited',
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to approve waitlist entry');
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    status: payload.status ?? 'invited',
-  };
 }
 
 /**
@@ -71,29 +76,34 @@ async function approveWaitlistEntry(
 async function updateWaitlistStatus(
   input: UpdateWaitlistStatusInput
 ): Promise<WaitlistMutationResponse> {
-  const response = await fetch('/app/admin/waitlist/update-status', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
+  try {
+    const payload = await fetchWithTimeout<{
+      success?: boolean;
+      status?: string;
+      error?: string;
+    }>('/app/admin/waitlist/update-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
 
-  const payload = (await response.json().catch(() => null)) as {
-    success?: boolean;
-    status?: string;
-    error?: string;
-  } | null;
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'Failed to update waitlist status');
+    }
 
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.error ?? 'Failed to update waitlist status');
+    return {
+      success: true,
+      status: payload.status ?? input.status,
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to update waitlist status');
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    status: payload.status ?? input.status,
-  };
 }
 
 /**

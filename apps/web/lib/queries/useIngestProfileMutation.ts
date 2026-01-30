@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface IngestProfileInput {
@@ -22,28 +23,33 @@ export interface IngestProfileResponse {
 async function ingestProfile(
   input: IngestProfileInput
 ): Promise<IngestProfileResponse> {
-  const response = await fetch('/api/admin/creator-ingest', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+  try {
+    const result = await fetchWithTimeout<{
+      ok?: boolean;
+      error?: string;
+      profile?: { id: string; username: string };
+      links?: number;
+    }>('/api/admin/creator-ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
 
-  const result = (await response.json()) as {
-    ok?: boolean;
-    error?: string;
-    profile?: { id: string; username: string };
-    links?: number;
-  };
+    if (!result.ok) {
+      throw new Error(result.error ?? 'Failed to ingest profile');
+    }
 
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error ?? 'Failed to ingest profile');
+    return {
+      success: true,
+      profile: result.profile,
+      links: result.links,
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to ingest profile');
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    profile: result.profile,
-    links: result.links,
-  };
 }
 
 /**
