@@ -144,20 +144,20 @@ async function checkForClientError(
  * Admin pages to test for navigation persistence
  */
 const ADMIN_PAGES = [
-  { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/activity', name: 'Admin Activity' },
-  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
-  { path: '/app/admin/creators', name: 'Admin Creators' },
-  { path: '/app/admin/users', name: 'Admin Users' },
-  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
+  { path: '/admin', name: 'Admin Dashboard' },
+  { path: '/admin/activity', name: 'Admin Activity' },
+  { path: '/admin/campaigns', name: 'Admin Campaigns' },
+  { path: '/admin/creators', name: 'Admin Creators' },
+  { path: '/admin/users', name: 'Admin Users' },
+  { path: '/admin/waitlist', name: 'Admin Waitlist' },
 ] as const;
 
 /**
  * Dashboard pages to test navigation from
  */
 const DASHBOARD_PAGES = [
-  { path: '/app/dashboard/analytics', name: 'Analytics' },
-  { path: '/app/dashboard/profile', name: 'Profile' },
+  { path: '/analytics', name: 'Analytics' },
+  { path: '/profile', name: 'Profile' },
 ] as const;
 
 test.describe('Admin Navigation Persistence @smoke', () => {
@@ -327,7 +327,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     }
 
     // 4. Navigate back to dashboard and verify admin nav still visible
-    await page.goto('/app/dashboard', {
+    await page.goto('/', {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
@@ -394,12 +394,12 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // Rapid navigation: quickly move between pages
     const allPages = [
-      '/app/dashboard/profile',
-      '/app/admin',
-      '/app/dashboard/analytics',
-      '/app/admin/users',
-      '/app/dashboard/profile',
-      '/app/admin/activity',
+      '/profile',
+      '/admin',
+      '/analytics',
+      '/admin/users',
+      '/profile',
+      '/admin/activity',
     ];
 
     let failures = 0;
