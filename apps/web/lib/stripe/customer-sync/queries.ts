@@ -5,8 +5,8 @@
  */
 
 import 'server-only';
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
@@ -223,7 +223,7 @@ export async function fetchUserBillingDataWithAuth<
   const { fields = BILLING_FIELDS_FULL as unknown as T } = options;
 
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return { success: false, error: 'User not authenticated' };
     }

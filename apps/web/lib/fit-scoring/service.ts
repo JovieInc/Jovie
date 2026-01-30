@@ -8,7 +8,12 @@
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import type { DbType } from '@/lib/db';
-import { creatorProfiles, discogReleases, socialLinks } from '@/lib/db/schema';
+import {
+  creatorContacts,
+  creatorProfiles,
+  discogReleases,
+  socialLinks,
+} from '@/lib/db/schema';
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 
 import {
@@ -31,7 +36,7 @@ export async function calculateAndStoreFitScore(
   db: DbType,
   creatorProfileId: string
 ): Promise<{ score: number; breakdown: FitScoreBreakdown } | null> {
-  // Fetch profile data
+  // Fetch profile data with additional DSP IDs
   const [profile] = await db
     .select({
       id: creatorProfiles.id,
@@ -39,6 +44,11 @@ export async function calculateAndStoreFitScore(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
+      appleMusicId: creatorProfiles.appleMusicId,
+      soundcloudId: creatorProfiles.soundcloudId,
+      deezerId: creatorProfiles.deezerId,
+      tidalId: creatorProfiles.tidalId,
+      youtubeMusicId: creatorProfiles.youtubeMusicId,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
@@ -47,6 +57,18 @@ export async function calculateAndStoreFitScore(
   if (!profile) {
     return null;
   }
+
+  // Check if we have a contact email
+  const [contact] = await db
+    .select({ email: creatorContacts.email })
+    .from(creatorContacts)
+    .where(
+      and(
+        eq(creatorContacts.creatorProfileId, creatorProfileId),
+        isNotNull(creatorContacts.email)
+      )
+    )
+    .limit(1);
 
   // Fetch social links to detect music tools
   const links = await db
@@ -76,6 +98,16 @@ export async function calculateAndStoreFitScore(
     .orderBy(desc(discogReleases.releaseDate))
     .limit(1);
 
+  // Count DSP platforms
+  const dspPlatformCount = [
+    profile.spotifyId,
+    profile.appleMusicId,
+    profile.soundcloudId,
+    profile.deezerId,
+    profile.tidalId,
+    profile.youtubeMusicId,
+  ].filter(Boolean).length;
+
   // Build input for calculator
   const input: FitScoreInput = {
     ingestionSourcePlatform: profile.ingestionSourcePlatform,
@@ -85,6 +117,10 @@ export async function calculateAndStoreFitScore(
     spotifyPopularity: profile.spotifyPopularity,
     genres: profile.genres,
     latestReleaseDate: latestRelease?.releaseDate ?? null,
+    hasContactEmail: !!contact?.email,
+    hasAppleMusicId: !!profile.appleMusicId,
+    hasSoundCloudId: !!profile.soundcloudId,
+    dspPlatformCount,
   };
 
   // Calculate score

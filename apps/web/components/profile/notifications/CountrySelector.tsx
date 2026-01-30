@@ -11,6 +11,8 @@ export interface CountryOption {
   label: string;
 }
 
+const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
+
 // Countries supported by Twilio SMS (sorted by usage/popularity)
 export const COUNTRY_OPTIONS: CountryOption[] = [
   // North America
@@ -94,7 +96,7 @@ const CountryOptionButton = memo(function CountryOptionButton({
           ? 'bg-surface-2 text-primary-token'
           : 'text-primary-token hover:bg-surface-1'
       }`}
-      style={{ fontSynthesisWeight: 'none' }}
+      style={FONT_SYNTHESIS_STYLE}
     >
       <span className='text-base'>{option.flag}</span>
       <span className='flex-1 text-left'>{option.label}</span>
@@ -131,7 +133,7 @@ export function CountrySelector({
         <button
           type='button'
           className='h-12 pl-4 pr-3 flex items-center gap-1.5 bg-transparent text-[15px] text-primary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
-          style={{ fontSynthesisWeight: 'none' }}
+          style={FONT_SYNTHESIS_STYLE}
           aria-label='Select country code'
         >
           <span>{country.flag}</span>

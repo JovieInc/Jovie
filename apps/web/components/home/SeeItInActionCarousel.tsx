@@ -8,9 +8,10 @@ import type { FeaturedCreator } from '@/lib/featured-creators';
 const BLUR_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExYTFhIi8+PC9zdmc+';
 
-interface Props {
-  creators: FeaturedCreator[];
-}
+interface Props
+  extends Readonly<{
+    creators: FeaturedCreator[];
+  }> {}
 
 /**
  * Client component for scroll-driven avatar carousel.

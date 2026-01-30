@@ -7,7 +7,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { usePollingManager } from '@/lib/hooks/usePollingManager';
 import {
   useAcceptSuggestionMutation,
   useDismissSuggestionMutation,
@@ -126,13 +127,14 @@ export function useSuggestionSync({
   initialSuggestionsData,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
   const [fastPolling, setFastPolling] = useState(false);
+  const pollingManager = usePollingManager({ isSidebarOpen: sidebarOpen });
 
   // Determine polling behavior:
-  // - Sidebar open: disable polling entirely
+  // - Sidebar open or hidden tab: disable polling entirely
   // - Auto-refresh mode or fast polling: use fixed 2s interval
   // - Otherwise: use adaptive polling with backoff
   function getRefetchInterval(): false | number | 'adaptive' {
-    if (sidebarOpen) return false;
+    if (pollingManager.isPaused) return false;
     if (autoRefreshUntilMs) return 2000;
     return 'adaptive';
   }
@@ -143,7 +145,9 @@ export function useSuggestionSync({
     profileId,
     enabled: suggestionsEnabled && !!profileId,
     refetchInterval,
-    fastPolling: fastPolling || !!autoRefreshUntilMs,
+    fastPolling:
+      !pollingManager.isPaused && (fastPolling || !!autoRefreshUntilMs),
+    pollingEnabled: !pollingManager.isPaused,
     initialData: initialSuggestionsData,
   });
 

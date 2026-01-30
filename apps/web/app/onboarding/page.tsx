@@ -1,7 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
-import { getDashboardData } from '@/app/app/dashboard/actions';
+import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';

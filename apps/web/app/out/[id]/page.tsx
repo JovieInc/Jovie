@@ -13,11 +13,12 @@ import { InterstitialClient } from './InterstitialClient';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-interface PageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
+interface PageProps
+  extends Readonly<{
+    params: Promise<{
+      id: string;
+    }>;
+  }> {}
 
 export async function generateMetadata({
   params: _params, // eslint-disable-line @typescript-eslint/no-unused-vars

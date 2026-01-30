@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from '@storybook/test';
 import { useState } from 'react';
+import { fn } from 'storybook/test';
 import { ErrorBanner } from './ErrorBanner';
 
 const meta: Meta<typeof ErrorBanner> = {

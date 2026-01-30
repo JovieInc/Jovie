@@ -2,16 +2,16 @@
 
 ## Status: ✅ IMPLEMENTED
 
-The featured creators query index has been implemented in migration `0019_colorful_master_mold.sql`.
+The featured creators query index has been implemented in migration `0018_featured_creator_query_index.sql`.
 
 ## Index Details
 
-**Index Name:** `idx_creator_profiles_featured_with_name`
+**Index Name:** `idx_creator_profiles_featured_query`
 
 **Definition:**
 
 ```sql
-CREATE INDEX "idx_creator_profiles_featured_with_name"
+CREATE INDEX "idx_creator_profiles_featured_query"
 ON "creator_profiles"
 USING btree ("is_public","is_featured","marketing_opt_out","display_name")
 WHERE is_public = true AND is_featured = true AND marketing_opt_out = false;
@@ -19,7 +19,7 @@ WHERE is_public = true AND is_featured = true AND marketing_opt_out = false;
 
 **Schema Location:** `lib/db/schema.ts` (creatorProfiles table definition)
 
-**Migration:** `drizzle/migrations/0019_colorful_master_mold.sql`
+**Migration:** `apps/web/drizzle/migrations/0018_featured_creator_query_index.sql`
 
 ## Query Being Optimized
 

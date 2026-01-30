@@ -6,7 +6,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/dashboard/tour-dates/actions';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
   type ContextMenuItemType,

@@ -8,10 +8,11 @@
 
 import { Button } from '@jovie/ui';
 
-interface ThemeToggleSkeletonProps {
-  appearance: 'icon' | 'segmented';
-  className?: string;
-}
+interface ThemeToggleSkeletonProps
+  extends Readonly<{
+    appearance: 'icon' | 'segmented';
+    className?: string;
+  }> {}
 
 export function ThemeToggleSkeleton({
   appearance,

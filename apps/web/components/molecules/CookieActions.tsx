@@ -24,7 +24,7 @@ export function CookieActions({
           onClick={onReject}
           variant='outline'
           size='sm'
-          className='flex-1 whitespace-nowrap rounded-lg border px-3 py-2.5 text-sm font-medium sm:flex-none'
+          className='flex-1 whitespace-nowrap rounded-lg border-default px-3 py-2.5 text-sm font-medium text-primary sm:flex-none'
         >
           Reject
         </Button>
@@ -32,7 +32,7 @@ export function CookieActions({
           onClick={onCustomize}
           variant='outline'
           size='sm'
-          className='flex-1 whitespace-nowrap rounded-lg border px-3 py-2.5 text-sm font-medium sm:flex-none'
+          className='flex-1 whitespace-nowrap rounded-lg border-default px-3 py-2.5 text-sm font-medium text-primary sm:flex-none'
         >
           Customize
         </Button>
@@ -41,7 +41,7 @@ export function CookieActions({
         onClick={onAcceptAll}
         variant='primary'
         size='sm'
-        className='w-full whitespace-nowrap rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white sm:w-auto dark:bg-white dark:text-black'
+        className='w-full whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium btn-primary sm:w-auto'
       >
         Accept All
       </Button>

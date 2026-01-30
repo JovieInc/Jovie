@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
+import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import {

@@ -31,6 +31,14 @@ export {
   normalizeHandle as normalizeBeaconsHandle,
   validateBeaconsUrl,
 } from './beacons';
+// Instagram strategy
+export {
+  extractInstagram,
+  extractInstagramHandle,
+  fetchInstagramDocument,
+  isInstagramUrl,
+  validateInstagramUrl,
+} from './instagram';
 // Laylo strategy
 export {
   extractLaylo,
@@ -50,6 +58,22 @@ export {
   normalizeHandle as normalizeLinktreeHandle,
   validateLinktreeUrl,
 } from './linktree';
+// TikTok strategy
+export {
+  extractTikTok,
+  extractTikTokHandle,
+  fetchTikTokDocument,
+  isTikTokUrl,
+  validateTikTokUrl,
+} from './tiktok';
+// Twitter strategy
+export {
+  extractTwitter,
+  extractTwitterHandle,
+  fetchTwitterDocument,
+  isTwitterUrl,
+  validateTwitterUrl,
+} from './twitter';
 // YouTube strategy
 export {
   extractYouTube,
@@ -64,14 +88,20 @@ export {
 // ============================================================================
 
 import { isBeaconsUrl } from './beacons';
+import { isInstagramUrl } from './instagram';
 import { isLayloUrl } from './laylo';
 import { isLinktreeUrl } from './linktree';
+import { isTikTokUrl } from './tiktok';
+import { isTwitterUrl } from './twitter';
 import { isYouTubeChannelUrl } from './youtube';
 
 export type IngestionPlatform =
   | 'linktree'
   | 'beacons'
   | 'laylo'
+  | 'instagram'
+  | 'tiktok'
+  | 'twitter'
   | 'youtube'
   | 'unknown';
 
@@ -91,6 +121,15 @@ export function detectIngestionPlatform(url: string): IngestionPlatform {
   }
   if (isLayloUrl(url)) {
     return 'laylo';
+  }
+  if (isInstagramUrl(url)) {
+    return 'instagram';
+  }
+  if (isTikTokUrl(url)) {
+    return 'tiktok';
+  }
+  if (isTwitterUrl(url)) {
+    return 'twitter';
   }
   if (isYouTubeChannelUrl(url)) {
     return 'youtube';

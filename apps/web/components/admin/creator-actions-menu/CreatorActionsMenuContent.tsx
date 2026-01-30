@@ -68,7 +68,7 @@ export function CreatorActionsMenuContent({
             disabled: isLoading,
             children: (
               <>
-                <RefreshCw className='h-4 w-4' />
+                <RefreshCw className='h-3.5 w-3.5' />
                 Refresh ingest
               </>
             ),
@@ -80,12 +80,12 @@ export function CreatorActionsMenuContent({
         onClick: () => void onToggleVerification?.(),
         children: profile.isVerified ? (
           <>
-            <X className='h-4 w-4' />
+            <X className='h-3.5 w-3.5' />
             Unverify creator
           </>
         ) : (
           <>
-            <Check className='h-4 w-4' />
+            <Check className='h-3.5 w-3.5' />
             Verify creator
           </>
         ),
@@ -97,7 +97,7 @@ export function CreatorActionsMenuContent({
           <>
             <Star
               className={cn(
-                'h-4 w-4',
+                'h-3.5 w-3.5',
                 profile.isFeatured && 'fill-yellow-400 text-yellow-400'
               )}
             />
@@ -112,12 +112,12 @@ export function CreatorActionsMenuContent({
         onClick: () => void onToggleMarketing?.(),
         children: profile.marketingOptOut ? (
           <>
-            <Mail className='h-4 w-4' />
+            <Mail className='h-3.5 w-3.5' />
             Enable marketing emails
           </>
         ) : (
           <>
-            <MailX className='h-4 w-4' />
+            <MailX className='h-3.5 w-3.5' />
             Disable marketing emails
           </>
         ),
@@ -127,7 +127,7 @@ export function CreatorActionsMenuContent({
         href: `/${profile.username}`,
         children: (
           <>
-            <ExternalLink className='h-4 w-4' />
+            <ExternalLink className='h-3.5 w-3.5' />
             View profile
           </>
         ),
@@ -139,7 +139,7 @@ export function CreatorActionsMenuContent({
             onClick: () => void onCopyClaimLink(),
             children: (
               <>
-                <Copy className='h-4 w-4' />
+                <Copy className='h-3.5 w-3.5' />
                 {copySuccess ? 'Copied!' : 'Copy claim link'}
               </>
             ),
@@ -149,7 +149,7 @@ export function CreatorActionsMenuContent({
               onClick: onSendInvite,
               children: (
                 <>
-                  <Send className='h-4 w-4' />
+                  <Send className='h-3.5 w-3.5' />
                   Send invite
                 </>
               ),
@@ -163,7 +163,7 @@ export function CreatorActionsMenuContent({
         destructive: true,
         children: (
           <>
-            <Trash2 className='h-4 w-4' />
+            <Trash2 className='h-3.5 w-3.5' />
             {profile.isClaimed ? 'Delete user' : 'Delete creator'}
           </>
         ),

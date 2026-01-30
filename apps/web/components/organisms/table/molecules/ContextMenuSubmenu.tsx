@@ -4,27 +4,28 @@ import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../table.styles';
 
-interface ContextMenuSubmenuProps {
-  /**
-   * Label for the submenu trigger (e.g., "Copy")
-   */
-  label: string;
+interface ContextMenuSubmenuProps
+  extends Readonly<{
+    /**
+     * Label for the submenu trigger (e.g., "Copy")
+     */
+    label: string;
 
-  /**
-   * Icon to show before the label
-   */
-  icon?: React.ReactNode;
+    /**
+     * Icon to show before the label
+     */
+    icon?: React.ReactNode;
 
-  /**
-   * Submenu items
-   */
-  children: React.ReactNode;
+    /**
+     * Submenu items
+     */
+    children: React.ReactNode;
 
-  /**
-   * Additional CSS classes for the trigger
-   */
-  className?: string;
-}
+    /**
+     * Additional CSS classes for the trigger
+     */
+    className?: string;
+  }> {}
 
 /**
  * ContextMenuSubmenu - Submenu for context menu (e.g., "Copy >" submenu)
@@ -100,32 +101,33 @@ export function ContextMenuSubmenu({
   );
 }
 
-interface ContextMenuItemProps {
-  /**
-   * Click handler
-   */
-  onClick: () => void;
+interface ContextMenuItemProps
+  extends Readonly<{
+    /**
+     * Click handler
+     */
+    onClick: () => void;
 
-  /**
-   * Icon to show before the label
-   */
-  icon?: React.ReactNode;
+    /**
+     * Icon to show before the label
+     */
+    icon?: React.ReactNode;
 
-  /**
-   * Item label
-   */
-  children: React.ReactNode;
+    /**
+     * Item label
+     */
+    children: React.ReactNode;
 
-  /**
-   * Whether this is a destructive action (shows in red)
-   */
-  destructive?: boolean;
+    /**
+     * Whether this is a destructive action (shows in red)
+     */
+    destructive?: boolean;
 
-  /**
-   * Additional CSS classes
-   */
-  className?: string;
-}
+    /**
+     * Additional CSS classes
+     */
+    className?: string;
+  }> {}
 
 /**
  * ContextMenuItem - Individual item in a context menu or submenu
@@ -156,9 +158,10 @@ export function ContextMenuItem({
   );
 }
 
-interface ContextMenuSeparatorProps {
-  className?: string;
-}
+interface ContextMenuSeparatorProps
+  extends Readonly<{
+    className?: string;
+  }> {}
 
 /**
  * ContextMenuSeparator - Visual separator between menu sections

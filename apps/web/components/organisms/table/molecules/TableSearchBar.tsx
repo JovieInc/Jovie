@@ -14,13 +14,14 @@ import { Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-export interface TableSearchBarProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  debounceMs?: number;
-  className?: string;
-}
+export interface TableSearchBarProps
+  extends Readonly<{
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    debounceMs?: number;
+    className?: string;
+  }> {}
 
 export function TableSearchBar({
   value,

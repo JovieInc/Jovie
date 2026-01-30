@@ -35,8 +35,8 @@ export function DashboardRefreshButton({
         <RefreshCw
           className={
             isPending
-              ? 'h-5 w-5 animate-spin motion-reduce:animate-none'
-              : 'h-5 w-5'
+              ? 'h-4 w-4 animate-spin motion-reduce:animate-none'
+              : 'h-4 w-4'
           }
         />
       }

@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -13,9 +13,10 @@ import {
   usePricingOptionsQuery,
 } from '@/lib/queries';
 
-export function BillingDashboard() {
+export const BillingDashboard = memo(function BillingDashboard() {
   const { error: notifyError } = useNotifications();
   const queryClient = useQueryClient();
+  const notifyErrorRef = useRef(notifyError);
 
   const billingQuery = useBillingStatusQuery();
   const pricingQuery = usePricingOptionsQuery();
@@ -23,12 +24,16 @@ export function BillingDashboard() {
   const isLoading = billingQuery.isLoading || pricingQuery.isLoading;
   const hasError = Boolean(billingQuery.error || pricingQuery.error);
 
+  useEffect(() => {
+    notifyErrorRef.current = notifyError;
+  }, [notifyError]);
+
   // Show error notification when queries fail
   useEffect(() => {
     if (hasError && !isLoading) {
-      notifyError('Billing is temporarily unavailable.');
+      notifyErrorRef.current('Billing is temporarily unavailable.');
     }
-  }, [hasError, isLoading, notifyError]);
+  }, [hasError, isLoading]);
 
   const defaultPriceId = useMemo(() => {
     const pricingData = pricingQuery.data;
@@ -40,9 +45,17 @@ export function BillingDashboard() {
   }, [pricingQuery.data]);
 
   // Refresh handler for error state
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.billing.all });
-  };
+  }, [queryClient]);
+
+  const errorActions = useMemo(
+    () => [
+      { label: 'Retry', onClick: handleRefresh },
+      { label: 'Contact support', href: '/support' },
+    ],
+    [handleRefresh]
+  );
 
   if (isLoading) {
     return (
@@ -59,10 +72,7 @@ export function BillingDashboard() {
       <ErrorBanner
         title='Billing is temporarily unavailable'
         description='We could not load your billing details. Please retry or visit the portal once the connection is restored.'
-        actions={[
-          { label: 'Retry', onClick: handleRefresh },
-          { label: 'Contact support', href: '/support' },
-        ]}
+        actions={errorActions}
         testId='billing-error-state'
       />
     );
@@ -158,4 +168,4 @@ export function BillingDashboard() {
       </div>
     </div>
   );
-}
+});

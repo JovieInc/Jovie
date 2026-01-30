@@ -115,7 +115,10 @@ export function AdminTablePagination({
               aria-disabled={!canPrev}
               aria-label='Previous page'
             >
-              <ChevronLeft className='h-4 w-4 sm:hidden' aria-hidden='true' />
+              <ChevronLeft
+                className='h-3.5 w-3.5 sm:hidden'
+                aria-hidden='true'
+              />
               <span className='hidden sm:inline'>Previous</span>
             </Link>
           </Button>
@@ -131,7 +134,10 @@ export function AdminTablePagination({
               aria-disabled={!canNext}
               aria-label='Next page'
             >
-              <ChevronRight className='h-4 w-4 sm:hidden' aria-hidden='true' />
+              <ChevronRight
+                className='h-3.5 w-3.5 sm:hidden'
+                aria-hidden='true'
+              />
               <span className='hidden sm:inline'>Next</span>
             </Link>
           </Button>

@@ -2,10 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo } from 'react';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
-import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { useLinksPersistence } from './links/hooks/useLinksPersistence';
@@ -51,8 +49,7 @@ export function EnhancedDashboardLinks({
   initialLinks: ProfileSocialLink[];
 }>) {
   // Feature gate for suggestions
-  const linkIngestionGate = useFeatureGate(STATSIG_FLAGS.LINK_INGESTION);
-  const suggestionsEnabled = linkIngestionGate?.value ?? false;
+  const suggestionsEnabled = true;
 
   // Profile editing hook
   const {

@@ -1,7 +1,7 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button, CommonDropdown, Kbd } from '@jovie/ui';
+import { Button, CommonDropdown } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
@@ -26,7 +26,6 @@ interface BuildDropdownItemsParams {
   displayName: string;
   userInitials: string;
   formattedUsername: string | null;
-  MENU_ITEM_CLASS: string;
   handleProfile: () => void;
   handleSettings: () => void;
   handleManageBilling: () => void;
@@ -43,7 +42,6 @@ function buildDropdownItems({
   displayName,
   userInitials,
   formattedUsername,
-  MENU_ITEM_CLASS,
   handleProfile,
   handleSettings,
   handleManageBilling,
@@ -61,7 +59,7 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleProfile}
-          className='w-full cursor-pointer rounded-lg px-2 py-2 hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-3'
+          className='w-full cursor-pointer rounded-lg px-3 py-2 hover:bg-surface-2 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 text-left'
         >
           <div className='flex w-full items-center gap-3'>
             <Avatar
@@ -114,32 +112,23 @@ function buildDropdownItems({
         />
       ),
       onClick: handleSettings,
-      className: MENU_ITEM_CLASS,
     },
   ];
 
   // Add keyboard shortcuts item if handler is provided
   if (handleOpenShortcuts) {
     items.push({
-      type: 'custom',
+      type: 'action',
       id: 'keyboard-shortcuts',
-      render: () => (
-        <button
-          type='button'
-          onClick={handleOpenShortcuts}
-          className={MENU_ITEM_CLASS}
-        >
-          <Icon
-            name='Keyboard'
-            className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-          />
-          <span className='flex-1 text-left'>Keyboard shortcuts</span>
-          <span className='flex items-center gap-0.5 ml-auto'>
-            <Kbd variant='default'>⌘</Kbd>
-            <Kbd variant='default'>/</Kbd>
-          </span>
-        </button>
+      label: 'Keyboard shortcuts',
+      icon: (
+        <Icon
+          name='Keyboard'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
       ),
+      onClick: handleOpenShortcuts,
+      shortcut: '⌘ /',
     });
   }
 
@@ -170,10 +159,7 @@ function buildDropdownItems({
       ),
       onClick: handleManageBilling,
       disabled: loading.manageBilling,
-      className: cn(
-        MENU_ITEM_CLASS,
-        'disabled:cursor-not-allowed disabled:opacity-70'
-      ),
+      className: 'disabled:cursor-not-allowed disabled:opacity-70',
     });
   } else {
     items.push({
@@ -188,10 +174,7 @@ function buildDropdownItems({
       ),
       onClick: handleUpgrade,
       disabled: loading.upgrade,
-      className: cn(
-        MENU_ITEM_CLASS,
-        'disabled:cursor-not-allowed disabled:opacity-70'
-      ),
+      className: 'disabled:cursor-not-allowed disabled:opacity-70',
     });
   }
 
@@ -208,18 +191,17 @@ function buildDropdownItems({
         />
       ),
       onClick: () => setIsFeedbackOpen(true),
-      className: MENU_ITEM_CLASS,
     },
     { type: 'custom', id: 'spacer-2', render: () => <div className='h-2' /> },
     {
       type: 'action',
       id: 'sign-out',
       label: loading.signOut ? 'Signing out…' : 'Sign out',
-      icon: <Icon name='LogOut' className='h-4 w-4 text-red-400' />,
+      icon: <Icon name='LogOut' className='h-4 w-4 text-red-500' />,
       onClick: handleSignOut,
       disabled: loading.signOut,
-      className:
-        'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive/10 data-[highlighted]:bg-destructive/10 focus-visible:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1 focus-visible:ring-offset-surface-3 disabled:cursor-not-allowed disabled:opacity-60',
+      variant: 'destructive',
+      className: 'disabled:cursor-not-allowed disabled:opacity-60',
     }
   );
 
@@ -300,13 +282,6 @@ export function UserButton({
     );
   }
 
-  // Menu styling using standard design tokens
-  const MENU_CONTENT_CLASS =
-    'w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-subtle bg-surface-3 p-2 font-sans text-[13px] leading-[18px] text-primary-token shadow-[0_4px_24px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]';
-
-  const MENU_ITEM_CLASS =
-    'group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-secondary-token transition-colors hover:bg-white/5 hover:text-primary-token data-[highlighted]:bg-white/5 data-[highlighted]:text-primary-token focus-visible:bg-white/5 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-3';
-
   const dropdownItems = buildDropdownItems({
     billingStatus,
     loading,
@@ -314,7 +289,6 @@ export function UserButton({
     displayName,
     userInitials,
     formattedUsername,
-    MENU_ITEM_CLASS,
     handleProfile,
     handleSettings,
     handleManageBilling,
@@ -374,7 +348,6 @@ export function UserButton({
         align='end'
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName={MENU_CONTENT_CLASS}
       />
       <FeedbackModal
         isOpen={isFeedbackOpen}

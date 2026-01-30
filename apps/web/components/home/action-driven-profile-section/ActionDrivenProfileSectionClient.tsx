@@ -158,6 +158,7 @@ export function ActionDrivenProfileSectionClient({
                               src='/avatars/default-user.png'
                               width={112}
                               height={112}
+                              sizes='56px'
                               className='h-full w-full object-cover'
                               priority={false}
                             />

@@ -120,6 +120,27 @@
       "when": 1769600000000,
       "tag": "0016_analytics_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1769700000000,
+      "tag": "0017_add_email_engagement_and_campaigns",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1769800000000,
+      "tag": "0018_featured_creator_query_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1769900000000,
+      "tag": "0019_creator_provenance_tables",
+      "breakpoints": true
     }
   ]
 }

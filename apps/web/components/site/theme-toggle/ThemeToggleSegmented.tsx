@@ -9,15 +9,16 @@
 import React from 'react';
 import { SmallMoonIcon, SmallSunIcon, SmallSystemIcon } from './ThemeIcons';
 
-interface ThemeToggleSegmentedProps {
-  currentTheme: string;
-  indicatorX: number;
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  shortcutDescriptionId?: string;
-  shortcutDescription?: string;
-  className?: string;
-  wrapButton: (button: React.ReactElement) => React.ReactElement;
-}
+interface ThemeToggleSegmentedProps
+  extends Readonly<{
+    currentTheme: string;
+    indicatorX: number;
+    setTheme: (theme: 'light' | 'dark' | 'system') => void;
+    shortcutDescriptionId?: string;
+    shortcutDescription?: string;
+    className?: string;
+    wrapButton: (button: React.ReactElement) => React.ReactElement;
+  }> {}
 
 const baseButtonClass =
   'relative z-10 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full leading-none outline-none transition-colors focus-ring-themed focus-visible:ring-offset-transparent';

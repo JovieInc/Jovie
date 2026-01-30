@@ -13,13 +13,13 @@ export function createCopyMenuItems(
     {
       id: 'copy-email',
       label: 'Copy Email',
-      icon: <Mail className='h-4 w-4' />,
+      icon: <Mail className='h-3.5 w-3.5' />,
       onClick: () => copyToClipboard(entry.email, 'email'),
     },
     {
       id: 'copy-name',
       label: 'Copy Name',
-      icon: <User className='h-4 w-4' />,
+      icon: <User className='h-3.5 w-3.5' />,
       onClick: () => copyToClipboard(entry.fullName, 'name'),
     },
   ];
@@ -35,7 +35,7 @@ export function createExternalLinkMenuItems(
     {
       id: 'open-social',
       label: 'Open Primary Social',
-      icon: <ExternalLink className='h-4 w-4' />,
+      icon: <ExternalLink className='h-3.5 w-3.5' />,
       onClick: () => {
         window.open(
           entry.primarySocialUrlNormalized,
@@ -51,7 +51,7 @@ export function createExternalLinkMenuItems(
     items.push({
       id: 'open-spotify',
       label: 'Open Spotify',
-      icon: <ExternalLink className='h-4 w-4' />,
+      icon: <ExternalLink className='h-3.5 w-3.5' />,
       onClick: () => {
         window.open(
           entry.spotifyUrlNormalized!,
@@ -78,7 +78,7 @@ export function createStatusActionMenuItems(
     {
       id: 'approve',
       label: isApproved ? 'Approved' : 'Approve',
-      icon: <ClipboardList className='h-4 w-4' />,
+      icon: <ClipboardList className='h-3.5 w-3.5' />,
       onClick: () => {
         if (!isApproved) {
           void approveEntry(entry.id);

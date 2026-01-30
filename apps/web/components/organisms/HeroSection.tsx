@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
+import { memo, type ReactNode, useMemo } from 'react';
 import { GradientText } from '@/components/atoms/GradientText';
 import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ export interface HeroSectionProps {
   showBackgroundEffects?: boolean;
 }
 
-export function HeroSection({
+export const HeroSection = memo(function HeroSection({
   headline,
   highlightText,
   gradientVariant = 'primary',
@@ -45,18 +45,24 @@ export function HeroSection({
   className,
   showBackgroundEffects = true,
 }: HeroSectionProps) {
+  const headlineParts = useMemo(() => {
+    if (!highlightText || typeof headline !== 'string') {
+      return null;
+    }
+    return headline.split(highlightText);
+  }, [headline, highlightText]);
+
   // Process headline to add gradient to highlighted text
   // Memoized to prevent re-computation on every render
   const processedHeadline = useMemo(() => {
-    if (!highlightText || typeof headline !== 'string') {
+    if (!headlineParts) {
       return headline;
     }
-    const parts = headline.split(highlightText);
     const result: ReactNode[] = [];
 
-    for (let i = 0; i < parts.length; i++) {
-      result.push(parts[i]);
-      if (i < parts.length - 1) {
+    for (let i = 0; i < headlineParts.length; i++) {
+      result.push(headlineParts[i]);
+      if (i < headlineParts.length - 1) {
         // Use stable key based on position in headline
         result.push(
           <GradientText key={`gradient-at-${i}`} variant={gradientVariant}>
@@ -67,7 +73,7 @@ export function HeroSection({
     }
 
     return result;
-  }, [headline, highlightText, gradientVariant]);
+  }, [gradientVariant, headline, headlineParts, highlightText]);
 
   return (
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-labelledby needed for hero section accessibility
@@ -140,4 +146,4 @@ export function HeroSection({
       </Container>
     </header>
   );
-}
+});

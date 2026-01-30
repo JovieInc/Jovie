@@ -102,7 +102,7 @@ export async function fetchYouTubeAboutDocument(
   return result.html;
 }
 
-function parseChannelJson(html: string): unknown | null {
+function parseChannelJson(html: string): unknown {
   const data =
     extractScriptJson<unknown>(html, 'ytInitialData') ??
     extractScriptJson<unknown>(html, 'ytInitialPlayerResponse');
@@ -270,5 +270,6 @@ export function extractYouTube(html: string): ExtractionResult {
     links,
     displayName,
     avatarUrl,
+    sourcePlatform: 'youtube',
   };
 }

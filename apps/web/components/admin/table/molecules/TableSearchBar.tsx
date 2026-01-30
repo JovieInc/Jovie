@@ -5,13 +5,14 @@ import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-export interface TableSearchBarProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  debounceMs?: number;
-  className?: string;
-}
+export interface TableSearchBarProps
+  extends Readonly<{
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    debounceMs?: number;
+    className?: string;
+  }> {}
 
 export function TableSearchBar({
   value,
@@ -40,7 +41,7 @@ export function TableSearchBar({
 
   return (
     <div className={cn('relative flex items-center', className)}>
-      <Search className='absolute left-3 h-4 w-4 text-tertiary-token pointer-events-none' />
+      <Search className='absolute left-3 h-3.5 w-3.5 text-tertiary-token pointer-events-none' />
       <Input
         type='search'
         value={localValue}

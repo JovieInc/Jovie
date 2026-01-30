@@ -8,10 +8,11 @@ const CONTAINER_ANIMATION_DELAY = 0.4;
 const BUTTON_HOVER_SCALE = 1.02;
 const BUTTON_TAP_SCALE = 0.98;
 
-interface PricingCTAProps {
-  onUpgrade: () => void;
-  isLoading: boolean;
-}
+interface PricingCTAProps
+  extends Readonly<{
+    onUpgrade: () => void;
+    isLoading: boolean;
+  }> {}
 
 export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
   return (

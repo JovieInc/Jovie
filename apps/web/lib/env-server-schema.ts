@@ -40,6 +40,9 @@ export const ServerEnvSchema = z.object({
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
 
+  // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
+  SLACK_WEBHOOK_URL: z.string().url().optional(),
+
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
 
@@ -66,9 +69,6 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().optional(),
   STRIPE_PRICE_GROWTH_YEARLY: z.string().optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
-
-  // Statsig server-side
-  STATSIG_SERVER_API_KEY: z.string().optional(),
 
   // URL encryption (required in production/preview)
   URL_ENCRYPTION_KEY: z.string().optional(),
@@ -152,6 +152,7 @@ export const ENV_KEYS = [
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
+  'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
@@ -165,7 +166,6 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'INGESTION_CRON_SECRET',
-  'STATSIG_SERVER_API_KEY',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',

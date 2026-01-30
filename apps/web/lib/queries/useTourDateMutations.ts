@@ -12,7 +12,7 @@ import {
   saveBandsintownApiKey,
   syncFromBandsintown,
   updateTourDate,
-} from '@/app/app/dashboard/tour-dates/actions';
+} from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { queryKeys } from './keys';
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useTransition } from 'react';
-import { connectSpotifyArtist } from '@/app/app/dashboard/releases/actions';
+import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { ReleasesEmptyStateAction } from '../types';
 
@@ -33,9 +33,8 @@ export function useSpotifyConnect({
   // Extract Spotify artist ID from URL
   const extractSpotifyArtistId = useCallback((input: string): string | null => {
     const trimmed = input.trim();
-    const artistMatch = trimmed.match(
-      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/
-    );
+    const artistMatch =
+      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(trimmed);
     return artistMatch ? artistMatch[1] : null;
   }, []);
 

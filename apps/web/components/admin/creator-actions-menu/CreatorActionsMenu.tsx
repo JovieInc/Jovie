@@ -62,7 +62,7 @@ function MenuItems({
       {onRefreshIngest && (
         <>
           <DropdownMenuItem onClick={onRefreshIngest} disabled={isLoading}>
-            <RefreshCw className='h-4 w-4' />
+            <RefreshCw className='h-3.5 w-3.5' />
             Refresh ingest
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -72,12 +72,12 @@ function MenuItems({
       <DropdownMenuItem onClick={onToggleVerification}>
         {profile.isVerified ? (
           <>
-            <X className='h-4 w-4' />
+            <X className='h-3.5 w-3.5' />
             Unverify creator
           </>
         ) : (
           <>
-            <Check className='h-4 w-4' />
+            <Check className='h-3.5 w-3.5' />
             Verify creator
           </>
         )}
@@ -86,7 +86,7 @@ function MenuItems({
       <DropdownMenuItem onClick={onToggleFeatured}>
         <Star
           className={cn(
-            'h-4 w-4',
+            'h-3.5 w-3.5',
             profile.isFeatured && 'fill-yellow-400 text-yellow-400'
           )}
         />
@@ -98,12 +98,12 @@ function MenuItems({
       <DropdownMenuItem onClick={onToggleMarketing}>
         {profile.marketingOptOut ? (
           <>
-            <Mail className='h-4 w-4' />
+            <Mail className='h-3.5 w-3.5' />
             Enable marketing emails
           </>
         ) : (
           <>
-            <MailX className='h-4 w-4' />
+            <MailX className='h-3.5 w-3.5' />
             Disable marketing emails
           </>
         )}
@@ -116,7 +116,7 @@ function MenuItems({
           rel='noopener noreferrer'
           onClick={e => e.stopPropagation()}
         >
-          <ExternalLink className='h-4 w-4' />
+          <ExternalLink className='h-3.5 w-3.5' />
           View profile
         </Link>
       </DropdownMenuItem>
@@ -125,12 +125,12 @@ function MenuItems({
         <>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleCopyClaimLink}>
-            <Copy className='h-4 w-4' />
+            <Copy className='h-3.5 w-3.5' />
             {copySuccess ? 'Copied!' : 'Copy claim link'}
           </DropdownMenuItem>
           {onSendInvite && (
             <DropdownMenuItem onClick={onSendInvite}>
-              <Send className='h-4 w-4' />
+              <Send className='h-3.5 w-3.5' />
               Send invite
             </DropdownMenuItem>
           )}
@@ -140,7 +140,7 @@ function MenuItems({
       <DropdownMenuSeparator />
 
       <DropdownMenuItem onClick={onDelete} variant='destructive'>
-        <Trash2 className='h-4 w-4' />
+        <Trash2 className='h-3.5 w-3.5' />
         {profile.isClaimed ? 'Delete user' : 'Delete creator'}
       </DropdownMenuItem>
     </>
@@ -200,7 +200,7 @@ export function CreatorActionsMenu({
               className='h-8 w-8 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
               disabled={isLoading}
             >
-              <MoreVertical className='h-4 w-4' />
+              <MoreVertical className='h-3.5 w-3.5' />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' sideOffset={8}>
@@ -233,7 +233,7 @@ export function CreatorActionsMenu({
           disabled={isLoading}
         >
           Actions
-          <MoreVertical className='h-4 w-4 ml-1' />
+          <MoreVertical className='h-3.5 w-3.5 ml-1' />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={8} className='w-56'>

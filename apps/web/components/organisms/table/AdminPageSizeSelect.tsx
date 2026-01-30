@@ -9,6 +9,9 @@ import {
 } from '@jovie/ui';
 import * as React from 'react';
 
+const selectItemClassName =
+  'text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token';
+
 export interface AdminPageSizeSelectProps {
   initialPageSize: number;
   name?: string;
@@ -44,10 +47,16 @@ export function AdminPageSizeSelect({
             <SelectTrigger className='h-8 w-20 px-2 text-xs'>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='10'>10</SelectItem>
-              <SelectItem value='20'>20</SelectItem>
-              <SelectItem value='50'>50</SelectItem>
+            <SelectContent className='bg-surface-1 text-primary-token border border-subtle'>
+              <SelectItem value='10' className={selectItemClassName}>
+                10
+              </SelectItem>
+              <SelectItem value='20' className={selectItemClassName}>
+                20
+              </SelectItem>
+              <SelectItem value='50' className={selectItemClassName}>
+                50
+              </SelectItem>
             </SelectContent>
           </Select>
         </label>

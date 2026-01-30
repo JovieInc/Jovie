@@ -17,13 +17,17 @@ import type { ingestionJobs } from '@/lib/db/schema';
 import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processBeaconsJob } from './jobs/beacons';
+import { processInstagramJob } from './jobs/instagram';
 import { processLayloJob } from './jobs/laylo';
 import { processLinktreeJob } from './jobs/linktree';
+import { processTikTokJob } from './jobs/tiktok';
+import { processTwitterJob } from './jobs/twitter';
 import { processYouTubeJob } from './jobs/youtube';
 
 // Re-export followup functions
 export { enqueueFollowupIngestionJobs } from './followup';
 export { beaconsJobConfig, processBeaconsJob } from './jobs/beacons';
+export { instagramJobConfig, processInstagramJob } from './jobs/instagram';
 export {
   deriveLayloHandle,
   layloJobConfig,
@@ -31,6 +35,8 @@ export {
 } from './jobs/laylo';
 // Re-export job processors (direct imports to avoid barrel export issues)
 export { linktreeJobConfig, processLinktreeJob } from './jobs/linktree';
+export { processTikTokJob, tiktokJobConfig } from './jobs/tiktok';
+export { processTwitterJob, twitterJobConfig } from './jobs/twitter';
 // Re-export types
 export type {
   BaseJobPayload,
@@ -76,6 +82,12 @@ export async function processJob(
       return processYouTubeJob(tx, job.payload);
     case 'import_beacons':
       return processBeaconsJob(tx, job.payload);
+    case 'import_instagram':
+      return processInstagramJob(tx, job.payload);
+    case 'import_tiktok':
+      return processTikTokJob(tx, job.payload);
+    case 'import_twitter':
+      return processTwitterJob(tx, job.payload);
     case 'send_claim_invite':
       return processSendClaimInviteJob(tx, job.payload);
     case 'dsp_artist_discovery':

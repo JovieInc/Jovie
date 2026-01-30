@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { Logo, type LogoVariant } from '@/components/atoms/Logo';
 import { cn } from '@/lib/utils';
 
-interface LogoLinkProps {
-  href?: string;
-  className?: string;
-  logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  variant?: LogoVariant;
-  'data-testid'?: string;
-}
+interface LogoLinkProps
+  extends Readonly<{
+    href?: string;
+    className?: string;
+    logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    variant?: LogoVariant;
+    'data-testid'?: string;
+  }> {}
 
 export function LogoLink({
   href = '/',

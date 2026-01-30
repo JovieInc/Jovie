@@ -9,9 +9,10 @@
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 
-interface AudienceMemberReferrersProps {
-  member: AudienceMember;
-}
+interface AudienceMemberReferrersProps
+  extends Readonly<{
+    member: AudienceMember;
+  }> {}
 
 export function AudienceMemberReferrers({
   member,

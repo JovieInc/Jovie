@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { DashboardData } from '@/app/app/dashboard/actions/dashboard-data';
-import { DashboardDataProvider } from '@/app/app/dashboard/DashboardDataContext';
-import DashboardLayoutClient from '@/app/app/dashboard/DashboardLayoutClient';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import DashboardLayoutClient from '@/app/app/(shell)/dashboard/DashboardLayoutClient';
 import type { AudienceMember } from '@/types';
-import { DashboardAudienceTable } from './DashboardAudienceTable';
+import { DashboardAudienceTable } from './dashboard-audience-table';
 
 const mockDashboardData: DashboardData = {
   user: { id: 'story-user' },

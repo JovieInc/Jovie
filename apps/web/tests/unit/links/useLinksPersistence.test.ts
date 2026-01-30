@@ -73,7 +73,7 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { useLinksPersistence } from '@/components/dashboard/organisms/links/hooks/useLinksPersistence';
 import type { LinkItem } from '@/components/dashboard/organisms/links/types';
 

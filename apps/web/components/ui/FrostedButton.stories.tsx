@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { FrostedButton } from './FrostedButton';
+import { FrostedButton } from '@/components/atoms/FrostedButton';
 
 const meta: Meta<typeof FrostedButton> = {
   title: 'UI/FrostedButton',

@@ -1,5 +1,3 @@
-import { useMemo } from 'react';
-
 /**
  * Reusable loading skeleton for settings pages.
  * Reduces duplication across settings loading.tsx files.
@@ -22,7 +20,7 @@ export interface SettingsLoadingSkeletonProps {
  * <SettingsLoadingSkeleton titleWidth="w-56" descriptionWidth="w-96">
  *   <InputSkeleton />
  *   <InputSkeleton />
- *   <ButtonSkeleton width="w-40" />
+ *   <SettingsButtonSkeleton width="w-40" />
  * </SettingsLoadingSkeleton>
  * ```
  */
@@ -55,8 +53,8 @@ export function InputSkeleton({
   return <div className={`h-10 ${width} rounded skeleton`} />;
 }
 
-/** Skeleton for a button */
-export function ButtonSkeleton({
+/** Skeleton for a button in settings context */
+export function SettingsButtonSkeleton({
   width = 'w-40',
 }: Readonly<{ width?: string }>) {
   return <div className={`h-10 ${width} rounded skeleton`} />;
@@ -76,8 +74,8 @@ export function ToggleRowSkeleton({
   );
 }
 
-/** Skeleton for a card/panel */
-export function CardSkeleton({
+/** Skeleton for a card/panel in settings context */
+export function SettingsCardSkeleton({
   height = 'h-20',
   width = 'w-full',
 }: Readonly<{
@@ -97,7 +95,7 @@ export function ProfileSettingsLoading() {
     <SettingsLoadingSkeleton titleWidth='w-48' descriptionWidth='w-80'>
       <InputSkeleton />
       <InputSkeleton />
-      <ButtonSkeleton width='w-40' />
+      <SettingsButtonSkeleton width='w-40' />
     </SettingsLoadingSkeleton>
   );
 }
@@ -106,8 +104,8 @@ export function ProfileSettingsLoading() {
 export function BillingSettingsLoading() {
   return (
     <SettingsLoadingSkeleton titleWidth='w-64' descriptionWidth='w-96'>
-      <CardSkeleton height='h-20' />
-      <ButtonSkeleton width='w-44' />
+      <SettingsCardSkeleton height='h-20' />
+      <SettingsButtonSkeleton width='w-44' />
     </SettingsLoadingSkeleton>
   );
 }
@@ -123,30 +121,6 @@ export function NotificationsSettingsLoading() {
   );
 }
 
-/** Appearance settings loading skeleton - reuses ProfileSettingsLoading */
-export const AppearanceSettingsLoading = ProfileSettingsLoading;
-
-/** Generic form settings loading skeleton */
-export function FormSettingsLoading({
-  inputCount = 3,
-}: Readonly<{
-  inputCount?: number;
-}>) {
-  const inputKeys = useMemo(
-    () => Array.from({ length: inputCount }, (_, i) => `form-input-${i}`),
-    [inputCount]
-  );
-
-  return (
-    <SettingsLoadingSkeleton>
-      {inputKeys.map(key => (
-        <InputSkeleton key={key} />
-      ))}
-      <ButtonSkeleton />
-    </SettingsLoadingSkeleton>
-  );
-}
-
 /** Branding settings loading skeleton (used by branding and remove-branding pages) */
 export function BrandingSettingsLoading() {
   return (
@@ -158,7 +132,7 @@ export function BrandingSettingsLoading() {
         </div>
         <div className='h-6 w-10 rounded skeleton' />
       </div>
-      <ButtonSkeleton width='w-44' />
+      <SettingsButtonSkeleton width='w-44' />
     </SettingsLoadingSkeleton>
   );
 }

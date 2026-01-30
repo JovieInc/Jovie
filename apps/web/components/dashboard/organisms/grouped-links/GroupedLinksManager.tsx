@@ -88,6 +88,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   // Refs
   const containerRef = useRef<HTMLDivElement | null>(null);
   const linkInputRef = useRef<UniversalLinkInputRef | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Pending preview management
   const {
@@ -98,21 +99,41 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
     handlePreviewChange,
   } = usePendingPreview({ onAdd: handleAdd });
 
+  // Combined memoization to reduce iterations over links array
+  const { existingPlatforms, existingNormalizedUrlPlatforms } = useMemo(() => {
+    const platforms = new Set<string>();
+    const urlPlatforms = new Map<string, Set<string>>();
+
+    for (const link of links) {
+      platforms.add(link.platform.id);
+
+      const normalizedUrl = link.normalizedUrl;
+      if (normalizedUrl) {
+        const existing = urlPlatforms.get(normalizedUrl);
+        if (existing) {
+          existing.add(link.platform.id);
+        } else {
+          urlPlatforms.set(normalizedUrl, new Set([link.platform.id]));
+        }
+      }
+    }
+
+    return {
+      existingPlatforms: platforms,
+      existingNormalizedUrlPlatforms: urlPlatforms,
+    };
+  }, [links]);
+
   // Suggestion handlers
   const { handleAcceptSuggestionClick, handleDismissSuggestionClick } =
     useSuggestionHandlers<T>({
-      links,
+      existingNormalizedUrlPlatforms,
       setLinks,
       insertLinkWithSectionOrdering,
       onLinkAdded,
       handleAcceptSuggestionFromHook,
       handleDismissSuggestionFromHook,
     });
-
-  const existingPlatforms = useMemo(
-    () => new Set(links.map(l => l.platform.id)),
-    [links]
-  );
 
   // Memoize platform IDs for UniversalLinkInput to prevent unnecessary re-renders
   const existingPlatformIds = useMemo(
@@ -244,7 +265,11 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
       data-testid='grouped-links-manager'
     >
       {/* Scrollable links area */}
-      <div className='flex-1 overflow-y-auto px-4 py-6'>
+      <section
+        ref={scrollContainerRef}
+        className='flex-1 overflow-y-auto px-4 py-6'
+        aria-label='Links list'
+      >
         <div className='mx-auto max-w-2xl'>
           <ChatStyleLinkList
             links={links}
@@ -264,9 +289,10 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
             onAddPendingPreview={handleAddPendingPreview}
             onCancelPendingPreview={handleCancelPendingPreview}
             onHint={setHint}
+            scrollContainerRef={scrollContainerRef}
           />
         </div>
-      </div>
+      </section>
 
       {/* Input at bottom */}
       <div className='border-t border-subtle bg-base px-4 py-4'>

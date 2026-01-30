@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { BarChart3, Link as LinkIcon, Lock, Search, Users } from 'lucide-react';
-import { EmptyState, type EmptyStateProps } from './EmptyState';
+import {
+  EmptyState,
+  type EmptyStateProps,
+} from '@/components/organisms/EmptyState';
 
 const meta: Meta<typeof EmptyState> = {
   title: 'UI/EmptyState',

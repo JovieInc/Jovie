@@ -1,8 +1,6 @@
 'use client';
 
-import { ClerkProvider, useUser } from '@clerk/nextjs';
-import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
-import { usePathname } from 'next/navigation';
+import { ClerkProvider } from '@clerk/nextjs';
 import React from 'react';
 import {
   ClerkSafeDefaultsProvider,
@@ -11,24 +9,6 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
-import type { StatsigProvidersProps } from './StatsigProviders';
-
-type StatsigLoadingProps = StatsigProvidersProps & DynamicOptionsLoadingProps;
-
-function StatsigProvidersSkeleton(props: DynamicOptionsLoadingProps) {
-  const { children } = props as StatsigLoadingProps;
-  return <>{children}</>;
-}
-
-const StatsigProviders = dynamic<StatsigProvidersProps>(
-  () =>
-    import('./StatsigProviders').then(mod => ({
-      default: mod.StatsigProviders,
-    })),
-  {
-    loading: StatsigProvidersSkeleton,
-  }
-);
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -48,26 +28,15 @@ function isMockPublishableKey(publishableKey: string): boolean {
 }
 
 // Inner component that uses Clerk hooks (must be inside ClerkProvider)
-interface ClientProvidersInnerProps {
-  children: React.ReactNode;
-  initialThemeMode?: ThemeMode;
-  enableStatsig?: boolean;
-  skipCoreProviders?: boolean;
-}
-
 interface WrappedProvidersOptions {
   children: React.ReactNode;
   initialThemeMode: ThemeMode;
-  enableStatsig: boolean;
-  userId?: string;
   skipCoreProviders: boolean;
 }
 
-function wrapWithStatsig({
+function wrapWithCoreProviders({
   children,
   initialThemeMode,
-  enableStatsig,
-  userId,
   skipCoreProviders,
 }: WrappedProvidersOptions) {
   const content = skipCoreProviders ? (
@@ -78,28 +47,7 @@ function wrapWithStatsig({
     </CoreProviders>
   );
 
-  if (!enableStatsig) {
-    return content;
-  }
-
-  return <StatsigProviders userId={userId}>{content}</StatsigProviders>;
-}
-
-function ClientProvidersInner({
-  children,
-  initialThemeMode = 'system',
-  enableStatsig = true,
-  skipCoreProviders = false,
-}: ClientProvidersInnerProps) {
-  const { user } = useUser();
-
-  return wrapWithStatsig({
-    children,
-    initialThemeMode,
-    enableStatsig,
-    userId: user?.id,
-    skipCoreProviders,
-  });
+  return content;
 }
 
 // Clerk appearance config with comprehensive dark mode support
@@ -182,22 +130,6 @@ export function ClientProviders({
   publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {
-  const pathname = usePathname();
-  const marketingPrefixes = [
-    '/blog',
-    '/changelog',
-    '/engagement-engine',
-    '/investors',
-    '/link-in-bio',
-    '/pricing',
-    '/support',
-    '/waitlist',
-  ];
-  const isMarketingRoute =
-    pathname === '/' ||
-    marketingPrefixes.some(prefix => pathname.startsWith(prefix));
-  const enableStatsig = !isMarketingRoute;
-
   const shouldBypassClerk =
     !publishableKey ||
     publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
@@ -209,10 +141,9 @@ export function ClientProviders({
     // instead of throwing "must be used within ClerkProvider" errors
     return (
       <ClerkSafeDefaultsProvider>
-        {wrapWithStatsig({
+        {wrapWithCoreProviders({
           children,
           initialThemeMode,
-          enableStatsig,
           skipCoreProviders,
         })}
       </ClerkSafeDefaultsProvider>
@@ -225,13 +156,11 @@ export function ClientProviders({
       appearance={clerkAppearance}
     >
       <ClerkSafeValuesProvider>
-        <ClientProvidersInner
-          initialThemeMode={initialThemeMode}
-          enableStatsig={enableStatsig}
-          skipCoreProviders={skipCoreProviders}
-        >
-          {children}
-        </ClientProvidersInner>
+        {wrapWithCoreProviders({
+          children,
+          initialThemeMode,
+          skipCoreProviders,
+        })}
       </ClerkSafeValuesProvider>
     </ClerkProvider>
   );

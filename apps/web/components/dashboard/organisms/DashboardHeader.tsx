@@ -34,7 +34,7 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       className={cn('z-20 border-b border-subtle', className)}
     >
-      <div className='relative flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
+      <div className='relative flex h-14 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (

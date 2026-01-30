@@ -2,15 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
-import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
@@ -41,7 +39,6 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
-  const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
 
   // Debug: track isAdmin changes in development
   useEffect(() => {
@@ -65,14 +62,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize filtered items to prevent creating new arrays on every render
   // Note: Tour dates is now always visible (unflagged)
-  const primaryItems = useMemo(
-    () =>
-      primaryNavigation.filter(item => {
-        if (item.id === 'contacts' && !contactsGate.value) return false;
-        return true;
-      }),
-    [contactsGate.value]
-  );
+  const primaryItems = useMemo(() => primaryNavigation, []);
 
   const secondaryItems = secondaryNavigation;
 
@@ -136,7 +126,10 @@ export function DashboardNav(_: DashboardNavProps) {
         </SidebarGroupContent>
       </SidebarGroup>
       {isAdmin && !isInSettings && (
-        <div className='mt-3 pt-3 border-t border-sidebar-border/50'>
+        <div
+          className='mt-3 pt-3 border-t border-sidebar-border/50'
+          data-testid='admin-nav-section'
+        >
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>

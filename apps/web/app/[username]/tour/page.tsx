@@ -3,7 +3,7 @@ import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import { loadUpcomingTourDates } from '@/app/app/dashboard/tour-dates/actions';
+import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { PROFILE_URL } from '@/constants/app';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';

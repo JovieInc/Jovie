@@ -7,16 +7,17 @@ interface DataAvailability {
   errorMessage?: string;
 }
 
-interface DefaultStatusBannerProps {
-  status: 'alive' | 'dead';
-  detail: string;
-  runwayMonths: number | null;
-  mrrGrowth30dUsd: number;
-  /** Stripe data availability status */
-  stripeAvailability?: DataAvailability;
-  /** Mercury data availability status */
-  mercuryAvailability?: DataAvailability;
-}
+interface DefaultStatusBannerProps
+  extends Readonly<{
+    status: 'alive' | 'dead';
+    detail: string;
+    runwayMonths: number | null;
+    mrrGrowth30dUsd: number;
+    /** Stripe data availability status */
+    stripeAvailability?: DataAvailability;
+    /** Mercury data availability status */
+    mercuryAvailability?: DataAvailability;
+  }> {}
 
 export function DefaultStatusBanner({
   status,

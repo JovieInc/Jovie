@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
 import type { AudienceIntentLevel } from '@/types';
 
 export interface AudienceIntentBadgeProps {
@@ -10,7 +10,7 @@ export interface AudienceIntentBadgeProps {
 
 const INTENT_BADGES: Record<
   AudienceIntentLevel,
-  { label: string; className: string; dotClassName: string }
+  { label: string } & DotBadgeVariant
 > = {
   high: {
     label: 'High',
@@ -29,28 +29,17 @@ const INTENT_BADGES: Record<
   },
 };
 
+/**
+ * AudienceIntentBadge - Displays the intent level of an audience segment.
+ *
+ * @example
+ * <AudienceIntentBadge intentLevel="high" />
+ */
 export function AudienceIntentBadge({
   intentLevel,
   className,
 }: AudienceIntentBadgeProps) {
   const badge = INTENT_BADGES[intentLevel];
 
-  return (
-    <span
-      className={cn(
-        'inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-medium tracking-wide',
-        badge.className,
-        className
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'mr-1.5 inline-block size-1.5 shrink-0 rounded-full',
-          badge.dotClassName
-        )}
-      />
-      {badge.label}
-    </span>
-  );
+  return <DotBadge label={badge.label} variant={badge} className={className} />;
 }

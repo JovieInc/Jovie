@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
 import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
+import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksSection } from '@/components/home/HowItWorksSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { SeeItInActionSafe } from '@/components/home/SeeItInActionSafe';
-import { SeeItInActionSkeleton } from '@/components/home/SeeItInActionSkeleton';
+import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
+import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 // Revalidate every hour to balance freshness with performance using ISR
@@ -250,19 +250,41 @@ export default function HomePage() {
       {/* 3. Comparison Section */}
       <ComparisonSection />
 
-      {/* 4. What You Get Section */}
-      <WhatYouGetSection />
+      <DeferredSection
+        placeholderHeight={560}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 4. What You Get Section */}
+        <WhatYouGetSection />
+      </DeferredSection>
 
-      {/* 5. How It Works Section */}
-      <HowItWorksSection />
+      <DeferredSection
+        placeholderHeight={640}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 5. How It Works Section */}
+        <HowItWorksSection />
+      </DeferredSection>
 
-      {/* 6. See It In Action Section */}
-      <Suspense fallback={<SeeItInActionSkeleton />}>
-        <SeeItInActionSafe />
-      </Suspense>
+      <DeferredSection
+        placeholderHeight={520}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 6. See It In Action Section */}
+        <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
+      </DeferredSection>
 
-      {/* 7. Final CTA Section */}
-      <FinalCTASection />
+      <DeferredSection
+        placeholderHeight={480}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 7. Final CTA Section */}
+        <FinalCTASection />
+      </DeferredSection>
     </div>
   );
 }

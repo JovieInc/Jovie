@@ -2,13 +2,14 @@ import { CheckCircle, Mail, Sparkles } from 'lucide-react';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
 
-interface MetricCardProps {
-  label: string;
-  value: number;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  colorClass: string;
-  bgClass: string;
-}
+interface MetricCardProps
+  extends Readonly<{
+    label: string;
+    value: number;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    colorClass: string;
+    bgClass: string;
+  }> {}
 
 function MetricCard({
   label,
@@ -25,7 +26,7 @@ function MetricCard({
           bgClass
         )}
       >
-        <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', colorClass)} />
+        <Icon className={cn('h-3.5 w-3.5 sm:h-5 sm:w-5', colorClass)} />
       </div>
       <div className='min-w-0'>
         <p className='text-xs text-tertiary-token uppercase tracking-wide'>
@@ -39,9 +40,10 @@ function MetricCard({
   );
 }
 
-interface WaitlistMetricsProps {
-  metrics: WaitlistMetricsType;
-}
+interface WaitlistMetricsProps
+  extends Readonly<{
+    metrics: WaitlistMetricsType;
+  }> {}
 
 export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
   return (

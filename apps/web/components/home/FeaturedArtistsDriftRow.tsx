@@ -17,10 +17,11 @@ import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSect
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 
-export interface FeaturedArtistsDriftRowProps {
-  creators: FeaturedCreator[];
-  showFades?: boolean;
-}
+export interface FeaturedArtistsDriftRowProps
+  extends Readonly<{
+    creators: FeaturedCreator[];
+    showFades?: boolean;
+  }> {}
 
 const MAX_SHIFT_PX = 56;
 

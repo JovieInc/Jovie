@@ -14,7 +14,7 @@ interface DashboardAnalyticsOptions {
   range?: AnalyticsRange;
   /** Analytics view (traffic, engagement, etc.). Defaults to 'traffic'. */
   view?: DashboardAnalyticsView;
-  /** Cache stale time in milliseconds. Defaults to 5000ms (5 seconds). */
+  /** Cache stale time in milliseconds. Defaults to 60000ms (1 minute). */
   staleTime?: number;
   /** Whether to enable the query. Defaults to true. */
   enabled?: boolean;
@@ -59,13 +59,23 @@ async function fetchDashboardAnalytics(
 export function useDashboardAnalyticsQuery({
   range = '7d',
   view = 'traffic',
-  staleTime = 5000,
+  staleTime = 60_000,
   enabled = true,
 }: DashboardAnalyticsOptions = {}) {
+  // Normalize analytics requests to a shared cache key so parallel views
+  // (overview cards + analytics page) reuse the same in-flight request.
+  const cacheRange = range;
+  const requestView: DashboardAnalyticsView =
+    view === 'traffic' ? 'full' : view;
+
   return useQuery({
-    queryKey: queryKeys.dashboard.analytics(view, range),
-    queryFn: ({ signal }) => fetchDashboardAnalytics(range, view, signal),
+    queryKey: queryKeys.dashboard.analytics(cacheRange),
+    queryFn: ({ signal }) =>
+      fetchDashboardAnalytics(cacheRange, requestView, signal),
     staleTime,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     gcTime: 30 * 60 * 1000, // 30 minutes
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
