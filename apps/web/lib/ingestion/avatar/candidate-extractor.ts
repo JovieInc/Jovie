@@ -207,49 +207,57 @@ async function extractDeezerAvatar(
   }
 }
 
-/**
- * Extract an avatar candidate from a link URL.
- *
- * Tries platform-specific extraction first, then falls back to OG/Twitter meta tags.
- */
-export async function extractAvatarCandidateFromLinkUrl(
-  url: string
+async function tryExtractFromLinktree(
+  normalized: string
 ): Promise<AvatarCandidate | null> {
-  const normalized = normalizeUrl(url);
-
   const linktree = validateLinktreeUrl(normalized);
-  if (linktree) {
-    const html = await fetchLinktreeDocument(linktree);
-    const extracted = extractLinktree(html);
-    const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
-    return avatarUrl ? { avatarUrl, sourcePlatform: 'linktree' } : null;
-  }
+  if (!linktree) return null;
 
+  const html = await fetchLinktreeDocument(linktree);
+  const extracted = extractLinktree(html);
+  const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
+  return avatarUrl ? { avatarUrl, sourcePlatform: 'linktree' } : null;
+}
+
+async function tryExtractFromBeacons(
+  normalized: string
+): Promise<AvatarCandidate | null> {
   const beacons = validateBeaconsUrl(normalized);
-  if (beacons) {
-    const html = await fetchBeaconsDocument(beacons);
-    const extracted = extractBeacons(html);
-    const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
-    return avatarUrl ? { avatarUrl, sourcePlatform: 'beacons' } : null;
-  }
+  if (!beacons) return null;
 
+  const html = await fetchBeaconsDocument(beacons);
+  const extracted = extractBeacons(html);
+  const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
+  return avatarUrl ? { avatarUrl, sourcePlatform: 'beacons' } : null;
+}
+
+async function tryExtractFromLaylo(
+  normalized: string
+): Promise<AvatarCandidate | null> {
   const layloHandle = extractLayloHandle(normalized);
-  if (layloHandle) {
-    const { profile, user } = await fetchLayloProfile(layloHandle);
-    const extracted = extractLaylo(profile, user);
-    const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
-    return avatarUrl ? { avatarUrl, sourcePlatform: 'laylo' } : null;
-  }
+  if (!layloHandle) return null;
 
+  const { profile, user } = await fetchLayloProfile(layloHandle);
+  const extracted = extractLaylo(profile, user);
+  const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
+  return avatarUrl ? { avatarUrl, sourcePlatform: 'laylo' } : null;
+}
+
+async function tryExtractFromYouTube(
+  normalized: string
+): Promise<AvatarCandidate | null> {
   const youtube = validateYouTubeChannelUrl(normalized);
-  if (youtube) {
-    const html = await fetchYouTubeAboutDocument(youtube);
-    const extracted = extractYouTube(html);
-    const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
-    return avatarUrl ? { avatarUrl, sourcePlatform: 'youtube' } : null;
-  }
+  if (!youtube) return null;
 
-  // Try DSP-specific extraction (Spotify, Apple Music, Deezer)
+  const html = await fetchYouTubeAboutDocument(youtube);
+  const extracted = extractYouTube(html);
+  const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
+  return avatarUrl ? { avatarUrl, sourcePlatform: 'youtube' } : null;
+}
+
+async function tryExtractFromDSPs(
+  normalized: string
+): Promise<AvatarCandidate | null> {
   const spotifyArtistId = extractSpotifyArtistId(normalized);
   if (spotifyArtistId) {
     const spotifyAvatar = await extractSpotifyAvatar(normalized);
@@ -268,6 +276,12 @@ export async function extractAvatarCandidateFromLinkUrl(
     if (deezerAvatar) return deezerAvatar;
   }
 
+  return null;
+}
+
+async function tryExtractFromMetaTags(
+  normalized: string
+): Promise<AvatarCandidate | null> {
   const parsed = new URL(normalized);
   const host = parsed.hostname.toLowerCase();
   const variant = host.startsWith('www.') ? host.slice(4) : `www.${host}`;
@@ -287,6 +301,34 @@ export async function extractAvatarCandidateFromLinkUrl(
   );
   if (twitterImage) {
     return { avatarUrl: twitterImage, sourcePlatform: 'web' };
+  }
+
+  return null;
+}
+
+/**
+ * Extract an avatar candidate from a link URL.
+ *
+ * Tries platform-specific extraction first, then falls back to OG/Twitter meta tags.
+ */
+export async function extractAvatarCandidateFromLinkUrl(
+  url: string
+): Promise<AvatarCandidate | null> {
+  const normalized = normalizeUrl(url);
+
+  // Try platform-specific extractors in sequence
+  const extractors = [
+    tryExtractFromLinktree,
+    tryExtractFromBeacons,
+    tryExtractFromLaylo,
+    tryExtractFromYouTube,
+    tryExtractFromDSPs,
+    tryExtractFromMetaTags,
+  ];
+
+  for (const extractor of extractors) {
+    const result = await extractor(normalized);
+    if (result) return result;
   }
 
   return null;

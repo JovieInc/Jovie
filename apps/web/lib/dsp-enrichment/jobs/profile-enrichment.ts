@@ -260,6 +260,87 @@ async function getBestAvatarCandidate(
 // Profile Update Logic
 // ============================================================================
 
+async function updateAvatarIfNeeded(
+  tx: DbOrTransaction,
+  creatorProfileId: string,
+  existingProfile: { avatarUrl: string | null; avatarLockedByUser: boolean },
+  updates: Record<string, unknown>
+): Promise<boolean> {
+  if (existingProfile.avatarLockedByUser || existingProfile.avatarUrl) {
+    return false;
+  }
+
+  const bestAvatar = await getBestAvatarCandidate(tx, creatorProfileId);
+  if (!bestAvatar) {
+    return false;
+  }
+
+  updates.avatarUrl = bestAvatar.avatarUrl;
+  return true;
+}
+
+function updateDisplayNameIfNeeded(
+  dspData: DspArtistData[],
+  existingProfile: { displayName: string | null; displayNameLocked: boolean },
+  updates: Record<string, unknown>
+): boolean {
+  if (existingProfile.displayNameLocked || existingProfile.displayName) {
+    return false;
+  }
+
+  const spotifyData = dspData.find(d => d.providerId === 'spotify');
+  const appleMusicData = dspData.find(d => d.providerId === 'apple_music');
+  const deezerData = dspData.find(d => d.providerId === 'deezer');
+
+  const bestName =
+    spotifyData?.name || appleMusicData?.name || deezerData?.name;
+  if (!bestName) {
+    return false;
+  }
+
+  updates.displayName = bestName;
+  return true;
+}
+
+function updateFollowerCountIfNeeded(
+  dspData: DspArtistData[],
+  updates: Record<string, unknown>
+): boolean {
+  const spotifyData = dspData.find(d => d.providerId === 'spotify');
+  if (!spotifyData?.followers || spotifyData.followers <= 0) {
+    return false;
+  }
+
+  updates.spotifyFollowers = spotifyData.followers;
+  return true;
+}
+
+function updateGenresIfNeeded(
+  dspData: DspArtistData[],
+  existingProfile: { genres: string[] | null },
+  updates: Record<string, unknown>
+): boolean {
+  if (existingProfile.genres && existingProfile.genres.length > 0) {
+    return false;
+  }
+
+  const allGenres = new Set<string>();
+  for (const data of dspData) {
+    if (data.genres) {
+      for (const genre of data.genres) {
+        allGenres.add(genre.toLowerCase());
+      }
+    }
+  }
+
+  if (allGenres.size === 0) {
+    return false;
+  }
+
+  updates.genres = Array.from(allGenres).slice(0, 10);
+  return true;
+}
+
 /**
  * Update profile with enriched data, respecting user locks.
  */
@@ -277,53 +358,23 @@ async function updateProfileFromDspData(
   }
 ): Promise<boolean> {
   const updates: Record<string, unknown> = {};
-  let hasUpdates = false;
 
-  // Get best avatar candidate if avatar is not locked
-  if (!existingProfile.avatarLockedByUser && !existingProfile.avatarUrl) {
-    const bestAvatar = await getBestAvatarCandidate(tx, creatorProfileId);
-    if (bestAvatar) {
-      updates.avatarUrl = bestAvatar.avatarUrl;
-      hasUpdates = true;
-    }
-  }
+  const avatarUpdated = await updateAvatarIfNeeded(
+    tx,
+    creatorProfileId,
+    existingProfile,
+    updates
+  );
+  const displayNameUpdated = updateDisplayNameIfNeeded(
+    dspData,
+    existingProfile,
+    updates
+  );
+  const followersUpdated = updateFollowerCountIfNeeded(dspData, updates);
+  const genresUpdated = updateGenresIfNeeded(dspData, existingProfile, updates);
 
-  // Update display name from highest priority DSP if not locked
-  if (!existingProfile.displayNameLocked && !existingProfile.displayName) {
-    const spotifyData = dspData.find(d => d.providerId === 'spotify');
-    const appleMusicData = dspData.find(d => d.providerId === 'apple_music');
-    const deezerData = dspData.find(d => d.providerId === 'deezer');
-
-    const bestName =
-      spotifyData?.name || appleMusicData?.name || deezerData?.name;
-    if (bestName) {
-      updates.displayName = bestName;
-      hasUpdates = true;
-    }
-  }
-
-  // Update follower count (prefer Spotify)
-  const spotifyData = dspData.find(d => d.providerId === 'spotify');
-  if (spotifyData?.followers && spotifyData.followers > 0) {
-    updates.spotifyFollowers = spotifyData.followers;
-    hasUpdates = true;
-  }
-
-  // Merge genres from all sources
-  if (!existingProfile.genres || existingProfile.genres.length === 0) {
-    const allGenres = new Set<string>();
-    for (const data of dspData) {
-      if (data.genres) {
-        for (const genre of data.genres) {
-          allGenres.add(genre.toLowerCase());
-        }
-      }
-    }
-    if (allGenres.size > 0) {
-      updates.genres = Array.from(allGenres).slice(0, 10); // Limit to 10 genres
-      hasUpdates = true;
-    }
-  }
+  const hasUpdates =
+    avatarUpdated || displayNameUpdated || followersUpdated || genresUpdated;
 
   if (hasUpdates) {
     updates.updatedAt = new Date();
@@ -339,6 +390,86 @@ async function updateProfileFromDspData(
 // ============================================================================
 // Job Processor
 // ============================================================================
+
+async function fetchDspDataInParallel(
+  profile: {
+    spotifyId: string | null;
+    appleMusicId: string | null;
+    deezerId: string | null;
+  },
+  providers: string[]
+): Promise<DspArtistData[]> {
+  const dspData: DspArtistData[] = [];
+  const fetchPromises: Promise<void>[] = [];
+
+  if (providers.includes('spotify') && profile.spotifyId) {
+    fetchPromises.push(
+      fetchSpotifyData(profile.spotifyId).then(data => {
+        if (data) dspData.push(data);
+      })
+    );
+  }
+
+  if (providers.includes('apple_music') && profile.appleMusicId) {
+    fetchPromises.push(
+      fetchAppleMusicData(profile.appleMusicId).then(data => {
+        if (data) dspData.push(data);
+      })
+    );
+  }
+
+  if (providers.includes('deezer') && profile.deezerId) {
+    fetchPromises.push(
+      fetchDeezerData(profile.deezerId).then(data => {
+        if (data) dspData.push(data);
+      })
+    );
+  }
+
+  await Promise.allSettled(fetchPromises);
+  return dspData;
+}
+
+async function storeAvatarCandidatesFromDsp(
+  tx: DbOrTransaction,
+  creatorProfileId: string,
+  dspData: DspArtistData[]
+): Promise<{ candidatesAdded: number; enrichedFrom: DspProviderId[] }> {
+  let candidatesAdded = 0;
+  const enrichedFrom: DspProviderId[] = [];
+
+  for (const data of dspData) {
+    if (data.imageUrls) {
+      const stored = await storeAvatarCandidate(
+        tx,
+        creatorProfileId,
+        data.providerId,
+        data.imageUrls,
+        data.externalUrl
+      );
+      if (stored) {
+        candidatesAdded++;
+        enrichedFrom.push(data.providerId);
+      }
+    }
+  }
+
+  return { candidatesAdded, enrichedFrom };
+}
+
+function shouldSkipEnrichment(
+  profile: {
+    avatarUrl: string | null;
+    displayName: string | null;
+    spotifyFollowers: number | null;
+  },
+  forceRefresh: boolean
+): boolean {
+  const hasExistingData = Boolean(
+    profile.avatarUrl && profile.displayName && profile.spotifyFollowers
+  );
+  return !forceRefresh && hasExistingData;
+}
 
 /**
  * Process a profile enrichment job.
@@ -387,79 +518,35 @@ export async function processProfileEnrichmentJob(
     return result;
   }
 
-  // Skip enrichment if profile already has all data and forceRefresh is false
-  const hasExistingData =
-    profile.avatarUrl && profile.displayName && profile.spotifyFollowers;
-  if (!forceRefresh && hasExistingData) {
+  if (shouldSkipEnrichment(profile, forceRefresh)) {
     result.errors.push(
       'Profile already enriched (use forceRefresh to override)'
     );
     return result;
   }
 
-  // Determine which providers to fetch from
   const providers = targetProviders ?? ['spotify', 'apple_music', 'deezer'];
-  const dspData: DspArtistData[] = [];
-
-  // Fetch data from each connected DSP in parallel
-  const fetchPromises: Promise<void>[] = [];
-
-  if (providers.includes('spotify') && profile.spotifyId) {
-    fetchPromises.push(
-      fetchSpotifyData(profile.spotifyId).then(data => {
-        if (data) dspData.push(data);
-      })
-    );
-  }
-
-  if (providers.includes('apple_music') && profile.appleMusicId) {
-    fetchPromises.push(
-      fetchAppleMusicData(profile.appleMusicId).then(data => {
-        if (data) dspData.push(data);
-      })
-    );
-  }
-
-  if (providers.includes('deezer') && profile.deezerId) {
-    fetchPromises.push(
-      fetchDeezerData(profile.deezerId).then(data => {
-        if (data) dspData.push(data);
-      })
-    );
-  }
-
-  await Promise.allSettled(fetchPromises);
+  const dspData = await fetchDspDataInParallel(profile, providers);
 
   if (dspData.length === 0) {
     result.errors.push('No DSP data could be fetched');
     return result;
   }
 
-  // Store avatar candidates from each DSP
-  for (const data of dspData) {
-    if (data.imageUrls) {
-      const stored = await storeAvatarCandidate(
-        tx,
-        creatorProfileId,
-        data.providerId,
-        data.imageUrls,
-        data.externalUrl
-      );
-      if (stored) {
-        result.avatarCandidatesAdded++;
-        result.enrichedFrom.push(data.providerId);
-      }
-    }
-  }
+  const { candidatesAdded, enrichedFrom } = await storeAvatarCandidatesFromDsp(
+    tx,
+    creatorProfileId,
+    dspData
+  );
+  result.avatarCandidatesAdded = candidatesAdded;
+  result.enrichedFrom = enrichedFrom;
 
-  // Update profile with best data
   const profileUpdated = await updateProfileFromDspData(
     tx,
     creatorProfileId,
     dspData,
     profile
   );
-
   result.profileUpdated = profileUpdated;
 
   return result;
