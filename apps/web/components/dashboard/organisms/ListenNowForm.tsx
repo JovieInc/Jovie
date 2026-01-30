@@ -13,8 +13,8 @@ import {
 } from '@/types/db';
 
 interface ListenNowFormProps {
-  artist: Artist;
-  onUpdate: (artist: Artist) => void;
+  readonly artist: Artist;
+  readonly onUpdate: (artist: Artist) => void;
 }
 
 export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {

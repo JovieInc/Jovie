@@ -15,12 +15,12 @@ import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
 
 interface ContactsTableProps {
-  contacts: EditableContact[];
-  artistName: string;
-  onUpdate: (id: string, updates: Partial<EditableContact>) => void;
-  onSave: (contact: EditableContact) => Promise<void>;
-  onDelete: (contact: EditableContact) => Promise<void>;
-  onAddContact: (role?: ContactRole) => void;
+  readonly contacts: EditableContact[];
+  readonly artistName: string;
+  readonly onUpdate: (id: string, updates: Partial<EditableContact>) => void;
+  readonly onSave: (contact: EditableContact) => Promise<void>;
+  readonly onDelete: (contact: EditableContact) => Promise<void>;
+  readonly onAddContact: (role?: ContactRole) => void;
 }
 
 export const ContactsTable = memo(function ContactsTable({

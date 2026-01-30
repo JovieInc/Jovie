@@ -19,9 +19,9 @@ import { TourDatesEmptyState } from './TourDatesEmptyState';
 import { TourDatesTable } from './TourDatesTable';
 
 interface TourDatesManagerProps {
-  profileId: string;
-  initialTourDates: TourDateViewModel[];
-  connectionStatus: BandsintownConnectionStatus;
+  readonly profileId: string;
+  readonly initialTourDates: TourDateViewModel[];
+  readonly connectionStatus: BandsintownConnectionStatus;
 }
 
 export function TourDatesManager({

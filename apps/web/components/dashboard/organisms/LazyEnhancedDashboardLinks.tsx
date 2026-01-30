@@ -43,7 +43,7 @@ function LinksErrorFallback() {
 }
 
 interface LinksErrorBoundaryProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 interface LinksErrorBoundaryState {
@@ -90,7 +90,7 @@ const EnhancedDashboardLinks = dynamic(
 );
 
 export interface LazyEnhancedDashboardLinksProps {
-  initialLinks: ProfileSocialLink[];
+  readonly initialLinks: ProfileSocialLink[];
 }
 
 export function LazyEnhancedDashboardLinks({

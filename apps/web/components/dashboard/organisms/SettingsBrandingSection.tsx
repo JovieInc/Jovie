@@ -8,8 +8,8 @@ import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
 import type { Artist } from '@/types/db';
 
 export interface SettingsBrandingSectionProps {
-  artist: Artist;
-  onArtistUpdate?: (updatedArtist: Artist) => void;
+  readonly artist: Artist;
+  readonly onArtistUpdate?: (updatedArtist: Artist) => void;
 }
 
 export function SettingsBrandingSection({

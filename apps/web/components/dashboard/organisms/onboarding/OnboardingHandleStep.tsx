@@ -6,26 +6,26 @@ import { AuthButton } from '@/components/auth';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface HandleValidationState {
-  available: boolean;
-  checking: boolean;
-  error: string | null;
-  clientValid: boolean;
-  suggestions: string[];
+  readonly available: boolean;
+  readonly checking: boolean;
+  readonly error: string | null;
+  readonly clientValid: boolean;
+  readonly suggestions: string[];
 }
 
 interface OnboardingHandleStepProps {
-  title: string;
-  prompt?: string;
-  handleInput: string;
-  handleValidation: HandleValidationState;
-  stateError: string | null;
-  isSubmitting: boolean;
-  isTransitioning: boolean;
-  ctaDisabledReason: string | null;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onHandleChange: (value: string) => void;
-  onSubmit: (e?: React.FormEvent) => void;
-  isPendingSubmit?: boolean;
+  readonly title: string;
+  readonly prompt?: string;
+  readonly handleInput: string;
+  readonly handleValidation: HandleValidationState;
+  readonly stateError: string | null;
+  readonly isSubmitting: boolean;
+  readonly isTransitioning: boolean;
+  readonly ctaDisabledReason: string | null;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly onHandleChange: (value: string) => void;
+  readonly onSubmit: (e?: React.FormEvent) => void;
+  readonly isPendingSubmit?: boolean;
 }
 
 function ValidationIcon({

@@ -18,9 +18,9 @@ import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
-  artist: Artist;
-  onArtistUpdate?: (updatedArtist: Artist) => void;
-  focusSection?: string;
+  readonly artist: Artist;
+  readonly onArtistUpdate?: (updatedArtist: Artist) => void;
+  readonly focusSection?: string;
 }
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
