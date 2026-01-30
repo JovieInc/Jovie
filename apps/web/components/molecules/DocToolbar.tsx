@@ -20,10 +20,10 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
 
     const restoreTitle = () => {
       document.title = previousTitle;
-      window.removeEventListener('afterprint', restoreTitle);
+      globalThis.removeEventListener('afterprint', restoreTitle);
     };
 
-    window.addEventListener('afterprint', restoreTitle);
+    globalThis.addEventListener('afterprint', restoreTitle);
 
     window.print();
 
