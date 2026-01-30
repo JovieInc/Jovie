@@ -21,7 +21,7 @@ interface NavMenuItemProps {
  * Render shortcut keys in tooltip format
  * Handles both "G then D" sequential and single key formats
  */
-function ShortcutKeys({ shortcut }: { shortcut: KeyboardShortcut }) {
+function ShortcutKeys({ shortcut }: { readonly shortcut: KeyboardShortcut }) {
   const { keys } = shortcut;
 
   // Handle "G then D" style sequential shortcuts

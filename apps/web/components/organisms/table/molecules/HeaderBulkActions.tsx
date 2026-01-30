@@ -12,22 +12,22 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface BulkAction {
-  label: string;
-  icon?: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'destructive';
+  readonly label: string;
+  readonly icon?: ReactNode;
+  readonly onClick: () => void;
+  readonly disabled?: boolean;
+  readonly variant?: 'default' | 'destructive';
 }
 
 export interface HeaderBulkActionsProps {
   /** Number of selected items */
-  selectedCount: number;
+  readonly selectedCount: number;
   /** Bulk actions shown in dropdown when items selected */
-  bulkActions: BulkAction[];
+  readonly bulkActions: BulkAction[];
   /** Callback to clear selection */
-  onClearSelection?: () => void;
+  readonly onClearSelection?: () => void;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

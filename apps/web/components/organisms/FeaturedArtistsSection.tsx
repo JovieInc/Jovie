@@ -54,17 +54,17 @@ const areCreatorsEqual = (
 };
 
 interface VirtualizedCreatorsRowProps {
-  creators: FeaturedCreator[];
-  size: 'sm' | 'md';
-  gap: number;
-  paddingStart: number;
-  paddingEnd: number;
-  estimatedWidth: number;
-  rowHeight: number;
-  containerClassName: string;
-  itemClassName: string;
-  ariaLabel: string;
-  showNames: boolean;
+  readonly creators: FeaturedCreator[];
+  readonly size: 'sm' | 'md';
+  readonly gap: number;
+  readonly paddingStart: number;
+  readonly paddingEnd: number;
+  readonly estimatedWidth: number;
+  readonly rowHeight: number;
+  readonly containerClassName: string;
+  readonly itemClassName: string;
+  readonly ariaLabel: string;
+  readonly showNames: boolean;
 }
 
 function VirtualizedCreatorsRow({

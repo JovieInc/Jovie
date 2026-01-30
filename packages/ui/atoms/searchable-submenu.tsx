@@ -44,57 +44,57 @@ import { cn } from '../lib/utils';
 
 export interface SearchableSubmenuItem {
   /** Unique identifier */
-  id: string;
+  readonly id: string;
   /** Display label */
-  label: string;
+  readonly label: string;
   /** Optional description shown below label */
-  description?: string;
+  readonly description?: string;
   /** Optional icon component */
-  icon?: React.ReactNode;
+  readonly icon?: React.ReactNode;
   /** Optional badge text (e.g., usage count) */
-  badge?: string;
+  readonly badge?: string;
   /** Optional keyboard shortcut hint */
-  shortcut?: string;
+  readonly shortcut?: string;
   /** Whether the item is disabled */
-  disabled?: boolean;
+  readonly disabled?: boolean;
 }
 
 export interface SearchableSubmenuSection {
   /** Section identifier */
-  id: string;
+  readonly id: string;
   /** Section header label */
-  label: string;
+  readonly label: string;
   /** Items in this section */
-  items: SearchableSubmenuItem[];
+  readonly items: SearchableSubmenuItem[];
 }
 
 export interface SearchableSubmenuProps {
   /** Custom trigger element (if not provided, uses triggerLabel + triggerIcon) */
-  trigger?: React.ReactNode;
+  readonly trigger?: React.ReactNode;
   /** Trigger label for accessibility and default trigger */
-  triggerLabel: string;
+  readonly triggerLabel: string;
   /** Optional trigger icon */
-  triggerIcon?: React.ReactNode;
+  readonly triggerIcon?: React.ReactNode;
   /** Sections to display (organized groups) */
-  sections: SearchableSubmenuSection[];
+  readonly sections: SearchableSubmenuSection[];
   /** Callback when an item is selected */
-  onSelect: (item: SearchableSubmenuItem) => void;
+  readonly onSelect: (item: SearchableSubmenuItem) => void;
   /** Search placeholder text */
-  searchPlaceholder?: string;
+  readonly searchPlaceholder?: string;
   /** Empty state message when no results */
-  emptyMessage?: string;
+  readonly emptyMessage?: string;
   /** Loading state */
-  isLoading?: boolean;
+  readonly isLoading?: boolean;
   /** Filter function (if not provided, uses default label/description filter) */
-  filterFn?: (item: SearchableSubmenuItem, query: string) => boolean;
+  readonly filterFn?: (item: SearchableSubmenuItem, query: string) => boolean;
   /** Callback when search query changes */
-  onSearchChange?: (query: string) => void;
+  readonly onSearchChange?: (query: string) => void;
   /** Optional footer element (e.g., "Create Custom..." link) */
-  footer?: React.ReactNode;
+  readonly footer?: React.ReactNode;
   /** Additional className for the submenu content */
-  contentClassName?: string;
+  readonly contentClassName?: string;
   /** Whether the submenu is disabled */
-  disabled?: boolean;
+  readonly disabled?: boolean;
 }
 
 // ============================================================================
@@ -503,21 +503,21 @@ export function SearchableSubmenu({
 
 export interface SearchableListProps {
   /** Items to display */
-  items: SearchableSubmenuItem[];
+  readonly items: SearchableSubmenuItem[];
   /** Callback when an item is selected */
-  onSelect: (item: SearchableSubmenuItem) => void;
+  readonly onSelect: (item: SearchableSubmenuItem) => void;
   /** Search placeholder text */
-  searchPlaceholder?: string;
+  readonly searchPlaceholder?: string;
   /** Empty state message when no results */
-  emptyMessage?: string;
+  readonly emptyMessage?: string;
   /** Filter function */
-  filterFn?: (item: SearchableSubmenuItem, query: string) => boolean;
+  readonly filterFn?: (item: SearchableSubmenuItem, query: string) => boolean;
   /** Optional header element */
-  header?: React.ReactNode;
+  readonly header?: React.ReactNode;
   /** Optional footer element */
-  footer?: React.ReactNode;
+  readonly footer?: React.ReactNode;
   /** Additional className */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

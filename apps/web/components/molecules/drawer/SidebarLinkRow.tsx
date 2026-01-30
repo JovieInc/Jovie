@@ -9,15 +9,15 @@ const ACTION_BUTTON_CLASS =
   'p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring';
 
 export interface SidebarLinkRowProps {
-  icon: ReactNode;
-  label: string;
-  url: string;
-  badge?: string;
-  isEditable?: boolean;
-  isRemoving?: boolean;
-  onRemove?: () => void;
-  className?: string;
-  testId?: string;
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly url: string;
+  readonly badge?: string;
+  readonly isEditable?: boolean;
+  readonly isRemoving?: boolean;
+  readonly onRemove?: () => void;
+  readonly className?: string;
+  readonly testId?: string;
 }
 
 export function SidebarLinkRow({

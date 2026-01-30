@@ -4,13 +4,13 @@ import { cn } from '@/lib/utils';
 
 export interface TableCountBadgeProps {
   /** Number of selected items (if any) */
-  selectedCount?: number;
+  readonly selectedCount?: number;
   /** Total number of items */
-  totalCount: number;
+  readonly totalCount: number;
   /** Visual variant */
-  variant?: 'pill' | 'text';
+  readonly variant?: 'pill' | 'text';
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

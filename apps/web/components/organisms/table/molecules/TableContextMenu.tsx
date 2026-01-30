@@ -10,17 +10,17 @@ import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/t
  */
 export interface ContextMenuAction {
   /** Unique identifier for the action */
-  id: string;
+  readonly id: string;
   /** Display label for the action */
-  label: string;
+  readonly label: string;
   /** Optional icon element to display before the label */
-  icon?: ReactNode;
+  readonly icon?: ReactNode;
   /** Callback function to execute when the action is clicked */
-  onClick: () => void;
+  readonly onClick: () => void;
   /** Whether this action is destructive (e.g., delete, remove). Uses red styling. */
-  destructive?: boolean;
+  readonly destructive?: boolean;
   /** Whether this action is disabled and cannot be clicked */
-  disabled?: boolean;
+  readonly disabled?: boolean;
 }
 
 /**
@@ -29,13 +29,13 @@ export interface ContextMenuAction {
  */
 export interface ContextMenuSubmenu {
   /** Unique identifier for the submenu */
-  id: string;
+  readonly id: string;
   /** Display label for the submenu */
-  label: string;
+  readonly label: string;
   /** Optional icon element to display before the label */
-  icon?: ReactNode;
+  readonly icon?: ReactNode;
   /** Array of actions within this submenu */
-  actions: ContextMenuAction[];
+  readonly actions: ContextMenuAction[];
 }
 
 /**
@@ -51,11 +51,11 @@ export type ContextMenuItemType =
  */
 export interface TableContextMenuProps {
   /** React children to wrap with context menu functionality */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Array of menu items to display in the context menu */
-  items: ContextMenuItemType[];
+  readonly items: ContextMenuItemType[];
   /** Whether the context menu is disabled */
-  disabled?: boolean;
+  readonly disabled?: boolean;
 }
 
 function isAction(item: ContextMenuItemType): item is ContextMenuAction {

@@ -18,8 +18,8 @@ import { cn } from '@/lib/utils';
 import { DspMatchEmptyState } from './DspMatchEmptyState';
 
 export interface DspMatchListProps {
-  profileId: string;
-  className?: string;
+  readonly profileId: string;
+  readonly className?: string;
 }
 
 type FilterStatus = DspMatchStatus | 'all';

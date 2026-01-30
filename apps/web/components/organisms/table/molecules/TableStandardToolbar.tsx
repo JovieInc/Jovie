@@ -14,34 +14,34 @@ import { cn } from '@/lib/utils';
 import { TableCountBadge } from '../atoms/TableCountBadge';
 
 export interface BulkAction {
-  label: string;
-  icon?: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'destructive';
+  readonly label: string;
+  readonly icon?: ReactNode;
+  readonly onClick: () => void;
+  readonly disabled?: boolean;
+  readonly variant?: 'default' | 'destructive';
 }
 
 export interface TableStandardToolbarProps {
   /** Number of selected items */
-  selectedCount?: number;
+  readonly selectedCount?: number;
   /** Total number of items */
-  totalCount: number;
+  readonly totalCount: number;
   /** Checkbox state for select all */
-  headerCheckboxState?: boolean | 'indeterminate';
+  readonly headerCheckboxState?: boolean | 'indeterminate';
   /** Callback when select all checkbox is toggled */
-  onToggleSelectAll?: () => void;
+  readonly onToggleSelectAll?: () => void;
   /** Callback to clear selection */
-  onClearSelection?: () => void;
+  readonly onClearSelection?: () => void;
   /** Array of bulk actions shown in dropdown when items selected */
-  bulkActions?: BulkAction[];
+  readonly bulkActions?: BulkAction[];
   /** Search component to render on the right side */
-  searchComponent?: ReactNode;
+  readonly searchComponent?: ReactNode;
   /** Export component to render on the right side */
-  exportComponent?: ReactNode;
+  readonly exportComponent?: ReactNode;
   /** Additional actions shown when no items selected */
-  primaryActions?: ReactNode;
+  readonly primaryActions?: ReactNode;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

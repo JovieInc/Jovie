@@ -22,13 +22,13 @@ import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface ProviderConfig {
-  label: string;
-  accent: string;
+  readonly label: string;
+  readonly accent: string;
 }
 
 interface ProviderStatusDotProps {
-  status: 'available' | 'manual' | 'missing';
-  accent: string;
+  readonly status: 'available' | 'manual' | 'missing';
+  readonly accent: string;
 }
 
 /**
@@ -67,11 +67,11 @@ const ProviderStatusDot = memo(function ProviderStatusDot({
 });
 
 interface AddProviderUrlPopoverProps {
-  providerLabel: string;
-  providerKey: ProviderKey;
-  accent: string;
-  onSave: (url: string) => Promise<void>;
-  isSaving?: boolean;
+  readonly providerLabel: string;
+  readonly providerKey: ProviderKey;
+  readonly accent: string;
+  readonly onSave: (url: string) => Promise<void>;
+  readonly isSaving?: boolean;
 }
 
 /**
@@ -229,12 +229,12 @@ function AddProviderUrlPopover({
 }
 
 interface ProviderActionButtonsProps {
-  provider: { url: string; path?: string };
-  releaseTitle: string;
-  providerLabel: string;
-  testId: string;
-  isCopied: boolean;
-  onCopyClick: () => void;
+  readonly provider: { url: string; path?: string };
+  readonly releaseTitle: string;
+  readonly providerLabel: string;
+  readonly testId: string;
+  readonly isCopied: boolean;
+  readonly onCopyClick: () => void;
 }
 
 function ProviderActionButtons({
@@ -298,16 +298,20 @@ function ProviderActionButtons({
 }
 
 interface ProviderCellProps {
-  release: ReleaseViewModel;
-  provider: ProviderKey;
-  config: ProviderConfig;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
-  onAddUrl?: (
+  readonly release: ReleaseViewModel;
+  readonly provider: ProviderKey;
+  readonly config: ProviderConfig;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
-  isAddingUrl?: boolean;
+  readonly isAddingUrl?: boolean;
 }
 
 /**

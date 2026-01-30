@@ -62,8 +62,8 @@ const LazyProviders = dynamic<LazyProvidersProps>(
 );
 
 export interface CoreProvidersProps {
-  children: React.ReactNode;
-  initialThemeMode?: ThemeMode;
+  readonly children: React.ReactNode;
+  readonly initialThemeMode?: ThemeMode;
 }
 
 /**

@@ -17,16 +17,16 @@ import { ReleaseCountdown } from './ReleaseCountdown';
 import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
 
 interface UnreleasedReleaseHeroProps {
-  release: {
-    title: string;
-    artworkUrl: string | null;
-    releaseDate: Date;
+  readonly release: {
+    readonly title: string;
+    readonly artworkUrl: string | null;
+    readonly releaseDate: Date;
   };
-  artist: {
-    id: string;
-    name: string;
-    handle: string;
-    avatarUrl: string | null;
+  readonly artist: {
+    readonly id: string;
+    readonly name: string;
+    readonly handle: string;
+    readonly avatarUrl: string | null;
   };
 }
 

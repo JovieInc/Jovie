@@ -36,8 +36,8 @@ const TRIGGER_ZONE = 20; // pixels from left edge
 const SIDEBAR_WIDTH = 250; // keep visible while over sidebar
 
 export interface UnifiedSidebarProps {
-  section: 'admin' | 'dashboard' | 'settings';
-  navigation: NavItem[];
+  readonly section: 'admin' | 'dashboard' | 'settings';
+  readonly navigation: NavItem[];
 }
 
 /**

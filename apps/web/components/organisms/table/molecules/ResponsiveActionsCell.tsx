@@ -25,28 +25,28 @@ const MAX_INLINE_ACTIONS = {
 } as const;
 
 export interface Action {
-  id: string;
-  label: string;
-  icon?: React.ReactNode;
-  onClick: () => void;
-  destructive?: boolean;
-  disabled?: boolean;
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: React.ReactNode;
+  readonly onClick: () => void;
+  readonly destructive?: boolean;
+  readonly disabled?: boolean;
 }
 
 export interface ResponsiveActionsCellProps {
   /**
    * All available actions
    */
-  actions: Action[];
+  readonly actions: Action[];
   /**
    * IDs of actions to show inline on desktop (others go in overflow menu)
    * Default: show first 2 actions inline
    */
-  primaryActionIds?: string[];
+  readonly primaryActionIds?: string[];
   /**
    * Custom className for the cell container
    */
-  className?: string;
+  readonly className?: string;
 }
 
 type Breakpoint = 'mobile' | 'tablet' | 'desktop';

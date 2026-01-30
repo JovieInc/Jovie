@@ -15,8 +15,8 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Artist } from '@/types/db';
 
 interface ReleaseNotificationsProviderProps {
-  artist: Artist;
-  children: ReactNode;
+  readonly artist: Artist;
+  readonly children: ReactNode;
 }
 
 export function ReleaseNotificationsProvider({

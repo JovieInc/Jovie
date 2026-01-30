@@ -6,10 +6,10 @@ import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/Dashbo
 import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderProps {
-  title: string;
-  onClose?: () => void;
-  actions?: ReactNode;
-  className?: string;
+  readonly title: string;
+  readonly onClose?: () => void;
+  readonly actions?: ReactNode;
+  readonly className?: string;
 }
 
 export function DrawerHeader({

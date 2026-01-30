@@ -32,16 +32,16 @@ export interface ConfidenceBreakdownData {
 }
 
 export interface MatchConfidenceBreakdownProps {
-  breakdown: ConfidenceBreakdownData;
-  totalScore: number;
-  className?: string;
+  readonly breakdown: ConfidenceBreakdownData;
+  readonly totalScore: number;
+  readonly className?: string;
 }
 
 interface ScoreRowProps {
-  label: string;
-  score: number;
-  weight: number;
-  description: string;
+  readonly label: string;
+  readonly score: number;
+  readonly weight: number;
+  readonly description: string;
 }
 
 const SCORE_CONFIG: Array<{

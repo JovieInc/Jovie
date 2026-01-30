@@ -22,11 +22,11 @@ function isPastDate(date: Date): boolean {
 }
 
 interface TourDatesTableProps {
-  tourDates: TourDateViewModel[];
-  onEdit: (tourDate: TourDateViewModel) => void;
-  onDelete: (id: string) => void;
-  onSync?: () => void;
-  isSyncing?: boolean;
+  readonly tourDates: TourDateViewModel[];
+  readonly onEdit: (tourDate: TourDateViewModel) => void;
+  readonly onDelete: (id: string) => void;
+  readonly onSync?: () => void;
+  readonly isSyncing?: boolean;
 }
 
 const columnHelper = createColumnHelper<TourDateViewModel>();

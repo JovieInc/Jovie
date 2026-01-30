@@ -8,30 +8,30 @@ export interface SimpleTooltipProps {
   /**
    * The content to display in the tooltip. Can be a string or ReactNode.
    */
-  content: React.ReactNode;
+  readonly content: React.ReactNode;
   /**
    * Which side of the trigger to show the tooltip.
    * @default 'top'
    */
-  side?: 'top' | 'right' | 'bottom' | 'left';
+  readonly side?: 'top' | 'right' | 'bottom' | 'left';
   /**
    * Distance from the trigger element in pixels.
    * @default 6
    */
-  sideOffset?: number;
+  readonly sideOffset?: number;
   /**
    * Whether to show the arrow pointer.
    * @default false
    */
-  showArrow?: boolean;
+  readonly showArrow?: boolean;
   /**
    * Additional class name for the tooltip content.
    */
-  className?: string;
+  readonly className?: string;
   /**
    * The trigger element (button, link, etc.)
    */
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 /**
