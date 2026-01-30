@@ -104,7 +104,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
   profileUrl,
   range = '7d',
   refreshSignal,
-}: DashboardAnalyticsCardsProps) {
+}: Readonly<DashboardAnalyticsCardsProps>) {
   const notifications = useNotifications();
   const lastRefreshSignalRef = useRef<number>(
     typeof refreshSignal === 'number' ? refreshSignal : 0

@@ -27,6 +27,8 @@ import { FetchError } from '@/lib/queries/fetch';
 import { useWaitlistSubmitMutation } from '@/lib/queries/useWaitlistMutations';
 import { useWaitlistStatusQuery } from '@/lib/queries/useWaitlistStatusQuery';
 
+type StepNumber = 0 | 1 | 2;
+
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const router = useRouter();
@@ -38,7 +40,7 @@ export default function WaitlistPage() {
   }, [searchParams]);
 
   const [isHydrating, setIsHydrating] = useState(true);
-  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [step, setStep] = useState<StepNumber>(0);
   const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoal | null>(null);
   const [primaryGoalFocusIndex, setPrimaryGoalFocusIndex] = useState(0);
   const [socialPlatform, setSocialPlatform] =
@@ -101,7 +103,7 @@ export default function WaitlistPage() {
         WAITLIST_STORAGE_KEYS.step
       );
       if (storedStep === '0' || storedStep === '1' || storedStep === '2') {
-        setStep(Number.parseInt(storedStep, 10) as 0 | 1 | 2);
+        setStep(Number.parseInt(storedStep, 10) as StepNumber);
       }
 
       const storedGoal = globalThis.sessionStorage.getItem(
@@ -237,7 +239,7 @@ export default function WaitlistPage() {
   }, [waitlistStatus, router]);
 
   const validateStep = useCallback(
-    (targetStep: 0 | 1 | 2): FormErrors => {
+    (targetStep: StepNumber): FormErrors => {
       const errors: FormErrors = {};
 
       if (targetStep === 0) {
@@ -294,13 +296,13 @@ export default function WaitlistPage() {
 
     setFieldErrors({});
 
-    if (step < 2) setStep((step + 1) as 0 | 1 | 2);
+    if (step < 2) setStep((step + 1) as StepNumber);
   };
 
   const handleBack = () => {
     setError('');
     setFieldErrors({});
-    if (step > 0) setStep((step - 1) as 0 | 1 | 2);
+    if (step > 0) setStep((step - 1) as StepNumber);
   };
 
   const handlePrimaryGoalSelect = (goal: PrimaryGoal) => {

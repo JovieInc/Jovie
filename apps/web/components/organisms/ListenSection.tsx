@@ -42,7 +42,7 @@ export function ListenSection({
   savePreferences = true,
   enableDeepLinks = true,
   enableTracking = true,
-}: ListenSectionProps) {
+}: Readonly<ListenSectionProps>) {
   useEffect(() => {
     // Auto open preferred URL if provided
     if (initialPreferredUrl) {

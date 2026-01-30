@@ -191,7 +191,7 @@ This section describes how to integrate the canonical Links Manager used on the 
 The dashboard Links page is implemented at `app/dashboard/links/page.tsx`.
 
 - Authenticates the user with Clerk (`auth()` from `@clerk/nextjs/server`).
-- Loads dashboard data via `getDashboardDataCached()`.
+- Loads dashboard data via `getDashboardData()`.
 - Redirects to onboarding if `needsOnboarding` is true.
 - Fetches `initialLinks` with `getProfileSocialLinks(profileId)`.
 - Renders `<EnhancedDashboardLinks initialLinks={initialLinks} />`.

@@ -21,7 +21,7 @@ export function FormField({
   children,
   id: providedId,
   helpText,
-}: FormFieldProps) {
+}: Readonly<FormFieldProps>) {
   // Generate unique IDs for accessibility connections
   const uniqueId = useId();
   const id = providedId || `field-${uniqueId}`;

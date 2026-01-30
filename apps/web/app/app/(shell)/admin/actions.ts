@@ -104,7 +104,7 @@ export async function bulkRerunCreatorIngestionAction(
 
   const parsed = JSON.parse(profileIdsRaw) as unknown;
   if (!Array.isArray(parsed)) {
-    throw new Error('profileIds must be an array');
+    throw new TypeError('profileIds must be an array');
   }
 
   const profileIds = parsed.filter((value): value is string => {
@@ -176,7 +176,7 @@ export async function bulkSetCreatorsVerifiedAction(
 
   const parsed = JSON.parse(profileIdsRaw) as unknown;
   if (!Array.isArray(parsed)) {
-    throw new Error('profileIds must be an array');
+    throw new TypeError('profileIds must be an array');
   }
 
   const profileIds = parsed.filter((value): value is string => {
@@ -282,7 +282,7 @@ export async function bulkSetCreatorsFeaturedAction(
 
   const parsed = JSON.parse(profileIdsRaw) as unknown;
   if (!Array.isArray(parsed)) {
-    throw new Error('profileIds must be an array');
+    throw new TypeError('profileIds must be an array');
   }
 
   const profileIds = parsed.filter((value): value is string => {

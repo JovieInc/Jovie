@@ -3,10 +3,7 @@ import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
-import {
-  getDashboardDataCached,
-  setSidebarCollapsed,
-} from './dashboard/actions';
+import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +19,7 @@ export default async function AppShellLayout({
   try {
     // Parallelize auth and dashboard data fetching for better performance
     // Both share getCachedAuth() via React's cache(), so the auth call is deduplicated
-    const dashboardData = await getDashboardDataCached();
+    const dashboardData = await getDashboardData();
 
     return (
       <>
