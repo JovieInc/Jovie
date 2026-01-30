@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   ButtonSkeleton,
   CardSkeleton,
-  ListSkeleton,
   LoadingSkeleton,
   ProfileSkeleton,
   SocialBarSkeleton,
@@ -78,10 +77,6 @@ export const Card: Story = {
   render: () => <CardSkeleton />,
 };
 
-export const List: Story = {
-  render: () => <ListSkeleton items={3} />,
-};
-
 export const Table: Story = {
   render: () => <TableSkeleton rows={3} columns={4} />,
 };
@@ -125,11 +120,6 @@ export const LoadingStates: Story = {
       <div>
         <h3 className='text-lg font-medium mb-2'>Card Loading</h3>
         <CardSkeleton />
-      </div>
-
-      <div>
-        <h3 className='text-lg font-medium mb-2'>List Loading</h3>
-        <ListSkeleton items={2} />
       </div>
 
       <div>

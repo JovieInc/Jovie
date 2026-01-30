@@ -82,7 +82,7 @@ const PRIVATE_IP_PATTERNS = [
   // IPv4 patterns
   /^127\./, // Loopback (127.0.0.0/8)
   /^10\./, // Class A private (10.0.0.0/8)
-  /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private (172.16.0.0/12)
+  /^172\.(1[6-9]|2\d|3[0-1])\./, // Class B private (172.16.0.0/12)
   /^192\.168\./, // Class C private (192.168.0.0/16)
   /^169\.254\./, // Link-local (169.254.0.0/16)
   /^0\./, // Current network (0.0.0.0/8)

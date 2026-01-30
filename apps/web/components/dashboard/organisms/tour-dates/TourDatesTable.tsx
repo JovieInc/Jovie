@@ -6,7 +6,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/dashboard/tour-dates/actions';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
   type ContextMenuItemType,
@@ -365,6 +365,17 @@ export function TourDatesTable({
       enableVirtualization={tourDates.length >= 20}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       className='text-[13px]'
+      emptyState={
+        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+          <Icon name='Calendar' className='h-6 w-6' />
+          <div>
+            <div className='font-medium'>No tour dates</div>
+            <div className='text-xs'>
+              Add your first tour date to get started.
+            </div>
+          </div>
+        </div>
+      }
     />
   );
 }

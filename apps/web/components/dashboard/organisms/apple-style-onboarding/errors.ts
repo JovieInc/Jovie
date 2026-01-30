@@ -132,7 +132,7 @@ export function mapErrorToUserMessage(
 
   // In development, include error code if available
   if (process.env.NODE_ENV === 'development') {
-    const errorCodeMatch = errorMessage.match(/^\[([A-Z_]+)\]/);
+    const errorCodeMatch = /^\[([A-Z_]+)\]/.exec(errorMessage);
     const errorCode = errorCodeMatch?.[1];
     if (errorCode) {
       userMessage = `Could not save (${errorCode}). Please try again.`;
@@ -153,7 +153,7 @@ export function extractErrorCode(error: unknown): string | undefined {
   if (message === 'Unknown error' || message === 'An error occurred') {
     return undefined;
   }
-  const match = message.match(/\[([A-Z_]+)\]/);
+  const match = /\[([A-Z_]+)\]/.exec(message);
   return match?.[1];
 }
 

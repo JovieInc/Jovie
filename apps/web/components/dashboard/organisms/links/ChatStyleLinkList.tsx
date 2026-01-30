@@ -2,6 +2,7 @@
 
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import React from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ChatStyleLinkItem } from './ChatStyleLinkItem';
@@ -9,6 +10,8 @@ import type { LinkCategoryGridProps } from './link-category-grid/types';
 import { useLinkCategoryGrid } from './link-category-grid/useLinkCategoryGrid';
 import { idFor, linkIsVisible } from './link-category-grid/utils';
 import { labelFor, sectionOf } from './utils';
+
+const LINK_SECTIONS = ['social', 'dsp', 'earnings', 'custom'] as const;
 
 /**
  * ChatStyleLinkList - Renders links in a centered vertical list layout.
@@ -35,6 +38,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
   onHint,
   modifiers = [],
   className,
+  scrollContainerRef,
 }: LinkCategoryGridProps<T>) {
   // Note: _buildPillLabel is intentionally unused - kept for type compatibility with LinkCategoryGridProps
 
@@ -48,52 +52,99 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
       onCancelPendingPreview,
     });
 
+  const sortedIds = React.useMemo(
+    () => LINK_SECTIONS.flatMap(section => sortedGroups[section].map(idFor)),
+    [sortedGroups]
+  );
+
+  const virtualRows = React.useMemo(() => {
+    return LINK_SECTIONS.flatMap(section => {
+      const items = sortedGroups[section];
+      const isAddingToThis = addingLink && sectionOf(addingLink) === section;
+
+      if (items.length === 0 && !isAddingToThis) {
+        return [];
+      }
+
+      const rows: Array<{
+        type: 'header' | 'link' | 'loading';
+        section: (typeof LINK_SECTIONS)[number];
+        link?: T;
+      }> = [
+        {
+          type: 'header',
+          section,
+        },
+        ...items.map(link => ({
+          type: 'link' as const,
+          section,
+          link,
+        })),
+      ];
+
+      if (isAddingToThis) {
+        rows.push({
+          type: 'loading',
+          section,
+        });
+      }
+
+      return rows;
+    });
+  }, [sortedGroups, addingLink]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualRows.length,
+    getScrollElement: () => scrollContainerRef?.current ?? null,
+    estimateSize: index => {
+      const row = virtualRows[index];
+      if (!row) return 72;
+      return row.type === 'header' ? 28 : 84;
+    },
+    overscan: 6,
+  });
+
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={modifiers}>
-      <div className={`w-full max-w-2xl space-y-6 ${className ?? ''}`}>
-        {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
-          const items = sortedGroups[section];
-          const isAddingToThis =
-            addingLink && sectionOf(addingLink) === section;
+      <SortableContext items={sortedIds}>
+        <div className={`w-full max-w-2xl ${className ?? ''}`}>
+          <div
+            className='relative w-full'
+            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          >
+            {rowVirtualizer.getVirtualItems().map(virtualRow => {
+              const row = virtualRows[virtualRow.index];
+              if (!row) return null;
 
-          if (items.length === 0 && !isAddingToThis) {
-            return null;
-          }
+              if (row.type === 'header') {
+                return (
+                  <div
+                    key={`${row.section}-header`}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className='absolute left-0 top-0 w-full pb-2'
+                    style={{
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <h3 className='px-2 text-xs font-semibold tracking-wider text-tertiary-token'>
+                      {labelFor(row.section)}
+                    </h3>
+                  </div>
+                );
+              }
 
-          return (
-            <div key={section} className='space-y-2'>
-              {/* Category header */}
-              <h3 className='px-2 text-xs font-semibold tracking-wider text-tertiary-token'>
-                {labelFor(section)}
-              </h3>
-
-              {/* Links */}
-              <SortableContext items={items.map(idFor)}>
-                <div className='space-y-2'>
-                  {items.map(link => {
-                    const linkId = idFor(link);
-                    const linkIndex = mapIdToIndex.get(linkId) ?? -1;
-
-                    return (
-                      <ChatStyleLinkItem
-                        key={linkId}
-                        id={linkId}
-                        link={link}
-                        index={linkIndex}
-                        draggable={items.length > 1}
-                        onToggle={onToggle}
-                        onRemove={onRemove}
-                        onEdit={onEdit}
-                        visible={linkIsVisible(link)}
-                        openMenuId={openMenuId}
-                        onAnyMenuOpen={onAnyMenuOpen}
-                        isLastAdded={lastAddedId === linkId}
-                      />
-                    );
-                  })}
-
-                  {/* Loading state for link being added */}
-                  {isAddingToThis && (
+              if (row.type === 'loading') {
+                return (
+                  <div
+                    key={`${row.section}-loading`}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className='absolute left-0 top-0 w-full pb-2'
+                    style={{
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
                     <div className='flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 opacity-60'>
                       <div className='h-4 w-4' />
                       <div className='flex h-10 w-10 shrink-0 animate-pulse items-center justify-center rounded-lg bg-surface-1' />
@@ -103,13 +154,44 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                );
+              }
+
+              const link = row.link;
+              if (!link) return null;
+              const linkId = idFor(link);
+              const linkIndex = mapIdToIndex.get(linkId) ?? -1;
+
+              return (
+                <div
+                  key={linkId}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className='absolute left-0 top-0 w-full pb-2'
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <ChatStyleLinkItem
+                    id={linkId}
+                    link={link}
+                    index={linkIndex}
+                    draggable={sortedGroups[row.section].length > 1}
+                    onToggle={onToggle}
+                    onRemove={onRemove}
+                    onEdit={onEdit}
+                    visible={linkIsVisible(link)}
+                    openMenuId={openMenuId}
+                    onAnyMenuOpen={onAnyMenuOpen}
+                    isLastAdded={lastAddedId === linkId}
+                  />
                 </div>
-              </SortableContext>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      </SortableContext>
     </DndContext>
   );
 });

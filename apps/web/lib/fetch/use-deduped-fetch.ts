@@ -308,7 +308,7 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
   refresh: () => Promise<void>;
 } {
   const [state, setState] = useState<{
-    data: (unknown | null)[];
+    data: unknown[];
     loading: boolean;
     errors: (string | null)[];
   }>({

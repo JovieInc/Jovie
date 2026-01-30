@@ -9,7 +9,7 @@ export function parseMarkdownFrontmatter(
   raw: string
 ): MarkdownFrontmatterResult {
   const safeRaw = raw.slice(0, 100000);
-  const match = safeRaw.match(FRONTMATTER_REGEX);
+  const match = FRONTMATTER_REGEX.exec(safeRaw);
   if (!match) {
     return {
       content: raw,

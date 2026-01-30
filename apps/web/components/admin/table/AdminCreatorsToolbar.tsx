@@ -72,7 +72,7 @@ export function AdminCreatorsToolbar({
                   onClick={onBulkUnverify}
                   className='gap-2.5'
                 >
-                  <XCircle className='h-4 w-4' />
+                  <XCircle className='h-3.5 w-3.5' />
                   Unverify
                 </Button>
               ) : (
@@ -82,7 +82,7 @@ export function AdminCreatorsToolbar({
                   onClick={onBulkVerify}
                   className='gap-2.5'
                 >
-                  <CheckCircle className='h-4 w-4' />
+                  <CheckCircle className='h-3.5 w-3.5' />
                   Verify
                 </Button>
               )}
@@ -92,7 +92,7 @@ export function AdminCreatorsToolbar({
                 onClick={onBulkFeature}
                 className='gap-2.5'
               >
-                <Star className='h-4 w-4' />
+                <Star className='h-3.5 w-3.5' />
                 Feature
               </Button>
               <Button
@@ -101,7 +101,7 @@ export function AdminCreatorsToolbar({
                 onClick={onBulkDelete}
                 className='gap-2.5 text-destructive hover:text-destructive'
               >
-                <Trash2 className='h-4 w-4' />
+                <Trash2 className='h-3.5 w-3.5' />
                 Delete
               </Button>
             </div>

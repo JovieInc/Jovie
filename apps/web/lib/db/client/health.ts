@@ -4,9 +4,9 @@
  * Health check and performance monitoring functions for the database.
  */
 
-import { Pool } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { env } from '@/lib/env-server';
 import { TABLE_NAMES } from '../config';
 import * as schema from '../schema';
@@ -27,20 +27,32 @@ import type {
   TableExistsRow,
 } from './types';
 
-const positiveTableExistenceCache = new Set<string>();
+// Cache with TTL for both positive and negative results
+const tableExistenceCache = new Map<
+  string,
+  { exists: boolean; timestamp: number }
+>();
 let lastTableExistenceDatabaseUrl: string | null = null;
 
+// 60 seconds TTL for table existence cache
+const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
+
 /**
- * Check if a table exists in the database
+ * Check if a table exists in the database.
+ * Uses a TTL-based cache for both positive and negative results to avoid
+ * repeated database round-trips on cold start.
  */
 export async function doesTableExist(tableName: string): Promise<boolean> {
+  // Clear cache if database URL changes
   if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
-    positiveTableExistenceCache.clear();
+    tableExistenceCache.clear();
     lastTableExistenceDatabaseUrl = env.DATABASE_URL;
   }
 
-  if (positiveTableExistenceCache.has(tableName)) {
-    return true;
+  // Check cache (both positive and negative results)
+  const cached = tableExistenceCache.get(tableName);
+  if (cached && Date.now() - cached.timestamp < TABLE_EXISTENCE_CACHE_TTL_MS) {
+    return cached.exists;
   }
 
   if (!env.DATABASE_URL) {
@@ -65,9 +77,8 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     const firstRow = result.rows[0];
     const exists = isTableExistsRow(firstRow) ? firstRow.table_exists : false;
 
-    if (exists) {
-      positiveTableExistenceCache.add(tableName);
-    }
+    // Cache both positive and negative results with timestamp
+    tableExistenceCache.set(tableName, { exists, timestamp: Date.now() });
 
     return exists;
   } catch (error) {
@@ -163,8 +174,9 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
     };
   }
 
-  const pool = new Pool({ connectionString });
-  const tempDb = drizzle(pool, { schema });
+  // Use HTTP driver - stateless, no pool cleanup needed
+  const sql = neon(connectionString);
+  const tempDb = drizzle(sql, { schema });
 
   try {
     await withRetry(
@@ -187,13 +199,8 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
       latency,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
-  } finally {
-    try {
-      await pool.end();
-    } catch {
-      // Ignore shutdown errors; connection might already be closed.
-    }
   }
+  // No cleanup needed - HTTP driver is stateless
 }
 
 /**

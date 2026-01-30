@@ -8,7 +8,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicClickLimiter } from '@/lib/rate-limit';
@@ -54,7 +54,7 @@ type AudienceMemberRecord = {
 };
 
 async function findAudienceMember(
-  tx: typeof db,
+  tx: DbOrTransaction,
   profileId: string,
   fingerprint: string,
   explicitId?: string

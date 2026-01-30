@@ -1,22 +1,23 @@
 import { cn, skeleton } from '../table.styles';
 
-interface SkeletonCellProps {
-  /**
-   * Width of the skeleton (e.g., '120px', 'w-40')
-   * Should match the actual cell width to prevent layout shift
-   */
-  width?: string;
+interface SkeletonCellProps
+  extends Readonly<{
+    /**
+     * Width of the skeleton (e.g., '120px', 'w-40')
+     * Should match the actual cell width to prevent layout shift
+     */
+    width?: string;
 
-  /**
-   * Type of skeleton to render
-   */
-  variant?: 'text' | 'avatar' | 'badge' | 'button';
+    /**
+     * Type of skeleton to render
+     */
+    variant?: 'text' | 'avatar' | 'badge' | 'button';
 
-  /**
-   * Additional CSS classes
-   */
-  className?: string;
-}
+    /**
+     * Additional CSS classes
+     */
+    className?: string;
+  }> {}
 
 /**
  * SkeletonCell - Loading skeleton for table cells

@@ -16,8 +16,6 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { useFeatureGate } from '@/lib/flags/client';
 import type { DashboardContact } from '@/types/contacts';
 
 export interface ContactModeProps {
@@ -144,8 +142,6 @@ export function ContactMode({
   hasError,
 }: ContactModeProps) {
   const router = useRouter();
-  const gate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
-  const featureEnabled = gate.value;
 
   const activeContacts = contacts.filter(c => c.isActive);
 
@@ -166,14 +162,6 @@ export function ContactMode({
       toast.error('Failed to copy');
     }
   }, []);
-
-  if (!featureEnabled) {
-    return (
-      <div className='flex h-full items-center justify-center'>
-        <p className='text-secondary-token'>Contacts coming soon</p>
-      </div>
-    );
-  }
 
   if (hasError) {
     return (

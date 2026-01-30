@@ -17,6 +17,9 @@ export interface ProxyUserState {
 const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
 const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for routing decisions
 
+// Timeout for DB query to prevent proxy hanging on Neon cold starts
+const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
+
 /**
  * Lightweight user state check for proxy.ts
  *
@@ -61,7 +64,8 @@ export async function getUserState(
   try {
     // Single query with join - optimized for proxy performance
     // Filter out deleted and banned users to prevent misrouting
-    const [result] = await db
+    // Wrapped with timeout to prevent hanging on Neon cold starts
+    const queryPromise = db
       .select({
         dbUserId: users.id,
         userStatus: users.userStatus, // Single source of truth for user lifecycle state
@@ -84,6 +88,17 @@ export async function getUserState(
         )
       )
       .limit(1);
+
+    // Race the query against a timeout to prevent proxy hanging
+    const [result] = await Promise.race([
+      queryPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('[proxy-state] DB query timeout after 5s')),
+          DB_QUERY_TIMEOUT_MS
+        )
+      ),
+    ]);
 
     let userState: ProxyUserState;
 

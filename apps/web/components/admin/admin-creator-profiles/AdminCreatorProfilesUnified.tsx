@@ -314,6 +314,7 @@ export function AdminCreatorProfilesUnified({
     <div className='flex h-full min-h-0 flex-row items-stretch overflow-hidden'>
       <div className='flex-1 min-h-0 overflow-hidden min-w-0'>
         <AdminTableShell
+          className='rounded-none'
           scrollContainerProps={{
             tabIndex: 0,
             onKeyDown: handleKeyDown,
@@ -389,7 +390,7 @@ export function AdminCreatorProfilesUnified({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex bg-surface-0 border-subtle'
+        className='hidden md:flex'
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <ContactSidebar

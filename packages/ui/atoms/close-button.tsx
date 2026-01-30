@@ -28,14 +28,15 @@ export const closeButtonClassName = [
   closeButtonStyles.offset,
 ].join(' ');
 
-interface CloseButtonIconProps {
-  /**
-   * Size of the X icon.
-   * @default 4
-   */
-  size?: number;
-  className?: string;
-}
+interface CloseButtonIconProps
+  extends Readonly<{
+    /**
+     * Size of the X icon.
+     * @default 4
+     */
+    size?: number;
+    className?: string;
+  }> {}
 
 /**
  * Close button icon component for modal components.

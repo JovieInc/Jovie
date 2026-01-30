@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -272,36 +274,6 @@ export function CardSkeleton() {
         </div>
       </div>
     </div>
-  );
-}
-
-export function ListSkeleton({ items = 3 }: Readonly<{ items?: number }>) {
-  const itemKeys = useMemo(
-    () => generateSkeletonKeys('list-item', items),
-    [items]
-  );
-
-  return (
-    <ul
-      className='space-y-4 list-none'
-      aria-label='Loading list items'
-      aria-busy='true'
-    >
-      {itemKeys.map(key => (
-        <li
-          key={key}
-          className='flex items-center space-x-3 p-3 border border-subtle rounded-md'
-          aria-hidden='true'
-        >
-          <span className='block h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
-          <span className='block space-y-1 flex-1'>
-            <span className='block h-4 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
-            <span className='block h-3 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
-          </span>
-          <span className='block h-8 w-8 rounded-md skeleton motion-reduce:animate-none' />
-        </li>
-      ))}
-    </ul>
   );
 }
 

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * useLinksPersistence Hook
  *
@@ -9,8 +11,9 @@ import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { track } from '@/lib/analytics';
+import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries/keys';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
@@ -299,7 +302,11 @@ export function useLinksPersistence({
           `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
         );
       } catch (error) {
-        console.error('Error saving links:', error);
+        void captureError('Failed to save social links', error, {
+          profileId,
+          linkCount: normalized.length,
+          route: '/app/dashboard/links',
+        });
         const message =
           error instanceof Error && error.message
             ? error.message

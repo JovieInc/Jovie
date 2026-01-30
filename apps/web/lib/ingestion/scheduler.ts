@@ -1,11 +1,14 @@
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
-import { type DbType, ingestionJobs } from '@/lib/db';
+import { type DbOrTransaction, ingestionJobs } from '@/lib/db';
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { logger } from '@/lib/utils/logger';
 import {
   beaconsPayloadSchema,
+  instagramPayloadSchema,
   layloPayloadSchema,
   linktreePayloadSchema,
+  tiktokPayloadSchema,
+  twitterPayloadSchema,
   youtubePayloadSchema,
 } from './jobs/schemas';
 import type { JobFailureReason } from './jobs/types';
@@ -85,7 +88,7 @@ function getJobHost(job: typeof ingestionJobs.$inferSelect): string | null {
  * Get count of currently processing jobs per host.
  */
 async function getProcessingHostCounts(
-  tx: DbType
+  tx: DbOrTransaction
 ): Promise<Map<string, number>> {
   const processingJobs = await tx
     .select({ payload: ingestionJobs.payload })
@@ -104,43 +107,36 @@ async function getProcessingHostCounts(
   }, new Map<string, number>());
 }
 
+const JOB_TYPE_TO_SCHEMA_MAP = {
+  import_linktree: linktreePayloadSchema,
+  import_laylo: layloPayloadSchema,
+  import_youtube: youtubePayloadSchema,
+  import_beacons: beaconsPayloadSchema,
+  import_instagram: instagramPayloadSchema,
+  import_tiktok: tiktokPayloadSchema,
+  import_twitter: twitterPayloadSchema,
+  send_claim_invite: sendClaimInvitePayloadSchema,
+} as const;
+
 /**
  * Extract creator profile ID from a job based on its type.
  */
 export function getCreatorProfileIdFromJob(
   job: typeof ingestionJobs.$inferSelect
 ): string | null {
-  switch (job.jobType) {
-    case 'import_linktree': {
-      const parsed = linktreePayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_laylo': {
-      const parsed = layloPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_youtube': {
-      const parsed = youtubePayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'import_beacons': {
-      const parsed = beaconsPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    case 'send_claim_invite': {
-      const parsed = sendClaimInvitePayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
-    default:
-      return null;
-  }
+  const schema =
+    JOB_TYPE_TO_SCHEMA_MAP[job.jobType as keyof typeof JOB_TYPE_TO_SCHEMA_MAP];
+  if (!schema) return null;
+
+  const parsed = schema.safeParse(job.payload);
+  return parsed.success ? parsed.data.creatorProfileId : null;
 }
 
 /**
  * Handle job failure with retry logic.
  */
 export async function handleIngestionJobFailure(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect,
   error: unknown
 ): Promise<void> {
@@ -166,7 +162,7 @@ export async function handleIngestionJobFailure(
  * Respects maxAttempts and only claims jobs that are ready to run.
  */
 export async function claimPendingJobs(
-  tx: DbType,
+  tx: DbOrTransaction,
   now: Date,
   limit = 5
 ): Promise<(typeof ingestionJobs.$inferSelect)[]> {
@@ -295,7 +291,7 @@ export async function claimPendingJobs(
  * Mark a job as failed with optional retry scheduling.
  */
 export async function failJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect,
   error: string,
   options: { reason?: JobFailureReason } = {}
@@ -350,7 +346,7 @@ export async function failJob(
  * Mark a job as succeeded.
  */
 export async function succeedJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect
 ): Promise<void> {
   await tx
@@ -367,7 +363,7 @@ export async function succeedJob(
  * Reset a failed job for retry (admin action).
  */
 export async function resetJobForRetry(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobId: string
 ): Promise<boolean> {
   const [updated] = await tx

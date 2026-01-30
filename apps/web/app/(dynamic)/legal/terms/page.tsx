@@ -3,8 +3,8 @@ import { LegalPage } from '@/components/organisms/LegalPage';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
-// Static generation with hourly revalidation - legal content rarely changes
-export const revalidate = 3600;
+// Full SSG - markdown content is read at build time, no runtime regeneration needed
+export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
   title: `Terms of Service | ${APP_NAME}`,

@@ -23,7 +23,8 @@ export type ValidationRule = (env: {
  * Validation rule: Check Clerk publishable key exists
  */
 const checkClerkPublishableKey: ValidationRule = () => {
-  // Skip validation if we're in mock mode (used for testing/bypass scenarios)
+  // Skip validation if in mock mode - this allows bypass during cold starts
+  // when environment variables may not be fully initialized yet
   if (publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1') {
     return null;
   }

@@ -7,11 +7,12 @@ import type { CreatorVerificationStatus } from '@/components/admin/useCreatorVer
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 
-interface CreatorVerificationToggleButtonProps {
-  profile: AdminCreatorProfileRow;
-  status: CreatorVerificationStatus;
-  onToggle: () => Promise<void> | void;
-}
+interface CreatorVerificationToggleButtonProps
+  extends Readonly<{
+    profile: AdminCreatorProfileRow;
+    status: CreatorVerificationStatus;
+    onToggle: () => Promise<void> | void;
+  }> {}
 
 export function CreatorVerificationToggleButton({
   profile,

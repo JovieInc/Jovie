@@ -9,9 +9,10 @@ import {
 } from '@jovie/ui';
 import * as React from 'react';
 
-export interface AdminCreatorFiltersProps {
-  initialPageSize: number;
-}
+export interface AdminCreatorFiltersProps
+  extends Readonly<{
+    initialPageSize: number;
+  }> {}
 
 export function AdminCreatorFilters({
   initialPageSize,

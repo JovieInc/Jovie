@@ -114,7 +114,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     return [
       {
         label: 'Copy Emails',
-        icon: <Copy className='h-4 w-4' />,
+        icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const emails = selectedEntries.map(e => e.email).join('\n');
           navigator.clipboard.writeText(emails);
@@ -123,7 +123,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
       },
       {
         label: 'Copy Names',
-        icon: <Copy className='h-4 w-4' />,
+        icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const names = selectedEntries.map(e => e.fullName).join('\n');
           navigator.clipboard.writeText(names);

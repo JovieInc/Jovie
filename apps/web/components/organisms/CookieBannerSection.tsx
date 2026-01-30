@@ -22,8 +22,22 @@ export interface CookieBannerSectionProps {
 export function CookieBannerSection({
   showBanner = true,
 }: CookieBannerSectionProps) {
-  const [visible, setVisible] = useState(showBanner);
+  const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
+
+  useEffect(() => {
+    if (!showBanner) {
+      setVisible(false);
+      return;
+    }
+
+    try {
+      const existing = localStorage.getItem('jv_cc');
+      setVisible(!existing);
+    } catch {
+      setVisible(true);
+    }
+  }, [showBanner]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !window.JVConsent) {
@@ -54,6 +68,11 @@ export function CookieBannerSection({
   const acceptAll = async () => {
     const consent = { essential: true, analytics: true, marketing: true };
     await saveConsent(consent);
+    try {
+      localStorage.setItem('jv_cc', JSON.stringify(consent));
+    } catch {
+      // ignore
+    }
     window.JVConsent?._emit(consent);
     setVisible(false);
   };
@@ -61,6 +80,11 @@ export function CookieBannerSection({
   const reject = async () => {
     const consent = { essential: true, analytics: false, marketing: false };
     await saveConsent(consent);
+    try {
+      localStorage.setItem('jv_cc', JSON.stringify(consent));
+    } catch {
+      // ignore
+    }
     window.JVConsent?._emit(consent);
     setVisible(false);
   };
@@ -70,9 +94,9 @@ export function CookieBannerSection({
       {showBanner && visible ? (
         <div
           data-testid='cookie-banner'
-          className='fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-gray-900 shadow-lg backdrop-blur-sm sm:px-6 md:flex md:items-center md:justify-between md:gap-4 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-100'
+          className='fixed inset-x-0 bottom-0 z-40 border-t border-default bg-surface-1 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-primary shadow-lg backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
         >
-          <p className='mb-3 text-sm leading-relaxed md:mb-0 md:flex-1'>
+          <p className='mb-3 text-sm leading-relaxed text-secondary md:mb-0 md:flex-1'>
             We use cookies to improve your experience.
           </p>
 
@@ -89,6 +113,11 @@ export function CookieBannerSection({
           open={customize}
           onClose={() => setCustomize(false)}
           onSave={c => {
+            try {
+              localStorage.setItem('jv_cc', JSON.stringify(c));
+            } catch {
+              // ignore
+            }
             window.JVConsent?._emit(c);
             setVisible(false);
           }}

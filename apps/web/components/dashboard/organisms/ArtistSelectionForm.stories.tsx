@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ThemeProvider } from 'next-themes';
-import { ArtistSelectionForm } from './ArtistSelectionForm';
+import { ArtistSelectionForm } from './artist-selection-form/ArtistSelectionForm';
 
 // Simplified Storybook story for ArtistSelectionForm
 // This component requires complex API mocking which is handled by Storybook's Next.js integration

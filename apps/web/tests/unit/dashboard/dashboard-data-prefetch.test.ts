@@ -77,11 +77,33 @@ vi.mock('@clerk/nextjs/server', () => ({
   currentUser: vi.fn(),
 }));
 
-vi.mock('next/cache', () => ({
-  unstable_noStore: vi.fn(),
-  revalidateTag: vi.fn(),
-  updateTag: vi.fn(),
-}));
+vi.mock('next/cache', async () => {
+  const actual =
+    await vi.importActual<typeof import('next/cache')>('next/cache');
+
+  const simpleCache = new Map<string, unknown>();
+
+  return {
+    ...actual,
+    unstable_cache: vi.fn(
+      <T extends (...args: never[]) => Promise<unknown>>(
+        fn: T,
+        keys?: readonly unknown[]
+      ) => {
+        const cacheKey = JSON.stringify(keys ?? ['default']);
+        return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+          if (!simpleCache.has(cacheKey)) {
+            simpleCache.set(cacheKey, fn(...args));
+          }
+          return simpleCache.get(cacheKey) as ReturnType<T>;
+        };
+      }
+    ),
+    unstable_noStore: vi.fn(),
+    revalidateTag: vi.fn(),
+    updateTag: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: withDbSessionTxMock,
@@ -120,7 +142,7 @@ describe('dashboard data prefetch', () => {
 
   it('dedupes dashboard fetches after prefetching', async () => {
     const { getDashboardData, getDashboardDataCached, prefetchDashboardData } =
-      await import('@/app/app/dashboard/actions');
+      await import('@/app/app/(shell)/dashboard/actions');
 
     prefetchDashboardData();
 

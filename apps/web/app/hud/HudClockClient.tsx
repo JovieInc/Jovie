@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-export interface HudClockClientProps {
-  locale?: string;
-}
+export interface HudClockClientProps
+  extends Readonly<{
+    locale?: string;
+  }> {}
 
 export function HudClockClient({ locale }: HudClockClientProps) {
   const resolvedLocale = locale ?? 'en-US';

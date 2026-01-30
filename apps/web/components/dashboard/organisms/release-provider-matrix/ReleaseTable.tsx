@@ -22,18 +22,9 @@ import {
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createReleaseHeaderRenderer,
+  createRightMetaCellRenderer,
   createSelectCellRenderer,
   createSelectHeaderRenderer,
-  createSmartLinkCellRenderer,
-  renderDurationCell,
-  renderGenresCell,
-  renderLabelCell,
-  renderMetricsCell,
-  renderPopularityCell,
-  renderReleaseDateCell,
-  renderStatsCell,
-  renderTotalTracksCell,
-  renderUpcCell,
 } from './utils/column-renderers';
 
 interface ProviderConfig {
@@ -74,78 +65,6 @@ interface ReleaseTableProps {
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
-
-// ============================================================================
-// Static Column Definitions (Module Level)
-// ============================================================================
-// These don't depend on props/state and are defined once at module load
-// Note: releaseType, availability, and ISRC columns have been moved to ReleaseSidebar drawer only
-
-const STATIC_COLUMNS = {
-  releaseDate: columnHelper.accessor('releaseDate', {
-    id: 'releaseDate',
-    header: 'Released',
-    cell: renderReleaseDateCell,
-    size: 80,
-    enableSorting: true,
-  }),
-  popularity: columnHelper.accessor('spotifyPopularity', {
-    id: 'popularity',
-    header: 'Popularity',
-    cell: renderPopularityCell,
-    size: 70,
-    enableSorting: true,
-  }),
-  upc: columnHelper.accessor('upc', {
-    id: 'upc',
-    header: 'UPC',
-    cell: renderUpcCell,
-    size: 110,
-    enableSorting: true,
-  }),
-  label: columnHelper.accessor('label', {
-    id: 'label',
-    header: 'Label',
-    cell: renderLabelCell,
-    size: 120,
-    enableSorting: true,
-  }),
-  totalTracks: columnHelper.accessor('totalTracks', {
-    id: 'totalTracks',
-    header: 'Tracks',
-    cell: renderTotalTracksCell,
-    size: 60,
-    enableSorting: true,
-  }),
-  duration: columnHelper.accessor('totalDurationMs', {
-    id: 'totalDurationMs',
-    header: 'Duration',
-    cell: renderDurationCell,
-    size: 70,
-    enableSorting: true,
-  }),
-  genres: columnHelper.accessor('genres', {
-    id: 'genres',
-    header: 'Genre',
-    cell: renderGenresCell,
-    size: 100,
-  }),
-  // Combined metrics column - replaces individual small columns
-  metrics: columnHelper.display({
-    id: 'metrics',
-    // sr-only header for cleaner look
-    header: () => <span className='sr-only'>Metrics</span>,
-    cell: renderMetricsCell,
-    size: 180,
-  }),
-  // Combined stats column: year + popularity icon + duration
-  stats: columnHelper.display({
-    id: 'stats',
-    header: () => <span className='sr-only'>Stats</span>,
-    cell: renderStatsCell,
-    size: 100, // Compact: ~40px year + 16px icon + duration
-  }),
-};
 
 /**
  * ReleaseTable - Releases table using UnifiedTable
@@ -343,13 +262,13 @@ export function ReleaseTable({
       const isRowExpanded = showTracks && isExpanded(row.id);
 
       if (isSelected) {
-        return 'group bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary';
+        return 'group bg-surface-1 bg-primary/5 dark:bg-surface-1 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-surface-2/50 dark:hover:bg-surface-2';
       }
       if (isRowExpanded) {
         // Expanded parent row has slightly darker background (like Linear)
-        return 'group bg-surface-2/50 dark:bg-surface-2/30';
+        return 'group bg-surface-1 bg-surface-2/50 dark:bg-surface-1 dark:bg-surface-2/30 hover:bg-surface-2/50 dark:hover:bg-surface-2';
       }
-      return 'group hover:bg-(--color-cell-hover)';
+      return 'group bg-surface-1 dark:bg-surface-1 hover:bg-surface-2/50 dark:hover:bg-surface-2';
     },
     [selectedIdsRef, showTracks, isExpanded]
   );
@@ -399,24 +318,22 @@ export function ReleaseTable({
       enableSorting: true,
     });
 
-    const smartLinkColumn = columnHelper.display({
-      id: 'smartLink',
-      header: 'Smart link',
-      cell: createSmartLinkCellRenderer(onCopy),
-      size: 160,
+    const rightMetaColumn = columnHelper.display({
+      id: 'meta',
+      header: () => (
+        <span className='sr-only'>Smart link, popularity, year</span>
+      ),
+      cell: createRightMetaCellRenderer(onCopy),
+      size: 260,
+      minSize: 260,
+      maxSize: 260,
     });
 
     // Return all columns - TanStack Table handles visibility natively
-    // Uses combined stats column for cleaner layout: year + popularity icon + duration
-    // Actions are now handled via context menu (right-click) only
+    // Right meta packs smart link + popularity + year; header is sr-only for a11y.
     // Note: releaseType, availability, and ISRC columns moved to ReleaseSidebar drawer only
-    return [
-      checkboxColumn,
-      releaseColumn,
-      smartLinkColumn,
-      STATIC_COLUMNS.stats, // Combined: year, popularity icon, duration
-      STATIC_COLUMNS.upc,
-    ];
+    // UPC column removed per design request.
+    return [checkboxColumn, releaseColumn, rightMetaColumn];
   }, [
     artistName,
     onCopy,
@@ -529,6 +446,17 @@ export function ReleaseTable({
       expandedRowIds={expandedRowIds}
       renderExpandedContent={showTracks ? renderExpandedContent : undefined}
       getExpandableRowId={getExpandableRowId}
+      emptyState={
+        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+          <Icon name='Disc3' className='h-6 w-6' />
+          <div>
+            <div className='font-medium'>No releases</div>
+            <div className='text-xs'>
+              Your releases will appear here once synced.
+            </div>
+          </div>
+        </div>
+      }
     />
   );
 }

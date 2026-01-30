@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import { getFeaturedCreators } from '@/lib/featured-creators';
 
 export const dynamic = 'force-dynamic';
@@ -62,7 +63,15 @@ export async function GET() {
       error: error instanceof Error ? error.message : 'Unknown error',
     };
 
-    console.error('[Health Check] Featured creators check failed:', error);
+    await captureError(
+      'Featured creators check failed in health endpoint',
+      error,
+      {
+        route: '/api/health/homepage',
+        checkType: 'featuredCreators',
+        duration: Date.now() - startTime,
+      }
+    );
   }
 
   const statusCode = health.status === 'healthy' ? 200 : 503;

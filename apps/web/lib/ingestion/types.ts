@@ -20,6 +20,10 @@ export interface ExtractedLink {
 
 export interface ExtractionResult {
   links: ExtractedLink[];
+  /** Source platform for provenance storage (e.g., linktree, instagram). */
+  sourcePlatform?: string | null;
+  /** Source URL used for extraction (normalized). */
+  sourceUrl?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
   /**

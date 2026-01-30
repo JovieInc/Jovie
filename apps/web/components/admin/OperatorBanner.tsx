@@ -80,7 +80,7 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
           className='p-1 rounded hover:bg-amber-600/20 transition-colors'
           aria-label='Dismiss environment warning'
         >
-          <X className='h-4 w-4' />
+          <X className='h-3.5 w-3.5' />
         </button>
       </div>
     </div>

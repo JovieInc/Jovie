@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Phase =
   | 'typing'
@@ -43,55 +43,109 @@ const CTA_BUTTON_LABELS: Record<string, string> = {
 
 export function JovieProfileUI() {
   const reducedMotion = useReducedMotion();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isVisible, setIsVisible] = useState(true);
   const [phase, setPhase] = useState<Phase>('typing');
   const [typedText, setTypedText] = useState('');
 
   const emailToType = 'fan@email.com';
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.2 }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setPhase('listen');
+      setTypedText('');
+      return;
+    }
+
+    if (isVisible) {
+      setPhase('typing');
+      setTypedText('');
+    }
+  }, [isVisible, reducedMotion]);
+
   // Typing animation
   useEffect(() => {
-    if (phase !== 'typing' || reducedMotion) return;
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+
+    if (phase !== 'typing' || reducedMotion || !isVisible) return;
 
     let charIndex = 0;
-    const typeInterval = setInterval(() => {
+    typingIntervalRef.current = setInterval(() => {
       if (charIndex < emailToType.length) {
         setTypedText(emailToType.slice(0, charIndex + 1));
         charIndex++;
       } else {
-        clearInterval(typeInterval);
+        if (typingIntervalRef.current) {
+          clearInterval(typingIntervalRef.current);
+          typingIntervalRef.current = null;
+        }
       }
     }, 100);
 
-    return () => clearInterval(typeInterval);
-  }, [phase, reducedMotion]);
+    return () => {
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
+    };
+  }, [phase, reducedMotion, isVisible]);
 
   // Phase transitions
   useEffect(() => {
-    if (reducedMotion) {
-      setPhase('listen');
-      return;
+    if (phaseTimeoutRef.current) {
+      clearTimeout(phaseTimeoutRef.current);
+      phaseTimeoutRef.current = null;
     }
+
+    if (reducedMotion || !isVisible) return;
 
     const currentIndex = phaseOrder.indexOf(phase);
     const nextPhase = phaseOrder[(currentIndex + 1) % phaseOrder.length];
     const duration = phaseConfig[phase].duration;
 
-    const timeout = setTimeout(() => {
+    phaseTimeoutRef.current = setTimeout(() => {
       if (nextPhase === 'typing') {
         setTypedText('');
       }
       setPhase(nextPhase);
     }, duration);
 
-    return () => clearTimeout(timeout);
-  }, [phase, reducedMotion]);
+    return () => {
+      if (phaseTimeoutRef.current) {
+        clearTimeout(phaseTimeoutRef.current);
+        phaseTimeoutRef.current = null;
+      }
+    };
+  }, [phase, reducedMotion, isVisible]);
 
   const isSubscribed = phase !== 'typing' && phase !== 'subscribing';
   const showCTAButton =
     phase === 'listen' || phase === 'shop' || phase === 'tickets';
 
   return (
-    <div className='w-full max-w-[320px] mx-auto'>
+    <div ref={containerRef} className='w-full max-w-[320px] mx-auto'>
       <div className='p-6 rounded-2xl bg-surface-1/50 border border-default min-h-[280px]'>
         {/* Profile info */}
         <div className='mb-6'>

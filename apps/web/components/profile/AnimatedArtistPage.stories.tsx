@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import React from 'react';
 import { Artist, LegacySocialLink } from '@/types/db';
-import { AnimatedArtistPage } from './AnimatedArtistPage';
+import { AnimatedArtistPage } from './animated-artist-page/AnimatedArtistPage';
 
 const meta: Meta<typeof AnimatedArtistPage> = {
   title: 'Profile/AnimatedArtistPage',

@@ -20,10 +20,10 @@ import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 export default function GlobalError({
   error,
   reset,
-}: {
+}: Readonly<{
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}>) {
   useEffect(() => {
     // Capture error in Sentry with SDK variant awareness
     const sentryMode = getSentryMode();

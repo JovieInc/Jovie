@@ -167,8 +167,7 @@ export function useContextMenuItems({
       });
 
       // Copy claim link & Send invite (if unclaimed and has claim token)
-      const claimToken =
-        'claimToken' in profile ? (profile.claimToken as string | null) : null;
+      const claimToken = 'claimToken' in profile ? profile.claimToken : null;
       if (!profile.isClaimed && claimToken) {
         items.push({ type: 'separator' as const });
         items.push({

@@ -96,6 +96,30 @@ export const useOrganizationList = () => ({
   setActive: () => Promise.resolve(),
 });
 
+// Mock sign-in/sign-up flow hooks
+export const useSignIn = () => ({
+  isLoaded: true,
+  signIn: {
+    create: () => Promise.resolve({ status: 'complete' }),
+    attemptFirstFactor: () => Promise.resolve({ status: 'complete' }),
+    prepareFirstFactor: () => Promise.resolve({ status: 'needs_first_factor' }),
+    supportedFirstFactors: [],
+  },
+  setActive: () => Promise.resolve(),
+});
+
+export const useSignUp = () => ({
+  isLoaded: true,
+  signUp: {
+    create: () => Promise.resolve({ status: 'complete' }),
+    prepareEmailAddressVerification: () =>
+      Promise.resolve({ status: 'needs_verification' }),
+    attemptEmailAddressVerification: () =>
+      Promise.resolve({ status: 'complete' }),
+  },
+  setActive: () => Promise.resolve(),
+});
+
 // Mock components
 export const SignInButton = ({ children, ...props }) => (
   <button type='button' {...props} data-testid='mock-sign-in-button'>
@@ -150,6 +174,13 @@ export const ClerkProvider = ({ children }) => children;
 export const ClerkLoaded = ({ children }) => children;
 export const ClerkLoading = ({ children }) => null;
 
+// Authentication state components
+export const SignedIn = ({ children }) => children; // Show content when "signed in" (always in mocked state)
+export const SignedOut = ({ children }) => null; // Never show "signed out" content in mocked state
+
+// SSO callback handler mock
+export const AuthenticateWithRedirectCallback = () => null;
+
 export const Protect = ({ children, fallback, ...props }) => {
   // In Storybook, always show protected content unless explicitly testing fallback
   return children;
@@ -163,6 +194,8 @@ export default {
   useSession,
   useOrganization,
   useOrganizationList,
+  useSignIn,
+  useSignUp,
   SignInButton,
   SignUpButton,
   SignOutButton,
@@ -173,5 +206,8 @@ export default {
   ClerkProvider,
   ClerkLoaded,
   ClerkLoading,
+  SignedIn,
+  SignedOut,
+  AuthenticateWithRedirectCallback,
   Protect,
 };

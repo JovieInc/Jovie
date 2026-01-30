@@ -38,11 +38,11 @@ export const queryKeys = {
   // Dashboard data queries
   dashboard: {
     all: ['dashboard'] as const,
-    analytics: (view?: string, range?: string) =>
+    analytics: (range?: string) =>
       [
         ...queryKeys.dashboard.all,
         'analytics',
-        ...(view === undefined ? [] : [{ view, range }]),
+        ...(range === undefined ? [] : [range]),
       ] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
     socialLinks: (profileId?: string) =>

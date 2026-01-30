@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import type { ExtractionResult } from '../types';
 
 /**
@@ -57,7 +57,10 @@ export type SupportedRecursiveJobType =
   | 'import_linktree'
   | 'import_laylo'
   | 'import_youtube'
-  | 'import_beacons';
+  | 'import_beacons'
+  | 'import_instagram'
+  | 'import_tiktok'
+  | 'import_twitter';
 
 /**
  * Maximum depth allowed for each job type.
@@ -68,6 +71,9 @@ export const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> =
     import_laylo: 3,
     import_youtube: 1,
     import_beacons: 3,
+    import_instagram: 2,
+    import_tiktok: 2,
+    import_twitter: 2,
   };
 
 /**
@@ -79,6 +85,6 @@ export type JobFailureReason = 'rate_limited' | 'transient';
  * Job processor function signature.
  */
 export type JobProcessor = (
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ) => Promise<JobExecutionResult>;

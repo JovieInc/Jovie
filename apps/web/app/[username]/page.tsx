@@ -11,18 +11,12 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { ConsentBanner, JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import {
-  getCreatorProfileWithLinks,
-  incrementProfileViews,
-} from '@/lib/db/queries';
+import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
-import { getLatestReleaseForProfile } from '@/lib/discography/queries';
-import { captureWarning } from '@/lib/error-tracking';
-import { STATSIG_FLAGS } from '@/lib/flags';
-import { checkGateForUser } from '@/lib/flags/server';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
@@ -109,9 +103,6 @@ function generateProfileStructuredData(
 
   return { musicGroupSchema, breadcrumbSchema };
 }
-
-// Feature flag check timeout (ms) - don't block render for slow flag checks
-const FLAG_CHECK_TIMEOUT_MS = 100;
 
 // Note: runtime = 'edge' removed for cacheComponents compatibility
 // Edge runtime is incompatible with Cache Components
@@ -201,8 +192,8 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
 
-    // Fetch latest release for the profile
-    const latestRelease = await getLatestReleaseForProfile(result.id);
+    // Latest release is now fetched in parallel with profile data
+    const latestRelease = result.latestRelease ?? null;
 
     return {
       profile,
@@ -215,7 +206,10 @@ const fetchProfileAndLinks = async (
       status: 'ok',
     };
   } catch (error) {
-    console.error('Error fetching creator profile:', error);
+    await captureError('Error fetching creator profile', error, {
+      username,
+      route: '/[username]',
+    });
     return {
       profile: null,
       links: [],
@@ -280,25 +274,6 @@ interface Props {
  * Non-blocking feature flag check with timeout.
  * Returns false if the check takes too long, avoiding render delays.
  */
-async function checkFeatureFlagWithTimeout(
-  clerkId: string | null
-): Promise<boolean> {
-  if (!clerkId) return false;
-
-  try {
-    const result = await Promise.race([
-      checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, { userID: clerkId }),
-      new Promise<false>(resolve =>
-        setTimeout(() => resolve(false), FLAG_CHECK_TIMEOUT_MS)
-      ),
-    ]);
-    return result;
-  } catch {
-    // Fail open - don't block render for flag check failures
-    return false;
-  }
-}
-
 export default async function ArtistPage({
   params,
   searchParams,
@@ -317,6 +292,22 @@ export default async function ArtistPage({
   // via the StaticArtistPage component which reads cookies on hydration.
 
   const normalizedUsername = username.toLowerCase();
+
+  // Run profile fetch and claim token validation in parallel when claim token is present
+  // This eliminates the sequential DB call that was blocking rendering
+  const hasClaimToken =
+    typeof claimTokenParam === 'string' && claimTokenParam.length > 0;
+
+  const [profileResult, claimTokenValidResult] = await Promise.all([
+    getProfileAndLinks(normalizedUsername, {
+      forceNoStore: hasClaimToken,
+    }),
+    // Only validate claim token if present (returns false immediately otherwise)
+    hasClaimToken
+      ? isClaimTokenValid(normalizedUsername, claimTokenParam)
+      : Promise.resolve(false),
+  ]);
+
   const {
     profile,
     links,
@@ -324,11 +315,8 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
-    creatorClerkId,
     latestRelease,
-  } = await getProfileAndLinks(normalizedUsername, {
-    forceNoStore: Boolean(claimTokenParam),
-  });
+  } = profileResult;
 
   if (status === 'error') {
     return (
@@ -350,18 +338,11 @@ export default async function ArtistPage({
     notFound();
   }
 
-  // Track profile view (fire-and-forget, non-blocking)
-  incrementProfileViews(normalizedUsername).catch(() => {
-    // Fail silently, don't block page render
-  });
-
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
   // Non-blocking feature flag check with timeout
-  const dynamicOverrideEnabled =
-    await checkFeatureFlagWithTimeout(creatorClerkId);
-  const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
+  const dynamicEnabled = creatorIsPro;
 
   // Social links loaded together with profile in a single cached helper
   const socialLinks = links;
@@ -391,14 +372,9 @@ export default async function ArtistPage({
 
   // Determine if we should show the claim banner
   // Show only when a claim token is present in the URL and matches the profile's token
-  // NOTE: This is async but only runs for unclaimed profiles with a claim token (rare path)
-  let showClaimBanner = false;
-  if (typeof claimTokenParam === 'string' && claimTokenParam.length > 0) {
-    const claimToken = claimTokenParam;
-    if (!profile.is_claimed) {
-      showClaimBanner = await isClaimTokenValid(normalizedUsername, claimToken);
-    }
-  }
+  // The claim token validation was already done in parallel with profile fetch above
+  const showClaimBanner =
+    hasClaimToken && !profile.is_claimed && claimTokenValidResult;
 
   // Generate structured data for SEO
   const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(

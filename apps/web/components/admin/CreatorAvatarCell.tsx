@@ -10,13 +10,14 @@ import {
 } from '@/lib/images/config';
 import { useAvatarUploadMutation } from '@/lib/queries/useAvatarUploadMutation';
 
-export interface CreatorAvatarCellProps {
-  profileId: string;
-  username: string;
-  avatarUrl: string | null;
-  verified?: boolean;
-  isFeatured?: boolean;
-}
+export interface CreatorAvatarCellProps
+  extends Readonly<{
+    profileId: string;
+    username: string;
+    avatarUrl: string | null;
+    verified?: boolean;
+    isFeatured?: boolean;
+  }> {}
 
 export function CreatorAvatarCell({
   profileId,

@@ -137,7 +137,7 @@ vi.mock('@/types', () => ({
   getSocialPlatformLabel: (platform: string) => platform,
 }));
 
-vi.mock('@/app/app/dashboard/DashboardDataContext', () => ({
+vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='dashboard-data-provider'>{children}</div>
   ),
@@ -157,7 +157,7 @@ vi.mock('@/app/app/dashboard/DashboardDataContext', () => ({
   }),
 }));
 
-vi.mock('@/app/app/dashboard/PreviewPanelContext', () => ({
+vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanel: () => ({
     isOpen: false,
     open: vi.fn(),

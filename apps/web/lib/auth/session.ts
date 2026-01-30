@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { type DbType, db } from '@/lib/db';
+import { type DbOrTransaction, type DbType, db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 
 /**
@@ -88,7 +88,7 @@ export type IsolationLevel =
  *   - 'serializable': Strictest, prevents all concurrency anomalies (use for critical operations like profile creation)
  */
 export async function withDbSessionTx<T>(
-  operation: (tx: DbType, userId: string) => Promise<T>,
+  operation: (tx: DbOrTransaction, userId: string) => Promise<T>,
   options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
   const userId = await resolveClerkUserId(options?.clerkUserId);

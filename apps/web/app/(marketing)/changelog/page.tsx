@@ -8,16 +8,40 @@ import html from 'remark-html';
 import { Container } from '@/components/site/Container';
 import { APP_NAME } from '@/constants/app';
 
-const CHANGELOG_PATH = path.join(process.cwd(), 'CHANGELOG.md');
+const CHANGELOG_CANDIDATE_PATHS = [
+  path.join(process.cwd(), 'CHANGELOG.md'),
+  path.join(process.cwd(), '..', '..', 'CHANGELOG.md'),
+];
+
+function resolveChangelogPath(): string | null {
+  for (const candidate of CHANGELOG_CANDIDATE_PATHS) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 const CACHE_REVALIDATE_SECONDS = 60 * 60 * 24; // 24 hours
 
 /**
  * Process markdown to HTML. This is CPU-intensive so we cache the result.
  */
 async function processChangelogMarkdown(): Promise<string> {
-  const fileContents = fs.readFileSync(CHANGELOG_PATH, 'utf8');
-  const processedContent = await remark().use(html).process(fileContents);
-  return DOMPurify.sanitize(processedContent.toString());
+  const changelogPath = resolveChangelogPath();
+  if (!changelogPath) {
+    return DOMPurify.sanitize(
+      '<h2>Changelog unavailable</h2><p>Please check back soon.</p>'
+    );
+  }
+
+  try {
+    const fileContents = fs.readFileSync(changelogPath, 'utf8');
+    const processedContent = await remark().use(html).process(fileContents);
+    return DOMPurify.sanitize(processedContent.toString());
+  } catch {
+    return DOMPurify.sanitize(
+      '<h2>Changelog unavailable</h2><p>Please check back soon.</p>'
+    );
+  }
 }
 
 /**

@@ -186,7 +186,7 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
     return buildSuccessResponse(accumulator);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    captureError('Error loading Stripe metrics', error);
+    captureError('Error loading Stripe metrics', error, { message });
     return buildErrorResponse(message);
   }
 }

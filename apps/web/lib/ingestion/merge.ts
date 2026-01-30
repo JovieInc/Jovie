@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { type DbType, socialLinks } from '@/lib/db';
+import { type DbOrTransaction, socialLinks } from '@/lib/db';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
@@ -13,6 +13,10 @@ import {
   buildCanonicalIndex,
   getCanonicalIdentity,
 } from './services/link-deduplication';
+import {
+  storeAvatarCandidate,
+  storeProfileAttributes,
+} from './services/provenance-store';
 import type { ExtractionResult } from './types';
 
 type SocialLinkRow = typeof socialLinks.$inferSelect;
@@ -22,7 +26,7 @@ export { mergeEvidence } from './services/evidence-merger';
 
 // Process an existing link update
 async function processExistingLink(
-  tx: DbType,
+  tx: DbOrTransaction,
   existing: SocialLinkRow,
   link: {
     url: string;
@@ -73,7 +77,7 @@ async function processExistingLink(
 
 // Insert a new link
 interface InsertNewLinkOptions {
-  tx: DbType;
+  tx: DbOrTransaction;
   profileId: string;
   link: { url: string; title?: string | null; sourcePlatform?: string };
   detected: {
@@ -169,7 +173,7 @@ export function createInMemorySocialLinkRow({
  * Uses modular services to reduce cognitive complexity.
  */
 export async function normalizeAndMergeExtraction(
-  tx: DbType,
+  tx: DbOrTransaction,
   profile: {
     id: string;
     usernameNormalized: string | null;
@@ -269,6 +273,25 @@ export async function normalizeAndMergeExtraction(
     profile,
     extraction.avatarUrl ?? null
   );
+
+  // Step 3.5: Store provenance for avatar/name/bio
+  const sourcePlatform = extraction.sourcePlatform ?? 'ingestion';
+  const sourceUrl = extraction.sourceUrl ?? null;
+  await storeAvatarCandidate({
+    tx,
+    profileId: profile.id,
+    avatarUrl: extraction.avatarUrl ?? null,
+    sourcePlatform,
+    sourceUrl,
+  });
+  await storeProfileAttributes({
+    tx,
+    profileId: profile.id,
+    sourcePlatform,
+    sourceUrl,
+    displayName: extraction.displayName ?? null,
+    bio: extraction.bio ?? null,
+  });
 
   // Step 4: Apply profile enrichment (respects user locks)
   await applyProfileEnrichment(tx, {

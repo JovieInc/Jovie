@@ -8,7 +8,7 @@
  * - Dashboard preview format
  */
 
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions/social-links';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import type { LinkItem, Platform, PlatformType, SuggestedLink } from '../types';

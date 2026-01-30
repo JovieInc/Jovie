@@ -212,7 +212,7 @@ describe('UniversalLinkInput Accessibility', () => {
 
       await waitFor(() => {
         const options = screen.getAllByRole('option');
-        expect(options).toHaveLength(2);
+        expect(options).toHaveLength(3);
       });
     });
   });

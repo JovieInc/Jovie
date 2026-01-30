@@ -162,6 +162,19 @@ export {
 } from './payments';
 
 // =============================================================================
+// Tip Schemas
+// =============================================================================
+
+export {
+  // Types
+  type Currency,
+  // Schema instances
+  currencySchema,
+  type TipCreationPayload,
+  tipCreationSchema,
+} from './tip';
+
+// =============================================================================
 // Media Schemas
 // =============================================================================
 
@@ -228,6 +241,10 @@ export {
   beaconsPayloadSchema,
   // Constants
   INGESTION_MAX_DEPTH,
+  type InstagramJobPayload,
+  type InstagramPayload,
+  instagramJobPayloadSchema,
+  instagramPayloadSchema,
   type LayloJobPayload,
   type LayloPayload,
   // Types - job payloads
@@ -242,8 +259,16 @@ export {
   linktreePayloadSchema,
   type ThematicJobPayload,
   type ThematicPayload,
+  type TikTokJobPayload,
+  type TikTokPayload,
+  type TwitterJobPayload,
+  type TwitterPayload,
   thematicJobPayloadSchema,
   thematicPayloadSchema,
+  tiktokJobPayloadSchema,
+  tiktokPayloadSchema,
+  twitterJobPayloadSchema,
+  twitterPayloadSchema,
   type YouTubeJobPayload,
   type YouTubePayload,
   youtubeJobPayloadSchema,
@@ -290,6 +315,7 @@ import * as notifications from './notifications';
 import * as onboarding from './onboarding';
 import * as payments from './payments';
 import * as pixels from './pixels';
+import * as tip from './tip';
 
 export {
   base,
@@ -303,4 +329,5 @@ export {
   onboarding,
   ingestion,
   pixels,
+  tip,
 };

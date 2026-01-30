@@ -5,7 +5,7 @@
  */
 
 import { eq, sql } from 'drizzle-orm';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 
@@ -27,7 +27,7 @@ export interface OrphanedSubscriptionResult {
  * @returns Result of handling operation
  */
 export async function handleOrphanedSubscription(
-  db: DbType,
+  db: DbOrTransaction,
   user: {
     id: string;
     clerkId: string;

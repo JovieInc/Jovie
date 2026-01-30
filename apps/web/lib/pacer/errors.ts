@@ -70,7 +70,7 @@ export function isHttpError(err: unknown): boolean {
 export function getHttpStatusCode(err: unknown): number | undefined {
   if (!(err instanceof Error)) return undefined;
 
-  const match = err.message.match(/HTTP\s*(\d{3})/i);
+  const match = /HTTP\s*(\d{3})/i.exec(err.message);
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 

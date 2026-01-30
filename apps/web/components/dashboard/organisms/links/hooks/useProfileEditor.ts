@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * useProfileEditor Hook
  *
@@ -9,7 +11,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PACER_TIMING, useAutoSave } from '@/lib/pacer';
 import {
   useAvatarMutation,

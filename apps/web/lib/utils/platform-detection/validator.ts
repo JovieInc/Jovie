@@ -170,7 +170,7 @@ export function validateUrl(url: string, platform: PlatformInfo): boolean {
       case 'instagram':
         return /instagram\.com\/[a-zA-Z0-9._]+\/?$/.test(url);
       case 'twitter':
-        return /(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/?$/.test(url);
+        return /(twitter\.com|x\.com)\/\w+\/?$/.test(url);
       case 'tiktok':
         return /tiktok\.com\/@[a-zA-Z0-9._]+\/?$/.test(url);
       case 'youtube':
@@ -184,7 +184,7 @@ export function validateUrl(url: string, platform: PlatformInfo): boolean {
       case 'soundcloud':
         return /soundcloud\.com\/[a-zA-Z0-9_-]+\/?/.test(url);
       case 'twitch':
-        return /twitch\.tv\/[a-zA-Z0-9_]+\/?$/.test(url);
+        return /twitch\.tv\/\w+\/?$/.test(url);
       case 'threads':
         return /threads\.net\/@[a-zA-Z0-9._]+\/?$/.test(url);
       case 'snapchat':
@@ -192,11 +192,11 @@ export function validateUrl(url: string, platform: PlatformInfo): boolean {
       case 'discord':
         return /discord\.(gg|com\/invite)\/[a-zA-Z0-9]+\/?$/.test(url);
       case 'telegram':
-        return /(t\.me|telegram\.me)\/[a-zA-Z0-9_]+\/?$/.test(url);
+        return /(t\.me|telegram\.me)\/\w+\/?$/.test(url);
       case 'reddit':
-        return /reddit\.com\/(r|u|user)\/[a-zA-Z0-9_]+\/?$/.test(url);
+        return /reddit\.com\/(r|u|user)\/\w+\/?$/.test(url);
       case 'pinterest':
-        return /pinterest\.com\/[a-zA-Z0-9_]+\/?$/.test(url);
+        return /pinterest\.com\/\w+\/?$/.test(url);
       case 'onlyfans':
         return /onlyfans\.com\/[a-zA-Z0-9._]+\/?$/.test(url);
       case 'linktree':

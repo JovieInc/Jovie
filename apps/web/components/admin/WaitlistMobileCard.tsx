@@ -152,9 +152,9 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
             aria-label={isExpanded ? 'Show less details' : 'Show more details'}
           >
             {isExpanded ? (
-              <ChevronUp className='h-4 w-4' />
+              <ChevronUp className='h-3.5 w-3.5' />
             ) : (
-              <ChevronDown className='h-4 w-4' />
+              <ChevronDown className='h-3.5 w-3.5' />
             )}
           </Button>
         </div>

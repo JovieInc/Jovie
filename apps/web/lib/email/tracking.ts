@@ -15,7 +15,7 @@ import {
   emailEngagement,
   type TrackedEmailType,
 } from '@/lib/db/schema';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 /**

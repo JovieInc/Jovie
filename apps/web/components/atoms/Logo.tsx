@@ -5,15 +5,16 @@ import { cn } from '@/lib/utils';
 
 export type LogoVariant = 'word' | 'wordAlt' | 'icon' | 'full' | 'fullAlt';
 
-interface LogoProps {
-  className?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  variant?: LogoVariant;
-  tone?: BrandLogoTone;
-  priority?: boolean;
-  'aria-hidden'?: boolean;
-  'data-testid'?: string;
-}
+interface LogoProps
+  extends Readonly<{
+    className?: string;
+    size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    variant?: LogoVariant;
+    tone?: BrandLogoTone;
+    priority?: boolean;
+    'aria-hidden'?: boolean;
+    'data-testid'?: string;
+  }> {}
 
 export function Logo({
   className,
@@ -40,6 +41,14 @@ export function Logo({
     xl: 40,
   };
 
+  const wordmarkWidthPx: Record<NonNullable<LogoProps['size']>, number> = {
+    xs: 56,
+    sm: 84,
+    md: 112,
+    lg: 168,
+    xl: 224,
+  };
+
   const altWordmark = (wordmarkClassName?: string, testId?: string) => {
     const imgClassName = cn(sizeClasses[size], wordmarkClassName);
 
@@ -51,6 +60,7 @@ export function Logo({
             alt={ariaHidden ? '' : 'Jovie logo'}
             width={136}
             height={39}
+            sizes={`${wordmarkWidthPx[size]}px`}
             priority={priority}
             aria-hidden={ariaHidden}
             data-testid={testId}
@@ -61,6 +71,7 @@ export function Logo({
             alt={ariaHidden ? '' : 'Jovie logo'}
             width={136}
             height={39}
+            sizes={`${wordmarkWidthPx[size]}px`}
             priority={priority}
             aria-hidden={ariaHidden}
             data-testid={testId}
@@ -81,6 +92,7 @@ export function Logo({
         alt={ariaHidden ? '' : 'Jovie logo'}
         width={136}
         height={39}
+        sizes={`${wordmarkWidthPx[size]}px`}
         priority={priority}
         aria-hidden={ariaHidden}
         data-testid={testId}

@@ -1,4 +1,5 @@
 import type { Modifier } from '@dnd-kit/core';
+import type { RefObject } from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 /**
@@ -60,4 +61,7 @@ export interface LinkCategoryGridProps<T extends DetectedLink = DetectedLink> {
 
   /** Optional additional CSS classes */
   className?: string;
+
+  /** Optional scroll container ref for virtualization */
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
 }

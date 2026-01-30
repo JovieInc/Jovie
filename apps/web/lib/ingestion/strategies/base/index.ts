@@ -38,7 +38,9 @@ export {
   extractHrefs,
   extractLinks,
   extractMetaContent,
+  extractOpenGraphProfile,
   extractScriptJson,
+  type OpenGraphProfile,
   stripTrackingParams,
 } from './parsing';
 // Result

@@ -4,7 +4,7 @@
  * Helper functions to enqueue email jobs.
  */
 
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
 import type { SendClaimInvitePayload } from './send-claim-invite';
@@ -26,7 +26,7 @@ function randomDelay(minMs: number, maxMs: number): number {
  * @param options - Optional job configuration
  */
 export async function enqueueClaimInviteJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   payload: SendClaimInvitePayload,
   options: {
     /** When to run the job (defaults to now) */
@@ -88,7 +88,7 @@ export async function enqueueClaimInviteJob(
  * @param options - Optional job configuration
  */
 export async function enqueueBulkClaimInviteJobs(
-  tx: DbType,
+  tx: DbOrTransaction,
   invites: SendClaimInvitePayload[],
   options: {
     /** Minimum delay between emails in ms */

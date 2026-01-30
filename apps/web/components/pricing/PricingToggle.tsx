@@ -6,6 +6,8 @@ interface PricingToggleProps {
   onChange: (isYearly: boolean) => void;
 }
 
+const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
+
 export function PricingToggle({ onChange }: PricingToggleProps) {
   const [isYearly, setIsYearly] = useState(false);
 
@@ -27,7 +29,7 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
             ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
             : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
         }`}
-        style={{ fontSynthesisWeight: 'none' }}
+        style={FONT_SYNTHESIS_STYLE}
       >
         Monthly $5
       </button>
@@ -41,7 +43,7 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
             ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
             : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
         }`}
-        style={{ fontSynthesisWeight: 'none' }}
+        style={FONT_SYNTHESIS_STYLE}
       >
         Yearly $50{' '}
         <span className='text-xs text-emerald-600 dark:text-emerald-400 font-medium'>

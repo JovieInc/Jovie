@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { UniversalLinkInput } from './UniversalLinkInput';
+import { UniversalLinkInput } from './universal-link-input/UniversalLinkInput';
 
 const meta: Meta<typeof UniversalLinkInput> = {
   title: 'Dashboard/Atoms/UniversalLinkInput',

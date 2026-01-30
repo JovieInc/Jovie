@@ -31,6 +31,22 @@ export function ProfileViewTracker({
       artist_id: artistId,
       source: source ?? (document.referrer || 'direct'),
     });
+
+    const body = JSON.stringify({ handle });
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' });
+      const sent = navigator.sendBeacon('/api/profile/view', blob);
+      if (sent) return;
+    }
+
+    fetch('/api/profile/view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {
+      // Ignore tracking errors
+    });
   }, [handle, artistId, source]);
 
   // This component renders nothing - it's purely for tracking

@@ -13,7 +13,7 @@ import { logger } from '@/lib/utils/logger';
  * Common email regex pattern
  * Matches most valid email addresses while avoiding false positives
  */
-const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi;
+const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi;
 
 /**
  * Obfuscation patterns used by creators to prevent scraping
@@ -242,59 +242,79 @@ export function extractAndRankEmails(params: {
   html?: string | null;
   linkTitles?: string[];
 }): ExtractedEmail[] {
-  const { bio, html, linkTitles } = params;
   const emailMap = new Map<string, ExtractedEmail>();
+  const { bio, html, linkTitles } = params;
 
-  // Extract from bio
-  if (bio) {
-    for (const email of extractEmailsFromText(bio)) {
-      const existing = emailMap.get(email);
-      const newScore = scoreEmail(email, bio);
-      if (!existing || existing.score < newScore) {
-        emailMap.set(email, {
-          email,
-          score: newScore,
-          source: 'bio',
-          context: bio.slice(0, 100),
-        });
-      }
+  addEmailsFromBio(emailMap, bio);
+  addEmailsFromHtml(emailMap, html);
+  addEmailsFromLinkTitles(emailMap, linkTitles);
+
+  return sortByScore(emailMap);
+}
+
+function addEmailsFromBio(
+  emailMap: Map<string, ExtractedEmail>,
+  bio?: string | null
+) {
+  if (!bio) return;
+
+  for (const email of extractEmailsFromText(bio)) {
+    upsertEmail(emailMap, email, {
+      score: scoreEmail(email, bio),
+      source: 'bio',
+      context: bio.slice(0, 100),
+    });
+  }
+}
+
+function addEmailsFromHtml(
+  emailMap: Map<string, ExtractedEmail>,
+  html?: string | null
+) {
+  if (!html) return;
+
+  for (const email of extractEmailsFromHtml(html)) {
+    upsertEmail(emailMap, email, {
+      score: scoreEmail(email),
+      source: 'html',
+    });
+  }
+}
+
+function addEmailsFromLinkTitles(
+  emailMap: Map<string, ExtractedEmail>,
+  linkTitles?: string[]
+) {
+  if (!linkTitles) return;
+
+  for (const title of linkTitles) {
+    for (const email of extractEmailsFromText(title)) {
+      upsertEmail(emailMap, email, {
+        score: scoreEmail(email, title),
+        source: 'link_title',
+        context: title,
+      });
     }
   }
+}
 
-  // Extract from HTML
-  if (html) {
-    for (const email of extractEmailsFromHtml(html)) {
-      const existing = emailMap.get(email);
-      const newScore = scoreEmail(email);
-      if (!existing || existing.score < newScore) {
-        emailMap.set(email, {
-          email,
-          score: newScore,
-          source: 'html',
-        });
-      }
-    }
+function upsertEmail(
+  emailMap: Map<string, ExtractedEmail>,
+  email: string,
+  payload: Omit<ExtractedEmail, 'email'>
+) {
+  const existing = emailMap.get(email);
+  if (existing && existing.score >= payload.score) {
+    return;
   }
 
-  // Extract from link titles (sometimes emails appear in link text)
-  if (linkTitles) {
-    for (const title of linkTitles) {
-      for (const email of extractEmailsFromText(title)) {
-        const existing = emailMap.get(email);
-        const newScore = scoreEmail(email, title);
-        if (!existing || existing.score < newScore) {
-          emailMap.set(email, {
-            email,
-            score: newScore,
-            source: 'link_title',
-            context: title,
-          });
-        }
-      }
-    }
-  }
+  emailMap.set(email, {
+    email,
+    ...payload,
+  });
+}
 
-  // Sort by score (highest first)
+function sortByScore(emailMap: Map<string, ExtractedEmail>) {
   return Array.from(emailMap.values()).sort((a, b) => b.score - a.score);
 }
 
