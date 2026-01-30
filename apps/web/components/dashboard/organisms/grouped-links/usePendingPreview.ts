@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useState } from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { PendingPreview } from './types';

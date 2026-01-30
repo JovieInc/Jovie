@@ -22,6 +22,7 @@ export * from './CopyableMonospaceCell';
 export * from './Copyright';
 export * from './DashboardErrorFallback';
 export * from './Divider';
+export * from './DotBadge';
 export * from './DropdownMenu';
 export * from './DSPButton';
 export * from './EmptyCell';

@@ -9,7 +9,7 @@ import {
   providerLinks,
 } from '@/lib/db';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import { sendNotification } from '@/lib/notifications/service';
 import { logger } from '@/lib/utils/logger';
 import type { SenderContext } from '@/types/notifications';
