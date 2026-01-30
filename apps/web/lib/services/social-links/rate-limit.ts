@@ -1,6 +1,6 @@
 import {
   createRateLimitHeaders,
-  dashboardLinksRateLimit,
+  dashboardLinksLimiter,
 } from '@/lib/rate-limit';
 
 /**
@@ -16,18 +16,8 @@ import {
 export async function checkRateLimit(
   userId: string
 ): Promise<{ allowed: boolean; headers: HeadersInit }> {
-  if (!dashboardLinksRateLimit) {
-    // Rate limiting not configured, allow request
-    return { allowed: true, headers: {} };
-  }
-
-  const result = await dashboardLinksRateLimit.limit(userId);
-  const headers = createRateLimitHeaders({
-    success: result.success,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: new Date(result.reset),
-  });
+  const result = await dashboardLinksLimiter.limit(userId);
+  const headers = createRateLimitHeaders(result);
 
   return { allowed: result.success, headers };
 }
