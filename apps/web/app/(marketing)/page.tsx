@@ -10,8 +10,8 @@ import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
-// Revalidate every hour to balance freshness with performance using ISR
-export const revalidate = 3600;
+// Fully static - no database dependency, instant cold starts
+export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
