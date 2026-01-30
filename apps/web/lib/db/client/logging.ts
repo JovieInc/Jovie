@@ -15,11 +15,18 @@ const VERY_SLOW_QUERY_THRESHOLD_MS = 500;
 
 /**
  * Log a database error with context and metadata
+ *
+ * @param context - Error context identifier
+ * @param error - The error object or message
+ * @param metadata - Additional metadata about the error
+ * @param options - Logging options
+ * @param options.asBreadcrumb - If true, log as breadcrumb instead of capturing exception (default: false)
  */
 export function logDbError(
   context: string,
   error: unknown,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  options?: { asBreadcrumb?: boolean }
 ): void {
   const errorInfo = {
     context,
@@ -36,13 +43,24 @@ export function logDbError(
     nodeEnv: env.NODE_ENV,
   };
 
-  Sentry.captureException(
-    error instanceof Error ? error : new Error(String(error)),
-    {
-      extra: errorInfo,
-      tags: { context: 'db_error', dbContext: context },
-    }
-  );
+  // For transient errors like pool errors, log as breadcrumb to avoid Sentry feedback loops
+  if (options?.asBreadcrumb) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    Sentry.addBreadcrumb({
+      category: 'database',
+      message: `[${context}] ${errorMessage}`,
+      level: 'error',
+      data: errorInfo,
+    });
+  } else {
+    Sentry.captureException(
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        extra: errorInfo,
+        tags: { context: 'db_error', dbContext: context },
+      }
+    );
+  }
 }
 
 /**
