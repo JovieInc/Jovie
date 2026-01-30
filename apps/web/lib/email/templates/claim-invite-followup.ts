@@ -52,9 +52,12 @@ function buildTrackingPayload(
   if (!data.inviteId || !data.recipientEmail) {
     return null;
   }
-  const emailType = `follow_up_${data.followUpNumber}` as const;
+  const emailType = `follow_up_${data.followUpNumber}` as
+    | 'follow_up_1'
+    | 'follow_up_2'
+    | 'follow_up_3';
   return {
-    emailType: emailType as 'follow_up_1' | 'follow_up_2' | 'follow_up_3',
+    emailType,
     referenceId: data.inviteId,
     email: data.recipientEmail,
     messageId: data.providerMessageId,

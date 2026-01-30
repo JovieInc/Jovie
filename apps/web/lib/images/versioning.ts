@@ -37,7 +37,7 @@ export function generateImageHash(url: string, timestamp?: number): string {
 
   // LRU eviction: remove oldest entry if at capacity
   if (hashCache.size >= MAX_HASH_CACHE_SIZE) {
-    const firstKey = hashCache.keys().next().value as string | undefined;
+    const firstKey = hashCache.keys().next().value;
     if (firstKey !== undefined) {
       hashCache.delete(firstKey);
     }
