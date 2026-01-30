@@ -37,6 +37,12 @@ export interface UseRateLimitedValidationOptions<TValue, TResult> {
   onSuccess?: (result: TResult) => void;
   /** Callback on validation error */
   onError?: (error: Error) => void;
+  /**
+   * Optional custom cache key generator for complex value types.
+   * By default, uses JSON.stringify which may be unstable for objects.
+   * Provide this if TValue is an object that needs stable serialization.
+   */
+  getCacheKey?: (value: TValue) => string;
 }
 
 export interface UseRateLimitedValidationReturn<TValue, TResult> {
@@ -81,6 +87,7 @@ export function useRateLimitedValidation<TValue, TResult>({
   onRateLimited,
   onSuccess,
   onError,
+  getCacheKey,
 }: UseRateLimitedValidationOptions<
   TValue,
   TResult
@@ -100,7 +107,9 @@ export function useRateLimitedValidation<TValue, TResult>({
     async (value: TValue) => {
       if (!enabled) return undefined;
 
-      const cacheKey = JSON.stringify(value);
+      // Use custom cache key generator if provided, otherwise fall back to JSON.stringify
+      // Note: JSON.stringify may produce unstable keys for objects with varying property order
+      const cacheKey = getCacheKey ? getCacheKey(value) : JSON.stringify(value);
 
       // Check cache first (respects TTL)
       const cached = cacheRef.current.get(cacheKey);

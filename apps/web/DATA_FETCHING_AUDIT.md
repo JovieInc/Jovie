@@ -323,7 +323,7 @@ The following improvements have been implemented as part of this audit:
 The following hooks now use standardized cache presets instead of inline configuration:
 
 | File | Change |
-|------|--------|
+| ------ | -------- |
 | `lib/queries/usePricingOptionsQuery.ts` | Now uses `...STABLE_CACHE` preset |
 | `lib/queries/useNotificationStatusQuery.ts` | Now uses `...STANDARD_CACHE` preset |
 | `lib/queries/useDspMatchesQuery.ts` | Now uses `...STANDARD_CACHE` preset |
@@ -332,15 +332,15 @@ The following hooks now use standardized cache presets instead of inline configu
 ### TanStack Pacer Enhancements
 
 | File | Change |
-|------|--------|
-| `lib/pacer/hooks/timing.ts` | Added rate limiting constants (`HANDLE_CHECK_RATE_LIMIT`, `HANDLE_CHECK_RATE_WINDOW_MS`) |
+| ------ | -------- |
+| `lib/pacer/hooks/timing.ts` | Added rate-limiting constants (`HANDLE_CHECK_RATE_LIMIT`, `HANDLE_CHECK_RATE_WINDOW_MS`) |
 | `lib/pacer/hooks/useRateLimitedValidation.ts` | New hook for rate-limited async validation (e.g., handle checks) |
 | `lib/pacer/hooks/index.ts` | Export new `useRateLimitedValidation` hook |
 
 ### Updated Metrics
 
 | Metric | Before | After | Target |
-|--------|--------|-------|--------|
+| -------- | -------- | ------- | -------- |
 | Files with raw fetch to `/api/*` | 40 | 40 | < 15 |
 | Mutation hooks | 8 | 10 | 12+ |
 | Hooks using cache presets | ~70% | ~85% | 100% |
