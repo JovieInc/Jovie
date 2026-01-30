@@ -262,13 +262,13 @@ export function ReleaseTable({
       const isRowExpanded = showTracks && isExpanded(row.id);
 
       if (isSelected) {
-        return 'group bg-surface-1 bg-primary/5 dark:bg-surface-1 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-(--color-cell-hover) dark:hover:bg-surface-2';
+        return 'group bg-surface-1 bg-primary/5 dark:bg-surface-1 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-surface-2/50 dark:hover:bg-surface-2';
       }
       if (isRowExpanded) {
         // Expanded parent row has slightly darker background (like Linear)
-        return 'group bg-surface-1 bg-surface-2/50 dark:bg-surface-1 dark:bg-surface-2/30 hover:bg-(--color-cell-hover) dark:hover:bg-surface-2';
+        return 'group bg-surface-1 bg-surface-2/50 dark:bg-surface-1 dark:bg-surface-2/30 hover:bg-surface-2/50 dark:hover:bg-surface-2';
       }
-      return 'group bg-surface-1 dark:bg-surface-1 hover:bg-(--color-cell-hover) dark:hover:bg-surface-2';
+      return 'group bg-surface-1 dark:bg-surface-1 hover:bg-surface-2/50 dark:hover:bg-surface-2';
     },
     [selectedIdsRef, showTracks, isExpanded]
   );
@@ -446,6 +446,17 @@ export function ReleaseTable({
       expandedRowIds={expandedRowIds}
       renderExpandedContent={showTracks ? renderExpandedContent : undefined}
       getExpandableRowId={getExpandableRowId}
+      emptyState={
+        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+          <Icon name='Disc3' className='h-6 w-6' />
+          <div>
+            <div className='font-medium'>No releases</div>
+            <div className='text-xs'>
+              Your releases will appear here once synced.
+            </div>
+          </div>
+        </div>
+      }
     />
   );
 }
