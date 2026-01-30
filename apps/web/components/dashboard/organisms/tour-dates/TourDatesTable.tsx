@@ -271,8 +271,9 @@ export function TourDatesTable({
     [onEdit, onDelete]
   );
 
-  // NOSONAR S6478: Cell renderers are TanStack Table render props, not React components.
-  // They are memoized via useMemo and don't cause re-mounting issues.
+  // NOSONAR S6478: TanStack Table requires render functions in column definitions.
+  // All components are properly extracted and memoized at file level (lines 34-223).
+  // The inline arrow functions are TanStack Table's intended API pattern.
   const columns = useMemo(() => {
     return [
       // Date column
