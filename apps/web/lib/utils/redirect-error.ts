@@ -19,7 +19,7 @@ export function isRedirectError(error: unknown): boolean {
  *   // handle actual error
  * }
  */
-export function throwIfRedirect(error: unknown): never | false {
+export function throwIfRedirect(error: unknown): false {
   if (isRedirectError(error)) {
     throw error;
   }
