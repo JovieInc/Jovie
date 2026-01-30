@@ -352,7 +352,7 @@ The following hooks now use standardized cache presets instead of inline configu
 
 1. ~~Implement mutation hooks for settings and links~~ ✅
 2. ~~Add error toasts to silent failure components~~ ✅
-3. ~~Update existing hooks to use cache presets~~ ✅ (mostly complete)
+3. Update existing hooks to use cache presets (~85% complete, see metrics)
 4. Refactor `useLinksPersistence.ts` to use mutation hooks for link saving
 5. ~~Create mutation hook for `UpgradeButton.tsx`~~ ✅ (uses `useCheckoutMutation`)
 6. ~~Create mutation hook for `BillingPortalLink.tsx`~~ ✅ (uses `usePortalMutation`)

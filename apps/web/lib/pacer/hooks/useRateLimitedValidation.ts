@@ -81,22 +81,21 @@ export function useRateLimitedValidation<TValue, TResult>({
   onRateLimited,
   onSuccess,
   onError,
-}: UseRateLimitedValidationOptions<TValue, TResult>): UseRateLimitedValidationReturn<
+}: UseRateLimitedValidationOptions<
   TValue,
   TResult
-> {
+>): UseRateLimitedValidationReturn<TValue, TResult> {
   const [result, setResult] = useState<TResult | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const requestCountRef = useRef(0);
 
   // Use the shared cache utility with TTL and size limits
   const cacheRef = useRef(
     createValidationCache<string, TResult>(CACHE_PRESETS.validation)
   );
 
-  // Rate-limited executor
+  // Rate-limited executor with state selector for reactivity
   const rateLimiter = useAsyncRateLimiter(
     async (value: TValue) => {
       if (!enabled) return undefined;
@@ -162,13 +161,17 @@ export function useRateLimitedValidation<TValue, TResult>({
         setIsRateLimited(true);
         onRateLimited?.();
       },
-    }
+    },
+    // Selector to subscribe to state changes
+    state => ({
+      isExecuting: state.isExecuting,
+      successCount: state.successCount,
+    })
   );
 
   const validate = useCallback(
     async (value: TValue) => {
       setError(null);
-      requestCountRef.current++;
       return rateLimiter.maybeExecute(value);
     },
     [rateLimiter]
@@ -178,16 +181,16 @@ export function useRateLimitedValidation<TValue, TResult>({
     abortControllerRef.current?.abort();
   }, []);
 
-  // Calculate remaining requests (approximate)
+  // Calculate remaining requests (approximate) using selected state
   const remainingRequests = Math.max(
     0,
-    rateLimit - (rateLimiter.state.executionCount || 0)
+    rateLimit - (rateLimiter.state?.successCount ?? 0)
   );
 
   return {
     validate,
     cancel,
-    isValidating: rateLimiter.state.isExecuting || false,
+    isValidating: rateLimiter.state?.isExecuting ?? false,
     isRateLimited,
     remainingRequests,
     result,
