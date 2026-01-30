@@ -444,6 +444,9 @@ export function getBestSpotifyImage(images: SpotifyImage[]): string | null {
  * Generate a URL-safe slug from a release title
  */
 export function generateReleaseSlug(title: string, spotifyId: string): string {
+  // Guard against undefined to prevent runtime errors
+  if (!title || !spotifyId) return '';
+
   const slugified = title
     .toLowerCase()
     .replaceAll(/[^a-z0-9\s-]/g, '')

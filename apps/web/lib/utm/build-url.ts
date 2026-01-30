@@ -297,8 +297,9 @@ export function createSimpleUTMParams(
   campaign?: string
 ): UTMParams {
   return {
-    utm_source: source.toLowerCase().replaceAll(/\s+/g, '_'),
-    utm_medium: medium.toLowerCase().replaceAll(/\s+/g, '_'),
+    // Guard against undefined values to prevent runtime errors
+    utm_source: (source ?? '').toLowerCase().replaceAll(/\s+/g, '_'),
+    utm_medium: (medium ?? '').toLowerCase().replaceAll(/\s+/g, '_'),
     utm_campaign: campaign,
   };
 }

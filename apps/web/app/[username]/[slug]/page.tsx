@@ -41,6 +41,7 @@ function generateMusicStructuredData(
   content: {
     type: 'release' | 'track';
     title: string;
+    slug: string;
     artworkUrl: string | null;
     releaseDate: Date | null;
     providerLinks: Array<{ providerId: string; url: string }>;
@@ -52,7 +53,11 @@ function generateMusicStructuredData(
   }
 ) {
   const artistName = creator.displayName ?? creator.username;
-  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.title.toLowerCase().replaceAll(/\s+/g, '-')}`;
+  // Guard against undefined title - use slug as fallback for valid URL
+  const titleSlug = (content.title ?? content.slug)
+    .toLowerCase()
+    .replaceAll(/\s+/g, '-');
+  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${titleSlug}`;
   const artistUrl = `${PROFILE_URL}/${creator.usernameNormalized}`;
 
   // Build sameAs array from provider links
@@ -372,6 +377,7 @@ export default async function ContentSmartLinkPage({
     {
       type: content.type,
       title: content.title,
+      slug: content.slug,
       artworkUrl: content.artworkUrl,
       releaseDate: content.releaseDate,
       providerLinks: content.providerLinks,

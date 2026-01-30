@@ -97,9 +97,10 @@ export async function GET(
     .filter(Boolean)
     .join('\r\n');
 
-  // Generate filename with null-safe city handling
+  // Generate filename with null-safe handling
   const citySlug = (tourDate.city || 'event').replaceAll(/[^a-zA-Z0-9]/g, '_');
-  const filename = `${artistName.replaceAll(/[^a-zA-Z0-9]/g, '_')}_${citySlug}.ics`;
+  const artistSlug = (artistName ?? 'artist').replaceAll(/[^a-zA-Z0-9]/g, '_');
+  const filename = `${artistSlug}_${citySlug}.ics`;
 
   return new NextResponse(icsContent, {
     headers: {
@@ -114,6 +115,7 @@ export async function GET(
  * Escape special characters for ICS format per RFC 5545
  */
 function escapeIcsText(text: string): string {
+  if (!text) return '';
   return text
     .replaceAll('\\', String.raw`\\`)
     .replaceAll(';', String.raw`\;`)
