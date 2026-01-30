@@ -173,7 +173,7 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
             stackable={useCollapsedMode}
             defaultExpanded={isLast && useCollapsedMode}
             onClick={() => {
-              window.open(link.url, '_blank', 'noopener,noreferrer');
+              globalThis.open(link.url, '_blank', 'noopener,noreferrer');
             }}
           />
         );

@@ -37,7 +37,7 @@ export function createExternalLinkMenuItems(
       label: 'Open Primary Social',
       icon: <ExternalLink className='h-3.5 w-3.5' />,
       onClick: () => {
-        window.open(
+        globalThis.open(
           entry.primarySocialUrlNormalized,
           '_blank',
           'noopener,noreferrer'
@@ -53,7 +53,7 @@ export function createExternalLinkMenuItems(
       label: 'Open Spotify',
       icon: <ExternalLink className='h-3.5 w-3.5' />,
       onClick: () => {
-        window.open(
+        globalThis.open(
           entry.spotifyUrlNormalized!,
           '_blank',
           'noopener,noreferrer'

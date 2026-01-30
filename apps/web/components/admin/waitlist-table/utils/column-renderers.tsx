@@ -89,7 +89,9 @@ export function renderPrimarySocialCell(entry: WaitlistEntryRow) {
       platformIcon={entry.primarySocialPlatform.toLowerCase()}
       platformName={platformLabel}
       primaryText={`@${username}`}
-      onClick={() => window.open(entry.primarySocialUrlNormalized, '_blank')}
+      onClick={() =>
+        globalThis.open(entry.primarySocialUrlNormalized, '_blank')
+      }
     />
   );
 }
@@ -109,7 +111,7 @@ export function renderSpotifyCell(spotifyUrl: string | null) {
       platformIcon='spotify'
       platformName='Spotify'
       primaryText={`@${artistName}`}
-      onClick={() => window.open(spotifyUrl, '_blank')}
+      onClick={() => globalThis.open(spotifyUrl, '_blank')}
     />
   );
 }
