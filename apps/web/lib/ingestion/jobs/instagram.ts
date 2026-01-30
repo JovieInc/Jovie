@@ -1,4 +1,4 @@
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import {
   extractInstagram,
   fetchInstagramDocument,
@@ -23,7 +23,7 @@ export const instagramJobConfig: JobExecutorConfig<InstagramPayload> = {
  * Process an Instagram import job.
  */
 export async function processInstagramJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
   return executeIngestionJob(tx, jobPayload, instagramJobConfig);

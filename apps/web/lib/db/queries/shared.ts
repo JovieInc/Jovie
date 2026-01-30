@@ -10,7 +10,7 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
 
 /**
@@ -49,7 +49,7 @@ export interface AuthenticatedProfile {
  * ```
  */
 export async function getAuthenticatedProfile(
-  tx: DbType,
+  tx: DbOrTransaction,
   profileId: string,
   clerkUserId: string
 ): Promise<AuthenticatedProfile | null> {
@@ -113,7 +113,7 @@ export interface SocialLink {
  * ```
  */
 export async function getProfileSocialLinks(
-  tx: DbType,
+  tx: DbOrTransaction,
   profileId: string,
   options: {
     activeOnly?: boolean;
@@ -186,7 +186,7 @@ export interface UserRecord {
  * ```
  */
 export async function getUserByClerkId(
-  tx: DbType,
+  tx: DbOrTransaction,
   clerkUserId: string
 ): Promise<UserRecord | null> {
   const [user] = await tx
@@ -230,7 +230,7 @@ export async function getUserByClerkId(
  * ```
  */
 export async function verifyProfileOwnership(
-  tx: DbType,
+  tx: DbOrTransaction,
   profileId: string,
   clerkUserId: string
 ): Promise<{ id: string } | null> {

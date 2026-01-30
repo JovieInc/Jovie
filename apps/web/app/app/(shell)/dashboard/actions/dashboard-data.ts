@@ -16,7 +16,7 @@ import {
 } from 'next/cache';
 import { cache } from 'react';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { type DbType, sqlAny } from '@/lib/db';
+import { type DbOrTransaction, sqlAny } from '@/lib/db';
 import {
   type CreatorProfile,
   clickEvents,
@@ -137,7 +137,7 @@ export interface DashboardData {
 type ChromeData = Omit<DashboardData, 'isAdmin' | 'tippingStats'>;
 
 async function fetchChromeDataWithSession(
-  dbClient: DbType,
+  dbClient: DbOrTransaction,
   clerkUserId: string
 ): Promise<ChromeData> {
   // All queries run inside a transaction to keep the RLS session variable set
@@ -317,7 +317,7 @@ async function fetchChromeDataWithSession(
 }
 
 async function fetchTippingStatsWithSession(
-  dbClient: DbType,
+  dbClient: DbOrTransaction,
   profileId: string
 ): Promise<TippingStats> {
   try {

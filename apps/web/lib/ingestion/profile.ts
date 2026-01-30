@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 
 interface EnrichmentInput {
@@ -13,7 +13,7 @@ interface EnrichmentInput {
 }
 
 export async function applyProfileEnrichment(
-  tx: DbType,
+  tx: DbOrTransaction,
   input: EnrichmentInput
 ): Promise<void> {
   const updates: Partial<typeof creatorProfiles.$inferInsert> = {};

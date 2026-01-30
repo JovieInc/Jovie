@@ -11,6 +11,7 @@ export type { InferModel } from 'drizzle-orm';
 export { and, eq } from 'drizzle-orm';
 // Re-export types from client
 export type {
+  DbOrTransaction,
   DbType,
   PoolMetrics,
   TransactionType,

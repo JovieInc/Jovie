@@ -1,4 +1,4 @@
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { extractLinktree, fetchLinktreeDocument } from '../strategies/linktree';
 import { executeIngestionJob } from './executor';
 import { type LinktreePayload, linktreePayloadSchema } from './schemas';
@@ -20,7 +20,7 @@ export const linktreeJobConfig: JobExecutorConfig<LinktreePayload> = {
  * Process a Linktree import job.
  */
 export async function processLinktreeJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
   return executeIngestionJob(tx, jobPayload, linktreeJobConfig);

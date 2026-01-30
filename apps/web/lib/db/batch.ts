@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, getTableName } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 
-import { type DbType, db, type TransactionType } from './index';
+import { type DbOrTransaction, db, type TransactionType } from './index';
 
 /** Escape single quotes for SQL string literals */
 function escapeSql(value: string): string {
@@ -140,7 +140,7 @@ export async function batchUpdateSortOrder<T extends PgTable>(
 export async function batchUpdateInTransaction<T>(
   updates: Array<{ id: string; data: Partial<T> }>,
   updateFn: (
-    tx: DbType | TransactionType,
+    tx: DbOrTransaction | TransactionType,
     id: string,
     data: Partial<T>
   ) => Promise<void>

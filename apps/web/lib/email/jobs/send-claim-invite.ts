@@ -7,7 +7,7 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
 import { enrollInCampaign } from '@/lib/email/campaigns/enrollment';
 import {
@@ -63,7 +63,7 @@ export interface SendClaimInviteResult {
  * 5. Updates invite status
  */
 export async function processSendClaimInviteJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<SendClaimInviteResult> {
   const payload = sendClaimInvitePayloadSchema.parse(jobPayload);

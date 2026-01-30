@@ -13,7 +13,7 @@ import 'server-only';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { type DbType, db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { creatorProfiles, discogTracks } from '@/lib/db/schema';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 
@@ -73,7 +73,7 @@ const MAX_TRACKS_FOR_MATCHING = 20;
  * Fetch local tracks with ISRCs for a creator profile.
  */
 async function fetchLocalTracks(
-  tx: DbType,
+  tx: DbOrTransaction,
   creatorProfileId: string
 ): Promise<LocalTrackData[]> {
   const tracks = await tx
@@ -103,7 +103,7 @@ async function fetchLocalTracks(
  * Fetch local artist data for matching.
  */
 async function fetchLocalArtist(
-  tx: DbType,
+  tx: DbOrTransaction,
   creatorProfileId: string,
   spotifyArtistId: string
 ): Promise<LocalArtistData | null> {
@@ -136,7 +136,7 @@ async function fetchLocalArtist(
  * Store a match result in the database.
  */
 async function storeMatch(
-  tx: DbType,
+  tx: DbOrTransaction,
   creatorProfileId: string,
   providerId: DspProviderId,
   match: ScoredArtistMatch,
@@ -207,7 +207,7 @@ async function storeMatch(
  * Discover Apple Music artist match.
  */
 async function discoverAppleMusicMatch(
-  tx: DbType,
+  tx: DbOrTransaction,
   localTracks: LocalTrackData[],
   localArtist: LocalArtistData,
   creatorProfileId: string
@@ -378,7 +378,7 @@ async function discoverAppleMusicMatch(
  * @returns Discovery result with matches found
  */
 export async function processDspArtistDiscoveryJob(
-  tx: DbType,
+  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<DspArtistDiscoveryResult> {
   const payload = dspArtistDiscoveryPayloadSchema.parse(jobPayload);
