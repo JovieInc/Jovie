@@ -69,7 +69,6 @@ export function WaitlistSocialStep({
         <fieldset
           className='flex items-center justify-center gap-2'
           disabled={isSubmitting}
-          onKeyDown={onPlatformKeyDown}
         >
           <legend className='sr-only'>Social platform</legend>
           {SOCIAL_PLATFORM_OPTIONS.map((option, index) => {
@@ -93,6 +92,7 @@ export function WaitlistSocialStep({
                   value={option.value}
                   checked={isSelected}
                   onChange={() => onPlatformSelect(option.value)}
+                  onKeyDown={onPlatformKeyDown}
                   className='sr-only'
                 />
                 {option.label}
