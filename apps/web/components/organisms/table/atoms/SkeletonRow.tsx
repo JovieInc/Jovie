@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo } from 'react';
 import { cn, layoutStability, presets } from '../table.styles';
 import { SkeletonCell } from './SkeletonCell';

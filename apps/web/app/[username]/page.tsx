@@ -16,7 +16,7 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
-import { captureWarning } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
@@ -206,7 +206,10 @@ const fetchProfileAndLinks = async (
       status: 'ok',
     };
   } catch (error) {
-    console.error('Error fetching creator profile:', error);
+    await captureError('Error fetching creator profile', error, {
+      username,
+      route: '/[username]',
+    });
     return {
       profile: null,
       links: [],

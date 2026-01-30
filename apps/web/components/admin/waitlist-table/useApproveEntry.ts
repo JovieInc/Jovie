@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useState } from 'react';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { useApproveWaitlistMutation } from '@/lib/queries/useWaitlistMutations';

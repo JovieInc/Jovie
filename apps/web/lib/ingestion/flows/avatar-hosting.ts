@@ -9,7 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { put as uploadBlob } from '@vercel/blob';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
