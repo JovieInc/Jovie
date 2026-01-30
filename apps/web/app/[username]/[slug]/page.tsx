@@ -52,7 +52,9 @@ function generateMusicStructuredData(
   }
 ) {
   const artistName = creator.displayName ?? creator.username;
-  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.title.toLowerCase().replaceAll(/\s+/g, '-')}`;
+  // Guard against undefined title to prevent runtime errors
+  const titleSlug = (content.title ?? '').toLowerCase().replaceAll(/\s+/g, '-');
+  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${titleSlug}`;
   const artistUrl = `${PROFILE_URL}/${creator.usernameNormalized}`;
 
   // Build sameAs array from provider links
