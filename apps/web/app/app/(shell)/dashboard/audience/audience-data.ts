@@ -243,7 +243,12 @@ export async function getAudienceServerData(params: {
           purchaseCount: member.purchaseCount,
           tags: Array.isArray(member.tags) ? member.tags : [],
           deviceType: member.deviceType,
-          lastSeenAt: member.lastSeenAt?.toISOString() ?? null,
+          // Handle both Date objects and already-serialized strings
+          lastSeenAt: member.lastSeenAt
+            ? typeof member.lastSeenAt === 'string'
+              ? member.lastSeenAt
+              : member.lastSeenAt.toISOString()
+            : null,
         };
       });
 
@@ -332,7 +337,12 @@ export async function getAudienceServerData(params: {
     const normalizedRows: AudienceServerRow[] = rows.map(subscriber => {
       const country = subscriber.countryCode;
       const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
-      const createdAt = subscriber.createdAt?.toISOString() ?? null;
+      // Handle both Date objects and already-serialized strings
+      const createdAt = subscriber.createdAt
+        ? typeof subscriber.createdAt === 'string'
+          ? subscriber.createdAt
+          : subscriber.createdAt.toISOString()
+        : null;
       const displayName = subscriber.email || subscriber.phone || 'Contact';
       const type = subscriber.channel === 'email' ? 'email' : 'sms';
 

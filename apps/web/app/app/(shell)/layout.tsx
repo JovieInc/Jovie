@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 export default async function AppShellLayout({
   children,
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) {
   // NO MORE AUTH GATE - proxy.ts already routed us correctly!
   // If we're rendering this layout, user is ACTIVE and can access the app.
