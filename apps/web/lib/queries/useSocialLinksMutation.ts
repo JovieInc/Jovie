@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
+import type { SuggestionsQueryResult } from './useSuggestionsQuery';
 
 /**
  * Input for accepting a link suggestion.
@@ -91,6 +92,9 @@ async function dismissSuggestion(
 /**
  * Hook for accepting a link suggestion.
  *
+ * Uses optimistic updates to immediately move the suggestion to an "accepting" state,
+ * with automatic rollback on error.
+ *
  * @param profileId - The profile ID for cache invalidation
  *
  * @example
@@ -98,14 +102,7 @@ async function dismissSuggestion(
  * const { mutate: accept, isPending } = useAcceptSuggestionMutation(profileId);
  *
  * const handleAccept = (linkId: string) => {
- *   accept({ profileId, linkId }, {
- *     onSuccess: (data) => {
- *       // Add link to active links list
- *       if (data.link) {
- *         setLinks(prev => [...prev, transformLink(data.link)]);
- *       }
- *     },
- *   });
+ *   accept({ profileId, linkId });
  * };
  * ```
  */
@@ -115,10 +112,55 @@ export function useAcceptSuggestionMutation(profileId: string | undefined) {
   return useMutation({
     mutationFn: acceptSuggestion,
 
+    // Optimistic update: mark the suggestion as being accepted
+    onMutate: async variables => {
+      if (!profileId) return;
+
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.suggestions.list(profileId),
+      });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData<SuggestionsQueryResult>(
+        queryKeys.suggestions.list(profileId)
+      );
+
+      // Optimistically update - mark the link as 'active' (accepted)
+      if (previousData) {
+        queryClient.setQueryData<SuggestionsQueryResult>(
+          queryKeys.suggestions.list(profileId),
+          {
+            ...previousData,
+            links: previousData.links.map(link =>
+              link.id === variables.linkId
+                ? { ...link, state: 'active' as const }
+                : link
+            ),
+          }
+        );
+      }
+
+      return { previousData };
+    },
+
     onSuccess: () => {
       handleMutationSuccess('Link added to your list');
+    },
 
-      // Invalidate suggestions query to refresh the list
+    // On error, rollback to the previous value
+    onError: (error, _variables, context) => {
+      if (context?.previousData && profileId) {
+        queryClient.setQueryData(
+          queryKeys.suggestions.list(profileId),
+          context.previousData
+        );
+      }
+      handleMutationError(error, 'Failed to accept link');
+    },
+
+    // Always refetch after error or success to ensure cache is in sync
+    onSettled: () => {
       if (profileId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.suggestions.list(profileId),
@@ -128,15 +170,14 @@ export function useAcceptSuggestionMutation(profileId: string | undefined) {
         });
       }
     },
-
-    onError: error => {
-      handleMutationError(error, 'Failed to accept link');
-    },
   });
 }
 
 /**
  * Hook for dismissing a link suggestion.
+ *
+ * Uses optimistic updates to immediately remove the suggestion from the UI,
+ * with automatic rollback on error.
  *
  * @param profileId - The profile ID for cache invalidation
  *
@@ -145,12 +186,7 @@ export function useAcceptSuggestionMutation(profileId: string | undefined) {
  * const { mutate: dismiss, isPending } = useDismissSuggestionMutation(profileId);
  *
  * const handleDismiss = (linkId: string) => {
- *   dismiss({ profileId, linkId }, {
- *     onSuccess: () => {
- *       // Remove suggestion from local state
- *       setSuggestedLinks(prev => prev.filter(s => s.id !== linkId));
- *     },
- *   });
+ *   dismiss({ profileId, linkId });
  * };
  * ```
  */
@@ -160,19 +196,59 @@ export function useDismissSuggestionMutation(profileId: string | undefined) {
   return useMutation({
     mutationFn: dismissSuggestion,
 
+    // Optimistic update: immediately remove the suggestion from cache
+    onMutate: async variables => {
+      if (!profileId) return;
+
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.suggestions.list(profileId),
+      });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData<SuggestionsQueryResult>(
+        queryKeys.suggestions.list(profileId)
+      );
+
+      // Optimistically update the cache
+      if (previousData) {
+        queryClient.setQueryData<SuggestionsQueryResult>(
+          queryKeys.suggestions.list(profileId),
+          {
+            ...previousData,
+            links: previousData.links.filter(
+              link => link.id !== variables.linkId
+            ),
+          }
+        );
+      }
+
+      // Return context with the previous data for rollback
+      return { previousData };
+    },
+
     onSuccess: () => {
       handleMutationSuccess('Suggestion dismissed');
+    },
 
-      // Invalidate suggestions query to refresh the list
+    // On error, rollback to the previous value
+    onError: (error, _variables, context) => {
+      if (context?.previousData && profileId) {
+        queryClient.setQueryData(
+          queryKeys.suggestions.list(profileId),
+          context.previousData
+        );
+      }
+      handleMutationError(error, 'Failed to dismiss suggestion');
+    },
+
+    // Always refetch after error or success to ensure cache is in sync
+    onSettled: () => {
       if (profileId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.suggestions.list(profileId),
         });
       }
-    },
-
-    onError: error => {
-      handleMutationError(error, 'Failed to dismiss suggestion');
     },
   });
 }

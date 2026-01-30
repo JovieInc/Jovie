@@ -380,9 +380,12 @@ if (PACER_DEBUG) {
 - [x] Implement `PacerProvider` in app root (`CoreProviders.tsx`)
 - [x] Create `lib/pacer/errors.ts` for standardized error handling
 - [x] Remove legacy constant exports
+- [x] Add `{ passive: true }` to resize listener in FeaturedArtistsDriftRow
+- [x] Create rate limiting hook for handle validation (`lib/pacer/hooks/useRateLimitedValidation.ts`)
 
 ### New Items
 
+- [ ] Migrate handle validation to use `useRateLimitedValidation` hook
 - [ ] Replace `useThrottledCallback` with `useRateLimiter` in JovieChat
 - [ ] Add retry logic wrapper using `AsyncRetryer`
 - [ ] Add missing timing constants (`SORT_DEBOUNCE_MS`, `PROFILE_SAVE_DEBOUNCE_MS`, `CHAT_RATE_LIMIT_MS`)

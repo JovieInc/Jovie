@@ -65,7 +65,7 @@ The `useUpdateDashboardProfileMutation()` hook demonstrates proper optimistic up
 **Examples:**
 
 | File | Pattern | Issue |
-|------|---------|-------|
+| ------ | --------- | ------- |
 | `SettingsNotificationsSection.tsx` | Manual `useState` for loading/error | Should use `useMutation` |
 | `SettingsAppearanceSection.tsx` | No user feedback on error | Silent failures |
 | `useLinksPersistence.ts` | Raw fetch for PUT | Should use `useMutation` with optimistic updates |
@@ -316,13 +316,46 @@ The following improvements have been implemented as part of this audit:
 
 ---
 
+## Completed Improvements (2026-01-30)
+
+### Cache Strategy Standardization
+
+The following hooks now use standardized cache presets instead of inline configuration:
+
+| File | Change |
+| ------ | -------- |
+| `lib/queries/usePricingOptionsQuery.ts` | Now uses `...STABLE_CACHE` preset |
+| `lib/queries/useNotificationStatusQuery.ts` | Now uses `...STANDARD_CACHE` preset |
+| `lib/queries/useDspMatchesQuery.ts` | Now uses `...STANDARD_CACHE` preset |
+| `lib/queries/usePublicProfileQuery.ts` | Now uses `...STABLE_CACHE` preset |
+
+### TanStack Pacer Enhancements
+
+| File | Change |
+| ------ | -------- |
+| `lib/pacer/hooks/timing.ts` | Added rate-limiting constants (`HANDLE_CHECK_RATE_LIMIT`, `HANDLE_CHECK_RATE_WINDOW_MS`) |
+| `lib/pacer/hooks/useRateLimitedValidation.ts` | New hook for rate-limited async validation (e.g., handle checks) |
+| `lib/pacer/hooks/index.ts` | Export new `useRateLimitedValidation` hook |
+
+### Updated Metrics
+
+| Metric | Before | After | Target |
+| -------- | -------- | ------- | -------- |
+| Files with raw fetch to `/api/*` | 40 | 40 | < 15 |
+| Mutation hooks | 8 | 10 | 12+ |
+| Hooks using cache presets | ~70% | ~85% | 100% |
+| Components with proper error handling | ~80% | ~80% | 100% |
+
+---
+
 ## Remaining Next Steps
 
 1. ~~Implement mutation hooks for settings and links~~ ✅
 2. ~~Add error toasts to silent failure components~~ ✅
-3. ~~Update existing hooks to use cache presets~~ ✅ (partial)
+3. Update existing hooks to use cache presets (~85% complete, see metrics)
 4. Refactor `useLinksPersistence.ts` to use mutation hooks for link saving
-5. Create mutation hook for `UpgradeButton.tsx` (Stripe checkout)
-6. Create mutation hook for `BillingPortalLink.tsx`
+5. ~~Create mutation hook for `UpgradeButton.tsx`~~ ✅ (uses `useCheckoutMutation`)
+6. ~~Create mutation hook for `BillingPortalLink.tsx`~~ ✅ (uses `usePortalMutation`)
 7. Add QueryErrorBoundary to dashboard sections
 8. Continue migrating remaining raw fetch calls to mutation hooks
+9. Consider using `useRateLimitedValidation` for handle checks to prevent API abuse
