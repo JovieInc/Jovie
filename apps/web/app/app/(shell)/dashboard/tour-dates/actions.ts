@@ -68,7 +68,7 @@ async function requireProfile(): Promise<{
   }
 
   if (!data.selectedProfile) {
-    throw new Error('Missing creator profile');
+    throw new TypeError('Missing creator profile');
   }
 
   // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)
@@ -112,10 +112,10 @@ function validateTicketUrl(ticketUrl: string | undefined | null): void {
   try {
     const url = new URL(ticketUrl);
     if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new Error('Invalid ticket URL: must use http or https');
+      throw new TypeError('Invalid ticket URL: must use http or https');
     }
   } catch {
-    throw new Error('Invalid ticket URL');
+    throw new TypeError('Invalid ticket URL');
   }
 }
 
@@ -283,7 +283,7 @@ export async function saveBandsintownApiKey(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -338,7 +338,7 @@ export async function removeBandsintownApiKey(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -385,7 +385,7 @@ export async function connectBandsintownArtist(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -454,7 +454,7 @@ export async function syncFromBandsintown(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -520,7 +520,7 @@ export async function createTourDate(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -581,7 +581,7 @@ export async function updateTourDate(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -596,7 +596,7 @@ export async function updateTourDate(params: {
     .limit(1);
 
   if (!existing) {
-    throw new Error('Tour date not found');
+    throw new TypeError('Tour date not found');
   }
 
   const updateData: Partial<TourDate> = {
@@ -644,7 +644,7 @@ export async function deleteTourDate(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -655,7 +655,7 @@ export async function deleteTourDate(
     .where(and(eq(tourDates.id, id), eq(tourDates.profileId, profile.id)));
 
   if (result.rowCount === 0) {
-    throw new Error('Tour date not found');
+    throw new TypeError('Tour date not found');
   }
 
   void trackServerEvent('tour_date_deleted', {
@@ -676,7 +676,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();

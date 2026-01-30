@@ -110,7 +110,7 @@ async function uploadAvatarFile(
   const photoId = data.photoId ?? data.jobId ?? null;
 
   if (!blobUrl || !photoId) {
-    throw new Error('Upload response missing required fields');
+    throw new TypeError('Upload response missing required fields');
   }
 
   return { blobUrl, photoId };

@@ -68,14 +68,14 @@ export function sanitizeContactInput(
   input: DashboardContactInput
 ): DashboardContactInput {
   if (!input.profileId) {
-    throw new Error('Profile ID is required');
+    throw new TypeError('Profile ID is required');
   }
 
   const email = validateEmail(input.email ?? null);
   const phone = normalizePhone(input.phone ?? null);
 
   if (!email && !phone) {
-    throw new Error('Add at least one contact channel (email or phone)');
+    throw new TypeError('Add at least one contact channel (email or phone)');
   }
 
   const territories = normalizeTerritories(input.territories ?? []);

@@ -60,7 +60,7 @@ export async function updateCreatorProfile(
       .limit(1);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new TypeError('User not found');
     }
 
     // Update the creator profile
@@ -79,7 +79,7 @@ export async function updateCreatorProfile(
       .returning();
 
     if (!updatedProfile) {
-      throw new Error('Profile not found or unauthorized');
+      throw new TypeError('Profile not found or unauthorized');
     }
 
     // Use centralized cache invalidation
@@ -108,13 +108,13 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
   const bioRaw = formData.get('bio');
 
   if (!profileId || typeof profileId !== 'string') {
-    throw new Error('Profile ID is required');
+    throw new TypeError('Profile ID is required');
   }
 
   const displayName =
     typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
   if (!displayName) {
-    throw new Error('Display name is required');
+    throw new TypeError('Display name is required');
   }
 
   const bio =

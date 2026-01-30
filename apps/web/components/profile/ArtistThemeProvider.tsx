@@ -101,7 +101,7 @@ export function ArtistThemeProvider({
 export function useArtistTheme() {
   const context = useContext(ArtistThemeContext);
   if (context === undefined) {
-    throw new Error(
+    throw new TypeError(
       'useArtistTheme must be used within an ArtistThemeProvider'
     );
   }

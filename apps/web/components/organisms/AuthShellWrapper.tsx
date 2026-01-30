@@ -44,7 +44,7 @@ const TableMetaContext = createContext<TableMetaContextValue | null>(null);
 export function useTableMeta(): TableMetaContextValue {
   const ctx = useContext(TableMetaContext);
   if (!ctx) {
-    throw new Error('useTableMeta must be used within AuthShellWrapper');
+    throw new TypeError('useTableMeta must be used within AuthShellWrapper');
   }
   return ctx;
 }

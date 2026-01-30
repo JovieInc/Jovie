@@ -49,7 +49,7 @@ export async function updateCreatorProfile(
 ) {
   const user = await getUserByClerkId(clerkUserId);
   if (!user) {
-    throw new Error('User not found');
+    throw new TypeError('User not found');
   }
 
   const [updated] = await db

@@ -75,7 +75,7 @@ export function HeaderActionsProvider({
 export function useHeaderActions(): HeaderActionsContextValue {
   const context = useContext(HeaderActionsContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'useHeaderActions must be used within HeaderActionsProvider'
     );
   }

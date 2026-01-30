@@ -78,7 +78,7 @@ export async function createWrappedLink(
   const { url, userId, expiresInHours, customAlias } = options;
 
   if (!isValidUrl(url)) {
-    throw new Error('Invalid URL provided');
+    throw new TypeError('Invalid URL provided');
   }
 
   const domain = extractDomain(url);

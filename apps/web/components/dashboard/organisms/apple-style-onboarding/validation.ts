@@ -46,7 +46,7 @@ export function canSubmitOnboarding(data: OnboardingFormData): boolean {
 export function validateDisplayName(fullName: string): void {
   const trimmedName = fullName.trim();
   if (!trimmedName) {
-    throw new Error('[DISPLAY_NAME_REQUIRED] Display name is required');
+    throw new TypeError('[DISPLAY_NAME_REQUIRED] Display name is required');
   }
 }
 
