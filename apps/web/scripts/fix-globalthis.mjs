@@ -121,6 +121,24 @@ const patterns = [
     replacement: 'globalThis.cancelAnimationFrame',
     description: 'window.cancelAnimationFrame → globalThis.cancelAnimationFrame'
   },
+  // Pattern 15b: window.history
+  {
+    regex: /\bwindow\.history\b/g,
+    replacement: 'globalThis.history',
+    description: 'window.history → globalThis.history'
+  },
+  // Pattern 15c: window.gtag (analytics)
+  {
+    regex: /\bwindow\.gtag\b/g,
+    replacement: 'globalThis.gtag',
+    description: 'window.gtag → globalThis.gtag'
+  },
+  // Pattern 15d: window.dataLayer (GTM)
+  {
+    regex: /\bwindow\.dataLayer\b/g,
+    replacement: 'globalThis.dataLayer',
+    description: 'window.dataLayer → globalThis.dataLayer'
+  },
   // Pattern 16: Custom window properties (e.g., window.JVConsent)
   {
     regex: /\bwindow\.([A-Z][a-zA-Z0-9]*)\b/g,

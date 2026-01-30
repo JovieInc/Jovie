@@ -49,7 +49,7 @@ export function SsoCallbackHandler({
 
       // Clear the hash and redirect to dashboard
       // The user is already authenticated via OAuth at this point
-      window.history.replaceState(null, '', globalThis.location.pathname);
+      globalThis.history.replaceState(null, '', globalThis.location.pathname);
 
       // Use signInFallbackRedirectUrl as the default destination
       // since password prompts typically happen for existing users

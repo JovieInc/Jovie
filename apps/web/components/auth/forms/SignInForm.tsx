@@ -58,7 +58,7 @@ export function SignInForm() {
 
     if (passwordHashFragments.some(fragment => hash.startsWith(fragment))) {
       // Clear the hash from the URL without triggering a reload
-      window.history.replaceState(
+      globalThis.history.replaceState(
         null,
         '',
         globalThis.location.pathname + globalThis.location.search

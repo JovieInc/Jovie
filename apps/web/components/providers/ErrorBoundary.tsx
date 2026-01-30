@@ -88,7 +88,7 @@ export class ErrorBoundary extends Component<Props, State> {
     // Track error for monitoring with gtag as backup
     if (typeof window !== 'undefined' && 'gtag' in window) {
       // @ts-expect-error - gtag is not typed
-      window.gtag('event', 'exception', {
+      globalThis.gtag('event', 'exception', {
         description: error.message,
         fatal: false,
       });
