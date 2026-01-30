@@ -122,6 +122,18 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
+### 6. Marketing Pages Must Be Fully Static
+
+- All marketing, blog, and legal pages **must be fully static** (`export const revalidate = false`): no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` and `app/(dynamic)/legal` pages/layouts.
+- `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
+- Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
+- Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
+- Blog and changelog pages must be fully static, reading content from filesystem at build time only.
+- Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
+- Public profiles (`/[username]`) use ISR (1h revalidate) for real-time updates, with cache tag invalidation for instant profile updates.
+
+**Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
+
 ---
 
 ## Pre-PR Checklist (required before opening any PR)

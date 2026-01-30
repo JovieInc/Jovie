@@ -7,6 +7,9 @@ interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
 }
 
+// Fully static - blog posts are pre-generated at build time
+export const revalidate = false;
+
 export async function generateStaticParams() {
   const slugs = await getBlogPostSlugs();
   return slugs.map(slug => ({ slug }));

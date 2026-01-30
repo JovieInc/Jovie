@@ -3,8 +3,8 @@ import { Container } from '@/components/site/Container';
 import { APP_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 
-// Revalidate hourly for ISR
-export const revalidate = 3600;
+// Fully static - blog posts are read from filesystem at build time
+export const revalidate = false;
 
 export const metadata = {
   title: 'Jovie Blog',

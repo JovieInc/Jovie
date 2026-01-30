@@ -20,7 +20,8 @@ function resolveChangelogPath(): string | null {
   return null;
 }
 
-const CACHE_REVALIDATE_SECONDS = 60 * 60 * 24; // 24 hours
+// Fully static - changelog is read from filesystem at build time
+export const revalidate = false;
 
 /**
  * Process markdown to HTML. This is CPU-intensive so we cache the result.
@@ -46,13 +47,13 @@ async function processChangelogMarkdown(): Promise<string> {
 
 /**
  * Cached version of changelog processing.
- * Revalidates every 24 hours or when 'changelog' tag is invalidated.
+ * Fully static - processed at build time only.
  */
 const getChangelogHtml = unstable_cache(
   processChangelogMarkdown,
   ['changelog-html'],
   {
-    revalidate: CACHE_REVALIDATE_SECONDS,
+    revalidate: false,
     tags: ['changelog'],
   }
 );
