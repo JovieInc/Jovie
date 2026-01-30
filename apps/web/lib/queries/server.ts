@@ -158,4 +158,4 @@ export async function prefetchQueries(
   return getDehydratedState();
 }
 
-export { dehydrate };
+export { dehydrate } from '@tanstack/react-query';

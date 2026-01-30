@@ -13,7 +13,8 @@ import React, {
 
 // Import useTableMeta for internal use and re-export for backward compatibility
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-export { useTableMeta };
+
+export { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
