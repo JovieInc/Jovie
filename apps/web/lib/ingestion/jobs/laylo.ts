@@ -19,7 +19,9 @@ export function deriveLayloHandle(
   if (handleFromUrl) return handleFromUrl;
   if (usernameNormalized) return usernameNormalized;
 
-  throw new Error('Unable to determine Laylo handle from sourceUrl or profile');
+  throw new SyntaxError(
+    'Unable to determine Laylo handle from sourceUrl or profile'
+  );
 }
 
 /**

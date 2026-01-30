@@ -121,7 +121,7 @@ export async function copyAvatarToBlob(
     const buffer = Buffer.from(arrayBuffer);
 
     if (!validateMagicBytes(buffer, contentType as SupportedImageMimeType)) {
-      throw new Error('Magic bytes validation failed');
+      throw new SyntaxError('Magic bytes validation failed');
     }
 
     const sharp = (await import('sharp')).default;
@@ -155,7 +155,7 @@ export async function copyAvatarToBlob(
     });
 
     if (!blob?.url) {
-      throw new Error('Blob upload returned no URL');
+      throw new SyntaxError('Blob upload returned no URL');
     }
 
     return blob.url;

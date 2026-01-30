@@ -23,7 +23,7 @@ function toUpstashWindow(
   // Map our format to Upstash format
   const match = normalized.match(/^(\d+)([smhd])$/);
   if (!match) {
-    throw new Error(`Invalid window format: ${window}`);
+    throw new SyntaxError(`Invalid window format: ${window}`);
   }
 
   const value = Number.parseInt(match[1], 10);

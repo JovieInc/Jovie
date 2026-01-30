@@ -184,13 +184,13 @@ export async function batchUpdateSocialLinks(
   // Validate IDs to prevent SQL injection
   for (const update of updates) {
     if (typeof update.id !== 'string' || !/^[\w-]+$/.test(update.id)) {
-      throw new Error('Invalid ID format in batch update');
+      throw new SyntaxError('Invalid ID format in batch update');
     }
     if (
       typeof update.sortOrder !== 'number' ||
       !Number.isInteger(update.sortOrder)
     ) {
-      throw new Error('Invalid sortOrder in batch update');
+      throw new SyntaxError('Invalid sortOrder in batch update');
     }
   }
 
