@@ -7,9 +7,9 @@ import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
 
 interface IngestProfileDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onSuccess: () => void;
 }
 
 export function IngestProfileDialog({

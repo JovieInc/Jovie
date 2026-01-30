@@ -17,8 +17,8 @@ import {
 import type { ApproveStatus, Column } from './types';
 
 interface UseWaitlistColumnsProps {
-  approveStatuses: Record<string, ApproveStatus>;
-  onApprove: (entryId: string) => void;
+  readonly approveStatuses: Readonly<Record<string, ApproveStatus>>;
+  readonly onApprove: (entryId: string) => void;
 }
 
 export function useWaitlistColumns({

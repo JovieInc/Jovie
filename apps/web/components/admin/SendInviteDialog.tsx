@@ -11,10 +11,10 @@ import { useCreateInviteMutation } from '@/lib/queries/useInviteMutation';
 import { normalizeEmail } from '@/lib/utils/email';
 
 interface SendInviteDialogProps {
-  profile: AdminCreatorProfileRow | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  readonly profile: AdminCreatorProfileRow | null;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onSuccess?: () => void;
 }
 
 export function SendInviteDialog({

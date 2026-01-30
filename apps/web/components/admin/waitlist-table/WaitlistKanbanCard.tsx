@@ -12,9 +12,9 @@ import {
 } from './constants';
 
 export interface WaitlistKanbanCardProps {
-  entry: WaitlistEntryRow;
-  approveStatus?: 'idle' | 'loading' | 'success' | 'error';
-  onApprove?: () => void;
+  readonly entry: WaitlistEntryRow;
+  readonly approveStatus?: 'idle' | 'loading' | 'success' | 'error';
+  readonly onApprove?: () => void;
 }
 
 /**

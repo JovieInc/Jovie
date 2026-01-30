@@ -2,11 +2,11 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface KpiItemProps {
-  title: string;
-  value: string;
-  metadata: ReactNode;
-  icon: LucideIcon;
-  iconClassName?: string;
+  readonly title: string;
+  readonly value: string;
+  readonly metadata: ReactNode;
+  readonly icon: LucideIcon;
+  readonly iconClassName?: string;
 }
 
 export function KpiItem({

@@ -40,7 +40,7 @@ const navItems = [
 ];
 
 interface AdminSidebarProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function AdminSidebar({ className }: Readonly<AdminSidebarProps>) {

@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 
 interface MetricCardProps
   extends Readonly<{
-    label: string;
-    value: number;
-    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    colorClass: string;
-    bgClass: string;
+    readonly label: string;
+    readonly value: number;
+    readonly icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    readonly colorClass: string;
+    readonly bgClass: string;
   }> {}
 
 function MetricCard({
@@ -42,7 +42,7 @@ function MetricCard({
 
 interface WaitlistMetricsProps
   extends Readonly<{
-    metrics: WaitlistMetricsType;
+    readonly metrics: WaitlistMetricsType;
   }> {}
 
 export function WaitlistMetrics({ metrics }: Readonly<WaitlistMetricsProps>) {

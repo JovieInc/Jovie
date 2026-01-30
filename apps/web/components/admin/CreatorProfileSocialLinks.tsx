@@ -8,7 +8,7 @@ import {
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 export interface CreatorProfileSocialLinksProps {
-  socialLinks: AdminCreatorProfileRow['socialLinks'];
+  readonly socialLinks: AdminCreatorProfileRow['socialLinks'];
 }
 
 export const CreatorProfileSocialLinks = memo(

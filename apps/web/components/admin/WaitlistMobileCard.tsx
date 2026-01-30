@@ -46,9 +46,9 @@ const STATUS_VARIANTS: Record<
 };
 
 export interface WaitlistMobileCardProps {
-  entry: WaitlistEntryRow;
-  approveStatus: 'idle' | 'loading' | 'success' | 'error';
-  onApprove: () => void;
+  readonly entry: WaitlistEntryRow;
+  readonly approveStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly onApprove: () => void;
 }
 
 /**

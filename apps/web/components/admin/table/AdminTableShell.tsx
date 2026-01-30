@@ -4,21 +4,20 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AdminTableShellRenderProps {
-  headerElevated: boolean;
+  readonly headerElevated: boolean;
   /** Pixel offset for sticky table headers when a toolbar is present. */
-  stickyTopPx: number;
+  readonly stickyTopPx: number;
 }
 
 export interface AdminTableShellProps {
-  toolbar?: React.ReactNode;
-  footer?: React.ReactNode;
-  children: (props: AdminTableShellRenderProps) => React.ReactNode;
-  className?: string;
-  scrollContainerProps?: Omit<
-    React.HTMLAttributes<HTMLDivElement>,
-    'children' | 'className' | 'ref'
+  readonly toolbar?: React.ReactNode;
+  readonly footer?: React.ReactNode;
+  readonly children: (props: AdminTableShellRenderProps) => React.ReactNode;
+  readonly className?: string;
+  readonly scrollContainerProps?: Readonly<
+    Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'className' | 'ref'>
   >;
-  scrollContainerRef?: React.RefObject<HTMLDivElement>;
+  readonly scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 const TOOLBAR_HEIGHT_PX = 56;
