@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
@@ -63,9 +64,6 @@ export function useBillingStatusQuery() {
     queryKey: queryKeys.billing.status(),
     queryFn: fetchBillingStatus,
     // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
-    staleTime: 1 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    ...FREQUENT_CACHE,
   });
 }
