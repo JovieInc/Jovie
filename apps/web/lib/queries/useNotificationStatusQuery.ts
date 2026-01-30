@@ -11,11 +11,7 @@ import {
   subscribeToNotifications,
   unsubscribeFromNotifications,
 } from '@/lib/notifications/client';
-import type {
-  NotificationStatusResponse,
-  NotificationSubscribeResponse,
-  NotificationUnsubscribeResponse,
-} from '@/types/notifications';
+import type { NotificationStatusResponse } from '@/types/notifications';
 
 import { queryKeys } from './keys';
 
@@ -71,7 +67,7 @@ export function useSubscribeNotificationsMutation() {
 
   return useMutation({
     mutationFn: (input: NotificationSubscribePayload) =>
-      subscribeToNotifications(input) as Promise<NotificationSubscribeResponse>,
+      subscribeToNotifications(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.notifications.status({
@@ -100,9 +96,7 @@ export function useUnsubscribeNotificationsMutation() {
 
   return useMutation({
     mutationFn: (input: NotificationUnsubscribePayload) =>
-      unsubscribeFromNotifications(
-        input
-      ) as Promise<NotificationUnsubscribeResponse>,
+      unsubscribeFromNotifications(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.notifications.status({
