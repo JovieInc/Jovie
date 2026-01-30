@@ -68,7 +68,9 @@ const resolvePath = (path: string) =>
     const envKey = `PERF_BUDGET_${normalizedKey.toUpperCase()}`;
     const value = process.env[envKey] || DEFAULT_PARAMS[normalizedKey];
     if (!value) {
-      throw new Error(`Missing route param value for [${key}]. Set ${envKey}.`);
+      throw new TypeError(
+        `Missing route param value for [${key}]. Set ${envKey}.`
+      );
     }
     return value;
   });

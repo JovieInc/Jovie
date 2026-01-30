@@ -216,7 +216,7 @@ class BandsintownClient {
     const config = getBandsintownConfig(apiKey);
 
     if (!config.isConfigured) {
-      throw new Error('Bandsintown not configured');
+      throw new TypeError('Bandsintown not configured');
     }
 
     const fullUrl = this.buildUrl(endpoint, config.appId);

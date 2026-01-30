@@ -114,13 +114,15 @@ let pendingTokenGeneration: Promise<string> | null = null;
  */
 async function generateToken(): Promise<string> {
   if (!APPLE_MUSIC_KEY_ID) {
-    throw new Error('APPLE_MUSIC_KEY_ID environment variable is not set');
+    throw new TypeError('APPLE_MUSIC_KEY_ID environment variable is not set');
   }
   if (!APPLE_MUSIC_TEAM_ID) {
-    throw new Error('APPLE_MUSIC_TEAM_ID environment variable is not set');
+    throw new TypeError('APPLE_MUSIC_TEAM_ID environment variable is not set');
   }
   if (!APPLE_MUSIC_PRIVATE_KEY) {
-    throw new Error('APPLE_MUSIC_PRIVATE_KEY environment variable is not set');
+    throw new TypeError(
+      'APPLE_MUSIC_PRIVATE_KEY environment variable is not set'
+    );
   }
 
   // The private key may be stored with escaped newlines
