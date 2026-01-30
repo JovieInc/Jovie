@@ -110,13 +110,22 @@ export function useRateLimitedValidation<TValue, TResult>({
     [getCacheKey]
   );
 
+  // Helper to handle successful validation result (reduces duplication)
+  const handleValidationSuccess = useCallback(
+    (validationResult: TResult) => {
+      setResult(validationResult);
+      setError(null);
+      setIsRateLimited(false);
+      onSuccess?.(validationResult);
+    },
+    [onSuccess]
+  );
+
   // Rate-limited executor with state selector for reactivity
   const rateLimiter = useAsyncRateLimiter(
     async (value: TValue) => {
       if (!enabled) return undefined;
 
-      // Use custom cache key generator if provided, otherwise fall back to JSON.stringify
-      // Note: JSON.stringify may produce unstable keys for objects with varying property order
       const cacheKey = generateCacheKey(value);
 
       // Cancel any previous request
@@ -138,13 +147,9 @@ export function useRateLimitedValidation<TValue, TResult>({
           return undefined;
         }
 
-        // Cache the result
+        // Cache and handle result
         cacheRef.current.set(cacheKey, validationResult);
-
-        setResult(validationResult);
-        setError(null);
-        setIsRateLimited(false);
-        onSuccess?.(validationResult);
+        handleValidationSuccess(validationResult);
 
         return validationResult;
       } catch (err) {
@@ -185,15 +190,13 @@ export function useRateLimitedValidation<TValue, TResult>({
       const cacheKey = generateCacheKey(value);
       const cached = cacheRef.current.get(cacheKey);
       if (cached !== undefined) {
-        setResult(cached);
-        setError(null);
-        onSuccess?.(cached);
+        handleValidationSuccess(cached);
         return cached;
       }
 
       return rateLimiter.maybeExecute(value);
     },
-    [rateLimiter, generateCacheKey, onSuccess]
+    [rateLimiter, generateCacheKey, handleValidationSuccess]
   );
 
   const cancel = useCallback(() => {
