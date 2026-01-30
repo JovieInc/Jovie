@@ -315,7 +315,8 @@ export function ReleasesEmptyState({
                       {results.map((artist, index) => (
                         <div
                           key={artist.id}
-                          tabIndex={-1}
+                          role='button'
+                          tabIndex={0}
                           className={cn(
                             'flex items-center gap-3 p-3 cursor-pointer transition-colors',
                             index === formState.activeResultIndex

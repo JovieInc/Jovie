@@ -407,7 +407,8 @@ export function WaitlistSpotifySearch({
               {results.map((artist, index) => (
                 <div
                   key={artist.id}
-                  tabIndex={-1}
+                  role='button'
+                  tabIndex={0}
                   className={cn(
                     'flex items-center gap-3 p-3 cursor-pointer transition-colors',
                     index === activeIndex
@@ -474,7 +475,8 @@ export function WaitlistSpotifySearch({
 
           {/* Always-visible "Manually add URL" option */}
           <div
-            tabIndex={-1}
+            role='button'
+            tabIndex={0}
             className={cn(
               'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-[#d7d9de] dark:border-[#2c2e33]',
               activeIndex === manualAddIndex
