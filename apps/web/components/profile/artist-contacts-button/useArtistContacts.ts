@@ -54,7 +54,7 @@ export function useArtistContacts({
       return;
     }
 
-    const normalized = decoded.value.replaceAll(/[^\d+]/g, '');
+    const normalized = (decoded.value ?? '').replaceAll(/[^\d+]/g, '');
     navigate(`tel:${normalized}`);
   };
 
