@@ -212,7 +212,7 @@ export async function getAnalyticsData(
     topReferrers: parseJsonArray<{ referrer: string | null; count: number }>(
       analyticsAggregates?.top_referrers ?? []
     ).map(row => ({
-      referrer: (row.referrer ?? '') as string,
+      referrer: row.referrer ?? '',
       count: Number(row.count),
     })),
   };
@@ -446,7 +446,7 @@ export async function getUserDashboardAnalytics(
     top_referrers: parseJsonArray<{ referrer: string | null; count: number }>(
       aggregates?.top_referrers ?? []
     ).map(row => ({
-      referrer: (row.referrer ?? '') as string,
+      referrer: row.referrer ?? '',
       count: Number(row.count),
     })),
     top_links: parseJsonArray<{

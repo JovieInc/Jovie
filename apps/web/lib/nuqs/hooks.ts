@@ -178,7 +178,7 @@ export function useSortParams<T extends string = string>(
   const [state, setQueryStates] = useQueryStates(
     {
       sort: defaultSort
-        ? (sortParser.withDefault(defaultSort as string) as typeof sortParser)
+        ? sortParser.withDefault(defaultSort as string)
         : sortParser,
       direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault(
         defaultDirection
@@ -516,7 +516,7 @@ export function useTableParams<SortField extends string = string>(
       page: parseAsInteger.withDefault(1),
       pageSize: parseAsInteger.withDefault(defaultPageSize),
       sort: defaultSort
-        ? (sortParser.withDefault(defaultSort as string) as typeof sortParser)
+        ? sortParser.withDefault(defaultSort as string)
         : sortParser,
       direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault(
         defaultDirection

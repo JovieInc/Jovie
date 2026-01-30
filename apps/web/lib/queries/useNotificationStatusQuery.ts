@@ -11,7 +11,6 @@ import {
   subscribeToNotifications,
   unsubscribeFromNotifications,
 } from '@/lib/notifications/client';
-import type { NotificationStatusResponse } from '@/types/notifications';
 
 import { queryKeys } from './keys';
 
@@ -48,7 +47,7 @@ export function useNotificationStatusQuery({
         artistId,
         email: emailValue ?? undefined,
         phone: phoneValue ?? undefined,
-      }) as Promise<NotificationStatusResponse>,
+      }),
     enabled: enabled && Boolean(emailValue || phoneValue),
     staleTime: 5 * MINUTE,
     gcTime: 30 * MINUTE,

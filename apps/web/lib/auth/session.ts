@@ -97,7 +97,7 @@ export async function withDbSessionTx<T>(
   // In tests, db may be a lightweight mock without transaction support.
   if (typeof (db as DbType).transaction !== 'function') {
     // Fall back to using the mocked db object directly.
-    return await operation(db as unknown as DbType, userId);
+    return await operation(db, userId);
   }
 
   return await db.transaction(async tx => {

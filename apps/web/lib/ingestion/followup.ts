@@ -184,7 +184,7 @@ export async function enqueueFollowupIngestionJobs(params: {
   };
   const jobsToEnqueue = extraction.links
     .filter(link => link.url)
-    .map(link => classifyLink(link.url!))
+    .map(link => classifyLink(link.url))
     .filter((job): job is ClassifiedJob => job !== null);
 
   // Enqueue jobs sequentially (Promise.all not supported in Drizzle tx)
